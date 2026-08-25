@@ -10,3 +10,5 @@ node_modules
 .env
 .env.local
 .turbo
+# Not an npm workspace member — turbo prune never needs it in the image.
+ibms-brain

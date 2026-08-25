@@ -1,11 +1,13 @@
 # ibms-app
 
 Engineering codebase for **IBMS** (Insurance Brokerage Management System). This is the
-first engineering repo for the IBMS build program — a sibling of, and standards-taker
-from, the `ibms-brain` repo (rules in `meta/lex/`, domain knowledge in `meta/context/`,
-architecture decisions in `meta/designs/`). This repo does not restate those rules; it
+first engineering repo for the IBMS build program — a standards-taker from the
+`ibms-brain` repo (rules in `meta/lex/`, domain knowledge in `meta/context/`,
+architecture decisions in `meta/designs/`), pulled in here as a git submodule at
+`ibms-brain/` so both a human and an agent working in this repo actually have it, not
+just a note saying to go read it elsewhere. This repo does not restate those rules; it
 implements against them. Compliance/PDPL/CBJ obligations still cite the source document
-in ibms-brain, not this README.
+in `ibms-brain/`, not this README.
 
 **Status:** infrastructure scaffold only. No business features (policy, claims, CRM, …)
 are implemented yet — see `meta/context/data-model.md` in ibms-brain for the logical
@@ -41,6 +43,7 @@ ibms-app/
     api/             NestJS backend (port 4000)
   packages/
     db/              Shared Prisma schema + generated client (@ibms/db)
+  ibms-brain/         Standards/rules/context — git submodule, not this repo's code
   docker-compose.yml Postgres + api + web for local/integration use
   turbo.json         Task graph (build/lint/typecheck/test/e2e)
   .github/workflows/ CI
@@ -54,6 +57,11 @@ ibms-app/
 ## Getting started
 
 ```bash
+# Clone with the ibms-brain submodule included:
+git clone --recurse-submodules https://github.com/SHOUQALMAHARBAH/IBMS-APP.git
+# already cloned without it?
+git submodule update --init --recursive
+
 cp .env.example .env
 npm install
 
@@ -76,6 +84,19 @@ also copy the relevant lines into `apps/web/.env.local` if you're not using
 
 ```bash
 docker compose up --build
+```
+
+## `ibms-brain` submodule
+
+`ibms-brain/` is a git submodule, pinned to a specific commit of
+[SHOUQALMAHARBAH/IBM-System](https://github.com/SHOUQALMAHARBAH/IBM-System) — it does
+not auto-track that repo's `main`. Claude Code (or any agent) working in this repo reads
+it automatically via the `@ibms-brain/CLAUDE.md` import at the top of this repo's own
+`CLAUDE.md`. To pull in newer brain rules:
+
+```bash
+cd ibms-brain && git pull origin main && cd ..
+git add ibms-brain && git commit -m "ibms-brain: sync to latest"
 ```
 
 ## Scripts (run from repo root; Turborepo fans them out per workspace)
@@ -112,7 +133,8 @@ this repo with **Root Directory = `apps/web`** — `apps/web/vercel.json` alread
 Vercel to install and build from the monorepo root via Turborepo. Set
 `NEXT_PUBLIC_API_URL` in the Vercel project's environment variables to wherever the API
 is reachable from that preview (there is no hosted API yet, so this is a placeholder
-until one exists).
+until one exists). The `ibms-brain` submodule isn't needed for the build (it's not an
+npm workspace member) and both repos are public, so no submodule-auth setup is required.
 
 ## Deployment
 

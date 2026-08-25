@@ -1,17 +1,37 @@
+@ibms-brain/CLAUDE.md
+
+<!-- The import above pulls in ibms-brain's full rule set (meta/lex/, meta/context/,
+     meta/designs/) via the ibms-brain/ git submodule. If that directory is empty, run
+     `git submodule update --init --recursive` — see "Cloning this repo" below. Keep
+     the import on line 1, same reason ibms-brain's own CLAUDE.md keeps @AGENTS.md on
+     line 1: without it this content is dead weight while still read by other tools. -->
+
 # CLAUDE.md — ibms-app
 
 This is the first IBMS engineering repo. **Standards, mandatory rules, domain
-knowledge, and architecture decisions live in the `ibms-brain` repo, not here** —
-`meta/lex/` (mandatory), `meta/context/` (domain knowledge), `meta/designs/` (why
-decisions were made). Read the relevant `ibms-brain/meta/context/` file before touching
-an area, and the `ibms-brain/meta/lex/` rules before any non-trivial change — most of
-them (money-decimal-jod, workflow-state-transitions, maker-checker-segregation,
-sensitive-data-handling, pdpl-sla-timers) apply the moment real domain code lands here,
-which it has not yet.
+knowledge, and architecture decisions live in `ibms-brain` (imported above via git
+submodule at `ibms-brain/`), not here** — `ibms-brain/meta/lex/` (mandatory),
+`ibms-brain/meta/context/` (domain knowledge), `ibms-brain/meta/designs/` (why decisions
+were made). Read the relevant `meta/context/` file before touching an area, and the
+`meta/lex/` rules before any non-trivial change — most of them (money-decimal-jod,
+workflow-state-transitions, maker-checker-segregation, sensitive-data-handling,
+pdpl-sla-timers) apply the moment real domain code lands here, which it has not yet.
 
-There is currently no automated sync between the two repos (no submodule, no copy
-script) — that mechanism is undecided. Until it exists, open `ibms-brain` alongside this
-repo and read it directly.
+## Cloning this repo
+
+```bash
+git clone --recurse-submodules https://github.com/SHOUQALMAHARBAH/IBMS-APP.git
+# already cloned without it?
+git submodule update --init --recursive
+```
+
+The submodule pins a specific `ibms-brain` commit — it does not auto-track `main`. Pull
+in newer brain rules deliberately:
+
+```bash
+cd ibms-brain && git pull origin main && cd ..
+git add ibms-brain && git commit -m "ibms-brain: sync to latest"
+```
 
 ## What's here today
 
@@ -45,6 +65,7 @@ npm run e2e           # playwright + axe-core, web
 apps/web/     Next.js frontend
 apps/api/     NestJS backend
 packages/db/  Shared Prisma schema + client (@ibms/db)
+ibms-brain/   Submodule — standards/rules/context (loaded via the import above)
 ```
 
 ## Before you write code
