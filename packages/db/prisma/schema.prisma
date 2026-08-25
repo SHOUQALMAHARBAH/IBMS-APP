@@ -132,6 +132,30 @@ model Role {
   createdAt   DateTime @default(now())
 
   users       UserRoleAssignment[]
+  permissions RolePermission[]
+}
+
+/// Part 4.1 core entity ("User / Role / Permission", n..n Role<->Permission)
+/// / Process 40 (staff permissions management) — the granular can/cannot
+/// grid illustrated per role in Part 5.1 (e.g. Sales Officer can create
+/// Lead/Customer/RFQ but cannot approve refunds or delete claims).
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g. "policy.check", "refund.approve", "claim.delete"
+  module      String   // maps to a Part 2 domain / PCMS module, e.g. "claims", "finance", "m04_dsr"
+  description String?
+
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
 }
 
 /// Explicit many-to-many: a user may hold more than one role (Part 5.1 notes
@@ -329,6 +353,7 @@ model Customer {
   retentionCases    RetentionCase[]
   crossSellOpportunities CrossSellOpportunity[]
   upSellRecommendations  UpSellRecommendation[]
+  transactionMonitoringAlerts TransactionMonitoringAlert[]
 
   @@index([legalName])
   @@index([status])
@@ -1378,6 +1403,23 @@ model ProfessionalIndemnityRiskEvent {
   loggedAt      DateTime @default(now())
 }
 
+/// Part 7.2 — transaction monitoring for unusual patterns (unusually large
+/// premium payments, frequent cancellations/refunds, third-party premium
+/// payment sources), escalating to Suspicious Activity where warranted.
+model TransactionMonitoringAlert {
+  id                 String   @id @default(uuid())
+  customerId         String?
+  customer           Customer? @relation(fields: [customerId], references: [id])
+  patternType        String   // large_premium_payment | frequent_cancellations | frequent_refunds | third_party_payment_source | other
+  detailText         String?
+  detectedAt         DateTime @default(now())
+  escalatedToSuspiciousActivity Boolean @default(false)
+  escalatedAt        DateTime?
+  reportedToAuthorityAt DateTime? // record-keeping for regulator-mandated retention (Part 7.2)
+  status             String   @default("open")
+  classification     DataClassification @default(HIGHLY_CONFIDENTIAL) // names payment sources/counterparties, AML-sensitive
+}
+
 /// Process 51 — configurable compliance calendar for CBJ regulatory
 /// filings/reporting obligations.
 model ComplianceCalendarItem {
@@ -1389,14 +1431,22 @@ model ComplianceCalendarItem {
   submittedAt     DateTime?
 }
 
-/// Process 53 — operational risks (e.g. policy issuance errors) with
-/// mitigation actions.
-model OperationalRiskRegisterItem {
-  id              String   @id @default(uuid())
-  description     String
+/// Process 53 / narrative process 37 ("إدارة مخاطر الوسيط نفسه") — the
+/// broker's own risk register across the six categories the source model
+/// names explicitly: operational (e.g. policy issuance errors), cyber
+/// (data leakage), financial (uncollected receivables), compliance
+/// (regulatory breach), and reputational (major client complaint).
+/// Professional Indemnity risk has its own richer model
+/// (ProfessionalIndemnityRiskEvent) because Part 3 gives it a dedicated
+/// deep-dive; the other five share this generic register.
+model RiskRegisterItem {
+  id               String   @id @default(uuid())
+  riskType         String   // operational | cyber | financial | compliance | reputational
+  description      String
   mitigationAction String?
-  status          String   @default("open")
-  loggedAt        DateTime @default(now())
+  status           String   @default("open")
+  loggedAt         DateTime @default(now())
+  closedAt         DateTime?
 }
 
 /// Process 57 — internal audit findings and remediation tracker.
@@ -1408,6 +1458,21 @@ model InternalAuditFinding {
   status          String   @default("open")
   loggedAt        DateTime @default(now())
   closedAt        DateTime?
+}
+
+// ============================================================================
+// PART 8.1 — ASSET MANAGEMENT (ISO 27001 Organizational Controls)
+// ============================================================================
+
+/// Part 8.1 — inventory of information assets (customer data, policy data,
+/// documents, backups, integrations) with owners and classification.
+model InformationAsset {
+  id             String   @id @default(uuid())
+  name           String
+  assetType      String   // customer_data | policy_data | document_store | backup | integration | other
+  ownerUserId    String
+  classification DataClassification
+  createdAt      DateTime @default(now())
 }
 
 // ============================================================================
@@ -1780,23 +1845,53 @@ model DocumentTemplate {
 // INSURER MASTER DATA (Part 4.1)
 // ============================================================================
 
-/// Insurance company master data: products, underwriters, claims contacts,
-/// commission agreements, SLAs, performance history.
+/// Part 4.1 core entity / narrative process 31 ("إدارة شركات التأمين" —
+/// Insurer Database): products, classes, contact persons, underwriters,
+/// claims contacts, commission agreements, credit terms, SLAs, financial
+/// strength, performance history.
 model Insurer {
-  id            String   @id @default(uuid())
-  name          String
-  nameAr        String?
-  contactEmail  String?
-  contactPhone  String?
-  claimsContact String?
-  createdAt     DateTime @default(now())
+  id                String   @id @default(uuid())
+  name              String
+  nameAr            String?
+  contactEmail      String?
+  contactPhone      String?
+  claimsContact     String?
+  underwriterContact String? // Part 4.1 "underwriters"
+  creditTermsDays   Int?     // narrative process 31 "Credit Terms"
+  financialStrengthRating String? // narrative process 31 "Financial Strength"
+  createdAt         DateTime @default(now())
 
-  rfqSubmissions RFQInsurer[]
-  quotations    Quotation[]
-  policies      Policy[]
+  products          InsurerProduct[]
+  slaAgreements     InsurerSlaAgreement[]
+  rfqSubmissions    RFQInsurer[]
+  quotations        Quotation[]
+  policies          Policy[]
   commissionAgreements CommissionAgreement[]
-  remittances   Remittance[]
+  remittances       Remittance[]
   performanceScores InsurerPerformanceScore[]
+}
+
+/// Narrative process 31 — "Products / Classes" per insurer, the lines of
+/// business the insurer underwrites and the broker can place with them.
+model InsurerProduct {
+  id            String   @id @default(uuid())
+  insurerId     String
+  insurer       Insurer  @relation(fields: [insurerId], references: [id])
+  insuranceLine String
+  productName   String?
+  isActive      Boolean  @default(true)
+}
+
+/// Narrative process 33 ("إدارة اتفاقيات الخدمات") / Part 4.1 "SLAs" —
+/// Response Time, Claim Handling SLA, Quote Response SLA, Policy Issuance
+/// SLA per insurer; the system monitors compliance against these.
+model InsurerSlaAgreement {
+  id                   String   @id @default(uuid())
+  insurerId            String
+  insurer              Insurer  @relation(fields: [insurerId], references: [id])
+  slaType              String   // response_time | claim_handling | quote_response | policy_issuance
+  targetDays           Int
+  effectiveFrom        DateTime @default(now())
 }
 
 // ============================================================================
