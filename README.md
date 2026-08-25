@@ -145,6 +145,29 @@ cd ibms-brain && git pull origin main && cd ..
 git add ibms-brain && git commit -m "ibms-brain: sync to latest"
 ```
 
+### `.claude/` — agents, commands, hooks
+
+Claude Code only discovers `.claude/agents/`, `.claude/commands/`, and `.claude/settings.json`
+at a session's own project root — not inside a nested git submodule — so this repo carries
+its own `.claude/` rather than relying on `ibms-brain/.claude/`:
+
+- `.claude/agents/{code-reviewer,software-developer}.md`, `.claude/commands/brain-gap.md` —
+  mirrored from `ibms-brain/.claude/{agents,commands}/` by
+  `.claude/hooks/mirror-brain-agents.sh` (a `PostToolUse` hook on Write/Edit). Don't hand-edit
+  these files — the hook overwrites drift on the next Write/Edit.
+- `.claude/settings.json` wires two of `ibms-brain`'s `PreToolUse` hooks directly against the
+  submodule path (`enforce-credential-safety.sh`, `enforce-workspace-updates.sh`).
+  `enforce-evidence.sh` (the `git push` evidence gate) is deliberately **not** wired yet —
+  `scripts/verify.sh` doesn't write `artifacts/<sha>/gates.json`, so turning that hook on
+  today would block every push with no way to satisfy it. The domain-code hooks
+  (`enforce-money-decimal.sh`, `enforce-state-transitions.sh`, `enforce-sensitive-data.sh`)
+  are also not wired — moot until real domain code lands (see `CLAUDE.md`).
+- **Known gap:** both wired hooks parse the tool-call JSON via `python3`. On a machine where
+  `python3` resolves to a stub (e.g. the Windows Store alias, with a real interpreter only at
+  `python`), they silently no-op instead of blocking — verified during setup. This is a
+  pre-existing issue in `ibms-brain`'s hook scripts, not something this repo can fix on its
+  own.
+
 ## Scripts (run from repo root; Turborepo fans them out per workspace)
 
 | Command | Does |

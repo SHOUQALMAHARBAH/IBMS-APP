@@ -76,7 +76,13 @@ apps/web/     Next.js frontend
 apps/api/     NestJS backend
 packages/db/  Shared Prisma schema + client (@ibms/db)
 ibms-brain/   Submodule — standards/rules/context (loaded via the import above)
+.claude/      Agents/commands mirrored from ibms-brain + a subset of its hooks — see
+              README.md § .claude/ — agents, commands, hooks
 ```
+
+`@code-reviewer` and `@software-developer` (defined in `ibms-brain/meta/agents/`) and
+`/brain-gap` are available in this repo via `.claude/`. Not yet wired here: the `git push`
+evidence-gate hook (`enforce-evidence.sh`) and the domain-code hooks — see README.md for why.
 
 ## Before you write code
 
