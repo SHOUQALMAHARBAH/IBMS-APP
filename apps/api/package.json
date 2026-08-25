@@ -9,6 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
+    "dev": "dotenv -e ../../.env -- nest start --watch",
     "start:dev": "dotenv -e ../../.env -- nest start --watch",
     "start:debug": "dotenv -e ../../.env -- nest start --debug --watch",
     "start:prod": "node dist/src/main",
@@ -51,6 +52,6 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
     "unplugin-swc": "1.5.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.7"
   }
 }
