@@ -107,6 +107,22 @@ jobs:
       - name: Create .env for CI (matches the postgres service above)
         run: cp .env.example .env
 
+      - name: Create .env.test for CI
+        # apps/api's test:e2e/test:contract scripts load .env.test via dotenv (see
+        # apps/api/package.json), and those tasks run through `npx turbo run ...`,
+        # which strips ambient env vars (including the DATABASE_URL set on this job)
+        # from tasks that don't declare them in turbo.json. Without this file, dotenv
+        # has nothing to restore and Prisma sees no DATABASE_URL at all. Point it at
+        # this job's own postgres service (port 5432) — not port 5434, which is
+        # docker-compose's local db-test container and doesn't exist here.
+        run: |
+          cat > .env.test <<'EOF'
+          POSTGRES_USER=ibms
+          POSTGRES_PASSWORD=ibms
+          POSTGRES_DB=ibms_test
+          DATABASE_URL=postgresql://ibms:ibms@localhost:5432/ibms_test?schema=public
+          EOF
+
       - name: Database schema (prisma validate)
         run: npm run db:validate
 
