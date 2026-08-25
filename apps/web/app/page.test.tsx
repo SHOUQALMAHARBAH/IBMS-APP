@@ -20,7 +20,7 @@ describe("Home", () => {
     render(await Home());
 
     expect(screen.getByRole("heading", { name: "IBMS" })).toBeInTheDocument();
-    expect(screen.getByText("ok")).toBeInTheDocument();
+    expect(screen.getByText("definitely not the api status")).toBeInTheDocument();
   });
 
   it("falls back to 'unreachable' when the API call fails", async () => {
