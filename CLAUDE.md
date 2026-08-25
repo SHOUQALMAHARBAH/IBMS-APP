@@ -55,8 +55,11 @@ npm run e2e           # playwright + axe-core, web
 
 ## Environment
 
-- Node `20.13.0` — see `.nvmrc`. Pinned because Prisma 7 requires Node ≥20.19/22.12/24;
-  see the Prisma note in root `README.md` before bumping either.
+- Node `20.19.0` — see `.nvmrc`. This satisfies Prisma 7's Node floor (≥20.19/22.12/24)
+  but Prisma itself stays pinned at `6.19.3` in `package.json` — Node version no longer
+  blocks a Prisma 7 install, so don't bump `prisma`/`@prisma/client` past 6.x without
+  doing the driver-adapter (`@prisma/adapter-pg`) + `prisma.config.ts` migration first.
+  See the Prisma note in root `README.md`.
 - Docker required for Postgres locally and for building `apps/api`/`apps/web` images.
 
 ## Repo map

@@ -1,7 +1,7 @@
 # Build from the monorepo root: docker build -f apps/web/Dockerfile .
 # Uses `turbo prune` + Next.js `output: "standalone"` for a minimal image.
 
-FROM node:20.13.0-alpine AS base
+FROM node:20.19.0-alpine AS base
 RUN apk add --no-cache libc6-compat
 
 FROM base AS builder

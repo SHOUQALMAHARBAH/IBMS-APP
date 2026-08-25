@@ -29,10 +29,12 @@ data model this will eventually be built against.
 | Production deployment target | **TBD** — not decided yet, do not assume one |
 
 **Why Prisma 6, not 7:** Prisma 7 requires Node ≥20.19/22.12/24 and mandates a driver
-adapter (`@prisma/adapter-pg`) plus a `prisma.config.ts`. This repo pins Node `20.13.0`
-(see `.nvmrc`) for now, so it stays on the last Prisma 6.x release, which needs only
-Node ≥18.18 and the classic `prisma-client-js` generator. Revisit when the team moves to
-Node 22 LTS.
+adapter (`@prisma/adapter-pg`) plus a `prisma.config.ts`. Node here is pinned at `20.19.0`
+(see `.nvmrc`) — high enough to satisfy tooling engine requirements (e.g.
+`typescript-eslint`), but Prisma itself stays pinned at `6.19.3` in `package.json`
+deliberately: Node ≥20.19 makes Prisma 7 *installable*, not required. Don't bump the
+`prisma`/`@prisma/client` versions past 6.x without doing the driver-adapter + config
+migration first. Revisit deliberately when the team moves to Node 22 LTS.
 
 ## Layout
 
@@ -67,7 +69,7 @@ starts, per `meta/context/policy-lifecycle.md` and `meta/context/claims-lifecycl
 
 ## Prerequisites
 
-- Node `20.13.0` (`nvm use`, or match `.nvmrc`)
+- Node `20.19.0` (`nvm use`, or match `.nvmrc`)
 - Docker (for Postgres locally, and for building the app images)
 
 ## Getting started

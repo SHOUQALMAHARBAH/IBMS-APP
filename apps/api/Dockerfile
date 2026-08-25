@@ -1,7 +1,7 @@
 # Build from the monorepo root: docker build -f apps/api/Dockerfile .
 # Uses `turbo prune` so the image only contains what apps/api actually needs.
 
-FROM node:20.13.0-alpine AS base
+FROM node:20.19.0-alpine AS base
 RUN apk add --no-cache libc6-compat openssl
 
 FROM base AS builder

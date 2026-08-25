@@ -11,7 +11,10 @@ services:
       # Postgres, which silently steals the connection instead of erroring.
       - "5433:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # Postgres 18+ images store data under a major-version subdirectory of
+      # /var/lib/postgresql (not directly at .../data) — mount the parent dir.
+      # See https://github.com/docker-library/postgres/pull/1259.
+      - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ibms}"]
       interval: 5s
