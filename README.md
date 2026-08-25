@@ -230,6 +230,13 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
    regressions. No registry/push step exists yet — the production deployment target is
    still TBD, so there's nowhere authorized to push to.
 
+### First end-to-end verification
+
+Confirmed 2026-08-25 via `chore/initial-ci`, the repo's first real PR: every gate above
+runs and passes on a clean diff, and a deliberately broken unit test correctly blocks
+the PR (red ❌) until reverted. This is what makes `definition-of-done.md` mechanically
+enforced rather than documentation.
+
 ## Vercel preview
 
 Not yet connected to a live Vercel project. To wire it up: create a Vercel project from
