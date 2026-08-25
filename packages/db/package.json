@@ -9,6 +9,11 @@
     "generate": "dotenv -e ../../.env -- prisma generate",
     "migrate:dev": "dotenv -e ../../.env -- prisma migrate dev",
     "migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "migrate:status": "dotenv -e ../../.env -- prisma migrate status",
+    "migrate:test:dev": "dotenv -e ../../.env.test -- prisma migrate dev",
+    "migrate:test:deploy": "dotenv -e ../../.env.test -- prisma migrate deploy",
+    "migrate:test:status": "dotenv -e ../../.env.test -- prisma migrate status",
+    "validate": "dotenv -e ../../.env -- prisma validate",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "typecheck": "tsc --noEmit"
   },

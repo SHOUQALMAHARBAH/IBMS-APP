@@ -49,7 +49,14 @@ npm run dev          # web:3000, api:4000
 npm run lint
 npm run typecheck
 npm run test          # vitest, web + api
-npm run test:e2e      # api e2e (needs DATABASE_URL reachable)
+
+# api e2e — separate test DB (db-test), never the dev DB above. See README
+# § Dev DB vs. test DB.
+cp .env.test.example .env.test
+docker compose up -d db-test
+npm run db:test:migrate:dev
+npm run test:e2e
+
 npm run e2e           # playwright + axe-core, web
 ```
 

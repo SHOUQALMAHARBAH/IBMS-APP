@@ -22,7 +22,13 @@
     "test:e2e": {
       "dependsOn": ["build"]
     },
+    "test:contract": {
+      "dependsOn": ["^build"]
+    },
     "e2e": {
+      "dependsOn": ["build"]
+    },
+    "test:a11y": {
       "dependsOn": ["build"]
     }
   }

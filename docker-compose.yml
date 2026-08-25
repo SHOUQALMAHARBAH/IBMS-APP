@@ -21,6 +21,30 @@ services:
       timeout: 5s
       retries: 10
 
+  # Separate instance from `db`, not just a second database on it — this one
+  # is where schema/integration-test iteration happens (migrate dev, test:e2e).
+  # `db` (above) only changes when you explicitly run a migrate command
+  # against it; nothing here ever touches it. Once a migration is verified
+  # against db-test, promote it to `db` by running `npm run db:migrate:deploy`.
+  db-test:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TEST_POSTGRES_USER:-ibms}
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-ibms}
+      POSTGRES_DB: ${TEST_POSTGRES_DB:-ibms_test}
+    ports:
+      # Host-side 5434 — distinct from dev's 5433 and CI's 5432 so all three
+      # can run at once without colliding.
+      - "5434:5432"
+    volumes:
+      - db-test-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER:-ibms}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -59,3 +83,4 @@ services:
 
 volumes:
   db-data:
+  db-test-data:

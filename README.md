@@ -91,6 +91,34 @@ npm run db:migrate:dev
 npm run dev
 ```
 
+### Dev DB vs. test DB
+
+Two separate local Postgres instances, never the same database:
+
+- **`db`** (dev) — `docker compose up -d db`, driven by `.env`. Only changes when you
+  explicitly run a migrate command against it. This is the database `npm run dev` talks to.
+- **`db-test`** — `docker compose up -d db-test`, driven by `.env.test` (copy from
+  `.env.test.example`). Everything exploratory happens here first: schema changes and
+  `npm run test:e2e` run against this database, never against `db`.
+
+```bash
+cp .env.test.example .env.test
+docker compose up -d db-test
+
+# Iterate on a schema change and run the integration suite against db-test:
+npm run db:test:migrate:dev
+npm run test:e2e
+
+# Once you're satisfied, promote the same migration files to the dev DB:
+npm run db:migrate:deploy
+```
+
+`db:test:migrate:dev` and `db:migrate:deploy` apply the same migration files under
+`packages/db/prisma/migrations/` to different databases — nothing is copied or
+regenerated between them, only re-applied. CI (`.github/workflows/ci.yml`) does the
+equivalent against its own ephemeral `ibms_test` container, which is destroyed with the
+runner at the end of the job — it never touches either local database.
+
 - `web` → http://localhost:3000
 - `api` → http://localhost:4000 (`/health` liveness, `/health/db` readiness)
 
@@ -126,21 +154,56 @@ git add ibms-brain && git commit -m "ibms-brain: sync to latest"
 | `npm run lint` | ESLint, per workspace |
 | `npm run typecheck` | `tsc --noEmit`, per workspace |
 | `npm run test` | Vitest unit tests (web + api) |
-| `npm run test:e2e` | API e2e tests (Vitest + Supertest) — needs a reachable `DATABASE_URL` |
-| `npm run e2e` | Playwright e2e + axe-core accessibility checks (web) |
-| `npm run db:migrate:dev` | Create/apply a dev migration (`packages/db`) |
-| `npm run db:migrate:deploy` | Apply existing migrations, no schema drift (CI/prod) |
-| `npm run db:studio` | Prisma Studio |
+| `npm run test:e2e` | API integration tests (Vitest + Supertest) — needs a reachable `DATABASE_URL` |
+| `npm run test:contract` | API contract tests — validates real responses against the OpenAPI schema generated from `@nestjs/swagger` decorators (`apps/api/test/contract.contract-spec.ts`) — needs a reachable `DATABASE_URL` |
+| `npm run test:security` | Dependency audit (`npm audit --audit-level=high`), repo-wide |
+| `npm run test:smoke` | `bash scripts/smoke.sh api` — dispatches to the api service's smoke test (see below) |
+| `npm run e2e` | Playwright functional e2e (web) — excludes `@a11y`-tagged specs |
+| `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — only `@a11y`-tagged specs |
+| `npm run db:validate` | `prisma validate` — schema is internally valid (not a drift check; that's `db:migrate:status`) |
+| `npm run db:migrate:dev` | Create/apply a migration against the dev DB (`packages/db`) |
+| `npm run db:migrate:deploy` | Apply existing migrations to the dev DB, no schema drift (also used for CI/prod) |
+| `npm run db:migrate:status` | Check dev DB migration history against `schema.prisma` for drift |
+| `npm run db:test:migrate:dev` | Create/apply a migration against `db-test` — where schema iteration happens |
+| `npm run db:test:migrate:deploy` | Apply existing migrations to `db-test`, no schema drift |
+| `npm run db:test:migrate:status` | Check `db-test` migration history against `schema.prisma` for drift |
+| `npm run db:studio` | Prisma Studio (dev DB) |
+
+## `scripts/`
+
+- **`scripts/smoke.sh <service>`** — dispatches to a single backend service's smoke
+  test. Today that's just `api` (`bash scripts/smoke.sh api`), which boots the real
+  service via `npm run start` and calls `/health` and `/health/db` — proving it can
+  reach Postgres, not just that the process started. Add a `case` for a second service
+  the day one exists; see `apps/api/scripts/smoke.sh` for what a real per-service smoke
+  test looks like.
+- **`scripts/verify.sh`** — runs every gate in `ibms-brain/meta/context/verification-contract.md`
+  § Backend/frontend gate commands against `db-test` and prints each gate's real evidence
+  (exit code, and a test count where the tool reports one), ending in a summary block.
+  Precondition: `.env.test` exists (`cp .env.test.example .env.test`) and `db-test` has
+  been migrated at least once (`npm run db:test:migrate:dev`). Run it before opening a PR
+  to get the evidence block for the PR description in one shot — claims aren't evidence,
+  this is.
 
 ## CI
 
-`.github/workflows/ci.yml`:
+`.github/workflows/ci.yml`, three jobs:
 
-1. **test** — installs, spins up a `postgres:16-alpine` service, runs migrate deploy,
-   lint, typecheck, build, unit tests, API e2e tests, then installs Playwright's
-   Chromium and runs the web e2e + accessibility suite. Uploads the Playwright HTML
-   report as an artifact on every run (including failures).
-2. **docker** — builds (does not push) the `api` and `web` images, to catch Dockerfile
+1. **frontend** — installs, then: typecheck → lint → unit/component tests (Vitest +
+   Testing Library) → installs Playwright's Chromium → accessibility (`test:a11y`,
+   axe-core, `@a11y`-tagged specs, evidence is 0 serious/critical violations) → e2e
+   (`e2e`, functional Playwright flows) → build. Uploads the Playwright HTML report as an
+   artifact on every run (including failures).
+2. **backend** — installs, then: typecheck → lint → unit tests → security (`test:security`
+   — dependency audit) → spins up an ephemeral `postgres:18-alpine` service container
+   (database `ibms_test`, ports/network scoped to the job — distinct from both local
+   `db` and `db-test`, and destroyed with the runner when the job ends) → database schema
+   (`db:validate` — `prisma validate`, schema is internally valid) → migrate deploy →
+   schema-drift check (`db:migrate:status`, fails on drift) → integration tests
+   (`test:e2e`) → contract tests (`test:contract`, OpenAPI-validated responses) → smoke
+   tests (`bash scripts/smoke.sh api` — boots the real service and hits `/health` +
+   `/health/db`) → build.
+3. **docker** — builds (does not push) the `api` and `web` images, to catch Dockerfile
    regressions. No registry/push step exists yet — the production deployment target is
    still TBD, so there's nowhere authorized to push to.
 

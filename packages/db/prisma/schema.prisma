@@ -1,3 +1,43 @@
+// ============================================================================
+// IBMS — Insurance Brokerage Management System
+// Full database schema — Prisma / PostgreSQL
+//
+// SOURCE: this schema is derived exclusively from the two documents supplied
+// for this build:
+//   1. IBMS_Full_Scope_Context_Document.docx  (Parts 1-13 + Appendices A-C)
+//   2. تصور عمليات وسطاء التأمين.pdf           (12 process groups, same model)
+//
+// Every model below is commented with the Part/Process it comes from so the
+// schema stays traceable to its source. Nothing here is invented outside
+// those two documents' content.
+//
+// CROSS-CUTTING RULES BUILT INTO THIS SCHEMA (apply to every model below):
+//   1. Maker/Checker (Part 5.2): any model with an approval step carries
+//      `createdByUserId` (maker) and `approvedByUserId` (checker) as two
+//      DISTINCT foreign keys. The application layer MUST reject
+//      approvedByUserId == createdByUserId — see backend service layer,
+//      not enforceable in Prisma schema syntax alone. A raw-SQL migration
+//      adding `CHECK (approved_by_user_id IS NULL OR approved_by_user_id
+//      <> created_by_user_id)` should follow the first migration.
+//   2. Money (Part 3.6 Controls): every monetary field is `Decimal(18, 3)`
+//      — JOD's minor unit is the fils (1/1000 JOD), never a float.
+//   3. Workflow state (Parts 3.x "Workflow States" rows): status fields are
+//      plain enums here, but MUST only be written through an application
+//      `transition()` function — never assigned directly. See AuditLogEntry.
+//   4. Data classification (Part 6.1): `DataClassification` is attached to
+//      every entity that can hold personal or sensitive data.
+//   5. Audit trail (Part 10.3): AuditLogEntry is immutable and polymorphic,
+//      covering create/read/update/delete/approve on every entity below,
+//      including READ access to Highly Confidential data.
+//   6. Encryption (Part 10.2): field-level encryption is an application-layer
+//      concern for the fields flagged `-- ENCRYPT` in the comments below
+//      (national ID, bank account, medical data) — Prisma stores them as
+//      opaque encrypted strings (`String` columns), never as plaintext.
+//   7. Versioning (Part 4.1, 3.3): Quotation and Document are never
+//      overwritten — a new version row is created and linked via
+//      `previousVersionId` / `isCurrentVersion`.
+// ============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,13 +47,1855 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Placeholder model only — proves the Postgres + Prisma + Prisma Migrate
-// pipeline end to end. The real IBMS entity model (Customer, Policy,
-// Claim, ...) is not yet a physical schema; the logical model it must be
-// built against is documented in ibms-brain/meta/context/data-model.md.
-// Designing the physical schema is its own reviewed change, not part of
-// infrastructure scaffolding.
-model HealthCheck {
+// ============================================================================
+// SHARED ENUMS
+// ============================================================================
+
+/// Part 6.1 — the single, binding four-tier classification model.
+/// Every Part 4 data entity carries one of these four labels.
+enum DataClassification {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  HIGHLY_CONFIDENTIAL
+}
+
+enum LanguagePreference {
+  AR
+  EN
+}
+
+/// Part 5.1 — illustrative role catalogue.
+enum RoleName {
+  SALES_RELATIONSHIP_OFFICER
+  PLACEMENT_TECHNICAL_OFFICER
+  POLICY_CHECKING_OFFICER
+  CLAIMS_OFFICER
+  FINANCE_COLLECTIONS_OFFICER
+  COMPLIANCE_OFFICER
+  BRANCH_DEPARTMENT_MANAGER
+  DATA_PROTECTION_OFFICER
+  SYSTEM_SECURITY_ADMINISTRATOR
+  EXECUTIVE_MANAGEMENT
+  EXTERNAL_AUDITOR
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  TRANSITION
+  EXPORT
+  PRINT
+}
+
+// ============================================================================
+// PART 5 / 10.1 — IDENTITY, ROLES & ACCESS CONTROL
+// ============================================================================
+
+/// Part 5.1, Part 10.1 — a system user. MFA/session details live at the
+/// auth-provider layer; this table is the authorization anchor.
+model User {
+  id                String    @id @default(uuid())
+  fullName          String
+  email             String    @unique
+  passwordHash      String
+  isActive          Boolean   @default(true)
+  languagePreference LanguagePreference @default(AR)
+  branchId          String?
+  branch            Branch?   @relation(fields: [branchId], references: [id])
+  employeeId        String?   @unique
+  employee          Employee? @relation(fields: [employeeId], references: [id])
+  mfaEnabled        Boolean   @default(false)
+  lastLoginAt       DateTime?
+  // External Auditor (Part 5.1) — time-boxed access
+  accessValidFrom   DateTime?
+  accessValidUntil  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  roles             UserRoleAssignment[]
+  auditLogEntries   AuditLogEntry[]        @relation("AuditLogUser")
+  recertifications  AccessRecertificationItem[] @relation("RecertificationReviewer")
+
+  @@index([email])
+}
+
+/// Part 5.1 — role catalogue.
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleName @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  users       UserRoleAssignment[]
+}
+
+/// Explicit many-to-many: a user may hold more than one role (Part 5.1 notes
+/// the DPO/Compliance Officer dual-hat as a conditional, recorded case).
+model UserRoleAssignment {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  roleId   String
+  role     Role     @relation(fields: [roleId], references: [id])
+  grantedAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+}
+
+/// Part 10.1 — periodic (e.g. quarterly) access recertification workflow.
+model AccessRecertificationCycle {
+  id          String   @id @default(uuid())
+  cycleLabel  String
+  startedAt   DateTime @default(now())
+  dueAt       DateTime
+  closedAt    DateTime?
+  items       AccessRecertificationItem[]
+}
+
+model AccessRecertificationItem {
+  id            String   @id @default(uuid())
+  cycleId       String
+  cycle         AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
+  subjectUserId String
+  reviewerUserId String
+  reviewer      User     @relation("RecertificationReviewer", fields: [reviewerUserId], references: [id])
+  decision      String?  // confirmed | revoked | changed
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+}
+
+/// Supporting structure referenced by "filterable by branch" dashboards
+/// (Part 13) and Branch/Department Manager role (Part 5.1).
+model Branch {
+  id     String @id @default(uuid())
+  name   String
+  nameAr String?
+  users  User[]
+}
+
+/// Process 66 — Human Resources. Minimal record: licensing/certification
+/// tracking for regulated staff, training records (Part 8.2).
+model Employee {
+  id                     String    @id @default(uuid())
+  fullName               String
+  nationalIdEnc          String    // -- ENCRYPT (Part 10.2 field-level encryption)
+  position               String?
+  hireDate               DateTime?
+  terminationDate        DateTime?
+  licensedRole           String?   // e.g. regulated staff licensing/certification (Part 8.2)
+  confidentialityAgreementSignedAt DateTime? // Part 8.2 NDAs
+  backgroundCheckCompletedAt DateTime? // Part 8.2 screening
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user                   User?
+  trainings              SecurityAwarenessTraining[]
+  deprovisioningChecklist AccessDeprovisioningChecklist?
+  performanceRecords     EmployeePerformanceRecord[]
+}
+
+/// Part 8.2 — security awareness training completion tracking.
+model SecurityAwarenessTraining {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  trainingName String
+  completedAt  DateTime?
+  dueAt        DateTime?
+}
+
+/// Part 8.2 — termination/change-of-employment de-provisioning checklist,
+/// triggered by HR status change (Part 5, PDPL SLA: same business day).
+model AccessDeprovisioningChecklist {
+  id                  String    @id @default(uuid())
+  employeeId          String    @unique
+  employee            Employee  @relation(fields: [employeeId], references: [id])
+  triggeredAt         DateTime  @default(now())
+  systemAccessRevokedAt DateTime?
+  physicalAccessRevokedAt DateTime?
+  deviceReturnedAt    DateTime?
+  knowledgeTransferDoneAt DateTime?
+  completedAt         DateTime?
+}
+
+// ============================================================================
+// PART 2 DOMAIN A / PART 4 — LEAD, PROSPECT, CUSTOMER, CRM (Processes 1-10)
+// ============================================================================
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED_TO_PROSPECT
+  DISQUALIFIED
+}
+
+/// Process 1 — Lead Management. Captured from referrals, website, social
+/// media, campaigns, tenders, corporate/bank partnerships, strategic
+/// partners, ex-customers, renewal opportunities.
+model Lead {
+  id            String     @id @default(uuid())
+  fullName      String
+  source        String     // referral | website | social_media | campaign | tender | bank_partner | strategic_partner | ex_customer | renewal
+  ownerUserId   String
+  status        LeadStatus @default(NEW)
+  contactPhone  String?
+  contactEmail  String?
+  // marketing consent captured distinctly from KYC consent, unticked by default (Part 6.3)
+  marketingConsentGranted Boolean @default(false)
+  firstContactAt DateTime  @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  prospect      Prospect?
+}
+
+/// Process 2 — Prospect Management (qualification of a Lead).
+model Prospect {
+  id                String   @id @default(uuid())
+  leadId            String?  @unique
+  lead              Lead?    @relation(fields: [leadId], references: [id])
+  companyName       String
+  sector            String?
+  activity          String?
+  employeeCount     Int?
+  businessSize      String?
+  location          String?
+  contactPerson     String?
+  productsOfInterest String[] // e.g. Medical, Motor, Property, Fire, Liability
+  expectedPremium   Decimal? @db.Decimal(18, 3)
+  salesOwnerUserId  String
+  status            String   @default("qualifying")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  customer          Customer?
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  CORPORATE
+}
+
+enum CustomerStatus {
+  PENDING_KYC
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+/// Part 4.1 core entity — the central Customer record (individual or
+/// corporate). Process 3-4 (Onboarding/KYC).
+model Customer {
+  id                String         @id @default(uuid())
+  prospectId        String?        @unique
+  prospect          Prospect?      @relation(fields: [prospectId], references: [id])
+  customerType      CustomerType
+  legalName         String         // corporate: legal name; individual: full name
+  registrationNumber String?       // corporate: commercial registration number
+  nationalIdEnc     String?        // individual -- ENCRYPT
+  taxRegistrationNumber String?
+  registeredAddress String?
+  natureOfBusiness  String?
+  contactPhoneEnc   String?        // -- ENCRYPT (Confidential)
+  contactEmailEnc   String?        // -- ENCRYPT (Confidential)
+  languagePreference LanguagePreference @default(AR)
+  status            CustomerStatus @default(PENDING_KYC)
+  classification    DataClassification @default(CONFIDENTIAL)
+  ownerUserId       String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  ubos              UltimateBeneficialOwner[]
+  kycRecords        KYCRecord[]
+  riskProfiles      RiskProfile[]
+  opportunities     Opportunity[]
+  policies          Policy[]
+  claims            Claim[]              @relation("ClaimCustomer")
+  complaints        Complaint[]
+  interactions      Interaction[]
+  insuredPersons    InsuredPerson[]
+  consentRecords    ConsentRecord[]
+  dataSubjectRequests DataSubjectRequest[] @relation("DsrCustomer")
+  invoices          Invoice[]
+  clientFundsLedgerEntries ClientFundsLedgerEntry[]
+  serviceRequests   ServiceRequest[]
+  feedback          CustomerFeedback[]
+  retentionCases    RetentionCase[]
+  crossSellOpportunities CrossSellOpportunity[]
+  upSellRecommendations  UpSellRecommendation[]
+
+  @@index([legalName])
+  @@index([status])
+}
+
+/// Process 3 — corporate KYC: Ultimate Beneficial Owner identification.
+model UltimateBeneficialOwner {
+  id             String   @id @default(uuid())
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id])
+  fullName       String
+  nationalIdEnc  String   // -- ENCRYPT
+  ownershipPercent Decimal? @db.Decimal(5, 2)
+  isAuthorizedSignatory Boolean @default(false)
+  isPep          Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+/// Part 4.1 note — a natural person covered by a policy who is NOT the
+/// contracting Customer (insured employee, driver, beneficiary). Carries
+/// its own consent/DSR record.
+model InsuredPerson {
+  id              String   @id @default(uuid())
+  customerId      String   // the contracting Customer this person is covered under
+  customer        Customer @relation(fields: [customerId], references: [id])
+  policyId        String?
+  policy          Policy?  @relation(fields: [policyId], references: [id])
+  role            String   // employee_group_medical | driver_motor_fleet | beneficiary_life | other
+  fullName        String
+  nationalIdEnc   String?  // -- ENCRYPT
+  dateOfBirth     DateTime?
+  classification  DataClassification @default(CONFIDENTIAL)
+  createdAt       DateTime @default(now())
+
+  consentRecords  ConsentRecord[]
+  dataSubjectRequests DataSubjectRequest[] @relation("DsrInsuredPerson")
+}
+
+/// Process 3.1 KYC file (per the Part 3.1 "Core Data Entities" row).
+model KYCRecord {
+  id           String    @id @default(uuid())
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  status       String    @default("draft") // Draft->Submitted->Screening->EDD(optional)->Compliance Review->Approved/Rejected->Periodic Review Due
+  isEdd        Boolean   @default(false) // enhanced due diligence
+  submittedAt  DateTime?
+  // Maker/checker (Part 3.1 Approval row) — capturer != approver
+  createdByUserId  String
+  approvedByUserId String?
+  approvedAt   DateTime?
+  nextReviewDueAt DateTime? // risk-based refresh schedule
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  screeningResults ScreeningResult[]
+  riskRating   RiskRating?
+
+  @@index([customerId])
+}
+
+/// Process 47/49 — sanctions/PEP/AML screening result, at onboarding, on
+/// material data change, and recurring batch.
+model ScreeningResult {
+  id           String   @id @default(uuid())
+  kycRecordId  String
+  kycRecord    KYCRecord @relation(fields: [kycRecordId], references: [id])
+  screeningType String  // sanctions | pep | aml
+  result       String   // clear | hit | pending_investigation
+  screenedAt   DateTime @default(now())
+  listSource   String?
+  escalatedToComplianceAt DateTime?
+}
+
+/// Process 3.1/47 — customer risk classification driving screening
+/// frequency and EDD depth.
+model RiskRating {
+  id           String   @id @default(uuid())
+  kycRecordId  String   @unique
+  kycRecord    KYCRecord @relation(fields: [kycRecordId], references: [id])
+  level        String   // standard | high
+  reason       String?
+  ratedAt      DateTime @default(now())
+}
+
+enum InteractionChannel {
+  MEETING
+  CALL
+  EMAIL
+  WHATSAPP
+  VISIT
+  PROPOSAL
+  RENEWAL
+  CLAIM
+  COMPLAINT
+  PORTAL
+  SMS
+  OTHER
+}
+
+/// Process 10 — Relationship Management (CRM). Every interaction logged,
+/// building a 360° Customer View.
+model Interaction {
+  id         String            @id @default(uuid())
+  customerId String
+  customer   Customer          @relation(fields: [customerId], references: [id])
+  channel    InteractionChannel
+  summary    String
+  occurredAt DateTime          @default(now())
+  loggedByUserId String
+  createdAt  DateTime          @default(now())
+
+  @@index([customerId])
+}
+
+/// Process 8 — Cross-Selling: system-detected coverage gap vs benchmark.
+model CrossSellOpportunity {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  gapLine      String   // e.g. "Liability" when customer only has Motor
+  detectedAt   DateTime @default(now())
+  status       String   @default("open") // open | converted | dismissed
+}
+
+/// Process 9 — Up-Selling: under-insurance vs updated asset values.
+model UpSellRecommendation {
+  id              String   @id @default(uuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  currentSumInsured Decimal @db.Decimal(18, 3)
+  currentAssetValue Decimal @db.Decimal(18, 3)
+  detectedAt      DateTime @default(now())
+  status          String   @default("open")
+}
+
+// ============================================================================
+// PART 3.2, PROCESSES 5-9 — NEEDS ASSESSMENT & RISK ASSESSMENT
+// ============================================================================
+
+/// Part 3.2 core data entity.
+model RiskProfile {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  siteLabel    String?  // for multi-site/multi-entity clients (repeated per location)
+  priorClaimsHistorySummary String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assets       Asset[]
+  needsAssessments NeedsAssessment[]
+  insurancePrograms InsuranceProgram[]
+}
+
+/// Part 3.2 — asset data (building value, equipment, stock, fleet size...).
+model Asset {
+  id            String   @id @default(uuid())
+  riskProfileId String
+  riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
+  assetType     String   // building | equipment | stock | vehicle | other
+  description   String?
+  declaredValue Decimal? @db.Decimal(18, 3)
+  annualGrossProfit Decimal? @db.Decimal(18, 3) // BI indemnity basis
+  indemnityPeriodMonths Int?
+  fleetVehicleCount Int?
+  createdAt     DateTime @default(now())
+}
+
+/// Process 5 — structured questionnaire ("what risks do you face").
+model NeedsAssessment {
+  id            String   @id @default(uuid())
+  riskProfileId String
+  riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
+  questionnaireAnswers Json
+  recommendedCoverageLines String[] // Fire, Machinery Breakdown, BI, Workers Comp, Product Liability, Burglary, Public Liability, Motor, Cyber, Group Life...
+  status        String   @default("draft") // Data Collection -> Draft Assessment -> Reviewed -> Approved -> Linked to Opportunity/RFQ
+  reviewedByUserId String?
+  approvedByUserId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// Process 6-7 — proposed multi-line Insurance Program.
+model InsuranceProgram {
+  id            String   @id @default(uuid())
+  riskProfileId String
+  riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
+  status        String   @default("draft")
+  createdAt     DateTime @default(now())
+
+  lines         InsuranceProgramLine[]
+  opportunities Opportunity[]
+}
+
+model InsuranceProgramLine {
+  id                 String   @id @default(uuid())
+  insuranceProgramId String
+  insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
+  insuranceLine      String   // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
+  sumInsuredBasis    Decimal? @db.Decimal(18, 3)
+}
+
+// ============================================================================
+// PROCESSES 11-19 / PART 3.3 — RFQ, PLACEMENT, QUOTATION, RECOMMENDATION
+// ============================================================================
+
+enum OpportunityStatus {
+  NEEDS_CONFIRMED
+  RFQ_ISSUED
+  QUOTES_RECEIVED
+  COMPARISON_BUILT
+  RECOMMENDATION_DRAFTED
+  SENT_TO_CLIENT
+  CLIENT_DECISION
+  PLACEMENT
+  RENEGOTIATE
+  CLOSED_LOST
+}
+
+/// Part 4.1 core entity — a specific insurance placement need (new business
+/// or renewal). May close-lost and never become a Policy.
+model Opportunity {
+  id                 String   @id @default(uuid())
+  customerId         String
+  customer           Customer @relation(fields: [customerId], references: [id])
+  insuranceProgramId String?
+  insuranceProgram   InsuranceProgram? @relation(fields: [insuranceProgramId], references: [id])
+  isRenewal          Boolean  @default(false)
+  renewalCaseId      String?  @unique
+  renewalCase        RenewalCase? @relation(fields: [renewalCaseId], references: [id])
+  status             OpportunityStatus @default(NEEDS_CONFIRMED)
+  targetPremiumThreshold Decimal? @db.Decimal(18, 3) // triggers senior-officer approval above this
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  rfqs               RFQ[]
+  recommendation     Recommendation?
+  clientDecision     ClientDecision?
+  policy             Policy?
+
+  @@index([customerId])
+  @@index([status])
+}
+
+/// Process 11 — RFQ / Market Submission per product/line to a shortlist of
+/// insurers.
+model RFQ {
+  id            String   @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  insuranceLine String
+  issuedAt      DateTime @default(now())
+  followUpThresholdDays Int @default(9) // Part 3.7-style configurable follow-up
+
+  insurerSubmissions RFQInsurer[]
+  quotations    Quotation[]
+  comparisonMatrix ComparisonMatrix?
+}
+
+enum RfqInsurerStatus {
+  SENT
+  VIEWED
+  QUOTED
+  DECLINED
+  NO_RESPONSE
+}
+
+/// Process 12 — per-insurer tracking of an RFQ (sent/viewed/quoted/declined/
+/// no response), with SLA follow-up alerting.
+model RFQInsurer {
+  id          String   @id @default(uuid())
+  rfqId       String
+  rfq         RFQ      @relation(fields: [rfqId], references: [id])
+  insurerId   String
+  insurer     Insurer  @relation(fields: [insurerId], references: [id])
+  status      RfqInsurerStatus @default(SENT)
+  sentAt      DateTime @default(now())
+  respondedAt DateTime?
+  followUpAlertSentAt DateTime?
+
+  @@unique([rfqId, insurerId])
+}
+
+/// Process 13 — insurer quotation. Versioned, NEVER overwritten (Part 4.1,
+/// Part 3.3 Controls: "full version history retained for every quotation").
+model Quotation {
+  id             String   @id @default(uuid())
+  rfqId          String
+  rfq            RFQ      @relation(fields: [rfqId], references: [id])
+  insurerId      String
+  insurer        Insurer  @relation(fields: [insurerId], references: [id])
+  versionNumber  Int      @default(1)
+  previousVersionId String? @unique
+  previousVersion Quotation? @relation("QuotationVersionChain", fields: [previousVersionId], references: [id])
+  nextVersion    Quotation? @relation("QuotationVersionChain")
+  isCurrentVersion Boolean @default(true)
+  premium        Decimal  @db.Decimal(18, 3)
+  currency       String   @default("JOD")
+  deductible     Decimal? @db.Decimal(18, 3)
+  limits         Json?
+  biPeriodMonths Int?
+  liabilityLimit Decimal? @db.Decimal(18, 3)
+  exclusions     String?
+  conditions     String?
+  commissionRatePercent Decimal? @db.Decimal(5, 2)
+  receivedAt     DateTime @default(now())
+
+  comparisonRows ComparisonMatrixRow[]
+  recommendation Recommendation? @relation("RecommendedQuotation")
+
+  @@index([rfqId])
+}
+
+/// Process 14 — structured comparison across price + coverage + exclusions
+/// + deductibles + limits + insurer quality + service. Never price alone.
+model ComparisonMatrix {
   id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
+  rfqId     String   @unique
+  rfq       RFQ      @relation(fields: [rfqId], references: [id])
+  builtAt   DateTime @default(now())
+  missingInsurers String[] // insurers that did not respond, flagged in output
+
+  rows      ComparisonMatrixRow[]
+}
+
+model ComparisonMatrixRow {
+  id                 String   @id @default(uuid())
+  comparisonMatrixId String
+  comparisonMatrix   ComparisonMatrix @relation(fields: [comparisonMatrixId], references: [id])
+  quotationId        String
+  quotation          Quotation @relation(fields: [quotationId], references: [id])
+  insurerQualityScore Decimal? @db.Decimal(5, 2)
+  serviceScore        Decimal? @db.Decimal(5, 2)
+}
+
+/// Process 16 — the broker's documented, reasoned advice — retained as
+/// professional-indemnity evidence. Never "cheapest wins" without reasoning.
+model Recommendation {
+  id                 String   @id @default(uuid())
+  opportunityId      String   @unique
+  opportunity        Opportunity @relation(fields: [opportunityId], references: [id])
+  recommendedQuotationId String @unique
+  recommendedQuotation Quotation @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
+  rationale          String   // coverage/price/insurer financial strength/claims service/deductible/policy conditions
+  draftedByUserId    String
+  // Maker/checker: senior-officer approval required above a configurable premium threshold
+  approvedByUserId   String?
+  approvedAt         DateTime?
+  sentToClientAt     DateTime?
+  createdAt          DateTime @default(now())
+
+  conflictOfInterestDisclosure ConflictOfInterestDisclosure?
+}
+
+/// Process 50 / Part 3.3, 7.3 — mandatory disclosure whenever a
+/// recommendation favors a materially higher-commission insurer over a
+/// comparable/better-value competing offer. System gate, not optional.
+model ConflictOfInterestDisclosure {
+  id               String   @id @default(uuid())
+  recommendationId String   @unique
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id])
+  competingQuotationId String?
+  commissionDifferencePercent Decimal? @db.Decimal(5, 2)
+  disclosureText   String
+  acknowledgedByUserId String
+  acknowledgedAt   DateTime @default(now())
+}
+
+enum ClientDecisionType {
+  ACCEPT
+  REJECT
+  REQUEST_FURTHER_NEGOTIATION
+  REQUEST_ALTERNATIVE_OPTIONS
+  REQUEST_PRICE_REDUCTION
+  REQUEST_COVERAGE_INCREASE
+}
+
+/// Process 17 — six distinct client-decision branches, each routing
+/// differently (Placement / RFQ closed / renewed Negotiation).
+model ClientDecision {
+  id            String   @id @default(uuid())
+  opportunityId String   @unique
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  decision      ClientDecisionType
+  evidenceType  String?  // signature | e-signature | email_confirmation
+  evidenceRef   String?
+  decidedAt     DateTime @default(now())
+}
+
+// ============================================================================
+// PROCESSES 18-22 / PART 3.4-3.5 — POLICY PLACEMENT, ISSUANCE, CHECKING,
+// DELIVERY, ENDORSEMENT
+// ============================================================================
+
+enum PolicyStatus {
+  PLACEMENT_CONFIRMED
+  ISSUED
+  CHECKING_IN_PROGRESS
+  DISCREPANCY
+  VERIFIED
+  DELIVERED
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+/// Part 4.1 core entity — the bound insurance contract.
+model Policy {
+  id             String   @id @default(uuid())
+  opportunityId  String   @unique
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id])
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id])
+  insurerId      String
+  insurer        Insurer  @relation(fields: [insurerId], references: [id])
+  policyNumber   String?  @unique
+  insuranceLine  String
+  status         PolicyStatus @default(PLACEMENT_CONFIRMED)
+  inceptionDate  DateTime?
+  expiryDate     DateTime?
+  requestedPremium Decimal @db.Decimal(18, 3)
+  issuedPremium  Decimal? @db.Decimal(18, 3)
+  currency       String   @default("JOD")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  schedules      PolicySchedule[]
+  coverNote      CoverNote?
+  checking       PolicyChecking?
+  deliveryRecord DeliveryRecord?
+  endorsements   Endorsement[]
+  claims         Claim[]              @relation("ClaimPolicy")
+  premiumTransactions PremiumTransaction[]
+  invoices       Invoice[]
+  commissionLedgerEntries CommissionLedgerEntry[]
+  insuredPersons InsuredPerson[]
+  complaints     Complaint[]
+  renewalCase    RenewalCase?
+  documents      Document[]           @relation("PolicyDocuments")
+
+  @@index([customerId])
+  @@index([status])
+  @@index([expiryDate])
+}
+
+/// Requested/issued coverage snapshot — limits, sums insured, named perils,
+/// extensions (Part 3.4). Kept as a distinct versioned row so a Claim can
+/// resolve to "coverage in force at the loss date" (Part 3.7, data-model rule).
+model PolicySchedule {
+  id            String   @id @default(uuid())
+  policyId      String
+  policy        Policy   @relation(fields: [policyId], references: [id])
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  limits        Json
+  sumsInsured   Json
+  namedPerils   String[]
+  extensions    String[]
+  sourceEndorsementId String? @unique
+  sourceEndorsement Endorsement? @relation(fields: [sourceEndorsementId], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([policyId, effectiveFrom])
+}
+
+/// Process 18 (interim state) — urgent cover before full policy issuance,
+/// with a tracked expiry.
+model CoverNote {
+  id        String   @id @default(uuid())
+  policyId  String   @unique
+  policy    Policy   @relation(fields: [policyId], references: [id])
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+}
+
+/// Process 20 — MANDATORY maker/checker line-by-line comparison of
+/// Requested Coverage vs Issued Policy. The single largest source of PI
+/// claims per the source model if skipped.
+model PolicyChecking {
+  id                String    @id @default(uuid())
+  policyId          String    @unique
+  policy            Policy    @relation(fields: [policyId], references: [id])
+  placedByUserId    String    // maker — the officer who placed the cover
+  checkedByUserId   String?   // checker — MUST differ from placedByUserId (app-enforced)
+  checklistResult   Json?     // structured field-by-field comparison
+  discrepancyFound  Boolean   @default(false)
+  discrepancyDetail String?
+  discrepancyLoggedAsPiRiskEvent Boolean @default(false)
+  complianceOverrideByUserId String? // discrepancy cannot be bypassed without logged override
+  checkedAt         DateTime?
+  createdAt         DateTime  @default(now())
+}
+
+/// Process 21 — delivery date, method, recipient, confirmation, receipt
+/// acknowledgement.
+model DeliveryRecord {
+  id             String   @id @default(uuid())
+  policyId       String   @unique
+  policy         Policy   @relation(fields: [policyId], references: [id])
+  deliveredAt    DateTime @default(now())
+  method         String   // email | portal | courier | in_person
+  recipient      String
+  receiptAcknowledgedAt DateTime?
+}
+
+enum EndorsementType {
+  POSITIVE
+  NEGATIVE
+}
+
+enum EndorsementStatus {
+  REQUESTED
+  SUBMITTED_TO_INSURER
+  INSURER_CONFIRMED
+  FINANCIAL_ADJUSTMENT_CALCULATED
+  REFUND_APPROVAL_PENDING
+  APPLIED
+  CLIENT_NOTIFIED
+}
+
+/// Process 22 / Part 3.5 — mid-term amendment. Positive (adds premium) or
+/// negative (returns premium) — never overwrites prior history.
+model Endorsement {
+  id              String   @id @default(uuid())
+  policyId        String
+  policy          Policy   @relation(fields: [policyId], references: [id])
+  type            EndorsementType
+  changeType      String   // add_vehicle | remove_vehicle | add_employee | remove_employee | address_change | sum_insured_increase | add_location | change_beneficiary | coverage_amendment
+  status          EndorsementStatus @default(REQUESTED)
+  premiumAdjustment Decimal @db.Decimal(18, 3) // positive or negative amount
+  requestedByUserId String
+  insurerConfirmedAt DateTime?
+  appliedAt       DateTime?
+  clientNotifiedAt DateTime?
+  createdAt       DateTime @default(now())
+
+  schedule        PolicySchedule?
+  refund          Refund?
+  commissionReversal CommissionReversal?
+  cancellation    Cancellation?
+}
+
+/// Process 22/37 — cancellation request, always paired with a commission
+/// reversal (Part 3.5 rule: "the two numbers must move together").
+model Cancellation {
+  id                String   @id @default(uuid())
+  endorsementId     String   @unique
+  endorsement       Endorsement @relation(fields: [endorsementId], references: [id])
+  reason            String
+  basis             String   // short_period | pro_rata
+  returnPremium     Decimal  @db.Decimal(18, 3)
+  clientNotifiedAt  DateTime?
+  createdAt         DateTime @default(now())
+}
+
+/// Process 37 — refund workflow. Maker/checker: raiser != Finance approver,
+/// gated by a configurable value threshold.
+model Refund {
+  id                 String   @id @default(uuid())
+  endorsementId      String   @unique
+  endorsement        Endorsement @relation(fields: [endorsementId], references: [id])
+  amount             Decimal  @db.Decimal(18, 3)
+  reason             String   // cancellation | premium_reduction | coverage_change | overpayment
+  raisedByUserId     String
+  approvedByUserId   String?  // MUST differ from raisedByUserId (app-enforced)
+  approvalThresholdMatrixLevel String?
+  paidAt             DateTime?
+  createdAt          DateTime @default(now())
+}
+
+/// Process 35-37 — commission reversal tied 1:1 to a negative
+/// endorsement/cancellation premium adjustment.
+model CommissionReversal {
+  id             String   @id @default(uuid())
+  endorsementId  String   @unique
+  endorsement    Endorsement @relation(fields: [endorsementId], references: [id])
+  amount         Decimal  @db.Decimal(18, 3)
+  createdAt      DateTime @default(now())
+}
+
+// ============================================================================
+// PROCESSES 23-30 / PART 3.7 — CLAIMS
+// ============================================================================
+
+enum ClaimStatus {
+  NOTIFIED
+  REGISTERED
+  DOCUMENTATION_IN_PROGRESS
+  UNDER_ASSESSMENT
+  APPROVED
+  PARTIALLY_APPROVED
+  DECLINED
+  SETTLED
+  CLOSED
+}
+
+/// Part 4.1 core entity — a reported loss event under a Policy. Must
+/// validate against coverage in force AT THE LOSS DATE (data-model rule) —
+/// resolve via PolicySchedule.effectiveFrom/effectiveTo, not Policy alone.
+model Claim {
+  id                 String   @id @default(uuid())
+  policyId           String
+  policy             Policy   @relation("ClaimPolicy", fields: [policyId], references: [id])
+  customerId         String
+  customer           Customer @relation("ClaimCustomer", fields: [customerId], references: [id])
+  claimNumber        String?  @unique
+  status             ClaimStatus @default(NOTIFIED)
+  lossDate           DateTime
+  lossLocation       String?
+  causeOfLoss        String?
+  estimatedLoss      Decimal  @db.Decimal(18, 3)
+  isThirdPartyInvolved Boolean @default(false)
+  isLargeClaim       Boolean  @default(false) // requires second approver
+  insurerClaimReference String?
+  followUpAlertThresholdDays Int @default(9)
+  classification     DataClassification @default(HIGHLY_CONFIDENTIAL) // medical/health claim data
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  documents          ClaimDocument[]
+  statusHistory      ClaimStatusHistory[]
+  settlement         Settlement?
+  thirdParty         ThirdPartyClaimant?
+  adjuster           Adjuster?
+  followUpAlerts     ClaimFollowUpAlert[]
+  complaints         Complaint[]
+
+  @@index([policyId])
+  @@index([status])
+  @@index([lossDate])
+}
+
+/// Process 25 — claim form, police report, medical report, photos,
+/// invoices, repair estimate, expert report.
+model ClaimDocument {
+  id           String   @id @default(uuid())
+  claimId      String
+  claim        Claim    @relation(fields: [claimId], references: [id])
+  documentId   String
+  document     Document @relation(fields: [documentId], references: [id])
+  docType      String   // claim_form | police_report | medical_report | photo | invoice | repair_estimate | expert_report | correspondence
+}
+
+/// Part 3.7 core data entity — explicit status-history trail, named
+/// separately from the generic AuditLogEntry because it feeds Loss Ratio
+/// and Claims Analytics directly.
+model ClaimStatusHistory {
+  id         String      @id @default(uuid())
+  claimId    String
+  claim      Claim       @relation(fields: [claimId], references: [id])
+  fromStatus ClaimStatus?
+  toStatus   ClaimStatus
+  changedByUserId String
+  changedAt  DateTime    @default(now())
+}
+
+/// Process 28 — four DISTINCT figures, never collapsed into one number.
+model Settlement {
+  id               String   @id @default(uuid())
+  claimId          String   @unique
+  claim            Claim    @relation(fields: [claimId], references: [id])
+  estimatedLoss    Decimal  @db.Decimal(18, 3)
+  approvedAmount   Decimal? @db.Decimal(18, 3)
+  deductible       Decimal? @db.Decimal(18, 3)
+  netSettlement    Decimal? @db.Decimal(18, 3)
+  // large claims / broker-processed payments require a second approver
+  approvedByUserId String?
+  secondApproverUserId String?
+  clientPaymentConfirmedAt DateTime?
+  createdAt        DateTime @default(now())
+}
+
+/// Process 23 — additional data for third-party-involved claims, with a
+/// subrogation/recovery flag (distinct piece of state, own process).
+model ThirdPartyClaimant {
+  id                String   @id @default(uuid())
+  claimId           String   @unique
+  claim             Claim    @relation(fields: [claimId], references: [id])
+  fullName          String?
+  contactDetailsEnc String?  // -- ENCRYPT
+  subrogationRecoveryFlag Boolean @default(false)
+  recoveryAmount    Decimal? @db.Decimal(18, 3)
+}
+
+/// Process 24/26 — insurer/loss-adjuster assignment tracking.
+model Adjuster {
+  id          String   @id @default(uuid())
+  claimId     String   @unique
+  claim       Claim    @relation(fields: [claimId], references: [id])
+  name        String
+  firm        String?
+  assignedAt  DateTime @default(now())
+  surveyCompletedAt DateTime?
+  investigationCompletedAt DateTime?
+}
+
+/// Process 27 — system-generated follow-up alert once insurer non-response
+/// exceeds the configurable threshold (example: day 10 after a 1 Aug
+/// submission with a 9-day threshold).
+model ClaimFollowUpAlert {
+  id          String   @id @default(uuid())
+  claimId     String
+  claim       Claim    @relation(fields: [claimId], references: [id])
+  triggeredAt DateTime @default(now())
+  resolvedAt  DateTime?
+}
+
+// ============================================================================
+// PROCESSES 31-40 / PART 3.6 — FINANCE
+// ============================================================================
+
+enum InvoiceStatus {
+  INVOICED
+  COLLECTED
+  RECONCILED
+  REMITTED
+  EXCEPTION_RAISED
+  EXCEPTION_RESOLVED
+}
+
+/// Part 4.1 core entity ("PremiumTransaction / Invoice / Receipt") / Part
+/// 3.5 core entity ("PolicyTransaction") — the generic financial-transaction
+/// ledger tied to a Policy: new-business premium, endorsement premium
+/// adjustment, cancellation, renewal. Distinct from Invoice, which is the
+/// billing document raised against one or more of these transactions.
+model PremiumTransaction {
+  id            String   @id @default(uuid())
+  policyId      String
+  policy        Policy   @relation(fields: [policyId], references: [id])
+  transactionType String // new_business_premium | endorsement_adjustment | cancellation | renewal_premium
+  amount        Decimal  @db.Decimal(18, 3)
+  currency      String   @default("JOD")
+  relatedEndorsementId String?
+  occurredAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([policyId])
+}
+
+/// Process 31 — premium + tax + fees, net of commission, with due dates.
+model Invoice {
+  id           String   @id @default(uuid())
+  policyId     String?
+  policy       Policy?  @relation(fields: [policyId], references: [id])
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  premiumAmount Decimal @db.Decimal(18, 3)
+  taxAmount    Decimal  @db.Decimal(18, 3) @default(0)
+  feesAmount   Decimal  @db.Decimal(18, 3) @default(0)
+  commissionDeducted Decimal @db.Decimal(18, 3) @default(0)
+  totalAmount  Decimal  @db.Decimal(18, 3)
+  currency     String   @default("JOD")
+  dueDate      DateTime
+  status       InvoiceStatus @default(INVOICED)
+  createdAt    DateTime @default(now())
+
+  receipts     Receipt[]
+  reconciliationExceptions ReconciliationException[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+/// Process 32 — Invoice -> Collection -> Receipt -> Reconciliation ->
+/// Remittance cycle.
+model Receipt {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id])
+  amount       Decimal  @db.Decimal(18, 3)
+  receivedAt   DateTime @default(now())
+  method       String?  // bank_transfer | cheque | card | cash
+
+  remittance   Remittance?
+}
+
+/// Process 32/34 — remittance to insurer per agreed arrangement (broker may
+/// collect on behalf of insurer).
+model Remittance {
+  id          String   @id @default(uuid())
+  receiptId   String   @unique
+  receipt     Receipt  @relation(fields: [receiptId], references: [id])
+  insurerId   String
+  insurer     Insurer  @relation(fields: [insurerId], references: [id])
+  amount      Decimal  @db.Decimal(18, 3)
+  remittedAt  DateTime?
+}
+
+/// Process 35 — insurer- and product-specific commission rate table
+/// (illustrative rates: Motor 12%, Medical 10%, Property 15%, Life 20%).
+model CommissionAgreement {
+  id            String   @id @default(uuid())
+  insurerId     String
+  insurer       Insurer  @relation(fields: [insurerId], references: [id])
+  insuranceLine String
+  ratePercent   Decimal  @db.Decimal(5, 2)
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+
+  ledgerEntries CommissionLedgerEntry[]
+
+  @@index([insurerId, insuranceLine])
+}
+
+/// Process 36 — commission rate, amount, VAT/tax implications, paid,
+/// outstanding, reversed.
+model CommissionLedgerEntry {
+  id                     String   @id @default(uuid())
+  policyId               String
+  policy                 Policy   @relation(fields: [policyId], references: [id])
+  commissionAgreementId  String?
+  commissionAgreement    CommissionAgreement? @relation(fields: [commissionAgreementId], references: [id])
+  amount                 Decimal  @db.Decimal(18, 3)
+  vatAmount              Decimal  @db.Decimal(18, 3) @default(0)
+  status                 String   @default("outstanding") // outstanding | paid | reversed
+  isManualOverride       Boolean  @default(false)
+  overrideReason         String?  // manual override requires an approval reason, logged
+  overrideApprovedByUserId String?
+  createdAt              DateTime @default(now())
+}
+
+/// Process 39 — every reconciliation mismatch raised as an EXPLICIT
+/// exception with the exact variance amount, NEVER silently written off.
+model ReconciliationException {
+  id                String   @id @default(uuid())
+  invoiceId         String?
+  invoice           Invoice? @relation(fields: [invoiceId], references: [id])
+  insurerStatementAmount Decimal @db.Decimal(18, 3)
+  brokerRecordAmount Decimal @db.Decimal(18, 3)
+  varianceAmount    Decimal  @db.Decimal(18, 3)
+  status            String   @default("open") // open | investigating | resolved
+  investigatedByUserId String?
+  resolvedAt        DateTime?
+  createdAt         DateTime @default(now())
+}
+
+/// Process 32/7.3 — client funds must be identifiable and reconcilable
+/// separately from the broker's own operating funds at all times.
+model ClientFundsLedgerEntry {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  amount      Decimal  @db.Decimal(18, 3)
+  direction   String   // in | out
+  reference   String?
+  recordedAt  DateTime @default(now())
+}
+
+// ============================================================================
+// PROCESSES 41-46 — CUSTOMER SERVICE
+// ============================================================================
+
+/// Process 41 — certificates, copies, changes, with SLA tracking.
+model ServiceRequest {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  requestType  String   // certificate | copy | change | other
+  status       String   @default("open")
+  slaTimerId   String?  @unique
+  slaTimer     SlaTimer? @relation(fields: [slaTimerId], references: [id])
+  createdAt    DateTime @default(now())
+  closedAt     DateTime?
+}
+
+enum ComplaintStatus {
+  LOGGED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+/// Process 42 / Part 3.8 — date, customer, issue, responsible employee,
+/// SLA, action, resolution, closure date.
+model Complaint {
+  id                 String   @id @default(uuid())
+  customerId         String
+  customer           Customer @relation(fields: [customerId], references: [id])
+  claimId            String?
+  claim              Claim?   @relation(fields: [claimId], references: [id])
+  policyId           String?
+  policy             Policy?  @relation(fields: [policyId], references: [id])
+  issue              String
+  category           String?  // denied_claim | delayed_issuance | premium_dispute | unanswered_claim | other
+  responsibleEmployeeUserId String?
+  status             ComplaintStatus @default(LOGGED)
+  slaTimerId         String?  @unique
+  slaTimer           SlaTimer? @relation(fields: [slaTimerId], references: [id])
+  resolution         String?
+  // closure requires supervisor approval before case is closed
+  closureApprovedByUserId String?
+  closedAt           DateTime?
+  createdAt          DateTime @default(now())
+
+  actions            ComplaintAction[]
+  escalations        EscalationRecord[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model ComplaintAction {
+  id          String    @id @default(uuid())
+  complaintId String
+  complaint   Complaint @relation(fields: [complaintId], references: [id])
+  actionText  String
+  takenByUserId String
+  takenAt     DateTime  @default(now())
+}
+
+/// Process 42 — escalation to regulator / insurance dispute resolution
+/// mechanism, captured as a case status.
+model EscalationRecord {
+  id            String    @id @default(uuid())
+  complaintId   String
+  complaint     Complaint @relation(fields: [complaintId], references: [id])
+  escalatedTo   String    // management | regulator | dispute_resolution_committee
+  escalatedAt   DateTime  @default(now())
+  reason        String?
+}
+
+/// Process 44 — outbound communication across channels, full logging.
+model CommunicationLog {
+  id          String   @id @default(uuid())
+  customerId  String
+  channel     InteractionChannel
+  templateId  String?
+  languageUsed LanguagePreference
+  sentAt      DateTime @default(now())
+  respectedConsent Boolean @default(true) // must respect customer's consent preference
+}
+
+/// Process 45 — satisfaction feedback post-issuance, post-claim,
+/// post-renewal.
+model CustomerFeedback {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  context     String   // post_issuance | post_claim | post_renewal
+  score       Int?
+  comments    String?
+  submittedAt DateTime @default(now())
+}
+
+/// Process 46 — at-risk renewals / lapsed clients, retention workflow.
+model RetentionCase {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  reason      String   // renewal_inactivity | lapse_risk
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  closedAt    DateTime?
+}
+
+// ============================================================================
+// PROCESS 9 (RENEWAL) / PART 3.9
+// ============================================================================
+
+enum RenewalStatus {
+  RENEWAL_DUE
+  IN_PROGRESS
+  QUOTES_OBTAINED
+  RECOMMENDED
+  CLIENT_DECISION
+  RENEWED
+  LAPSED
+  CANCELLED
+}
+
+/// Part 3.9 core entity — triggered automatically at a configurable lead
+/// time before expiry (default 90 days).
+model RenewalCase {
+  id                String   @id @default(uuid())
+  policyId          String   @unique
+  policy            Policy   @relation(fields: [policyId], references: [id])
+  status            RenewalStatus @default(RENEWAL_DUE)
+  leadTimeDays       Int     @default(90)
+  triggeredAt       DateTime @default(now())
+  riskChangedSinceLastRenewal Boolean @default(false) // triggers fresh Risk Assessment
+  insurerTermsWorsened Boolean @default(false) // triggers full re-marketing
+  retentionEscalatedAt DateTime?
+  createdAt         DateTime @default(now())
+
+  opportunity       Opportunity?
+  lossRatio         LossRatio?
+  recommendation    RenewalRecommendation?
+}
+
+/// Process 30/9 — Claims ÷ Premium for a given client/policy/line/period.
+/// Computed and surfaced BEFORE the renewal recommendation is drafted.
+model LossRatio {
+  id             String   @id @default(uuid())
+  renewalCaseId  String   @unique
+  renewalCase    RenewalCase @relation(fields: [renewalCaseId], references: [id])
+  periodClaims   Decimal  @db.Decimal(18, 3)
+  periodPremium  Decimal  @db.Decimal(18, 3)
+  ratio          Decimal  @db.Decimal(7, 4)
+  computedAt     DateTime @default(now())
+}
+
+model RenewalRecommendation {
+  id            String   @id @default(uuid())
+  renewalCaseId String   @unique
+  renewalCase   RenewalCase @relation(fields: [renewalCaseId], references: [id])
+  rationale     String
+  createdAt     DateTime @default(now())
+}
+
+// ============================================================================
+// PROCESSES 47-57 / PART 5, 7 — COMPLIANCE & RISK
+// ============================================================================
+
+/// Process 51/Part 7.1 — the broker's own CBJ license status.
+model BrokerLicense {
+  id                String   @id @default(uuid())
+  licenseNumber     String
+  scopeOfAuthorization String?
+  issuedAt          DateTime?
+  expiresAt         DateTime
+  status            String   @default("active") // active | lapsed
+}
+
+/// Part 7.1 — the broker's own Professional Indemnity insurance — a broker
+/// without valid PI cover is itself a licensing breach.
+model ProfessionalIndemnityPolicy {
+  id            String   @id @default(uuid())
+  insurerName   String
+  coverageLimit Decimal  @db.Decimal(18, 3)
+  expiresAt     DateTime
+  claimsHistorySummary String?
+
+  riskEvents    ProfessionalIndemnityRiskEvent[]
+}
+
+/// Process 54 — exposures from advice/placement errors (e.g. requested Sum
+/// Insured not matching amount sent to insurer).
+model ProfessionalIndemnityRiskEvent {
+  id            String   @id @default(uuid())
+  piPolicyId    String?
+  piPolicy      ProfessionalIndemnityPolicy? @relation(fields: [piPolicyId], references: [id])
+  sourcePolicyCheckingId String? // links back to a PolicyChecking discrepancy
+  description   String
+  mitigationAction String?
+  loggedAt      DateTime @default(now())
+}
+
+/// Process 51 — configurable compliance calendar for CBJ regulatory
+/// filings/reporting obligations.
+model ComplianceCalendarItem {
+  id              String   @id @default(uuid())
+  obligationName  String
+  ownerUserId     String
+  dueDate         DateTime
+  evidenceOfSubmissionRef String?
+  submittedAt     DateTime?
+}
+
+/// Process 53 — operational risks (e.g. policy issuance errors) with
+/// mitigation actions.
+model OperationalRiskRegisterItem {
+  id              String   @id @default(uuid())
+  description     String
+  mitigationAction String?
+  status          String   @default("open")
+  loggedAt        DateTime @default(now())
+}
+
+/// Process 57 — internal audit findings and remediation tracker.
+model InternalAuditFinding {
+  id              String   @id @default(uuid())
+  auditPeriodLabel String
+  finding         String
+  remediationAction String?
+  status          String   @default("open")
+  loggedAt        DateTime @default(now())
+  closedAt        DateTime?
+}
+
+// ============================================================================
+// PROCESS 55 / PART 7.4, 8.1, 9.3 — INCIDENT / BREACH MANAGEMENT (PDPL + ISO)
+// ============================================================================
+
+enum IncidentStatus {
+  REPORTED
+  CONTAINED
+  IMPACT_ASSESSED
+  CLASSIFIED
+  NOTIFIED
+  RECOVERED
+  CLOSED
+}
+
+enum IncidentClassification {
+  NOT_YET_CLASSIFIED
+  MATERIAL
+  NON_MATERIAL
+}
+
+/// Process 55 / Part 6.2 / Part 7.4 — unified security + personal-data
+/// breach workflow. State machine: Reported -> Contained (4h target for
+/// critical) -> Impact Assessed -> Classified (Material needs DPO + Senior
+/// Management co-sign) -> Notified -> Recovered -> Closed (RCA mandatory).
+model IncidentReport {
+  id                    String   @id @default(uuid())
+  title                 String
+  description           String
+  severity              String   // low | medium | high | critical
+  status                IncidentStatus @default(REPORTED)
+  reportedAt            DateTime @default(now())
+  containedAt           DateTime? // 4-hour target for critical severity
+  impactAssessedAt      DateTime?
+  classification        IncidentClassification @default(NOT_YET_CLASSIFIED)
+  classifiedByDpoUserId String?
+  seniorManagementCoSignUserId String? // Material classification irreversible without this
+  seniorManagementNotifiedAt DateTime? // within 1 hour of Material classification
+  notifiedRegulators    String[] // CBJ | NCSC | Personal_Data_Protection_Council
+  notifiedAt            DateTime?
+  affectedDataSubjectsNotifiedAt DateTime?
+  rootCauseAnalysis     String? // mandatory before Closed
+  recoveredAt           DateTime?
+  closedAt              DateTime?
+  createdAt             DateTime @default(now())
+}
+
+// ============================================================================
+// PART 6, PART 9.3 — DATA PROTECTION (PDPL) CORE CAPABILITIES
+// (implements the cross-cutting rules described in Part 6.2 / 9.3; field-
+// level detail limited to what these two source documents describe)
+// ============================================================================
+
+enum ConsentPurpose {
+  UNDERWRITING
+  CLAIMS
+  MARKETING
+  KYC_AML
+  SHARING_WITH_INSURER
+  OTHER
+}
+
+/// Part 4.1 core entity / Part 6.2 (Consent Management). Every optional
+/// consent defaults unchecked; contractual-necessity and marketing consent
+/// are ALWAYS two separate, independently-actionable controls (Part 6.3).
+model ConsentRecord {
+  id              String    @id @default(uuid())
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  insuredPersonId String?
+  insuredPerson   InsuredPerson? @relation(fields: [insuredPersonId], references: [id])
+  purpose         ConsentPurpose
+  isMarketing     Boolean   @default(false) // never combined with contractual-necessity processing
+  granted         Boolean   @default(false) // defaults unchecked — pre-ticked boxes prohibited
+  consentTextVersion String
+  grantedAt       DateTime?
+  withdrawnAt     DateTime? // must reflect in register within 2 business days (SLA)
+  createdAt       DateTime  @default(now())
+
+  @@index([customerId])
+}
+
+enum DsrType {
+  ACCESS
+  CORRECTION
+  DELETION
+  OBJECTION
+}
+
+enum DsrStatus {
+  RECEIVED
+  IDENTITY_VERIFIED
+  IN_PROGRESS
+  PARTIALLY_FULFILLED
+  FULFILLED
+  REJECTED
+  CLOSED
+}
+
+/// Part 4.1 core entity / Part 6.2 (M04). SLA: Access/Deletion 15 business
+/// days (Access +15 extension allowed, reason logged); Correction/Objection
+/// 10 business days. A Deletion DSR with an open retention flag cannot be
+/// closed "fully fulfilled" — must force PARTIALLY_FULFILLED with a
+/// retentionScheduleReference.
+model DataSubjectRequest {
+  id                    String    @id @default(uuid())
+  customerId            String?
+  customer              Customer? @relation("DsrCustomer", fields: [customerId], references: [id])
+  insuredPersonId       String?
+  insuredPerson         InsuredPerson? @relation("DsrInsuredPerson", fields: [insuredPersonId], references: [id])
+  type                  DsrType
+  status                DsrStatus @default(RECEIVED)
+  receivedAt            DateTime  @default(now()) // logged same business day regardless of channel
+  identityVerifiedAt    DateTime?
+  slaDueAt              DateTime
+  accessExtensionAppliedAt DateTime? // Access-only, +15 business days
+  extensionReason       String?
+  retentionScheduleReference String? // required if partially-fulfilled deletion
+  partialFulfilmentJustification String?
+  closedAt              DateTime?
+  dpoHandlerUserId      String?
+  createdAt             DateTime  @default(now())
+
+  @@index([status])
+  @@index([slaDueAt])
+}
+
+/// Part 6.2 (M06) — retention periods per record category against a
+/// documented legal-minimum retention table.
+model RetentionScheduleItem {
+  id                String   @id @default(uuid())
+  recordCategory    String
+  retentionPeriodMonths Int
+  legalBasis        String?
+  confirmedByLegalCounselAt DateTime?
+
+  disposalBatches   DisposalBatch[]
+}
+
+/// Part 6.2 (M06) — records under active Legal Hold are excluded from
+/// routine disposal. Reviewed every 6 months (SLA).
+model LegalHold {
+  id            String   @id @default(uuid())
+  scope         String   // description / entity reference under hold
+  reason        String
+  placedAt      DateTime @default(now())
+  nextReviewDueAt DateTime
+  releasedAt    DateTime?
+}
+
+enum DisposalBatchStatus {
+  NOMINATED
+  MANAGER_APPROVED
+  DPO_APPROVED
+  EXECUTED
+  CLOSED
+}
+
+/// Part 5.2, Part 6.2 (M06) — destruction ALWAYS dual control (Department
+/// Manager nominates, DPO approves), and ALWAYS produces a Certificate of
+/// Destruction. 30-day SLA from batch approval.
+model DisposalBatch {
+  id                    String   @id @default(uuid())
+  retentionScheduleItemId String?
+  retentionScheduleItem RetentionScheduleItem? @relation(fields: [retentionScheduleItemId], references: [id])
+  status                DisposalBatchStatus @default(NOMINATED)
+  nominatedByUserId     String   // Department Manager — maker
+  managerApprovedAt     DateTime?
+  dpoApprovedByUserId   String?  // MUST differ from nominatedByUserId
+  dpoApprovedAt         DateTime?
+  method                String?  // certified_secure_wipe_nist_800_88 | physical_destruction | certified_shredding
+  executedAt            DateTime?
+  slaDueAt              DateTime? // 30 days from batch approval
+  createdAt             DateTime @default(now())
+
+  certificateOfDestruction CertificateOfDestruction?
+}
+
+/// A DisposalBatch cannot reach Closed without this attached.
+model CertificateOfDestruction {
+  id              String   @id @default(uuid())
+  disposalBatchId String   @unique
+  disposalBatch   DisposalBatch @relation(fields: [disposalBatchId], references: [id])
+  issuedAt        DateTime @default(now())
+  issuedByUserId  String
+}
+
+/// Part 6.2 — any transfer of personal data outside Jordan is blocked
+/// unless exactly one of three bases is recorded.
+model CrossBorderTransferRecord {
+  id            String   @id @default(uuid())
+  description   String
+  destinationCountry String
+  legalBasis    String   // statutory_exception | standard_contractual_clauses | explicit_consent
+  legalBasisEvidenceRef String?
+  approvedByUserId String?
+  transferredAt DateTime @default(now())
+}
+
+/// Part 7.5 / Part 9.3 (M07) — insurers, reinsurers, loss adjusters, IT/
+/// cloud vendors, printing/archiving, marketing/call-centre vendors.
+/// Merges Process 71 (Vendor Management) and PDPL third-party governance —
+/// both describe the same register in these two source documents.
+model Vendor {
+  id                String   @id @default(uuid())
+  name              String
+  vendorType        String   // insurer | reinsurer | loss_adjuster | it_cloud | printing_archiving | marketing_call_centre | other
+  riskTier          String?  // low | medium | high — assigned before any data is shared or access granted
+  annualReviewDueAt DateTime?
+  terminationDataReturnConfirmedAt DateTime?
+  accessRevokedAt   DateTime? // within 2 business days of termination
+  createdAt         DateTime @default(now())
+
+  dataProcessingAgreements DataProcessingAgreement[]
+  dataSharingApprovals DataSharingApproval[]
+}
+
+/// Part 7.5 — mandatory for Medium/High tier before go-live; High tier
+/// additionally requires DPO approval before first data share.
+model DataProcessingAgreement {
+  id            String   @id @default(uuid())
+  vendorId      String
+  vendor        Vendor   @relation(fields: [vendorId], references: [id])
+  signedAt      DateTime?
+  dpoApprovedByUserId String? // required for High tier
+  expiresAt     DateTime?
+}
+
+/// Part 7.5 (M08) — one-off, non-recurring data shares outside a standing
+/// vendor relationship. 3 business days standard SLA, 1 business day for
+/// a recognized regulatory channel (e.g. CBJ Data Portal/iFile).
+model DataSharingApproval {
+  id               String   @id @default(uuid())
+  vendorId         String?
+  vendor           Vendor?  @relation(fields: [vendorId], references: [id])
+  description      String
+  isRegulatoryChannel Boolean @default(false) // exempt from standard vendor-risk workflow, still classification-checked
+  requestedByUserId String
+  approvedByUserId String?  // DPO — MUST differ from requestedByUserId
+  slaDueAt         DateTime
+  decidedAt        DateTime?
+  createdAt        DateTime @default(now())
+}
+
+enum DpiaOutcome {
+  AUTO_APPROVED
+  DPO_REVIEW_REQUIRED
+  ESCALATED_FULL_DPIA
+}
+
+/// Part 6.2 (M10) — 5-question yes/no screening before any new product,
+/// system, campaign or vendor integration involving personal data goes
+/// live. Any single "Yes" -> mandatory DPO review within 5 business days.
+model DpiaScreening {
+  id                     String   @id @default(uuid())
+  subjectDescription     String   // the product/system/campaign/vendor integration being screened
+  qSensitiveData         Boolean
+  qLargeScaleProcessing  Boolean
+  qCrossBorderTransfer   Boolean
+  qNewTechnologyMonitoring Boolean
+  qNewDigitalChannel     Boolean
+  outcome                DpiaOutcome
+  dpoReviewDueAt         DateTime?
+  dpoReviewedAt          DateTime?
+  dpoSpotCheckedAt       DateTime? // for all-"No" auto-approved results
+  escalatedToFullDpiaAt  DateTime?
+  createdAt              DateTime @default(now())
+}
+
+/// Part 6.2 — bilingual, version-controlled privacy notice text presented
+/// at each relevant collection point.
+model PrivacyNotice {
+  id            String   @id @default(uuid())
+  touchpoint    String   // lead_capture | onboarding_kyc | needs_risk_assessment | rfq_market_placement | claims | group_medical_life_motor_fleet | renewal_cross_sell
+  versionNumber Int      @default(1)
+  textAr        String
+  textEn        String
+  legallyReviewedAt DateTime?
+  publishedAt   DateTime @default(now())
+}
+
+/// Part 9.3 — system-maintained Records of Processing Activities register.
+model RopaEntry {
+  id             String   @id @default(uuid())
+  processingActivity String
+  categoriesOfData String[]
+  purpose        String
+  recipients     String[]
+  retentionPeriodMonths Int?
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+}
+
+// ============================================================================
+// PART 13 — MANAGEMENT: INSURER & EMPLOYEE PERFORMANCE
+// ============================================================================
+
+/// Process 60 — score insurers on Quote Response, Claims Service, Price,
+/// Service quality.
+model InsurerPerformanceScore {
+  id                  String   @id @default(uuid())
+  insurerId           String
+  insurer             Insurer  @relation(fields: [insurerId], references: [id])
+  periodLabel         String
+  quoteResponseScore  Decimal  @db.Decimal(5, 2)
+  claimsServiceScore  Decimal  @db.Decimal(5, 2)
+  priceScore          Decimal  @db.Decimal(5, 2)
+  serviceQualityScore Decimal  @db.Decimal(5, 2)
+  computedAt          DateTime @default(now())
+}
+
+/// Process 61 — employee KPI achievement vs target.
+model EmployeePerformanceRecord {
+  id              String   @id @default(uuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  periodLabel     String
+  newClients      Int?
+  premiumWritten  Decimal? @db.Decimal(18, 3)
+  commissionEarned Decimal? @db.Decimal(18, 3)
+  renewalRatePercent Decimal? @db.Decimal(5, 2)
+  crossSellRatePercent Decimal? @db.Decimal(5, 2)
+}
+
+// ============================================================================
+// PROCESSES 66-74 — SUPPORTING OPERATIONS
+// ============================================================================
+
+/// Process 72-73 — continuity/DR plans and tests (system outage, office/
+/// site loss, cyberattack/ransomware, key-staff unavailability, insurer
+/// service interruption).
+model BcpDrPlan {
+  id            String   @id @default(uuid())
+  scenario      String   // system_outage | office_site_loss | cyberattack_ransomware | key_staff_unavailability | insurer_service_interruption
+  planDocumentId String?
+  rtoHours      Int?
+  rpoHours      Int?
+  lastTestedAt  DateTime?
+  nextTestDueAt DateTime?
+}
+
+/// Process 74 — product knowledge, insurer appetite, rate guides,
+/// regulatory updates for staff.
+model KnowledgeBaseArticle {
+  id          String   @id @default(uuid())
+  title       String
+  titleAr     String?
+  category    String   // product_knowledge | insurer_appetite | rate_guide | regulatory_update
+  bodyEn      String?
+  bodyAr      String?
+  publishedAt DateTime @default(now())
+}
+
+/// Part 11.2 — bilingual master data: coverage types, exclusion clauses,
+/// notification templates maintained in parallel EN/AR, not machine-
+/// translated at render time for regulator-facing documents.
+model DocumentTemplate {
+  id          String   @id @default(uuid())
+  templateType String  // quotation_comparison | recommendation_report | policy_schedule_summary | invoice | certificate | complaint_acknowledgement | notification
+  nameEn      String
+  nameAr      String
+  bodyEn      String
+  bodyAr      String
+  versionNumber Int    @default(1)
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================================
+// INSURER MASTER DATA (Part 4.1)
+// ============================================================================
+
+/// Insurance company master data: products, underwriters, claims contacts,
+/// commission agreements, SLAs, performance history.
+model Insurer {
+  id            String   @id @default(uuid())
+  name          String
+  nameAr        String?
+  contactEmail  String?
+  contactPhone  String?
+  claimsContact String?
+  createdAt     DateTime @default(now())
+
+  rfqSubmissions RFQInsurer[]
+  quotations    Quotation[]
+  policies      Policy[]
+  commissionAgreements CommissionAgreement[]
+  remittances   Remittance[]
+  performanceScores InsurerPerformanceScore[]
+}
+
+// ============================================================================
+// PART 4.2 — DOCUMENT MANAGEMENT (ELECTRONIC INSURANCE FILE)
+// ============================================================================
+
+enum DocumentCategory {
+  APPLICATION_PROPOSAL
+  RISK_SURVEY
+  QUOTATION
+  COMPARISON
+  RECOMMENDATION
+  CLIENT_APPROVAL
+  POLICY
+  ENDORSEMENT
+  INVOICE
+  RECEIPT
+  CLAIM
+  CORRESPONDENCE
+  OTHER
+}
+
+/// Part 4.2 — every Policy resolves to ONE electronic Insurance File made
+/// of these version-controlled, access-controlled objects. Deletion
+/// disallowed without a privileged, logged override (Part 5.2).
+/// A file combining multiple classification levels is classified at the
+/// HIGHEST level present — never averaged (Part 6.1).
+model Document {
+  id               String   @id @default(uuid())
+  policyId         String?
+  policy           Policy?  @relation("PolicyDocuments", fields: [policyId], references: [id])
+  category         DocumentCategory
+  classification   DataClassification
+  fileName         String
+  storageRef       String   // encrypted-at-rest object storage key (Part 10.2)
+  versionNumber    Int      @default(1)
+  previousVersionId String? @unique
+  previousVersion  Document? @relation("DocumentVersionChain", fields: [previousVersionId], references: [id])
+  nextVersion      Document? @relation("DocumentVersionChain")
+  uploadedByUserId String
+  deletionLocked   Boolean  @default(true) // disabled by default (Part 4.2, 5.2)
+  deletionOverrideByUserId String? // privileged, logged override only
+  createdAt        DateTime @default(now())
+
+  claimDocuments   ClaimDocument[]
+
+  @@index([policyId])
+  @@index([classification])
+}
+
+// ============================================================================
+// PART 10.3 — AUDIT TRAIL (cross-cutting, polymorphic, immutable)
+// ============================================================================
+
+/// Part 4.1 core entity / Part 10.3 — IMMUTABLE record of every
+/// create/read/update/delete/approve action across EVERY entity above,
+/// including READ access to Sensitive/Highly Confidential data. Never
+/// updated after insert; no update/delete path should exist at the
+/// application layer for this table.
+model AuditLogEntry {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation("AuditLogUser", fields: [userId], references: [id])
+  action       AuditAction
+  entityType   String      // polymorphic: "Customer" | "Policy" | "Claim" | ...
+  entityId     String
+  beforeValue  Json?
+  afterValue   Json?
+  isSensitiveDataAccess Boolean @default(false) // Part 10.3: reads of Sensitive Personal Data specifically flagged
+  occurredAt   DateTime    @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([occurredAt])
+}
+
+// ============================================================================
+// GENERIC SLA TIMER (Part 2 cross-cutting "Workflow & Notifications";
+// every lex-listed SLA in Part 6.2/7/3.x becomes a queryable row here, not
+// a note in a ticket)
+// ============================================================================
+
+/// Polymorphic SLA deadline tracker with automated escalation, backing
+/// ServiceRequest/Complaint and any other SLA-bearing workflow described
+/// across Parts 2-9.
+model SlaTimer {
+  id           String   @id @default(uuid())
+  entityType   String   // polymorphic: "DataSubjectRequest" | "Complaint" | "ClaimFollowUpAlert" | ...
+  entityId     String
+  workflowName String   // e.g. "dsr_access", "consent_withdrawal", "disposal_batch_execution"
+  dueAt        DateTime
+  escalatedAt  DateTime?
+  escalatedTo  String?  // role or user escalated to
+  resolvedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  serviceRequest ServiceRequest?
+  complaint      Complaint?
+
+  @@index([entityType, entityId])
+  @@index([dueAt])
 }
