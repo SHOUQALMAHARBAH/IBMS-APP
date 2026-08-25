@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# build output
+dist/
+.next/
+.turbo/
+out/
+
+# prisma
+packages/db/generated/
+
+# tests
+coverage/
+playwright-report/
+test-results/
+apps/web/blob-report/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

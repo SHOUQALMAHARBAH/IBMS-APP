@@ -1,0 +1,29 @@
+{
+  "name": "ibms-app",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@10.8.0",
+  "engines": {
+    "node": ">=20.13.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "e2e": "turbo run e2e",
+    "db:generate": "npm run generate --workspace=@ibms/db",
+    "db:migrate:dev": "npm run migrate:dev --workspace=@ibms/db",
+    "db:migrate:deploy": "npm run migrate:deploy --workspace=@ibms/db",
+    "db:studio": "npm run studio --workspace=@ibms/db"
+  },
+  "devDependencies": {
+    "turbo": "2.10.11"
+  }
+}

@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Placeholder model only — proves the Postgres + Prisma + Prisma Migrate
+// pipeline end to end. The real IBMS entity model (Customer, Policy,
+// Claim, ...) is not yet a physical schema; the logical model it must be
+// built against is documented in ibms-brain/meta/context/data-model.md.
+// Designing the physical schema is its own reviewed change, not part of
+// infrastructure scaffolding.
+model HealthCheck {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+}
