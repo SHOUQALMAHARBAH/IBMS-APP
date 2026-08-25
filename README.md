@@ -39,8 +39,18 @@ Node 22 LTS.
 ```
 ibms-app/
   apps/
-    web/            Next.js frontend (port 3000)
-    api/             NestJS backend (port 4000)
+    web/                Next.js frontend (port 3000)
+      app/              Routes (App Router)
+      components/       Shared/presentational UI components
+      features/         Feature-scoped UI + client logic
+      lib/              Client-side utilities, API client, helpers
+    api/                NestJS backend (port 4000)
+      src/
+        modules/         Feature modules (each wires its own controller/service)
+        controllers/      Route handlers not yet owned by a feature module
+        services/         Business logic not yet owned by a feature module
+        repositories/     Data-access layer (wraps @ibms/db)
+        middleware/       Cross-cutting request handling (auth, logging, ...)
   packages/
     db/              Shared Prisma schema + generated client (@ibms/db)
   ibms-brain/         Standards/rules/context — git submodule, not this repo's code
@@ -48,6 +58,12 @@ ibms-app/
   turbo.json         Task graph (build/lint/typecheck/test/e2e)
   .github/workflows/ CI
 ```
+
+`components/`, `features/`, `lib/` (web) and `modules/`, `controllers/`, `services/`,
+`repositories/`, `middleware/` (api) are currently empty scaffolding — no business
+features exist yet (see Status above). They establish where feature work lands once it
+starts, per `meta/context/policy-lifecycle.md` and `meta/context/claims-lifecycle.md` in
+`ibms-brain`.
 
 ## Prerequisites
 
