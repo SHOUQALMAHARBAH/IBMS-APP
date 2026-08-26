@@ -181,9 +181,14 @@ jobs:
           # A.10): failing the whole pipeline on ZAP's default ruleset
           # before any real business endpoint exists would be noise, not
           # signal. Revisit once there's a documented allowlist for
-          # accepted alerts.
+          # accepted alerts. allow_issue_writing: false — this job's
+          # GITHUB_TOKEN has no issues:write permission (default token
+          # permissions on this repo are read-only), and a GitHub issue
+          # filed on every PR run isn't what "informational" means here;
+          # the scan output already lands in the job log.
           cmd_options: "-I"
           fail_action: false
+          allow_issue_writing: false
 
       - name: Stop API (DAST)
         if: always()
