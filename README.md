@@ -579,8 +579,52 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
   a real separate environment reachable by anyone but the developer running it.
   `synthesizeEntityFields()` exists so that whenever a real non-prod environment is
   seeded from a production export, PII doesn't have to travel there unmasked — but
-  nothing calls it yet, since there's no production data to synthesize from and no
-  seed pipeline beyond `prisma/seed.ts`'s roles/permissions.
+  nothing calls it yet, since there's no production data to synthesize from.
+  `prisma/seed.ts` (Part B) now seeds roles/permissions/document templates plus
+  fictional sample insurers/users, not real exported data, so `synthesizeEntityFields()`
+  has nothing to apply to yet either way.
+
+**Part B — Database**
+
+- **B.1 (first migration from `schema.prisma` + a real `prisma validate` run) is done —
+  and the sandbox limitation the backlog item names no longer holds in this
+  environment.** `prisma validate` needs `DATABASE_URL` resolvable, not registry access;
+  it ran clean here (`npm run db:validate`). The schema grew as 13 incremental
+  migrations (one per backlog item, starting from `20260825083352_init`) rather than one
+  single "first migration" — same net schema, smaller reviewable steps.
+  `npm run db:migrate:status` confirms zero drift between `schema.prisma` and both the
+  `db` and `db-test` databases.
+- **B.2 (the `CHECK` constraints from A.5) was already done** — see A.5 above; nothing
+  further needed here.
+- **B.3 (additional performance indexes "based on real usage patterns after the first
+  load test") is blocked, not implemented — same shape of gap as A.10's pentest item.**
+  No load test has run and no Part C business module exists yet to generate real query
+  patterns to index against. `schema.prisma` already carries 39 `@@index` entries from
+  the initial design (FK lookups, `status`, SLA/expiry date fields, the
+  `entityType`+`entityId` polymorphic lookups on `AuditLogEntry`/`SlaTimer`) — adding
+  more without real usage data would be guessing, which this item explicitly says not to
+  do. Revisit once Part C modules exist and a load test has actually run.
+- **B.4 (seed data) is done.** The 11 roles + full permission grid were already seeded
+  (A.2); this change adds the three pieces that weren't:
+  - `DOCUMENT_TEMPLATES` (`packages/db/prisma/seed-data/document-templates.ts`) — 4 rows,
+    `templateType` `proposal_form_motor/general/health/life`. Seeded unconditionally
+    (real reference data, like roles/permissions), but `bodyEn`/`bodyAr` are a structural
+    skeleton (applicant details / risk details / sum insured / claims history /
+    declarations) — neither source document supplies real proposal-form wording, so this
+    is placeholder copy pending Underwriting/Compliance sign-off, not a document to use
+    as-is.
+  - `SAMPLE_INSURERS` (`.../seed-data/insurers.ts`) — 3 fictional insurers (names
+    suffixed so nobody mistakes them for real Jordanian insurer master data) spanning
+    the four lines, each with nested `InsurerProduct`/`InsurerSlaAgreement` rows.
+  - `SAMPLE_USERS` (`.../seed-data/sample-users.ts`) — one login-capable account per
+    `RoleName` (11), sharing a single `SAMPLE_USER_PASSWORD` that satisfies the real
+    password policy but isn't a real credential — purely so the list doesn't enumerate
+    11 secrets.
+  - The last two are gated on `process.env.NODE_ENV !== 'production'` in `seed.ts` —
+    same convention as `ENABLE_DEV_RESET_TOKEN` (A.1) — since they're synthetic demo
+    data, not configuration every environment needs. Verified: the gate actually skips
+    them under `NODE_ENV=production`, and re-running the seed with sample data enabled
+    is a no-op (idempotent) rather than duplicating rows.
 
 ## Deployment
 

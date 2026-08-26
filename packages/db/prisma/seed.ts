@@ -1,9 +1,23 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { ROLES } from './seed-data/roles';
 import { PERMISSIONS } from './seed-data/permissions';
 import { RETENTION_SCHEDULE } from './seed-data/retention-schedule';
+import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from './seed-data/sample-users';
+import { SAMPLE_INSURERS } from './seed-data/insurers';
+import { DOCUMENT_TEMPLATES } from './seed-data/document-templates';
 
 const prisma = new PrismaClient();
+
+/**
+ * Sample/demo data (fictional insurers, login-capable sample users per
+ * role) must never land in a production database — same gate convention as
+ * `ENABLE_DEV_RESET_TOKEN` (apps/api/.../auth.service.ts) and
+ * `securityHeaders()` (apps/api/src/common/security-headers.middleware.ts).
+ * Roles, permissions, the retention schedule, and document templates are
+ * real configuration data and are seeded in every environment.
+ */
+const SEED_SAMPLE_DATA = process.env.NODE_ENV !== 'production';
 
 /**
  * Well-known service-account email for actions with no human actor (the
@@ -64,6 +78,100 @@ async function ensureRetentionSchedule(): Promise<void> {
 }
 
 /**
+ * Part B / Part 11.2 — bilingual document templates (quotation comparison,
+ * proposal forms, ...). `DocumentTemplate` has no unique constraint on
+ * `templateType` (a future version-history use might want more than one row
+ * per type), so this upserts by hand via findFirst, same as
+ * `ensureRetentionSchedule()`.
+ */
+async function ensureDocumentTemplates(): Promise<void> {
+  for (const template of DOCUMENT_TEMPLATES) {
+    const existing = await prisma.documentTemplate.findFirst({
+      where: { templateType: template.templateType },
+    });
+    if (existing) {
+      await prisma.documentTemplate.update({
+        where: { id: existing.id },
+        data: {
+          nameEn: template.nameEn,
+          nameAr: template.nameAr,
+          bodyEn: template.bodyEn,
+          bodyAr: template.bodyAr,
+        },
+      });
+    } else {
+      await prisma.documentTemplate.create({ data: template });
+    }
+  }
+  console.log(`Seeded ${DOCUMENT_TEMPLATES.length} document template(s).`);
+}
+
+/**
+ * Part B — "sample insurers". Dev/demo-only fictional insurer master data
+ * (see seed-data/insurers.ts). Skipped entirely once created — `Insurer`
+ * has no unique key to upsert nested `products`/`slaAgreements` against
+ * without either duplicating them or hand-rolling per-child reconciliation,
+ * neither of which is worth it for sample data.
+ */
+async function ensureSampleInsurers(): Promise<void> {
+  let created = 0;
+  for (const insurer of SAMPLE_INSURERS) {
+    const existing = await prisma.insurer.findFirst({ where: { name: insurer.name } });
+    if (existing) continue;
+    await prisma.insurer.create({
+      data: {
+        name: insurer.name,
+        nameAr: insurer.nameAr,
+        contactEmail: insurer.contactEmail,
+        contactPhone: insurer.contactPhone,
+        claimsContact: insurer.claimsContact,
+        underwriterContact: insurer.underwriterContact,
+        creditTermsDays: insurer.creditTermsDays,
+        financialStrengthRating: insurer.financialStrengthRating,
+        products: { create: insurer.products },
+        slaAgreements: { create: insurer.slaAgreements },
+      },
+    });
+    created += 1;
+  }
+  console.log(`Seeded ${created} sample insurer(s) (${SAMPLE_INSURERS.length - created} already present).`);
+}
+
+/**
+ * Part B — "a sample user per role". Dev/demo-only login-capable accounts,
+ * one per `RoleName` (see seed-data/sample-users.ts). Requires
+ * `roleIdByName` from the roles seeded earlier in `main()`.
+ */
+async function ensureSampleUsers(roleIdByName: Map<string, string>): Promise<void> {
+  const passwordHash = await bcrypt.hash(SAMPLE_USER_PASSWORD, 12);
+
+  for (const sampleUser of SAMPLE_USERS) {
+    const user = await prisma.user.upsert({
+      where: { email: sampleUser.email },
+      update: { fullName: sampleUser.fullName },
+      create: {
+        fullName: sampleUser.fullName,
+        email: sampleUser.email,
+        passwordHash,
+      },
+    });
+
+    const roleId = roleIdByName.get(sampleUser.role);
+    if (!roleId) {
+      throw new Error(
+        `Sample user "${sampleUser.email}" references role "${sampleUser.role}", which was not seeded — is it missing from seed-data/roles.ts?`,
+      );
+    }
+    await prisma.userRoleAssignment.upsert({
+      where: { userId_roleId: { userId: user.id, roleId } },
+      update: {},
+      create: { userId: user.id, roleId },
+    });
+  }
+  console.log(`Seeded ${SAMPLE_USERS.length} sample user(s), one per role.`);
+}
+
+/**
  * Part B — "Seed data: the 11 roles + the full permission grid". Idempotent
  * (upsert-based) so it's safe to re-run in CI/dev without duplicating rows
  * or clobbering roles/permissions added by hand since the last run.
@@ -71,6 +179,7 @@ async function ensureRetentionSchedule(): Promise<void> {
 async function main() {
   await ensureSystemAccount();
   await ensureRetentionSchedule();
+  await ensureDocumentTemplates();
 
   for (const role of ROLES) {
     await prisma.role.upsert({
@@ -114,6 +223,13 @@ async function main() {
     }
   }
   console.log(`Seeded ${PERMISSIONS.length} permissions.`);
+
+  if (SEED_SAMPLE_DATA) {
+    await ensureSampleInsurers();
+    await ensureSampleUsers(roleIdByName);
+  } else {
+    console.log('NODE_ENV=production — skipping sample insurers/users.');
+  }
 }
 
 main()
