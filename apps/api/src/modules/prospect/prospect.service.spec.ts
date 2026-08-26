@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ProspectService } from './prospect.service';
 import type { ProspectRepository } from '../../repositories/prospect.repository';
 import type { LeadRepository } from '../../repositories/lead.repository';
@@ -80,7 +83,22 @@ describe('ProspectService', () => {
       expect(mocks.transition).not.toHaveBeenCalled();
     });
 
-    it('transitions the Lead to CONVERTED_TO_PROSPECT then creates the Prospect owned by the actor', async () => {
+    it("rejects converting a lead that isn't QUALIFIED without ever writing a Prospect row (no non-atomic-write orphan on the common failure path)", async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findLeadById.mockResolvedValue({
+        id: 'lead-1',
+        ownerUserId: 'sales-1',
+        status: 'NEW',
+      });
+
+      await expect(service.convert(CONVERT_DTO, 'sales-1')).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(mocks.create).not.toHaveBeenCalled();
+      expect(mocks.transition).not.toHaveBeenCalled();
+    });
+
+    it('creates the Prospect BEFORE transitioning the Lead to CONVERTED_TO_PROSPECT — the risky, user-data-validated write happens first so a failure there never leaves the Lead stuck in a terminal status with no Prospect', async () => {
       const { service, mocks } = makeDeps();
       mocks.findLeadById.mockResolvedValue({
         id: 'lead-1',
@@ -90,6 +108,14 @@ describe('ProspectService', () => {
 
       const prospect = await service.convert(CONVERT_DTO, 'sales-1');
 
+      expect(mocks.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leadId: 'lead-1',
+          companyName: 'Acme Trading Co.',
+          salesOwnerUserId: 'sales-1',
+          productsOfInterest: [],
+        }),
+      );
       expect(mocks.transition).toHaveBeenCalledWith(
         expect.objectContaining({
           entityType: 'Lead',
@@ -98,13 +124,8 @@ describe('ProspectService', () => {
           actorUserId: 'sales-1',
         }),
       );
-      expect(mocks.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          leadId: 'lead-1',
-          companyName: 'Acme Trading Co.',
-          salesOwnerUserId: 'sales-1',
-          productsOfInterest: [],
-        }),
+      expect(mocks.create.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.transition.mock.invocationCallOrder[0],
       );
       expect(prospect.leadId).toBe('lead-1');
       expect(mocks.record).toHaveBeenCalledWith(
@@ -115,6 +136,20 @@ describe('ProspectService', () => {
           entityId: 'prospect-1',
         }),
       );
+    });
+
+    it('still returns the created Prospect even if writing its audit row fails (already-committed work must not be reported as a failure)', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findLeadById.mockResolvedValue({
+        id: 'lead-1',
+        ownerUserId: 'sales-1',
+        status: 'QUALIFIED',
+      });
+      mocks.record.mockRejectedValueOnce(new Error('audit db down'));
+
+      const prospect = await service.convert(CONVERT_DTO, 'sales-1');
+
+      expect(prospect.id).toBe('prospect-1');
     });
 
     it('quantizes expectedPremium to fils precision before persisting', async () => {

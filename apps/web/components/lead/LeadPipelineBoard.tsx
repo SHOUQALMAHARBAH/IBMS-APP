@@ -100,6 +100,13 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
                             key={next}
                             type="button"
                             style={smallButtonStyle}
+                            // Disabled while another transition on this same
+                            // card (e.g. Disqualify) is in flight — otherwise
+                            // an officer could navigate to the conversion
+                            // screen mid-flight and later submit it against a
+                            // Lead that transitioned to a different status in
+                            // the background.
+                            disabled={isTransitioning}
                             aria-label={`${MOVE_TO_LABEL[next]} — ${lead.fullName}`}
                             onClick={() => goToProspectConversion(lead)}
                           >

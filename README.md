@@ -695,11 +695,44 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
 - **Reuses `WorkflowTransitionService` for the Lead side of the conversion** rather than
   inventing a second write path — `ProspectService.convert()` calls
   `workflow.transition({ entityType: 'Lead', toStatus: 'CONVERTED_TO_PROSPECT' })`
-  directly, which also rejects a Lead not currently `QUALIFIED` and rejects converting the
-  same Lead twice (`CONVERTED_TO_PROSPECT` is terminal) — no separate "already converted"
-  check needed here. `LeadService.transition()` (the generic `POST /leads/:id/transition`
-  endpoint) now explicitly refuses `toStatus: CONVERTED_TO_PROSPECT` so this is the only
-  legal path to that move; see the Part C #1 note above.
+  directly, which rejects converting the same Lead twice (`CONVERTED_TO_PROSPECT` is
+  terminal) — no separate "already converted" check needed here. `LeadService.transition()`
+  (the generic `POST /leads/:id/transition` endpoint) now explicitly refuses
+  `toStatus: CONVERTED_TO_PROSPECT` so this is the only legal path to that move; see the
+  Part C #1 note above and `workflow-transitions.config.ts`'s Lead entry, which now notes
+  the application-layer restriction the map itself doesn't (and can't) express.
+- **`/code-review --level high` caught a real non-atomic-write bug before this landed**:
+  the first version transitioned the Lead to its terminal `CONVERTED_TO_PROSPECT` status
+  *before* creating the Prospect row — with no `$transaction` spanning both tables (this
+  codebase has none; see `workflow-transition.service.ts`'s own note on the same
+  tradeoff), any failure of the second write (concretely reproducible: `employeeCount` had
+  no upper bound, so a value like `3000000000` passed DTO validation but overflowed
+  Postgres's `INTEGER` column) permanently orphaned the Lead — converted, but with no
+  Prospect and no way to retry, reintroducing via a different mechanism the exact
+  "converted Lead just... stops" gap this module exists to close. Fixed by reordering
+  (`ProspectService.convert()` now creates the Prospect first, transitions the Lead
+  second) plus an explicit `lead.status === 'QUALIFIED'` precondition check before ever
+  writing a Prospect row (redundant with what `workflow.transition()` itself validates —
+  deliberately so, to catch the common "not qualified yet" case before any write, not just
+  before the Lead transition) plus a `@Max(2147483647)` bound added to `employeeCount` in
+  `create-prospect.dto.ts`. The audit-log write for the new Prospect is now also wrapped
+  in try/catch (logged, not thrown) so an audit hiccup after both real writes succeed
+  can't turn a successful conversion into a reported failure — same philosophy as
+  `WorkflowTransitionService`'s own `sideEffect` catch. A narrower residual race (Prospect
+  created, then the Lead transition itself fails for an unrelated reason) is accepted, not
+  fixed — no worse than the double-DB-read tradeoff already accepted in Part C #1.
+- **Two lower-severity findings from the same review, fixed**: `VIEW_ALL_OWNERS_ROLES` was
+  byte-for-byte duplicated between `lead.service.ts` and `prospect.service.ts` — moved to
+  `apps/api/src/common/rbac-visibility.util.ts`, shared by both. The "Convert to prospect"
+  button in `LeadPipelineBoard.tsx` was missing `disabled={isTransitioning}` (present on
+  its sibling transition buttons), letting an officer navigate to the conversion screen
+  while another transition on the same lead card was still in flight.
+- **One finding accepted as a documented tradeoff, not fixed**: `LeadModule` now exports
+  `LeadRepository` (so `ProspectService` can read a Lead's owner/status) rather than a
+  narrower Lead-read-only interface — a real but latent encapsulation weakening (a future
+  module could bypass `LeadService`'s ownership-scoping/audit guarantees by importing the
+  repository directly), not a bug in this change. Revisit if/when a second consumer
+  actually does that.
 - **`Prospect.status` (default `"qualifying"`) is a bare string, not a workflow-engine-
   governed enum** — unlike `Lead`, the schema defines no `ProspectStatus` enum, and unlike
   backlog Part C #1's explicit "`LeadStatus` transition" bullet, this backlog item's own

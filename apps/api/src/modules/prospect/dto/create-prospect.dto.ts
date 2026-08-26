@@ -6,6 +6,7 @@ import {
   IsUUID,
   Length,
   Matches,
+  Max,
   Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
@@ -43,9 +44,14 @@ export class CreateProspectDto {
   @Length(1, 200)
   activity?: string;
 
+  // Upper bound matches the Postgres INTEGER column Prospect.employeeCount
+  // is stored as (@db default for Prisma `Int`) — without it, a value like
+  // 3_000_000_000 passes validation here but overflows at insert time as an
+  // unhandled Postgres error instead of a clean 400.
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(2147483647)
   employeeCount?: number;
 
   @IsOptional()

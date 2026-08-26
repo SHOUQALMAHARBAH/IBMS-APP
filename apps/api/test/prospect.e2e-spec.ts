@@ -314,9 +314,7 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
       expect(
         prospects.every((p) => p.salesOwnerUserId === officerA.userId),
       ).toBe(true);
-      expect(prospects.some((p) => p.companyName === 'Owned By B')).toBe(
-        false,
-      );
+      expect(prospects.some((p) => p.companyName === 'Owned By B')).toBe(false);
     });
   });
 
@@ -377,9 +375,7 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
         .get(`/prospects/${prospectId}`)
         .set(bearer(manager.accessToken))
         .expect(200);
-      expect((res.body as ProspectBody).companyName).toBe(
-        'Manager View Co.',
-      );
+      expect((res.body as ProspectBody).companyName).toBe('Manager View Co.');
     });
   });
 });

@@ -283,6 +283,16 @@ export const WORKFLOW_TRANSITIONS: {
   // segment) right after first contact, not only once fully qualified.
   // Modeled the same way here; worth a `/brain-gap` to confirm against a
   // real CRM-process source rather than this inference.
+  //
+  // QUALIFIED -> CONVERTED_TO_PROSPECT is correctly listed as reachable
+  // here — WorkflowTransitionService.transition() itself doesn't restrict
+  // it, and ProspectService.convert() (backlog Part C #2) calls it
+  // directly. But the GENERIC `POST /leads/:id/transition` endpoint
+  // additionally refuses that one target at the LeadService.transition()
+  // application layer (a Prospect must be created in the same operation,
+  // which the generic engine has no way to do) — see lead.service.ts. This
+  // map stays the source of truth for what's a legal STATE move; it is not
+  // a complete list of which endpoints may request which move.
   Lead: {
     NEW: ['CONTACTED', 'DISQUALIFIED'],
     CONTACTED: ['QUALIFIED', 'DISQUALIFIED'],

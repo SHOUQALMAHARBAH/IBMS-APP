@@ -3,23 +3,14 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { Lead, LeadStatus, RoleName } from '@ibms/db';
+import type { Lead, LeadStatus } from '@ibms/db';
 import { LeadRepository } from '../../repositories/lead.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
+import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateLeadDto } from './dto/create-lead.dto';
 import type { ListLeadsQueryDto } from './dto/list-leads-query.dto';
-
-/** Roles the seeded permission grid trusts with cross-owner visibility
- * (packages/db/prisma/seed-data/permissions.ts: `lead.list.read` also
- * grants SALES, but roles-and-segregation-of-duties.md scopes a Sales
- * Officer's own view to their own pipeline — Manager/Executive get the
- * org-wide view). */
-const VIEW_ALL_OWNERS_ROLES: RoleName[] = [
-  'BRANCH_DEPARTMENT_MANAGER',
-  'EXECUTIVE_MANAGEMENT',
-];
 
 /** Process 1 — Lead Management (backlog Part C, Domain A #1). Every Lead is
  * owned by the Sales/Relationship Officer who created it (the only role
