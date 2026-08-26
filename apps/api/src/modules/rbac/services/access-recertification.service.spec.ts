@@ -5,6 +5,7 @@ import type { AccessRecertificationRepository } from '../../../repositories/acce
 import type { RoleRepository } from '../../../repositories/role.repository';
 import type { UserRepository } from '../../../repositories/user.repository';
 import type { AuditService } from '../../audit/audit.service';
+import type { SlaTimerService } from '../../sla/sla-timer.service';
 
 interface Mocks {
   createItem: Mock;
@@ -15,6 +16,7 @@ interface Mocks {
   findItemsByCycle: Mock;
   findSummariesByIds: Mock;
   getRoleNames: Mock;
+  startTimer: Mock;
 }
 
 function makeDeps(overrides?: {
@@ -83,8 +85,17 @@ function makeDeps(overrides?: {
     record: vi.fn().mockResolvedValue(undefined),
   } as unknown as AuditService;
 
+  const startTimer = vi.fn().mockResolvedValue([]);
+  const slaTimer = { startTimer } as unknown as SlaTimerService;
+
   return {
-    service: new AccessRecertificationService(repo, roles, users, audit),
+    service: new AccessRecertificationService(
+      repo,
+      roles,
+      users,
+      audit,
+      slaTimer,
+    ),
     mocks: {
       createItem,
       findItemById,
@@ -94,6 +105,7 @@ function makeDeps(overrides?: {
       findItemsByCycle,
       findSummariesByIds,
       getRoleNames,
+      startTimer,
     },
   };
 }
@@ -113,6 +125,36 @@ describe('AccessRecertificationService', () => {
         'sales-1',
         'compliance-1',
       );
+    });
+
+    it("starts the cycle's SLA timer (backlog A.8) once it is created", async () => {
+      const dueAt = new Date('2026-09-10T00:00:00.000Z');
+      const { service, mocks } = makeDeps({
+        activeSubjectUserIds: ['sales-1'],
+        complianceOfficers: ['compliance-1'],
+      });
+
+      await service.startCycle('Q1', dueAt, 'admin-1');
+
+      expect(mocks.startTimer).toHaveBeenCalledWith({
+        entityType: 'AccessRecertificationCycle',
+        entityId: 'cycle-1',
+        workflowName: 'quarterly_access_review',
+        dueAt,
+        actorUserId: 'admin-1',
+      });
+    });
+
+    it('still returns the created cycle when starting its SLA timer fails', async () => {
+      const { service, mocks } = makeDeps({
+        activeSubjectUserIds: ['sales-1'],
+        complianceOfficers: ['compliance-1'],
+      });
+      mocks.startTimer.mockRejectedValue(new Error('sla timer boom'));
+
+      await expect(
+        service.startCycle('Q1', new Date(), 'admin-1'),
+      ).resolves.toEqual({ id: 'cycle-1' });
     });
 
     it('never assigns a reviewer who is a Compliance/Manager subject to themselves — falls back to Executive Management', async () => {

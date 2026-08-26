@@ -11,13 +11,15 @@ import { PermissionRepository } from '../../repositories/permission.repository';
 import { AccessRecertificationRepository } from '../../repositories/access-recertification.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { SlaModule } from '../sla/sla.module';
 
 @Module({
   // AuthModule exports UserRepository — reused here (the scheduler needs it
   // to resolve the system service account, and the recertification service
   // needs it to enrich item views with subject name/email/roles) rather
-  // than re-provided.
-  imports: [AuditModule, AuthModule],
+  // than re-provided. SlaModule exports SlaTimerService — AccessRecertification
+  // Service.startCycle() starts a quarterly_access_review timer (backlog A.8).
+  imports: [AuditModule, AuthModule, SlaModule],
   controllers: [RbacController, AccessRecertificationController],
   providers: [
     PermissionsService,

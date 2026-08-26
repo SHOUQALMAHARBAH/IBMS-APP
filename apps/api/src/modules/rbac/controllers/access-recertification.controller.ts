@@ -6,8 +6,9 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { StartRecertificationCycleDto } from '../dto/start-recertification-cycle.dto';
 import { RecertificationDecisionDto } from '../dto/recertification-decision.dto';
+import { addBusinessDays } from '../../../common/business-days.util';
 
-const CYCLE_SLA_DAYS = 15; // Part A.8 — "quarterly access review (15 days)"
+const CYCLE_SLA_BUSINESS_DAYS = 15; // Part A.8 — "quarterly access review (15 business days)"
 
 const itemListSchema = {
   type: 'array' as const,
@@ -67,7 +68,7 @@ export class AccessRecertificationController {
   ) {
     const dueAt = dto.dueAt
       ? new Date(dto.dueAt)
-      : new Date(Date.now() + CYCLE_SLA_DAYS * 24 * 60 * 60 * 1000);
+      : addBusinessDays(new Date(), CYCLE_SLA_BUSINESS_DAYS);
     return this.recertification.startCycle(dto.cycleLabel, dueAt, user.id);
   }
 

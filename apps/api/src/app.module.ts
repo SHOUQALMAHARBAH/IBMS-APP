@@ -8,6 +8,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { SecurityModule } from './modules/security/security.module';
+import { SlaModule } from './modules/sla/sla.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 
 @Module({
@@ -28,6 +29,9 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     // row every transition() call writes.
     WorkflowModule,
     AuthModule,
+    // Depends on AuthModule's exported UserRepository (system service
+    // account lookup for escalation-sweep audit rows) — imported after it.
+    SlaModule,
     // Imported after AuthModule — see rbac.module.ts's PermissionsGuard
     // comment for why global-guard execution order depends on this.
     RbacModule,

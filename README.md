@@ -431,6 +431,50 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
   checked state with no maker recorded at all; the `CHECK` constraint only rejects an
   actual maker==checker match, it doesn't require both to be populated.
 
+**A.8 — SLA Timers & Automated Escalation (Part 6.2, 7, 3.x)**
+
+- `SlaTimerService` + `SlaTimerScheduler` (`apps/api/src/modules/sla/`) are the generic,
+  polymorphic engine `ibms-brain/meta/lex/pdpl-sla-timers.md` asks for, backing the
+  `SlaTimer` model that's been in the schema since the initial domain-model migration.
+  `SLA_REGISTRY` (`sla-registry.config.ts`) is the machine-readable registry that lex file
+  itself calls for ("this table should be generated from it, not maintained by hand in two
+  places") — one entry per each of its 14 SLA types, self-checked for completeness in
+  `sla-registry.config.spec.ts`. A `*/15 * * * *` cron sweep escalates any overdue,
+  unresolved timer and writes a new `SLA_ESCALATED` audit action.
+- **One `SlaTimer` row per escalation stage, not per workflow** — a row is one deadline
+  plus the one target it escalates to; a multi-stage workflow (only the two DSR types:
+  an early T-3-business-day DPO warning, then a General-Manager escalation at the SLA
+  due date itself) gets one row per stage, distinguished by a `::`-suffixed
+  `workflowName`, to avoid another schema migration for a stage column.
+- `business-days.util.ts` (`apps/api/src/common/`) is a new shared Friday/Saturday
+  (Jordan's real weekend, not Saturday/Sunday) business-day calculator — no gazetted
+  public-holiday calendar exists yet (same gap as A.6's retention-period table), so a
+  computed business-day deadline is a lower bound, not an exact one.
+- **One real call site**: `AccessRecertificationService.startCycle()` now starts a
+  `quarterly_access_review` timer (best-effort — a timer-bookkeeping failure never rolls
+  back or blocks the cycle itself). Fixed in the same change:
+  `AccessRecertificationScheduler`/`AccessRecertificationController` both previously
+  computed their default due date as 15 *calendar* days despite citing "15 business days"
+  in their own comments/DTO doc — both now use `addBusinessDays()`.
+- **The other 13 registry entries have no real call site** — same root cause as A.6/A.7:
+  no Part C business module (`DataSubjectRequestService`, `IncidentService`,
+  `DisposalBatchService`, etc.) exists yet to call `startTimer()`/`resolve()` from. Several
+  of those entities already carry their *own* inline due-date field
+  (`DataSubjectRequest.slaDueAt`, `DisposalBatch.slaDueAt`, `LegalHold.nextReviewDueAt`,
+  `Vendor.annualReviewDueAt`, `DataSharingApproval.slaDueAt`,
+  `DpiaScreening.dpoReviewDueAt`) with no generic `SlaTimer` row alongside it yet — wire
+  `startTimer()`/`resolve()` into each one's create/close write path as its service layer
+  is built, using that field as `dueAt` rather than `computeDueAt()`'s registry default.
+- `escalatedTo` is populated at `startTimer()` time (the stage's *planned* target), not at
+  escalation time — the sweep only ever flips `escalatedAt`. See `SlaTimerService`'s header
+  comment for why; a reader expecting `escalatedTo` to mean "already escalated to" should
+  check `escalatedAt` instead.
+- Every non-DPO escalation target (`GENERAL_MANAGER`, `IT_MANAGEMENT`,
+  `CUSTOMER_RETENTION`, `DPO_AND_LEGAL_COUNSEL`) is free text, not a real RBAC role —
+  `ibms-brain/meta/context/roles-and-segregation-of-duties.md` doesn't name any of them.
+  Resolving a free-text target to an actual notified person is a notification-system
+  concern this repo doesn't have yet (same gap as A.1's "no email provider").
+
 ## Deployment
 
 **Not decided.** Docker images build correctly and can run anywhere that accepts a

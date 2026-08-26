@@ -15,6 +15,7 @@ import { AccessRecertificationRepository } from '../../../repositories/access-re
 import { RoleRepository } from '../../../repositories/role.repository';
 import { UserRepository } from '../../../repositories/user.repository';
 import { AuditService } from '../../audit/audit.service';
+import { SlaTimerService } from '../../sla/sla-timer.service';
 
 export type RecertificationDecision = 'confirmed' | 'revoked' | 'changed';
 
@@ -64,6 +65,7 @@ export class AccessRecertificationService {
     private readonly roles: RoleRepository,
     private readonly users: UserRepository,
     private readonly audit: AuditService,
+    private readonly slaTimer: SlaTimerService,
   ) {}
 
   async startCycle(
@@ -121,6 +123,24 @@ export class AccessRecertificationService {
         itemCount: subjectUserIds.length,
       },
     });
+
+    // Backlog A.8 (ibms-brain/meta/lex/pdpl-sla-timers.md, "Quarterly access
+    // review — 15 business days"). Best-effort: the cycle itself is already
+    // committed above, so a timer-bookkeeping failure must not roll it back
+    // or hide that the cycle started successfully.
+    try {
+      await this.slaTimer.startTimer({
+        entityType: 'AccessRecertificationCycle',
+        entityId: cycle.id,
+        workflowName: 'quarterly_access_review',
+        dueAt,
+        actorUserId: startedByUserId,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `AccessRecertificationCycle ${cycle.id}: failed to start its SLA timer — cycle itself was created successfully: ${(err as Error).message}`,
+      );
+    }
 
     return cycle;
   }

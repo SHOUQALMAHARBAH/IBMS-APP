@@ -109,6 +109,12 @@ enum AuditAction {
   // entityId carry the owning record (e.g. "Customer"/<id>); afterValue
   // carries { keyId, purpose, field, operation } — never plaintext/ciphertext.
   ENCRYPTION_KEY_USED
+  // Part 6.2/7/3.x SLA registry (ibms-brain/meta/lex/pdpl-sla-timers.md,
+  // backlog A.8): written by SlaTimerService when its scheduled sweep marks
+  // an overdue SlaTimer row escalated. entityType/entityId carry the
+  // underlying business entity (not "SlaTimer" itself); afterValue carries
+  // { slaTimerId, workflowName, escalatedTo, dueAt }.
+  SLA_ESCALATED
 }
 
 /// Part 10.1 — how a user authenticates. SSO is a reserved integration point

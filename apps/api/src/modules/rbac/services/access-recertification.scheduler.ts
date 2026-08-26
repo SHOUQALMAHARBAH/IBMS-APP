@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { AccessRecertificationService } from './access-recertification.service';
 import { UserRepository } from '../../../repositories/user.repository';
+import { addBusinessDays } from '../../../common/business-days.util';
 
-const CYCLE_SLA_DAYS = 15; // Part A.8 — "quarterly access review (15 days)"
+const CYCLE_SLA_BUSINESS_DAYS = 15; // Part A.8 — "quarterly access review (15 business days)"
 
 // Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL —
 // AuditLogEntry.userId is a real FK to User, so a scheduled job needs a
@@ -27,9 +28,7 @@ export class AccessRecertificationScheduler {
   async runQuarterlyCycle(): Promise<void> {
     const now = new Date();
     const label = `Q${Math.floor(now.getUTCMonth() / 3) + 1}-${now.getUTCFullYear()}`;
-    const dueAt = new Date(
-      now.getTime() + CYCLE_SLA_DAYS * 24 * 60 * 60 * 1000,
-    );
+    const dueAt = addBusinessDays(now, CYCLE_SLA_BUSINESS_DAYS);
     try {
       const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
       if (!systemUser) {
