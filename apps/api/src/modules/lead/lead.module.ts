@@ -10,5 +10,9 @@ import { AuditModule } from '../audit/audit.module';
   imports: [AuditModule],
   controllers: [LeadController],
   providers: [LeadService, LeadRepository],
+  // ProspectModule (backlog Part C #2) reads a Lead's status/owner before
+  // converting it — reuses this repository rather than duplicating a
+  // near-identical one scoped to a single findById call.
+  exports: [LeadRepository],
 })
 export class LeadModule {}

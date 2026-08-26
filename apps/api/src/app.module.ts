@@ -11,6 +11,7 @@ import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { LeadModule } from './modules/lead/lead.module';
+import { ProspectModule } from './modules/prospect/prospect.module';
 
 @Module({
   imports: [
@@ -42,6 +43,10 @@ import { LeadModule } from './modules/lead/lead.module';
     // transitions) and RbacModule's PermissionsGuard (lead.create/
     // lead.list.read/lead.transition) already being registered above.
     LeadModule,
+    // Part C backlog #2 (Prospect Management) — depends on LeadModule's
+    // exported LeadRepository (reads the source Lead before converting it)
+    // and WorkflowModule (the Lead's CONVERTED_TO_PROSPECT transition).
+    ProspectModule,
   ],
   controllers: [AppController],
   providers: [AppService],

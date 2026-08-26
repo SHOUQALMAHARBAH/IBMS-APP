@@ -1,13 +1,4 @@
-import type { TransformFnParams } from 'class-transformer';
-
-/** class-validator's `@IsOptional()` only skips validation for `undefined`/
- * `null`, not `""` — an empty query-string value (`GET /leads?ownerUserId=`)
- * or an empty form field would otherwise still hit `@IsEmail()`/`@IsUUID()`/
- * `@IsIn()` and 400. Use as `@Transform(emptyStringToUndefined)` above
- * `@IsOptional()` on any optional field that can arrive as `""`. */
-export function emptyStringToUndefined({ value }: TransformFnParams): unknown {
-  return value === '' ? undefined : value;
-}
+export { emptyStringToUndefined } from '../../common/dto.util';
 
 /** Every acquisition source named in the Lead model comment
  * (packages/db/prisma/schema.prisma, Process 1 — Lead Management):

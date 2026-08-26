@@ -9,12 +9,13 @@ just a note saying to go read it elsewhere. This repo does not restate those rul
 implements against them. Compliance/PDPL/CBJ obligations still cite the source document
 in `ibms-brain/`, not this README.
 
-**Status:** infrastructure scaffold, plus the first Part C business module. Lead
+**Status:** infrastructure scaffold, plus the first two Part C business modules. Lead
 Management (Domain A #1 — create/list/filter, `LeadStatus` transition, an intake-form +
-pipeline-board screen) is implemented; policy, claims, and the rest of CRM are not — see
-`meta/context/data-model.md` in ibms-brain for the logical data model this will
-eventually be built against, and § Known gaps, Part C, below for what Lead Management
-itself still doesn't do.
+pipeline-board screen) and Prospect Management (Domain A #2 — convert a qualified Lead,
+capture its qualification profile, a profile screen) are implemented; policy, claims, and
+the rest of CRM are not — see `meta/context/data-model.md` in ibms-brain for the logical
+data model this will eventually be built against, and § Known gaps, Part C, below for
+what each module still doesn't do.
 
 ## Stack
 
@@ -66,11 +67,12 @@ ibms-app/
 
 `features/` (web) and `controllers/`, `services/` (api) are still empty scaffolding — no
 feature has needed them over its own `modules/` subfolder yet. `modules/`/`repositories/`
-(api) and `lib/`/`components/` (web) now also carry the first real business feature
-(Lead Management — `apps/api/src/modules/lead/`, `apps/web/app/(app)/leads/`), alongside
-the infrastructure modules (auth, RBAC, audit, SLA, workflow, security) built first. They
-establish where feature work lands, per `meta/context/policy-lifecycle.md` and
-`meta/context/claims-lifecycle.md` in `ibms-brain`.
+(api) and `lib/`/`components/` (web) now also carry the first two real business features
+(Lead Management — `apps/api/src/modules/lead/`, `apps/web/app/(app)/leads/`; Prospect
+Management — `apps/api/src/modules/prospect/`, `apps/web/app/(app)/prospects/`),
+alongside the infrastructure modules (auth, RBAC, audit, SLA, workflow, security) built
+first. They establish where feature work lands, per `meta/context/policy-lifecycle.md`
+and `meta/context/claims-lifecycle.md` in `ibms-brain`.
 
 ## Prerequisites
 
@@ -656,10 +658,11 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
   (`Opportunity.CLOSED_LOST`, `RenewalCase.LAPSED`) — see the citation comment in
   `workflow-transitions.config.ts`. Candidate for a `/brain-gap` confirmation against a
   real CRM-process source.
-- **Process 2 (Prospect Management/qualification) is not built** — `CONVERTED_TO_PROSPECT`
-  is a terminal `LeadStatus`, but nothing creates the corresponding `Prospect` row yet
-  (the model exists in `schema.prisma`; no service writes to it). A converted Lead
-  currently just... stops.
+- **Process 2 (Prospect Management/qualification) is now built** — see Part C #2 below.
+  `POST /leads/:id/transition` itself now rejects `toStatus: CONVERTED_TO_PROSPECT`
+  directly (`UnprocessableEntityException`), closing off the "converted Lead just...
+  stops" gap this note used to describe — that move only happens through `POST
+  /prospects`.
 - **No lead reassignment** — `ownerUserId` is fixed to the creating user at `POST /leads`
   time; there's no endpoint for a Manager to hand a lead to a different Sales Officer.
   Not asked for by this backlog item; add it the day a real reassignment need shows up.
@@ -678,6 +681,45 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
   otherwise.
 - Domain A Processes 3-10 (Prospect qualification through the 360° customer view) remain
   entirely unbuilt.
+
+**Part C #2 — Prospect Management (Domain A, Process 2)**
+
+- **`POST /prospects`** converts a Lead into a Prospect and captures the qualification
+  profile the backlog names verbatim (sector/activity/employee count/business size/
+  location/contact person/products of interest/expected premium), **`GET /prospects`**
+  (Sales Officers forced to their own prospects server-side, same pattern as
+  `GET /leads`; Manager/Executive see any owner), **`GET /prospects/:id`** (the profile
+  screen's data source). `apps/web/app/(app)/prospects/` is the qualification form
+  (`/prospects/new`, reached from a "Convert to prospect" action on a `QUALIFIED` lead in
+  the pipeline board) + list + profile screens the backlog item asks for.
+- **Reuses `WorkflowTransitionService` for the Lead side of the conversion** rather than
+  inventing a second write path — `ProspectService.convert()` calls
+  `workflow.transition({ entityType: 'Lead', toStatus: 'CONVERTED_TO_PROSPECT' })`
+  directly, which also rejects a Lead not currently `QUALIFIED` and rejects converting the
+  same Lead twice (`CONVERTED_TO_PROSPECT` is terminal) — no separate "already converted"
+  check needed here. `LeadService.transition()` (the generic `POST /leads/:id/transition`
+  endpoint) now explicitly refuses `toStatus: CONVERTED_TO_PROSPECT` so this is the only
+  legal path to that move; see the Part C #1 note above.
+- **`Prospect.status` (default `"qualifying"`) is a bare string, not a workflow-engine-
+  governed enum** — unlike `Lead`, the schema defines no `ProspectStatus` enum, and unlike
+  backlog Part C #1's explicit "`LeadStatus` transition" bullet, this backlog item's own
+  task list (convert / capture fields / profile screen) never asks for a Prospect-side
+  status transition. Left as a plain field nothing writes to after creation; revisit if a
+  later item (e.g. Process #3-4, Customer Acquisition/Onboarding) needs a governed
+  Prospect status progression before consuming it.
+- **`expectedPremium` is the first field any Part C module actually writes through
+  `money.util.ts`** (`quantizeMoney`, backlog A.7) — accepted client-side as a decimal
+  string (`create-prospect.dto.ts`'s `MONEY_STRING` regex, fils precision, at most 3dp)
+  and quantized again server-side before persisting, per
+  `ibms-brain/meta/lex/money-decimal-jod.md`.
+- **No reassignment of a Prospect's owner** — `salesOwnerUserId` is copied from the
+  converting Lead's `ownerUserId` at creation time; same deferred gap as Lead
+  reassignment above, for the same reason (not asked for yet).
+- **No field-level encryption or masking** on `companyName`/`contactPerson`/`location` —
+  none of these are classified Confidential/Highly Confidential in this schema, matching
+  the same reasoning as Lead's `contactPhone`/`contactEmail` above.
+- Domain A Processes 3-10 (Customer Acquisition/Onboarding through the 360° customer
+  view) remain entirely unbuilt.
 
 ## Deployment
 

@@ -50,6 +50,7 @@ const commercialFrontOffice: PermissionSeed[] = [
   { code: 'lead.list.read', module: 'commercial-front-office', description: 'List/filter leads', roles: [SALES, MANAGER, EXEC] },
   { code: 'lead.transition', module: 'commercial-front-office', description: 'Transition LeadStatus', roles: [SALES] },
   { code: 'prospect.capture', module: 'commercial-front-office', description: 'Convert/qualify a Lead into a Prospect', roles: [SALES] },
+  { code: 'prospect.read', module: 'commercial-front-office', description: 'List/read Prospect profiles', roles: [SALES, MANAGER, EXEC] },
   { code: 'customer.create', module: 'commercial-front-office', description: 'Create a Customer (individual/corporate)', roles: [SALES] },
   { code: 'kyc.capture', module: 'commercial-front-office', description: 'Capture KYC data and supporting documents', roles: [SALES] },
   { code: 'ubo.record', module: 'commercial-front-office', description: 'Record Ultimate Beneficial Owners for a corporate customer', roles: [SALES, COMPLIANCE] },

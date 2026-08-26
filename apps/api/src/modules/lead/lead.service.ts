@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import type { Lead, LeadStatus, RoleName } from '@ibms/db';
 import { LeadRepository } from '../../repositories/lead.repository';
 import { AuditService } from '../audit/audit.service';
@@ -88,6 +92,19 @@ export class LeadService {
     // auth.service.ts's verifyTotpEnrollment().
     if (!lead || lead.ownerUserId !== actorUserId) {
       throw new NotFoundException('Lead not found');
+    }
+
+    // CONVERTED_TO_PROSPECT is the one LeadStatus move that must also create
+    // the linked Prospect row (backlog Part C #2) — going through this
+    // generic transition endpoint would flip the Lead to a terminal status
+    // with no Prospect ever created, since WorkflowTransitionService only
+    // knows about `status` columns, not about spawning a sibling entity.
+    // POST /prospects (ProspectService.convert) is the only legal path to
+    // this particular move; it calls WorkflowTransitionService directly.
+    if (toStatus === 'CONVERTED_TO_PROSPECT') {
+      throw new UnprocessableEntityException(
+        'Convert a Lead to a Prospect via POST /prospects (captures the qualification profile), not this generic transition endpoint.',
+      );
     }
 
     return this.workflow.transition({

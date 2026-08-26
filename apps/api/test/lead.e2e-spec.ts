@@ -365,7 +365,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
         .expect(422);
     });
 
-    it('walks NEW -> CONTACTED -> QUALIFIED -> CONVERTED_TO_PROSPECT for the owning officer', async () => {
+    it('walks NEW -> CONTACTED -> QUALIFIED for the owning officer', async () => {
       const app = await boot();
       const owner = await makeUser(
         app,
@@ -383,11 +383,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
         .expect(201);
       const leadId = (created.body as LeadBody).id;
 
-      for (const toStatus of [
-        'CONTACTED',
-        'QUALIFIED',
-        'CONVERTED_TO_PROSPECT',
-      ]) {
+      for (const toStatus of ['CONTACTED', 'QUALIFIED']) {
         const res = await request(app.getHttpServer())
           .post(`/leads/${leadId}/transition`)
           .set(bearer(owner.accessToken))
@@ -395,6 +391,43 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           .expect(201);
         expect((res.body as { status: string }).status).toBe(toStatus);
       }
+    });
+
+    // Backlog Part C #2 (Prospect Management) — CONVERTED_TO_PROSPECT must
+    // also create the linked Prospect row, which this generic endpoint has
+    // no way to do. See prospect.e2e-spec.ts for the real conversion path
+    // (POST /prospects).
+    it('rejects a direct move to CONVERTED_TO_PROSPECT even for a QUALIFIED lead — only POST /prospects may make that move', async () => {
+      const app = await boot();
+      const owner = await makeUser(
+        app,
+        'lead-owner-h',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const created = await request(app.getHttpServer())
+        .post('/leads')
+        .set(bearer(owner.accessToken))
+        .send({
+          fullName: 'Direct Convert Attempt',
+          source: 'bank_partner',
+          marketingConsentGranted: false,
+        })
+        .expect(201);
+      const leadId = (created.body as LeadBody).id;
+
+      for (const toStatus of ['CONTACTED', 'QUALIFIED']) {
+        await request(app.getHttpServer())
+          .post(`/leads/${leadId}/transition`)
+          .set(bearer(owner.accessToken))
+          .send({ toStatus })
+          .expect(201);
+      }
+
+      await request(app.getHttpServer())
+        .post(`/leads/${leadId}/transition`)
+        .set(bearer(owner.accessToken))
+        .send({ toStatus: 'CONVERTED_TO_PROSPECT' })
+        .expect(422);
     });
 
     it('stamps firstContactAt with the actual contact date when a lead moves to CONTACTED, not the creation date', async () => {

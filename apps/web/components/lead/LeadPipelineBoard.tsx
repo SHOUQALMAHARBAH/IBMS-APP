@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   transitionLead,
   LEAD_NEXT_STATUSES,
@@ -38,8 +39,19 @@ interface LeadPipelineBoardProps {
 }
 
 export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: LeadPipelineBoardProps) {
+  const router = useRouter();
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // CONVERTED_TO_PROSPECT must also create the linked Prospect row (backlog
+  // Part C #2) — the generic transition endpoint rejects this target
+  // directly (lead.service.ts), so this move goes to the qualification
+  // screen instead of a plain status-change button. leadFullName is only a
+  // display-prefill hint for that screen's form (see prospects/new/page.tsx).
+  function goToProspectConversion(lead: Lead) {
+    const params = new URLSearchParams({ leadId: lead.id, leadFullName: lead.fullName });
+    router.push(`/prospects/new?${params.toString()}`);
+  }
 
   async function handleTransition(lead: Lead, toStatus: LeadStatus) {
     setTransitioningId(lead.id);
@@ -82,18 +94,30 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
                   {lead.contactEmail ? <div style={cardMetaStyle}>{lead.contactEmail}</div> : null}
                   {isOwner && nextStatuses.length > 0 ? (
                     <div style={cardActionsStyle}>
-                      {nextStatuses.map((next) => (
-                        <button
-                          key={next}
-                          type="button"
-                          style={smallButtonStyle}
-                          disabled={isTransitioning}
-                          aria-label={`${MOVE_TO_LABEL[next]} — ${lead.fullName}`}
-                          onClick={() => void handleTransition(lead, next)}
-                        >
-                          {MOVE_TO_LABEL[next]}
-                        </button>
-                      ))}
+                      {nextStatuses.map((next) =>
+                        next === 'CONVERTED_TO_PROSPECT' ? (
+                          <button
+                            key={next}
+                            type="button"
+                            style={smallButtonStyle}
+                            aria-label={`${MOVE_TO_LABEL[next]} — ${lead.fullName}`}
+                            onClick={() => goToProspectConversion(lead)}
+                          >
+                            {MOVE_TO_LABEL[next]}
+                          </button>
+                        ) : (
+                          <button
+                            key={next}
+                            type="button"
+                            style={smallButtonStyle}
+                            disabled={isTransitioning}
+                            aria-label={`${MOVE_TO_LABEL[next]} — ${lead.fullName}`}
+                            onClick={() => void handleTransition(lead, next)}
+                          >
+                            {MOVE_TO_LABEL[next]}
+                          </button>
+                        ),
+                      )}
                     </div>
                   ) : null}
                   {errors[lead.id] ? (

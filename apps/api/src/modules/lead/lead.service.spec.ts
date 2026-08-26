@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { LeadService } from './lead.service';
 import type { LeadRepository } from '../../repositories/lead.repository';
 import type { AuditService } from '../audit/audit.service';
@@ -173,6 +176,20 @@ describe('LeadService', () => {
       ];
       expect(call.data?.firstContactAt).toBeInstanceOf(Date);
       expect(result).toEqual({ id: 'lead-1', status: 'CONTACTED' });
+    });
+
+    it('rejects a direct move to CONVERTED_TO_PROSPECT — that move must go through POST /prospects instead', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findById.mockResolvedValue({
+        id: 'lead-1',
+        ownerUserId: 'sales-1',
+        status: 'QUALIFIED',
+      });
+
+      await expect(
+        service.transition('lead-1', 'CONVERTED_TO_PROSPECT', 'sales-1'),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(mocks.transition).not.toHaveBeenCalled();
     });
 
     it('does not stamp firstContactAt on a move that is not into CONTACTED', async () => {
