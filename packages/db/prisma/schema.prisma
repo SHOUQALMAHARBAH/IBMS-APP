@@ -12,13 +12,15 @@
 // those two documents' content.
 //
 // CROSS-CUTTING RULES BUILT INTO THIS SCHEMA (apply to every model below):
-//   1. Maker/Checker (Part 5.2): any model with an approval step carries
-//      `createdByUserId` (maker) and `approvedByUserId` (checker) as two
-//      DISTINCT foreign keys. The application layer MUST reject
-//      approvedByUserId == createdByUserId — see backend service layer,
-//      not enforceable in Prisma schema syntax alone. A raw-SQL migration
-//      adding `CHECK (approved_by_user_id IS NULL OR approved_by_user_id
-//      <> created_by_user_id)` should follow the first migration.
+//   1. Maker/Checker (Part 5.2): any model with an approval step carries a
+//      maker field (e.g. `createdByUserId`) and a checker field (e.g.
+//      `approvedByUserId`) that MUST resolve to two distinct users. Every
+//      write of a checker field MUST call `assertDifferentActors()`
+//      (apps/api/src/common/maker-checker.util.ts) — not enforceable in
+//      Prisma schema syntax alone. A DB-level CHECK constraint per table
+//      (raw-SQL migration `add_maker_checker_check_constraints`) backs the
+//      same invariant so it can't be bypassed by a caller that skips the
+//      application layer entirely.
 //   2. Money (Part 3.6 Controls): every monetary field is `Decimal(18, 3)`
 //      — JOD's minor unit is the fils (1/1000 JOD), never a float.
 //   3. Workflow state (Parts 3.x "Workflow States" rows): status fields are
@@ -90,6 +92,45 @@ enum AuditAction {
   TRANSITION
   EXPORT
   PRINT
+  // Part 10.1 — auth/session lifecycle events, logged the same as any other
+  // AuditLogEntry action (entityType "User", entityId = the acting user).
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  MFA_ENROLLED
+  MFA_VERIFIED
+  MFA_FAILED
+  STEP_UP_VERIFIED
+  ACCESS_WINDOW_EXPIRED
+  // Part 10.2 — centralized key management: every encrypt/decrypt of a
+  // field-level `-- ENCRYPT` column logs which key was used. entityType/
+  // entityId carry the owning record (e.g. "Customer"/<id>); afterValue
+  // carries { keyId, purpose, field, operation } — never plaintext/ciphertext.
+  ENCRYPTION_KEY_USED
+  // Part 6.2/7/3.x SLA registry (ibms-brain/meta/lex/pdpl-sla-timers.md,
+  // backlog A.8): written by SlaTimerService when its scheduled sweep marks
+  // an overdue SlaTimer row escalated. entityType/entityId carry the
+  // underlying business entity (not "SlaTimer" itself); afterValue carries
+  // { slaTimerId, workflowName, escalatedTo, dueAt }.
+  SLA_ESCALATED
+}
+
+/// Part 10.1 — how a user authenticates. SSO is a reserved integration point
+/// (Part 10.1 "SSO integration point, optional per broker") — no identity
+/// provider is wired yet; see meta/designs for why none is assumed.
+enum AuthProvider {
+  LOCAL
+  SSO
+}
+
+/// Part 10.1 — MFA factor type. WEBAUTHN is schema-reserved for the
+/// hardware-token fast-follow (mandatory for privileged roles / Compliance
+/// / DPO) — no enrollment/verification path exists for it yet.
+enum MfaCredentialType {
+  TOTP
+  WEBAUTHN
 }
 
 // ============================================================================
@@ -103,14 +144,18 @@ model User {
   fullName          String
   email             String    @unique
   passwordHash      String
+  passwordUpdatedAt DateTime?
   isActive          Boolean   @default(true)
   languagePreference LanguagePreference @default(AR)
   branchId          String?
   branch            Branch?   @relation(fields: [branchId], references: [id])
   employeeId        String?   @unique
   employee          Employee? @relation(fields: [employeeId], references: [id])
+  authProvider      AuthProvider @default(LOCAL)
   mfaEnabled        Boolean   @default(false)
   lastLoginAt       DateTime?
+  failedLoginAttempts Int     @default(0)
+  lockedUntil       DateTime? // Part 10.1 — automatic lockout after repeated failed logins
   // External Auditor (Part 5.1) — time-boxed access
   accessValidFrom   DateTime?
   accessValidUntil  DateTime?
@@ -119,9 +164,113 @@ model User {
 
   roles             UserRoleAssignment[]
   auditLogEntries   AuditLogEntry[]        @relation("AuditLogUser")
+  accessAnomalyAlerts AccessAnomalyAlert[] @relation("AccessAnomalyAlertUser")
   recertifications  AccessRecertificationItem[] @relation("RecertificationReviewer")
+  mfaCredentials    MfaCredential[]
+  refreshTokens     RefreshToken[]
+  sessions          UserSession[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
+}
+
+/// Part 10.1 — a single enrolled MFA factor. A user may hold more than one
+/// (e.g. TOTP now, a hardware key later) — `isActive` lets one be retired
+/// without losing the audit trail of when it was enrolled/used.
+model MfaCredential {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  type          MfaCredentialType
+  secretEnc     String?  // TOTP secret -- ENCRYPT (Part 10.2)
+  label         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  lastUsedAt    DateTime?
+  // Reserved for the WebAuthn/hardware-token fast-follow — unused by TOTP.
+  webauthnCredentialId String? @unique
+  webauthnPublicKeyEnc String? // -- ENCRYPT
+  webauthnCounter      Int?
+
+  @@index([userId])
+}
+
+/// Part 10.1 — issued refresh tokens. The raw token is never stored, only
+/// its hash (`token.service.ts` hashes with sha256 before persisting) —
+/// same principle as password hashing, applied to bearer secrets.
+/// `replacedByTokenId` chains rotation so reuse of a retired token (a stolen
+/// or replayed refresh token) is detectable, not just "expired eventually."
+model RefreshToken {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  tokenHash         String   @unique
+  issuedAt          DateTime @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  replacedByTokenId String?  @unique
+  userAgent         String?
+  ipAddress         String?
+
+  session           UserSession?
+
+  @@index([userId])
+}
+
+/// Part 10.1 / Part 8.3 — the live-session anchor idle-timeout enforcement
+/// and the External Auditor time-boxed access window both key off.
+/// `lastActivityAt` is bumped by the session heartbeat; a request outside
+/// `SecurityConfig.idleTimeoutMinutes` or past `User.accessValidUntil` is
+/// rejected AND the session is revoked here (not just refused at login).
+model UserSession {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  refreshTokenId String?  @unique
+  refreshToken   RefreshToken? @relation(fields: [refreshTokenId], references: [id])
+  createdAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  lastStepUpAt   DateTime? // Part 10.1 — forced re-auth before sensitive actions
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedReason  String?  // idle_timeout | logout | access_window_expired | admin_revoked | refresh_reuse_detected
+  ipAddress      String?
+  userAgent      String?
+
+  @@index([userId])
+}
+
+/// Part 10.1 — forgot-password flow. Single-use (`usedAt`), short-lived,
+/// hashed the same way as RefreshToken.
+model PasswordResetToken {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  requestedIp String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// Part 10.1 / Part 8.3 — single-row, admin-editable security configuration
+/// (idle timeout, token lifetimes, lockout policy). Deliberately real data
+/// the System/Security Administrator role edits, not an env var only — see
+/// roles-and-segregation-of-duties.md for that role's mandate. The
+/// application layer enforces the single-row invariant (fixed id "default").
+model SecurityConfig {
+  id                         String   @id @default("default")
+  idleTimeoutMinutes         Int      @default(15)
+  hardLogoutAfterIdleMinutes Int      @default(30)
+  accessTokenTtlMinutes      Int      @default(15)
+  refreshTokenTtlDays        Int      @default(14)
+  stepUpMaxAgeMinutes        Int      @default(10)
+  maxFailedLoginAttempts     Int      @default(5)
+  lockoutMinutes             Int      @default(15)
+  updatedByUserId            String?
+  updatedAt                  DateTime @updatedAt
 }
 
 /// Part 5.1 — role catalogue.
@@ -167,6 +316,11 @@ model UserRoleAssignment {
   roleId   String
   role     Role     @relation(fields: [roleId], references: [id])
   grantedAt DateTime @default(now())
+  // Part 10.1 — set when an access-recertification decision revokes this
+  // grant (AccessRecertificationItem.decision = "revoked"). A row with
+  // revokedAt set is no longer an active assignment, but is kept (not
+  // deleted) as the audit record of when/that access was withdrawn.
+  revokedAt DateTime?
 
   @@unique([userId, roleId])
 }
@@ -1171,6 +1325,10 @@ model CommissionLedgerEntry {
   status                 String   @default("outstanding") // outstanding | paid | reversed
   isManualOverride       Boolean  @default(false)
   overrideReason         String?  // manual override requires an approval reason, logged
+  // Maker/checker (Part 5.2): whoever requests the manual override MUST
+  // differ from overrideApprovedByUserId, the separately logged approver
+  // (app- and DB-enforced).
+  overrideRequestedByUserId String?
   overrideApprovedByUserId String?
   createdAt              DateTime @default(now())
 }
@@ -1698,8 +1856,29 @@ model DataProcessingAgreement {
   vendorId      String
   vendor        Vendor   @relation(fields: [vendorId], references: [id])
   signedAt      DateTime?
+  // Maker/checker (Part 5.2): the Relationship Owner who assessed this
+  // vendor and prepared the agreement — MUST differ from dpoApprovedByUserId
+  // (app- and DB-enforced).
+  assessedByUserId String?
   dpoApprovedByUserId String? // required for High tier
   expiresAt     DateTime?
+}
+
+/// Part 10.6/M08 — the data-sharing channel picklist. CONFIDENTIAL/
+/// HIGHLY_CONFIDENTIAL shares may only pick a channel in the SECURE_*
+/// subset — assertSecureChannel() (apps/api/src/modules/security/
+/// secure-channel.util.ts) rejects the rest for those two classifications;
+/// see meta/lex/sensitive-data-handling.md "any data share where the picked
+/// channel is not on the approved secure-channel list."
+enum DataSharingChannel {
+  SECURE_SFTP
+  ENCRYPTED_EMAIL
+  VENDOR_SECURE_PORTAL
+  CBJ_REGULATORY_PORTAL
+  IN_PERSON_ENCRYPTED_MEDIA
+  UNENCRYPTED_EMAIL
+  POSTAL_MAIL
+  OTHER_UNSECURED
 }
 
 /// Part 7.5 (M08) — one-off, non-recurring data shares outside a standing
@@ -1710,12 +1889,16 @@ model DataSharingApproval {
   vendorId         String?
   vendor           Vendor?  @relation(fields: [vendorId], references: [id])
   description      String
+  classification   DataClassification // of the data being shared — drives assertSecureChannel()
+  channel          DataSharingChannel
   isRegulatoryChannel Boolean @default(false) // exempt from standard vendor-risk workflow, still classification-checked
   requestedByUserId String
   approvedByUserId String?  // DPO — MUST differ from requestedByUserId
   slaDueAt         DateTime
   decidedAt        DateTime?
   createdAt        DateTime @default(now())
+
+  @@index([classification])
 }
 
 enum DpiaOutcome {
@@ -1966,6 +2149,33 @@ model AuditLogEntry {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([occurredAt])
+}
+
+/// Part 10.3 — detected anomalous access pattern over AuditLogEntry (bulk
+/// export, off-hours access, repeated unjustified access to the same
+/// sensitive record). Written by AuditAnomalyDetectionService right after
+/// the triggering AuditLogEntry itself; never a live notification channel
+/// today, same as TransactionMonitoringAlert above.
+enum AccessAnomalyPatternType {
+  BULK_EXPORT
+  OFF_HOURS_ACCESS
+  REPEATED_UNJUSTIFIED_ACCESS
+}
+
+model AccessAnomalyAlert {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation("AccessAnomalyAlertUser", fields: [userId], references: [id])
+  patternType    AccessAnomalyPatternType
+  detailText     String?
+  relatedAuditLogEntryIds String[]
+  detectedAt     DateTime @default(now())
+  status         String   @default("open")
+  classification DataClassification @default(CONFIDENTIAL)
+
+  @@index([userId])
+  @@index([patternType])
+  @@index([detectedAt])
 }
 
 // ============================================================================

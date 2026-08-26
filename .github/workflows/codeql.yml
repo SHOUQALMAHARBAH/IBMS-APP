@@ -1,0 +1,46 @@
+name: CodeQL
+
+# A.10 (Part 10.4/10.5) — "SAST/DAST integrated into the build pipeline."
+# Static analysis (SAST) over apps/web + apps/api source, separate from the
+# dependency audit in ci.yml's "Security tests" step (that's SCA — known-CVE
+# scanning of third-party packages — not SAST — pattern analysis of this
+# repo's own code). See ci.yml's backend job for the DAST counterpart.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Catches a newly-published CodeQL query matching old code that no PR
+    # touched — same rationale as a dependency-audit re-run on a schedule.
+    - cron: "0 3 * * 1"
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      matrix:
+        language: [javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # No `packages: write`/build step needed — CodeQL's JS/TS
+          # extractor works from source without a compile step.
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

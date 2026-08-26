@@ -1,0 +1,74 @@
+name: Backup restore drill
+
+# A.10 (Part 10.4/10.5) — "Encrypted, scheduled backups + actually-tested
+# restore drills" and "Document and test RPO/RTO at least annually." Weekly
+# is deliberately more often than the annual minimum the backlog item asks
+# for — see ibms-brain/meta/lex/backup-rpo-rto.md for why.
+#
+# Uses docker-compose's db-test service directly (not a GitHub Actions
+# `services:` container) because scripts/backup-restore-drill.sh drives it
+# via `docker compose exec` — the same container the local dev/CI-verify
+# flow already uses, so this drill is proving the same restore path a human
+# running `bash scripts/backup-restore-drill.sh` locally would exercise.
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env.test
+        run: |
+          cat > .env.test <<'EOF'
+          POSTGRES_USER=ibms
+          POSTGRES_PASSWORD=ibms
+          POSTGRES_DB=ibms_test
+          DATABASE_URL=postgresql://ibms:ibms@localhost:5434/ibms_test?schema=public
+          JWT_ACCESS_SECRET=ci-only-change-me-32-characters-minimum
+          MFA_ENCRYPTION_KEY=jWvaaenpb1O7k9jMlLZhRTeQFNJ1jQOFTUHtzgTHNtg=
+          PII_ENCRYPTION_KEYS=v1:DzVvLT8z/wNB6UZW2cglf0EEajI/+hjMXk8WlVfHphI=
+          PII_ENCRYPTION_ACTIVE_KEY_ID=v1
+          ENABLE_DEV_RESET_TOKEN=true
+          EOF
+
+      - name: Start db-test
+        run: |
+          docker compose up -d db-test
+          for _ in $(seq 1 30); do
+            if docker compose exec -T db-test pg_isready -U ibms >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "db-test never became healthy" >&2
+          exit 1
+
+      - name: Run Prisma migrations (db-test)
+        run: npm run db:test:migrate:deploy
+
+      - name: Seed database (roles + permission grid)
+        run: npm run db:test:seed
+
+      - name: Backup + restore drill
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_DRILL_ENCRYPTION_KEY }}
+        run: |
+          if [ -z "${BACKUP_ENCRYPTION_KEY:-}" ]; then
+            echo "backup-drill workflow: BACKUP_DRILL_ENCRYPTION_KEY repo secret is not set — see ibms-brain/meta/lex/backup-rpo-rto.md" >&2
+            exit 1
+          fi
+          bash scripts/backup-restore-drill.sh
