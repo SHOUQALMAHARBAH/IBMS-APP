@@ -9,9 +9,12 @@ just a note saying to go read it elsewhere. This repo does not restate those rul
 implements against them. Compliance/PDPL/CBJ obligations still cite the source document
 in `ibms-brain/`, not this README.
 
-**Status:** infrastructure scaffold only. No business features (policy, claims, CRM, …)
-are implemented yet — see `meta/context/data-model.md` in ibms-brain for the logical
-data model this will eventually be built against.
+**Status:** infrastructure scaffold, plus the first Part C business module. Lead
+Management (Domain A #1 — create/list/filter, `LeadStatus` transition, an intake-form +
+pipeline-board screen) is implemented; policy, claims, and the rest of CRM are not — see
+`meta/context/data-model.md` in ibms-brain for the logical data model this will
+eventually be built against, and § Known gaps, Part C, below for what Lead Management
+itself still doesn't do.
 
 ## Stack
 
@@ -61,11 +64,13 @@ ibms-app/
   .github/workflows/ CI
 ```
 
-`components/`, `features/`, `lib/` (web) and `modules/`, `controllers/`, `services/`,
-`repositories/`, `middleware/` (api) are currently empty scaffolding — no business
-features exist yet (see Status above). They establish where feature work lands once it
-starts, per `meta/context/policy-lifecycle.md` and `meta/context/claims-lifecycle.md` in
-`ibms-brain`.
+`features/` (web) and `controllers/`, `services/` (api) are still empty scaffolding — no
+feature has needed them over its own `modules/` subfolder yet. `modules/`/`repositories/`
+(api) and `lib/`/`components/` (web) now also carry the first real business feature
+(Lead Management — `apps/api/src/modules/lead/`, `apps/web/app/(app)/leads/`), alongside
+the infrastructure modules (auth, RBAC, audit, SLA, workflow, security) built first. They
+establish where feature work lands, per `meta/context/policy-lifecycle.md` and
+`meta/context/claims-lifecycle.md` in `ibms-brain`.
 
 ## Prerequisites
 
@@ -536,9 +541,13 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
 - `assertExportAllowed()`/`buildWatermarkText()` enforce the business rule and produce
   the watermark text, but don't themselves stamp a PDF/image — no document-rendering or
   object-storage pipeline exists yet behind `Document.storageRef` (same gap as A.3).
-- `assertNoPresetSensitiveDefaults()` has no form to call it from yet — `apps/web` has
-  no business forms (Part C isn't built). It's a guard for a future form's
-  initial-values builder to call, not something with a UI to verify today.
+- `assertNoPresetSensitiveDefaults()` still has no form to call it from — `apps/web`'s one
+  business form so far (the Lead intake form, Part C #1) has no Confidential/Highly
+  Confidential field for it to guard (name/source/phone/email aren't that
+  classification tier; the marketing-consent checkbox defaults to unticked per Part 6.3,
+  a different rule — see Known gaps, Part C, below). It's still a guard for a future
+  KYC/Customer-style form's initial-values builder to call, not something with a UI to
+  verify today.
 - `DataSharingApproval.classification`/`channel` are new required (non-nullable)
   columns added in this change — safe because the table is empty in every environment
   today (no Part C module writes to it yet); a schema with real rows would have needed
@@ -625,6 +634,50 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
     data, not configuration every environment needs. Verified: the gate actually skips
     them under `NODE_ENV=production`, and re-running the seed with sample data enabled
     is a no-op (idempotent) rather than duplicating rows.
+
+**Part C #1 — Lead Management (Domain A, Process 1)**
+
+- **The first real business module.** `POST /leads` (create, owner = creator),
+  `GET /leads` (filter by `source`/`ownerUserId`/`status`, Sales Officers forced to their
+  own pipeline server-side, Manager/Executive see any owner), and
+  `POST /leads/:id/transition` (only the owning officer, only a legal `LeadStatus` move).
+  `apps/web/app/(app)/leads/page.tsx` is the intake-form + pipeline-board screen the
+  backlog item asks for.
+- **`LeadStatus` reuses `WorkflowTransitionService`** (backlog A.6) rather than growing a
+  second transition function — `Lead` is now a twelfth entry in `WORKFLOW_TRANSITIONS`
+  alongside the eleven named in `ibms-brain/meta/lex/workflow-state-transitions.md`/A.6,
+  which that lex file's own wording already permits ("every entity that carries a
+  workflow state", not a closed list).
+- **`DISQUALIFIED` reachable from every non-terminal status (`NEW`/`CONTACTED`/
+  `QUALIFIED`), not only after `QUALIFIED`, is an inference**, not a cited rule — the
+  backlog item's own text reads `NEW→CONTACTED→QUALIFIED→CONVERTED_TO_PROSPECT/
+  DISQUALIFIED` literally, which would put `DISQUALIFIED` reachable only at the end.
+  Modeled the same way this file's other "the client went quiet/declined" exits are
+  (`Opportunity.CLOSED_LOST`, `RenewalCase.LAPSED`) — see the citation comment in
+  `workflow-transitions.config.ts`. Candidate for a `/brain-gap` confirmation against a
+  real CRM-process source.
+- **Process 2 (Prospect Management/qualification) is not built** — `CONVERTED_TO_PROSPECT`
+  is a terminal `LeadStatus`, but nothing creates the corresponding `Prospect` row yet
+  (the model exists in `schema.prisma`; no service writes to it). A converted Lead
+  currently just... stops.
+- **No lead reassignment** — `ownerUserId` is fixed to the creating user at `POST /leads`
+  time; there's no endpoint for a Manager to hand a lead to a different Sales Officer.
+  Not asked for by this backlog item; add it the day a real reassignment need shows up.
+- **No field-level encryption or masking on `contactPhone`/`contactEmail`** — these
+  aren't classified Confidential/Highly Confidential in this schema (see A.3/A.9 above),
+  so `EncryptionService`/`SensitiveFieldRevealService` correctly have no call site here.
+- **`Lead.marketingConsentGranted` is a bare boolean, not a `ConsentRecord`** — the model
+  that's actually wired into the mandatory PDPL consent-withdrawal SLA
+  (`ibms-brain/meta/lex/pdpl-sla-timers.md`, `sla-registry.config.ts`). A lead can grant
+  marketing consent at intake but has no way to withdraw it with a tracked, SLA-timed
+  record — only Customer-level consent (a later Domain A process) was in scope for this
+  item. Revisit if/when marketing-consent withdrawal for a pre-Customer Lead becomes a
+  real requirement, not before.
+- **No SLA timer on a Lead sitting untouched** — `pdpl-sla-timers.md`'s registry doesn't
+  name a Lead-response SLA, so `SlaTimerService` isn't wired in; nothing here claims
+  otherwise.
+- Domain A Processes 3-10 (Prospect qualification through the 360° customer view) remain
+  entirely unbuilt.
 
 ## Deployment
 

@@ -22,6 +22,7 @@ const entityTypes: WorkflowEntityType[] = [
   'DataSubjectRequest',
   'IncidentReport',
   'DisposalBatch',
+  'Lead',
 ];
 
 describe('WORKFLOW_TRANSITIONS', () => {
@@ -190,6 +191,40 @@ describe('isWorkflowTransitionAllowed', () => {
     }
     expect(
       isWorkflowTransitionAllowed('DisposalBatch', 'NOMINATED', 'DPO_APPROVED'),
+    ).toBe(false);
+  });
+
+  it('allows Lead NEW -> CONTACTED -> QUALIFIED -> CONVERTED_TO_PROSPECT (backlog Part C #1, verbatim)', () => {
+    const chain: Array<
+      Parameters<typeof isWorkflowTransitionAllowed<'Lead'>>[1]
+    > = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED_TO_PROSPECT'];
+    for (let i = 0; i < chain.length - 1; i++) {
+      expect(isWorkflowTransitionAllowed('Lead', chain[i], chain[i + 1])).toBe(
+        true,
+      );
+    }
+  });
+
+  it('allows a Lead to be disqualified right after first contact, not only once qualified', () => {
+    expect(isWorkflowTransitionAllowed('Lead', 'NEW', 'DISQUALIFIED')).toBe(
+      true,
+    );
+    expect(
+      isWorkflowTransitionAllowed('Lead', 'CONTACTED', 'DISQUALIFIED'),
+    ).toBe(true);
+  });
+
+  it('rejects Lead NEW -> QUALIFIED (skips CONTACTED)', () => {
+    expect(isWorkflowTransitionAllowed('Lead', 'NEW', 'QUALIFIED')).toBe(false);
+  });
+
+  it('rejects any move out of a terminal Lead status', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'Lead',
+        'CONVERTED_TO_PROSPECT',
+        'DISQUALIFIED',
+      ),
     ).toBe(false);
   });
 });

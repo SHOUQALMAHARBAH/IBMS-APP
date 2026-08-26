@@ -6,6 +6,7 @@ import type {
   EndorsementStatus,
   IncidentStatus,
   InvoiceStatus,
+  LeadStatus,
   OpportunityStatus,
   PolicyStatus,
   Prisma,
@@ -16,7 +17,12 @@ import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * The eleven workflow-state entities named in
- * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6.
+ * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6,
+ * plus `Lead` — the lex file's rule is not scoped to that named list ("Every
+ * entity that carries a workflow state ... moves through a transition()"),
+ * and backlog Part C #1 (Lead Management) explicitly asks for a governed
+ * `LeadStatus` transition, so it reuses this engine rather than growing a
+ * second one-off transition function.
  * The string values match the `entityType` already used for these models'
  * AuditLogEntry rows elsewhere (AuditService is polymorphic on this same
  * string), so a TRANSITION audit row and any other action on the same
@@ -33,7 +39,8 @@ export type WorkflowEntityType =
   | 'Invoice'
   | 'DataSubjectRequest'
   | 'IncidentReport'
-  | 'DisposalBatch';
+  | 'DisposalBatch'
+  | 'Lead';
 
 /** Maps each entity to the Prisma-generated enum type its `status` column holds. */
 export interface WorkflowStatusMap {
@@ -48,6 +55,7 @@ export interface WorkflowStatusMap {
   DataSubjectRequest: DsrStatus;
   IncidentReport: IncidentStatus;
   DisposalBatch: DisposalBatchStatus;
+  Lead: LeadStatus;
 }
 
 /**
@@ -264,6 +272,24 @@ export const WORKFLOW_TRANSITIONS: {
     EXECUTED: ['CLOSED'],
     CLOSED: [],
   },
+
+  // Backlog Part C #1 (Lead Management), verbatim: "NEW -> CONTACTED ->
+  // QUALIFIED -> CONVERTED_TO_PROSPECT/DISQUALIFIED". Read literally that
+  // puts DISQUALIFIED reachable only after QUALIFIED, but every sibling
+  // entity in this file that has a "the client went quiet/declined" exit
+  // (Opportunity's CLOSED_LOST, RenewalCase's LAPSED) models that exit as
+  // reachable from every non-terminal stage, not just the last one — a lead
+  // can go cold or turn out disqualified (wrong number, no budget, wrong
+  // segment) right after first contact, not only once fully qualified.
+  // Modeled the same way here; worth a `/brain-gap` to confirm against a
+  // real CRM-process source rather than this inference.
+  Lead: {
+    NEW: ['CONTACTED', 'DISQUALIFIED'],
+    CONTACTED: ['QUALIFIED', 'DISQUALIFIED'],
+    QUALIFIED: ['CONVERTED_TO_PROSPECT', 'DISQUALIFIED'],
+    CONVERTED_TO_PROSPECT: [],
+    DISQUALIFIED: [],
+  },
 };
 
 /** True if `to` is a legal next status from `from` for the given entity. */
@@ -327,6 +353,7 @@ export function getWorkflowDelegate(
     DataSubjectRequest: client.dataSubjectRequest,
     IncidentReport: client.incidentReport,
     DisposalBatch: client.disposalBatch,
+    Lead: client.lead,
   };
   return delegates[entityType] as WorkflowDelegate;
 }

@@ -10,6 +10,7 @@ import { RbacModule } from './modules/rbac/rbac.module';
 import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { LeadModule } from './modules/lead/lead.module';
 
 @Module({
   imports: [
@@ -36,6 +37,11 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     // comment for why global-guard execution order depends on this.
     RbacModule,
     SecurityModule,
+    // Part C backlog #1 (Lead Management) — the first business (non-
+    // infrastructure) module. Depends on WorkflowModule (Lead's status
+    // transitions) and RbacModule's PermissionsGuard (lead.create/
+    // lead.list.read/lead.transition) already being registered above.
+    LeadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

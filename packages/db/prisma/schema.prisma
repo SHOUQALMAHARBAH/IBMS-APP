@@ -431,6 +431,10 @@ model Lead {
   updatedAt     DateTime   @updatedAt
 
   prospect      Prospect?
+
+  @@index([ownerUserId])
+  @@index([source])
+  @@index([status])
 }
 
 /// Process 2 — Prospect Management (qualification of a Lead).
