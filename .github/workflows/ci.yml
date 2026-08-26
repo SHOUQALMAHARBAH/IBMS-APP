@@ -152,6 +152,43 @@ jobs:
       - name: Build
         run: npx turbo run build --filter=api...
 
+      # A.10 (Part 10.4/10.5) — DAST, the counterpart to codeql.yml's SAST.
+      # Boots the real built service (not a mock) against the same ephemeral
+      # postgres this job already migrated/seeded, same "boot the real
+      # thing" approach as the Smoke tests step above.
+      - name: Start API for DAST scan
+        working-directory: apps/api
+        run: |
+          node dist/src/main.js >/tmp/ibms-api-dast.log 2>&1 &
+          echo $! > /tmp/ibms-api-dast.pid
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "DAST: API never became healthy" >&2
+          cat /tmp/ibms-api-dast.log >&2
+          exit 1
+
+      - name: DAST — OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "http://localhost:4000"
+          # Baseline is passive-only (no active exploit attempts) — safe to
+          # run against a live service in CI. `-I` and fail_action: false
+          # make this informational-only for now (see README § Known gaps,
+          # A.10): failing the whole pipeline on ZAP's default ruleset
+          # before any real business endpoint exists would be noise, not
+          # signal. Revisit once there's a documented allowlist for
+          # accepted alerts.
+          cmd_options: "-I"
+          fail_action: false
+
+      - name: Stop API (DAST)
+        if: always()
+        run: kill "$(cat /tmp/ibms-api-dast.pid)" 2>/dev/null || true
+
   docker:
     runs-on: ubuntu-latest
     strategy:

@@ -35,7 +35,8 @@
     "db:test:migrate:status": "npm run migrate:test:status --workspace=@ibms/db",
     "db:studio": "npm run studio --workspace=@ibms/db",
     "db:seed": "npm run seed --workspace=@ibms/db",
-    "db:test:seed": "npm run seed:test --workspace=@ibms/db"
+    "db:test:seed": "npm run seed:test --workspace=@ibms/db",
+    "db:backup:drill": "bash scripts/backup-restore-drill.sh"
   },
   "devDependencies": {
     "turbo": "2.10.11"

@@ -1864,6 +1864,23 @@ model DataProcessingAgreement {
   expiresAt     DateTime?
 }
 
+/// Part 10.6/M08 — the data-sharing channel picklist. CONFIDENTIAL/
+/// HIGHLY_CONFIDENTIAL shares may only pick a channel in the SECURE_*
+/// subset — assertSecureChannel() (apps/api/src/modules/security/
+/// secure-channel.util.ts) rejects the rest for those two classifications;
+/// see meta/lex/sensitive-data-handling.md "any data share where the picked
+/// channel is not on the approved secure-channel list."
+enum DataSharingChannel {
+  SECURE_SFTP
+  ENCRYPTED_EMAIL
+  VENDOR_SECURE_PORTAL
+  CBJ_REGULATORY_PORTAL
+  IN_PERSON_ENCRYPTED_MEDIA
+  UNENCRYPTED_EMAIL
+  POSTAL_MAIL
+  OTHER_UNSECURED
+}
+
 /// Part 7.5 (M08) — one-off, non-recurring data shares outside a standing
 /// vendor relationship. 3 business days standard SLA, 1 business day for
 /// a recognized regulatory channel (e.g. CBJ Data Portal/iFile).
@@ -1872,12 +1889,16 @@ model DataSharingApproval {
   vendorId         String?
   vendor           Vendor?  @relation(fields: [vendorId], references: [id])
   description      String
+  classification   DataClassification // of the data being shared — drives assertSecureChannel()
+  channel          DataSharingChannel
   isRegulatoryChannel Boolean @default(false) // exempt from standard vendor-risk workflow, still classification-checked
   requestedByUserId String
   approvedByUserId String?  // DPO — MUST differ from requestedByUserId
   slaDueAt         DateTime
   decidedAt        DateTime?
   createdAt        DateTime @default(now())
+
+  @@index([classification])
 }
 
 enum DpiaOutcome {

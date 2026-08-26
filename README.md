@@ -211,10 +211,17 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
   been migrated at least once (`npm run db:test:migrate:dev`). Run it before opening a PR
   to get the evidence block for the PR description in one shot — claims aren't evidence,
   this is.
+- **`scripts/backup-restore-drill.sh`** (A.10, Part 10.4/10.5) — dumps a database
+  (`db-test` by default — never dev/prod automatically), encrypts the dump
+  (AES-256-CBC), decrypts and restores it into a throwaway database, verifies the
+  restored row count matches the original, and fails if the whole cycle exceeds the RTO
+  target (`RTO_TARGET_SECONDS`, default 900s). Requires `BACKUP_ENCRYPTION_KEY` in the
+  environment. `npm run db:backup:drill` runs it. See
+  `ibms-brain/meta/lex/backup-rpo-rto.md` for the RPO/RTO targets this is testing.
 
 ## CI
 
-`.github/workflows/ci.yml`, three jobs:
+`.github/workflows/ci.yml`, three jobs, plus two standalone workflows:
 
 1. **frontend** — installs, then: typecheck → lint → unit/component tests (Vitest +
    Testing Library) → installs Playwright's Chromium → accessibility (`test:a11y`,
@@ -229,10 +236,23 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
    schema-drift check (`db:migrate:status`, fails on drift) → integration tests
    (`test:e2e`) → contract tests (`test:contract`, OpenAPI-validated responses) → smoke
    tests (`bash scripts/smoke.sh api` — boots the real service and hits `/health` +
-   `/health/db`) → build.
+   `/health/db`) → build → boots the built service again and runs an OWASP ZAP baseline
+   scan against it (DAST, A.10/Part 10.4-10.5) — passive-only, informational
+   (`fail_action: false`) for now, see § Known gaps, A.10.
 3. **docker** — builds (does not push) the `api` and `web` images, to catch Dockerfile
    regressions. No registry/push step exists yet — the production deployment target is
    still TBD, so there's nowhere authorized to push to.
+
+**`.github/workflows/codeql.yml`** (A.10, SAST) — GitHub CodeQL static analysis over
+`apps/web`/`apps/api` TypeScript source, on every push/PR to `main` plus a weekly
+schedule (catches a newly-published query matching old code no PR touched). Separate
+from `test:security` in the backend job above, which is SCA (known-CVE dependency
+scanning), not SAST (this repo's own code).
+
+**`.github/workflows/backup-drill.yml`** (A.10, Part 10.4/10.5) — runs
+`scripts/backup-restore-drill.sh` against `db-test` weekly and on manual dispatch.
+Needs a `BACKUP_DRILL_ENCRYPTION_KEY` repository secret to run — see
+`ibms-brain/meta/lex/backup-rpo-rto.md`.
 
 ### First end-to-end verification
 
@@ -284,6 +304,32 @@ Field-level encryption, TLS enforcement, and key management live in
   service behind `Document.storageRef` yet. Tracked as a deferred requirement in the
   design doc above: whichever managed Postgres/object-store this project deploys to
   must have encryption at rest enabled as part of that provisioning decision.
+
+## Data masking, secure sharing & environment separation (Part 10.4-10.6)
+
+- **Masking + justified drill-down.** `maskTrailing()` (`apps/api/src/common/masking.util.ts`)
+  produces a last-4-visible masked string for list-view display.
+  `SensitiveFieldRevealService` (`apps/api/src/modules/security/`) wraps that together
+  with `EncryptionService.decrypt()` and a required, audited justification (`READ`
+  `AuditLogEntry`, `isSensitiveDataAccess: true`, reason recorded — never the plaintext)
+  — the only sanctioned way to get a real (unmasked) value back.
+- **Secure data-sharing channel.** `DataSharingApproval.classification`/`channel`
+  (new columns, migration `20260826140000_...`) plus `assertSecureChannel()`
+  (`apps/api/src/modules/security/secure-channel.util.ts`) reject a CONFIDENTIAL/
+  HIGHLY_CONFIDENTIAL share picked over `UNENCRYPTED_EMAIL`/`POSTAL_MAIL`/
+  `OTHER_UNSECURED`.
+- **Watermarking + export/print restriction.** `assertExportAllowed()`/
+  `buildWatermarkText()` (`apps/api/src/modules/security/document-export.util.ts`)
+  enforce that a HIGHLY_CONFIDENTIAL `Document` export/print carries a watermark, using
+  the existing `AuditAction.EXPORT`/`PRINT` values.
+- **Privacy-by-default forms.** `assertNoPresetSensitiveDefaults()`
+  (`apps/web/lib/forms/privacy-by-default.ts`) throws if a form's initial values
+  pre-populate a listed sensitive field.
+- **Non-production data.** `synthesizeEntityFields()`/`synthesizeSensitiveValue()`
+  (`apps/api/src/modules/security/synthetic-data.util.ts`) replace `-- ENCRYPT` field
+  values with same-shape random data, for seeding Dev/Test/UAT without real PII.
+  `.env.uat.example` + docker-compose's `db-uat` service give UAT its own local
+  database, separate from `db`/`db-test`.
 
 ## Known gaps (per completed backlog item)
 
@@ -474,6 +520,67 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
   `ibms-brain/meta/context/roles-and-segregation-of-duties.md` doesn't name any of them.
   Resolving a free-text target to an actual notified person is a notification-system
   concern this repo doesn't have yet (same gap as A.1's "no email provider").
+
+**A.9 — Data Masking & Leakage Prevention (Part 10.6)**
+
+- `maskTrailing()`, `SensitiveFieldRevealService`, `assertSecureChannel()`,
+  `assertExportAllowed()`/`buildWatermarkText()`, and
+  `assertNoPresetSensitiveDefaults()` are all real and unit-tested (see § Data masking
+  above), but — same root cause as A.5/A.6/A.7/A.8 — nothing in the codebase calls any
+  of them from a real business write/read path yet, since no Part C business module
+  (`CustomerService`, `DocumentService`, a `DataSharingApproval` create/decide
+  endpoint) exists. Wire `SensitiveFieldRevealService.mask()`/`reveal()` into each
+  entity's list/detail read path, `assertSecureChannel()` into
+  `DataSharingApproval`'s create/decide write path, and `assertExportAllowed()` into
+  whatever export/print/download endpoint is built, as each is built.
+- `assertExportAllowed()`/`buildWatermarkText()` enforce the business rule and produce
+  the watermark text, but don't themselves stamp a PDF/image — no document-rendering or
+  object-storage pipeline exists yet behind `Document.storageRef` (same gap as A.3).
+- `assertNoPresetSensitiveDefaults()` has no form to call it from yet — `apps/web` has
+  no business forms (Part C isn't built). It's a guard for a future form's
+  initial-values builder to call, not something with a UI to verify today.
+- `DataSharingApproval.classification`/`channel` are new required (non-nullable)
+  columns added in this change — safe because the table is empty in every environment
+  today (no Part C module writes to it yet); a schema with real rows would have needed
+  a backfill migration instead.
+
+**A.10 — Infrastructure & Deployment (Part 10.4/10.5)**
+
+- **Independent penetration testing before go-live and periodically after is not
+  implemented, and can't be — by definition it requires an external, unaffiliated
+  party, not code written by the same agent building the system under test.** Nothing
+  in this change simulates, schedules, or claims to satisfy this item; it needs to be
+  engaged and tracked as an organizational/procurement task (candidate home: M11
+  Compliance & Audit Toolkit's corrective-action register once that module exists —
+  `ibms-brain/meta/context/pcms-privacy-modules.md`), not a repo change.
+- SAST (`.github/workflows/codeql.yml`) and DAST (the backend CI job's ZAP baseline
+  step) are both real and run in CI, but DAST is informational only
+  (`cmd_options: -I`, `fail_action: false`) — this app has almost no exposed business
+  surface yet (Part C isn't built), so failing the pipeline on ZAP's generic ruleset
+  today would train everyone to ignore it. Turn it into a hard gate, with a documented
+  allowlist for accepted alerts, once there's real endpoint surface to scan
+  meaningfully.
+- The backup/restore drill (`scripts/backup-restore-drill.sh`,
+  `.github/workflows/backup-drill.yml`) is real, runs against `db-test`, and has been
+  executed locally (dump → encrypt → decrypt → restore → row-count verify, ~14s against
+  a 900s RTO target — see `ibms-brain/meta/lex/backup-rpo-rto.md`). It has never run
+  against a production database, because none exists. The scheduled workflow needs a
+  `BACKUP_DRILL_ENCRYPTION_KEY` repository secret set before its first scheduled run
+  will succeed rather than fail on the missing-secret check.
+- RPO (24h)/RTO (15min) in `backup-rpo-rto.md` are drafts this repo picked to have a
+  real number to test against — not yet reviewed or signed off by whoever owns
+  business continuity (Part 10.4/10.5 names that role, this repo doesn't have a named
+  person yet). Confirm and update both the lex file and `RTO_TARGET_SECONDS`'s default
+  the day someone with that authority sets a real target.
+- **Dev/Test/UAT/Prod separation is scaffolded, not achieved.** `db`/`db-test`/`db-uat`
+  are three separate local docker-compose Postgres instances with their own env files
+  (`.env`/`.env.test`/`.env.uat.example`) — but there is no UAT or Prod *deployment*
+  target (see § Deployment below), so "UAT" today means "a fourth local database," not
+  a real separate environment reachable by anyone but the developer running it.
+  `synthesizeEntityFields()` exists so that whenever a real non-prod environment is
+  seeded from a production export, PII doesn't have to travel there unmasked — but
+  nothing calls it yet, since there's no production data to synthesize from and no
+  seed pipeline beyond `prisma/seed.ts`'s roles/permissions.
 
 ## Deployment
 
