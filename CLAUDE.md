@@ -17,6 +17,14 @@ were made). Read the relevant `meta/context/` file before touching an area, and 
 workflow-state-transitions, maker-checker-segregation, sensitive-data-handling,
 pdpl-sla-timers) apply the moment real domain code lands here, which it has not yet.
 
+## What's New
+
+| Date | Change | Action required |
+|------|--------|-----------------|
+| 2026-08-26 | Auth/RBAC/encryption/audit infrastructure landed (backlog A.1-A.5), plus the generic workflow `transition()` engine (A.6, `apps/api/src/modules/workflow/`) and the fils-precision money helper (A.7, `apps/api/src/common/money.util.ts`). `.env.example`/`.env.test.example` gained new required keys: `JWT_ACCESS_SECRET`, `MFA_ENCRYPTION_KEY`, `PII_ENCRYPTION_KEYS`, `PII_ENCRYPTION_ACTIVE_KEY_ID`, `ENABLE_DEV_RESET_TOKEN`. `npm run db:seed`/`db:test:seed` are now required before RBAC works (seeds roles + permission grid) — see README.md § Known gaps for exactly what each item still doesn't do. | Re-copy `.env.example`/`.env.test.example` if your local `.env`/`.env.test` predate this row, and run `npm run db:seed` (or `db:test:seed`) before relying on RBAC locally |
+
+Drop the oldest row once this table exceeds 5 entries (ibms-brain/meta/lex/workspace-updates.md).
+
 ## Cloning this repo
 
 ```bash
@@ -45,6 +53,7 @@ npm install
 cp .env.example .env
 docker compose up -d db
 npm run db:migrate:dev
+npm run db:seed       # 11 roles + full permission grid — RBAC needs these to exist
 npm run dev          # web:3000, api:4000
 npm run lint
 npm run typecheck

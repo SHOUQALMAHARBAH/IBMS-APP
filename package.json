@@ -33,7 +33,9 @@
     "db:test:migrate:dev": "npm run migrate:test:dev --workspace=@ibms/db",
     "db:test:migrate:deploy": "npm run migrate:test:deploy --workspace=@ibms/db",
     "db:test:migrate:status": "npm run migrate:test:status --workspace=@ibms/db",
-    "db:studio": "npm run studio --workspace=@ibms/db"
+    "db:studio": "npm run studio --workspace=@ibms/db",
+    "db:seed": "npm run seed --workspace=@ibms/db",
+    "db:test:seed": "npm run seed:test --workspace=@ibms/db"
   },
   "devDependencies": {
     "turbo": "2.10.11"

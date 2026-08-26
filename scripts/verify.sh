@@ -58,6 +58,7 @@ gate "Security"            npm run test:security
 gate "Database Schema"     npm run db:validate
 gate "Database Migrations" npm run db:test:migrate:deploy
 gate "Database Migrations (drift check)" npm run db:test:migrate:status
+gate "Database Seed"       npm run db:test:seed
 gate "Integration Tests"   npm run test:e2e
 gate "Contract Tests"      npm run test:contract
 gate "Smoke Tests"         bash scripts/smoke.sh api

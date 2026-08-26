@@ -86,6 +86,7 @@ npm install
 # Postgres only, for local (non-Docker) app dev:
 docker compose up -d db
 npm run db:migrate:dev
+npm run db:seed   # 11 roles + full permission grid — RBAC needs these to exist
 
 # Everything else, run natively:
 npm run dev
@@ -107,6 +108,7 @@ docker compose up -d db-test
 
 # Iterate on a schema change and run the integration suite against db-test:
 npm run db:test:migrate:dev
+npm run db:test:seed
 npm run test:e2e
 
 # Once you're satisfied, promote the same migration files to the dev DB:
@@ -191,6 +193,8 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run db:test:migrate:deploy` | Apply existing migrations to `db-test`, no schema drift |
 | `npm run db:test:migrate:status` | Check `db-test` migration history against `schema.prisma` for drift |
 | `npm run db:studio` | Prisma Studio (dev DB) |
+| `npm run db:seed` | Seed the dev DB — the 11 roles + full permission grid (`packages/db/prisma/seed.ts`), idempotent |
+| `npm run db:test:seed` | Same seed, against `db-test` |
 
 ## `scripts/`
 
@@ -247,9 +251,190 @@ is reachable from that preview (there is no hosted API yet, so this is a placeho
 until one exists). The `ibms-brain` submodule isn't needed for the build (it's not an
 npm workspace member) and both repos are public, so no submodule-auth setup is required.
 
+## Security — encryption & key management (Part 10.2)
+
+Field-level encryption, TLS enforcement, and key management live in
+`apps/api/src/modules/security/` (`EncryptionService`, `KeyRegistryService`,
+`encrypted-fields.ts`). Design rationale:
+`ibms-brain/meta/designs/2026-08-a3-encryption-key-management.md`.
+
+- **Field-level encryption.** Every `-- ENCRYPT` schema field
+  (`Customer.nationalIdEnc/contactPhoneEnc/contactEmailEnc`,
+  `UltimateBeneficialOwner.nationalIdEnc`, `InsuredPerson.nationalIdEnc`,
+  `Employee.nationalIdEnc`, `ThirdPartyClaimant.contactDetailsEnc`) is covered by
+  `encryptEntityFields`/`decryptEntityFields` in `encrypted-fields.ts`, AES-256-GCM via
+  `EncryptionService`. `MfaCredential.secretEnc`/`webauthnPublicKeyEnc` keep their own,
+  separate encryption path (`apps/api/src/common/crypto.util.ts`,
+  `MFA_ENCRYPTION_KEY`) — a deliberate second key pool, not an oversight; see the design
+  doc.
+- **Key management.** `PII_ENCRYPTION_KEYS` (`keyId:base64key,...`) and
+  `PII_ENCRYPTION_ACTIVE_KEY_ID` — see `.env.example` for the exact format and a
+  rotation walkthrough. `GET /security/encryption-keys` (SYSTEM_SECURITY_ADMINISTRATOR
+  only — the key-custodian role) returns key ids and active/retired status, never key
+  material. Every encrypt/decrypt call writes an `AuditLogEntry`
+  (`AuditAction.ENCRYPTION_KEY_USED`) recording which key/field/operation was used —
+  never the plaintext or ciphertext.
+- **TLS.** `securityHeaders()` middleware (`apps/api/src/common/`) sets HSTS and rejects
+  any request that didn't arrive over HTTPS; `main.ts` refuses to boot if
+  `DATABASE_URL` lacks `sslmode=require`/`verify-ca`/`verify-full`. Both gate on
+  `NODE_ENV=production` only — local dev and CI have no TLS termination in front of
+  them.
+- **Encryption at rest (database + document store).** Not yet configurable — this repo
+  has no chosen deployment platform (see § Deployment below) and no document-upload
+  service behind `Document.storageRef` yet. Tracked as a deferred requirement in the
+  design doc above: whichever managed Postgres/object-store this project deploys to
+  must have encryption at rest enabled as part of that provisioning decision.
+
+## Known gaps (per completed backlog item)
+
+This repo's backlog (A.x/B.x/C.x task IDs) lives outside this repo, so this list only
+tracks what's genuinely incomplete **within an item that has actually been built** — not
+a project-wide roadmap. Updated in the same change that closes or narrows a gap.
+
+**A.1 — Authentication & Session Management (Part 10.1)**
+
+- **Hardware-token MFA (WebAuthn) is not implemented — and Part 10.1's requirement that
+  privileged roles (SYSTEM_SECURITY_ADMINISTRATOR, EXECUTIVE_MANAGEMENT,
+  BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER) use a hardware
+  token is currently unenforced as a result.** `MfaCredentialType.WEBAUTHN` is
+  schema-reserved only; `AuthService.mfaPolicySatisfied()` computes
+  `requiresHardwareToken(roles)` but only uses it to surface a frontend banner, never to
+  block login — a privileged user with TOTP-only MFA logs in normally today. This is the
+  most compliance-significant gap in what's built so far.
+- No email/notification provider exists, so `POST /auth/forgot-password` cannot deliver
+  a real reset link in any deployed environment. `ENABLE_DEV_RESET_TOKEN` returns the raw
+  token in the response body instead, hard-blocked by `NODE_ENV=production` regardless of
+  the flag — a dev/e2e-only workaround, not a substitute for a real provider.
+- SSO has no identity provider wired — `POST /auth/sso/:provider/callback` returns 501 by
+  design (`SsoController`); `SsoProviderStrategy` is a strategy interface with nothing
+  implementing it yet, since no broker-specific IdP (SAML/OIDC/Azure AD/Okta) has been
+  chosen. This one is a correctly-built stub, not an oversight — Part 10.1 marks SSO
+  "optional per broker."
+- `RequireStepUp` (recent-reauthentication gate for refund approval/data export/disposal,
+  Part 10.1) exists as a decorator + guard but is not applied to any route — there is no
+  business endpoint yet for it to protect. Same "built ahead of the consumer" pattern as
+  the RBAC permission grid and the field-encryption service.
+- Minor: `auth.types.ts`'s `requiresHardwareToken` doc comment points to "the auth module
+  README" — no such file exists in this repo (`apps/api/src/modules/auth/` has no
+  `README.md`). Dangling reference, not a functional gap.
+
+**A.2 — Roles & Permissions / access recertification**
+
+- Instance-level maker≠checker self-check (e.g. one user placing *and* checking the
+  *same* policy) is backlog item A.5 (`assertDifferentActors`) — its own call site here
+  (`AccessRecertificationService.decide()`) now uses it. A.2 only enforces the
+  role-permission-grid level.
+- `AccessRecertificationItem` has no per-`UserRoleAssignment` foreign key — one item is
+  generated per *user* holding any active role, not per role grant, so a "revoked"
+  decision revokes all of that user's active roles, not one.
+- Reviewer-pool assignment always picks the first eligible (≠ subject) member of the
+  COMPLIANCE_OFFICER/BRANCH_DEPARTMENT_MANAGER/EXECUTIVE_MANAGEMENT pool, not
+  round-robin — acceptable for now since there's no manager-hierarchy field on
+  `User`/`Employee` yet.
+- `startCycle` skips (logs a warning on) a subject with no eligible reviewer rather than
+  blocking the whole cycle.
+
+**A.3 — Encryption & Key Management (Part 10.2)**
+
+- Encryption at rest for the database and document store is not configured — no
+  deployment platform is chosen yet and no document-upload service exists behind
+  `Document.storageRef`. See § Security above.
+- No automated re-encryption sweep on key rotation — an operator must re-encrypt
+  existing rows by hand before retiring an old key id. Deferred until real production
+  data and a real rotation event exist to size the sweep against.
+- Key material is env-var-backed, not a real KMS/HSM (AWS KMS, Azure Key Vault, Vault) —
+  `KeyRegistryService`'s interface is deliberately shaped so swapping in a real KMS
+  client later is a contained change, not a redesign.
+- `encryptEntityFields`/`decryptEntityFields` are not wired into any repository yet —
+  `Customer`/`UltimateBeneficialOwner`/`InsuredPerson`/`Employee`/`ThirdPartyClaimant`
+  have no CRUD module (Part C business modules aren't built). The encryption is ready;
+  nothing calls it yet.
+- TLS enforcement covers client-server traffic and the database connection only —
+  there's no third-party/server-to-server HTTP client (Insurer/vendor integration) in
+  the codebase yet to enforce TLS on.
+- `MfaCredential` encryption (`crypto.util.ts`) remains a separate, unrotated key pool
+  from the new PII registry — a deliberate isolation choice, not an oversight; see the
+  design doc's Alternatives table.
+
+**A.4 — Immutable Audit Trail (Part 10.3)**
+
+- Write-on-every-action (`AuditService.record()`), the DB-level immutability trigger
+  (`packages/db/prisma/migrations/20260826083942_add_audit_log_entry_immutability_trigger/`),
+  and anomaly detection (bulk export / off-hours / repeated access,
+  `AuditAnomalyDetectionService`) are all real and e2e-verified — Postgres itself rejects
+  `UPDATE`/`DELETE` on `AuditLogEntry`, not just an app-layer convention.
+- **Not yet done: READ access to Highly Confidential data is not actually logged.** The
+  mechanism exists (`AuditAction.READ`, `AuditLogEntry.isSensitiveDataAccess`, and
+  `AuditAnomalyDetectionService` keys its "repeated unjustified access" pattern off it),
+  but no code path in the app calls `audit.record({ action: 'READ', ... })` for a real
+  business-entity read today — only test fixtures use it. The only live producer of
+  `isSensitiveDataAccess: true` is `EncryptionService.decrypt()`, logged as
+  `ENCRYPTION_KEY_USED`, not `READ`. Same root cause as A.5's gap (no Part C business
+  modules — the entities that would actually be read — exist yet); call `audit.record()`
+  with `action: 'READ'` from each entity's read path as its service layer is built.
+- `AuditService`'s retention-cutoff lookup (`getRetentionCutoffDate`) depends on a
+  `RetentionScheduleItem` seed row for `"AuditLogEntry"` — a fresh dev DB without
+  `npm run db:seed` logs a warning and falls back rather than failing, but the log
+  retention SLA isn't actually enforced until that seed exists.
+
+**A.5 — Maker/Checker Rule enforced, not just documented (Part 5.2)**
+
+- `assertDifferentActors(makerId, checkerId, context)` (`apps/api/src/common/`) is the
+  shared application-layer guard; a `CHECK` constraint per table
+  (`packages/db/prisma/migrations/20260826091424_add_maker_checker_check_constraints/`)
+  is the DB-layer backstop, covering all 9 entities in the Part 5.2 table
+  (`KYCRecord`, `PolicyChecking`, `Refund`, `DisposalBatch`, `DataSharingApproval`,
+  `DataProcessingAgreement`, `Settlement`, `CommissionLedgerEntry`, `Recommendation`)
+  plus `AccessRecertificationItem`.
+- Only one of those 10 has a real call site today —
+  `AccessRecertificationService.decide()` calls `assertDifferentActors()` before
+  recording a reviewer decision. The other 9 have no repository/service layer yet (Part
+  C business modules aren't built — see `CLAUDE.md`), so the helper isn't wired into an
+  approval write-path for them; the DB `CHECK` constraint is what actually enforces the
+  invariant for those tables today. Wire `assertDifferentActors()` into each one's
+  approve/check/DPO-approve write path as its service layer is built.
+- `DataProcessingAgreement.assessedByUserId` and
+  `CommissionLedgerEntry.overrideRequestedByUserId` are new maker-side columns added to
+  give those two entities' pre-existing checker fields something to be checked against
+  — neither previously had a maker field in the schema. Both are nullable, so — same as
+  `Settlement`/`CommissionLedgerEntry`'s existing approver pairs — a row can reach a
+  checked state with no maker recorded at all; the `CHECK` constraint only rejects an
+  actual maker==checker match, it doesn't require both to be populated.
+
+**A.6 — Workflow Transition Engine (Part 2 "Workflow & Notifications")**
+
+- `WorkflowTransitionService.transition()` (`apps/api/src/modules/workflow/`) and the
+  `WORKFLOW_TRANSITIONS` map covering all 11 workflow status enums are built and
+  unit-tested, but nothing calls `transition()` yet — same root cause as A.5's gap: no
+  Part C business modules (`PolicyService`, `ClaimService`, etc.) exist to call it from.
+  Wire each one's status-changing write path through `transition()` as it's built.
+- Two entities' transition maps (`RFQInsurer`, `Invoice`) are inferred from schema field
+  semantics rather than transcribed from an explicit lifecycle document — flagged inline
+  in `workflow-transitions.config.ts`, candidates for a `/brain-gap` confirmation.
+- The `sideEffect` extension point (for a linked SLA timer/notification/recompute) has no
+  registered consumer yet — no timer/notification service exists in this repo.
+
+**A.7 — Fils-Precision Money Arithmetic (Part 3.6 Controls)**
+
+- `money.util.ts` (`apps/api/src/common/`) fixes `Decimal(18,3)` + `ROUND_HALF_UP` as the
+  only sanctioned way to add/subtract/apply a percentage to a JOD amount, and
+  `money-fields.inventory.ts` classifies all 54 `Decimal` fields in `schema.prisma` as
+  money vs. rate/ratio, self-checked against the live schema. Both are unit-tested, but —
+  same root cause as A.6 — nothing in the codebase actually calls these helpers yet, since
+  no service layer does premium/commission/claim arithmetic. Any future service touching a
+  `MONEY_DECIMAL_FIELDS` entry must go through this helper, never a raw `Prisma.Decimal`
+  method call or a JS `number`.
+  `CommissionLedgerEntry.overrideRequestedByUserId` are new maker-side columns added to
+  give those two entities' pre-existing checker fields something to be checked against
+  — neither previously had a maker field in the schema. Both are nullable, so — same as
+  `Settlement`/`CommissionLedgerEntry`'s existing approver pairs — a row can reach a
+  checked state with no maker recorded at all; the `CHECK` constraint only rejects an
+  actual maker==checker match, it doesn't require both to be populated.
+
 ## Deployment
 
 **Not decided.** Docker images build correctly and can run anywhere that accepts a
 container; nothing here assumes AWS, Azure, Fly, Render, or any other target. Record the
 decision in `ibms-brain/meta/designs/` the day it's made, and update this section in the
-same change.
+same change — including enabling encryption at rest on whatever managed database/object
+storage is chosen (see § Security above).

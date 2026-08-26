@@ -46,4 +46,12 @@ echo "smoke: GET /health/db (proves the service can reach Postgres, not just tha
 curl -sf "${BASE_URL}/health/db"
 echo
 
+echo "smoke: GET /auth/me with no token (proves the auth guard is really wired into the running app, not just covered by tests)"
+status="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/auth/me")"
+if [ "$status" != "401" ]; then
+  echo "smoke: FAILED — expected 401 Unauthorized, got ${status}" >&2
+  exit 1
+fi
+echo "smoke: got 401 as expected"
+
 echo "smoke: OK"

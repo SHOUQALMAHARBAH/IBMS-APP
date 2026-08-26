@@ -59,6 +59,15 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ibms}:${POSTGRES_PASSWORD:-ibms}@db:5432/${POSTGRES_DB:-ibms}?schema=public
       PORT: ${PORT:-4000}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      # Dev-only fallbacks below, same placeholders as .env.example — this
+      # compose stack has no production deployment target yet (see README),
+      # so real per-environment secrets aren't wired here. Set these in .env
+      # to override.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-change-me-32-characters-minimum}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-jWvaaenpb1O7k9jMlLZhRTeQFNJ1jQOFTUHtzgTHNtg=}
+      PII_ENCRYPTION_KEYS: ${PII_ENCRYPTION_KEYS:-v1:DzVvLT8z/wNB6UZW2cglf0EEajI/+hjMXk8WlVfHphI=}
+      PII_ENCRYPTION_ACTIVE_KEY_ID: ${PII_ENCRYPTION_ACTIVE_KEY_ID:-v1}
+      ENABLE_DEV_RESET_TOKEN: ${ENABLE_DEV_RESET_TOKEN:-false}
     ports:
       - "4000:4000"
     healthcheck:

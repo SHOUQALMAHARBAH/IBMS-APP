@@ -1,11 +1,27 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
+import type { INestApplication } from '@nestjs/common';
+import {
+  DocumentBuilder,
+  SwaggerModule,
+  type OpenAPIObject,
+} from '@nestjs/swagger';
 import Ajv from 'ajv';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
+import type { App } from 'supertest/types';
+import { authenticator } from 'otplib';
+import { prisma } from '@ibms/db';
+import { createTestApp } from './utils/test-app';
+
+interface MfaEnrollBody {
+  credentialId: string;
+  otpAuthUri: string;
+}
+
+function secretFromOtpAuthUri(uri: string): string {
+  const match = /[?&]secret=([^&]+)/.exec(uri);
+  if (!match) throw new Error('No secret in otpauth URI');
+  return match[1];
+}
 
 // Validates that real HTTP responses conform to the OpenAPI document generated
 // from the controllers' `@Api*Response` decorators — the contract is the
@@ -18,13 +34,7 @@ describe('API contract (OpenAPI)', () => {
   const ajv = new Ajv();
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
-
+    app = await createTestApp();
     document = SwaggerModule.createDocument(
       app,
       new DocumentBuilder().setTitle('IBMS API').setVersion('0.0.1').build(),
@@ -60,4 +70,79 @@ describe('API contract (OpenAPI)', () => {
       expect(valid, ajv.errorsText(validate.errors)).toBe(true);
     },
   );
+
+  it('GET /auth/me (200) matches its documented OpenAPI schema', async () => {
+    const email = `contract-${Date.now()}-${Math.random().toString(36).slice(2)}@ibms.test`;
+    const password = 'Correct-Horse-Battery-Staple-9';
+    await request(app.getHttpServer())
+      .post('/auth/signup')
+      .send({ fullName: 'Contract Test', email, password })
+      .expect(201);
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    const accessToken = (login.body as { accessToken: string }).accessToken;
+
+    const res = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    const validate = ajv.compile(responseSchema('/auth/me', 200));
+    const valid = validate(res.body);
+    expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+  });
+
+  it('GET /rbac/roles (200) matches its documented OpenAPI schema', async () => {
+    const email = `contract-rbac-${Date.now()}-${Math.random().toString(36).slice(2)}@ibms.test`;
+    const password = 'Correct-Horse-Battery-Staple-9';
+    await request(app.getHttpServer())
+      .post('/auth/signup')
+      .send({ fullName: 'Contract RBAC Test', email, password })
+      .expect(201);
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    const accessToken = (
+      login.body as { accessToken: string; user: { id: string } }
+    ).accessToken;
+    const userId = (login.body as { user: { id: string } }).user.id;
+
+    // MfaRequiredGuard and RolesGuard/PermissionsGuard both run before this
+    // route resolves — enroll MFA and grant the admin role first, same as
+    // rbac.e2e-spec.ts.
+    const enroll = await request(app.getHttpServer())
+      .post('/auth/mfa/totp/enroll')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201);
+    const enrollBody = enroll.body as MfaEnrollBody;
+    const secret = secretFromOtpAuthUri(enrollBody.otpAuthUri);
+    await request(app.getHttpServer())
+      .post('/auth/mfa/totp/enroll/verify')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        credentialId: enrollBody.credentialId,
+        code: authenticator.generate(secret),
+      })
+      .expect(200);
+    const role = await prisma.role.upsert({
+      where: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
+      update: {},
+      create: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
+    });
+    await prisma.userRoleAssignment.upsert({
+      where: { userId_roleId: { userId, roleId: role.id } },
+      update: { revokedAt: null },
+      create: { userId, roleId: role.id },
+    });
+
+    const res = await request(app.getHttpServer())
+      .get('/rbac/roles')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    const validate = ajv.compile(responseSchema('/rbac/roles', 200));
+    const valid = validate(res.body);
+    expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+  });
 });

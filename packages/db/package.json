@@ -4,6 +4,9 @@
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "build": "dotenv -e ../../.env -- prisma generate && tsc",
     "generate": "dotenv -e ../../.env -- prisma generate",
@@ -15,7 +18,10 @@
     "migrate:test:status": "dotenv -e ../../.env.test -- prisma migrate status",
     "validate": "dotenv -e ../../.env -- prisma validate",
     "studio": "dotenv -e ../../.env -- prisma studio",
-    "typecheck": "tsc --noEmit"
+    "seed": "dotenv -e ../../.env -- prisma db seed",
+    "seed:test": "dotenv -e ../../.env.test -- prisma db seed",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "6.19.3"
@@ -23,6 +29,8 @@
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
     "prisma": "6.19.3",
-    "typescript": "^5.7.3"
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.7"
   }
 }
