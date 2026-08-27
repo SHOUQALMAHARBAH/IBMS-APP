@@ -131,6 +131,13 @@ export default function CustomerProfilePage() {
       'EXECUTIVE_MANAGEMENT',
     ].includes(role),
   );
+  const canOpenCrossSell = user.roles.some((role) =>
+    [
+      'SALES_RELATIONSHIP_OFFICER',
+      'BRANCH_DEPARTMENT_MANAGER',
+      'EXECUTIVE_MANAGEMENT',
+    ].includes(role),
+  );
 
   return (
     <main style={pageStyle}>
@@ -295,6 +302,30 @@ export default function CustomerProfilePage() {
             ) : (
               <p style={{ opacity: 0.6 }}>
                 You don&apos;t hold the program.read permission.
+              </p>
+            )}
+          </section>
+
+          <section style={{ marginTop: '2rem' }}>
+            <h2>Cross-sell</h2>
+            <p style={{ opacity: 0.8 }}>
+              Process 8 — a nightly scan compares this customer&apos;s in-force
+              policy lines against a benchmark line list and flags the gaps as
+              cross-sell opportunities to convert or dismiss.
+            </p>
+            {canOpenCrossSell ? (
+              <button
+                type="button"
+                style={{ cursor: 'pointer' }}
+                onClick={() =>
+                  router.push(`/cross-sell?customerId=${customer.id}`)
+                }
+              >
+                Open cross-sell opportunities
+              </button>
+            ) : (
+              <p style={{ opacity: 0.6 }}>
+                You don&apos;t hold the cross-sell.read permission.
               </p>
             )}
           </section>

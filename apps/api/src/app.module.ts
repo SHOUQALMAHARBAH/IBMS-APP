@@ -17,6 +17,7 @@ import { CustomerModule } from './modules/customer/customer.module';
 import { RiskProfileModule } from './modules/risk-profile/risk-profile.module';
 import { NeedsAssessmentModule } from './modules/needs-assessment/needs-assessment.module';
 import { InsuranceProgramModule } from './modules/insurance-program/insurance-program.module';
+import { CrossSellModule } from './modules/cross-sell/cross-sell.module';
 
 @Module({
   imports: [
@@ -77,6 +78,13 @@ import { InsuranceProgramModule } from './modules/insurance-program/insurance-pr
     // /RiskProfileModule/CustomerModule's exported repositories and reuses
     // WorkflowModule for the InsuranceProgram status chain.
     InsuranceProgramModule,
+    // Part C backlog #8 (Cross-Selling) — a nightly job + on-demand scan
+    // flags each benchmark insurance line a customer holds no in-force
+    // policy for, as a CrossSellOpportunity a Sales Officer then converts or
+    // dismisses. Depends on CustomerModule (visibility) and AuthModule (the
+    // scheduler's system-account lookup); reuses WorkflowModule for the
+    // OPEN -> CONVERTED | DISMISSED status chain.
+    CrossSellModule,
   ],
   controllers: [AppController],
   providers: [AppService],

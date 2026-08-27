@@ -666,14 +666,52 @@ model Interaction {
   @@index([customerId])
 }
 
-/// Process 8 — Cross-Selling: system-detected coverage gap vs benchmark.
+/// Process 8 (Cross-Selling) status. OPEN once the detection sweep flags a
+/// gap between a customer's in-force policy lines and the benchmark line
+/// list; CONVERTED when a Sales Officer takes it forward into an
+/// Opportunity/RFQ (Process 11+, not built); DISMISSED (with a reason) when
+/// it is not pursued. Both non-OPEN states are terminal — and the
+/// `@@unique([customerId, gapLine])` on CrossSellOpportunity means a
+/// resolved gap is never re-flagged, so re-opening would be a manual action
+/// with no endpoint yet (same "modeled ahead of a real trigger" shape as
+/// InsuranceProgramStatus.SUPERSEDED). Converted from a free-text String,
+/// the same enum conversion #1/#3-4/#5/#7 did for their status columns.
+enum CrossSellStatus {
+  OPEN
+  CONVERTED
+  DISMISSED
+}
+
+/// Process 8 — Cross-Selling (backlog Part C #8). A system-detected gap
+/// between a customer's in-force policy lines and a benchmark line list —
+/// flagged by the nightly CrossSellDetectionScheduler (or an on-demand
+/// scan via POST /cross-sell-opportunities/detect), then converted or
+/// dismissed. See apps/api/src/modules/cross-sell/.
+///
+/// `status` moves ONLY through WorkflowTransitionService (A.6) — see
+/// ibms-brain/meta/lex/workflow-state-transitions.md.
+///
+/// `@@unique([customerId, gapLine])` is the race-safe backstop
+/// (ibms-brain/meta/lex/race-safe-invariants.md): at most one opportunity
+/// per (customer, benchmark line), ever — the detection sweep inserts with
+/// `skipDuplicates`, so a re-run or a concurrent run adds nothing.
 model CrossSellOpportunity {
   id           String   @id @default(uuid())
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
-  gapLine      String   // e.g. "Liability" when customer only has Motor
+  gapLine      String   // a benchmark insuranceLine the customer holds no in-force policy for, e.g. "Public Liability"
+  status       CrossSellStatus @default(OPEN)
   detectedAt   DateTime @default(now())
-  status       String   @default("open") // open | converted | dismissed
+  /// The actor behind the detection run — the system service account for
+  /// the nightly sweep, the Sales Officer for an on-demand scan. Bare
+  /// scalar, no relation; the AuditLogEntry is the authoritative trail.
+  detectedByUserId String?
+  resolvedByUserId String?
+  resolvedAt   DateTime?
+  dismissReason String?
+
+  @@unique([customerId, gapLine])
+  @@index([status])
 }
 
 /// Process 9 — Up-Selling: under-insurance vs updated asset values.

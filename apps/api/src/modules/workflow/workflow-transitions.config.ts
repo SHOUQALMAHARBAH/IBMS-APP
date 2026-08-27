@@ -1,6 +1,7 @@
 import type {
   ClaimStatus,
   ComplaintStatus,
+  CrossSellStatus,
   CustomerStatus,
   DisposalBatchStatus,
   DsrStatus,
@@ -22,21 +23,23 @@ import type { PrismaService } from '../../prisma/prisma.service';
 /**
  * The eleven workflow-state entities named in
  * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6,
- * plus `Lead`, `KYCRecord`, `Customer`, `NeedsAssessment`, and
- * `InsuranceProgram` — the lex file's rule is not scoped to that named list
- * ("Every entity that carries a workflow state ... moves through a
- * transition()"), and each of these backlog items (Part C #1 Lead
- * Management, #3-4 Customer Acquisition/Onboarding, #5 Needs Assessment, #7
- * Product Recommendation / Program Design) explicitly asks for a governed
- * status move, so they reuse this engine rather than growing one-off
- * transition functions. `KycStatus` and `CustomerStatus` were added
- * together: backlog #3-4 explicitly says "do not activate Customer.status =
- * ACTIVE before [KYC] approval" — see kyc.service.ts, the sole caller of the
- * Customer transition. `NeedsAssessmentStatus` carries the review/approval
- * gate the #5 backlog item asks for — see needs-assessment.service.ts.
- * `InsuranceProgramStatus` carries the DRAFT -> FINALIZED lock the #7
- * backlog item's program-assembly implies — see
- * insurance-program.service.ts.
+ * plus `Lead`, `KYCRecord`, `Customer`, `NeedsAssessment`,
+ * `InsuranceProgram`, and `CrossSellOpportunity` — the lex file's rule is
+ * not scoped to that named list ("Every entity that carries a workflow
+ * state ... moves through a transition()"), and each of these backlog items
+ * (Part C #1 Lead Management, #3-4 Customer Acquisition/Onboarding, #5 Needs
+ * Assessment, #7 Product Recommendation / Program Design, #8 Cross-Selling)
+ * explicitly asks for a governed status move, so they reuse this engine
+ * rather than growing one-off transition functions. `KycStatus` and
+ * `CustomerStatus` were added together: backlog #3-4 explicitly says "do not
+ * activate Customer.status = ACTIVE before [KYC] approval" — see
+ * kyc.service.ts, the sole caller of the Customer transition.
+ * `NeedsAssessmentStatus` carries the review/approval gate the #5 backlog
+ * item asks for — see needs-assessment.service.ts. `InsuranceProgramStatus`
+ * carries the DRAFT -> FINALIZED lock the #7 backlog item's program-assembly
+ * implies — see insurance-program.service.ts. `CrossSellStatus` carries the
+ * "convert/dismiss the opportunity" move the #8 backlog item asks for — see
+ * cross-sell.service.ts.
  * The string values match the `entityType` already used for these models'
  * AuditLogEntry rows elsewhere (AuditService is polymorphic on this same
  * string), so a TRANSITION audit row and any other action on the same
@@ -58,7 +61,8 @@ export type WorkflowEntityType =
   | 'KYCRecord'
   | 'Customer'
   | 'NeedsAssessment'
-  | 'InsuranceProgram';
+  | 'InsuranceProgram'
+  | 'CrossSellOpportunity';
 
 /** Maps each entity to the Prisma-generated enum type its `status` column holds. */
 export interface WorkflowStatusMap {
@@ -78,6 +82,7 @@ export interface WorkflowStatusMap {
   Customer: CustomerStatus;
   NeedsAssessment: NeedsAssessmentStatus;
   InsuranceProgram: InsuranceProgramStatus;
+  CrossSellOpportunity: CrossSellStatus;
 }
 
 /**
@@ -401,6 +406,23 @@ export const WORKFLOW_TRANSITIONS: {
     FINALIZED: ['DRAFT', 'SUPERSEDED'],
     SUPERSEDED: [],
   },
+
+  // Backlog Part C #8 (Cross-Selling), verbatim: "Convert/dismiss the
+  // opportunity". A CrossSellOpportunity is created OPEN by the detection
+  // sweep (nothing else creates one — there is no user-facing "raise a
+  // cross-sell opportunity" path); a Sales Officer then either CONVERTED it
+  // (takes the gap forward into an Opportunity/RFQ — Process 11+, not built,
+  // so CONVERTED is terminal here, same "modeled up to the edge of the next
+  // unbuilt process" shape as Lead's CONVERTED_TO_PROSPECT was before Part C
+  // #2) or DISMISSED it (with a reason). Both non-OPEN states are terminal:
+  // the `@@unique([customerId, gapLine])` on CrossSellOpportunity means a
+  // resolved gap is never re-flagged as a new row either (see
+  // cross-sell.service.ts).
+  CrossSellOpportunity: {
+    OPEN: ['CONVERTED', 'DISMISSED'],
+    CONVERTED: [],
+    DISMISSED: [],
+  },
 };
 
 /** True if `to` is a legal next status from `from` for the given entity. */
@@ -469,6 +491,7 @@ export function getWorkflowDelegate(
     Customer: client.customer,
     NeedsAssessment: client.needsAssessment,
     InsuranceProgram: client.insuranceProgram,
+    CrossSellOpportunity: client.crossSellOpportunity,
   };
   return delegates[entityType] as WorkflowDelegate;
 }

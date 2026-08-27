@@ -10,7 +10,7 @@ implements against them. Compliance/PDPL/CBJ obligations still cite the source d
 in `ibms-brain/`, not this README.
 
 **Status:** infrastructure scaffold (Part A + Part B), plus the first Part C business
-modules — **Domain A, Processes 1–7**: Lead Management (#1 — create/list/filter,
+modules — **Domain A, Processes 1–8**: Lead Management (#1 — create/list/filter,
 `LeadStatus` transition, an intake-form + pipeline-board screen), Prospect Management (#2
 — convert a qualified Lead, capture its qualification profile, a profile screen), Customer
 Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
@@ -18,10 +18,13 @@ lifecycle with *simulated* sanctions/PEP/AML screening and maker/checker approva
 step-by-step wizard + Compliance queue), Needs Assessment (#5 — a structured risk
 questionnaire that derives a recommended coverage list, with a review + approval gate),
 Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity period,
-consolidated across a multi-site client), and Product Recommendation / Program Design (#7
+consolidated across a multi-site client), Product Recommendation / Program Design (#7
 — a multi-line `InsuranceProgram` assembled deterministically from an approved Needs
-Assessment's coverage list + the Risk Profile's derived Sum Insured, DRAFT → FINALIZED).
-Everything else — Domain A #8–10, Domains B–H
+Assessment's coverage list + the Risk Profile's derived Sum Insured, DRAFT → FINALIZED),
+and Cross-Selling (#8 — a nightly job + on-demand scan flag each benchmark insurance line
+a customer holds no in-force policy for as a `CrossSellOpportunity` to convert or dismiss;
+`Policy` is empty until Domain B, so it is a correct no-op for now).
+Everything else — Domain A #9–10, Domains B–H
 (policy, claims, finance, service, compliance/risk, management, supporting ops), and
 Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
 **not started**. See § Scope status for the full picture and § Known gaps for the
@@ -403,7 +406,7 @@ build actually is today:
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
-### Part C · Domain A #1–7 — built, with these deferrals
+### Part C · Domain A #1–8 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -413,10 +416,11 @@ build actually is today:
 | 5 | Needs Assessment | fixed questionnaire · deterministic answers→coverage-list derivation · review + approval gate · minimal `RiskProfile` parent | derived coverage list is not manually curatable; the questionnaire is not runtime-configurable; no reassignment; the `APPROVED → Opportunity/RFQ` link is Process 11+ |
 | 6 | Risk Assessment | per-site asset survey (building/equipment/stock/annual-profit/fleet) · deterministic Sum Insured + indemnity-period derivation · multi-site consolidation | no per-asset revision history (a `PATCH` replaces in place) — assembling the survey into an `InsuranceProgram` is Process 7, **now built (row 7)** |
 | 7 | Product Recommendation / Program Design | deterministic assembly of a multi-line `InsuranceProgram` from an APPROVED Needs Assessment's coverage list + the Risk Profile's derived Sum Insured · `InsuranceProgramStatus` DRAFT → FINALIZED (reopen) through the workflow engine (16th entity) · re-assemble in place while DRAFT · per-customer list + detail screen | one `InsuranceProgram` per `RiskProfile` (schema has no program↔multi-`RiskProfile` join — a multi-site client's cross-site roll-up stays the `GET /risk-profiles/consolidated` view, for a human to reference); only Property All Risks + Business Interruption get an asset-derived `sumInsuredBasis`, every other line is `null` (set at RFQ/quotation, Process 11+); no manual line curation; `SUPERSEDED` is modeled but no endpoint triggers it; the `FINALIZED → Opportunity/RFQ` link is Process 11+; `program.assemble` is role-level (no per-officer queue), no maker/checker (the coverage set was maker/checker-approved at #5) |
+| 8 | Cross-Selling | nightly `@Cron` sweep + on-demand `POST /cross-sell-opportunities/detect` compare a customer's in-force `Policy` lines against a benchmark line list and flag the gaps as `CrossSellOpportunity` · `CrossSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (17th entity) · per-customer list + detail screen with inline convert/dismiss | **the Policy module (Domain B) is not built, so `Policy` is empty everywhere and the job is a correct no-op until real policies exist**; `BENCHMARK_LINES` is one conservative global list, not a per-sector table (no sector taxonomy on `Customer`); only customers with ≥1 `ACTIVE` policy are scanned; a resolved (converted/dismissed) gap is never re-flagged (no re-open endpoint); the `CONVERTED → Opportunity/RFQ` link is Process 11+; no maker/checker (acting on a system nudge is single-actor); no per-officer queue; no reassignment |
 
 ### Not started
 
-- **Domain A Processes 8–10** — Cross-Selling (#8), Up-Selling (#9),
+- **Domain A Processes 9–10** — Up-Selling (#9),
   Relationship Management / 360° customer view (#10).
 - **Domains B–H** — Insurance Operations (RFQ / placement / quotation / comparison /
   recommendation / policy issuance / checking / delivery / endorsement, #11–22), Claims
@@ -1243,6 +1247,69 @@ narrows a gap.
   finalize/reopen/re-assemble lifecycle, visibility 404); `insurance-programs.spec.ts`
   Playwright (8 tests incl. `@a11y` + keyboard). Full suites green: 488 api unit, 76 api
   e2e, 4 contract, 54 web e2e, 11 a11y.
+
+**Part C #8 — Cross-Selling (Domain A, Process 8)**
+
+- **`apps/api/src/modules/cross-sell/`**: a nightly `@Cron('0 4 * * *')` sweep
+  (`cross-sell-detection.scheduler.ts`) and an on-demand `POST
+  /cross-sell-opportunities/detect` (`{ customerId }`, new seeded `cross-sell.detect` →
+  Sales/Manager) compare a customer's in-force `Policy` lines against a benchmark line
+  list and flag each missing line as a `CrossSellOpportunity`. `GET
+  /cross-sell-opportunities?customerId=&status=` + `GET /:id` (new seeded
+  `cross-sell.read` → Sales/Manager/Executive); `POST /:id/convert` and `POST /:id/dismiss`
+  (`{ reason }`) under the existing `cross-sell.convert` (Sales only).
+- **Deterministic comparison** (`cross-sell.config.ts`, pure + unit-tested, same
+  philosophy as `insurance-program.config.ts`): `findCoverageGaps(heldLines, benchmark)`
+  returns the benchmark lines a customer holds no in-force policy for, in `BENCHMARK_LINES`
+  declaration order, case- and whitespace-insensitive. `BENCHMARK_LINES` is **one
+  deliberately conservative global list** (Property All Risks, Business Interruption,
+  Public Liability, Workers Compensation) — the vocabulary matches
+  `InsuranceProgramLine.insuranceLine`. A per-sector benchmark table is deferred (the
+  schema has no structured sector taxonomy — `Customer.natureOfBusiness` is free text).
+- **Only customers with ≥1 in-force policy are scanned** (`Policy.status = ACTIVE`) — a
+  customer with no cover is a new-business prospect, not a cross-sell target. **The Policy
+  module (Domain B) is not built, so `Policy` is empty in every environment and both the
+  nightly sweep and an on-demand scan legitimately produce nothing today** — built ahead
+  of its data source, same pattern as the A.8 SLA registry's 13 unwired timer types.
+- **`CrossSellStatus` through `WorkflowTransitionService`** (A.6, 17th entity): `OPEN
+  -[convert]-> CONVERTED` and `OPEN -[dismiss]-> DISMISSED`, both terminal. "Converting"
+  only records the decision — starting the actual Opportunity/RFQ for the gap line is
+  Process 11+ (same edge `NeedsAssessment.APPROVED` sits at). Migration
+  `20260827200000_add_cross_sell_status_enum` converts `CrossSellOpportunity.status` from
+  free-text `String` (the fourth such enum conversion, after `KycStatus` #3-4,
+  `NeedsAssessmentStatus` #5, `InsuranceProgramStatus` #7), adds
+  `detectedByUserId`/`resolvedByUserId`/`resolvedAt`/`dismissReason`, `@@index([status])`,
+  and **`@@unique([customerId, gapLine])`** — the `race-safe-invariants.md` backstop (at
+  most one opportunity per customer+line, ever; the sweep inserts via
+  `createMany({ skipDuplicates })`, so a re-run or two concurrent scans add nothing).
+  Prisma expresses this one directly — no raw SQL, unlike #7's partial index. **Re-run
+  `npm run db:migrate:dev` / `db:test:migrate:dev`, then `npm run db:seed` /
+  `db:test:seed`** for the two new permissions.
+- **No maker/checker** — acting on a system-surfaced nudge is a single-actor Sales task,
+  not an approval. Visibility is inherited from the Customer's owner, same as
+  `lead.service.ts` / `prospect.service.ts` (Sales sees its own book,
+  Manager/Executive the whole book).
+- **`apps/web/app/(app)/cross-sell/`**: a `?customerId=` list with a "Scan for gaps now"
+  button, a last-scan panel (held lines / benchmark / gaps), inline Convert / Dismiss
+  (with a reason), and a detail screen. New "Cross-sell" nav item and a "Cross-sell"
+  section on the customer profile. Four states, `@a11y` + keyboard covered.
+- **Deferred**: a resolved (converted/dismissed) gap is never re-flagged — re-opening
+  isn't just a missing endpoint, it needs the `@@unique([customerId, gapLine])` narrowed
+  to a partial unique on `status = 'OPEN'` first (a migration), so the current shape is a
+  deliberate "one shot per gap, ever". An `OPEN` opportunity is also never auto-closed
+  once the customer later buys that line — `runDetection` only ever adds rows, it does
+  not reconcile existing `OPEN` rows against current cover (moot while `Policy` is empty;
+  wire it in when Domain B lands). The benchmark is global, not per-sector; the
+  `CONVERTED → Opportunity/RFQ` link is Process 11+; `cross-sell.convert` is role-level
+  (no per-officer queue); no reassignment.
+- **Verification**: 20 new api unit tests (`cross-sell.config.spec.ts` ×7,
+  `cross-sell.service.spec.ts` ×10 — incl. a `P2002`-on-a-racing-insert skip,
+  `cross-sell-detection.scheduler.spec.ts` ×3) + 2 new
+  `workflow-transitions.config.spec.ts` cases; `cross-sell.e2e-spec.ts` (7 tests — the
+  gap scan + idempotency, **two concurrent scans → one row per gap**, no-policy no-op,
+  convert/dismiss lifecycle + resolver stamp + terminal 422, dismiss-needs-a-reason 400,
+  RBAC 403, visibility 404); `cross-sell.spec.ts` Playwright (7 tests incl. `@a11y` +
+  keyboard).
 
 ## Deployment
 

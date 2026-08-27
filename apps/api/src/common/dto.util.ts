@@ -10,3 +10,10 @@ import type { TransformFnParams } from 'class-transformer';
 export function emptyStringToUndefined({ value }: TransformFnParams): unknown {
   return value === '' ? undefined : value;
 }
+
+/** Trims a string value, leaving non-strings untouched — pair with
+ * `@IsString()`/`@MinLength()` so " x " can't slip past a length check.
+ * Use as `@Transform(trimIfString)`. */
+export function trimIfString({ value }: TransformFnParams): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}

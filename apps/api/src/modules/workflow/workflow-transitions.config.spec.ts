@@ -27,6 +27,7 @@ const entityTypes: WorkflowEntityType[] = [
   'Customer',
   'NeedsAssessment',
   'InsuranceProgram',
+  'CrossSellOpportunity',
 ];
 
 describe('WORKFLOW_TRANSITIONS', () => {
@@ -349,6 +350,28 @@ describe('isWorkflowTransitionAllowed', () => {
         'SUPERSEDED',
         'FINALIZED',
       ),
+    ).toBe(false);
+  });
+
+  it('allows CrossSellOpportunity OPEN -> CONVERTED and OPEN -> DISMISSED (backlog Part C #8)', () => {
+    expect(
+      isWorkflowTransitionAllowed('CrossSellOpportunity', 'OPEN', 'CONVERTED'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('CrossSellOpportunity', 'OPEN', 'DISMISSED'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a resolved CrossSellOpportunity (both non-OPEN states terminal)', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'CrossSellOpportunity',
+        'CONVERTED',
+        'DISMISSED',
+      ),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed('CrossSellOpportunity', 'DISMISSED', 'OPEN'),
     ).toBe(false);
   });
 });
