@@ -11,5 +11,9 @@ import { LeadModule } from '../lead/lead.module';
   imports: [AuditModule, LeadModule],
   controllers: [ProspectController],
   providers: [ProspectService, ProspectRepository],
+  // CustomerModule (backlog Part C #3-4) validates a Customer's optional
+  // prospectId link the same way this module validates a Prospect's leadId
+  // — reuses this repository rather than duplicating a near-identical one.
+  exports: [ProspectRepository],
 })
 export class ProspectModule {}

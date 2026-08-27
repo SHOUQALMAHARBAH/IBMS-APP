@@ -25,6 +25,9 @@ apps/web/blob-report/
 # logs
 *.log
 npm-debug.log*
+/logs/*
+!/logs/.gitkeep
+!/logs/README.md
 
 # OS
 .DS_Store

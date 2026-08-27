@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { securityHeaders } from './common/security-headers.middleware';
 
@@ -22,7 +23,11 @@ function assertDatabaseTls(): void {
 
 async function bootstrap() {
   assertDatabaseTls();
-  const app = await NestFactory.create(AppModule);
+  // bufferLogs: hold startup logs until the pino logger is wired in below,
+  // so nothing bypasses the redacted/structured pipeline.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.flushLogs();
   app.use(cookieParser());
   app.use(securityHeaders());
   app.useGlobalPipes(

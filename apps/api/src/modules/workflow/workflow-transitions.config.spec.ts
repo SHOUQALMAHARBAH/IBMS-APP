@@ -23,6 +23,9 @@ const entityTypes: WorkflowEntityType[] = [
   'IncidentReport',
   'DisposalBatch',
   'Lead',
+  'KYCRecord',
+  'Customer',
+  'NeedsAssessment',
 ];
 
 describe('WORKFLOW_TRANSITIONS', () => {
@@ -225,6 +228,104 @@ describe('isWorkflowTransitionAllowed', () => {
         'CONVERTED_TO_PROSPECT',
         'DISQUALIFIED',
       ),
+    ).toBe(false);
+  });
+
+  it('follows the KYCRecord model comment chain (backlog Part C #3-4, verbatim)', () => {
+    const chain: Array<
+      Parameters<typeof isWorkflowTransitionAllowed<'KYCRecord'>>[1]
+    > = [
+      'DRAFT',
+      'SUBMITTED',
+      'SCREENING',
+      'EDD',
+      'COMPLIANCE_REVIEW',
+      'APPROVED',
+      'PERIODIC_REVIEW_DUE',
+    ];
+    for (let i = 0; i < chain.length - 1; i++) {
+      expect(
+        isWorkflowTransitionAllowed('KYCRecord', chain[i], chain[i + 1]),
+      ).toBe(true);
+    }
+  });
+
+  it('allows KYCRecord SCREENING -> COMPLIANCE_REVIEW directly (no EDD needed on a clear result)', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'KYCRecord',
+        'SCREENING',
+        'COMPLIANCE_REVIEW',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects KYCRecord DRAFT -> SCREENING (skips SUBMITTED)', () => {
+    expect(isWorkflowTransitionAllowed('KYCRecord', 'DRAFT', 'SCREENING')).toBe(
+      false,
+    );
+  });
+
+  it('rejects any move out of a terminal KYCRecord status', () => {
+    expect(isWorkflowTransitionAllowed('KYCRecord', 'REJECTED', 'DRAFT')).toBe(
+      false,
+    );
+  });
+
+  it('allows Customer PENDING_KYC -> ACTIVE (the sole legal activation move)', () => {
+    expect(
+      isWorkflowTransitionAllowed('Customer', 'PENDING_KYC', 'ACTIVE'),
+    ).toBe(true);
+  });
+
+  it('rejects Customer PENDING_KYC -> SUSPENDED (cannot suspend before activation)', () => {
+    expect(
+      isWorkflowTransitionAllowed('Customer', 'PENDING_KYC', 'SUSPENDED'),
+    ).toBe(false);
+  });
+
+  it('allows NeedsAssessment DRAFT -> PENDING_REVIEW -> REVIEWED -> APPROVED (backlog Part C #5)', () => {
+    const chain: Array<
+      Parameters<typeof isWorkflowTransitionAllowed<'NeedsAssessment'>>[1]
+    > = ['DRAFT', 'PENDING_REVIEW', 'REVIEWED', 'APPROVED'];
+    for (let i = 0; i < chain.length - 1; i++) {
+      expect(
+        isWorkflowTransitionAllowed('NeedsAssessment', chain[i], chain[i + 1]),
+      ).toBe(true);
+    }
+  });
+
+  it('rejects NeedsAssessment DRAFT -> REVIEWED (skips the review submission)', () => {
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'DRAFT', 'REVIEWED'),
+    ).toBe(false);
+  });
+
+  it('rejects NeedsAssessment PENDING_REVIEW -> APPROVED (a review must be recorded first)', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'NeedsAssessment',
+        'PENDING_REVIEW',
+        'APPROVED',
+      ),
+    ).toBe(false);
+  });
+
+  it('lets a manager bounce a NeedsAssessment back to DRAFT from either review stage', () => {
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'PENDING_REVIEW', 'DRAFT'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'REVIEWED', 'DRAFT'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a terminal NeedsAssessment status', () => {
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'APPROVED', 'DRAFT'),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'REJECTED', 'DRAFT'),
     ).toBe(false);
   });
 });

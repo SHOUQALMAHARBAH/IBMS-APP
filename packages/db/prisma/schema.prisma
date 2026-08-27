@@ -506,6 +506,7 @@ model Customer {
   insuredPersons    InsuredPerson[]
   consentRecords    ConsentRecord[]
   dataSubjectRequests DataSubjectRequest[] @relation("DsrCustomer")
+  documents         Document[]           @relation("CustomerDocuments")
   invoices          Invoice[]
   clientFundsLedgerEntries ClientFundsLedgerEntry[]
   serviceRequests   ServiceRequest[]
@@ -552,12 +553,29 @@ model InsuredPerson {
   dataSubjectRequests DataSubjectRequest[] @relation("DsrInsuredPerson")
 }
 
+/// Process 3-4 (Customer Acquisition/Onboarding) KYC lifecycle — mirrors the
+/// model's original comment 1:1 so WorkflowTransitionService (A.6) has a
+/// real enum to govern, the same way LeadStatus does. PERIODIC_REVIEW_DUE is
+/// terminal for THIS row (same pattern as Lead's CONVERTED_TO_PROSPECT): the
+/// actual re-KYC cycle is a new KYCRecord for the same Customer, not a loop
+/// back on this one.
+enum KycStatus {
+  DRAFT
+  SUBMITTED
+  SCREENING
+  EDD
+  COMPLIANCE_REVIEW
+  APPROVED
+  REJECTED
+  PERIODIC_REVIEW_DUE
+}
+
 /// Process 3.1 KYC file (per the Part 3.1 "Core Data Entities" row).
 model KYCRecord {
   id           String    @id @default(uuid())
   customerId   String
   customer     Customer  @relation(fields: [customerId], references: [id])
-  status       String    @default("draft") // Draft->Submitted->Screening->EDD(optional)->Compliance Review->Approved/Rejected->Periodic Review Due
+  status       KycStatus @default(DRAFT)
   isEdd        Boolean   @default(false) // enhanced due diligence
   submittedAt  DateTime?
   // Maker/checker (Part 3.1 Approval row) — capturer != approver
@@ -572,6 +590,19 @@ model KYCRecord {
   riskRating   RiskRating?
 
   @@index([customerId])
+  @@index([status])
+}
+
+enum ScreeningType {
+  SANCTIONS
+  PEP
+  AML
+}
+
+enum ScreeningOutcome {
+  CLEAR
+  HIT
+  PENDING_INVESTIGATION
 }
 
 /// Process 47/49 — sanctions/PEP/AML screening result, at onboarding, on
@@ -580,11 +611,18 @@ model ScreeningResult {
   id           String   @id @default(uuid())
   kycRecordId  String
   kycRecord    KYCRecord @relation(fields: [kycRecordId], references: [id])
-  screeningType String  // sanctions | pep | aml
-  result       String   // clear | hit | pending_investigation
+  screeningType ScreeningType
+  result       ScreeningOutcome
   screenedAt   DateTime @default(now())
   listSource   String?
   escalatedToComplianceAt DateTime?
+
+  @@index([kycRecordId])
+}
+
+enum RiskLevel {
+  STANDARD
+  HIGH
 }
 
 /// Process 3.1/47 — customer risk classification driving screening
@@ -593,7 +631,7 @@ model RiskRating {
   id           String   @id @default(uuid())
   kycRecordId  String   @unique
   kycRecord    KYCRecord @relation(fields: [kycRecordId], references: [id])
-  level        String   // standard | high
+  level        RiskLevel
   reason       String?
   ratedAt      DateTime @default(now())
 }
@@ -666,6 +704,8 @@ model RiskProfile {
   assets       Asset[]
   needsAssessments NeedsAssessment[]
   insurancePrograms InsuranceProgram[]
+
+  @@index([customerId])
 }
 
 /// Part 3.2 — asset data (building value, equipment, stock, fleet size...).
@@ -680,20 +720,44 @@ model Asset {
   indemnityPeriodMonths Int?
   fleetVehicleCount Int?
   createdAt     DateTime @default(now())
+
+  @@index([riskProfileId])
 }
 
-/// Process 5 — structured questionnaire ("what risks do you face").
+enum NeedsAssessmentStatus {
+  DRAFT
+  PENDING_REVIEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+/// Process 5 — structured questionnaire ("what risks do you face") that
+/// derives a recommended coverage list, then goes through review + approval
+/// before it can feed an Opportunity/RFQ. Maker/checker: `createdByUserId`
+/// is the Sales/Relationship Officer who captured it; `reviewedByUserId`/
+/// `approvedByUserId` are the Branch/Department Manager who signs it off —
+/// assertDifferentActors (A.5) plus a DB CHECK enforce the split. `status`
+/// moves ONLY through WorkflowTransitionService (A.6) — see
+/// ibms-brain/meta/lex/workflow-state-transitions.md. APPROVED is terminal
+/// here: linking an approved assessment to an Opportunity/RFQ is Process
+/// 11+, not built yet.
 model NeedsAssessment {
   id            String   @id @default(uuid())
   riskProfileId String
   riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
   questionnaireAnswers Json
   recommendedCoverageLines String[] // Fire, Machinery Breakdown, BI, Workers Comp, Product Liability, Burglary, Public Liability, Motor, Cyber, Group Life...
-  status        String   @default("draft") // Data Collection -> Draft Assessment -> Reviewed -> Approved -> Linked to Opportunity/RFQ
+  status        NeedsAssessmentStatus @default(DRAFT)
+  createdByUserId String
   reviewedByUserId String?
   approvedByUserId String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([riskProfileId])
+  @@index([status])
+  @@index([createdByUserId])
 }
 
 /// Process 6-7 — proposed multi-line Insurance Program.
@@ -2112,6 +2176,10 @@ model Document {
   id               String   @id @default(uuid())
   policyId         String?
   policy           Policy?  @relation("PolicyDocuments", fields: [policyId], references: [id])
+  // Process 3-4 (Customer Acquisition/Onboarding) — APPLICATION_PROPOSAL
+  // onboarding documents attach to a Customer before any Policy exists.
+  customerId       String?
+  customer         Customer? @relation("CustomerDocuments", fields: [customerId], references: [id])
   category         DocumentCategory
   classification   DataClassification
   fileName         String
@@ -2128,6 +2196,7 @@ model Document {
   claimDocuments   ClaimDocument[]
 
   @@index([policyId])
+  @@index([customerId])
   @@index([classification])
 }
 

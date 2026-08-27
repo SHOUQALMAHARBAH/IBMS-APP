@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { LoggingModule } from './common/logging/logging.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -12,6 +13,9 @@ import { SlaModule } from './modules/sla/sla.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { ProspectModule } from './modules/prospect/prospect.module';
+import { CustomerModule } from './modules/customer/customer.module';
+import { RiskProfileModule } from './modules/risk-profile/risk-profile.module';
+import { NeedsAssessmentModule } from './modules/needs-assessment/needs-assessment.module';
 
 @Module({
   imports: [
@@ -25,6 +29,11 @@ import { ProspectModule } from './modules/prospect/prospect.module';
     // rbac/services/access-recertification.scheduler.ts) — registered once,
     // globally, here.
     ScheduleModule.forRoot(),
+    // Part 10.3/10.4 — structured operational logging (pino). First so the
+    // injectable Logger + HTTP request logging cover every module below.
+    // Distinct from AuditModule's immutable AuditLogEntry (the compliance
+    // trail); see common/logging/logging.module.ts.
+    LoggingModule,
     PrismaModule,
     AuditModule,
     // Depends on AuditModule's global AuditService for the TRANSITION audit
@@ -47,6 +56,20 @@ import { ProspectModule } from './modules/prospect/prospect.module';
     // exported LeadRepository (reads the source Lead before converting it)
     // and WorkflowModule (the Lead's CONVERTED_TO_PROSPECT transition).
     ProspectModule,
+    // Part C backlog #3-4 (Customer Acquisition/Onboarding) — depends on
+    // ProspectModule's exported ProspectRepository (validates an optional
+    // prospectId link), SecurityModule (field encryption/masking, its first
+    // real consumer), and WorkflowModule/SlaModule (KYCRecord/Customer
+    // status transitions, the two new kyc_*_review SLA timers).
+    CustomerModule,
+    // Part C backlog #5 (Needs Assessment) — depends on CustomerModule's
+    // exported CustomerRepository (a Risk Profile inherits its Customer's
+    // visibility). RiskProfileModule is the minimal parent-record home
+    // Process 6 (the asset survey) will build on; NeedsAssessmentModule
+    // carries the questionnaire + review/approval gate and reuses
+    // WorkflowModule for the NeedsAssessment status chain.
+    RiskProfileModule,
+    NeedsAssessmentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

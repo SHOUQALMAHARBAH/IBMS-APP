@@ -1,12 +1,15 @@
 import type {
   ClaimStatus,
   ComplaintStatus,
+  CustomerStatus,
   DisposalBatchStatus,
   DsrStatus,
   EndorsementStatus,
   IncidentStatus,
   InvoiceStatus,
+  KycStatus,
   LeadStatus,
+  NeedsAssessmentStatus,
   OpportunityStatus,
   PolicyStatus,
   Prisma,
@@ -18,11 +21,17 @@ import type { PrismaService } from '../../prisma/prisma.service';
 /**
  * The eleven workflow-state entities named in
  * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6,
- * plus `Lead` — the lex file's rule is not scoped to that named list ("Every
- * entity that carries a workflow state ... moves through a transition()"),
- * and backlog Part C #1 (Lead Management) explicitly asks for a governed
- * `LeadStatus` transition, so it reuses this engine rather than growing a
- * second one-off transition function.
+ * plus `Lead`, `KYCRecord`, `Customer`, and `NeedsAssessment` — the lex
+ * file's rule is not scoped to that named list ("Every entity that carries a
+ * workflow state ... moves through a transition()"), and each of these
+ * backlog items (Part C #1 Lead Management, #3-4 Customer Acquisition/
+ * Onboarding, #5 Needs Assessment) explicitly asks for a governed status
+ * move, so they reuse this engine rather than growing one-off transition
+ * functions. `KycStatus` and `CustomerStatus` were added together: backlog
+ * #3-4 explicitly says "do not activate Customer.status = ACTIVE before
+ * [KYC] approval" — see kyc.service.ts, the sole caller of the Customer
+ * transition. `NeedsAssessmentStatus` carries the review/approval gate the
+ * #5 backlog item asks for — see needs-assessment.service.ts.
  * The string values match the `entityType` already used for these models'
  * AuditLogEntry rows elsewhere (AuditService is polymorphic on this same
  * string), so a TRANSITION audit row and any other action on the same
@@ -40,7 +49,10 @@ export type WorkflowEntityType =
   | 'DataSubjectRequest'
   | 'IncidentReport'
   | 'DisposalBatch'
-  | 'Lead';
+  | 'Lead'
+  | 'KYCRecord'
+  | 'Customer'
+  | 'NeedsAssessment';
 
 /** Maps each entity to the Prisma-generated enum type its `status` column holds. */
 export interface WorkflowStatusMap {
@@ -56,6 +68,9 @@ export interface WorkflowStatusMap {
   IncidentReport: IncidentStatus;
   DisposalBatch: DisposalBatchStatus;
   Lead: LeadStatus;
+  KYCRecord: KycStatus;
+  Customer: CustomerStatus;
+  NeedsAssessment: NeedsAssessmentStatus;
 }
 
 /**
@@ -300,6 +315,66 @@ export const WORKFLOW_TRANSITIONS: {
     CONVERTED_TO_PROSPECT: [],
     DISQUALIFIED: [],
   },
+
+  // Backlog Part C #3-4 (Customer Acquisition/Onboarding), transcribed
+  // verbatim from the KYCRecord model comment in schema.prisma: "Draft ->
+  // Submitted -> Screening -> EDD(optional) -> Compliance Review ->
+  // Approved/Rejected -> Periodic Review Due". EDD is reachable only from
+  // SCREENING (ScreeningService decides the branch once results are in, or
+  // a Compliance Officer forces it via kyc.edd.trigger — see
+  // kyc.service.ts); COMPLIANCE_REVIEW is reachable from either SCREENING
+  // (no hit) or EDD (enhanced review complete). PERIODIC_REVIEW_DUE is
+  // terminal for THIS row, same shape as Lead's CONVERTED_TO_PROSPECT: the
+  // actual re-KYC cycle is a new KYCRecord for the same Customer (see
+  // KycPeriodicReviewScheduler), not a loop back onto this one.
+  KYCRecord: {
+    DRAFT: ['SUBMITTED'],
+    SUBMITTED: ['SCREENING'],
+    SCREENING: ['EDD', 'COMPLIANCE_REVIEW'],
+    EDD: ['COMPLIANCE_REVIEW'],
+    COMPLIANCE_REVIEW: ['APPROVED', 'REJECTED'],
+    APPROVED: ['PERIODIC_REVIEW_DUE'],
+    REJECTED: [],
+    PERIODIC_REVIEW_DUE: [],
+  },
+
+  // Backlog Part C #3-4: "do not activate Customer.status = ACTIVE before
+  // [KYC] approval" — ACTIVE is reachable only from PENDING_KYC, and the
+  // sole caller of that move is KycService.approve() (maker/checker-gated;
+  // see maker-checker.util.ts). SUSPENDED/CLOSED have no dedicated lifecycle
+  // doc in this backlog item — modeled the same way every other sibling
+  // entity in this file models its "something went wrong later" exits:
+  // reachable from ACTIVE, with SUSPENDED able to return to ACTIVE (a
+  // resolved suspension) or move on to CLOSED. Worth a `/brain-gap` to
+  // confirm against a real post-onboarding account-management process once
+  // one exists (Domain A Processes 5-10 aren't built yet).
+  Customer: {
+    PENDING_KYC: ['ACTIVE'],
+    ACTIVE: ['SUSPENDED', 'CLOSED'],
+    SUSPENDED: ['ACTIVE', 'CLOSED'],
+    CLOSED: [],
+  },
+
+  // Backlog Part C #5 (Needs Assessment), from the model's own status
+  // comment ("Data Collection -> Draft Assessment -> Reviewed -> Approved ->
+  // Linked to Opportunity/RFQ") narrowed to what is buildable now. The
+  // Sales Officer captures/edits in DRAFT and submits for review; the
+  // Branch/Department Manager (needs-assessment.approve) records a review,
+  // then an approval — two stamped columns (reviewedByUserId then
+  // approvedByUserId), each maker/checker-gated against createdByUserId (see
+  // needs-assessment.service.ts). A manager can bounce it back to DRAFT
+  // (returned for changes) from either PENDING_REVIEW or REVIEWED, or
+  // REJECTED it outright. APPROVED is terminal here: linking an approved
+  // assessment to an Opportunity/RFQ is Process 11+, not built — same
+  // "modeled up to the edge of the next unbuilt process" shape as Lead's
+  // CONVERTED_TO_PROSPECT was before Part C #2.
+  NeedsAssessment: {
+    DRAFT: ['PENDING_REVIEW'],
+    PENDING_REVIEW: ['REVIEWED', 'DRAFT', 'REJECTED'],
+    REVIEWED: ['APPROVED', 'DRAFT', 'REJECTED'],
+    APPROVED: [],
+    REJECTED: [],
+  },
 };
 
 /** True if `to` is a legal next status from `from` for the given entity. */
@@ -364,6 +439,9 @@ export function getWorkflowDelegate(
     IncidentReport: client.incidentReport,
     DisposalBatch: client.disposalBatch,
     Lead: client.lead,
+    KYCRecord: client.kYCRecord,
+    Customer: client.customer,
+    NeedsAssessment: client.needsAssessment,
   };
   return delegates[entityType] as WorkflowDelegate;
 }

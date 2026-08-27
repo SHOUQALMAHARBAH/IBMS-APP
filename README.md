@@ -9,13 +9,23 @@ just a note saying to go read it elsewhere. This repo does not restate those rul
 implements against them. Compliance/PDPL/CBJ obligations still cite the source document
 in `ibms-brain/`, not this README.
 
-**Status:** infrastructure scaffold, plus the first two Part C business modules. Lead
-Management (Domain A #1 — create/list/filter, `LeadStatus` transition, an intake-form +
-pipeline-board screen) and Prospect Management (Domain A #2 — convert a qualified Lead,
-capture its qualification profile, a profile screen) are implemented; policy, claims, and
-the rest of CRM are not — see `meta/context/data-model.md` in ibms-brain for the logical
-data model this will eventually be built against, and § Known gaps, Part C, below for
-what each module still doesn't do.
+**Status:** infrastructure scaffold (Part A + Part B), plus the first Part C business
+modules — **Domain A, Processes 1–6**: Lead Management (#1 — create/list/filter,
+`LeadStatus` transition, an intake-form + pipeline-board screen), Prospect Management (#2
+— convert a qualified Lead, capture its qualification profile, a profile screen), Customer
+Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
+lifecycle with *simulated* sanctions/PEP/AML screening and maker/checker approval, a
+step-by-step wizard + Compliance queue), Needs Assessment (#5 — a structured risk
+questionnaire that derives a recommended coverage list, with a review + approval gate),
+and Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity period,
+consolidated across a multi-site client). Everything else — Domain A #7–10, Domains B–H
+(policy, claims, finance, service, compliance/risk, management, supporting ops), and
+Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
+**not started**. See § Scope status for the full picture and § Known gaps for the
+deferred edges of each built item; `meta/context/data-model.md` in ibms-brain is the
+logical data model this is built against. A minimal signed-in navigation shell (a sidebar
+plus a `Welcome` landing at `/`) ties the built screens together; the original `/`
+scaffold placeholder is gone, and login now lands on the home page.
 
 ## Stack
 
@@ -53,12 +63,14 @@ ibms-app/
     api/                NestJS backend (port 4000)
       src/
         modules/         Feature modules (each wires its own controller/service)
+        common/          Cross-cutting utilities (money, masking, logging, ...)
         controllers/      Route handlers not yet owned by a feature module
         services/         Business logic not yet owned by a feature module
         repositories/     Data-access layer (wraps @ibms/db)
         middleware/       Cross-cutting request handling (auth, logging, ...)
   packages/
     db/              Shared Prisma schema + generated client (@ibms/db)
+  logs/              Runtime operational logs (pino) — gitignored; see logs/README.md
   ibms-brain/         Standards/rules/context — git submodule, not this repo's code
   docker-compose.yml Postgres + api + web for local/integration use
   turbo.json         Task graph (build/lint/typecheck/test/e2e)
@@ -67,12 +79,16 @@ ibms-app/
 
 `features/` (web) and `controllers/`, `services/` (api) are still empty scaffolding — no
 feature has needed them over its own `modules/` subfolder yet. `modules/`/`repositories/`
-(api) and `lib/`/`components/` (web) now also carry the first two real business features
-(Lead Management — `apps/api/src/modules/lead/`, `apps/web/app/(app)/leads/`; Prospect
-Management — `apps/api/src/modules/prospect/`, `apps/web/app/(app)/prospects/`),
-alongside the infrastructure modules (auth, RBAC, audit, SLA, workflow, security) built
-first. They establish where feature work lands, per `meta/context/policy-lifecycle.md`
-and `meta/context/claims-lifecycle.md` in `ibms-brain`.
+(api) and `lib/`/`components/` (web) now also carry the first real business features (Lead
+Management — `apps/api/src/modules/lead/`, `apps/web/app/(app)/leads/`; Prospect
+Management — `apps/api/src/modules/prospect/`, `apps/web/app/(app)/prospects/`; Customer
+Acquisition/Onboarding — `apps/api/src/modules/customer/`,
+`apps/web/app/(app)/customers/`; Needs Assessment + minimal Risk Profile —
+`apps/api/src/modules/needs-assessment/` + `apps/api/src/modules/risk-profile/`,
+`apps/web/app/(app)/needs-assessments/`), alongside the infrastructure modules (auth,
+RBAC, audit, SLA, workflow, security) built first. They establish where feature work
+lands, per `meta/context/policy-lifecycle.md` and `meta/context/claims-lifecycle.md` in
+`ibms-brain`.
 
 ## Prerequisites
 
@@ -338,11 +354,102 @@ Field-level encryption, TLS enforcement, and key management live in
   `.env.uat.example` + docker-compose's `db-uat` service give UAT its own local
   database, separate from `db`/`db-test`.
 
+## Logging (Part 10.3/10.4)
+
+`apps/api` uses **pino** (`nestjs-pino`) for structured operational logs — request
+traces, debug output, error stacks. Config is one pure, unit-tested function,
+`buildLoggerParams()` in `apps/api/src/common/logging/logger.options.ts`
+(wired by `LoggingModule`, and `app.useLogger()` in `main.ts` so every
+`@nestjs/common` `Logger` call routes through it too).
+
+- **This is not the audit trail.** The immutable business `AuditLogEntry`
+  (`apps/api/src/modules/audit`, Postgres, DB-level immutability trigger) is the
+  legal/compliance record. These logs are for engineering incident triage.
+- **Bodies are never logged.** The custom `req`/`res` serializers emit only
+  `id` / `method` / `url` / `remoteAddress` / `user-agent` and `statusCode` — no
+  headers, no request/response body, ever. On top of that, `redact` scrubs
+  `Authorization`/`Cookie` and known secret/national-ID/contact-field keys to
+  `[redacted]`. This is the mandatory `ibms-brain/meta/lex/sensitive-data-handling.md`
+  rule ("a logging pipeline is exactly such an unencrypted, wide-retention,
+  wide-access channel").
+- **Correlation.** Every request gets an `x-request-id` (reused from the inbound
+  header if present, else generated) echoed on the response and attached to every
+  log line for that request, plus `userId` (id only, never email) once
+  authenticated. `/health*` probes are not logged.
+- **Where it goes.** Console only in local dev (pretty-printed). `NODE_ENV=production`
+  — or `LOG_TO_FILE=true` anywhere — also writes daily-rolling JSON to
+  `LOG_DIR` (default `<repo>/logs`): `api.<date>.<n>.log` (all levels, ~14 kept)
+  and `api-error.<date>.<n>.log` (errors, ~30 kept). `LOG_LEVEL` (default
+  `debug` dev / `info` prod) sets the floor. Under vitest the logger is forced
+  silent with no transports or files. See `logs/README.md`.
+
+## Scope status
+
+The engineering backlog spans **Part A** (security & cross-cutting infra), **Part B**
+(database), **Part C** (74 business processes across Domains A–H), and **Parts D–G**
+(PDPL / M-series, dashboards, bilingual UI, a final verification checklist). Where the
+build actually is today:
+
+- **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
+  enforcement, an SSO identity provider, an email/notification provider,
+  encryption-at-rest, a real KMS/HSM, load-test-driven performance indexes, independent
+  penetration testing) are each documented under § Known gaps and mostly wait on a
+  deployment-target decision.
+- **Part C — Domain A, Processes 1–6 — built and verified** (unit + e2e +
+  Playwright/axe green). Per-process detail below.
+- **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
+  103 models) exist for all of it; there is no application code, no API, and no UI.
+
+### Part C · Domain A #1–6 — built, with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 1 | Lead Management | create · list/filter · `LeadStatus` transitions · intake + pipeline board | no reassignment; `Lead.marketingConsentGranted` is a bare boolean, not an SLA-timed `ConsentRecord`; no Lead-response SLA timer |
+| 2 | Prospect Management | Lead→Prospect conversion · full qualification profile · profile screen | `Prospect.status` has no workflow-engine transitions; no reassignment |
+| 3–4 | Customer Acquisition / Onboarding | individual + corporate forms · KYC lifecycle · UBO capture · sanctions/PEP/AML screening · EDD path · maker/checker approval gate · periodic re-KYC schedule · onboarding wizard + Compliance queue | **screening is simulated against a fictional fixture watchlist — no real sanctions/PEP/AML data provider**; the KYC/EDD review SLA durations and the re-KYC cadence are **unsourced draft figures** (`/brain-gap` filed); a batch/sweep HIT sets `escalatedToComplianceAt` but does **not** auto-suspend the Customer or force a status move; no dedicated "re-screening hits" list beyond the per-KYCRecord queue view; hardware-token MFA (A.1) is not enforced for the privileged approvers |
+| 5 | Needs Assessment | fixed questionnaire · deterministic answers→coverage-list derivation · review + approval gate · minimal `RiskProfile` parent | derived coverage list is not manually curatable; the questionnaire is not runtime-configurable; no reassignment; the `APPROVED → Opportunity/RFQ` link is Process 11+ |
+| 6 | Risk Assessment | per-site asset survey (building/equipment/stock/annual-profit/fleet) · deterministic Sum Insured + indemnity-period derivation · multi-site consolidation | assembling the survey into an `InsuranceProgram` / `InsuranceProgramLine` with per-line Sum Insured is **Process 7**; no per-asset revision history (a `PATCH` replaces in place) |
+
+### Not started
+
+- **Domain A Processes 7–10** — Product Recommendation / Program Design (#7),
+  Cross-Selling (#8), Up-Selling (#9), Relationship Management / 360° customer view (#10).
+- **Domains B–H** — Insurance Operations (RFQ / placement / quotation / comparison /
+  recommendation / policy issuance / checking / delivery / endorsement, #11–22), Claims
+  (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
+  Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
+  regulatory calendar, incident management, internal audit, #47–57), Management reporting
+  (#58–65), Supporting Operations (HR, procurement, IT, document management, vendor
+  management, BCP/DR, knowledge base, #66–74).
+- **Part D — PDPL / M-series** — `ConsentRecord` capture/withdrawal at the 7 touchpoints,
+  `DataSubjectRequest` handling, retention & disposal (`RetentionScheduleItem` /
+  `LegalHold` / `DisposalBatch` / `CertificateOfDestruction`), cross-border transfer
+  gating, one-off `DataSharingApproval`, DPIA screening, version-controlled bilingual
+  privacy notices, the RoPA register, and the DPO workspace screen. The A.8 SLA registry
+  already carries the PDPL timer definitions; nothing consumes them yet.
+- **Part E — dashboards** — none of the six management dashboards (Sales, Policy, Claims,
+  Financial, Compliance, Insurer & Employee Performance) exist.
+- **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
+  is no i18n framework, no RTL layout, no bidirectional-text handling, no locale-aware
+  number/date/currency formatting (Gregorian/Hijri, JOD base + multi-currency), no
+  Arabic-first input or Arabic collation, and no system-generated bilingual documents.
+  Screens implement the loading / empty / error / populated states, but the Part F rule
+  of capturing a screenshot of each state as evidence is not met.
+- **Part G — final verification checklist** — not run as a formal, evidence-attached
+  gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
+  status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
+  where the relevant code exists).
+
+Nothing here has been deployed anywhere and the production target is undecided (§
+Deployment). Part C #1–6 currently live on the `feat/backlog-c1-lead-management` branch;
+none of it is merged to `main` yet.
+
 ## Known gaps (per completed backlog item)
 
 This repo's backlog (A.x/B.x/C.x task IDs) lives outside this repo, so this list only
-tracks what's genuinely incomplete **within an item that has actually been built** — not
-a project-wide roadmap. Updated in the same change that closes or narrows a gap.
+tracks what's genuinely incomplete **within an item that has actually been built** — the
+project-wide picture is § Scope status above. Updated in the same change that closes or
+narrows a gap.
 
 **A.1 — Authentication & Session Management (Part 10.1)**
 
@@ -398,10 +505,11 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
 - Key material is env-var-backed, not a real KMS/HSM (AWS KMS, Azure Key Vault, Vault) —
   `KeyRegistryService`'s interface is deliberately shaped so swapping in a real KMS
   client later is a contained change, not a redesign.
-- `encryptEntityFields`/`decryptEntityFields` are not wired into any repository yet —
-  `Customer`/`UltimateBeneficialOwner`/`InsuredPerson`/`Employee`/`ThirdPartyClaimant`
-  have no CRUD module (Part C business modules aren't built). The encryption is ready;
-  nothing calls it yet.
+- `encryptEntityFields`/`decryptEntityFields` are wired into `CustomerService` (backlog
+  Part C #3-4 — see that entry below) for `Customer`/`UltimateBeneficialOwner`, their
+  first real consumers. `InsuredPerson`/`Employee`/`ThirdPartyClaimant` still have no CRUD
+  module (those Part C business modules aren't built yet) — the encryption is ready for
+  them too; nothing calls it yet.
 - TLS enforcement covers client-server traffic and the database connection only —
   there's no third-party/server-to-server HTTP client (Insurer/vendor integration) in
   the codebase yet to enforce TLS on.
@@ -453,14 +561,29 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
   `Settlement`/`CommissionLedgerEntry`'s existing approver pairs — a row can reach a
   checked state with no maker recorded at all; the `CHECK` constraint only rejects an
   actual maker==checker match, it doesn't require both to be populated.
+- Real call sites now exist as Part C business modules land: `KycService.decide()`
+  (backlog #3-4) and `NeedsAssessmentService.review()`/`.approve()`/`.reject()` (backlog
+  #5) both call `assertDifferentActors()` before recording a checker decision.
+  `NeedsAssessment` also gained a maker-side `createdByUserId` column (same "add the
+  missing maker field" move as `DataProcessingAgreement` above) and two `CHECK`
+  constraints — `reviewedByUserId`/`approvedByUserId` each `<> createdByUserId`
+  (migration `20260827120000_add_needs_assessment_status_enum`).
 
 **A.6 — Workflow Transition Engine (Part 2 "Workflow & Notifications")**
 
 - `WorkflowTransitionService.transition()` (`apps/api/src/modules/workflow/`) and the
-  `WORKFLOW_TRANSITIONS` map covering all 11 workflow status enums are built and
-  unit-tested, but nothing calls `transition()` yet — same root cause as A.5's gap: no
-  Part C business modules (`PolicyService`, `ClaimService`, etc.) exist to call it from.
-  Wire each one's status-changing write path through `transition()` as it's built.
+  `WORKFLOW_TRANSITIONS` map (originally 11 workflow status enums, now 15 — `Lead`,
+  `KYCRecord`, `Customer`, and `NeedsAssessment` were added as their Part C modules
+  landed; the lex rule was never scoped to the original 11) are built and unit-tested.
+  Real callers now exist: `LeadService`, `ProspectService`, `KycService`, and
+  `NeedsAssessmentService`. The remaining status enums (`PolicyStatus`, `ClaimStatus`,
+  etc.) still have no service to call `transition()` from — wire each one's
+  status-changing write path through it as its module is built.
+- `NeedsAssessmentStatus` (backlog #5) was converted from a free-text `String` column to
+  a real Prisma enum in the same move (migration
+  `20260827120000_add_needs_assessment_status_enum`), the same enum conversion #3-4 did
+  for `KycStatus` — a string-literal `status` can't plug into the typed
+  `WORKFLOW_TRANSITIONS` `Record`.
 - Two entities' transition maps (`RFQInsurer`, `Invoice`) are inferred from schema field
   semantics rather than transcribed from an explicit lifecycle document — flagged inline
   in `workflow-transitions.config.ts`, candidates for a `/brain-gap` confirmation.
@@ -530,26 +653,26 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
 
 **A.9 — Data Masking & Leakage Prevention (Part 10.6)**
 
-- `maskTrailing()`, `SensitiveFieldRevealService`, `assertSecureChannel()`,
-  `assertExportAllowed()`/`buildWatermarkText()`, and
-  `assertNoPresetSensitiveDefaults()` are all real and unit-tested (see § Data masking
-  above), but — same root cause as A.5/A.6/A.7/A.8 — nothing in the codebase calls any
-  of them from a real business write/read path yet, since no Part C business module
-  (`CustomerService`, `DocumentService`, a `DataSharingApproval` create/decide
-  endpoint) exists. Wire `SensitiveFieldRevealService.mask()`/`reveal()` into each
-  entity's list/detail read path, `assertSecureChannel()` into
-  `DataSharingApproval`'s create/decide write path, and `assertExportAllowed()` into
-  whatever export/print/download endpoint is built, as each is built.
+- `maskTrailing()`/`SensitiveFieldRevealService` and `assertNoPresetSensitiveDefaults()`
+  now have real callers — `CustomerService` (backlog Part C #3-4, see that entry below)
+  and the customer onboarding wizard's initial-values check, respectively.
+  `assertSecureChannel()` and `assertExportAllowed()`/`buildWatermarkText()` still have
+  none — same root cause as A.5/A.6/A.7/A.8 for the modules that would call them (a
+  `DataSharingApproval` create/decide endpoint, any export/print/download endpoint) —
+  neither exists yet. Wire `assertSecureChannel()` into `DataSharingApproval`'s
+  create/decide write path, and `assertExportAllowed()` into whatever export/print/
+  download endpoint is built, as each is built.
 - `assertExportAllowed()`/`buildWatermarkText()` enforce the business rule and produce
   the watermark text, but don't themselves stamp a PDF/image — no document-rendering or
-  object-storage pipeline exists yet behind `Document.storageRef` (same gap as A.3).
-- `assertNoPresetSensitiveDefaults()` still has no form to call it from — `apps/web`'s one
-  business form so far (the Lead intake form, Part C #1) has no Confidential/Highly
-  Confidential field for it to guard (name/source/phone/email aren't that
-  classification tier; the marketing-consent checkbox defaults to unticked per Part 6.3,
-  a different rule — see Known gaps, Part C, below). It's still a guard for a future
-  KYC/Customer-style form's initial-values builder to call, not something with a UI to
-  verify today.
+  object-storage pipeline exists yet behind `Document.storageRef` (same gap as A.3; Part
+  C #3-4's customer document capture is metadata/reference only for the same reason —
+  see that entry below).
+- `assertNoPresetSensitiveDefaults()` is called once, real, from the customer onboarding
+  wizard (`CustomerOnboardingWizard.tsx`) — against its own literal empty-string initial
+  values, not live form state (calling it against live state would incorrectly throw the
+  moment a real user typed a real national ID; see that component's own comment). Every
+  other `apps/web` business form so far (Lead intake, Prospect qualification) has no
+  Confidential/Highly Confidential field for it to guard.
 - `DataSharingApproval.classification`/`channel` are new required (non-nullable)
   columns added in this change — safe because the table is empty in every environment
   today (no Part C module writes to it yet); a schema with real rows would have needed
@@ -751,8 +874,292 @@ a project-wide roadmap. Updated in the same change that closes or narrows a gap.
 - **No field-level encryption or masking** on `companyName`/`contactPerson`/`location` —
   none of these are classified Confidential/Highly Confidential in this schema, matching
   the same reasoning as Lead's `contactPhone`/`contactEmail` above.
-- Domain A Processes 3-10 (Customer Acquisition/Onboarding through the 360° customer
-  view) remain entirely unbuilt.
+- **Process 5 (Needs Assessment) is now built** — see Part C #5 below. Domain A Processes
+  6-10 (Risk Assessment through the 360° customer view) remain entirely unbuilt.
+
+**Part C #3-4 — Customer Acquisition/Onboarding (Domain A, Processes 3-4)**
+
+- **`apps/api/src/modules/customer/`**: `POST /customers` (individual/corporate,
+  `CreateCustomerDto` branches required fields on `customerType` via `@ValidateIf`),
+  `GET /customers` / `GET /customers/:id` (owner-scoped like Lead/Prospect, plus
+  `customer.360-view.read`'s Compliance/Manager/Exec/Auditor cross-owner grant),
+  `POST /customers/:id/ubos` + `GET .../ubos` (`CORPORATE` only), `POST
+  /customers/:id/documents` + `GET .../documents` (category fixed to
+  `APPLICATION_PROPOSAL` server-side, never caller-chosen), `POST
+  /customers/:id/reveal-field` (justified drill-down). `kyc.controller.ts`: `POST
+  /customers/:id/kyc` (start, `DRAFT`), `.../submit`, `.../run-screening`,
+  `.../rerun-screening`, `.../trigger-edd`, `.../approve`, `.../reject`, `.../schedule-
+  review`, plus `GET /kyc-records` (the Compliance queue) / `GET /kyc-records/:id`. See
+  `kyc.service.ts`'s header comment for the full `KycStatus` chain and which permission
+  gates each step.
+- **First real consumer of A.3 field encryption and A.9 masking/drill-down** for
+  `Customer.nationalIdEnc`/`contactPhoneEnc`/`contactEmailEnc` and
+  `UltimateBeneficialOwner.nationalIdEnc` — `encryptEntityFields`/`decryptEntityFields`
+  (`security/encrypted-fields.ts`) and `SensitiveFieldRevealService` had no caller before
+  this landed (see the A.3 entry above). List endpoints never decrypt at all; only the
+  single-record profile view decrypts-then-masks, and only `reveal-field` returns the true
+  plaintext, gated on a written justification.
+- **A real bug the e2e suite caught before this landed**: `POST /customers` originally
+  returned the bare Prisma `Customer` row straight from `create()` — including the raw
+  `nationalIdEnc`/`contactPhoneEnc`/`contactEmailEnc` ciphertext, verbatim, in the HTTP
+  response. `GET /customers/:id` was correctly masked from the start; the creation
+  response was not, because masking lived only in `get()`. Caught by
+  `customer.e2e-spec.ts`'s "never returns the raw encrypted field" assertion against the
+  real API. Fixed by extracting both code paths onto one shared `toMasked()` helper in
+  `customer.service.ts` — there is now exactly one place a `Customer` becomes an API
+  response, not two that can drift.
+- **`@code-reviewer` (mandatory here — this module touches maker/checker workflow logic
+  and Confidential/Highly Confidential data) caught four more real bugs of the same
+  shape, all fixed before this landed**:
+  - `GET /customers` (`list()`) had the identical raw-ciphertext leak `POST /customers`
+    had — every row's `nationalIdEnc`/`contactPhoneEnc`/`contactEmailEnc` went out
+    verbatim. `list()` never decrypts (masking a field means decrypting it, and doing
+    that for every row of every Customer is the bulk-decrypt pattern Part 10.3's anomaly
+    detection watches for — see that method's own comment), but the raw ciphertext
+    columns are now explicitly stripped from every row regardless.
+  - `POST /customers/:id/ubos` (`addUbo()`) returned the created UBO straight from the
+    repository, including raw `nationalIdEnc` — unlike `listUbos()` a few lines below,
+    which already masked it. Both now share one `toMaskedUbo()` helper.
+  - `addUbo()`/`addDocument()` checked only that the target Customer existed
+    (`customers.findById`), never that the caller owned or could view it — unlike every
+    other method in `CustomerService`. A Sales Officer could add a UBO or document to
+    *any* Customer, not just their own book. Both now go through the same
+    `findOwnedOrVisible()` gate `get()`/`listUbos()`/`listDocuments()` already used.
+  - `KycService.decide()` unconditionally transitioned `Customer` `PENDING_KYC ->
+    ACTIVE` on every approval — which throws (`WorkflowTransitionService`: "already in
+    status ACTIVE") on the *second* KYC approval for the same Customer, i.e. every
+    periodic re-KYC cycle this same backlog item asks for. The throw happened after the
+    KYCRecord was already committed `APPROVED`, its SLA timer resolved, and
+    `nextReviewDueAt` persisted — turning an already-successful approval into a reported
+    422. Fixed by gating the Customer transition on `customer.status === 'PENDING_KYC'`
+    (the only legal predecessor of `ACTIVE`) — a re-approval on an already-`ACTIVE`
+    Customer now simply skips that transition instead of throwing.
+  - Also fixed in the same pass: `ScheduleReviewDto.nextReviewDueAt` accepted any
+    well-formed ISO-8601 date with no future-date check (a past date would be picked up
+    by `KycPeriodicReviewScheduler`'s very next daily sweep); the sanctions/PEP/AML loop
+    in `ScreeningService.run()` recomputed the identical watchlist match three times for
+    an input that never changes between iterations; `customer.constants.ts` shipped with
+    zero consumers (dead code, removed); and the wizard's unreachable "Customer active."
+    success message (the page navigates away immediately after a successful submit, so
+    it could never render) was removed.
+- **A second `@code-reviewer` pass (2026-08-27, run while reviewing Part C #5) found and
+  fixed six more issues in this module** — none in #5's own code:
+  - `KycService.decide()` did the `SCREENING/EDD -> COMPLIANCE_REVIEW -> APPROVED/REJECTED`
+    move as two separate transitions with nothing spanning them; a failure in between
+    stranded the file in the transient `COMPLIANCE_REVIEW` state with no endpoint to
+    resume it. `decide()` now *accepts* `COMPLIANCE_REVIEW` as an entry status and skips
+    the first transition when already there — the "resumable guard" pattern, matching the
+    Prospect non-atomic-write fix (`b57a380`).
+  - `ScreeningService.run()` on a re-screen (`rerunScreening` / the monthly batch)
+    unconditionally overwrote `RiskRating.level` and `KYCRecord.isEdd`, silently
+    *downgrading* a customer who had been escalated to `HIGH`/EDD if a later fixture scan
+    came back CLEAR — with no audit row. It now only ever *escalates* (a CLEAR re-scan
+    keeps a prior `HIGH`; `isEdd` never goes true→false), and audits any actual
+    `RiskRating` change.
+  - `decide()` could approve a file stranded in `SCREENING` by an interrupted
+    `runScreening()` — no `ScreeningResult` rows, no `RiskRating`, activating a Customer
+    with no sanctions/PEP/AML check ever run. `decide()` now refuses a file with zero
+    `ScreeningResult` rows, and `runScreening()` runs the watchlist check *before* the
+    `SCREENING` transition so a failure leaves the file retriable in `SUBMITTED`.
+  - The `decide()` `PENDING_KYC -> ACTIVE` Customer activation now catches the
+    concurrent-approval race (two KYC files for one Customer approved at once): the loser
+    of the `updateMany` race was getting a thrown `ConflictException` *after* its own
+    KYCRecord committed `APPROVED`. It re-checks the Customer and only re-raises if it is
+    genuinely still `PENDING_KYC`.
+  - Both schedulers (`KycPeriodicReviewScheduler`, `ScreeningBatchScheduler`) wrapped
+    their entire per-record loop in one outer try/catch — the first record that threw
+    abandoned every remaining due record until the next scheduled run. The try/catch is
+    now per-record: one failure is logged and the sweep continues. New
+    `*.scheduler.spec.ts` files lock this in.
+  - `CreateCustomerDto` only made `nationalId` *optional* for a CORPORATE body via
+    `@ValidateIf` — it never *rejected* one, so `{ customerType: 'CORPORATE', nationalId:
+    '...' }` passed validation and `CustomerService.create()` still encrypted it into
+    `nationalIdEnc`. A `CustomerTypeFieldCoherence` class-validator now rejects a body
+    that mixes the two forms, and `CustomerService.create()` additionally never maps a
+    field from the wrong form onto the row.
+- **A third `@code-reviewer` pass (2026-08-27, run against a healthy tree while reviewing
+  Part C #6) fixed five more** — again none in #6's own code:
+  - `KycService.decide()` still had a non-resumable span *after* the `KYCRecord ->
+    APPROVED` transition: if the `nextReviewDueAt` write or the `Customer PENDING_KYC ->
+    ACTIVE` activation threw, the file was permanently `APPROVED` while the Customer was
+    stranded `PENDING_KYC` with no endpoint to finish it (and periodic re-KYC never picked
+    it up either, `nextReviewDueAt` being null). The tail is now `finalizeApproval()`, and
+    `decide('APPROVED')` on an already-`APPROVED` file whose tail is demonstrably
+    unfinished resumes it; a genuinely finished approval still gets the `422`.
+  - The monthly `ScreeningBatchScheduler` (and `KycService.rerunScreening()`) skipped
+    every ACTIVE customer whose latest KYC file was `PERIODIC_REVIEW_DUE` — the
+    overdue-re-KYC slice, i.e. exactly the customers whose sanctions/PEP/AML screening
+    most needs to keep running. Both now accept `PERIODIC_REVIEW_DUE` as well as
+    `APPROVED`.
+  - `logger.options.ts` `genReqId` echoed an inbound `x-request-id` straight into
+    `res.setHeader` with no validation — a value containing CR/LF (or any byte outside a
+    safe token set) made `setHeader` throw `ERR_INVALID_CHAR` and `500` the request, a
+    trivially reachable denial vector. It now only reuses a client id matching
+    `/^[A-Za-z0-9._-]{1,128}$/`, else generates a fresh UUID.
+  - `ScreeningService.run()` called `upsertRiskRating` on *every* re-screen, and
+    `upsertRiskRating`'s update branch bumps `ratedAt` and rewrites `reason`
+    unconditionally — so a re-screen that kept the level (a retained `HIGH`) silently
+    mutated the rating row with nothing in the audit trail. It now writes the `RiskRating`
+    only on a real change (first assessment or an escalation), and audits every such
+    write; the per-run "we re-screened and it was CLEAR" evidence is the `ScreeningResult`
+    rows.
+  - `CustomerOnboardingWizard`'s Review step rendered `contactPhone`/`contactEmail` from
+    the `create()` response, which come back *masked* — the officer's final confirmation
+    showed values they couldn't check against what they typed. It now renders the local
+    form state (the typed values), which never leaves the browser.
+- **`KYCRecord.status`, `ScreeningResult.screeningType`/`.result`, and `RiskRating.level`
+  converted from free-text `String` columns to real enums** (migration
+  `20260826170000_add_customer_kyc_screening_enums`) so `KYCRecord` could plug into
+  `WorkflowTransitionService` (A.6) as its 13th entity, `Customer` as the 14th —
+  `KycService.decide()` is the only caller of the `Customer` `PENDING_KYC -> ACTIVE`
+  move, gated on `assertDifferentActors(kyc.createdByUserId, actorUserId, ...)` (A.5) so
+  the Sales Officer who captured a KYC file can never also be its approver.
+- **Sanctions/PEP/AML screening is simulated, not real** — no such data provider exists
+  or is obtainable in this environment (same category of gap as A.1's "no SSO identity
+  provider"). `ScreeningService` checks the Customer's `legalName` and any UBO
+  `fullName`s against a small fictional fixture list
+  (`apps/api/src/modules/customer/sample-watchlist.ts`), hard-gated on `NODE_ENV !==
+  'production'` (same convention as `SAMPLE_INSURERS`/`SAMPLE_USERS`) — in production,
+  every screening result is CLEAR until a real provider is integrated, never a HIT the
+  system can't substantiate. All three `ScreeningType`s check the same fixture list; a
+  real integration would call three distinct providers/lists.
+- **The KYC/EDD review SLA durations and the re-KYC review cadence are drafted, unsourced
+  defaults, not PRIV-SOP/PRIV-STD-cited figures** — unlike every other row in
+  `ibms-brain/meta/lex/pdpl-sla-timers.md`'s registry (all 14 are PDPL-sourced), there is
+  no brain document covering CBJ AML customer-due-diligence turnaround time at all. The
+  two new `SLA_REGISTRY` entries (`kyc_standard_review`: 5 business days,
+  `kyc_edd_review`: 15 business days) and the re-KYC cadence
+  (`RiskLevel.STANDARD`: +12 months, `HIGH`: +6 months, both in `kyc.service.ts`) are
+  reasonable placeholders, explicitly marked `DRAFT, UNSOURCED` in code — a `/brain-gap`
+  was filed for real sourcing before these are cited as compliant in a regulator-facing
+  context.
+- **A recurring screening batch and a periodic re-KYC sweep exist, running as the system
+  service account** (`ScreeningBatchScheduler`, monthly; `KycPeriodicReviewScheduler`,
+  daily) — but a HIT surfaced by either one does not force any status transition or
+  auto-suspend the Customer. It only sets `ScreeningResult.escalatedToComplianceAt` on the
+  new row; making that visible/actionable to Compliance beyond the queue's existing
+  per-KYCRecord view (e.g. a dedicated "re-screening hits" list) is deferred, not built.
+- **No object-storage/upload pipeline exists behind `Document.storageRef`** — same
+  pre-existing gap as A.3 (see that entry above); this module doesn't add one either.
+  `POST /customers/:id/documents` accepts a caller-supplied filename/reference string, not
+  an uploaded file — the wizard's "documents" step is metadata capture, not a real file
+  picker.
+- **The KYC compliance queue has no per-officer assignment** — any user holding
+  `kyc.approve` (role-level, not instance-level, matching the seeded permission grid's own
+  design) can act on any KYCRecord in the queue; there is no "assigned reviewer" concept
+  the way `AccessRecertificationItem` has one.
+- **`CustomerStatus.SUSPENDED`/`.CLOSED` are modeled in `WORKFLOW_TRANSITIONS.Customer`
+  but nothing in this backlog item actually triggers them** — no suspend/close endpoint
+  exists yet; only `PENDING_KYC -> ACTIVE` (via KYC approval) is reachable today. Same
+  "modeled ahead of a real trigger" shape as other not-yet-consumed corners of this
+  codebase.
+- **Fixed a latent e2e test-isolation race, unrelated to this module's own logic but
+  exposed by it**: every `*.e2e-spec.ts` file shares one real Postgres test DB with no
+  isolation between files, and Vitest's default is to run spec files in parallel worker
+  processes. `customer.e2e-spec.ts` (~14 signups across 8 tests) was large enough to
+  reliably trigger two real races when run alongside the rest of the suite: extra
+  `COMPLIANCE_OFFICER` users shifted `AccessRecertificationService`'s "first eligible
+  reviewer" pick (a known, already-documented ordering-not-round-robin gap — see the A.2
+  entry above) out from under a concurrently running assertion in `rbac.e2e-spec.ts`, and
+  the added parallel CPU load pushed a real-time-based TOTP code in `auth.e2e-spec.ts`
+  past its 30-second window. Fixed by setting `fileParallelism: false` in
+  `apps/api/test/vitest-e2e.config.ts` — confirmed this makes all 8 files/53 tests pass
+  reliably; the previous (parallel) default was flaky at this file count. Slower
+  (~15s -> ~90-100s total), but a flaky e2e gate is not real evidence
+  (`ibms-brain/meta/lex/definition-of-done.md`).
+
+**Part C #5 — Needs Assessment (Domain A, Process 5)**
+
+- **`apps/api/src/modules/needs-assessment/`**: `POST /needs-assessments` (captures the
+  questionnaire against a Risk Profile, derives `recommendedCoverageLines`, starts in
+  `DRAFT`), `GET /needs-assessments` (owner-scoped: a Sales Officer sees only what they
+  captured; Placement/Manager/Executive see the whole book), `GET /needs-assessments/:id`,
+  `GET /needs-assessments/questionnaire` (the fixed question set the form renders),
+  `PATCH /needs-assessments/:id` (re-answer while `DRAFT`, owner only), and the lifecycle
+  actions `POST /needs-assessments/:id/{submit,review,approve,return,reject}`. The
+  questionnaire is a fixed config (`needs-assessment.config.ts`) with a deterministic,
+  rule-based answers→coverage mapping — not an admin-editable form builder.
+- **Status is a real `NeedsAssessmentStatus` enum through `WorkflowTransitionService`**
+  (A.6, 15th entity): `DRAFT → PENDING_REVIEW → {REVIEWED → APPROVED | back to DRAFT |
+  REJECTED}`. `APPROVED` is terminal — linking an approved assessment to an
+  Opportunity/RFQ is Process 11+ (not built), the same "modeled up to the edge of the
+  next unbuilt process" shape `Lead.CONVERTED_TO_PROSPECT` had before Part C #2. Migration
+  `20260827120000_add_needs_assessment_status_enum` converts the column from free-text
+  `String` and adds `createdByUserId`.
+- **Maker/checker (A.5)**: the `needs-assessment.approve` role (Branch/Department Manager)
+  that reviews, approves, or rejects must differ from `createdByUserId` (the Sales Officer
+  who captured it) — `assertDifferentActors()` plus two DB `CHECK` constraints
+  (`reviewedByUserId`/`approvedByUserId` each `<> createdByUserId`). The manager who
+  records the review and the one who approves *may* be the same person (no source
+  requires them to differ); only the capturer is excluded from both. e2e proves the guard
+  with a dual-hatted (Sales + Manager) user trying to review their own assessment.
+- **Minimal `RiskProfile` parent record** (`apps/api/src/modules/risk-profile/`): `POST
+  /risk-profiles` + `GET /risk-profiles?customerId=` + `GET /risk-profiles/:id`, capturing
+  only `customerId` + optional `siteLabel` + optional `priorClaimsHistorySummary`. The
+  schema makes `NeedsAssessment.riskProfileId` a required FK to `RiskProfile`, and
+  `RiskProfile` (backlog #6) had no module — so #5 builds the parent shell it needs. The
+  detailed building/equipment/stock/annual-profit/fleet survey, per-asset declared values,
+  and the Sum Insured / indemnity-period derivation were Process 6 — **now built, see Part
+  C #6 below.** `risk-profile.create` is granted to Sales *and* Placement; a Sales Officer
+  can only target a Customer they own, Placement/Manager/Executive any Customer.
+- **New seeded permissions**: `needs-assessment.read` and `risk-profile.read`
+  (`.create`/`.approve` were already in the A.2 grid). Re-run `npm run db:seed` /
+  `db:test:seed`.
+- **Deferred**: no manual curation of the derived coverage list (it's purely rule-derived
+  from the answers — a manager who disagrees returns it for changes, and the officer
+  edits answers); the questionnaire is not runtime-configurable; `NeedsAssessment` has no
+  reassignment path (mirrors Lead/Prospect); the `APPROVED → Opportunity/RFQ` link is
+  Process 11+; the manager review queue has no per-officer assignment (role-level, like
+  the KYC queue).
+- **Verification**: 18 new api unit tests (`needs-assessment.config.spec.ts`,
+  `needs-assessment.service.spec.ts`, `risk-profile.service.spec.ts`) + 6 new
+  `workflow-transitions.config.spec.ts` cases; `needs-assessment.e2e-spec.ts` (9 tests,
+  full flow + maker/checker + RBAC + visibility); `needs-assessments.spec.ts` Playwright
+  (7 tests incl. `@a11y` + keyboard). All green: 414 api unit, 62 api e2e, 4 contract,
+  50 Playwright.
+
+**Part C #6 — Risk Assessment (Domain A, Process 6)**
+
+- **`apps/api/src/modules/risk-profile/`** (extends the #5 parent module): `POST
+  /risk-profiles/:id/assets`, `PATCH /risk-profiles/:id/assets/:assetId` (replaces the
+  asset's survey fields wholesale), `DELETE /risk-profiles/:id/assets/:assetId` (204) —
+  all under the existing `risk-profile.create`. `GET /risk-profiles/:id` now returns
+  `{ ...profile, assets, sumInsured }`, and `GET /risk-profiles/consolidated?customerId=`
+  rolls every site's survey into one consolidated Sum Insured view (`risk-profile.read`).
+- **Deterministic Sum Insured derivation** (`risk-profile.config.ts`, pure + unit-tested,
+  same philosophy as `needs-assessment.config.ts`): property Sum Insured = Σ `declaredValue`
+  over building/equipment/stock/other; Business Interruption Sum Insured = Σ
+  `annualGrossProfit`; indemnity period = the longest BI window; fleet = Σ
+  `fleetVehicleCount` over vehicle assets; total = property + BI. **Every roll-up goes
+  through `money.util.ts`** (fils precision, `ibms-brain/meta/lex/money-decimal-jod.md`) —
+  no raw `Decimal` op, no JS `number`. `deriveSumInsured()` / `consolidateSites()` are the
+  only place the arithmetic lives; the web never re-derives it.
+- **`Asset` carries no workflow state and no maker/checker** — it is survey data captured
+  under `risk-profile.create` and read under `risk-profile.read`, not an approvable
+  record. `Asset` has no `-- ENCRYPT` fields, so no field encryption. An `AssetFieldCoherence`
+  validator keeps the two shapes apart: a `vehicle` asset takes only `fleetVehicleCount`;
+  every other type needs a `declaredValue` and/or `annualGrossProfit`, must not carry a
+  fleet count, and may set `indemnityPeriodMonths` only alongside `annualGrossProfit`.
+- **No new permissions** — the seeded `risk-profile.create` description already reads
+  "Capture a detailed risk survey (Risk Profile/**Asset**)". Migration
+  `20260827160000_add_asset_risk_profile_index` adds `@@index([riskProfileId])` on `Asset`
+  (the one child table that lacked its parent-FK index — `ScreeningResult`, `Interaction`,
+  `KYCRecord` etc. all have theirs). No schema type change, so no `db:generate` needed.
+- **`apps/web/app/(app)/risk-profiles/`**: a per-site asset-survey screen (asset table +
+  add/remove + a "Derived Sum Insured" panel) and a `?customerId=` list showing every site
+  plus the consolidated roll-up. Reached from a "Risk survey" section on the customer
+  profile and a new "Risk surveys" nav item. Four states (loading/empty/error/populated),
+  `@a11y` + keyboard covered.
+- **Deferred**: assembling the survey into an `InsuranceProgram` / `InsuranceProgramLine`
+  with per-line Sum Insured is Process 7 (Product Recommendation / Program Design) — the
+  consolidated view is modelled up to the edge of it, the same shape
+  `Lead.CONVERTED_TO_PROSPECT` had before Part C #2. No per-asset revision history (a PATCH
+  replaces in place); no reassignment path (mirrors `RiskProfile`/Lead/Prospect).
+- **Verification**: 21 new api unit tests (`risk-profile.config.spec.ts` ×10,
+  `risk-profile.service.spec.ts` +11); `risk-profile.e2e-spec.ts` (6 tests — derivation,
+  coherence 400s, PATCH/DELETE, multi-site consolidation, RBAC + visibility);
+  `risk-profiles.spec.ts` Playwright (7 tests incl. `@a11y` + keyboard). All green: 454
+  api unit, 69 api e2e, 4 contract, 57 Playwright.
 
 ## Deployment
 

@@ -243,6 +243,44 @@ export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
     citation:
       'pdpl-sla-timers.md row "Claim follow-up (insurer non-response)"; IBMS_Full_Scope_Context_Document.docx Part 3.5 (Claims); see also ClaimFollowUpAlert in schema.prisma',
   },
+  // Backlog Part C #3-4 (Customer Acquisition/Onboarding) asks for "a
+  // separate, longer SLA" on the EDD path, but — unlike every entry above —
+  // NEITHER of these two rows has a source in pdpl-sla-timers.md's registry
+  // (that table is PDPL-driven; KYC/EDD turnaround is a CBJ AML
+  // customer-due-diligence timing question, a different regulatory domain
+  // entirely). The durations below are a drafted default, not a sourced
+  // fact: 5 business days standard reuses this same table's DPIA-review
+  // figure as a reasonable "compliance review turnaround" analog; 15
+  // business days EDD reuses the DSR figure as the established "long"
+  // analog for a deeper review. Tracked as a brain gap in
+  // ibms-brain/meta/lex/kyc-aml-sla-timers.md (filed via `/brain-gap`) —
+  // do not cite this pair as PRIV-SOP/PRIV-STD-sourced in a PR the way the
+  // other 14 rows are.
+  {
+    workflowName: 'kyc_standard_review',
+    label: 'KYC compliance review (standard)',
+    entityType: 'KYCRecord',
+    duration: { value: 5, unit: 'businessDays' },
+    escalationStages: [
+      { offset: { value: 0, unit: 'businessDays' }, escalateTo: null },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers KYC/AML review turnaround)',
+  },
+  {
+    workflowName: 'kyc_edd_review',
+    label: 'KYC compliance review (enhanced due diligence)',
+    entityType: 'KYCRecord',
+    duration: { value: 15, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'COMPLIANCE_OFFICER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers KYC/AML EDD review turnaround)',
+  },
 ];
 
 const SLA_REGISTRY_BY_NAME = new Map(
