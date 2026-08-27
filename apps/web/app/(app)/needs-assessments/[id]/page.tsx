@@ -26,6 +26,7 @@ import {
 } from '../../../../components/prospect/prospect.styles';
 
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
+const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 export default function NeedsAssessmentDetailPage() {
   const router = useRouter();
@@ -90,6 +91,7 @@ export default function NeedsAssessmentDetailPage() {
 
   const isCreator = assessment?.createdByUserId === user.id;
   const isManager = user.roles.includes(MANAGER_ROLE);
+  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
   const inReview =
     assessment?.status === 'PENDING_REVIEW' || assessment?.status === 'REVIEWED';
 
@@ -180,6 +182,27 @@ export default function NeedsAssessmentDetailPage() {
           {inReview && !isManager ? (
             <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
               Awaiting review and approval by a Branch/Department Manager.
+            </p>
+          ) : null}
+
+          {assessment.status === 'APPROVED' && isPlacement ? (
+            <button
+              type="button"
+              style={{ ...buttonStyle, marginTop: '1.5rem' }}
+              onClick={() =>
+                router.push(
+                  `/insurance-programs/new?needsAssessmentId=${assessment.id}`,
+                )
+              }
+            >
+              Assemble insurance program →
+            </button>
+          ) : null}
+
+          {assessment.status === 'APPROVED' && !isPlacement ? (
+            <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
+              Approved — a Placement/Technical Officer can now assemble the
+              insurance program.
             </p>
           ) : null}
 

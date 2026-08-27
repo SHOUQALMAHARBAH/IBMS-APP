@@ -760,16 +760,41 @@ model NeedsAssessment {
   @@index([createdByUserId])
 }
 
-/// Process 6-7 — proposed multi-line Insurance Program.
+/// Process 7 — Product Recommendation / Program Design (backlog Part C #7).
+/// DRAFT once assembled from an APPROVED NeedsAssessment's coverage list +
+/// the parent RiskProfile's asset survey; FINALIZED when the Placement/
+/// Technical Officer locks it to feed an Opportunity/RFQ (Process 11+, not
+/// built). `status` moves ONLY through WorkflowTransitionService (A.6) — see
+/// apps/api/src/modules/insurance-program/. SUPERSEDED is modeled for a
+/// re-assembled replacement (e.g. a mid-cycle risk change per
+/// policy-lifecycle.md) but no endpoint triggers it in Part C #7 yet — same
+/// "modeled ahead of a real trigger" shape as CustomerStatus.SUSPENDED.
+enum InsuranceProgramStatus {
+  DRAFT
+  FINALIZED
+  SUPERSEDED
+}
+
 model InsuranceProgram {
   id            String   @id @default(uuid())
   riskProfileId String
   riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
-  status        String   @default("draft")
+  status        InsuranceProgramStatus @default(DRAFT)
+  /// The APPROVED NeedsAssessment whose recommendedCoverageLines this
+  /// program was assembled from (Part C #7). Nullable: bare scalar, no
+  /// relation — provenance for display/re-assembly, the AuditLogEntry is the
+  /// authoritative trail.
+  needsAssessmentId String?
+  assembledByUserId String?
   createdAt     DateTime @default(now())
 
   lines         InsuranceProgramLine[]
   opportunities Opportunity[]
+
+  // "One live program per RiskProfile" is enforced by a partial UNIQUE index
+  // (riskProfileId WHERE status <> 'SUPERSEDED') that Prisma can't express
+  // here — see migration 20260827180000.
+  @@index([riskProfileId])
 }
 
 model InsuranceProgramLine {
@@ -778,6 +803,8 @@ model InsuranceProgramLine {
   insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
   insuranceLine      String   // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
   sumInsuredBasis    Decimal? @db.Decimal(18, 3)
+
+  @@index([insuranceProgramId])
 }
 
 // ============================================================================

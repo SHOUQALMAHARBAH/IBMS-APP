@@ -26,6 +26,7 @@ const entityTypes: WorkflowEntityType[] = [
   'KYCRecord',
   'Customer',
   'NeedsAssessment',
+  'InsuranceProgram',
 ];
 
 describe('WORKFLOW_TRANSITIONS', () => {
@@ -326,6 +327,28 @@ describe('isWorkflowTransitionAllowed', () => {
     ).toBe(false);
     expect(
       isWorkflowTransitionAllowed('NeedsAssessment', 'REJECTED', 'DRAFT'),
+    ).toBe(false);
+  });
+
+  it('allows InsuranceProgram DRAFT -> FINALIZED and back (reopen) (backlog Part C #7)', () => {
+    expect(
+      isWorkflowTransitionAllowed('InsuranceProgram', 'DRAFT', 'FINALIZED'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('InsuranceProgram', 'FINALIZED', 'DRAFT'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a SUPERSEDED InsuranceProgram (terminal)', () => {
+    expect(
+      isWorkflowTransitionAllowed('InsuranceProgram', 'SUPERSEDED', 'DRAFT'),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed(
+        'InsuranceProgram',
+        'SUPERSEDED',
+        'FINALIZED',
+      ),
     ).toBe(false);
   });
 });

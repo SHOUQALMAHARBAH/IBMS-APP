@@ -64,6 +64,7 @@ const commercialFrontOffice: PermissionSeed[] = [
   { code: 'risk-profile.create', module: 'commercial-front-office', description: 'Capture a detailed risk survey (Risk Profile/Asset)', roles: [SALES, PLACEMENT] },
   { code: 'risk-profile.read', module: 'commercial-front-office', description: 'List/read Risk Profiles', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'program.assemble', module: 'commercial-front-office', description: 'Assemble a multi-line Insurance Program from risk-assessment results', roles: [PLACEMENT] },
+  { code: 'program.read', module: 'commercial-front-office', description: 'List/read Insurance Programs', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'cross-sell.convert', module: 'commercial-front-office', description: 'Convert or dismiss a system-flagged cross-sell opportunity', roles: [SALES] },
   { code: 'up-sell.convert', module: 'commercial-front-office', description: 'Act on a system-flagged up-sell recommendation', roles: [SALES] },
   { code: 'interaction.log', module: 'commercial-front-office', description: 'Log a customer interaction (meeting/call/email/...)', roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER] },

@@ -7,8 +7,11 @@ import { buildLoggerParams } from './logger.options';
  *
  * Wraps nestjs-pino: a DI-injectable pino `Logger`, automatic HTTP
  * request/response logging (pino-http), JSON output, `LOG_LEVEL`, and
- * daily-rolling files under `<repo>/logs` in production. All configuration —
- * redaction rules, serializers, transports — lives in `./logger.options.ts`.
+ * daily-rolling files under `<repo>/logs` (on by default outside vitest;
+ * `LOG_TO_FILE=false` for console-only). Stray `console.*` and process-level
+ * crashes are bridged onto this same pipeline in `main.ts`. All
+ * configuration — redaction rules, serializers, transports — lives in
+ * `./logger.options.ts`.
  *
  * This is NOT the audit trail. The immutable business `AuditLogEntry`
  * (apps/api/src/modules/audit) is the legal/compliance record and stays in

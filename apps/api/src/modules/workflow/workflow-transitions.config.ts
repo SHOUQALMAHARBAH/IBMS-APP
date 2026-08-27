@@ -6,6 +6,7 @@ import type {
   DsrStatus,
   EndorsementStatus,
   IncidentStatus,
+  InsuranceProgramStatus,
   InvoiceStatus,
   KycStatus,
   LeadStatus,
@@ -21,17 +22,21 @@ import type { PrismaService } from '../../prisma/prisma.service';
 /**
  * The eleven workflow-state entities named in
  * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6,
- * plus `Lead`, `KYCRecord`, `Customer`, and `NeedsAssessment` — the lex
- * file's rule is not scoped to that named list ("Every entity that carries a
- * workflow state ... moves through a transition()"), and each of these
- * backlog items (Part C #1 Lead Management, #3-4 Customer Acquisition/
- * Onboarding, #5 Needs Assessment) explicitly asks for a governed status
- * move, so they reuse this engine rather than growing one-off transition
- * functions. `KycStatus` and `CustomerStatus` were added together: backlog
- * #3-4 explicitly says "do not activate Customer.status = ACTIVE before
- * [KYC] approval" — see kyc.service.ts, the sole caller of the Customer
- * transition. `NeedsAssessmentStatus` carries the review/approval gate the
- * #5 backlog item asks for — see needs-assessment.service.ts.
+ * plus `Lead`, `KYCRecord`, `Customer`, `NeedsAssessment`, and
+ * `InsuranceProgram` — the lex file's rule is not scoped to that named list
+ * ("Every entity that carries a workflow state ... moves through a
+ * transition()"), and each of these backlog items (Part C #1 Lead
+ * Management, #3-4 Customer Acquisition/Onboarding, #5 Needs Assessment, #7
+ * Product Recommendation / Program Design) explicitly asks for a governed
+ * status move, so they reuse this engine rather than growing one-off
+ * transition functions. `KycStatus` and `CustomerStatus` were added
+ * together: backlog #3-4 explicitly says "do not activate Customer.status =
+ * ACTIVE before [KYC] approval" — see kyc.service.ts, the sole caller of the
+ * Customer transition. `NeedsAssessmentStatus` carries the review/approval
+ * gate the #5 backlog item asks for — see needs-assessment.service.ts.
+ * `InsuranceProgramStatus` carries the DRAFT -> FINALIZED lock the #7
+ * backlog item's program-assembly implies — see
+ * insurance-program.service.ts.
  * The string values match the `entityType` already used for these models'
  * AuditLogEntry rows elsewhere (AuditService is polymorphic on this same
  * string), so a TRANSITION audit row and any other action on the same
@@ -52,7 +57,8 @@ export type WorkflowEntityType =
   | 'Lead'
   | 'KYCRecord'
   | 'Customer'
-  | 'NeedsAssessment';
+  | 'NeedsAssessment'
+  | 'InsuranceProgram';
 
 /** Maps each entity to the Prisma-generated enum type its `status` column holds. */
 export interface WorkflowStatusMap {
@@ -71,6 +77,7 @@ export interface WorkflowStatusMap {
   KYCRecord: KycStatus;
   Customer: CustomerStatus;
   NeedsAssessment: NeedsAssessmentStatus;
+  InsuranceProgram: InsuranceProgramStatus;
 }
 
 /**
@@ -375,6 +382,25 @@ export const WORKFLOW_TRANSITIONS: {
     APPROVED: [],
     REJECTED: [],
   },
+
+  // Backlog Part C #7 (Product Recommendation / Program Design). The #7 task
+  // list is a single "assemble" bullet with no explicit lifecycle, but a
+  // program that feeds an Opportunity/RFQ (Process 11+) must be lockable
+  // first — so: DRAFT once assembled from the APPROVED NeedsAssessment's
+  // coverage list + the RiskProfile survey, FINALIZED when the
+  // Placement/Technical Officer locks it. FINALIZED -> DRAFT (reopen) keeps
+  // a finalized program with an error from being a dead end. SUPERSEDED is
+  // the terminal state a re-assembled replacement would leave the old
+  // program in (e.g. a mid-cycle risk change per
+  // ibms-brain/meta/context/policy-lifecycle.md) — modeled and reachable,
+  // but no endpoint triggers it in this backlog item yet (same "modeled
+  // ahead of a real trigger" shape as Customer's SUSPENDED/CLOSED). See
+  // insurance-program.service.ts.
+  InsuranceProgram: {
+    DRAFT: ['FINALIZED', 'SUPERSEDED'],
+    FINALIZED: ['DRAFT', 'SUPERSEDED'],
+    SUPERSEDED: [],
+  },
 };
 
 /** True if `to` is a legal next status from `from` for the given entity. */
@@ -408,8 +434,8 @@ export function allowedNextStatuses<E extends WorkflowEntityType>(
  * The minimal shape `WorkflowTransitionService` needs from a Prisma model
  * delegate — every workflow entity's `status` column is a plain string enum
  * (see the cross-cutting rule #3 at the top of schema.prisma), so this one
- * narrow interface covers all eleven without depending on their individual
- * generated types.
+ * narrow interface covers every entity in `WORKFLOW_TRANSITIONS` without
+ * depending on their individual generated types.
  */
 export interface WorkflowDelegate {
   findUnique(args: {
@@ -442,6 +468,7 @@ export function getWorkflowDelegate(
     KYCRecord: client.kYCRecord,
     Customer: client.customer,
     NeedsAssessment: client.needsAssessment,
+    InsuranceProgram: client.insuranceProgram,
   };
   return delegates[entityType] as WorkflowDelegate;
 }

@@ -16,6 +16,7 @@ import { ProspectModule } from './modules/prospect/prospect.module';
 import { CustomerModule } from './modules/customer/customer.module';
 import { RiskProfileModule } from './modules/risk-profile/risk-profile.module';
 import { NeedsAssessmentModule } from './modules/needs-assessment/needs-assessment.module';
+import { InsuranceProgramModule } from './modules/insurance-program/insurance-program.module';
 
 @Module({
   imports: [
@@ -70,6 +71,12 @@ import { NeedsAssessmentModule } from './modules/needs-assessment/needs-assessme
     // WorkflowModule for the NeedsAssessment status chain.
     RiskProfileModule,
     NeedsAssessmentModule,
+    // Part C backlog #7 (Product Recommendation / Program Design) — assembles
+    // an InsuranceProgram from an APPROVED NeedsAssessment's coverage list +
+    // the parent RiskProfile's asset survey. Depends on NeedsAssessmentModule
+    // /RiskProfileModule/CustomerModule's exported repositories and reuses
+    // WorkflowModule for the InsuranceProgram status chain.
+    InsuranceProgramModule,
   ],
   controllers: [AppController],
   providers: [AppService],

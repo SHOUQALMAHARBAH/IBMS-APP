@@ -10,15 +10,18 @@ implements against them. Compliance/PDPL/CBJ obligations still cite the source d
 in `ibms-brain/`, not this README.
 
 **Status:** infrastructure scaffold (Part A + Part B), plus the first Part C business
-modules — **Domain A, Processes 1–6**: Lead Management (#1 — create/list/filter,
+modules — **Domain A, Processes 1–7**: Lead Management (#1 — create/list/filter,
 `LeadStatus` transition, an intake-form + pipeline-board screen), Prospect Management (#2
 — convert a qualified Lead, capture its qualification profile, a profile screen), Customer
 Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
 lifecycle with *simulated* sanctions/PEP/AML screening and maker/checker approval, a
 step-by-step wizard + Compliance queue), Needs Assessment (#5 — a structured risk
 questionnaire that derives a recommended coverage list, with a review + approval gate),
-and Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity period,
-consolidated across a multi-site client). Everything else — Domain A #7–10, Domains B–H
+Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity period,
+consolidated across a multi-site client), and Product Recommendation / Program Design (#7
+— a multi-line `InsuranceProgram` assembled deterministically from an approved Needs
+Assessment's coverage list + the Risk Profile's derived Sum Insured, DRAFT → FINALIZED).
+Everything else — Domain A #8–10, Domains B–H
 (policy, claims, finance, service, compliance/risk, management, supporting ops), and
 Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
 **not started**. See § Scope status for the full picture and § Known gaps for the
@@ -395,12 +398,12 @@ build actually is today:
   encryption-at-rest, a real KMS/HSM, load-test-driven performance indexes, independent
   penetration testing) are each documented under § Known gaps and mostly wait on a
   deployment-target decision.
-- **Part C — Domain A, Processes 1–6 — built and verified** (unit + e2e +
+- **Part C — Domain A, Processes 1–7 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
-### Part C · Domain A #1–6 — built, with these deferrals
+### Part C · Domain A #1–7 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -408,12 +411,13 @@ build actually is today:
 | 2 | Prospect Management | Lead→Prospect conversion · full qualification profile · profile screen | `Prospect.status` has no workflow-engine transitions; no reassignment |
 | 3–4 | Customer Acquisition / Onboarding | individual + corporate forms · KYC lifecycle · UBO capture · sanctions/PEP/AML screening · EDD path · maker/checker approval gate · periodic re-KYC schedule · onboarding wizard + Compliance queue | **screening is simulated against a fictional fixture watchlist — no real sanctions/PEP/AML data provider**; the KYC/EDD review SLA durations and the re-KYC cadence are **unsourced draft figures** (`/brain-gap` filed); a batch/sweep HIT sets `escalatedToComplianceAt` but does **not** auto-suspend the Customer or force a status move; no dedicated "re-screening hits" list beyond the per-KYCRecord queue view; hardware-token MFA (A.1) is not enforced for the privileged approvers |
 | 5 | Needs Assessment | fixed questionnaire · deterministic answers→coverage-list derivation · review + approval gate · minimal `RiskProfile` parent | derived coverage list is not manually curatable; the questionnaire is not runtime-configurable; no reassignment; the `APPROVED → Opportunity/RFQ` link is Process 11+ |
-| 6 | Risk Assessment | per-site asset survey (building/equipment/stock/annual-profit/fleet) · deterministic Sum Insured + indemnity-period derivation · multi-site consolidation | assembling the survey into an `InsuranceProgram` / `InsuranceProgramLine` with per-line Sum Insured is **Process 7**; no per-asset revision history (a `PATCH` replaces in place) |
+| 6 | Risk Assessment | per-site asset survey (building/equipment/stock/annual-profit/fleet) · deterministic Sum Insured + indemnity-period derivation · multi-site consolidation | no per-asset revision history (a `PATCH` replaces in place) — assembling the survey into an `InsuranceProgram` is Process 7, **now built (row 7)** |
+| 7 | Product Recommendation / Program Design | deterministic assembly of a multi-line `InsuranceProgram` from an APPROVED Needs Assessment's coverage list + the Risk Profile's derived Sum Insured · `InsuranceProgramStatus` DRAFT → FINALIZED (reopen) through the workflow engine (16th entity) · re-assemble in place while DRAFT · per-customer list + detail screen | one `InsuranceProgram` per `RiskProfile` (schema has no program↔multi-`RiskProfile` join — a multi-site client's cross-site roll-up stays the `GET /risk-profiles/consolidated` view, for a human to reference); only Property All Risks + Business Interruption get an asset-derived `sumInsuredBasis`, every other line is `null` (set at RFQ/quotation, Process 11+); no manual line curation; `SUPERSEDED` is modeled but no endpoint triggers it; the `FINALIZED → Opportunity/RFQ` link is Process 11+; `program.assemble` is role-level (no per-officer queue), no maker/checker (the coverage set was maker/checker-approved at #5) |
 
 ### Not started
 
-- **Domain A Processes 7–10** — Product Recommendation / Program Design (#7),
-  Cross-Selling (#8), Up-Selling (#9), Relationship Management / 360° customer view (#10).
+- **Domain A Processes 8–10** — Cross-Selling (#8), Up-Selling (#9),
+  Relationship Management / 360° customer view (#10).
 - **Domains B–H** — Insurance Operations (RFQ / placement / quotation / comparison /
   recommendation / policy issuance / checking / delivery / endorsement, #11–22), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
@@ -441,7 +445,7 @@ build actually is today:
   where the relevant code exists).
 
 Nothing here has been deployed anywhere and the production target is undecided (§
-Deployment). Part C #1–6 currently live on the `feat/backlog-c1-lead-management` branch;
+Deployment). Part C #1–7 currently live on the `feat/backlog-c1-lead-management` branch;
 none of it is merged to `main` yet.
 
 ## Known gaps (per completed backlog item)
@@ -1151,15 +1155,94 @@ narrows a gap.
   profile and a new "Risk surveys" nav item. Four states (loading/empty/error/populated),
   `@a11y` + keyboard covered.
 - **Deferred**: assembling the survey into an `InsuranceProgram` / `InsuranceProgramLine`
-  with per-line Sum Insured is Process 7 (Product Recommendation / Program Design) — the
-  consolidated view is modelled up to the edge of it, the same shape
-  `Lead.CONVERTED_TO_PROSPECT` had before Part C #2. No per-asset revision history (a PATCH
-  replaces in place); no reassignment path (mirrors `RiskProfile`/Lead/Prospect).
+  with per-line Sum Insured was Process 7 (Product Recommendation / Program Design) —
+  **now built, see Part C #7 below.** No per-asset revision history (a PATCH replaces in
+  place); no reassignment path (mirrors `RiskProfile`/Lead/Prospect).
 - **Verification**: 21 new api unit tests (`risk-profile.config.spec.ts` ×10,
   `risk-profile.service.spec.ts` +11); `risk-profile.e2e-spec.ts` (6 tests — derivation,
   coherence 400s, PATCH/DELETE, multi-site consolidation, RBAC + visibility);
   `risk-profiles.spec.ts` Playwright (7 tests incl. `@a11y` + keyboard). All green: 454
   api unit, 69 api e2e, 4 contract, 57 Playwright.
+
+**Part C #7 — Product Recommendation / Program Design (Domain A, Process 7)**
+
+- **`apps/api/src/modules/insurance-program/`**: `POST /insurance-programs`
+  (`{ needsAssessmentId }` — assemble, `program.assemble`/Placement only, starts `DRAFT`),
+  `GET /insurance-programs?customerId=` + `GET /insurance-programs/:id` (new seeded
+  `program.read`, granted Sales/Placement/Manager/Executive), `POST
+  /insurance-programs/:id/{reassemble,finalize,reopen}`. `:id` responses carry a
+  `context` block — the source Needs Assessment id/status, its `recommendedCoverageLines`,
+  and the Risk Profile's currently-derived `SumInsuredSummary` (what a re-assembly would
+  seed from).
+- **Deterministic assembly** (`insurance-program.config.ts`, pure + unit-tested, same
+  philosophy as `needs-assessment.config.ts`/`risk-profile.config.ts`): one
+  `InsuranceProgramLine` per line in the APPROVED Needs Assessment's
+  `recommendedCoverageLines`, order-stable in `COVERAGE_LINES` order.
+  `assembleProgramLines()` maps each coverage line to a canonical `insuranceLine` string
+  and picks its `sumInsuredBasis` from `deriveSumInsured()` (Process 6) — **only Property
+  All Risks (← `propertySumInsured`) and Business Interruption (← `businessInterruptionSumInsured`)
+  get an asset-derived basis**; every other line (liability limit, payroll, per-capita,
+  per-vehicle) is created with `sumInsuredBasis: null`, set later at the RFQ/quotation
+  stage (Process 11+). An empty asset survey (`assetCount === 0`) leaves Property/BI
+  `null` too — not a misleading `0.000`. No arithmetic in this module — the figures were
+  already derived at fils precision by `risk-profile.config.ts` (`money.util.ts`); the
+  service re-`quantizeMoney()`s at the persistence boundary.
+- **`InsuranceProgramStatus` through `WorkflowTransitionService`** (A.6, 16th entity):
+  `DRAFT -[finalize]-> FINALIZED -[reopen]-> DRAFT`, with
+  `{DRAFT|FINALIZED} -> SUPERSEDED` modeled and reachable but **triggered by no endpoint
+  in this item** (same "modeled ahead of a real trigger" shape as
+  `CustomerStatus.SUSPENDED/CLOSED`). Migration
+  `20260827180000_add_insurance_program_status_enum` converts `InsuranceProgram.status`
+  from free-text `String` (the third such enum conversion, after `KycStatus` #3-4 and
+  `NeedsAssessmentStatus` #5), adds `needsAssessmentId`/`assembledByUserId` provenance
+  columns (bare scalars, no relation — the `AuditLogEntry` is the authoritative trail),
+  the parent-FK indexes `InsuranceProgram`/`InsuranceProgramLine` both lacked, and a
+  **partial `UNIQUE` index** (`riskProfileId WHERE status <> 'SUPERSEDED'` — raw SQL,
+  Prisma can't express the predicate) that makes "one live program per Risk Profile" a
+  real DB invariant, not a check-then-act. **Re-run `npm run db:migrate:dev` /
+  `db:test:migrate:dev`, then `npm run db:seed` / `db:test:seed`** for the new
+  `program.read` permission.
+- **One `InsuranceProgram` per `RiskProfile`.** The schema has no program↔multi-`RiskProfile`
+  join, and `NeedsAssessment` is per-`RiskProfile` too (`meta/context/data-model.md`:
+  `RiskProfile / Asset -> 1..n InsuranceProgramLine`). A multi-site client's cross-site
+  roll-up stays the `GET /risk-profiles/consolidated` view — for a human to reference
+  when assembling the primary site's program. `POST /insurance-programs` refuses a second
+  non-`SUPERSEDED` program for the same `RiskProfile` — a descriptive 409 on the
+  non-racing path (the pre-check names the existing program), and the partial `UNIQUE`
+  index above (`P2002` → the same 409) for two concurrent assemblies. Point the caller at
+  `reassemble` (in place, DRAFT only) or `reopen`.
+- **No maker/checker** on a program — assembly is a single-actor Placement/Technical
+  Officer task (`program.assemble`, Placement only), and the coverage set it is built
+  from was already maker/checker-approved at the Needs Assessment stage (A.5). Visibility
+  is inherited from the Risk Profile's Customer, same pattern as
+  `RiskProfileService`/`NeedsAssessmentService` (Sales sees its own book,
+  Placement/Manager/Executive the whole book).
+- **`apps/web/app/(app)/insurance-programs/`**: a `?customerId=` list, a detail screen
+  (lines table + derived-Sum-Insured panel + Finalize/Reopen/Re-assemble for Placement),
+  and an assemble screen reached from an APPROVED needs assessment. New "Insurance
+  programs" nav item and an "Insurance program" section on the customer profile. Four
+  states (loading/empty/error/populated), `@a11y` + keyboard covered.
+- **Deferred**: no manual line curation (purely rule-derived, like #5's coverage list);
+  `SUPERSEDED` has no trigger; the `FINALIZED -> Opportunity/RFQ` link is Process 11+;
+  `program.assemble` is role-level (no per-officer queue, like the KYC/needs-assessment
+  queues); no reassignment path.
+- **`@code-reviewer` pass** (mandatory — workflow + money logic) returned one blocker and
+  four minors, all fixed before this landed: the "one live program per Risk Profile"
+  guard was a check-then-act with no DB backstop (→ the partial `UNIQUE` index above,
+  `P2002` mapped to 409, + a concurrent-assembly e2e test); `assemble()` leaked an
+  existence oracle via differing 404 messages for "no such Needs Assessment" vs. "one you
+  can't see" (→ normalised); the `CREATE` audit row is now written *before* the lines
+  insert so a crash in between still leaves a trail (the zero-line program is recoverable
+  via `reassemble`); `reassemble()` re-reads `status` immediately before the wholesale
+  line rewrite so a `finalize()` in the window can't be silently clobbered; and
+  `finalize()` now refuses a zero-line program.
+- **Verification**: 24 new api unit tests (`insurance-program.config.spec.ts` ×7,
+  `insurance-program.service.spec.ts` ×17) + 2 new `workflow-transitions.config.spec.ts`
+  cases; `insurance-program.e2e-spec.ts` (7 tests — RBAC 403, assembly + Property basis,
+  not-APPROVED 422, duplicate 409, **concurrent-assembly race → exactly one program**,
+  finalize/reopen/re-assemble lifecycle, visibility 404); `insurance-programs.spec.ts`
+  Playwright (8 tests incl. `@a11y` + keyboard). Full suites green: 488 api unit, 76 api
+  e2e, 4 contract, 54 web e2e, 11 a11y.
 
 ## Deployment
 

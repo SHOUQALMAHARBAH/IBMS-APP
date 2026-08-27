@@ -123,6 +123,14 @@ export default function CustomerProfilePage() {
   const canOpenRiskSurvey = user.roles.some((role) =>
     ['SALES_RELATIONSHIP_OFFICER', 'PLACEMENT_TECHNICAL_OFFICER'].includes(role),
   );
+  const canOpenInsuranceProgram = user.roles.some((role) =>
+    [
+      'SALES_RELATIONSHIP_OFFICER',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'BRANCH_DEPARTMENT_MANAGER',
+      'EXECUTIVE_MANAGEMENT',
+    ].includes(role),
+  );
 
   return (
     <main style={pageStyle}>
@@ -263,6 +271,30 @@ export default function CustomerProfilePage() {
             ) : (
               <p style={{ opacity: 0.6 }}>
                 You don&apos;t hold the risk-profile.read permission.
+              </p>
+            )}
+          </section>
+
+          <section style={{ marginTop: '2rem' }}>
+            <h2>Insurance program</h2>
+            <p style={{ opacity: 0.8 }}>
+              Process 7 — a multi-line Insurance Program assembled from an approved
+              needs assessment&apos;s coverage list and the risk survey&apos;s derived
+              Sum Insured, then finalized to feed an RFQ.
+            </p>
+            {canOpenInsuranceProgram ? (
+              <button
+                type="button"
+                style={{ cursor: 'pointer' }}
+                onClick={() =>
+                  router.push(`/insurance-programs?customerId=${customer.id}`)
+                }
+              >
+                Open the insurance program
+              </button>
+            ) : (
+              <p style={{ opacity: 0.6 }}>
+                You don&apos;t hold the program.read permission.
               </p>
             )}
           </section>

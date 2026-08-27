@@ -1,10 +1,18 @@
 # `logs/`
 
-Runtime **operational** logs for `apps/api` — pino structured (JSON) output:
-request traces, debug lines, error stacks. Written here only when
-`NODE_ENV=production` or `LOG_TO_FILE=true` (set `LOG_DIR` to write elsewhere).
-In plain local dev the API logs to the console only and this folder stays
-empty.
+Runtime **operational** logs for `apps/api` — pino structured (JSON) output.
+The running API mirrors **everything it prints** here: HTTP request traces,
+Nest `Logger` output, error stacks, stray `console.*` from libraries, and
+uncaught `unhandledRejection` / `uncaughtException` crashes.
+
+Written whenever `NODE_ENV=production` **or** `LOG_TO_FILE` is anything other
+than `false` — i.e. **on by default in local dev too**, alongside the pretty
+console. Set `LOG_TO_FILE=false` for console-only; set `LOG_DIR` to write
+elsewhere. Forced silent and file-less under `vitest` regardless.
+
+The `npm run dev` / turbo / `nest start --watch` compiler output ("compiled
+successfully", webpack progress, etc.) comes from separate parent processes
+and is **not** captured here — only what the API process itself emits.
 
 Files (daily rotation, via `pino-roll`):
 

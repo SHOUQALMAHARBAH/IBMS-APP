@@ -171,17 +171,15 @@ describe('logger.options', () => {
     expect(targets.some((t) => t.target === 'pino/file')).toBe(true);
   });
 
-  it('writes no files in dev unless LOG_TO_FILE=true — just the pretty console', () => {
+  it('writes rolling files in dev by default (pretty console too); LOG_TO_FILE=false opts out', () => {
     const devTargets = pinoHttp(DEV).transport?.targets ?? [];
-    expect(devTargets.some((t) => t.target === 'pino-roll')).toBe(false);
+    expect(devTargets.filter((t) => t.target === 'pino-roll')).toHaveLength(2);
     expect(devTargets.some((t) => t.target === 'pino-pretty')).toBe(true);
 
-    const devWithFiles =
-      pinoHttp({ ...DEV, LOG_TO_FILE: 'true' }).transport?.targets ?? [];
-    expect(devWithFiles.filter((t) => t.target === 'pino-roll')).toHaveLength(
-      2,
-    );
-    expect(devWithFiles.some((t) => t.target === 'pino-pretty')).toBe(true);
+    const consoleOnly =
+      pinoHttp({ ...DEV, LOG_TO_FILE: 'false' }).transport?.targets ?? [];
+    expect(consoleOnly.some((t) => t.target === 'pino-roll')).toBe(false);
+    expect(consoleOnly.some((t) => t.target === 'pino-pretty')).toBe(true);
   });
 
   it('resolveLogDir honours LOG_DIR, else resolves to <repo>/logs', () => {

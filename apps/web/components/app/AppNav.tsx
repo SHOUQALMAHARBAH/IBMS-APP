@@ -27,6 +27,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/customers/kyc-queue', label: 'KYC queue' },
   { href: '/needs-assessments', label: 'Needs assessments' },
   { href: '/risk-profiles', label: 'Risk surveys' },
+  { href: '/insurance-programs', label: 'Insurance programs' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

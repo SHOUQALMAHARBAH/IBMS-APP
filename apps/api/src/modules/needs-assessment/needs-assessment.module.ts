@@ -20,5 +20,10 @@ import { RiskProfileModule } from '../risk-profile/risk-profile.module';
   ],
   controllers: [NeedsAssessmentController],
   providers: [NeedsAssessmentService, NeedsAssessmentRepository],
+  // Exported so InsuranceProgramModule (Part C #7) can resolve the APPROVED
+  // Needs Assessment whose recommendedCoverageLines drive program assembly —
+  // same "export the repository for a downstream consumer" shape
+  // RiskProfileModule uses for this module.
+  exports: [NeedsAssessmentRepository],
 })
 export class NeedsAssessmentModule {}

@@ -89,8 +89,19 @@ function resolveLevel(env: Env): string {
   return env.LOG_LEVEL ?? (isProd(env) ? 'info' : 'debug');
 }
 
+/**
+ * Whether to also write rolling files, not just the console.
+ *
+ * Always on in production. In dev it is now **on by default** — the point is
+ * that `<repo>/logs` mirrors everything the running API prints to the
+ * terminal (HTTP traces, Nest `Logger` output, error stacks, and the
+ * `console.*` / crash output bridged in `main.ts`). Set `LOG_TO_FILE=false`
+ * for the old console-only behaviour. The `npm run dev` / turbo / nest-CLI
+ * build output belongs to a separate parent process and is never captured
+ * here. Test env never reaches this — `buildLoggerParams` short-circuits.
+ */
 function fileLoggingEnabled(env: Env): boolean {
-  return isProd(env) || env.LOG_TO_FILE === 'true';
+  return isProd(env) || env.LOG_TO_FILE !== 'false';
 }
 
 /**
