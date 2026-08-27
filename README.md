@@ -10,7 +10,7 @@ implements against them. Compliance/PDPL/CBJ obligations still cite the source d
 in `ibms-brain/`, not this README.
 
 **Status:** infrastructure scaffold (Part A + Part B), plus the first Part C business
-modules — **Domain A, Processes 1–9**: Lead Management (#1 — create/list/filter,
+modules — **Domain A, Processes 1–10**: Lead Management (#1 — create/list/filter,
 `LeadStatus` transition, an intake-form + pipeline-board screen), Prospect Management (#2
 — convert a qualified Lead, capture its qualification profile, a profile screen), Customer
 Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
@@ -26,8 +26,11 @@ a customer holds no in-force policy for as a `CrossSellOpportunity` to convert o
 `Policy` is empty until Domain B, so it is a correct no-op for now), and Up-Selling (#9 —
 a nightly job + on-demand scan raise an `UpSellRecommendation` when a customer's surveyed
 asset value has grown materially past the property Sum Insured designed into their live
-`InsuranceProgram`).
-Everything else — Domain A #10, Domains B–H
+`InsuranceProgram`), and Relationship Management / CRM (#10 — log every customer
+touchpoint as an `Interaction` and serve the aggregated 360° customer view: interactions
+plus policies, claims and complaints merged into one timeline; the latter three are empty
+until Domains B/C/E land).
+Everything else — Domains B–H
 (policy, claims, finance, service, compliance/risk, management, supporting ops), and
 Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
 **not started**. See § Scope status for the full picture and § Known gaps for the
@@ -404,12 +407,12 @@ build actually is today:
   encryption-at-rest, a real KMS/HSM, load-test-driven performance indexes, independent
   penetration testing) are each documented under § Known gaps and mostly wait on a
   deployment-target decision.
-- **Part C — Domain A, Processes 1–7 — built and verified** (unit + e2e +
+- **Part C — Domain A, Processes 1–10 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
-### Part C · Domain A #1–9 — built, with these deferrals
+### Part C · Domain A #1–10 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -421,10 +424,10 @@ build actually is today:
 | 7 | Product Recommendation / Program Design | deterministic assembly of a multi-line `InsuranceProgram` from an APPROVED Needs Assessment's coverage list + the Risk Profile's derived Sum Insured · `InsuranceProgramStatus` DRAFT → FINALIZED (reopen) through the workflow engine (16th entity) · re-assemble in place while DRAFT · per-customer list + detail screen | one `InsuranceProgram` per `RiskProfile` (schema has no program↔multi-`RiskProfile` join — a multi-site client's cross-site roll-up stays the `GET /risk-profiles/consolidated` view, for a human to reference); only Property All Risks + Business Interruption get an asset-derived `sumInsuredBasis`, every other line is `null` (set at RFQ/quotation, Process 11+); no manual line curation; `SUPERSEDED` is modeled but no endpoint triggers it; the `FINALIZED → Opportunity/RFQ` link is Process 11+; `program.assemble` is role-level (no per-officer queue), no maker/checker (the coverage set was maker/checker-approved at #5) |
 | 8 | Cross-Selling | nightly `@Cron` sweep + on-demand `POST /cross-sell-opportunities/detect` compare a customer's in-force `Policy` lines against a benchmark line list and flag the gaps as `CrossSellOpportunity` · `CrossSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (17th entity) · per-customer list + detail screen with inline convert/dismiss | **the Policy module (Domain B) is not built, so `Policy` is empty everywhere and the job is a correct no-op until real policies exist**; `BENCHMARK_LINES` is one conservative global list, not a per-sector table (no sector taxonomy on `Customer`); only customers with ≥1 `ACTIVE` policy are scanned; a resolved (converted/dismissed) gap is never re-flagged (no re-open endpoint); the `CONVERTED → Opportunity/RFQ` link is Process 11+; no maker/checker (acting on a system nudge is single-actor); no per-officer queue; no reassignment |
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
+| 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
 ### Not started
 
-- **Domain A Process 10** — Relationship Management / 360° customer view (#10).
 - **Domains B–H** — Insurance Operations (RFQ / placement / quotation / comparison /
   recommendation / policy issuance / checking / delivery / endorsement, #11–22), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
@@ -452,7 +455,7 @@ build actually is today:
   where the relevant code exists).
 
 Nothing here has been deployed anywhere and the production target is undecided (§
-Deployment). Part C #1–7 currently live on the `feat/backlog-c1-lead-management` branch;
+Deployment). Part C #1–10 currently live on the `feat/backlog-c1-lead-management` branch;
 none of it is merged to `main` yet.
 
 ## Known gaps (per completed backlog item)
@@ -1398,6 +1401,104 @@ narrows a gap.
   400, RBAC 403, visibility 404); `up-sell.spec.ts` Playwright (7 tests incl. `@a11y` +
   keyboard). Full suites: **543** api unit (47 files), **91** api e2e (13 files), 4
   contract, 6 web unit, 66 web e2e, 13 a11y, `npm audit` 0.
+
+**Part C #10 — Relationship Management / CRM (Domain A, Process 10)**
+
+- **No schema migration, no seed change.** `Interaction` + the `InteractionChannel` enum
+  (meeting / call / email / WhatsApp / visit / proposal / renewal / claim / complaint /
+  portal / SMS / other) were already in the schema, and `interaction.log`
+  (Sales/Placement/Claims/Finance/Compliance/Manager) + `customer.360-view.read`
+  (Sales/Manager/Executive/Compliance/Auditor) were already seeded by A.2. This process
+  needed only application code.
+- **`apps/api/src/modules/crm/`** (+ `repositories/interaction.repository.ts`), routes
+  nested under `customers/:customerId` alongside `ubos` / `documents`:
+  - `POST /customers/:customerId/interactions` (`{ channel, summary, occurredAt? }`,
+    `interaction.log`) — logs one touchpoint. **Gated by the permission alone, not by
+    customer ownership**: relationship touchpoints are cross-functional (a Claims Officer
+    logs a claim call, a Finance Officer a collection call), which is exactly why six
+    roles hold `interaction.log`. The customer must exist (404 otherwise). A future
+    `occurredAt` is rejected 422 (backdating a call/meeting logged after the fact is
+    allowed).
+  - `GET /customers/:customerId/interactions` and `GET /customers/:customerId/360-view`
+    (`customer.360-view.read`) — owner-or-cross-owner visibility, identical to
+    `CustomerService.get()` (`NotFoundException` either way, no existence oracle).
+- **The 360° view** aggregates the interaction log with the customer's policies, claims
+  and complaints and runs all four through `crm.config.ts`'s **pure, deterministic**
+  `buildCustomerTimeline()` — one reverse-chronological list, each kind placed at its
+  representative instant (interaction→`occurredAt`, policy→`inceptionDate ?? createdAt`,
+  claim→`lossDate`, complaint→`createdAt`), ties broken by a fixed kind order then
+  `refId` so the output never depends on input order. Same "pure config module" pattern
+  as `needs-assessment.config.ts` / `cross-sell.config.ts` / `up-sell.config.ts`.
+- **`Interaction` is NOT a `WorkflowTransitionService` entity** — it has no status column
+  — and has no maker/checker. It is a factual log: create + read only, no edit or delete.
+  (Same judgement as Prospect #2 leaving `Prospect.status` alone — the backlog bullets
+  don't ask for a governed progression.)
+- **The Policy / Claim / Complaint modules (Domains B / C / E) are not built, so those
+  three collections are empty in every environment and the timeline is interactions-only
+  today** — built ahead of its data source, the same shape as #8. The read-only
+  `Policy` / `Claim` / `Complaint` finders live on `InteractionRepository` (the same
+  reason `cross-sell-opportunity.repository.ts` owns its own `Policy` reads).
+- **Sensitive data** (`ibms-brain/meta/lex/sensitive-data-handling.md`): `Claim` is
+  HIGHLY_CONFIDENTIAL, so the claim projection `select`s an id, number, status and dates
+  **only** — never `causeOfLoss`, `lossLocation`, `estimatedLoss`, any money figure, or a
+  money-derived flag like `isLargeClaim` (money is dropped from the policy projection
+  too). The 360° read writes a `READ` `AuditLogEntry` — counts only, never content —
+  flagged `isSensitiveDataAccess` when the aggregate actually surfaced a claim, giving the
+  A.4 read-logging requirement its first real business-entity caller.
+- **`occurredAt`** (optional, backdate-only) must carry an explicit timezone offset when
+  it includes a time component — `new Date("2026-02-01T09:00:00")` is parsed as
+  server-local time by the JS engine and would silently shift the recorded instant for
+  any caller that isn't the web client (which always sends `…Z`). A bare date
+  (`2026-02-01`) is accepted (parsed as UTC midnight, unambiguous); an offset-less
+  datetime is rejected 422.
+- **Shared:** `CUSTOMER_CROSS_OWNER_ROLES` moved from a private const in
+  `customer.service.ts` to `common/rbac-visibility.util.ts`, and a new
+  `isCustomerVisibleTo(customer, actor)` helper there is the one place the
+  owner-or-cross-owner rule is decided (now used by `customer.service.ts` and
+  `crm.service.ts`; `cross-sell.service.ts` / `insurance-program.service.ts` still carry
+  an inline equivalent, candidates to migrate).
+- **`apps/web/app/(app)/crm/`**: a `?customerId=` customer-timeline screen (a log-an-
+  interaction form — channel select + summary + optional date — over the merged timeline
+  and a counts row), reached from a new "Relationship (CRM)" nav item and a
+  customer-profile section. The log form renders for any role holding `interaction.log`
+  **even when the 360° view 403s** (Placement/Claims/Finance can log but not browse the
+  timeline), with a note in place of the timeline. Four states, `@a11y` + keyboard
+  covered.
+- **Deferred**: the three non-interaction collections are empty until Domains B/C/E land;
+  no edit/delete of a logged interaction; no link to `CommunicationLog` / `ConsentRecord`
+  (Process 44 / Part D — this logs what happened, it does not send anything or check
+  marketing consent); no pagination on the interaction list; a role holding
+  `interaction.log` but not `customer.360-view.read` (Placement/Claims/Finance) can log
+  but cannot see the timeline it feeds (a grid choice, not a bug); no per-officer queue;
+  no reassignment.
+- **`@code-reviewer` pass** (mandatory — the 360° view reads `Claim` / HIGHLY_CONFIDENTIAL
+  data): returned **5 findings, all fixed** — (1) the web screen returned the load-error
+  view before the log form, dead-ending the three cross-functional roles that can only
+  log → the form now renders on a 403 view; (2) `@IsISO8601()` let an offset-less
+  datetime through and `new Date()` parsed it server-local → an explicit offset is now
+  required for a datetime `occurredAt`, 422 otherwise, with an e2e for it; (3)
+  `isLargeClaim` (a loss-value threshold flag) was in the claim projection, contradicting
+  the "no money signal" contract → removed from the projection, the type, and the
+  timeline `detail`, with an e2e proving it is stripped even when set; (4)
+  `new Date(occurredAt).toISOString()` on the web could throw `RangeError` into the
+  generic catch → guarded with a date-specific message; (5) the owner-or-cross-owner
+  visibility check was a fourth inline re-implementation → extracted
+  `isCustomerVisibleTo()` into `rbac-visibility.util.ts` and adopted it in
+  `crm.service.ts` and `customer.service.ts`.
+- **Verification**: 20 new api unit tests (`crm.config.spec.ts` ×6,
+  `crm.service.spec.ts` ×14 — log + audit, not-owner-gated logging, 404 / 422 guards
+  (future, offset-less datetime, bare date accepted), audit best-effort, read visibility
+  404s, the sensitive-read flag); `crm.e2e-spec.ts` (7 tests — log + newest-first
+  timeline, 422 future / 400 empty / 400 bad channel / 422 offset-less datetime / 201
+  bare date, 404 missing customer, 360° aggregate of a directly-seeded Policy + Claim +
+  Complaint with correct counts + merged order + a claim projection that omits loss
+  detail / money / `isLargeClaim`, a Claims Officer logs a non-owned customer but 403s
+  the 360° view, an External Auditor 403s logging but reads the view, other-Sales-officer
+  404 on view + interactions); `crm.spec.ts` Playwright (8 tests incl. the log-form-on-403
+  path, a neither-permission friendly message, `@a11y` + keyboard). Full suites green:
+  563 api unit (49 files), 98 api e2e (14 files), 4 contract, web e2e 73, a11y 14 (the
+  pre-existing `rbac.e2e-spec.ts` full-suite flake — passes 5/5 in isolation — is
+  unrelated).
 
 ## Deployment
 

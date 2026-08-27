@@ -22,24 +22,16 @@ import {
   encryptEntityFields,
   decryptEntityFields,
 } from '../security/encrypted-fields';
-import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
+import {
+  CUSTOMER_CROSS_OWNER_ROLES,
+  isCustomerVisibleTo,
+} from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import type { CreateUboDto } from './dto/create-ubo.dto';
 import type { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
 import type { RevealFieldDto } from './dto/reveal-field.dto';
-
-/** `customer.360-view.read` (packages/db/prisma/seed-data/permissions.ts)
- * grants SALES/MANAGER/EXEC/COMPLIANCE/AUDITOR — a superset of
- * VIEW_ALL_OWNERS_ROLES (Manager/Exec) because Compliance needs to open any
- * Sales Officer's customer to work its KYC file, and External Auditor is
- * read-only across the org by design (roles-and-segregation-of-duties.md). */
-const CUSTOMER_CROSS_OWNER_ROLES = [
-  ...VIEW_ALL_OWNERS_ROLES,
-  'COMPLIANCE_OFFICER',
-  'EXTERNAL_AUDITOR',
-] as const;
 
 /** Masked view of a Customer's own `-- ENCRYPT` fields for the profile
  * screen (Part 10.6 — masked-by-default, full reveal only via
@@ -243,19 +235,12 @@ export class CustomerService {
     }));
   }
 
-  private canView(customer: Customer, actor: AuthenticatedUser): boolean {
-    if (customer.ownerUserId === actor.id) return true;
-    return actor.roles.some((role) =>
-      (CUSTOMER_CROSS_OWNER_ROLES as readonly string[]).includes(role),
-    );
-  }
-
   private async findOwnedOrVisible(
     id: string,
     actor: AuthenticatedUser,
   ): Promise<Customer> {
     const customer = await this.customers.findById(id);
-    if (!customer || !this.canView(customer, actor)) {
+    if (!customer || !isCustomerVisibleTo(customer, actor)) {
       throw new NotFoundException('Customer not found');
     }
     return customer;

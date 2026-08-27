@@ -139,6 +139,15 @@ export default function CustomerProfilePage() {
     ].includes(role),
   );
   const canOpenUpSell = canOpenCrossSell;
+  const canOpenCrm = user.roles.some((role) =>
+    [
+      'SALES_RELATIONSHIP_OFFICER',
+      'BRANCH_DEPARTMENT_MANAGER',
+      'EXECUTIVE_MANAGEMENT',
+      'COMPLIANCE_OFFICER',
+      'EXTERNAL_AUDITOR',
+    ].includes(role),
+  );
 
   return (
     <main style={pageStyle}>
@@ -351,6 +360,28 @@ export default function CustomerProfilePage() {
             ) : (
               <p style={{ opacity: 0.6 }}>
                 You don&apos;t hold the up-sell.read permission.
+              </p>
+            )}
+          </section>
+
+          <section style={{ marginTop: '2rem' }}>
+            <h2>Relationship (CRM)</h2>
+            <p style={{ opacity: 0.8 }}>
+              Process 10 — log every customer touchpoint and see the 360°
+              timeline (interactions today, plus policies, claims and
+              complaints once those modules exist).
+            </p>
+            {canOpenCrm ? (
+              <button
+                type="button"
+                style={{ cursor: 'pointer' }}
+                onClick={() => router.push(`/crm?customerId=${customer.id}`)}
+              >
+                Open the relationship timeline
+              </button>
+            ) : (
+              <p style={{ opacity: 0.6 }}>
+                You don&apos;t hold the customer.360-view.read permission.
               </p>
             )}
           </section>

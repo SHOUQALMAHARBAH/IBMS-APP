@@ -19,6 +19,7 @@ import { NeedsAssessmentModule } from './modules/needs-assessment/needs-assessme
 import { InsuranceProgramModule } from './modules/insurance-program/insurance-program.module';
 import { CrossSellModule } from './modules/cross-sell/cross-sell.module';
 import { UpSellModule } from './modules/up-sell/up-sell.module';
+import { CrmModule } from './modules/crm/crm.module';
 
 @Module({
   imports: [
@@ -94,6 +95,14 @@ import { UpSellModule } from './modules/up-sell/up-sell.module';
     // AuthModule; reuses WorkflowModule for the OPEN -> CONVERTED |
     // DISMISSED status chain.
     UpSellModule,
+    // Part C backlog #10 (Relationship Management / CRM) — logs every
+    // customer touchpoint as an Interaction and serves the aggregated 360°
+    // customer view (interactions + policies + claims + complaints, merged
+    // into one timeline). Depends on CustomerModule (read visibility) and
+    // AuditModule (the CREATE row per interaction + the sensitive-data READ
+    // row for a 360° view). No workflow / maker-checker — Interaction is a
+    // factual log.
+    CrmModule,
   ],
   controllers: [AppController],
   providers: [AppService],
