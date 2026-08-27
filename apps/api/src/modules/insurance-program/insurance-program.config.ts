@@ -38,6 +38,15 @@ interface CoverageLineMapping {
 }
 
 /**
+ * The canonical `InsuranceProgramLine.insuranceLine` string for the
+ * property line — the only line #7 seeds from `propertySumInsured`, and the
+ * one Process 9 (Up-Selling) compares a customer's current asset value
+ * against. Exported so up-sell.config.ts references the same literal instead
+ * of hand-copying it.
+ */
+export const PROGRAM_LINE_PROPERTY_ALL_RISKS = 'Property All Risks';
+
+/**
  * One entry per `COVERAGE_LINES` member. `insuranceLine` is deliberately the
  * program-side vocabulary from the `InsuranceProgramLine` model comment,
  * which is close to but not identical to the client-facing coverage-line
@@ -46,7 +55,7 @@ interface CoverageLineMapping {
  */
 const COVERAGE_LINE_MAPPINGS: Record<CoverageLine, CoverageLineMapping> = {
   'Property All Risks (Fire)': {
-    insuranceLine: 'Property All Risks',
+    insuranceLine: PROGRAM_LINE_PROPERTY_ALL_RISKS,
     basis: 'property',
   },
   'Business Interruption': {

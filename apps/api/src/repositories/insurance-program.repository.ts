@@ -62,6 +62,20 @@ export class InsuranceProgramRepository {
     });
   }
 
+  /** Distinct customer ids that have at least one non-SUPERSEDED Insurance
+   * Program — the set the Up-Selling sweep (Part C #9) scans for
+   * under-insurance. `InsuranceProgram_one_live_per_risk_profile` (migration
+   * 20260827180000) already caps it at one non-SUPERSEDED program per Risk
+   * Profile, so the `new Set` only has to fold a multi-site customer's
+   * several profiles into one id. */
+  async findCustomerIdsWithLiveProgram(): Promise<string[]> {
+    const rows = await this.prisma.client.insuranceProgram.findMany({
+      where: { status: { not: 'SUPERSEDED' } },
+      select: { riskProfile: { select: { customerId: true } } },
+    });
+    return [...new Set(rows.map((r) => r.riskProfile.customerId))];
+  }
+
   createLines(
     insuranceProgramId: string,
     lines: readonly InsuranceProgramLineInput[],

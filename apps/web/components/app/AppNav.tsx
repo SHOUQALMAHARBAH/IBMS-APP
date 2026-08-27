@@ -29,6 +29,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/risk-profiles', label: 'Risk surveys' },
   { href: '/insurance-programs', label: 'Insurance programs' },
   { href: '/cross-sell', label: 'Cross-sell' },
+  { href: '/up-sell', label: 'Up-sell' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

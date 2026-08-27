@@ -27,5 +27,10 @@ import { NeedsAssessmentModule } from '../needs-assessment/needs-assessment.modu
   ],
   controllers: [InsuranceProgramController],
   providers: [InsuranceProgramService, InsuranceProgramRepository],
+  // Exported so UpSellModule (Part C #9) can read a customer's live
+  // programme lines for the "current Sum Insured" side of its
+  // under-insurance comparison — same reuse pattern as
+  // NeedsAssessmentModule/RiskProfileModule exporting their repositories.
+  exports: [InsuranceProgramRepository],
 })
 export class InsuranceProgramModule {}

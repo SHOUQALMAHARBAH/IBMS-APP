@@ -17,6 +17,7 @@ import type {
   Prisma,
   RenewalStatus,
   RfqInsurerStatus,
+  UpSellStatus,
 } from '@ibms/db';
 import type { PrismaService } from '../../prisma/prisma.service';
 
@@ -24,13 +25,14 @@ import type { PrismaService } from '../../prisma/prisma.service';
  * The eleven workflow-state entities named in
  * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6,
  * plus `Lead`, `KYCRecord`, `Customer`, `NeedsAssessment`,
- * `InsuranceProgram`, and `CrossSellOpportunity` — the lex file's rule is
- * not scoped to that named list ("Every entity that carries a workflow
- * state ... moves through a transition()"), and each of these backlog items
- * (Part C #1 Lead Management, #3-4 Customer Acquisition/Onboarding, #5 Needs
- * Assessment, #7 Product Recommendation / Program Design, #8 Cross-Selling)
- * explicitly asks for a governed status move, so they reuse this engine
- * rather than growing one-off transition functions. `KycStatus` and
+ * `InsuranceProgram`, `CrossSellOpportunity`, and `UpSellRecommendation` —
+ * the lex file's rule is not scoped to that named list ("Every entity that
+ * carries a workflow state ... moves through a transition()"), and each of
+ * these backlog items (Part C #1 Lead Management, #3-4 Customer
+ * Acquisition/Onboarding, #5 Needs Assessment, #7 Product Recommendation /
+ * Program Design, #8 Cross-Selling, #9 Up-Selling) explicitly asks for a
+ * governed status move, so they reuse this engine rather than growing
+ * one-off transition functions. `KycStatus` and
  * `CustomerStatus` were added together: backlog #3-4 explicitly says "do not
  * activate Customer.status = ACTIVE before [KYC] approval" — see
  * kyc.service.ts, the sole caller of the Customer transition.
@@ -39,7 +41,9 @@ import type { PrismaService } from '../../prisma/prisma.service';
  * carries the DRAFT -> FINALIZED lock the #7 backlog item's program-assembly
  * implies — see insurance-program.service.ts. `CrossSellStatus` carries the
  * "convert/dismiss the opportunity" move the #8 backlog item asks for — see
- * cross-sell.service.ts.
+ * cross-sell.service.ts. `UpSellStatus` is the same OPEN -> CONVERTED |
+ * DISMISSED shape for #9's system-flagged under-insurance recommendations —
+ * see up-sell.service.ts.
  * The string values match the `entityType` already used for these models'
  * AuditLogEntry rows elsewhere (AuditService is polymorphic on this same
  * string), so a TRANSITION audit row and any other action on the same
@@ -62,7 +66,8 @@ export type WorkflowEntityType =
   | 'Customer'
   | 'NeedsAssessment'
   | 'InsuranceProgram'
-  | 'CrossSellOpportunity';
+  | 'CrossSellOpportunity'
+  | 'UpSellRecommendation';
 
 /** Maps each entity to the Prisma-generated enum type its `status` column holds. */
 export interface WorkflowStatusMap {
@@ -83,6 +88,7 @@ export interface WorkflowStatusMap {
   NeedsAssessment: NeedsAssessmentStatus;
   InsuranceProgram: InsuranceProgramStatus;
   CrossSellOpportunity: CrossSellStatus;
+  UpSellRecommendation: UpSellStatus;
 }
 
 /**
@@ -423,6 +429,21 @@ export const WORKFLOW_TRANSITIONS: {
     CONVERTED: [],
     DISMISSED: [],
   },
+
+  // Backlog Part C #9 (Up-Selling). Same shape as CrossSellOpportunity: a
+  // system-detected under-insurance recommendation is created OPEN by the
+  // detection sweep (nothing else creates one), then a Sales Officer either
+  // CONVERTED it (takes the proposed increase forward into an endorsement /
+  // re-quote — Process 22 / 11+, not built, so CONVERTED is terminal here)
+  // or DISMISSED it (with a reason). Both non-OPEN states are terminal; the
+  // partial UNIQUE index (customerId WHERE status = 'OPEN') keeps at most one
+  // OPEN per customer, and a resolved recommendation frees that slot for a
+  // fresh one once assets grow further (see up-sell.service.ts).
+  UpSellRecommendation: {
+    OPEN: ['CONVERTED', 'DISMISSED'],
+    CONVERTED: [],
+    DISMISSED: [],
+  },
 };
 
 /** True if `to` is a legal next status from `from` for the given entity. */
@@ -492,6 +513,7 @@ export function getWorkflowDelegate(
     NeedsAssessment: client.needsAssessment,
     InsuranceProgram: client.insuranceProgram,
     CrossSellOpportunity: client.crossSellOpportunity,
+    UpSellRecommendation: client.upSellRecommendation,
   };
   return delegates[entityType] as WorkflowDelegate;
 }

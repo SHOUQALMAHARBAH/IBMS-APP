@@ -28,6 +28,7 @@ const entityTypes: WorkflowEntityType[] = [
   'NeedsAssessment',
   'InsuranceProgram',
   'CrossSellOpportunity',
+  'UpSellRecommendation',
 ];
 
 describe('WORKFLOW_TRANSITIONS', () => {
@@ -372,6 +373,28 @@ describe('isWorkflowTransitionAllowed', () => {
     ).toBe(false);
     expect(
       isWorkflowTransitionAllowed('CrossSellOpportunity', 'DISMISSED', 'OPEN'),
+    ).toBe(false);
+  });
+
+  it('allows UpSellRecommendation OPEN -> CONVERTED and OPEN -> DISMISSED (backlog Part C #9)', () => {
+    expect(
+      isWorkflowTransitionAllowed('UpSellRecommendation', 'OPEN', 'CONVERTED'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('UpSellRecommendation', 'OPEN', 'DISMISSED'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a resolved UpSellRecommendation (both non-OPEN states terminal)', () => {
+    expect(
+      isWorkflowTransitionAllowed('UpSellRecommendation', 'CONVERTED', 'OPEN'),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed(
+        'UpSellRecommendation',
+        'DISMISSED',
+        'CONVERTED',
+      ),
     ).toBe(false);
   });
 });

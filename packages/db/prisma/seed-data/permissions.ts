@@ -68,7 +68,9 @@ const commercialFrontOffice: PermissionSeed[] = [
   { code: 'cross-sell.read', module: 'commercial-front-office', description: 'List/read cross-sell opportunities', roles: [SALES, MANAGER, EXEC] },
   { code: 'cross-sell.detect', module: 'commercial-front-office', description: 'Run an on-demand cross-sell gap scan for a customer', roles: [SALES, MANAGER] },
   { code: 'cross-sell.convert', module: 'commercial-front-office', description: 'Convert or dismiss a system-flagged cross-sell opportunity', roles: [SALES] },
-  { code: 'up-sell.convert', module: 'commercial-front-office', description: 'Act on a system-flagged up-sell recommendation', roles: [SALES] },
+  { code: 'up-sell.read', module: 'commercial-front-office', description: 'List/read up-sell recommendations', roles: [SALES, MANAGER, EXEC] },
+  { code: 'up-sell.detect', module: 'commercial-front-office', description: 'Run an on-demand under-insurance scan for a customer', roles: [SALES, MANAGER] },
+  { code: 'up-sell.convert', module: 'commercial-front-office', description: 'Convert or dismiss a system-flagged up-sell recommendation', roles: [SALES] },
   { code: 'interaction.log', module: 'commercial-front-office', description: 'Log a customer interaction (meeting/call/email/...)', roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER] },
   { code: 'customer.360-view.read', module: 'commercial-front-office', description: 'Read the aggregated 360° customer view', roles: [SALES, MANAGER, EXEC, COMPLIANCE, AUDITOR] },
 ];

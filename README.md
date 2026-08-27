@@ -10,7 +10,7 @@ implements against them. Compliance/PDPL/CBJ obligations still cite the source d
 in `ibms-brain/`, not this README.
 
 **Status:** infrastructure scaffold (Part A + Part B), plus the first Part C business
-modules — **Domain A, Processes 1–8**: Lead Management (#1 — create/list/filter,
+modules — **Domain A, Processes 1–9**: Lead Management (#1 — create/list/filter,
 `LeadStatus` transition, an intake-form + pipeline-board screen), Prospect Management (#2
 — convert a qualified Lead, capture its qualification profile, a profile screen), Customer
 Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
@@ -21,10 +21,13 @@ Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity
 consolidated across a multi-site client), Product Recommendation / Program Design (#7
 — a multi-line `InsuranceProgram` assembled deterministically from an approved Needs
 Assessment's coverage list + the Risk Profile's derived Sum Insured, DRAFT → FINALIZED),
-and Cross-Selling (#8 — a nightly job + on-demand scan flag each benchmark insurance line
+Cross-Selling (#8 — a nightly job + on-demand scan flag each benchmark insurance line
 a customer holds no in-force policy for as a `CrossSellOpportunity` to convert or dismiss;
-`Policy` is empty until Domain B, so it is a correct no-op for now).
-Everything else — Domain A #9–10, Domains B–H
+`Policy` is empty until Domain B, so it is a correct no-op for now), and Up-Selling (#9 —
+a nightly job + on-demand scan raise an `UpSellRecommendation` when a customer's surveyed
+asset value has grown materially past the property Sum Insured designed into their live
+`InsuranceProgram`).
+Everything else — Domain A #10, Domains B–H
 (policy, claims, finance, service, compliance/risk, management, supporting ops), and
 Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
 **not started**. See § Scope status for the full picture and § Known gaps for the
@@ -406,7 +409,7 @@ build actually is today:
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
-### Part C · Domain A #1–8 — built, with these deferrals
+### Part C · Domain A #1–9 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -417,11 +420,11 @@ build actually is today:
 | 6 | Risk Assessment | per-site asset survey (building/equipment/stock/annual-profit/fleet) · deterministic Sum Insured + indemnity-period derivation · multi-site consolidation | no per-asset revision history (a `PATCH` replaces in place) — assembling the survey into an `InsuranceProgram` is Process 7, **now built (row 7)** |
 | 7 | Product Recommendation / Program Design | deterministic assembly of a multi-line `InsuranceProgram` from an APPROVED Needs Assessment's coverage list + the Risk Profile's derived Sum Insured · `InsuranceProgramStatus` DRAFT → FINALIZED (reopen) through the workflow engine (16th entity) · re-assemble in place while DRAFT · per-customer list + detail screen | one `InsuranceProgram` per `RiskProfile` (schema has no program↔multi-`RiskProfile` join — a multi-site client's cross-site roll-up stays the `GET /risk-profiles/consolidated` view, for a human to reference); only Property All Risks + Business Interruption get an asset-derived `sumInsuredBasis`, every other line is `null` (set at RFQ/quotation, Process 11+); no manual line curation; `SUPERSEDED` is modeled but no endpoint triggers it; the `FINALIZED → Opportunity/RFQ` link is Process 11+; `program.assemble` is role-level (no per-officer queue), no maker/checker (the coverage set was maker/checker-approved at #5) |
 | 8 | Cross-Selling | nightly `@Cron` sweep + on-demand `POST /cross-sell-opportunities/detect` compare a customer's in-force `Policy` lines against a benchmark line list and flag the gaps as `CrossSellOpportunity` · `CrossSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (17th entity) · per-customer list + detail screen with inline convert/dismiss | **the Policy module (Domain B) is not built, so `Policy` is empty everywhere and the job is a correct no-op until real policies exist**; `BENCHMARK_LINES` is one conservative global list, not a per-sector table (no sector taxonomy on `Customer`); only customers with ≥1 `ACTIVE` policy are scanned; a resolved (converted/dismissed) gap is never re-flagged (no re-open endpoint); the `CONVERTED → Opportunity/RFQ` link is Process 11+; no maker/checker (acting on a system nudge is single-actor); no per-officer queue; no reassignment |
+| 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 
 ### Not started
 
-- **Domain A Processes 9–10** — Up-Selling (#9),
-  Relationship Management / 360° customer view (#10).
+- **Domain A Process 10** — Relationship Management / 360° customer view (#10).
 - **Domains B–H** — Insurance Operations (RFQ / placement / quotation / comparison /
   recommendation / policy issuance / checking / delivery / endorsement, #11–22), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
@@ -1310,6 +1313,91 @@ narrows a gap.
   convert/dismiss lifecycle + resolver stamp + terminal 422, dismiss-needs-a-reason 400,
   RBAC 403, visibility 404); `cross-sell.spec.ts` Playwright (7 tests incl. `@a11y` +
   keyboard).
+
+**Part C #9 — Up-Selling (Domain A, Process 9)**
+
+- **`apps/api/src/modules/up-sell/`**: a nightly `@Cron('0 5 * * *')` sweep
+  (`up-sell-detection.scheduler.ts`) and an on-demand `POST
+  /up-sell-recommendations/detect` (`{ customerId }`, new seeded `up-sell.detect` →
+  Sales/Manager) compare a customer's **designed property Sum Insured** against the
+  **current value of their surveyed assets** and raise an `UpSellRecommendation` when the
+  gap is material. `GET /up-sell-recommendations?customerId=&status=` + `GET /:id` (new
+  seeded `up-sell.read` → Sales/Manager/Executive); `POST /:id/convert` and `POST
+  /:id/dismiss` (`{ reason }`) under `up-sell.convert` (Sales only — its seed description
+  was tightened from "Act on…" to "Convert or dismiss…" to match `cross-sell.convert`).
+- **Deterministic verdict** (`up-sell.config.ts`, pure + unit-tested): `assessUnderinsurance({ currentSumInsured, currentAssetValue })`
+  returns `{ shortfall, thresholdAmount, isUnderinsured }`. `isUnderinsured` is true when
+  `currentSumInsured > 0` and `shortfall >= UNDERINSURANCE_THRESHOLD_PERCENT` (**10%, a
+  drafted default** — roughly where an average clause bites, but no IBMS source names a
+  figure) of the Sum Insured. Every figure runs through `money.util.ts` (fils precision,
+  `ibms-brain/meta/lex/money-decimal-jod.md`) — `subtractMoney` / `applyPercentage` /
+  `compareMoney`, never a JS number.
+- **Where the two figures come from.** `currentSumInsured` = Σ of the "Property All
+  Risks" line's `sumInsuredBasis` over the customer's non-SUPERSEDED `InsuranceProgram`s
+  (#7). `currentAssetValue` = `deriveSumInsured(...).propertySumInsured` over every asset
+  behind the customer's whole book of `RiskProfile`s (#6). Both are **snapshotted onto
+  the row** at detection. The comparison is deliberately **property/asset-value only** —
+  a BI up-sell on annual-gross-profit growth is a separate concern, deferred. Because
+  `currentSumInsured` reads the *designed* programme line (not an in-force `Policy` — the
+  Policy module isn't built), and `reassemble` (#7) re-derives that line from the current
+  survey, the job specifically catches a **survey that grew without a re-assembly /
+  endorsement**. When Domain B lands this should read the in-force `Policy`/`PolicySchedule`
+  sum insured instead.
+- **`UpSellStatus` through `WorkflowTransitionService`** (A.6, 18th entity): `OPEN
+  -[convert]-> CONVERTED` and `OPEN -[dismiss]-> DISMISSED`, both terminal (the
+  `CONVERTED → endorsement / re-quote` link is Process 22 / 11+). Migration
+  `20260827220000_add_up_sell_status_enum` converts `UpSellRecommendation.status` from
+  free-text `String` (the fifth such enum conversion), adds
+  `detectedByUserId`/`resolvedByUserId`/`resolvedAt`/`dismissReason`, `@@index([customerId])`
+  + `@@index([status])`, and a **partial `UNIQUE` index** (`customerId WHERE status =
+  'OPEN'` — raw SQL, Prisma can't express the predicate). Unlike #8's `CrossSellOpportunity`
+  (a **full** `UNIQUE` — a line gap is binary and one-shot), an up-sell gap is a
+  continuous, growing quantity, so a customer who converts/dismisses one recommendation
+  can get a fresh one **once their assets grow further**. On top of the DB constraint, a
+  pre-check heuristic suppresses an immediate re-flag until `currentAssetValue` exceeds
+  the most recent resolved recommendation's — so a customer who declined an increase
+  isn't nagged nightly with the same figure. **Re-run `npm run db:migrate:dev` /
+  `db:test:migrate:dev` (or `db:migrate:deploy` given the pre-existing checksum drift),
+  then `npm run db:seed` / `db:test:seed`** for the two new permissions.
+- **Only customers with ≥1 non-SUPERSEDED `InsuranceProgram` are scanned** — there is no
+  "current Sum Insured" to compare against otherwise. Unlike #8, this is **buildable
+  data**: assemble a programme (#7), grow the asset survey (#6), and the scan flags a
+  real recommendation.
+- **No maker/checker** — acting on a system-surfaced nudge is a single-actor Sales task.
+  Visibility inherited from the Customer's owner, same as `cross-sell.service.ts` /
+  `lead.service.ts`.
+- **`apps/web/app/(app)/up-sell/`**: a `?customerId=` list with a "Scan for
+  under-insurance now" button, a last-scan panel (both figures + shortfall + verdict),
+  inline Convert / Dismiss (with a reason), and a detail screen. New "Up-sell" nav item
+  and a "Up-sell" section on the customer profile. Four states, `@a11y` + keyboard
+  covered.
+- **Deferred**: property/asset-value only (no BI up-sell); `currentSumInsured` is the
+  designed programme line, not an in-force policy (Domain B); the 10% threshold and the
+  re-nag heuristic are drafted, not sourced; no absolute-shortfall floor (a 10% gap on a
+  tiny Sum Insured still flags); `up-sell.convert` is role-level (no per-officer queue);
+  no reassignment.
+- **`@code-reviewer` pass** (mandatory — workflow + money) returned **APPROVE WITH
+  MINORS** (no blocker, no lex violation — money/workflow/race-safety all verified
+  clean). Three MINORs fixed before this landed: `findCustomerIdsWithLiveProgram`'s
+  `distinct` was redundant + divergent from its sibling and had no real-DB coverage (→
+  dropped it; added an e2e that runs the actual nightly sweep via
+  `app.get(UpSellDetectionScheduler).runSweep()`); `PROPERTY_ALL_RISKS_LINE` was a
+  hand-copied literal (→ exported `PROGRAM_LINE_PROPERTY_ALL_RISKS` from
+  `insurance-program.config.ts` and re-exported it, so the two can't drift);
+  `findLatestResolvedByCustomerId` ordered by `detectedAt` where resolution recency is
+  `resolvedAt` (→ ordered by `resolvedAt`). Plus a NIT: added a CONVERTED-prior
+  suppression test.
+- **Verification**: 23 new api unit tests (`up-sell.config.spec.ts` ×7,
+  `up-sell.service.spec.ts` ×13 — incl. the re-nag suppression off both a DISMISSED and
+  a CONVERTED prior, re-flag-on-growth, and a `P2002`-on-a-racing-insert skip,
+  `up-sell-detection.scheduler.spec.ts` ×3) + new `workflow-transitions.config.spec.ts`
+  cases; `up-sell.e2e-spec.ts` (8 tests — the full assemble → grow assets → flag →
+  idempotent → dismiss → suppress → re-flag chain, the real nightly sweep
+  (`runSweep()`) flags an under-insured customer, **two concurrent scans → one row**,
+  no-programme no-op, convert + resolver stamp + terminal 422, dismiss-needs-a-reason
+  400, RBAC 403, visibility 404); `up-sell.spec.ts` Playwright (7 tests incl. `@a11y` +
+  keyboard). Full suites: **543** api unit (47 files), **91** api e2e (13 files), 4
+  contract, 6 web unit, 66 web e2e, 13 a11y, `npm audit` 0.
 
 ## Deployment
 

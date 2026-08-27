@@ -714,15 +714,61 @@ model CrossSellOpportunity {
   @@index([status])
 }
 
-/// Process 9 — Up-Selling: under-insurance vs updated asset values.
+/// Process 9 (Up-Selling) status. OPEN once the detection sweep flags
+/// under-insurance (updated asset value materially above the currently
+/// designed Sum Insured); CONVERTED when a Sales Officer takes the proposed
+/// increase forward (an endorsement / re-quote — Process 22 / 11+, not
+/// built); DISMISSED (with a reason) when it is not pursued. Both non-OPEN
+/// states are terminal. Converted from a free-text String, the same enum
+/// conversion #1/#3-4/#5/#7/#8 did for their status columns.
+enum UpSellStatus {
+  OPEN
+  CONVERTED
+  DISMISSED
+}
+
+/// Process 9 — Up-Selling (backlog Part C #9). A system-detected gap between
+/// a customer's currently designed property Sum Insured (the "Property All
+/// Risks" line of their live `InsuranceProgram`, Process 7) and the current
+/// value of their surveyed assets (`deriveSumInsured` over the `RiskProfile`
+/// asset survey, Process 6) — flagged by the nightly
+/// UpSellDetectionScheduler (or an on-demand scan via
+/// POST /up-sell-recommendations/detect), then converted or dismissed. See
+/// apps/api/src/modules/up-sell/. Both figures are fils-precision JOD
+/// (`money.util.ts`, ibms-brain/meta/lex/money-decimal-jod.md).
+///
+/// `status` moves ONLY through WorkflowTransitionService (A.6).
+///
+/// A **partial** UNIQUE index (`customerId WHERE status = 'OPEN'`) is the
+/// race-safe backstop (ibms-brain/meta/lex/race-safe-invariants.md): at most
+/// one OPEN recommendation per customer at a time. Unlike #8's
+/// CrossSellOpportunity (a full UNIQUE — a line gap is binary and one-shot),
+/// an up-sell gap is a continuous, growing quantity, so a customer who
+/// resolves one recommendation can get a fresh one later once their assets
+/// have grown further. Raw SQL — Prisma can't express the predicate; see
+/// migration 20260827220000.
 model UpSellRecommendation {
   id              String   @id @default(uuid())
   customerId      String
   customer        Customer @relation(fields: [customerId], references: [id])
+  /// Σ of the "Property All Risks" line's `sumInsuredBasis` over the
+  /// customer's non-SUPERSEDED Insurance Programs, snapshotted at detection.
   currentSumInsured Decimal @db.Decimal(18, 3)
+  /// `deriveSumInsured(...).propertySumInsured` over the customer's whole
+  /// asset survey, snapshotted at detection.
   currentAssetValue Decimal @db.Decimal(18, 3)
+  status          UpSellStatus @default(OPEN)
   detectedAt      DateTime @default(now())
-  status          String   @default("open")
+  /// The actor behind the detection run — the system service account for
+  /// the nightly sweep, the Sales Officer for an on-demand scan. Bare
+  /// scalar, no relation; the AuditLogEntry is the authoritative trail.
+  detectedByUserId String?
+  resolvedByUserId String?
+  resolvedAt      DateTime?
+  dismissReason   String?
+
+  @@index([customerId])
+  @@index([status])
 }
 
 // ============================================================================

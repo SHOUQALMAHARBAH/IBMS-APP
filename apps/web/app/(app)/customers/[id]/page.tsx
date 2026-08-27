@@ -138,6 +138,7 @@ export default function CustomerProfilePage() {
       'EXECUTIVE_MANAGEMENT',
     ].includes(role),
   );
+  const canOpenUpSell = canOpenCrossSell;
 
   return (
     <main style={pageStyle}>
@@ -326,6 +327,30 @@ export default function CustomerProfilePage() {
             ) : (
               <p style={{ opacity: 0.6 }}>
                 You don&apos;t hold the cross-sell.read permission.
+              </p>
+            )}
+          </section>
+
+          <section style={{ marginTop: '2rem' }}>
+            <h2>Up-sell</h2>
+            <p style={{ opacity: 0.8 }}>
+              Process 9 — a nightly job compares this customer&apos;s designed
+              property Sum Insured against the current value of their surveyed
+              assets and proposes an increase where the gap is material.
+            </p>
+            {canOpenUpSell ? (
+              <button
+                type="button"
+                style={{ cursor: 'pointer' }}
+                onClick={() =>
+                  router.push(`/up-sell?customerId=${customer.id}`)
+                }
+              >
+                Open up-sell recommendations
+              </button>
+            ) : (
+              <p style={{ opacity: 0.6 }}>
+                You don&apos;t hold the up-sell.read permission.
               </p>
             )}
           </section>

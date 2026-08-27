@@ -18,6 +18,7 @@ import { RiskProfileModule } from './modules/risk-profile/risk-profile.module';
 import { NeedsAssessmentModule } from './modules/needs-assessment/needs-assessment.module';
 import { InsuranceProgramModule } from './modules/insurance-program/insurance-program.module';
 import { CrossSellModule } from './modules/cross-sell/cross-sell.module';
+import { UpSellModule } from './modules/up-sell/up-sell.module';
 
 @Module({
   imports: [
@@ -85,6 +86,14 @@ import { CrossSellModule } from './modules/cross-sell/cross-sell.module';
     // scheduler's system-account lookup); reuses WorkflowModule for the
     // OPEN -> CONVERTED | DISMISSED status chain.
     CrossSellModule,
+    // Part C backlog #9 (Up-Selling) — a nightly job + on-demand scan
+    // compares a customer's designed property Sum Insured (InsuranceProgram,
+    // #7) against the current value of their surveyed assets (RiskProfile,
+    // #6) and flags a proposed increase. Depends on InsuranceProgramModule /
+    // RiskProfileModule / CustomerModule's exported repositories and
+    // AuthModule; reuses WorkflowModule for the OPEN -> CONVERTED |
+    // DISMISSED status chain.
+    UpSellModule,
   ],
   controllers: [AppController],
   providers: [AppService],
