@@ -31,6 +31,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/cross-sell', label: 'Cross-sell' },
   { href: '/up-sell', label: 'Up-sell' },
   { href: '/crm', label: 'Relationship (CRM)' },
+  { href: '/opportunities', label: 'RFQ / market' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

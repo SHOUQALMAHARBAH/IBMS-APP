@@ -138,9 +138,15 @@ export const WORKFLOW_TRANSITIONS: {
   },
 
   // Inferred (no dedicated lifecycle doc yet — see file header). SENT ->
-  // insurer views and/or responds; a follow-up alert (Process 12) marks a
-  // silent insurer NO_RESPONSE, but a late responder can still submit a
-  // quote or decline afterward.
+  // insurer views and/or responds. NO_RESPONSE is a MANUAL move a Placement
+  // Officer records (Process 12, `rfq.insurer.update`) once an insurer has
+  // gone silent past the follow-up window — a late responder can still
+  // submit a quote or decline afterward, hence NO_RESPONSE -> QUOTED/DECLINED.
+  // Backlog Part C #11's nightly follow-up sweep is ALERT-ONLY: it stamps
+  // `RFQInsurer.followUpAlertSentAt` + writes an audit row, it does NOT
+  // drive this transition (see rfq-followup.scheduler.ts / RfqService.
+  // runFollowUpScan). Whether a silent insurer should auto-advance to
+  // NO_RESPONSE is a `/brain-gap` candidate (README § Known gaps, Part C #11).
   RFQInsurer: {
     SENT: ['VIEWED', 'QUOTED', 'DECLINED', 'NO_RESPONSE'],
     VIEWED: ['QUOTED', 'DECLINED', 'NO_RESPONSE'],

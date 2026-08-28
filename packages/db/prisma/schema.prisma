@@ -921,6 +921,10 @@ model Opportunity {
   renewalCase        RenewalCase? @relation(fields: [renewalCaseId], references: [id])
   status             OpportunityStatus @default(NEEDS_CONFIRMED)
   targetPremiumThreshold Decimal? @db.Decimal(18, 3) // triggers senior-officer approval above this
+  // Process 11 (backlog Part C #11) provenance — the Placement Officer who
+  // took the finalized Insurance Program to market. Bare scalar, no relation;
+  // the AuditLogEntry CREATE row is the authoritative trail.
+  createdByUserId    String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -929,8 +933,13 @@ model Opportunity {
   clientDecision     ClientDecision?
   policy             Policy?
 
+  // "At most one live Opportunity per InsuranceProgram" is enforced by a
+  // partial UNIQUE index (insuranceProgramId WHERE status <> 'CLOSED_LOST')
+  // that Prisma can't express here — see migration
+  // 20260828120000_add_rfq_market_submission.
   @@index([customerId])
   @@index([status])
+  @@index([insuranceProgramId])
 }
 
 /// Process 11 — RFQ / Market Submission per product/line to a shortlist of
@@ -942,10 +951,18 @@ model RFQ {
   insuranceLine String
   issuedAt      DateTime @default(now())
   followUpThresholdDays Int @default(9) // Part 3.7-style configurable follow-up
+  // Process 11 (backlog Part C #11) provenance — the Placement Officer who
+  // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
+  issuedByUserId String?
 
   insurerSubmissions RFQInsurer[]
   quotations    Quotation[]
   comparisonMatrix ComparisonMatrix?
+
+  // One RFQ per insurance line per Opportunity (backlog Part C #11 — "Create
+  // an RFQ per insurance line"). Re-marketing a line is a deliberate future
+  // relaxation (Negotiation #15 / Client Decision #17).
+  @@unique([opportunityId, insuranceLine])
 }
 
 enum RfqInsurerStatus {
@@ -970,6 +987,9 @@ model RFQInsurer {
   followUpAlertSentAt DateTime?
 
   @@unique([rfqId, insurerId])
+  @@index([insurerId])
+  // The nightly follow-up sweep (backlog Part C #11) filters on status.
+  @@index([status])
 }
 
 /// Process 13 — insurer quotation. Versioned, NEVER overwritten (Part 4.1,

@@ -20,6 +20,8 @@ import { InsuranceProgramModule } from './modules/insurance-program/insurance-pr
 import { CrossSellModule } from './modules/cross-sell/cross-sell.module';
 import { UpSellModule } from './modules/up-sell/up-sell.module';
 import { CrmModule } from './modules/crm/crm.module';
+import { OpportunityModule } from './modules/opportunity/opportunity.module';
+import { RfqModule } from './modules/rfq/rfq.module';
 
 @Module({
   imports: [
@@ -103,6 +105,18 @@ import { CrmModule } from './modules/crm/crm.module';
     // row for a 360° view). No workflow / maker-checker — Interaction is a
     // factual log.
     CrmModule,
+    // Part C backlog #11 (RFQ / Market Submission) — the first Domain B
+    // (Insurance Operations) module. OpportunityModule is the minimal
+    // parent-record home (created from a FINALIZED InsuranceProgram, then
+    // list/read only — the full Opportunity lifecycle is #16-17); RfqModule
+    // creates one RFQ per insurance line, tracks each shortlisted insurer's
+    // response status, and runs the nightly follow-up alert sweep. Depends
+    // on InsuranceProgramModule / RiskProfileModule / CustomerModule's
+    // exported repositories and AuthModule (the scheduler's system-account
+    // lookup); reuses WorkflowModule for the Opportunity NEEDS_CONFIRMED ->
+    // RFQ_ISSUED and the RFQInsurer response-status transitions.
+    OpportunityModule,
+    RfqModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -10,6 +10,7 @@ import {
   reopenInsuranceProgram,
   type InsuranceProgramWithContext,
 } from '../../../../lib/insurance-program/insurance-program-api';
+import { createOpportunity } from '../../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
@@ -77,6 +78,30 @@ export default function InsuranceProgramDetailPage() {
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : failMessage);
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function takeToMarket() {
+    if (!program) return;
+    setActionError(null);
+    setBusy(true);
+    const customerId = program.context.customerId;
+    try {
+      const opportunity = await createOpportunity(program.id);
+      router.push(`/opportunities/${opportunity.id}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && customerId) {
+        // A live Opportunity already exists for this programme — go to the
+        // customer's opportunity list rather than dead-ending.
+        router.push(`/opportunities?customerId=${customerId}`);
+        return;
+      }
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not take this program to market — try again.',
+      );
       setBusy(false);
     }
   }
@@ -244,19 +269,29 @@ export default function InsuranceProgramDetailPage() {
                 </>
               ) : null}
               {program.status === 'FINALIZED' ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  style={{ ...buttonStyle, width: 'auto' }}
-                  onClick={() =>
-                    void runAction(
-                      reopenInsuranceProgram,
-                      'Could not reopen — try again.',
-                    )
-                  }
-                >
-                  Reopen for revision
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    style={buttonStyle}
+                    onClick={() => void takeToMarket()}
+                  >
+                    {busy ? 'Working…' : 'Take to market'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    style={{ ...buttonStyle, width: 'auto' }}
+                    onClick={() =>
+                      void runAction(
+                        reopenInsuranceProgram,
+                        'Could not reopen — try again.',
+                      )
+                    }
+                  >
+                    Reopen for revision
+                  </button>
+                </>
               ) : null}
             </div>
           ) : null}

@@ -409,6 +409,10 @@ build actually is today:
   deployment-target decision.
 - **Part C — Domain A, Processes 1–10 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
+- **Part C — Domain B has begun: RFQ / Market Submission (#11) — built and verified.**
+  A minimal `Opportunity` parent (created from a FINALIZED `InsuranceProgram`) plus
+  `RFQ` / `RFQInsurer` — one RFQ per insurance line, an insurer shortlist, per-insurer
+  response tracking, and a nightly business-day follow-up alert sweep. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -426,10 +430,17 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
+### Part C · Domain B #11 — built, with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 11 | RFQ / Market Submission | minimal `Opportunity` parent — `POST /opportunities` (`{ insuranceProgramId }`) creates a `NEEDS_CONFIRMED` Opportunity from a **FINALIZED** `InsuranceProgram`, `customerId` resolved server-side · `GET /opportunities?customerId=` + `/:id` · `POST /rfqs` (one RFQ per `insuranceLine`, a SENT `RFQInsurer` per shortlisted insurer, `followUpThresholdDays` override) — the first RFQ drives `Opportunity` `NEEDS_CONFIRMED → RFQ_ISSUED` through the workflow engine · `GET /rfqs/selectable-insurers` (read-only `Insurer` master data) · `GET /rfqs?opportunityId=\|customerId=` + `/:id` · `POST /rfqs/:id/insurers` (broaden the shortlist) · `POST /rfq-insurers/:id/transition` (VIEWED/QUOTED/DECLINED/NO_RESPONSE via the workflow engine; QUOTED/DECLINED stamp `respondedAt`) · nightly `@Cron('0 6 * * *')` follow-up sweep — **alert only**: stamps `followUpAlertSentAt` + audits every still-open submission past its RFQ's threshold, counted in **Jordan business days** · `@@unique([opportunityId, insuranceLine])` + partial `UNIQUE` `Opportunity(insuranceProgramId) WHERE status <> 'CLOSED_LOST'` (`race-safe-invariants.md`) · web: opportunities + RFQ list/detail/new, per-insurer status control, "Take to market" on a FINALIZED programme, one nav item | **full Opportunity lifecycle is #16–17** — no Recommendation, no Client Decision (6 outcomes), no renegotiation, no close-lost endpoint, no `targetPremiumThreshold`; new-business Opportunities with no `InsuranceProgram` are not supported (a FINALIZED programme is the only entry point); the follow-up sweep does **not** auto-mark `NO_RESPONSE` (a #12 human decision — the inline note in `workflow-transitions.config.ts` to the contrary is a flagged inference, `/brain-gap` candidate); the business-day threshold is a **lower bound** (no Jordanian public-holiday calendar exists — `ibms-brain/meta/context/business-day-calendar.md`); one RFQ per `(opportunity, line)` — re-marketing a line needs a deliberate relaxation (#15/#17); `Insurer` master data is read-only (a real Insurer-management module is narrative Process 31); no maker/checker (issuing an RFQ is single-actor Placement work); `rfq.create` / `opportunity.create` are role-level (no per-officer queue); `Quotation` / `ComparisonMatrix` / `Recommendation` (#13–16) are not built |
+
 ### Not started
 
-- **Domains B–H** — Insurance Operations (RFQ / placement / quotation / comparison /
-  recommendation / policy issuance / checking / delivery / endorsement, #11–22), Claims
+- **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission is **built** — see
+  the Domain B table above; #12–22 placement / quotation / comparison / recommendation /
+  client decision / policy issuance / checking / delivery / endorsement remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -1499,6 +1510,107 @@ narrows a gap.
   563 api unit (49 files), 98 api e2e (14 files), 4 contract, web e2e 73, a11y 14 (the
   pre-existing `rbac.e2e-spec.ts` full-suite flake — passes 5/5 in isolation — is
   unrelated).
+
+**Part C #11 — RFQ / Market Submission (Domain B, Process 11)**
+
+- **First Domain B module.** `RFQ` requires an `Opportunity` parent and no Opportunity
+  module existed, so this ships a **minimal `Opportunity` module** — the same "build the
+  minimal parent" shape as #5's minimal `RiskProfile`. The full Opportunity lifecycle
+  (Recommendation, Client Decision's 6 outcomes, renegotiation, close-lost,
+  `targetPremiumThreshold`) is Processes 16–17 and deliberately out of scope.
+- **Migration `20260828120000_add_rfq_market_submission`** (hand-authored + applied +
+  `migrate resolve`, the known `_prisma_migrations` checksum-drift workaround — run
+  `npm run db:migrate:deploy` on a fresh checkout). No enum conversion — `OpportunityStatus`
+  / `RfqInsurerStatus` were already proper enums (modeled ahead at A.6). It adds:
+  `Opportunity.createdByUserId` + `RFQ.issuedByUserId` provenance (bare scalars, the
+  `AuditLogEntry` is authoritative); `@@index([insuranceProgramId])` on `Opportunity`,
+  `@@index([insurerId])` + `@@index([status])` on `RFQInsurer`; `@@unique([opportunityId,
+  insuranceLine])` on `RFQ` (one RFQ per line per Opportunity); and a **partial `UNIQUE`
+  index** `Opportunity(insuranceProgramId) WHERE status <> 'CLOSED_LOST'` (raw SQL — Prisma
+  can't express the predicate; `ibms-brain/meta/lex/race-safe-invariants.md`). Partial, not
+  full: a lost placement leaves the Opportunity `CLOSED_LOST` and frees the finalized
+  programme to be re-marketed.
+- **Seed:** three new permissions — `opportunity.create` (Placement), `opportunity.read` +
+  `rfq.read` (Sales/Placement/Manager/Executive). `rfq.create` + `rfq.insurer.update`
+  (Placement) were already seeded by A.2.
+- **`apps/api/src/modules/opportunity/`** (+ `repositories/opportunity.repository.ts`):
+  `POST /opportunities` (`{ insuranceProgramId }`, `opportunity.create`) — the programme
+  must be `FINALIZED` (422 otherwise); `customerId` is resolved server-side
+  (programme → `RiskProfile` → `Customer`), never caller-supplied; a descriptive 409
+  pre-check plus the partial-UNIQUE `P2002 → 409` backstop enforce one live Opportunity per
+  programme. `GET /opportunities?customerId=` + `GET /:id` (`opportunity.read`). Visibility
+  is the `CUSTOMER_FILE_CROSS_OWNER_ROLES` rule (Placement works the whole book; a Sales
+  Officer is scoped to customers they own), identical to `InsuranceProgramService`.
+- **`apps/api/src/modules/rfq/`** (+ `repositories/rfq.repository.ts`, two controllers):
+  - `POST /rfqs` (`{ opportunityId, insuranceLine, insurerIds[], followUpThresholdDays? }`,
+    `rfq.create`) — the Opportunity must be `NEEDS_CONFIRMED` or `RFQ_ISSUED`; `insurerIds`
+    are de-duplicated and every id must resolve to a real `Insurer` (422); a pre-check plus
+    the `@@unique` `P2002 → 409` enforce one RFQ per `(opportunity, line)`; the `CREATE`
+    audit row is written **before** the shortlist insert (recoverable on a partial crash,
+    same ordering as `InsuranceProgramService.assemble`); each shortlisted insurer becomes a
+    `SENT` `RFQInsurer` (per-row insert, `P2002` tolerated). On the **first** RFQ the
+    Opportunity is moved `NEEDS_CONFIRMED → RFQ_ISSUED` through `WorkflowTransitionService`
+    — **best-effort**: a concurrent transition that already moved it is logged, never
+    surfaced as a failure of the (already committed) RFQ.
+  - `GET /rfqs/selectable-insurers` (`rfq.create`) — read-only `Insurer` master data for
+    the shortlist picker (there is no Insurer-management module — narrative Process 31).
+  - `GET /rfqs?opportunityId=|customerId=` + `GET /:id` (`rfq.read`) — exactly one scope
+    param required (422 otherwise).
+  - `POST /rfqs/:id/insurers` (`rfq.create`) — broaden the shortlist; ids already on it are
+    skipped, `@@unique([rfqId, insurerId])` the backstop; audits only the ids actually added.
+  - `POST /rfq-insurers/:id/transition` (`{ toStatus }`, `rfq.insurer.update`) — `VIEWED` /
+    `QUOTED` / `DECLINED` / `NO_RESPONSE` (`SENT` is not a target); the legal-move map is
+    `WorkflowTransitionService`'s (`WORKFLOW_TRANSITIONS.RFQInsurer`, modeled ahead at A.6);
+    `QUOTED` / `DECLINED` stamp `respondedAt` in the same write via the transition `data`
+    hook.
+- **Follow-up alert sweep** — nightly `@Cron('0 6 * * *')` `rfq-followup.scheduler.ts` +
+  `RfqService.runFollowUpScan()` (system service account, same convention as the
+  cross-sell / up-sell schedulers). For every not-yet-alerted submission still `SENT` /
+  `VIEWED` whose RFQ's `followUpThresholdDays` has elapsed since `sentAt` — counted in
+  **Jordan business days** (`rfq.config.ts`'s pure `isFollowUpDue()` → `addBusinessDays()`,
+  same weekend-only lower-bound caveat as every other deadline: no public-holiday calendar
+  exists yet) — it stamps `followUpAlertSentAt` (race-safe: `updateMany` conditional on the
+  timestamp still being null) and writes an `UPDATE` audit row. **Alert only** — it does
+  **not** move a silent insurer to `NO_RESPONSE`. Process 12 (Market Placement) is the
+  "update each insurer's response status" step; the inline note in
+  `workflow-transitions.config.ts` that "a follow-up alert marks a silent insurer
+  NO_RESPONSE" is a flagged inference, and this divergence is a `/brain-gap` candidate.
+- **No maker/checker** — issuing an RFQ and recording insurer responses is single-actor
+  Placement work, and the coverage set was maker/checker-approved at the Needs Assessment
+  stage (A.5).
+- **`apps/web/app/(app)/opportunities/` + `apps/web/app/(app)/rfqs/`**: a `?customerId=`
+  opportunity list, an opportunity detail (its RFQs + a "Create RFQ for a line" button), an
+  RFQ create screen (line + insurer shortlist checkboxes + threshold), an RFQ detail
+  (insurer-submissions table with a per-row status `<select>` + an "Add insurers" control),
+  and a `?opportunityId=|customerId=` RFQ list. A "Take to market" button on a **FINALIZED**
+  insurance program creates the Opportunity and routes into the RFQ flow (on a 409 it routes
+  to the customer's opportunity list). One "RFQ / market" nav item. Non-Placement roles see
+  the read views without the create/transition controls.
+- **Deferred**: full Opportunity lifecycle (#16–17); new-business Opportunities with no
+  programme; auto-`NO_RESPONSE` on follow-up (#12); a real public-holiday calendar; one RFQ
+  per `(opportunity, line)` (re-marketing needs a deliberate relaxation at #15/#17); an
+  Insurer-management module (Process 31); a per-officer queue / reassignment;
+  `Quotation` / `ComparisonMatrix` / `Recommendation` (#13–16).
+- **`@code-reviewer` pass** (mandatory — workflow / approval logic on `Opportunity` +
+  `RFQInsurer`): **APPROVE WITH MINORS — no blockers, no lex violations.** The race-safety
+  of both invariants, the transition routing, and the visibility gates were all confirmed
+  correct. Findings addressed: (1) the RFQ line is now validated against the designed
+  `InsuranceProgram`'s canonical line set (422 for a typo / off-programme line, so #13–16
+  don't inherit a forked line); (2) `addInsurers` now refuses to broaden a shortlist once
+  the parent Opportunity has left the market phase (modelled ahead of #16–17), while
+  `transitionInsurer` deliberately stays ungated (recording a factual insurer response is
+  always valid); (3) the stale "a follow-up alert marks a silent insurer NO_RESPONSE"
+  comment in `workflow-transitions.config.ts` reconciled to match the alert-only behaviour;
+  (4) `markOpportunityRfqIssued` now documents that #12 must derive "has RFQs" from the RFQ
+  table, not `Opportunity.status` (the best-effort transition can lose a race or swallow an
+  audit-write failure inside `transition()`). NITs (unpaginated sweep, api/web enum
+  duplication, PLACEMENT-only rationale) resolved with comments.
+- **Verification**: 41 new api unit tests (`rfq.config.spec.ts` ×5,
+  `opportunity.service.spec.ts` ×11, `rfq.service.spec.ts` ×22,
+  `rfq-followup.scheduler.spec.ts` ×3); `rfq.spec.ts` Playwright (5 tests incl. `@a11y`).
+  Full suites green: **604** api unit (53 files), api e2e **96/98** (the 2 failures are the
+  pre-existing `rbac.e2e-spec.ts` access-recertification full-suite flake — timeouts under
+  load, unrelated to this change), 4 contract, 6 web unit, web e2e (Playwright + axe).
 
 ## Deployment
 

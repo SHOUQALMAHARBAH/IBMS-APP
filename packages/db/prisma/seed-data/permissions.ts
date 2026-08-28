@@ -79,7 +79,16 @@ const commercialFrontOffice: PermissionSeed[] = [
 // Domain B — Insurance Operations (Processes 11-22)
 // ----------------------------------------------------------------------
 const insuranceOperations: PermissionSeed[] = [
+  // Domain B is the Placement/Technical Officer's desk — `opportunity.create`
+  // and `rfq.create` are PLACEMENT-only per meta/context/policy-lifecycle.md
+  // ("Placement ... Manage RFQ"). The role-catalogue's illustrative "Sales
+  // Officer initiates RFQ" line is not a maker/checker pairing, so scoping
+  // market submission to Placement is a deliberate choice, not a violation.
+  // Sales still gets the `.read` codes (they own the customer relationship).
+  { code: 'opportunity.create', module: 'insurance-operations', description: 'Create an Opportunity from a finalized Insurance Program', roles: [PLACEMENT] },
+  { code: 'opportunity.read', module: 'insurance-operations', description: 'List/read Opportunities', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'rfq.create', module: 'insurance-operations', description: 'Create an RFQ and select an insurer shortlist', roles: [PLACEMENT] },
+  { code: 'rfq.read', module: 'insurance-operations', description: 'List/read RFQs and insurer submissions', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'rfq.insurer.update', module: 'insurance-operations', description: "Update an insurer's RFQ response status", roles: [PLACEMENT] },
   { code: 'quotation.capture', module: 'insurance-operations', description: "Capture an insurer's quotation", roles: [PLACEMENT] },
   { code: 'quotation.negotiate', module: 'insurance-operations', description: 'Record a renegotiation round as a new quotation version', roles: [PLACEMENT] },
