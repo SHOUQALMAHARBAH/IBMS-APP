@@ -9,16 +9,17 @@ const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
 
 /**
  * Process 11 — "Follow-up alert job once `followUpThresholdDays` is
- * exceeded". Runs at 06:00 UTC daily, after the 04:00 cross-sell and 05:00
- * up-sell sweeps.
+ * exceeded" + Process 12 (Market Placement) auto-NO_RESPONSE. Runs at 06:00
+ * UTC daily, after the 04:00 cross-sell and 05:00 up-sell sweeps.
  *
  * `RfqService.runFollowUpScan` finds every still-open `RFQInsurer` (status
- * SENT / VIEWED, not yet alerted) whose RFQ's business-day
- * `followUpThresholdDays` has elapsed since `sentAt`, stamps
- * `followUpAlertSentAt`, and writes an audit row. **Alert only** — it does
- * not move a silent insurer to NO_RESPONSE; that is a human decision in
- * Process 12 (Market Placement). Idempotent: `stampFollowUpAlert` is
- * conditional on the timestamp still being null, so a re-run adds nothing.
+ * SENT / VIEWED) whose RFQ's business-day `followUpThresholdDays` has elapsed
+ * since `sentAt`, stamps `followUpAlertSentAt` + writes an audit row, and
+ * moves it SENT/VIEWED -> NO_RESPONSE through the workflow engine (a late
+ * responder can still be moved NO_RESPONSE -> QUOTED/DECLINED). Idempotent:
+ * `stampFollowUpAlert` is conditional on the timestamp still being null, and
+ * once NO_RESPONSE the row is out of the candidate set; a concurrent manual
+ * QUOTED/DECLINED makes the transition a safe no-op.
  */
 @Injectable()
 export class RfqFollowUpScheduler {
@@ -50,9 +51,14 @@ export class RfqFollowUpScheduler {
       return;
     }
 
-    if (result.alerted > 0 || result.failed > 0) {
+    if (
+      result.alerted > 0 ||
+      result.autoNoResponse > 0 ||
+      result.transitionSkipped > 0 ||
+      result.failed > 0
+    ) {
       this.logger.log(
-        `RFQ follow-up sweep: ${result.candidates} open submission(s) awaiting a response, ${result.due} past threshold, ${result.alerted} newly alerted, ${result.failed} failed.`,
+        `RFQ follow-up sweep: ${result.candidates} open submission(s) awaiting a response, ${result.due} past threshold, ${result.alerted} newly alerted, ${result.autoNoResponse} moved to NO_RESPONSE, ${result.transitionSkipped} skipped (insurer responded), ${result.failed} failed.`,
       );
     }
   }

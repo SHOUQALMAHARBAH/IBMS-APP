@@ -100,6 +100,19 @@ function makeDeps() {
   const countInsurersByIds = vi
     .fn()
     .mockImplementation((ids: string[]) => Promise.resolve(ids.length));
+  // Mirrors Prisma's default-fill: an undefined `sentAt` in `data` becomes
+  // now() on the persisted row.
+  const createCommunication = vi
+    .fn()
+    .mockImplementation((input: Record<string, unknown>) =>
+      Promise.resolve({
+        id: 'comm-1',
+        createdAt: new Date(),
+        ...input,
+        sentAt: (input.sentAt as Date | undefined) ?? new Date(),
+      }),
+    );
+  const findCommunicationsByRfqId = vi.fn().mockResolvedValue([]);
   const rfqs = {
     createRfq,
     findRfqById,
@@ -113,6 +126,8 @@ function makeDeps() {
     findOpenSubmissionsForFollowUp,
     findSelectableInsurers,
     countInsurersByIds,
+    createCommunication,
+    findCommunicationsByRfqId,
   } as unknown as RfqRepository;
 
   const findOpportunityById = vi.fn().mockResolvedValue({
@@ -173,6 +188,8 @@ function makeDeps() {
       findOpenSubmissionsForFollowUp,
       findSelectableInsurers,
       countInsurersByIds,
+      createCommunication,
+      findCommunicationsByRfqId,
       findOpportunityById,
       findProgramById,
       findCustomerById,
@@ -435,25 +452,54 @@ describe('RfqService', () => {
   describe('runFollowUpScan', () => {
     const OLD_SENT = new Date('2020-01-06T09:00:00Z');
 
-    it('stamps and audits an over-threshold open submission exactly once', async () => {
+    function dueRow(overrides?: Record<string, unknown>) {
+      return {
+        id: 'sub-1',
+        rfqId: 'rfq-1',
+        insurerId: 'ins-1',
+        status: 'SENT',
+        sentAt: OLD_SENT,
+        followUpAlertSentAt: null,
+        rfq: { id: 'rfq-1', followUpThresholdDays: 9 },
+        ...overrides,
+      };
+    }
+
+    it('stamps + audits + auto-advances an over-threshold open submission', async () => {
       const { service, mocks } = makeDeps();
-      mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([
-        {
-          id: 'sub-1',
-          rfqId: 'rfq-1',
-          insurerId: 'ins-1',
-          status: 'SENT',
-          sentAt: OLD_SENT,
-          followUpAlertSentAt: null,
-          rfq: { id: 'rfq-1', followUpThresholdDays: 9 },
-        },
-      ]);
+      mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([dueRow()]);
+      mocks.transition.mockResolvedValue({
+        id: 'sub-1',
+        status: 'NO_RESPONSE',
+      });
+
       const result = await service.runFollowUpScan('system-1');
-      expect(result).toEqual({ candidates: 1, due: 1, alerted: 1, failed: 0 });
+
+      expect(result).toEqual({
+        candidates: 1,
+        due: 1,
+        alerted: 1,
+        autoNoResponse: 1,
+        transitionSkipped: 0,
+        failed: 0,
+      });
       expect(mocks.stampFollowUpAlert).toHaveBeenCalledWith(
         'sub-1',
         expect.any(Date),
       );
+      expect(mocks.transition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: 'RFQInsurer',
+          entityId: 'sub-1',
+          toStatus: 'NO_RESPONSE',
+          actorUserId: 'system-1',
+        }),
+      );
+      // respondedAt is NOT stamped by an auto-NO_RESPONSE move.
+      const call = mocks.transition.mock.calls[0]?.[0] as {
+        data?: unknown;
+      };
+      expect(call.data).toBeUndefined();
       const auditArg = mocks.record.mock.calls[0]?.[0] as {
         action: string;
         entityType: string;
@@ -466,62 +512,252 @@ describe('RfqService', () => {
       expect(auditArg.afterValue.followUpAlert).toBe(true);
     });
 
-    it('does not audit when another sweep stamped the row first (count 0)', async () => {
+    it('auto-advances a VIEWED submission too', async () => {
       const { service, mocks } = makeDeps();
       mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([
-        {
-          id: 'sub-1',
-          rfqId: 'rfq-1',
-          insurerId: 'ins-1',
-          sentAt: OLD_SENT,
-          rfq: { followUpThresholdDays: 9 },
-        },
+        dueRow({ status: 'VIEWED' }),
       ]);
+      const result = await service.runFollowUpScan('system-1');
+      expect(result.autoNoResponse).toBe(1);
+      expect(mocks.transition).toHaveBeenCalledWith(
+        expect.objectContaining({ toStatus: 'NO_RESPONSE' }),
+      );
+    });
+
+    it('counts a concurrent insurer response as transitionSkipped, not failed', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([
+        dueRow({ id: 'sub-1' }),
+        dueRow({ id: 'sub-2' }),
+      ]);
+      mocks.transition
+        .mockRejectedValueOnce(new ConflictException('status changed'))
+        .mockResolvedValueOnce({ id: 'sub-2', status: 'NO_RESPONSE' });
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toEqual({
+        candidates: 2,
+        due: 2,
+        alerted: 2,
+        autoNoResponse: 1,
+        transitionSkipped: 1,
+        failed: 0,
+      });
+    });
+
+    it('treats an illegal-move 422 from a terminal state as transitionSkipped', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([dueRow()]);
+      mocks.transition.mockRejectedValue(
+        new UnprocessableEntityException('cannot transition from QUOTED'),
+      );
+      const result = await service.runFollowUpScan('system-1');
+      expect(result.transitionSkipped).toBe(1);
+      expect(result.failed).toBe(0);
+    });
+
+    it('still auto-advances when another sweep stamped the alert first (count 0)', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([dueRow()]);
       mocks.stampFollowUpAlert.mockResolvedValue(0);
       const result = await service.runFollowUpScan('system-1');
-      expect(result).toEqual({ candidates: 1, due: 1, alerted: 0, failed: 0 });
+      expect(result).toEqual({
+        candidates: 1,
+        due: 1,
+        alerted: 0,
+        autoNoResponse: 1,
+        transitionSkipped: 0,
+        failed: 0,
+      });
       expect(mocks.record).not.toHaveBeenCalled();
     });
 
     it('skips a submission that has not yet cleared its threshold', async () => {
       const { service, mocks } = makeDeps();
       mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([
-        {
-          id: 'sub-1',
-          rfqId: 'rfq-1',
-          insurerId: 'ins-1',
-          sentAt: new Date(),
-          rfq: { followUpThresholdDays: 9 },
-        },
+        dueRow({ sentAt: new Date() }),
       ]);
       const result = await service.runFollowUpScan('system-1');
-      expect(result).toEqual({ candidates: 1, due: 0, alerted: 0, failed: 0 });
+      expect(result).toEqual({
+        candidates: 1,
+        due: 0,
+        alerted: 0,
+        autoNoResponse: 0,
+        transitionSkipped: 0,
+        failed: 0,
+      });
       expect(mocks.stampFollowUpAlert).not.toHaveBeenCalled();
+      expect(mocks.transition).not.toHaveBeenCalled();
     });
 
-    it('isolates a failing row and keeps going', async () => {
+    it('isolates a row that throws unexpectedly and keeps going', async () => {
       const { service, mocks } = makeDeps();
       mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([
-        {
-          id: 'sub-1',
-          rfqId: 'r',
-          insurerId: 'i',
-          sentAt: OLD_SENT,
-          rfq: { followUpThresholdDays: 9 },
-        },
-        {
-          id: 'sub-2',
-          rfqId: 'r',
-          insurerId: 'i',
-          sentAt: OLD_SENT,
-          rfq: { followUpThresholdDays: 9 },
-        },
+        dueRow({ id: 'sub-1' }),
+        dueRow({ id: 'sub-2' }),
       ]);
       mocks.stampFollowUpAlert
         .mockRejectedValueOnce(new Error('db blip'))
         .mockResolvedValueOnce(1);
       const result = await service.runFollowUpScan('system-1');
-      expect(result).toEqual({ candidates: 2, due: 2, alerted: 1, failed: 1 });
+      expect(result).toEqual({
+        candidates: 2,
+        due: 2,
+        alerted: 1,
+        autoNoResponse: 1,
+        transitionSkipped: 0,
+        failed: 1,
+      });
+    });
+  });
+
+  describe('logCommunication', () => {
+    const COMM_DTO = {
+      direction: 'INBOUND' as const,
+      channel: 'EMAIL' as const,
+      body: 'Please send 3 years of loss history for site 2.',
+    };
+
+    it('creates the row, backfills customerId, and audits metadata only (no body)', async () => {
+      const { service, mocks } = makeDeps();
+
+      await service.logCommunication('rfq-1', COMM_DTO, placement());
+
+      expect(mocks.createCommunication).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rfqId: 'rfq-1',
+          customerId: 'cust-1',
+          direction: 'INBOUND',
+          channel: 'EMAIL',
+          body: 'Please send 3 years of loss history for site 2.',
+          loggedByUserId: 'plc-1',
+        }),
+      );
+      const auditArg = mocks.record.mock.calls[0]?.[0] as {
+        action: string;
+        entityType: string;
+        afterValue: Record<string, unknown>;
+      };
+      expect(auditArg.action).toBe('CREATE');
+      expect(auditArg.entityType).toBe('RfqCommunication');
+      expect(auditArg.afterValue).toMatchObject({
+        rfqId: 'rfq-1',
+        rfqInsurerId: null,
+        direction: 'INBOUND',
+        channel: 'EMAIL',
+      });
+      // Free text never enters the audit row — no `subject`, no `body`.
+      expect(auditArg.afterValue).not.toHaveProperty('subject');
+      expect(auditArg.afterValue).not.toHaveProperty('body');
+      expect(JSON.stringify(auditArg.afterValue)).not.toContain('loss history');
+    });
+
+    it('accepts an OUTBOUND exchange', async () => {
+      const { service, mocks } = makeDeps();
+      await service.logCommunication(
+        'rfq-1',
+        { ...COMM_DTO, direction: 'OUTBOUND' },
+        placement(),
+      );
+      expect(mocks.createCommunication).toHaveBeenCalledWith(
+        expect.objectContaining({ direction: 'OUTBOUND' }),
+      );
+    });
+
+    it('422s an rfqInsurerId that is not on this RFQ', async () => {
+      const { service, mocks } = makeDeps();
+      await expect(
+        service.logCommunication(
+          'rfq-1',
+          { ...COMM_DTO, rfqInsurerId: 'sub-999' },
+          placement(),
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(mocks.createCommunication).not.toHaveBeenCalled();
+    });
+
+    it('accepts an rfqInsurerId that IS on this RFQ', async () => {
+      const { service, mocks } = makeDeps();
+      await service.logCommunication(
+        'rfq-1',
+        { ...COMM_DTO, rfqInsurerId: 'sub-1' },
+        placement(),
+      );
+      expect(mocks.createCommunication).toHaveBeenCalledWith(
+        expect.objectContaining({ rfqInsurerId: 'sub-1' }),
+      );
+    });
+
+    it('422s an offset-less datetime occurredAt', async () => {
+      const { service, mocks } = makeDeps();
+      await expect(
+        service.logCommunication(
+          'rfq-1',
+          { ...COMM_DTO, occurredAt: '2026-01-15T09:30:00' },
+          placement(),
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(mocks.createCommunication).not.toHaveBeenCalled();
+    });
+
+    it('422s a future occurredAt', async () => {
+      const { service } = makeDeps();
+      const future = new Date(Date.now() + 3 * 3600_000).toISOString();
+      await expect(
+        service.logCommunication(
+          'rfq-1',
+          { ...COMM_DTO, occurredAt: future },
+          placement(),
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('passes a valid backdated occurredAt through as sentAt', async () => {
+      const { service, mocks } = makeDeps();
+      await service.logCommunication(
+        'rfq-1',
+        { ...COMM_DTO, occurredAt: '2026-01-15T09:30:00.000Z' },
+        placement(),
+      );
+      expect(mocks.createCommunication).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sentAt: new Date('2026-01-15T09:30:00.000Z'),
+        }),
+      );
+    });
+
+    it('404s an RFQ on a customer the caller cannot see', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findCustomerById.mockResolvedValue({
+        id: 'cust-1',
+        ownerUserId: 'sales-2',
+      });
+      await expect(
+        service.logCommunication(
+          'rfq-1',
+          COMM_DTO,
+          placement({ id: 'sales-1', roles: ['SALES_RELATIONSHIP_OFFICER'] }),
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('listCommunications', () => {
+    it('returns the RFQ correspondence after a visibility check', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findCommunicationsByRfqId.mockResolvedValue([{ id: 'comm-1' }]);
+      const rows = await service.listCommunications('rfq-1', placement());
+      expect(rows).toEqual([{ id: 'comm-1' }]);
+      expect(mocks.findCommunicationsByRfqId).toHaveBeenCalledWith('rfq-1');
+    });
+
+    it('404s when the RFQ is not visible', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findRfqById.mockResolvedValue(null);
+      await expect(
+        service.listCommunications('rfq-1', placement()),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

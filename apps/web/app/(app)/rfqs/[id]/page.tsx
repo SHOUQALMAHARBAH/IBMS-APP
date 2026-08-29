@@ -6,10 +6,14 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   addRfqInsurers,
   getRfq,
+  listRfqCommunications,
   listSelectableInsurers,
+  logRfqCommunication,
   transitionRfqInsurer,
   RFQ_INSURER_TARGET_STATUSES,
+  type CommunicationDirection,
   type Rfq,
+  type RfqCommunication,
   type RfqInsurerStatus,
   type SelectableInsurer,
 } from '../../../../lib/rfq/rfq-api';
@@ -17,17 +21,28 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
 import {
+  commBodyStyle,
   insurerPickerStyle,
   rfqActionsStyle,
   rfqBadgeStyle,
   rfqCellStyle,
+  rfqFieldStyle,
   rfqTableStyle,
 } from '../../../../components/rfq/rfq.styles';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
+// The medium of a broker<->insurer exchange. The API accepts the full
+// InteractionChannel enum; this is the practical subset for placement work.
+const COMM_CHANNELS = ['EMAIL', 'CALL', 'PORTAL', 'MEETING', 'OTHER'] as const;
+const COMM_DIRECTIONS: CommunicationDirection[] = ['INBOUND', 'OUTBOUND'];
+
 function fmt(value: string | null): string {
   return value ? new Date(value).toLocaleDateString() : '—';
+}
+
+function fmtDateTime(value: string): string {
+  return new Date(value).toLocaleString();
 }
 
 export default function RfqDetailPage() {
@@ -46,6 +61,16 @@ export default function RfqDetailPage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [addBusy, setAddBusy] = useState(false);
 
+  const [comms, setComms] = useState<RfqCommunication[] | null>(null);
+  const [commsError, setCommsError] = useState<string | null>(null);
+  const [direction, setDirection] = useState<CommunicationDirection>('OUTBOUND');
+  const [channel, setChannel] = useState<string>('EMAIL');
+  const [commInsurerId, setCommInsurerId] = useState<string>('');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [commError, setCommError] = useState<string | null>(null);
+  const [commBusy, setCommBusy] = useState(false);
+
   const load = useCallback(async () => {
     try {
       setRfq(await getRfq(params.id));
@@ -61,6 +86,19 @@ export default function RfqDetailPage() {
     }
   }, [params.id]);
 
+  const loadComms = useCallback(async () => {
+    try {
+      setComms(await listRfqCommunications(params.id));
+      setCommsError(null);
+    } catch (err) {
+      setCommsError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not load the correspondence log — try again.',
+      );
+    }
+  }, [params.id]);
+
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
@@ -69,8 +107,9 @@ export default function RfqDetailPage() {
     if (!user) return;
     void (async () => {
       await load();
+      await loadComms();
     })();
-  }, [user, load]);
+  }, [user, load, loadComms]);
 
   async function changeStatus(submissionId: string, toStatus: RfqInsurerStatus) {
     setRowError(null);
@@ -124,6 +163,33 @@ export default function RfqDetailPage() {
     }
   }
 
+  async function submitComm() {
+    if (!rfq || body.trim().length === 0) return;
+    setCommBusy(true);
+    setCommError(null);
+    try {
+      await logRfqCommunication(rfq.id, {
+        direction,
+        channel,
+        body: body.trim(),
+        subject: subject.trim() || undefined,
+        rfqInsurerId: commInsurerId || undefined,
+      });
+      setSubject('');
+      setBody('');
+      setCommInsurerId('');
+      await loadComms();
+    } catch (err) {
+      setCommError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not log the exchange — try again.',
+      );
+    } finally {
+      setCommBusy(false);
+    }
+  }
+
   if (isLoading || !user) return null;
 
   const isPlacement = user.roles.includes(PLACEMENT_ROLE);
@@ -161,6 +227,10 @@ export default function RfqDetailPage() {
           </div>
 
           <h2 style={{ marginTop: '2rem' }}>Insurer submissions</h2>
+          <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+            A status of <code>NO_RESPONSE</code> may be set by the nightly
+            follow-up sweep once the threshold above has lapsed.
+          </p>
           {rfq.insurerSubmissions.length === 0 ? (
             <p style={{ opacity: 0.6 }}>No insurers on this RFQ.</p>
           ) : (
@@ -298,6 +368,139 @@ export default function RfqDetailPage() {
                   Add insurers…
                 </button>
               )}
+            </div>
+          ) : null}
+
+          <h2 style={{ marginTop: '2.5rem' }}>Correspondence</h2>
+          <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
+            Insurer queries during the market phase, and the answers /
+            additional information supplied.
+          </p>
+
+          {commsError ? (
+            <p role="alert" style={errorStyle}>
+              {commsError}
+            </p>
+          ) : null}
+
+          {comms === null ? (
+            <p>Loading…</p>
+          ) : comms.length === 0 ? (
+            <p style={{ opacity: 0.6 }}>Nothing logged yet.</p>
+          ) : (
+            <table style={rfqTableStyle}>
+              <thead>
+                <tr>
+                  <th style={rfqCellStyle}>When</th>
+                  <th style={rfqCellStyle}>Direction</th>
+                  <th style={rfqCellStyle}>Channel</th>
+                  <th style={rfqCellStyle}>Insurer</th>
+                  <th style={rfqCellStyle}>Exchange</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comms.map((c) => (
+                  <tr key={c.id}>
+                    <td style={rfqCellStyle}>{fmtDateTime(c.sentAt)}</td>
+                    <td style={rfqCellStyle}>
+                      <span style={rfqBadgeStyle}>{c.direction}</span>
+                    </td>
+                    <td style={rfqCellStyle}>{c.channel}</td>
+                    <td style={rfqCellStyle}>
+                      {c.rfqInsurer?.insurer.name ?? 'Panel'}
+                    </td>
+                    <td style={rfqCellStyle}>
+                      {c.subject ? <strong>{c.subject}</strong> : null}
+                      <p style={commBodyStyle}>{c.body}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {isPlacement ? (
+            <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
+              <strong>Log an exchange</strong>
+              {commError ? (
+                <p role="alert" style={errorStyle}>
+                  {commError}
+                </p>
+              ) : null}
+              <div style={rfqFieldStyle}>
+                <label htmlFor="comm-direction">Direction</label>
+                <select
+                  id="comm-direction"
+                  value={direction}
+                  onChange={(e) =>
+                    setDirection(e.target.value as CommunicationDirection)
+                  }
+                >
+                  {COMM_DIRECTIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {d === 'INBOUND'
+                        ? 'INBOUND — insurer asked us'
+                        : 'OUTBOUND — we answered / sent info'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={rfqFieldStyle}>
+                <label htmlFor="comm-channel">Channel</label>
+                <select
+                  id="comm-channel"
+                  value={channel}
+                  onChange={(e) => setChannel(e.target.value)}
+                >
+                  {COMM_CHANNELS.map((ch) => (
+                    <option key={ch} value={ch}>
+                      {ch}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={rfqFieldStyle}>
+                <label htmlFor="comm-insurer">Insurer (optional)</label>
+                <select
+                  id="comm-insurer"
+                  value={commInsurerId}
+                  onChange={(e) => setCommInsurerId(e.target.value)}
+                >
+                  <option value="">Whole panel</option>
+                  {rfq.insurerSubmissions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.insurer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={rfqFieldStyle}>
+                <label htmlFor="comm-subject">Subject (optional)</label>
+                <input
+                  id="comm-subject"
+                  value={subject}
+                  maxLength={200}
+                  onChange={(e) => setSubject(e.target.value)}
+                />
+              </div>
+              <div style={rfqFieldStyle}>
+                <label htmlFor="comm-body">Exchange</label>
+                <textarea
+                  id="comm-body"
+                  value={body}
+                  rows={4}
+                  maxLength={4000}
+                  onChange={(e) => setBody(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={commBusy || body.trim().length === 0}
+                style={{ ...buttonStyle, width: 'auto' }}
+                onClick={() => void submitComm()}
+              >
+                {commBusy ? 'Logging…' : 'Log exchange'}
+              </button>
             </div>
           ) : null}
         </>

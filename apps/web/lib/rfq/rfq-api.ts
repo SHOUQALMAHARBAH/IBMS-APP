@@ -51,6 +51,37 @@ export interface Rfq {
   insurerSubmissions: RfqInsurerSubmission[];
 }
 
+/** Process 12 — a broker<->insurer exchange on an RFQ: an insurer's query
+ * (`INBOUND`) or the broker's answer / additional-information note
+ * (`OUTBOUND`). */
+export type CommunicationDirection = 'INBOUND' | 'OUTBOUND';
+
+export interface RfqCommunication {
+  id: string;
+  rfqId: string;
+  rfqInsurerId: string | null;
+  direction: CommunicationDirection;
+  channel: string;
+  subject: string | null;
+  body: string | null;
+  loggedByUserId: string | null;
+  sentAt: string;
+  createdAt: string;
+  rfqInsurer: {
+    id: string;
+    insurer: { id: string; name: string; nameAr: string | null };
+  } | null;
+}
+
+export interface LogRfqCommunicationInput {
+  direction: CommunicationDirection;
+  channel: string;
+  body: string;
+  subject?: string;
+  rfqInsurerId?: string;
+  occurredAt?: string;
+}
+
 export interface CreateRfqInput {
   opportunityId: string;
   insuranceLine: string;
@@ -92,4 +123,17 @@ export function transitionRfqInsurer(
   toStatus: RfqInsurerStatus,
 ): Promise<RfqInsurerSubmission> {
   return apiPost(`/rfq-insurers/${submissionId}/transition`, { toStatus });
+}
+
+export function listRfqCommunications(
+  rfqId: string,
+): Promise<RfqCommunication[]> {
+  return apiGet(`/rfqs/${rfqId}/communications`);
+}
+
+export function logRfqCommunication(
+  rfqId: string,
+  input: LogRfqCommunicationInput,
+): Promise<RfqCommunication> {
+  return apiPost(`/rfqs/${rfqId}/communications`, input);
 }

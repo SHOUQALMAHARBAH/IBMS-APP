@@ -958,6 +958,7 @@ model RFQ {
   insurerSubmissions RFQInsurer[]
   quotations    Quotation[]
   comparisonMatrix ComparisonMatrix?
+  communications CommunicationLog[]
 
   // One RFQ per insurance line per Opportunity (backlog Part C #11 — "Create
   // an RFQ per insurance line"). Re-marketing a line is a deliberate future
@@ -985,6 +986,8 @@ model RFQInsurer {
   sentAt      DateTime @default(now())
   respondedAt DateTime?
   followUpAlertSentAt DateTime?
+
+  communications CommunicationLog[]
 
   @@unique([rfqId, insurerId])
   @@index([insurerId])
@@ -1636,15 +1639,48 @@ model EscalationRecord {
   reason        String?
 }
 
-/// Process 44 — outbound communication across channels, full logging.
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+/// Process 44 — outbound customer communication across channels, full
+/// logging — AND (backlog Part C #12, Domain B) broker<->insurer
+/// correspondence during an RFQ's market phase ("answer insurer queries and
+/// supply additional information"). The Process 44 columns (`templateId`,
+/// `languageUsed`, `respectedConsent`) are untouched by placement rows;
+/// `direction` defaults to OUTBOUND so Process 44 (always outbound) needs no
+/// change when it is built. A placement row carries `rfqId` (+ optional
+/// `rfqInsurerId` to pin it to one insurer submission; null = the whole
+/// panel), a free-text `body`, and `loggedByUserId`; its `customerId` is
+/// backfilled from the RFQ's Opportunity's Customer.
+///
+/// DISCRIMINATOR: `rfqId IS NULL` == a Process-44 customer-communication row;
+/// `rfqId IS NOT NULL` == a Part C #12 RFQ-correspondence row. A placement
+/// row *also* has `customerId` set (backfilled), so a Process-44 "all
+/// communications for customer X" query MUST filter `rfqId IS NULL` or it
+/// will pick up RFQ correspondence too.
 model CommunicationLog {
   id          String   @id @default(uuid())
-  customerId  String
+  customerId  String?
   channel     InteractionChannel
   templateId  String?
-  languageUsed LanguagePreference
+  languageUsed LanguagePreference?
+  direction   CommunicationDirection @default(OUTBOUND)
+  rfqId       String?
+  rfq         RFQ? @relation(fields: [rfqId], references: [id])
+  rfqInsurerId String?
+  rfqInsurer  RFQInsurer? @relation(fields: [rfqInsurerId], references: [id])
+  subject     String?
+  body        String?
+  loggedByUserId String?
   sentAt      DateTime @default(now())
+  createdAt   DateTime @default(now())
   respectedConsent Boolean @default(true) // must respect customer's consent preference
+
+  @@index([customerId])
+  @@index([rfqId])
+  @@index([rfqInsurerId])
 }
 
 /// Process 45 — satisfaction feedback post-issuance, post-claim,

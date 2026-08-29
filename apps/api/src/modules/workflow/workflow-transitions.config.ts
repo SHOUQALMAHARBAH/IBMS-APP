@@ -137,16 +137,16 @@ export const WORKFLOW_TRANSITIONS: {
     CLOSED_LOST: [],
   },
 
-  // Inferred (no dedicated lifecycle doc yet — see file header). SENT ->
-  // insurer views and/or responds. NO_RESPONSE is a MANUAL move a Placement
-  // Officer records (Process 12, `rfq.insurer.update`) once an insurer has
-  // gone silent past the follow-up window — a late responder can still
-  // submit a quote or decline afterward, hence NO_RESPONSE -> QUOTED/DECLINED.
-  // Backlog Part C #11's nightly follow-up sweep is ALERT-ONLY: it stamps
-  // `RFQInsurer.followUpAlertSentAt` + writes an audit row, it does NOT
-  // drive this transition (see rfq-followup.scheduler.ts / RfqService.
-  // runFollowUpScan). Whether a silent insurer should auto-advance to
-  // NO_RESPONSE is a `/brain-gap` candidate (README § Known gaps, Part C #11).
+  // Inferred (no dedicated lifecycle doc yet — see file header, and the
+  // `/brain-gap` filed for ibms-brain/meta/context/policy-lifecycle.md).
+  // SENT -> insurer views and/or responds. NO_RESPONSE is reached two ways:
+  // a Placement Officer records it manually (Process 12, `rfq.insurer.update`),
+  // OR the nightly follow-up sweep (backlog Part C #12) auto-advances a
+  // SENT/VIEWED submission once its RFQ's business-day `followUpThresholdDays`
+  // has lapsed (see rfq-followup.scheduler.ts / RfqService.runFollowUpScan —
+  // it also stamps `followUpAlertSentAt` + audits). A late responder can
+  // still submit a quote or decline afterward, hence
+  // NO_RESPONSE -> QUOTED/DECLINED.
   RFQInsurer: {
     SENT: ['VIEWED', 'QUOTED', 'DECLINED', 'NO_RESPONSE'],
     VIEWED: ['QUOTED', 'DECLINED', 'NO_RESPONSE'],

@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { RfqService } from './rfq.service';
 import { CreateRfqDto } from './dto/create-rfq.dto';
 import { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
+import { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
 import { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -57,5 +58,27 @@ export class RfqController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.rfqs.addInsurers(id, dto, user);
+  }
+
+  /** Process 12 — the broker<->insurer correspondence log for this RFQ.
+   * Reading is covered by `rfq.read` (the same roles that see the RFQ);
+   * logging needs `rfq.communication.log` (Placement). */
+  @RequirePermissions('rfq.read')
+  @Get(':id/communications')
+  listCommunications(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rfqs.listCommunications(id, user);
+  }
+
+  @RequirePermissions('rfq.communication.log')
+  @Post(':id/communications')
+  logCommunication(
+    @Param('id') id: string,
+    @Body() dto: LogRfqCommunicationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rfqs.logCommunication(id, dto, user);
   }
 }

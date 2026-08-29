@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, RFQ, RFQInsurer } from '@ibms/db';
+import type {
+  CommunicationDirection,
+  CommunicationLog,
+  InteractionChannel,
+  Prisma,
+  RFQ,
+  RFQInsurer,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateRfqInput {
@@ -65,6 +72,32 @@ const INSURER_IDENTITY_SELECT = {
   nameAr: true,
   financialStrengthRating: true,
 } as const;
+
+/** Input for one broker<->insurer correspondence row on an RFQ (backlog
+ * Part C #12). `sentAt` is when the exchange happened (defaults to now());
+ * `customerId` is backfilled by the service from the RFQ's Opportunity. */
+export interface CreateRfqCommunicationInput {
+  rfqId: string;
+  rfqInsurerId?: string;
+  customerId?: string;
+  direction: CommunicationDirection;
+  channel: InteractionChannel;
+  subject?: string;
+  body: string;
+  loggedByUserId: string;
+  sentAt?: Date;
+}
+
+/** A correspondence row with the pinned insurer's identity attached (via
+ * `rfqInsurer`), for the RFQ detail screen. `rfqInsurer` is null for a row
+ * addressed to / from the whole panel. */
+export type RfqCommunicationRow = Prisma.CommunicationLogGetPayload<{
+  include: {
+    rfqInsurer: {
+      include: { insurer: { select: typeof INSURER_IDENTITY_SELECT } };
+    };
+  };
+}>;
 
 /**
  * Process 11 — RFQ / Market Submission (backlog Part C #11, Domain B). Owns
@@ -188,17 +221,22 @@ export class RfqRepository {
     return count;
   }
 
-  /** Every not-yet-alerted submission still awaiting a response — the
-   * candidate set the nightly sweep filters by the business-day threshold
-   * (rfq.config.ts `isFollowUpDue`). QUOTED / DECLINED are done; a submission
-   * already stamped is left alone. Unpaginated, like the cross-sell /
-   * up-sell sweeps — fine at Domain B's current (pre-Policy-module) volume;
-   * revisit with a cursor / batched scan when real RFQ traffic exists. */
+  /** Every submission still awaiting a response (SENT / VIEWED) — the
+   * candidate set the nightly sweep (backlog Part C #12) filters by the
+   * business-day threshold (rfq.config.ts `isFollowUpDue`). QUOTED / DECLINED
+   * / NO_RESPONSE are excluded (done). NOT filtered on `followUpAlertSentAt`
+   * any more: the sweep now also auto-advances a past-threshold row to
+   * NO_RESPONSE, and a row alerted under #11's alert-only behaviour must
+   * still become eligible for that move; `stampFollowUpAlert` stays
+   * conditional on the timestamp so it is not re-alerted, and once
+   * NO_RESPONSE the status filter drops it. Unpaginated, like the
+   * cross-sell / up-sell sweeps — fine at Domain B's current
+   * (pre-Policy-module) volume; revisit with a cursor when real RFQ traffic
+   * exists. */
   findOpenSubmissionsForFollowUp(): Promise<RfqInsurerForFollowUp[]> {
     return this.prisma.client.rFQInsurer.findMany({
       where: {
         status: { in: ['SENT', 'VIEWED'] },
-        followUpAlertSentAt: null,
       },
       include: { rfq: true },
     });
@@ -219,6 +257,47 @@ export class RfqRepository {
   countInsurersByIds(insurerIds: readonly string[]): Promise<number> {
     return this.prisma.client.insurer.count({
       where: { id: { in: [...insurerIds] } },
+    });
+  }
+
+  // --------------------------------------------------------------------
+  // Process 12 — broker<->insurer correspondence on an RFQ (backlog Part C
+  // #12). Rows live on the shared `CommunicationLog` table (also Process 44 —
+  // outbound customer comms); a placement row is the subset with `rfqId` set.
+  // `CommunicationLog` has no workflow status, so nothing here is a
+  // WorkflowTransitionService concern.
+  // --------------------------------------------------------------------
+
+  createCommunication(
+    input: CreateRfqCommunicationInput,
+  ): Promise<CommunicationLog> {
+    return this.prisma.client.communicationLog.create({
+      data: {
+        rfqId: input.rfqId,
+        rfqInsurerId: input.rfqInsurerId,
+        customerId: input.customerId,
+        direction: input.direction,
+        channel: input.channel,
+        subject: input.subject,
+        body: input.body,
+        loggedByUserId: input.loggedByUserId,
+        sentAt: input.sentAt,
+      },
+    });
+  }
+
+  /** One RFQ's correspondence, newest first. `sentAt` (when it happened) is
+   * the primary sort; `createdAt` (when it was recorded) breaks ties for two
+   * rows backdated to the same instant. */
+  findCommunicationsByRfqId(rfqId: string): Promise<RfqCommunicationRow[]> {
+    return this.prisma.client.communicationLog.findMany({
+      where: { rfqId },
+      include: {
+        rfqInsurer: {
+          include: { insurer: { select: INSURER_IDENTITY_SELECT } },
+        },
+      },
+      orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
     });
   }
 }

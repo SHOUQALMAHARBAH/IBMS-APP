@@ -59,3 +59,16 @@ export const insurerPickerStyle: CSSProperties = {
   borderRadius: '0.5rem',
   padding: '0.75rem',
 };
+
+export const rfqFieldStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.25rem',
+  marginBottom: '0.75rem',
+  maxWidth: '32rem',
+};
+
+export const commBodyStyle: CSSProperties = {
+  whiteSpace: 'pre-wrap',
+  margin: '0.25rem 0 0',
+};

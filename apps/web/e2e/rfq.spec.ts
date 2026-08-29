@@ -63,8 +63,16 @@ const RFQ = {
 
 async function mockRfqApi(
   page: Page,
-  opts: { onCreateRfq?: () => void; onTransition?: (status: string) => void } = {},
+  opts: {
+    onCreateRfq?: () => void;
+    onTransition?: (status: string) => void;
+    onLogComm?: (body: { direction: string; body: string }) => void;
+  } = {},
 ) {
+  // Correspondence log — starts empty, a POST appends so the list re-renders
+  // with the new row.
+  const comms: Record<string, unknown>[] = [];
+
   await page.route("http://localhost:4000/opportunities**", (route) => {
     const url = route.request().url();
     if (/\/opportunities\/opp-1(\?|$)/.test(url)) {
@@ -81,6 +89,33 @@ async function mockRfqApi(
     const method = route.request().method();
     if (/\/rfqs\/selectable-insurers(\?|$)/.test(url)) {
       return route.fulfill({ status: 200, json: INSURERS });
+    }
+    if (/\/rfqs\/rfq-1\/communications(\?|$)/.test(url)) {
+      if (method === "POST") {
+        const b = route.request().postDataJSON() as {
+          direction: string;
+          channel: string;
+          body: string;
+          subject?: string;
+        };
+        opts.onLogComm?.(b);
+        const row = {
+          id: `comm-${comms.length + 1}`,
+          rfqId: "rfq-1",
+          rfqInsurerId: null,
+          direction: b.direction,
+          channel: b.channel,
+          subject: b.subject ?? null,
+          body: b.body,
+          loggedByUserId: "user-1",
+          sentAt: "2026-03-06T00:00:00.000Z",
+          createdAt: "2026-03-06T00:00:00.000Z",
+          rfqInsurer: null,
+        };
+        comms.unshift(row);
+        return route.fulfill({ status: 201, json: row });
+      }
+      return route.fulfill({ status: 200, json: comms });
     }
     if (method === "POST" && /\/rfqs$/.test(url.split("?")[0])) {
       opts.onCreateRfq?.();
@@ -143,6 +178,23 @@ test("records an insurer response status from the RFQ detail screen", async ({ p
     .selectOption("QUOTED");
 
   await expect.poll(() => transitionedTo).toBe("QUOTED");
+});
+
+test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page }) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  let logged: { direction: string; body: string } | null = null;
+  await mockRfqApi(page, { onLogComm: (b) => { logged = b; } });
+
+  await page.goto("/rfqs/rfq-1");
+  await expect(page.getByRole("heading", { name: "Correspondence" })).toBeVisible();
+  await page.getByLabel("Direction").selectOption("INBOUND");
+  await page.getByLabel("Exchange").fill("Please send 3 years of loss history for site 2.");
+  await page.getByRole("button", { name: "Log exchange" }).click();
+
+  await expect.poll(() => logged?.direction).toBe("INBOUND");
+  await expect(
+    page.getByText("Please send 3 years of loss history for site 2."),
+  ).toBeVisible();
 });
 
 test("a non-Placement user sees the list but no create controls", async ({ page }) => {

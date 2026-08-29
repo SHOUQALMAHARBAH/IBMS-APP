@@ -6,9 +6,10 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { OpportunityStatus } from '@ibms/db';
+import type { CommunicationLog, OpportunityStatus } from '@ibms/db';
 import {
   RfqRepository,
+  type RfqCommunicationRow,
   type RfqInsurerWithParents,
   type RfqWithSubmissions,
   type SelectableInsurer,
@@ -19,23 +20,36 @@ import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import { isFollowUpDue } from './rfq.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateRfqDto } from './dto/create-rfq.dto';
 import type { AddRfqInsurersDto } from './dto/add-rfq-insurers.dto';
 import type { TransitionRfqInsurerDto } from './dto/transition-rfq-insurer.dto';
+import type { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
 import type { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
 
-/** Result of one follow-up sweep run — logged by the scheduler. */
+/** Result of one follow-up sweep run — logged by the scheduler. Only
+ * `candidates` and `due` are row counts; the four tallies below are per-step
+ * and **overlap** — one due row can bump `alerted` *and* `autoNoResponse`, or
+ * `alerted` *and* `failed`, in the same iteration. `due` is not their sum. */
 export interface FollowUpScanResult {
-  /** Not-yet-alerted submissions still awaiting a response. */
+  /** Open submissions (SENT / VIEWED) examined. */
   candidates: number;
   /** Of those, how many cleared the business-day threshold this run. */
   due: number;
-  /** Of the due ones, how many this run actually stamped (a concurrent
-   * sweep may have stamped some first — `stampFollowUpAlert` returns 0). */
+  /** Of the due ones, how many this run newly stamped `followUpAlertSentAt`
+   * (a concurrent sweep, or a prior alert-only run, may have stamped some
+   * first — `stampFollowUpAlert` returns 0). */
   alerted: number;
-  /** Rows that threw and were skipped — the next run retries them. */
+  /** Of the due ones, how many this run moved SENT/VIEWED -> NO_RESPONSE
+   * through the workflow engine. */
+  autoNoResponse: number;
+  /** Due rows whose NO_RESPONSE transition was a no-op because the insurer
+   * responded concurrently (engine ConflictException / illegal-move 422) —
+   * expected, not an error. */
+  transitionSkipped: number;
+  /** Rows that threw unexpectedly and were skipped — the next run retries. */
   failed: number;
 }
 
@@ -48,7 +62,8 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 /**
- * Process 11 — RFQ / Market Submission (backlog Part C #11, Domain B).
+ * Process 11 — RFQ / Market Submission (backlog Part C #11) + Process 12 —
+ * Market Placement (backlog Part C #12), Domain B.
  *
  *  - `createRfq` — one RFQ per insurance line under an Opportunity, sent to a
  *    shortlist of insurers (each a SENT `RFQInsurer` row). One RFQ per
@@ -61,14 +76,23 @@ function isUniqueViolation(err: unknown): boolean {
  *  - `transitionInsurer` — record an insurer's response status
  *    (viewed/quoted/declined/no-response) through the workflow engine;
  *    QUOTED / DECLINED stamp `respondedAt`.
- *  - `runFollowUpScan` — the nightly sweep: stamps `followUpAlertSentAt` +
- *    writes an audit row on every still-open submission past its RFQ's
- *    business-day `followUpThresholdDays`. **Alert only** — it does NOT move
- *    a silent insurer to NO_RESPONSE; that is a human decision in Process 12.
+ *  - `logCommunication` / `listCommunications` (#12) — the broker<->insurer
+ *    correspondence log for an RFQ ("answer insurer queries and supply
+ *    additional information"). Rows live on the shared `CommunicationLog`
+ *    table; a factual log — no workflow status, no maker/checker. The CREATE
+ *    audit row carries metadata only, never the free-text `body`
+ *    (Confidential — loss history, sums insured;
+ *    ibms-brain/meta/lex/sensitive-data-handling.md).
+ *  - `runFollowUpScan` — the nightly sweep: on every still-open submission
+ *    past its RFQ's business-day `followUpThresholdDays`, stamps
+ *    `followUpAlertSentAt` + writes an audit row AND (#12) moves it
+ *    SENT/VIEWED -> NO_RESPONSE through the workflow engine. Race-safe: a
+ *    concurrent manual QUOTED/DECLINED makes the transition a no-op (engine
+ *    ConflictException / illegal-move 422), caught and counted as skipped.
  *
- * No maker/checker: issuing an RFQ and recording insurer responses is
- * single-actor Placement work, and the coverage set was maker/checker-
- * approved at the Needs Assessment stage (A.5).
+ * No maker/checker: issuing an RFQ, recording insurer responses, and logging
+ * correspondence is single-actor Placement work, and the coverage set was
+ * maker/checker-approved at the Needs Assessment stage (A.5).
  *
  * Visibility mirrors InsuranceProgramService / OpportunityService: an RFQ
  * inherits its Opportunity's Customer's visibility — the owning
@@ -171,6 +195,7 @@ export class RfqService {
   ): Promise<{
     rfq: RfqWithSubmissions;
     opportunityStatus: OpportunityStatus;
+    opportunityCustomerId: string;
   }> {
     const rfq = await this.rfqs.findRfqById(id);
     if (!rfq) {
@@ -181,7 +206,11 @@ export class RfqService {
       actor,
       'RFQ not found',
     );
-    return { rfq, opportunityStatus: opportunity.status };
+    return {
+      rfq,
+      opportunityStatus: opportunity.status,
+      opportunityCustomerId: opportunity.customerId,
+    };
   }
 
   private async mustFindRfq(id: string): Promise<RfqWithSubmissions> {
@@ -477,13 +506,95 @@ export class RfqService {
   }
 
   /**
+   * Process 12 — log one broker<->insurer exchange on an RFQ (an insurer's
+   * query, or the broker's answer / additional-information note). A factual
+   * log: no workflow status, no maker/checker, and deliberately NOT gated on
+   * the Opportunity's market phase — a late clarification after the business
+   * was placed elsewhere is still worth recording (same reasoning as
+   * `transitionInsurer`). `customerId` is backfilled from the RFQ's
+   * Opportunity so the row also surfaces on that customer's file.
+   */
+  async logCommunication(
+    rfqId: string,
+    dto: LogRfqCommunicationDto,
+    actor: AuthenticatedUser,
+  ): Promise<CommunicationLog> {
+    const { rfq, opportunityCustomerId } = await this.findVisibleRfq(
+      rfqId,
+      actor,
+    );
+
+    if (
+      dto.rfqInsurerId !== undefined &&
+      !rfq.insurerSubmissions.some((s) => s.id === dto.rfqInsurerId)
+    ) {
+      throw new UnprocessableEntityException(
+        `Submission ${dto.rfqInsurerId} is not on RFQ ${rfqId} — omit rfqInsurerId to address the whole panel, or pass one of this RFQ's shortlisted insurers.`,
+      );
+    }
+
+    const sentAt =
+      dto.occurredAt !== undefined
+        ? parseHistoricalInstant(dto.occurredAt, 'occurredAt')
+        : undefined;
+
+    const row = await this.rfqs.createCommunication({
+      rfqId,
+      rfqInsurerId: dto.rfqInsurerId,
+      customerId: opportunityCustomerId,
+      direction: dto.direction,
+      channel: dto.channel,
+      subject: dto.subject,
+      body: dto.body,
+      loggedByUserId: actor.id,
+      sentAt,
+    });
+
+    // Structural metadata only — the free-text `subject` / `body` are
+    // Confidential (loss history, sums insured) and never go into an
+    // AuditLogEntry (ibms-brain/meta/lex/sensitive-data-handling.md), exactly
+    // like CRM's interaction audit which logs channel/occurredAt but not the
+    // `summary`.
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'CREATE',
+      entityType: 'RfqCommunication',
+      entityId: row.id,
+      afterValue: {
+        rfqId,
+        rfqInsurerId: dto.rfqInsurerId ?? null,
+        direction: dto.direction,
+        channel: dto.channel,
+        sentAt: row.sentAt.toISOString(),
+      },
+    });
+
+    return row;
+  }
+
+  async listCommunications(
+    rfqId: string,
+    actor: AuthenticatedUser,
+  ): Promise<RfqCommunicationRow[]> {
+    await this.findVisibleRfq(rfqId, actor);
+    return this.rfqs.findCommunicationsByRfqId(rfqId);
+  }
+
+  /**
    * The nightly follow-up sweep (also runnable on demand from a test). For
-   * each not-yet-alerted submission still awaiting a response whose RFQ's
-   * business-day `followUpThresholdDays` has elapsed since `sentAt`: stamp
-   * `followUpAlertSentAt` (race-safe — `stampFollowUpAlert` is conditional on
-   * it still being null) and write an audit row. Per-row isolation so one
-   * bad row does not abandon the rest of the run (same shape as
-   * CrossSellDetectionScheduler).
+   * each still-open submission (SENT / VIEWED) whose RFQ's business-day
+   * `followUpThresholdDays` has elapsed since `sentAt`:
+   *   1. stamp `followUpAlertSentAt` + write an audit row (race-safe —
+   *      `stampFollowUpAlert` is conditional on it still being null, so a
+   *      re-run / concurrent sweep does not re-alert);
+   *   2. (backlog Part C #12) move it SENT/VIEWED -> NO_RESPONSE through the
+   *      workflow engine. The engine's status-conditional write is the
+   *      race backstop: a concurrent manual QUOTED/DECLINED makes this a
+   *      no-op (ConflictException, or an illegal-move 422 from a terminal
+   *      state) — caught and counted as `transitionSkipped`, not `failed`.
+   *      `respondedAt` is left null — NO_RESPONSE means no response.
+   * Per-row isolation so one bad row does not abandon the rest of the run
+   * (same shape as CrossSellDetectionScheduler).
    */
   async runFollowUpScan(actorUserId: string): Promise<FollowUpScanResult> {
     const now = new Date();
@@ -491,6 +602,8 @@ export class RfqService {
 
     let due = 0;
     let alerted = 0;
+    let autoNoResponse = 0;
+    let transitionSkipped = 0;
     let failed = 0;
 
     for (const submission of candidates) {
@@ -522,6 +635,28 @@ export class RfqService {
             },
           });
         }
+
+        try {
+          await this.workflow.transition({
+            entityType: 'RFQInsurer',
+            entityId: submission.id,
+            toStatus: 'NO_RESPONSE',
+            actorUserId,
+          });
+          autoNoResponse += 1;
+        } catch (err) {
+          if (
+            err instanceof ConflictException ||
+            err instanceof UnprocessableEntityException
+          ) {
+            transitionSkipped += 1;
+            this.logger.log(
+              `RFQ follow-up sweep: submission ${submission.id} not moved to NO_RESPONSE (${(err as Error).message}) — the insurer responded concurrently.`,
+            );
+          } else {
+            throw err;
+          }
+        }
       } catch (err) {
         failed += 1;
         this.logger.error(
@@ -530,6 +665,13 @@ export class RfqService {
       }
     }
 
-    return { candidates: candidates.length, due, alerted, failed };
+    return {
+      candidates: candidates.length,
+      due,
+      alerted,
+      autoNoResponse,
+      transitionSkipped,
+      failed,
+    };
   }
 }

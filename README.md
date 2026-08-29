@@ -409,10 +409,12 @@ build actually is today:
   deployment-target decision.
 - **Part C — Domain A, Processes 1–10 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
-- **Part C — Domain B has begun: RFQ / Market Submission (#11) — built and verified.**
-  A minimal `Opportunity` parent (created from a FINALIZED `InsuranceProgram`) plus
-  `RFQ` / `RFQInsurer` — one RFQ per insurance line, an insurer shortlist, per-insurer
-  response tracking, and a nightly business-day follow-up alert sweep. Detail below.
+- **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) —
+  built and verified.** A minimal `Opportunity` parent (created from a FINALIZED
+  `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an insurer
+  shortlist, per-insurer response tracking, a nightly business-day follow-up sweep (now
+  alerts *and* auto-advances a silent insurer to `NO_RESPONSE`), and a broker↔insurer
+  correspondence log on each RFQ (the widened `CommunicationLog`). Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -430,17 +432,19 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11 — built, with these deferrals
+### Part C · Domain B #11–12 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
-| 11 | RFQ / Market Submission | minimal `Opportunity` parent — `POST /opportunities` (`{ insuranceProgramId }`) creates a `NEEDS_CONFIRMED` Opportunity from a **FINALIZED** `InsuranceProgram`, `customerId` resolved server-side · `GET /opportunities?customerId=` + `/:id` · `POST /rfqs` (one RFQ per `insuranceLine`, a SENT `RFQInsurer` per shortlisted insurer, `followUpThresholdDays` override) — the first RFQ drives `Opportunity` `NEEDS_CONFIRMED → RFQ_ISSUED` through the workflow engine · `GET /rfqs/selectable-insurers` (read-only `Insurer` master data) · `GET /rfqs?opportunityId=\|customerId=` + `/:id` · `POST /rfqs/:id/insurers` (broaden the shortlist) · `POST /rfq-insurers/:id/transition` (VIEWED/QUOTED/DECLINED/NO_RESPONSE via the workflow engine; QUOTED/DECLINED stamp `respondedAt`) · nightly `@Cron('0 6 * * *')` follow-up sweep — **alert only**: stamps `followUpAlertSentAt` + audits every still-open submission past its RFQ's threshold, counted in **Jordan business days** · `@@unique([opportunityId, insuranceLine])` + partial `UNIQUE` `Opportunity(insuranceProgramId) WHERE status <> 'CLOSED_LOST'` (`race-safe-invariants.md`) · web: opportunities + RFQ list/detail/new, per-insurer status control, "Take to market" on a FINALIZED programme, one nav item | **full Opportunity lifecycle is #16–17** — no Recommendation, no Client Decision (6 outcomes), no renegotiation, no close-lost endpoint, no `targetPremiumThreshold`; new-business Opportunities with no `InsuranceProgram` are not supported (a FINALIZED programme is the only entry point); the follow-up sweep does **not** auto-mark `NO_RESPONSE` (a #12 human decision — the inline note in `workflow-transitions.config.ts` to the contrary is a flagged inference, `/brain-gap` candidate); the business-day threshold is a **lower bound** (no Jordanian public-holiday calendar exists — `ibms-brain/meta/context/business-day-calendar.md`); one RFQ per `(opportunity, line)` — re-marketing a line needs a deliberate relaxation (#15/#17); `Insurer` master data is read-only (a real Insurer-management module is narrative Process 31); no maker/checker (issuing an RFQ is single-actor Placement work); `rfq.create` / `opportunity.create` are role-level (no per-officer queue); `Quotation` / `ComparisonMatrix` / `Recommendation` (#13–16) are not built |
+| 11 | RFQ / Market Submission | minimal `Opportunity` parent — `POST /opportunities` (`{ insuranceProgramId }`) creates a `NEEDS_CONFIRMED` Opportunity from a **FINALIZED** `InsuranceProgram`, `customerId` resolved server-side · `GET /opportunities?customerId=` + `/:id` · `POST /rfqs` (one RFQ per `insuranceLine`, a SENT `RFQInsurer` per shortlisted insurer, `followUpThresholdDays` override) — the first RFQ drives `Opportunity` `NEEDS_CONFIRMED → RFQ_ISSUED` through the workflow engine · `GET /rfqs/selectable-insurers` (read-only `Insurer` master data) · `GET /rfqs?opportunityId=\|customerId=` + `/:id` · `POST /rfqs/:id/insurers` (broaden the shortlist) · `POST /rfq-insurers/:id/transition` (VIEWED/QUOTED/DECLINED/NO_RESPONSE via the workflow engine; QUOTED/DECLINED stamp `respondedAt`) · nightly `@Cron('0 6 * * *')` follow-up sweep (see #12 for its behaviour) · `@@unique([opportunityId, insuranceLine])` + partial `UNIQUE` `Opportunity(insuranceProgramId) WHERE status <> 'CLOSED_LOST'` (`race-safe-invariants.md`) · web: opportunities + RFQ list/detail/new, per-insurer status control, "Take to market" on a FINALIZED programme, one nav item | **full Opportunity lifecycle is #16–17** — no Recommendation, no Client Decision (6 outcomes), no renegotiation, no close-lost endpoint, no `targetPremiumThreshold`; new-business Opportunities with no `InsuranceProgram` are not supported (a FINALIZED programme is the only entry point); the business-day threshold is a **lower bound** (no Jordanian public-holiday calendar exists — `ibms-brain/meta/context/business-day-calendar.md`); one RFQ per `(opportunity, line)` — re-marketing a line needs a deliberate relaxation (#15/#17); `Insurer` master data is read-only (a real Insurer-management module is narrative Process 31); no maker/checker (issuing an RFQ is single-actor Placement work); `rfq.create` / `opportunity.create` are role-level (no per-officer queue); `Quotation` / `ComparisonMatrix` / `Recommendation` (#13–16) are not built |
+| 12 | Market Placement | `CommunicationLog` **widened** (not a new model) to carry broker↔insurer RFQ correspondence alongside its Process-44 role — nullable `customerId`/`languageUsed`, new `direction CommunicationDirection @default(OUTBOUND)` (enum `INBOUND\|OUTBOUND`), `rfqId?`/`rfqInsurerId?` FKs, `subject?`/`body?`/`loggedByUserId?`/`createdAt` (migration `20260829120000`) · `POST /rfqs/:id/communications` (`{ direction, channel, body, subject?, rfqInsurerId?, occurredAt? }`, new perm `rfq.communication.log`/Placement — `rfqInsurerId` must be on the RFQ; `occurredAt` offset-required + not-future) + `GET /rfqs/:id/communications` (`rfq.read`) — factual log, no status/maker-checker, CREATE audit is **metadata only, never `body`** (Confidential) · the nightly follow-up sweep now also **auto-advances** `SENT`/`VIEWED → NO_RESPONSE` through the workflow engine once past the business-day threshold (race-safe: a concurrent manual QUOTED/DECLINED → no-op, counted `transitionSkipped`) · shared `parseHistoricalInstant` (`common/historical-instant.util.ts`) reused by CRM + RFQ · web: a "Correspondence" section on the RFQ detail screen (list + Placement-only log form) | no attachment upload for "additional information" (free-text note only — a Document-module concern); no per-insurer thread view / pagination on the correspondence list; a placement row leaves `respectedConsent`/`languageUsed`/`templateId` unused; auto-`NO_RESPONSE` inherits the same business-day **lower bound**; Process 44 (outbound customer communication) itself is unbuilt and will share the widened table |
 
 ### Not started
 
-- **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission is **built** — see
-  the Domain B table above; #12–22 placement / quotation / comparison / recommendation /
-  client decision / policy issuance / checking / delivery / endorsement remain), Claims
+- **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission and #12 Market
+  Placement are **built** — see the Domain B table above; #13–22 quotation / comparison /
+  recommendation / client decision / policy issuance / checking / delivery / endorsement
+  remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -1570,11 +1574,9 @@ narrows a gap.
   **Jordan business days** (`rfq.config.ts`'s pure `isFollowUpDue()` → `addBusinessDays()`,
   same weekend-only lower-bound caveat as every other deadline: no public-holiday calendar
   exists yet) — it stamps `followUpAlertSentAt` (race-safe: `updateMany` conditional on the
-  timestamp still being null) and writes an `UPDATE` audit row. **Alert only** — it does
-  **not** move a silent insurer to `NO_RESPONSE`. Process 12 (Market Placement) is the
-  "update each insurer's response status" step; the inline note in
-  `workflow-transitions.config.ts` that "a follow-up alert marks a silent insurer
-  NO_RESPONSE" is a flagged inference, and this divergence is a `/brain-gap` candidate.
+  timestamp still being null) and writes an `UPDATE` audit row. **Alert only in #11** — it
+  did not move a silent insurer to `NO_RESPONSE`; **Process 12 (below) adds that
+  auto-advance**, and the `/brain-gap` on `policy-lifecycle.md` was filed then.
 - **No maker/checker** — issuing an RFQ and recording insurer responses is single-actor
   Placement work, and the coverage set was maker/checker-approved at the Needs Assessment
   stage (A.5).
@@ -1587,10 +1589,10 @@ narrows a gap.
   to the customer's opportunity list). One "RFQ / market" nav item. Non-Placement roles see
   the read views without the create/transition controls.
 - **Deferred**: full Opportunity lifecycle (#16–17); new-business Opportunities with no
-  programme; auto-`NO_RESPONSE` on follow-up (#12); a real public-holiday calendar; one RFQ
-  per `(opportunity, line)` (re-marketing needs a deliberate relaxation at #15/#17); an
-  Insurer-management module (Process 31); a per-officer queue / reassignment;
-  `Quotation` / `ComparisonMatrix` / `Recommendation` (#13–16).
+  programme; a real public-holiday calendar; one RFQ per `(opportunity, line)` (re-marketing
+  needs a deliberate relaxation at #15/#17); an Insurer-management module (Process 31); a
+  per-officer queue / reassignment; `Quotation` / `ComparisonMatrix` / `Recommendation`
+  (#13–16). (Auto-`NO_RESPONSE` on follow-up was deferred here and landed in #12, below.)
 - **`@code-reviewer` pass** (mandatory — workflow / approval logic on `Opportunity` +
   `RFQInsurer`): **APPROVE WITH MINORS — no blockers, no lex violations.** The race-safety
   of both invariants, the transition routing, and the visibility gates were all confirmed
@@ -1611,6 +1613,100 @@ narrows a gap.
   Full suites green: **604** api unit (53 files), api e2e **96/98** (the 2 failures are the
   pre-existing `rbac.e2e-spec.ts` access-recertification full-suite flake — timeouts under
   load, unrelated to this change), 4 contract, 6 web unit, web e2e (Playwright + axe).
+
+**Part C #12 — Market Placement (Domain B, Process 12)**
+
+- **Extends the `apps/api/src/modules/rfq/` module** — no new module. The backlog names
+  `RFQInsurer` + `CommunicationLog`; the two deliverables are "update each insurer's
+  response status" and "answer insurer queries and supply additional information".
+- **`CommunicationLog` is widened, not replaced.** The schema's `CommunicationLog` is
+  Process 44 — *outbound customer* comms (required `customerId`, `templateId`,
+  `languageUsed`, `respectedConsent`; no RFQ/Insurer link, no direction, no free-text body).
+  Rather than a dedicated model, the table is extended to carry broker↔insurer RFQ
+  correspondence too (**the deliberate call recorded here**): `customerId` + `languageUsed`
+  relaxed to nullable; new `direction CommunicationDirection @default(OUTBOUND)` (new enum
+  `INBOUND | OUTBOUND` — the default keeps Process 44's always-outbound semantics for when
+  it is built); `rfqId?` / `rfqInsurerId?` FKs (`ON DELETE SET NULL`); `subject?`, `body?`
+  (nullable in DB so a Process-44 template row needs none; the DTO requires it),
+  `loggedByUserId?`, `createdAt`; `@@index` on `customerId` / `rfqId` / `rfqInsurerId`.
+  Migration `20260829120000_extend_communication_log_for_placement` (hand-authored +
+  applied + `migrate resolve`, the checksum-drift workaround — run `npm run db:migrate:deploy`
+  on a fresh checkout). Zero rows and zero code referenced the table before this item.
+- **Seed:** one new permission — `rfq.communication.log` (Placement). Reading the
+  correspondence is folded into the existing `rfq.read` (same roles that see the RFQ).
+- **`POST /rfqs/:id/communications`** (`{ direction, channel, body, subject?, rfqInsurerId?,
+  occurredAt? }`, `rfq.communication.log`) — visibility via the RFQ's Opportunity's Customer
+  (`findVisibleRfq`); a `rfqInsurerId` must be on *this* RFQ (422 otherwise; omit it to
+  address the whole panel); `occurredAt` (optional) must carry an explicit offset and not be
+  in the future (422, in the service so the message explains). `customerId` is backfilled
+  from the RFQ's Opportunity. **The `CREATE` audit row records metadata only — `direction` /
+  `channel` / `rfqInsurerId` / `subject`, never the free-text `body`** (Confidential — loss
+  history, sums insured; `ibms-brain/meta/lex/sensitive-data-handling.md`), the same shape
+  as CRM's interaction audit. A factual log — no workflow status, no maker/checker.
+- **`GET /rfqs/:id/communications`** (`rfq.read`) — reverse-chronological (`sentAt`, then
+  `createdAt` for same-instant ties).
+- **Auto-`NO_RESPONSE`.** `RfqService.runFollowUpScan` (the nightly sweep) now, for every
+  past-threshold open submission, *also* moves it `SENT`/`VIEWED → NO_RESPONSE` through
+  `WorkflowTransitionService` — not just alerts (#11 was alert-only). The engine's
+  status-conditional write is the race backstop (`ibms-brain/meta/lex/race-safe-invariants.md`):
+  a concurrent manual `QUOTED`/`DECLINED` makes the move a no-op — `ConflictException`, or an
+  illegal-move 422 from a now-terminal state — which is caught and counted `transitionSkipped`,
+  not `failed`. `respondedAt` is left null (there was no response). A late responder can
+  still be moved `NO_RESPONSE → QUOTED/DECLINED`. `findOpenSubmissionsForFollowUp` drops its
+  `followUpAlertSentAt: null` filter so a submission alerted under #11 still becomes
+  NO_RESPONSE-eligible; it stays idempotent (status filter + the conditional stamp). The
+  `RFQInsurer` comment in `workflow-transitions.config.ts` is rewritten (manual + sweep
+  paths); `FollowUpScanResult` gains `autoNoResponse` / `transitionSkipped`.
+- **Shared util** — `crm.service.ts`'s private `parseOccurredAt` (offset-required, no-future,
+  ~1 min skew) is extracted to `apps/api/src/common/historical-instant.util.ts`
+  (`parseHistoricalInstant(raw, label)`), used by both CRM interaction logging and RFQ
+  correspondence. CRM behaviour is unchanged.
+- **`apps/web/app/(app)/rfqs/[id]/`** — a "Correspondence" section on the RFQ detail screen:
+  the exchange list (everyone with `rfq.read`) plus a Placement-only log form (direction,
+  channel, optional insurer scoped to the shortlist, subject, body). One line of helper copy
+  notes `NO_RESPONSE` may be set by the nightly sweep.
+- **Deferred**: no attachment upload for "additional information" — the log is a free-text
+  note (a Document-module concern, narrative Process); no per-insurer thread view or
+  pagination on the correspondence list; a placement row leaves `respectedConsent` /
+  `languageUsed` / `templateId` unused (Process 44's columns); auto-`NO_RESPONSE` is
+  best-effort and inherits the same business-day *lower bound* (no public-holiday calendar).
+  **Process 44 (outbound customer communication) is unbuilt and will share this widened
+  table** — the discriminator is `rfqId IS NULL` (a placement row also carries a backfilled
+  `customerId`, so a future "all communications for customer X" read must filter
+  `rfqId IS NULL`), documented on the `CommunicationLog` model. The free-text `body` is
+  handled as Confidential (never audit-logged, never masked-logged) but could attract
+  Highly-Confidential content on a medical/life-line RFQ with no guard — the same latent
+  free-text risk already accepted for `Interaction.summary` at #10; no lex covers it.
+- **No `apps/api` e2e for the RFQ module** — a pre-existing gap (#11 also shipped with unit
+  + web-e2e only). `@code-reviewer` recommends a small `rfq.e2e-spec.ts` against real
+  Postgres covering `POST/GET /rfqs/:id/communications` (happy path + the
+  `rfqInsurerId`-not-on-this-RFQ 422 + not-visible 404) and `runFollowUpScan` moving a real
+  past-threshold row to `NO_RESPONSE` while leaving a concurrently-`QUOTED` row untouched —
+  the migration and the system-actor `transition()` path are exactly what an e2e catches
+  cheaply. Not built here; carried as a Domain-B follow-up.
+- **`@code-reviewer` pass** (mandatory — system-actor workflow transition + Confidential
+  data): **APPROVE WITH MINORS — no blockers, no lex violations.** The auto-`NO_RESPONSE`
+  race analysis (engine status-conditional `updateMany` → `ConflictException` / illegal-move
+  422, both classified `transitionSkipped`), the `transition()`-only status write, the
+  metadata-only `CommunicationLog` CREATE audit (no `subject`/`body`), the maker/checker
+  non-applicability, and the existence-oracle-free visibility were all verified. Minors
+  addressed: the `/brain-gap` row wording (`followUpThresholdDays` is on `RFQ`, not
+  `RFQInsurer`) — fixed in a follow-up brain commit; the `CommunicationLog` `rfqId IS NULL`
+  discriminator — documented on the model + here; the `FollowUpScanResult` counter-overlap
+  and the scheduler's `transitionSkipped`-only log path — comment + guard added. The api
+  e2e gap is carried as the follow-up above.
+- **`/brain-gap`** filed + pushed — `ibms-brain/meta/context/policy-lifecycle.md` § "The
+  rules that aren't obvious" gains a row on RFQ follow-up / insurer non-response (a lapsed
+  threshold auto-marks the silent submission `NO_RESPONSE` via the engine, not just alerts;
+  `NO_RESPONSE` is non-terminal).
+- **Verification**: +22 api unit tests — `historical-instant.util.spec.ts` ×8;
+  `rfq.service.spec.ts` gains `logCommunication` ×8 + `listCommunications` ×2 and its
+  `runFollowUpScan` block was rewritten for the auto-`NO_RESPONSE` path (×7, incl. the
+  concurrent-response skip); `rfq-followup.scheduler.spec.ts` +1. `rfq.spec.ts` Playwright
+  6/6 (a correspondence-log test added), `@a11y` clean. Full suites green: **626** api unit
+  (54 files), api e2e **96/98** (the 2 failures are the pre-existing `rbac.e2e-spec.ts`
+  access-recertification full-suite flake — timeouts under load, unrelated), web unit 6,
+  turbo `lint` 3/3, api + web `typecheck` clean.
 
 ## Deployment
 
