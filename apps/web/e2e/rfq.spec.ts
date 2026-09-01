@@ -29,6 +29,7 @@ const OPPORTUNITY = {
   insuranceProgramId: "prog-1",
   isRenewal: false,
   status: "NEEDS_CONFIRMED",
+  targetPremiumThreshold: null as string | null,
   createdByUserId: "user-1",
   createdAt: "2026-03-01T00:00:00.000Z",
   updatedAt: "2026-03-01T00:00:00.000Z",
@@ -134,6 +135,10 @@ async function mockRfqApi(
     onBuildComparison?: (body: {
       rfqId: string;
       scores?: { insurerId: string }[];
+    }) => void;
+    onDraftRecommendation?: (body: {
+      recommendedQuotationId: string;
+      rationale: string;
     }) => void;
   } = {},
 ) {
@@ -253,12 +258,125 @@ async function mockRfqApi(
     },
   );
 
+  // Opportunity — the detail GET reflects the current threshold; a PATCH
+  // (Part C #16) updates it in place.
+  const opp = { ...OPPORTUNITY };
   await page.route("http://localhost:4000/opportunities**", (route) => {
     const url = route.request().url();
-    if (/\/opportunities\/opp-1(\?|$)/.test(url)) {
-      return route.fulfill({ status: 200, json: OPPORTUNITY });
+    const method = route.request().method();
+    if (method === "PATCH" && /\/target-premium-threshold(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        targetPremiumThreshold: string | null;
+      };
+      opp.targetPremiumThreshold = b.targetPremiumThreshold;
+      return route.fulfill({ status: 200, json: opp });
     }
-    return route.fulfill({ status: 200, json: [OPPORTUNITY] });
+    if (/\/opportunities\/opp-1(\?|$)/.test(url)) {
+      return route.fulfill({ status: 200, json: opp });
+    }
+    return route.fulfill({ status: 200, json: [opp] });
+  });
+
+  // Broker recommendation (Part C #16) — starts empty; a POST drafts it, and
+  // approve / disclose / send each mutate the single row in place.
+  let recommendation: Record<string, unknown> | null = null;
+  const recBlocked = () => {
+    const blocked: string[] = [];
+    if (
+      (recommendation?.approvalRequired as boolean) &&
+      recommendation?.approvedByUserId == null
+    ) {
+      blocked.push(
+        "Senior-officer approval is required (recommended premium exceeds the Opportunity target threshold).",
+      );
+    }
+    if (
+      (recommendation?.conflictOfInterestFlagged as boolean) &&
+      recommendation?.conflictOfInterestDisclosure == null
+    ) {
+      blocked.push(
+        "A conflict-of-interest disclosure is required before this recommendation can be sent.",
+      );
+    }
+    return blocked;
+  };
+  await page.route("http://localhost:4000/recommendations**", (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+    if (method === "POST" && /\/recommendations\/[^/]+\/approve/.test(url)) {
+      recommendation = { ...recommendation, approvedByUserId: "mgr-1" };
+      recommendation.blockedFromSend = recBlocked();
+      return route.fulfill({ status: 201, json: recommendation });
+    }
+    if (
+      method === "POST" &&
+      /\/conflict-of-interest-disclosure/.test(url)
+    ) {
+      recommendation = {
+        ...recommendation,
+        conflictOfInterestDisclosure: {
+          id: "coi-1",
+          competingQuotationId: "q-1",
+          commissionDifferencePercent: "7.50",
+          disclosureText: "Disclosed to the client.",
+          acknowledgedByUserId: "cmp-1",
+          acknowledgedAt: "2026-03-09T00:00:00.000Z",
+        },
+      };
+      recommendation.blockedFromSend = recBlocked();
+      return route.fulfill({ status: 201, json: recommendation });
+    }
+    if (method === "POST" && /\/recommendations\/[^/]+\/send/.test(url)) {
+      recommendation = {
+        ...recommendation,
+        sentToClientAt: "2026-03-10T00:00:00.000Z",
+      };
+      recommendation.blockedFromSend = [];
+      return route.fulfill({ status: 201, json: recommendation });
+    }
+    if (method === "POST") {
+      const b = route.request().postDataJSON() as {
+        recommendedQuotationId: string;
+        rationale: string;
+        rationaleFactors: Record<string, string>;
+      };
+      opts.onDraftRecommendation?.(b);
+      const q = quoteVersion({ premium: "125000.500" });
+      recommendation = {
+        id: "rec-1",
+        opportunityId: "opp-1",
+        customerId: "cust-1",
+        recommendedQuotation: {
+          id: q.id,
+          insurerId: q.insurerId,
+          insurer: INSURER_IDENTITY,
+          insuranceLine: "Property All Risks",
+          premium: q.premium,
+          currency: "JOD",
+          commissionRatePercent: "17.5",
+        },
+        rationale: b.rationale,
+        rationaleFactors: b.rationaleFactors,
+        approvalRequired: true,
+        approvedByUserId: null,
+        approvedAt: null,
+        conflictOfInterestFlagged: true,
+        coiCompetingQuotationId: "q-2",
+        coiCommissionDiffPercent: "7.50",
+        conflictOfInterestDisclosure: null,
+        sentToClientAt: null,
+        sentByUserId: null,
+        draftedByUserId: "user-1",
+        createdAt: "2026-03-08T00:00:00.000Z",
+        blockedFromSend: [] as string[],
+      };
+      recommendation.blockedFromSend = recBlocked();
+      return route.fulfill({ status: 201, json: recommendation });
+    }
+    return route.fulfill({
+      status: 200,
+      json: recommendation ? [recommendation] : [],
+    });
   });
 
   // One route for the whole /rfqs prefix — the last-registered route wins in
@@ -479,6 +597,78 @@ test("a non-Placement user sees the comparison but no build control", async ({
   await expect(
     page.getByRole("button", { name: /Build comparison|Rebuild comparison/ }),
   ).toHaveCount(0);
+});
+
+test("drafts a broker recommendation and clears the approval + conflict-of-interest gates before sending", async ({
+  page,
+}) => {
+  // A dual-hatted Placement + Manager user can drive every step here.
+  await mockAuth(page, [
+    "PLACEMENT_TECHNICAL_OFFICER",
+    "BRANCH_DEPARTMENT_MANAGER",
+  ]);
+  let drafted: { rationale: string } | null = null;
+  await mockRfqApi(page, {
+    onDraftRecommendation: (b) => {
+      drafted = b;
+    },
+  });
+
+  // Capture a quote first so the recommendation form has something to pick.
+  await page.goto("/rfqs/rfq-1");
+  await page.getByLabel("Insurer", { exact: true }).selectOption("ins-1");
+  await page.getByLabel("Premium *").fill("125000.500");
+  await page.getByRole("button", { name: "Capture quote" }).click();
+  await expect(
+    page.getByRole("button", { name: "Revise (new version)" }),
+  ).toBeVisible();
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Broker recommendation" }),
+  ).toBeVisible();
+
+  await page.getByLabel("Recommended quotation").selectOption({ index: 1 });
+  await page
+    .getByLabel("Overall rationale")
+    .fill("Insurer One on balance of coverage and claims service.");
+  for (const label of [
+    "Coverage",
+    "Price",
+    "Insurer financial strength",
+    "Claims service",
+    "Deductible",
+    "Policy conditions",
+  ]) {
+    await page.getByLabel(label, { exact: true }).fill(`${label} reasoning here.`);
+  }
+  await page.getByRole("button", { name: "Draft recommendation" }).click();
+
+  await expect.poll(() => drafted?.rationale).toContain("balance of coverage");
+  // Both gates block the send.
+  await expect(
+    page.getByText("Senior-officer approval is required", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("A conflict-of-interest disclosure is required", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Send to client" }),
+  ).toHaveCount(0);
+
+  // Approve, then disclose, then send.
+  await page.getByRole("button", { name: "Approve" }).click();
+  await page
+    .getByLabel("Conflict-of-interest disclosure")
+    .fill(
+      "Insurer One pays 7.5 points more commission than a comparable quote; disclosed to the client.",
+    );
+  await page.getByRole("button", { name: "Record disclosure" }).click();
+
+  await page.getByRole("button", { name: "Send to client" }).click();
+  await expect(page.getByText("sent to client")).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

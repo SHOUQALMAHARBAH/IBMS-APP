@@ -48,11 +48,26 @@ function makeDeps() {
   });
   const findManyByCustomerId = vi.fn().mockResolvedValue([]);
   const findManyByInsuranceProgramId = vi.fn().mockResolvedValue([]);
+  const updateTargetPremiumThreshold = vi
+    .fn()
+    .mockImplementation((id: string, targetPremiumThreshold: unknown) =>
+      Promise.resolve({
+        id,
+        customerId: 'cust-1',
+        insuranceProgramId: 'prog-1',
+        status: 'COMPARISON_BUILT',
+        isRenewal: false,
+        targetPremiumThreshold,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
   const opportunities = {
     create: createOpportunity,
     findById: findOpportunityById,
     findManyByCustomerId,
     findManyByInsuranceProgramId,
+    updateTargetPremiumThreshold,
   } as unknown as OpportunityRepository;
 
   const findProgramById = vi.fn().mockResolvedValue({
@@ -94,6 +109,7 @@ function makeDeps() {
       findOpportunityById,
       findManyByCustomerId,
       findManyByInsuranceProgramId,
+      updateTargetPremiumThreshold,
       findProgramById,
       findRiskProfileById,
       findCustomerById,
@@ -230,6 +246,116 @@ describe('OpportunityService', () => {
       await expect(
         service.get(
           'opp-1',
+          placement({ id: 'sales-1', roles: ['SALES_RELATIONSHIP_OFFICER'] }),
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('setTargetPremiumThreshold', () => {
+    const manager = placement({
+      id: 'mgr-1',
+      roles: ['BRANCH_DEPARTMENT_MANAGER'],
+    });
+
+    it('quantizes and stores a threshold, and audits UPDATE', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpportunityById.mockResolvedValue({
+        id: 'opp-1',
+        customerId: 'cust-1',
+        status: 'COMPARISON_BUILT',
+        isRenewal: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await service.setTargetPremiumThreshold(
+        'opp-1',
+        { targetPremiumThreshold: '250000.5' },
+        manager,
+      );
+      const [, value] = mocks.updateTargetPremiumThreshold.mock.calls[0] as [
+        string,
+        Prisma.Decimal,
+      ];
+      expect(value.toFixed(3)).toBe('250000.500');
+      expect(mocks.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'UPDATE',
+          entityType: 'Opportunity',
+        }),
+      );
+    });
+
+    it('clears the threshold on null', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpportunityById.mockResolvedValue({
+        id: 'opp-1',
+        customerId: 'cust-1',
+        status: 'RFQ_ISSUED',
+        isRenewal: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await service.setTargetPremiumThreshold(
+        'opp-1',
+        { targetPremiumThreshold: null },
+        manager,
+      );
+      expect(mocks.updateTargetPremiumThreshold).toHaveBeenCalledWith(
+        'opp-1',
+        null,
+      );
+    });
+
+    it('422s once the Opportunity is past SENT_TO_CLIENT', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpportunityById.mockResolvedValue({
+        id: 'opp-1',
+        customerId: 'cust-1',
+        status: 'SENT_TO_CLIENT',
+        isRenewal: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await expect(
+        service.setTargetPremiumThreshold(
+          'opp-1',
+          { targetPremiumThreshold: '1000.000' },
+          manager,
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(mocks.updateTargetPremiumThreshold).not.toHaveBeenCalled();
+    });
+
+    it('422s a negative threshold', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpportunityById.mockResolvedValue({
+        id: 'opp-1',
+        customerId: 'cust-1',
+        status: 'COMPARISON_BUILT',
+        isRenewal: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await expect(
+        service.setTargetPremiumThreshold(
+          'opp-1',
+          { targetPremiumThreshold: '-1.000' },
+          manager,
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('404s an opportunity the caller cannot see', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findCustomerById.mockResolvedValue({
+        id: 'cust-1',
+        ownerUserId: 'sales-2',
+      });
+      await expect(
+        service.setTargetPremiumThreshold(
+          'opp-1',
+          { targetPremiumThreshold: '1000.000' },
           placement({ id: 'sales-1', roles: ['SALES_RELATIONSHIP_OFFICER'] }),
         ),
       ).rejects.toThrow(NotFoundException);

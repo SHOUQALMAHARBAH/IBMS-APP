@@ -87,6 +87,7 @@ const insuranceOperations: PermissionSeed[] = [
   // Sales still gets the `.read` codes (they own the customer relationship).
   { code: 'opportunity.create', module: 'insurance-operations', description: 'Create an Opportunity from a finalized Insurance Program', roles: [PLACEMENT] },
   { code: 'opportunity.read', module: 'insurance-operations', description: 'List/read Opportunities', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
+  { code: 'opportunity.set-target-threshold', module: 'insurance-operations', description: "Set/clear the Opportunity's configurable premium threshold that triggers senior-officer approval of the recommendation (Process 16)", roles: [MANAGER, EXEC] },
   { code: 'rfq.create', module: 'insurance-operations', description: 'Create an RFQ and select an insurer shortlist', roles: [PLACEMENT] },
   { code: 'rfq.read', module: 'insurance-operations', description: 'List/read RFQs and insurer submissions', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'rfq.insurer.update', module: 'insurance-operations', description: "Update an insurer's RFQ response status", roles: [PLACEMENT] },
@@ -96,9 +97,20 @@ const insuranceOperations: PermissionSeed[] = [
   { code: 'quotation.read', module: 'insurance-operations', description: 'List/read insurer quotations and their version history', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'comparison.build', module: 'insurance-operations', description: 'Build/rebuild the quote comparison matrix from the current-version quotations', roles: [PLACEMENT] },
   { code: 'comparison.read', module: 'insurance-operations', description: 'List/read the quote comparison matrix', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
-  { code: 'recommendation.draft', module: 'insurance-operations', description: 'Draft the broker recommendation with documented rationale', roles: [PLACEMENT] },
-  { code: 'recommendation.approve', module: 'insurance-operations', description: 'Approve a recommendation above the configurable premium threshold before it is sent to the client', roles: [MANAGER] },
-  { code: 'conflict-of-interest.disclose', module: 'insurance-operations', description: 'Record a mandatory conflict-of-interest disclosure', roles: [PLACEMENT, COMPLIANCE] },
+  { code: 'recommendation.draft', module: 'insurance-operations', description: 'Draft the broker recommendation with documented rationale (all six factors: coverage/price/financial strength/claims service/deductible/policy conditions)', roles: [PLACEMENT] },
+  { code: 'recommendation.read', module: 'insurance-operations', description: 'List/read broker recommendations and their approval / conflict-of-interest state', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
+  { code: 'recommendation.approve', module: 'insurance-operations', description: 'Approve a recommendation above the configurable premium threshold before it is sent to the client (maker/checker: never the drafter)', roles: [MANAGER] },
+  { code: 'recommendation.send', module: 'insurance-operations', description: 'Send an approved / cleared recommendation to the client', roles: [PLACEMENT] },
+  // roles-and-segregation-of-duties.md lists conflict-of-interest disclosures
+  // in the Compliance Officer's column. PLACEMENT is retained here as well:
+  // the structural control is `assertDifferentActors` (the acknowledger can
+  // never be the conflicted drafter), and in a small brokerage a Placement
+  // peer may be the only one on hand to record a disclosure the drafter
+  // made to the client. maker-checker-segregation.md's covered-actions table
+  // has no Recommendation-drafter -> COI-acknowledger row yet — a `/brain-gap`
+  // is filed; narrow this to [COMPLIANCE] once that lands (the seed is
+  // additive, so narrowing also needs an explicit grant revoke).
+  { code: 'conflict-of-interest.disclose', module: 'insurance-operations', description: 'Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).', roles: [PLACEMENT, COMPLIANCE] },
   { code: 'client-decision.capture', module: 'insurance-operations', description: "Capture the client's decision on a recommendation", roles: [SALES, PLACEMENT] },
   { code: 'policy.create', module: 'insurance-operations', description: 'Create a Policy from an accepted Opportunity', roles: [PLACEMENT] },
   { code: 'policy.issue', module: 'insurance-operations', description: 'Record the insurer-issued policy/schedule/certificates/invoice', roles: [PLACEMENT] },

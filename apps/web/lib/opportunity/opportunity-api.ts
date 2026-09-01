@@ -4,7 +4,7 @@
 // Program, then list/read only. Mirrors lib/insurance-program/
 // insurance-program-api.ts's conventions.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 
 export type OpportunityStatus =
   | 'NEEDS_CONFIRMED'
@@ -24,6 +24,9 @@ export interface Opportunity {
   insuranceProgramId: string | null;
   isRenewal: boolean;
   status: OpportunityStatus;
+  /** Part C #16 — the configurable premium threshold above which the broker
+   * recommendation needs senior-officer approval. Decimal string or null. */
+  targetPremiumThreshold: string | null;
   createdByUserId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -50,4 +53,15 @@ export function listOpportunities(customerId: string): Promise<Opportunity[]> {
 
 export function getOpportunity(id: string): Promise<OpportunityWithContext> {
   return apiGet(`/opportunities/${id}`);
+}
+
+/** Part C #16 — set (`"250000.000"`) or clear (`null`) the senior-officer
+ * approval threshold. Manager/Executive only. */
+export function setTargetPremiumThreshold(
+  id: string,
+  targetPremiumThreshold: string | null,
+): Promise<OpportunityWithContext> {
+  return apiPatch(`/opportunities/${id}/target-premium-threshold`, {
+    targetPremiumThreshold,
+  });
 }

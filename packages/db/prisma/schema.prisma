@@ -1112,26 +1112,66 @@ model ComparisonMatrixRow {
 
 /// Process 16 — the broker's documented, reasoned advice — retained as
 /// professional-indemnity evidence. Never "cheapest wins" without reasoning.
+///
+/// Backlog Part C #16: NOT a WorkflowTransitionService entity (it has no
+/// `status` column) — its lifecycle is DRAFTED (row exists) -> APPROVED
+/// (`approvedAt`, only when `approvalRequired`) -> SENT (`sentToClientAt`),
+/// carried by nullable timestamps; the parent `Opportunity` reflects the
+/// same progression through the engine (COMPARISON_BUILT ->
+/// RECOMMENDATION_DRAFTED -> SENT_TO_CLIENT). Maker/checker (Part 5.2): the
+/// `recommendation.approve` holder (senior officer) must differ from
+/// `draftedByUserId` — `assertDifferentActors` is the app guard, the
+/// `Recommendation_maker_checker_distinct` CHECK (migration 20260826091424)
+/// the DB backstop.
+///
+/// `rationaleFactors` is the structured, per-dimension rationale the backlog
+/// enumerates — a JSON object with a non-empty note for each of
+/// `coverage` / `price` / `financialStrength` / `claimsService` /
+/// `deductible` / `policyConditions` (a recommendation must address every
+/// dimension, not just price — the "never price alone" controls rule from
+/// #14 carried forward). `rationale` stays the free-text overall summary.
+///
+/// `approvalRequired` / `conflictOfInterestFlagged` are snapshots taken at
+/// draft time: `approvalRequired` = the recommended quote's premium exceeds
+/// the Opportunity's `targetPremiumThreshold` (when one is set);
+/// `conflictOfInterestFlagged` = a comparable competing quote (premium within
+/// a configured band) carried a materially lower commission rate.
+/// `coiCompetingQuotationId` / `coiCommissionDiffPercent` explain the flag.
 model Recommendation {
   id                 String   @id @default(uuid())
   opportunityId      String   @unique
   opportunity        Opportunity @relation(fields: [opportunityId], references: [id])
   recommendedQuotationId String @unique
   recommendedQuotation Quotation @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
-  rationale          String   // coverage/price/insurer financial strength/claims service/deductible/policy conditions
+  rationale          String   // free-text overall summary
+  rationaleFactors   Json     // { coverage, price, financialStrength, claimsService, deductible, policyConditions } — a non-empty note each
   draftedByUserId    String
+  // Snapshot at draft: recommendedQuotation.premium > Opportunity.targetPremiumThreshold
+  approvalRequired   Boolean  @default(false)
+  // Snapshot at draft: COI heuristic (comparable competing quote, materially lower commission)
+  conflictOfInterestFlagged Boolean @default(false)
+  coiCompetingQuotationId String?
+  coiCommissionDiffPercent Decimal? @db.Decimal(5, 2)
   // Maker/checker: senior-officer approval required above a configurable premium threshold
   approvedByUserId   String?
   approvedAt         DateTime?
   sentToClientAt     DateTime?
+  sentByUserId       String?
   createdAt          DateTime @default(now())
 
   conflictOfInterestDisclosure ConflictOfInterestDisclosure?
+
+  @@index([draftedByUserId])
 }
 
 /// Process 50 / Part 3.3, 7.3 — mandatory disclosure whenever a
 /// recommendation favors a materially higher-commission insurer over a
-/// comparable/better-value competing offer. System gate, not optional.
+/// comparable/better-value competing offer. System gate, not optional
+/// (backlog Part C #16): `RecommendationService.send` refuses to stamp
+/// `sentToClientAt` while `Recommendation.conflictOfInterestFlagged` is true
+/// and no disclosure row exists. `acknowledgedByUserId` must differ from the
+/// recommendation's `draftedByUserId` (the conflicted officer cannot clear
+/// their own conflict — `assertDifferentActors`, Part 5.2).
 model ConflictOfInterestDisclosure {
   id               String   @id @default(uuid())
   recommendationId String   @unique
@@ -1141,6 +1181,8 @@ model ConflictOfInterestDisclosure {
   disclosureText   String
   acknowledgedByUserId String
   acknowledgedAt   DateTime @default(now())
+
+  @@index([competingQuotationId])
 }
 
 enum ClientDecisionType {

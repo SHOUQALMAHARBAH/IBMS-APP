@@ -1,8 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { OpportunityService } from './opportunity.service';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { ListOpportunitiesQueryDto } from './dto/list-opportunities-query.dto';
+import { SetTargetPremiumThresholdDto } from './dto/set-target-premium-threshold.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -39,5 +48,17 @@ export class OpportunityController {
   @Get(':id')
   get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.opportunities.get(id, user);
+  }
+
+  /** Process 16 — set (or clear, with `null`) the configurable premium
+   * threshold that triggers senior-officer approval of the recommendation. */
+  @RequirePermissions('opportunity.set-target-threshold')
+  @Patch(':id/target-premium-threshold')
+  setTargetPremiumThreshold(
+    @Param('id') id: string,
+    @Body() dto: SetTargetPremiumThresholdDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.opportunities.setTargetPremiumThreshold(id, dto, user);
   }
 }

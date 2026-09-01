@@ -24,6 +24,7 @@ import { OpportunityModule } from './modules/opportunity/opportunity.module';
 import { RfqModule } from './modules/rfq/rfq.module';
 import { QuotationModule } from './modules/quotation/quotation.module';
 import { ComparisonModule } from './modules/comparison/comparison.module';
+import { RecommendationModule } from './modules/recommendation/recommendation.module';
 
 @Module({
   imports: [
@@ -137,6 +138,16 @@ import { ComparisonModule } from './modules/comparison/comparison.module';
     // OpportunityModule / CustomerModule; reuses WorkflowModule for the
     // best-effort Opportunity QUOTES_RECEIVED -> COMPARISON_BUILT move.
     ComparisonModule,
+    // Part C backlog #16 (Broker Recommendation) — drafts the documented
+    // recommendation (all six rationale factors), gates it on a
+    // senior-officer approval above the Opportunity's configurable
+    // targetPremiumThreshold (maker/checker), and detects + requires a
+    // conflict-of-interest disclosure when a comparable competing quote
+    // carried a materially lower commission rate. Depends on
+    // OpportunityModule / QuotationModule / CustomerModule; reuses
+    // WorkflowModule for the best-effort Opportunity COMPARISON_BUILT ->
+    // RECOMMENDATION_DRAFTED -> SENT_TO_CLIENT moves.
+    RecommendationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

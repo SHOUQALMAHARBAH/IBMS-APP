@@ -16,8 +16,11 @@ import {
   rfqBadgeStyle,
   rfqCardStyle,
 } from '../../../../components/rfq/rfq.styles';
+import { RecommendationSection } from '../../../../components/recommendation/RecommendationSection';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
+const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
+const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
 
 function statusBreakdown(rfq: Rfq): string {
   if (rfq.insurerSubmissions.length === 0) return 'no insurers yet';
@@ -76,6 +79,8 @@ export default function OpportunityDetailPage() {
   if (isLoading || !user) return null;
 
   const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isManager = user.roles.includes(MANAGER_ROLE);
+  const isCompliance = user.roles.includes(COMPLIANCE_ROLE);
 
   return (
     <main style={pageStyle}>
@@ -181,6 +186,14 @@ export default function OpportunityDetailPage() {
               ))}
             </div>
           )}
+
+          <RecommendationSection
+            opportunity={opportunity}
+            isPlacement={isPlacement}
+            isManager={isManager}
+            isCompliance={isCompliance}
+            onOpportunityChanged={() => void load()}
+          />
         </>
       ) : null}
     </main>

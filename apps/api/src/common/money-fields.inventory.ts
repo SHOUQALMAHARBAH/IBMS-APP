@@ -75,6 +75,7 @@ export const NON_MONEY_DECIMAL_FIELDS: readonly string[] = [
   'ComparisonMatrixRow.insurerQualityScore',
   'ComparisonMatrixRow.serviceScore',
   'ConflictOfInterestDisclosure.commissionDifferencePercent',
+  'Recommendation.coiCommissionDiffPercent',
   'CommissionAgreement.ratePercent',
   'InsurerPerformanceScore.quoteResponseScore',
   'InsurerPerformanceScore.claimsServiceScore',

@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { Opportunity } from '@ibms/db';
+import type { Opportunity, OpportunityStatus } from '@ibms/db';
 import {
   OpportunityRepository,
   type CreateOpportunityInput,
@@ -16,8 +16,10 @@ import { RiskProfileRepository } from '../../repositories/risk-profile.repositor
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { quantizeMoney } from '../../common/money.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateOpportunityDto } from './dto/create-opportunity.dto';
+import type { SetTargetPremiumThresholdDto } from './dto/set-target-premium-threshold.dto';
 
 /** The programme context echoed back on a create / get so the caller can see
  * which finalized Insurance Program this Opportunity was taken to market
@@ -239,5 +241,65 @@ export class OpportunityService {
 
   async get(id: string, actor: AuthenticatedUser): Promise<OpportunityView> {
     return this.toView(await this.findVisible(id, actor));
+  }
+
+  /**
+   * Backlog Part C #16 — set (or clear) the Opportunity's configurable
+   * senior-officer approval threshold. A recommended quote whose premium
+   * exceeds this needs `recommendation.approve` before it can be sent to the
+   * client. Changing it at `RECOMMENDATION_DRAFTED` **does** take effect on
+   * an already-drafted recommendation: `RecommendationService` re-derives the
+   * send-gates from live data (this field + the current competing quotes),
+   * OR'd with the draft-time snapshot, so a gate can be added late but never
+   * silently cleared. Refused only once the recommendation has been sent
+   * (`SENT_TO_CLIENT` onward), where changing the bar would be pointless.
+   */
+  async setTargetPremiumThreshold(
+    id: string,
+    dto: SetTargetPremiumThresholdDto,
+    actor: AuthenticatedUser,
+  ): Promise<OpportunityView> {
+    const opportunity = await this.findVisible(id, actor);
+
+    const OPEN_TO_THRESHOLD_CHANGE: OpportunityStatus[] = [
+      'NEEDS_CONFIRMED',
+      'RFQ_ISSUED',
+      'QUOTES_RECEIVED',
+      'COMPARISON_BUILT',
+      'RECOMMENDATION_DRAFTED',
+      'RENEGOTIATE',
+    ];
+    if (!OPEN_TO_THRESHOLD_CHANGE.includes(opportunity.status)) {
+      throw new UnprocessableEntityException(
+        `Opportunity ${id} is ${opportunity.status}; the target premium threshold can only be changed before the recommendation is sent.`,
+      );
+    }
+
+    const value =
+      dto.targetPremiumThreshold === null
+        ? null
+        : quantizeMoney(dto.targetPremiumThreshold);
+    if (value !== null && value.isNegative()) {
+      throw new UnprocessableEntityException(
+        'targetPremiumThreshold cannot be negative.',
+      );
+    }
+
+    const updated = await this.opportunities.updateTargetPremiumThreshold(
+      id,
+      value,
+    );
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'UPDATE',
+      entityType: 'Opportunity',
+      entityId: id,
+      afterValue: {
+        targetPremiumThreshold: value === null ? null : value.toFixed(3),
+      },
+    });
+
+    return this.toView(updated);
   }
 }

@@ -97,6 +97,17 @@ export function listQuotationsForRfq(
   return apiGet(`/quotations?rfqId=${encodeURIComponent(rfqId)}`);
 }
 
+/** Every per-insurer quotation chain across all of an Opportunity's RFQs —
+ * used by the Broker Recommendation form (Part C #16) to pick the
+ * recommended quote. */
+export function listQuotationsForOpportunity(
+  opportunityId: string,
+): Promise<QuotationChain[]> {
+  return apiGet(
+    `/quotations?opportunityId=${encodeURIComponent(opportunityId)}`,
+  );
+}
+
 export function captureQuotation(
   input: CaptureQuotationInput,
 ): Promise<QuotationChain> {

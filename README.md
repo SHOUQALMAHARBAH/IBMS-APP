@@ -410,18 +410,23 @@ build actually is today:
 - **Part C — Domain A, Processes 1–10 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
-  Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) — built and
-  verified.** A minimal `Opportunity` parent (created from a FINALIZED `InsuranceProgram`)
-  plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an insurer shortlist, per-insurer
-  response tracking, a nightly business-day follow-up sweep (alerts *and* auto-advances a
-  silent insurer to `NO_RESPONSE`), a broker↔insurer correspondence log on each RFQ (the
-  widened `CommunicationLog`), each insurer's `Quotation` captured against an RFQ line and
-  versioned on every negotiation round (`previousVersionId` / `isCurrentVersion`, the old
-  version never overwritten — and, from #15, "never deleted or replaced" is enforced by a
-  DB immutability trigger, with each round carrying the broker's rationale + a premium
-  delta), and a `ComparisonMatrix` (re)built from every current-version quotation — price
-  alongside coverage / exclusions / deductibles / limits / optional quality & service
-  scores, with the shortlisted insurers that didn't quote flagged. Detail below.
+  Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
+  Recommendation (#16) — built and verified.** A minimal `Opportunity` parent (created from
+  a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
+  insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
+  (alerts *and* auto-advances a silent insurer to `NO_RESPONSE`), a broker↔insurer
+  correspondence log on each RFQ (the widened `CommunicationLog`), each insurer's
+  `Quotation` captured against an RFQ line and versioned on every negotiation round
+  (`previousVersionId` / `isCurrentVersion`, the old version never overwritten — and, from
+  #15, "never deleted or replaced" is enforced by a DB immutability trigger, with each round
+  carrying the broker's rationale + a premium delta), a `ComparisonMatrix` (re)built from
+  every current-version quotation — price alongside coverage / exclusions / deductibles /
+  limits / optional quality & service scores, with the shortlisted insurers that didn't
+  quote flagged — and a `Recommendation` with a six-factor documented rationale, gated on a
+  senior-officer approval above the Opportunity's configurable `targetPremiumThreshold`
+  (maker/checker) and on a mandatory conflict-of-interest disclosure whenever the pick
+  earns materially more commission than a comparable competing quote, both before it can be
+  sent to the client. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -439,7 +444,7 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–15 — built, with these deferrals
+### Part C · Domain B #11–16 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -448,12 +453,13 @@ build actually is today:
 | 13 | Quotation Management | `POST /quotations` (`{ rfqId, insurerId, premium, currency?, deductible?, limits?, biPeriodMonths?, liabilityLimit?, exclusions?, conditions?, commissionRatePercent? }`, `quotation.capture`/Placement) captures an insurer's quote as a version-1 `Quotation` — the insurer must be on the RFQ's shortlist and not `DECLINED`, and must not already have a current quotation (409 → revise) · `POST /quotations/:id/revise` (`quotation.negotiate`/Placement) records a renegotiation round as a NEW version linked by `previousVersionId`, flipping `isCurrentVersion` — the old row is kept verbatim · `GET /quotations?rfqId=\|opportunityId=\|customerId=` + `/:id` (`quotation.read` — new seeded perm, Sales/Placement/Manager/Exec) return per-insurer version chains · every monetary field is fils-quantized through `money.util.ts` (`normalizeQuotationTerms`, pure) · partial `UNIQUE` `Quotation(rfqId, insurerId) WHERE isCurrentVersion` + the existing `previousVersionId @unique` are the race backstops (`race-safe-invariants.md`) · a successful capture / revise **best-effort** advances the matching `RFQInsurer → QUOTED` (stamping `respondedAt`) and the `Opportunity RFQ_ISSUED → QUOTES_RECEIVED` through the workflow engine (logged, never thrown) · web: a "Quotations" section on the RFQ detail screen (per-insurer chain cards + version history + a Placement-only capture / revise form) | `Quotation` is **not** a `WorkflowTransitionService` entity (`isCurrentVersion` is a boolean, not a status) and has no maker/checker (capturing what an insurer sent is a factual single-actor record); `limits` is stored as opaque JSON — its internal shape is not validated; `commissionRatePercent` is captured verbatim, not applied (Finance, #31+); the best-effort workflow advances are **not authoritative** — derive "this insurer has quoted" from the `Quotation` table, not `RFQInsurer.status`; no `Recommendation` (#16) consuming these quotes yet; the `apps/api` e2e gap carried from #11–12 is **closed for this module at #15** (`test/quotation.e2e-spec.ts` drives the real capture / revise path + the immutability trigger); the `revise` two writes run in one Prisma `$transaction` (`reviseChain`) — a deliberate local exception to this codebase's no-`$transaction` convention, since a crash between the predecessor-clear and the successor-insert would otherwise leave the chain headless; the nightly RFQ follow-up sweep (#12) now **drops any open submission whose `(rfqId, insurerId)` already has a current `Quotation`** (`RfqRepository.findCurrentQuotationKeys` → `FollowUpScanResult.skippedQuoted`) — an insurer that quoted is not "silent" even if its best-effort `→ QUOTED` move failed (`/brain-gap` filed + solved, `ibms-brain/meta/context/policy-lifecycle.md`) |
 | 14 | Quote Comparison | `POST /comparison-matrices` (`{ rfqId, scores?: [{ insurerId, insurerQualityScore?, serviceScore? }] }`, `comparison.build`/Placement) **(re)builds** the one `ComparisonMatrix` per RFQ from every **current-version** `Quotation` on it — one `ComparisonMatrixRow` each (the objective dimensions — premium / deductible / `limits` / BI period / liability limit / exclusions / conditions / commission rate — live on the linked `Quotation`, so the matrix is **never price alone**, `policy-lifecycle.md` § controls) · shortlisted insurers with no quote in the matrix are flagged — the `missing` / `declined` buckets are **recomputed live on every read** from the current shortlist (so they stay disjoint after a post-build status change); `ComparisonMatrix.missingInsurers` stores the build-time snapshot for the audit counts only · optional per-insurer `insurerQualityScore` / `serviceScore` (0–100, 2dp) — Placement's judgement, there is no Insurer-scoring module (Process 61) · `GET /comparison-matrices?rfqId=` + `/:id` (`comparison.read` — **new seeded perm**, Sales/Placement/Manager/Exec) · a build **best-effort** advances `Opportunity QUOTES_RECEIVED → COMPARISON_BUILT` through the workflow engine (logged, never thrown) · upsert-matrix + replace-rows run in one Prisma `$transaction` (`ComparisonRepository.buildOrRebuild`, which also reports created-vs-rebuilt for the audit action); `@@unique([comparisonMatrixId, quotationId])` backstops a doubled row (`race-safe-invariants.md`) · migration `20260901160000` adds `ComparisonMatrix.builtByUserId` + the FK/filter indexes + that `@@unique` · web: a "Comparison" section on the RFQ detail screen (a wide scrollable table + missing / declined callouts + a "· superseded" marker on a row whose quote was revised since the build + a Placement-only build / rebuild control with an optional score grid) | `ComparisonMatrix` is **not** a `WorkflowTransitionService` entity (no status) and has no maker/checker (a derived artefact — the gate sits downstream at the Recommendation, #16); the two subjective scores are manual free inputs (no Insurer-scoring module — Process 61) and `Insurer.financialStrengthRating` is not mapped in; a row's **quote terms** can go stale (a `Quotation` revised since the build — `builtAt` and the row's `quotation.isCurrentVersion` / "superseded" marker signal it; rebuild to refresh); rows carry no computed ranking / "best value" (that reasoning is the Recommendation, #16 — and row order is deliberately by insurer, not by premium); no `apps/api` e2e (carried from #11–13); `comparison.build` is role-level (no per-officer queue) |
 | 15 | Negotiation | the negotiation mechanism is `POST /quotations/:id/revise` from #13 — a round is a NEW `Quotation` version (`versionNumber+1`, linked by `previousVersionId`, `isCurrentVersion` flipped, the predecessor kept verbatim) · #15 makes **"never deleted or replaced" a real DB-layer guarantee**: migration `20260901180000` adds `negotiationNotes TEXT` + a trigger (`prevent_quotation_version_mutation`, same pattern as the `AuditLogEntry` immutability trigger) that rejects any `DELETE` of a `Quotation` row, any `UPDATE` of an already-superseded version, and any `UPDATE` of a live version that changes anything other than `isCurrentVersion` true→false (the supersede flip — asserted column-by-column via `to_jsonb(NEW) - 'isCurrentVersion' IS DISTINCT FROM to_jsonb(OLD) - 'isCurrentVersion'`) · a revise round now carries the broker's optional `negotiationNotes` (the rationale — what was asked / conceded; Confidential, audited as a `hasNegotiationNotes` boolean only) · every quotation read returns a pure `history: NegotiationRound[]` projection (`buildNegotiationHistory`) — round 0 is the opening quote, each later round is diffed against the version its `previousVersionId` names and carries `premiumDeltaFromPrevious` (fils-quantized via `money.util.ts`, sign preserved, `null` when the round changed `currency`) + `changedTermFields` + that round's notes · web: the "Quotations" version-history table gains Round / Δ premium / Terms-changed columns + the round rationale, and the revise form gains a "Negotiation notes" field | `Quotation` is still **not** a `WorkflowTransitionService` entity and has no maker/checker (recording a negotiated term set is a factual single-actor Placement record; the approval gate is the Broker Recommendation, #16); no structured "negotiation ask vs. counter" model — `negotiationNotes` is one free-text field per round; the DB trigger's documented residual risk is identical to the `AuditLogEntry` trigger's (a session on the shared `ibms` Postgres role can still `SET session_replication_role = replica` — a least-privilege app role is a separate infra change); a data fix or PDPL Correction DSR touching a historical version now requires that privileged bypass (same posture as `AuditLogEntry`); `changedTermFields` treats a `limits` JSON key reorder as a change (stringify compare, a display aid not a semantic diff) |
+| 16 | Broker Recommendation | **new module** `apps/api/src/modules/recommendation/` · `POST /recommendations` (`{ opportunityId, recommendedQuotationId, rationale, rationaleFactors }`, `recommendation.draft`/Placement) — one `Recommendation` per Opportunity (`opportunityId @unique`), pointing at one **current-version** `Quotation` on one of its RFQs; the Opportunity must be at `COMPARISON_BUILT`; `rationaleFactors` requires a non-empty note for **all six** dimensions (coverage / price / financial strength / claims service / deductible / policy conditions — "never price alone") · two gate flags snapshot at draft: `approvalRequired` (recommended premium > the Opportunity's `targetPremiumThreshold`) and `conflictOfInterestFlagged` (`detectConflictOfInterest`, pure — a competing current-version quote priced within a **drafted, unsourced** 10% band carries a commission rate at least a **drafted, unsourced** 2 percentage points lower) · `PATCH /opportunities/:id/target-premium-threshold` (`opportunity.set-target-threshold`/**Manager, Exec** — new perm) sets/clears the configurable threshold · `POST /recommendations/:id/approve` (`recommendation.approve`/**Manager**) — only when `approvalRequired`, **maker/checker**: `assertDifferentActors(draftedByUserId, actor)` + the existing `Recommendation_maker_checker_distinct` CHECK; a status-conditional `updateMany` stamps `approvedByUserId`/`approvedAt` (0 rows → 409) · `POST /recommendations/:id/conflict-of-interest-disclosure` (`conflict-of-interest.disclose`/Placement, Compliance) — only when flagged, acknowledger ≠ drafter, one per recommendation · `POST /recommendations/:id/send` (`recommendation.send`/**Placement** — new perm) — 422 while a required approval or COI disclosure is outstanding, else stamps `sentToClientAt` and best-effort advances `Opportunity RECOMMENDATION_DRAFTED → SENT_TO_CLIENT` · `GET /recommendations?opportunityId=\|customerId=` + `/:id` (`recommendation.read` — new perm, Sales/Placement/Manager/Exec) return the recommendation + its quotation + the COI disclosure + a computed `blockedFromSend` list · a successful draft best-effort advances `Opportunity COMPARISON_BUILT → RECOMMENDATION_DRAFTED` · migration `20260901200000` adds `Recommendation.rationaleFactors`/`approvalRequired`/`conflictOfInterestFlagged`/`coiCompetingQuotationId`/`coiCommissionDiffPercent`/`sentByUserId` + FK/filter indexes · web: a "Broker recommendation" section on the Opportunity detail screen (Manager-only threshold control, Placement-only draft form, Manager-only Approve, Placement/Compliance COI disclosure form, Send with the block reasons listed) | `Recommendation` is **not** a `WorkflowTransitionService` entity (no `status` column — its lifecycle is nullable timestamps; the parent `Opportunity` carries the same progression through the engine); one recommendation per Opportunity pointing at **one** quote — a multi-line programme's per-line recommendation is a deferred edge (schema constraint, like #7's one-programme-per-`RiskProfile`); the **10% comparable-premium band** and **2 pp material-commission** figures are `ibms-app` product decisions, drafted, **unsourced** — `/brain-gap` candidates; the COI check can only assess quotes that captured a `commissionRatePercent` at #13 (no rate → not flagged); `CommissionAgreement.ratePercent` (the governed rate table, Finance) is not consulted — the check uses the per-quote rate; draft requires the Opportunity to be **at** `COMPARISON_BUILT`, which is an adequate proxy for "a comparison was built" but not a hard FK to a `ComparisonMatrix` row; `recommendation.draft` / `.send` are role-level (no per-officer queue); the disclosure records that a disclosure was **made to the client** — the system does not itself send anything to the client |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
-  Placement, #13 Quotation Management, #14 Quote Comparison, and #15 Negotiation are
-  **built** — see the Domain B table above; #16–22 recommendation / client decision /
+  Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, and #16 Broker
+  Recommendation are **built** — see the Domain B table above; #17–22 client decision /
   policy issuance / checking / delivery / endorsement remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
@@ -2074,6 +2080,129 @@ narrows a gap.
   (function re-applied + checksum reconciled after the `@code-reviewer` MINOR fix);
   `prisma validate` OK, `prisma migrate status` clean; seed re-run (**139** permissions —
   description-only change).
+
+**Part C #16 — Broker Recommendation (Domain B, Process 16)**
+
+- **New module** `apps/api/src/modules/recommendation/` (+ `apps/api/src/repositories/recommendation.repository.ts`).
+  The `Recommendation` / `ConflictOfInterestDisclosure` models and the
+  `Recommendation_maker_checker_distinct` CHECK (`approvedByUserId <> draftedByUserId`,
+  migration `20260826091424`) already existed — this item is their first consumer.
+  Backlog: draft the documented rationale (six named factors), a mandatory approval gate
+  above a configurable premium threshold, and automatic conflict-of-interest detection +
+  disclosure before send.
+- **`Recommendation` is NOT a `WorkflowTransitionService` entity** — it has no `status`
+  column, so its lifecycle (DRAFTED → APPROVED → SENT) is nullable timestamps, and the
+  parent `Opportunity` carries the same progression through the engine
+  (`COMPARISON_BUILT → RECOMMENDATION_DRAFTED → SENT_TO_CLIENT`, best-effort on draft /
+  send). Same "no engine entity where the schema has no status" call as #13–15.
+- **`POST /recommendations`** (`recommendation.draft`, Placement) — one per Opportunity
+  (`opportunityId @unique` → 409), pointing at one current-version `Quotation` on one of
+  its RFQs (422 otherwise); the Opportunity must be **at** `COMPARISON_BUILT`.
+  `normalizeRecommendationRationale` (`recommendation.config.ts`, pure) requires a non-empty
+  note for **every** one of `coverage` / `price` / `financialStrength` / `claimsService` /
+  `deductible` / `policyConditions` (422 naming the offender; an unknown key is rejected,
+  not dropped). Two gate flags snapshot at draft time.
+- **Approval gate** — `approvalRequired` = recommended premium **>** the Opportunity's
+  `targetPremiumThreshold` (via `money.util.ts` `compareMoney`; no threshold → never
+  required). `PATCH /opportunities/:id/target-premium-threshold` (`opportunity.set-target-threshold`
+  — **new perm, Manager / Executive**) sets or clears it (`null`); refused once the
+  Opportunity is past `RECOMMENDATION_DRAFTED`. `POST /recommendations/:id/approve`
+  (`recommendation.approve`, Manager) — 422 when no approval is required, **maker/checker**
+  `assertDifferentActors(draftedByUserId, actor.id)` (403) backed by the CHECK constraint,
+  409 when already approved, and a **status-conditional `updateMany`** (`WHERE
+  approvedByUserId IS NULL`) so a concurrent approve loses cleanly (0 rows → 409).
+- **Conflict of interest** — `detectConflictOfInterest` (pure): among the *other*
+  current-version quotes on the Opportunity, a "comparable" one is priced within
+  `COI_COMPARABLE_PREMIUM_BAND_PERCENT` (**10%, drafted/unsourced**) of the recommended
+  premium; flag when the recommended quote's `commissionRatePercent` exceeds the lowest
+  comparable competitor's by ≥ `COI_MATERIAL_COMMISSION_DIFF_POINTS` (**2 percentage
+  points, drafted/unsourced**) — both are `ibms-app` product decisions, `/brain-gap`
+  candidates (same status as #9's 10% under-insurance threshold). Recommended quote with no
+  `commissionRatePercent` → cannot assess → not flagged. `coiCompetingQuotationId` /
+  `coiCommissionDiffPercent` explain the flag. `POST /recommendations/:id/conflict-of-interest-disclosure`
+  (`conflict-of-interest.disclose`, Placement / Compliance) — 422 when not flagged, one per
+  recommendation (409), and the **acknowledger must differ from the drafter** (403 —
+  `assertDifferentActors`, the conflicted officer cannot self-clear). A Compliance Officer
+  can reach any recommendation for this (`canReachAnyCustomer` adds `COMPLIANCE_OFFICER`).
+- **`POST /recommendations/:id/send`** (`recommendation.send` — **new perm**, Placement) —
+  422 while `blockedFromSend` is non-empty (a required approval or COI disclosure
+  outstanding), 409 if already sent; stamps `sentToClientAt` / `sentByUserId` via a
+  status-conditional write and best-effort advances the Opportunity.
+- **Money / sensitive data** — every rate comparison runs through `money.util.ts` (`toMoney`
+  parse + `MONEY_ROUNDING`, at the `Decimal(5, 2)` scale — a commission *rate* is a ratio,
+  not a fils amount, so it does not use `subtractMoney`; same reuse `comparison.config.ts`
+  makes). `recommendationAuditSnapshot` carries metadata + money + the gate flags but
+  **never** the free-text `rationale` / `rationaleFactors` / `disclosureText` (booleans
+  `hasRationale` / `rationaleFactorsComplete` instead — same "metadata not body" shape as
+  #12 / #13 / #15).
+- **Migration `20260901200000_add_broker_recommendation`** (hand-authored + `migrate
+  deploy`; applied to `db` + `db-test`) — `Recommendation.rationaleFactors JSONB NOT NULL`
+  (add-with-default / drop-default two-step), `approvalRequired` / `conflictOfInterestFlagged`
+  booleans, `coiCompetingQuotationId` / `coiCommissionDiffPercent` / `sentByUserId`, plus
+  `Recommendation_draftedByUserId_idx` and `ConflictOfInterestDisclosure_competingQuotationId_idx`.
+  `Recommendation.coiCommissionDiffPercent` added to `NON_MONEY_DECIMAL_FIELDS` (a rate, not
+  a JOD amount — the schema-inventory test enforces the classification).
+- **`apps/web/app/(app)/opportunities/[id]/`** — a "Broker recommendation" section
+  (`components/recommendation/RecommendationSection.tsx`): Manager-only target-threshold
+  control, Placement-only draft form (recommended-quote picker + overall rationale + the six
+  factor fields), Manager-only Approve, Placement/Compliance COI-disclosure form, and a Send
+  button that lists the outstanding block reasons. New nav: none.
+- **Send-gates are re-derived from LIVE data, not the draft-time snapshot** (`@code-reviewer`
+  MAJOR — a control that only fires when a human configured data in the right order before
+  draft is procedural, not structural). `RecommendationService.effectiveGates(rec)` OR's the
+  stored `approvalRequired` / `conflictOfInterestFlagged` snapshot with a fresh check
+  (`recommendedQuotation.premium` vs. the Opportunity's *current* `targetPremiumThreshold`;
+  `detectConflictOfInterest` re-run over the *current* current-version quotes on the
+  recommended quote's **own RFQ line**) — so a threshold configured, or a comparable
+  competitor quoting, *after* the draft still blocks `send`, but a gate can never be
+  silently *cleared*. `approve` / `discloseConflictOfInterest` / every read use the same
+  effective gates; the snapshot columns stay the draft-time record. COI competitors are
+  RFQ-line-scoped (a cross-line quote is not a "comparable competing offer" — matches #14).
+- **`@code-reviewer` (mandatory — approval / workflow logic + financial calc + Confidential
+  data + a migration)** → **CHANGES REQUESTED → resolved.** One MAJOR (send-gates trusted
+  stale draft snapshots) fixed as above, with three new tests (2 unit: a late threshold /
+  a late competitor each still block; 1 e2e: threshold set after draft → `send` 422 → GET
+  shows `approvalRequired: true` → approve → `send` 201). MINORs: audit `entityId` for the
+  COI disclosure now keys to the disclosure row's own id (was the recommendation id);
+  COI competitors scoped to the RFQ line; `conflict-of-interest.disclose` kept `[PLACEMENT,
+  COMPLIANCE]` with a documented rationale (the seed is additive — narrowing needs an
+  explicit grant revoke; `assertDifferentActors` is the structural control, and a
+  `/brain-gap` is filed to add a Recommendation-drafter → COI-acknowledger row to
+  `maker-checker-segregation.md` at which point it narrows). NITs: `send` reads
+  status/threshold off the already-loaded `rec` (dropped a redundant round-trip); the
+  disclosure override is documented as a deliberate human choice. **`/brain-gap` filed** —
+  `ibms-brain/meta/context/policy-lifecycle.md` § "The rules that aren't obvious" now
+  quantifies "comparable" (10% premium band) and "materially higher" (2 pp commission),
+  records the deterministic tie-break, the no-rate-→-not-flagged rule, the RFQ-line
+  scoping, and the live-recompute-at-send requirement.
+- **Deferred**: one recommendation per Opportunity pointing at **one** quote — a multi-line
+  programme's per-line recommendation is a schema-constraint deferral (like #7's
+  one-programme-per-`RiskProfile`); the 10% band and 2 pp figures are unsourced drafts
+  (now in the brain);
+  `CommissionAgreement.ratePercent` (the governed rate table, Finance) is not consulted;
+  draft gates on the Opportunity *status* being `COMPARISON_BUILT`, not a hard FK to a
+  `ComparisonMatrix` row; `recommendation.draft` / `.send` are role-level (no per-officer
+  queue); the disclosure records that a disclosure was made — the system sends nothing to
+  the client itself; no renegotiation / close-lost from here (#17).
+- **Verification**: +50 api unit — `recommendation.config.spec.ts` ×18
+  (`normalizeRecommendationRationale` — missing / blank / unknown factor, short summary;
+  `detectConflictOfInterest` — flagged / marginal / out-of-band / no-rate / deterministic
+  tie-break; `approvalRequired`; `recommendationAuditSnapshot` — never the rationale text),
+  `recommendation.service.spec.ts` ×28 (draft gate flags + 422/409/404 edges + best-effort
+  advance; approve 422-not-required / 403-self / 409 / 409-race; disclose 422-not-flagged /
+  403-self / 409 / override validation; send 409-sent / 422-approval / 422-COI / happy +
+  **the two live-gate recompute tests**; list/get), `opportunity.service.spec.ts` +4
+  (`setTargetPremiumThreshold`). **New** `test/recommendation.e2e-spec.ts` ×3 — the full
+  gated path (threshold → draft → approval → COI disclosure → send, Opportunity ends
+  `SENT_TO_CLIENT`, second send 409), the maker/checker self-approval refusal (a
+  dual-hatted Placement + Manager drafter is 403 on their own recommendation), and the
+  **live approval-gate recompute** (threshold set after draft still blocks). Full suites
+  green: **748** api unit (60 files, workspace-scoped), api contract 4/4, **api e2e
+  103/103** (16 files), `npm audit` 0 high, `nest build` OK, web unit 6, web Playwright
+  **rfq.spec.ts 11/11** (+1: draft a recommendation, clear both gates, send), `next build`
+  OK, api + web + db `typecheck` + `eslint` clean. Migration applied to `db` + `db-test`;
+  `prisma validate` OK, `prisma migrate status` clean; seed re-run (**142** permissions —
+  `opportunity.set-target-threshold`, `recommendation.read`, `recommendation.send` new).
 
 ## Deployment
 

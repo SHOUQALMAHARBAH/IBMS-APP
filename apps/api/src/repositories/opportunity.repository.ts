@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Opportunity } from '@ibms/db';
+import type { Opportunity, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateOpportunityInput {
@@ -53,6 +53,19 @@ export class OpportunityRepository {
     return this.prisma.client.opportunity.findMany({
       where: { insuranceProgramId },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** Backlog Part C #16 — set (or clear, with `null`) the configurable
+   * senior-officer approval threshold. Not a `status` write, so it stays
+   * here rather than going through the workflow engine. */
+  updateTargetPremiumThreshold(
+    id: string,
+    targetPremiumThreshold: Prisma.Decimal | null,
+  ): Promise<Opportunity> {
+    return this.prisma.client.opportunity.update({
+      where: { id },
+      data: { targetPremiumThreshold },
     });
   }
 }
