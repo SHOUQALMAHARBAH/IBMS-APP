@@ -30,5 +30,8 @@ import { CustomerModule } from '../customer/customer.module';
   ],
   controllers: [RecommendationController],
   providers: [RecommendationService, RecommendationRepository],
+  // ClientDecisionModule (backlog Part C #17) reads the sent Recommendation
+  // as the precondition for capturing a client decision.
+  exports: [RecommendationRepository],
 })
 export class RecommendationModule {}

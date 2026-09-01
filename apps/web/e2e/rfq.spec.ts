@@ -140,6 +140,11 @@ async function mockRfqApi(
       recommendedQuotationId: string;
       rationale: string;
     }) => void;
+    onClientDecision?: (body: {
+      decision: string;
+      evidenceRef: string;
+    }) => void;
+    opportunityStatus?: string;
   } = {},
 ) {
   // Correspondence log — starts empty, a POST appends so the list re-renders
@@ -260,7 +265,7 @@ async function mockRfqApi(
 
   // Opportunity — the detail GET reflects the current threshold; a PATCH
   // (Part C #16) updates it in place.
-  const opp = { ...OPPORTUNITY };
+  const opp = { ...OPPORTUNITY, status: opts.opportunityStatus ?? OPPORTUNITY.status };
   await page.route("http://localhost:4000/opportunities**", (route) => {
     const url = route.request().url();
     const method = route.request().method();
@@ -376,6 +381,55 @@ async function mockRfqApi(
     return route.fulfill({
       status: 200,
       json: recommendation ? [recommendation] : [],
+    });
+  });
+
+  // Client decision (Part C #17) — starts empty; a POST records the single
+  // decision and routes the mocked opportunity.
+  let clientDecision: Record<string, unknown> | null = null;
+  const ROUTE_BY_DECISION: Record<string, [string, string]> = {
+    ACCEPT: ["PLACEMENT", "Proceed to placement"],
+    REJECT: ["CLOSED_LOST", "Close the request"],
+    REQUEST_FURTHER_NEGOTIATION: ["RENEGOTIATE", "Renewed negotiation"],
+    REQUEST_ALTERNATIVE_OPTIONS: ["RENEGOTIATE", "Renewed negotiation"],
+    REQUEST_PRICE_REDUCTION: ["RENEGOTIATE", "Renewed negotiation"],
+    REQUEST_COVERAGE_INCREASE: ["RENEGOTIATE", "Renewed negotiation"],
+  };
+  await page.route("http://localhost:4000/client-decisions**", (route) => {
+    const method = route.request().method();
+    if (method === "POST") {
+      const b = route.request().postDataJSON() as {
+        decision: string;
+        evidenceType: string;
+        evidenceRef: string;
+        notes?: string;
+      };
+      opts.onClientDecision?.(b);
+      const [routeName, label] = ROUTE_BY_DECISION[b.decision] ?? [
+        "PLACEMENT",
+        "Proceed to placement",
+      ];
+      opp.status = routeName;
+      clientDecision = {
+        id: "cd-1",
+        opportunityId: "opp-1",
+        customerId: "cust-1",
+        decision: b.decision,
+        route: routeName,
+        routeLabel: label,
+        evidenceType: b.evidenceType,
+        evidenceRef: b.evidenceRef,
+        notes: b.notes ?? null,
+        capturedByUserId: "user-1",
+        decidedAt: "2026-03-12T00:00:00.000Z",
+        opportunityStatus: routeName,
+        routingComplete: true,
+      };
+      return route.fulfill({ status: 201, json: clientDecision });
+    }
+    return route.fulfill({
+      status: 200,
+      json: clientDecision ? [clientDecision] : [],
     });
   });
 
@@ -669,6 +723,33 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
 
   await page.getByRole("button", { name: "Send to client" }).click();
   await expect(page.getByText("sent to client")).toBeVisible();
+});
+
+test("records a client decision and shows the route it takes", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  let captured: { decision: string; evidenceRef: string } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "SENT_TO_CLIENT",
+    onClientDecision: (b) => {
+      captured = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Client decision" }),
+  ).toBeVisible();
+
+  await page.getByLabel("Decision").selectOption("REQUEST_PRICE_REDUCTION");
+  await page.getByLabel("Evidence type").selectOption("email_confirmation");
+  await page.getByLabel("Evidence reference").fill("msg-9931");
+  await page.getByRole("button", { name: "Record client decision" }).click();
+
+  await expect.poll(() => captured?.decision).toBe("REQUEST_PRICE_REDUCTION");
+  await expect.poll(() => captured?.evidenceRef).toBe("msg-9931");
+  await expect(page.getByText("Renewed negotiation")).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

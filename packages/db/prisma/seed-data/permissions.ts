@@ -111,7 +111,8 @@ const insuranceOperations: PermissionSeed[] = [
   // is filed; narrow this to [COMPLIANCE] once that lands (the seed is
   // additive, so narrowing also needs an explicit grant revoke).
   { code: 'conflict-of-interest.disclose', module: 'insurance-operations', description: 'Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).', roles: [PLACEMENT, COMPLIANCE] },
-  { code: 'client-decision.capture', module: 'insurance-operations', description: "Capture the client's decision on a recommendation", roles: [SALES, PLACEMENT] },
+  { code: 'client-decision.capture', module: 'insurance-operations', description: "Capture the client's single decision on a sent recommendation (Process 17) — routes the Opportunity to placement / close / renewed negotiation", roles: [SALES, PLACEMENT] },
+  { code: 'client-decision.read', module: 'insurance-operations', description: 'List/read the client decision and its routing outcome', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'policy.create', module: 'insurance-operations', description: 'Create a Policy from an accepted Opportunity', roles: [PLACEMENT] },
   { code: 'policy.issue', module: 'insurance-operations', description: 'Record the insurer-issued policy/schedule/certificates/invoice', roles: [PLACEMENT] },
   { code: 'policy.check', module: 'insurance-operations', description: 'Independently check an issued policy against requested coverage (maker/checker: never the officer who placed it)', roles: [POLICY_CHECK] },

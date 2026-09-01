@@ -1194,8 +1194,17 @@ enum ClientDecisionType {
   REQUEST_COVERAGE_INCREASE
 }
 
-/// Process 17 — six distinct client-decision branches, each routing
-/// differently (Placement / RFQ closed / renewed Negotiation).
+/// Process 17 — Client Decision Handling (backlog Part C #17). The client's
+/// single decision on a sent Recommendation, one per Opportunity
+/// (`opportunityId @unique`). The six `ClientDecisionType` values collapse
+/// to three routes (`client-decision.config.ts` `routeFor`): ACCEPT ->
+/// placement (`Opportunity -> PLACEMENT`), REJECT -> close the request
+/// (`-> CLOSED_LOST`), and the four REQUEST_* values -> renewed negotiation
+/// (`-> RENEGOTIATE`). The routing is the parent Opportunity's engine
+/// transition (`SENT_TO_CLIENT -> CLIENT_DECISION -> <route>`); `ClientDecision`
+/// itself is NOT a WorkflowTransitionService entity (`decision` is a one-shot
+/// enum, not a state machine) and has no maker/checker (recording the
+/// client's stated decision is a factual, single-actor Sales/Placement act).
 model ClientDecision {
   id            String   @id @default(uuid())
   opportunityId String   @unique
@@ -1203,6 +1212,14 @@ model ClientDecision {
   decision      ClientDecisionType
   evidenceType  String?  // signature | e-signature | email_confirmation
   evidenceRef   String?
+  /// Free-text context the officer recorded with the decision (e.g. which
+  /// terms the client wants changed on a REQUEST_* route). Not evidence.
+  notes         String?
+  /// Backlog Part C #17 provenance — the Sales/Placement officer who recorded
+  /// the client's decision. Bare scalar, no relation; the AuditLogEntry
+  /// CREATE row is the authoritative trail (same shape as
+  /// Recommendation.sentByUserId / RFQ.issuedByUserId).
+  capturedByUserId String?
   decidedAt     DateTime @default(now())
 }
 

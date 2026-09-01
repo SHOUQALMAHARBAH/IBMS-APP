@@ -411,7 +411,8 @@ build actually is today:
   Playwright/axe green). Per-process detail below.
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
-  Recommendation (#16) — built and verified.** A minimal `Opportunity` parent (created from
+  Recommendation (#16) + Client Decision Handling (#17) — built and verified.** A minimal
+  `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
   (alerts *and* auto-advances a silent insurer to `NO_RESPONSE`), a broker↔insurer
@@ -426,7 +427,9 @@ build actually is today:
   senior-officer approval above the Opportunity's configurable `targetPremiumThreshold`
   (maker/checker) and on a mandatory conflict-of-interest disclosure whenever the pick
   earns materially more commission than a comparable competing quote, both before it can be
-  sent to the client. Detail below.
+  sent to the client. Once sent, a single `ClientDecision` is recorded (one of six types)
+  and routes the Opportunity down one of three paths — Accept → placement, Reject → close
+  the request, any &ldquo;request&rdquo; → renewed negotiation. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -444,7 +447,7 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–16 — built, with these deferrals
+### Part C · Domain B #11–17 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -454,13 +457,14 @@ build actually is today:
 | 14 | Quote Comparison | `POST /comparison-matrices` (`{ rfqId, scores?: [{ insurerId, insurerQualityScore?, serviceScore? }] }`, `comparison.build`/Placement) **(re)builds** the one `ComparisonMatrix` per RFQ from every **current-version** `Quotation` on it — one `ComparisonMatrixRow` each (the objective dimensions — premium / deductible / `limits` / BI period / liability limit / exclusions / conditions / commission rate — live on the linked `Quotation`, so the matrix is **never price alone**, `policy-lifecycle.md` § controls) · shortlisted insurers with no quote in the matrix are flagged — the `missing` / `declined` buckets are **recomputed live on every read** from the current shortlist (so they stay disjoint after a post-build status change); `ComparisonMatrix.missingInsurers` stores the build-time snapshot for the audit counts only · optional per-insurer `insurerQualityScore` / `serviceScore` (0–100, 2dp) — Placement's judgement, there is no Insurer-scoring module (Process 61) · `GET /comparison-matrices?rfqId=` + `/:id` (`comparison.read` — **new seeded perm**, Sales/Placement/Manager/Exec) · a build **best-effort** advances `Opportunity QUOTES_RECEIVED → COMPARISON_BUILT` through the workflow engine (logged, never thrown) · upsert-matrix + replace-rows run in one Prisma `$transaction` (`ComparisonRepository.buildOrRebuild`, which also reports created-vs-rebuilt for the audit action); `@@unique([comparisonMatrixId, quotationId])` backstops a doubled row (`race-safe-invariants.md`) · migration `20260901160000` adds `ComparisonMatrix.builtByUserId` + the FK/filter indexes + that `@@unique` · web: a "Comparison" section on the RFQ detail screen (a wide scrollable table + missing / declined callouts + a "· superseded" marker on a row whose quote was revised since the build + a Placement-only build / rebuild control with an optional score grid) | `ComparisonMatrix` is **not** a `WorkflowTransitionService` entity (no status) and has no maker/checker (a derived artefact — the gate sits downstream at the Recommendation, #16); the two subjective scores are manual free inputs (no Insurer-scoring module — Process 61) and `Insurer.financialStrengthRating` is not mapped in; a row's **quote terms** can go stale (a `Quotation` revised since the build — `builtAt` and the row's `quotation.isCurrentVersion` / "superseded" marker signal it; rebuild to refresh); rows carry no computed ranking / "best value" (that reasoning is the Recommendation, #16 — and row order is deliberately by insurer, not by premium); no `apps/api` e2e (carried from #11–13); `comparison.build` is role-level (no per-officer queue) |
 | 15 | Negotiation | the negotiation mechanism is `POST /quotations/:id/revise` from #13 — a round is a NEW `Quotation` version (`versionNumber+1`, linked by `previousVersionId`, `isCurrentVersion` flipped, the predecessor kept verbatim) · #15 makes **"never deleted or replaced" a real DB-layer guarantee**: migration `20260901180000` adds `negotiationNotes TEXT` + a trigger (`prevent_quotation_version_mutation`, same pattern as the `AuditLogEntry` immutability trigger) that rejects any `DELETE` of a `Quotation` row, any `UPDATE` of an already-superseded version, and any `UPDATE` of a live version that changes anything other than `isCurrentVersion` true→false (the supersede flip — asserted column-by-column via `to_jsonb(NEW) - 'isCurrentVersion' IS DISTINCT FROM to_jsonb(OLD) - 'isCurrentVersion'`) · a revise round now carries the broker's optional `negotiationNotes` (the rationale — what was asked / conceded; Confidential, audited as a `hasNegotiationNotes` boolean only) · every quotation read returns a pure `history: NegotiationRound[]` projection (`buildNegotiationHistory`) — round 0 is the opening quote, each later round is diffed against the version its `previousVersionId` names and carries `premiumDeltaFromPrevious` (fils-quantized via `money.util.ts`, sign preserved, `null` when the round changed `currency`) + `changedTermFields` + that round's notes · web: the "Quotations" version-history table gains Round / Δ premium / Terms-changed columns + the round rationale, and the revise form gains a "Negotiation notes" field | `Quotation` is still **not** a `WorkflowTransitionService` entity and has no maker/checker (recording a negotiated term set is a factual single-actor Placement record; the approval gate is the Broker Recommendation, #16); no structured "negotiation ask vs. counter" model — `negotiationNotes` is one free-text field per round; the DB trigger's documented residual risk is identical to the `AuditLogEntry` trigger's (a session on the shared `ibms` Postgres role can still `SET session_replication_role = replica` — a least-privilege app role is a separate infra change); a data fix or PDPL Correction DSR touching a historical version now requires that privileged bypass (same posture as `AuditLogEntry`); `changedTermFields` treats a `limits` JSON key reorder as a change (stringify compare, a display aid not a semantic diff) |
 | 16 | Broker Recommendation | **new module** `apps/api/src/modules/recommendation/` · `POST /recommendations` (`{ opportunityId, recommendedQuotationId, rationale, rationaleFactors }`, `recommendation.draft`/Placement) — one `Recommendation` per Opportunity (`opportunityId @unique`), pointing at one **current-version** `Quotation` on one of its RFQs; the Opportunity must be at `COMPARISON_BUILT`; `rationaleFactors` requires a non-empty note for **all six** dimensions (coverage / price / financial strength / claims service / deductible / policy conditions — "never price alone") · two gate flags snapshot at draft: `approvalRequired` (recommended premium > the Opportunity's `targetPremiumThreshold`) and `conflictOfInterestFlagged` (`detectConflictOfInterest`, pure — a competing current-version quote priced within a **drafted, unsourced** 10% band carries a commission rate at least a **drafted, unsourced** 2 percentage points lower) · `PATCH /opportunities/:id/target-premium-threshold` (`opportunity.set-target-threshold`/**Manager, Exec** — new perm) sets/clears the configurable threshold · `POST /recommendations/:id/approve` (`recommendation.approve`/**Manager**) — only when `approvalRequired`, **maker/checker**: `assertDifferentActors(draftedByUserId, actor)` + the existing `Recommendation_maker_checker_distinct` CHECK; a status-conditional `updateMany` stamps `approvedByUserId`/`approvedAt` (0 rows → 409) · `POST /recommendations/:id/conflict-of-interest-disclosure` (`conflict-of-interest.disclose`/Placement, Compliance) — only when flagged, acknowledger ≠ drafter, one per recommendation · `POST /recommendations/:id/send` (`recommendation.send`/**Placement** — new perm) — 422 while a required approval or COI disclosure is outstanding, else stamps `sentToClientAt` and best-effort advances `Opportunity RECOMMENDATION_DRAFTED → SENT_TO_CLIENT` · `GET /recommendations?opportunityId=\|customerId=` + `/:id` (`recommendation.read` — new perm, Sales/Placement/Manager/Exec) return the recommendation + its quotation + the COI disclosure + a computed `blockedFromSend` list · a successful draft best-effort advances `Opportunity COMPARISON_BUILT → RECOMMENDATION_DRAFTED` · migration `20260901200000` adds `Recommendation.rationaleFactors`/`approvalRequired`/`conflictOfInterestFlagged`/`coiCompetingQuotationId`/`coiCommissionDiffPercent`/`sentByUserId` + FK/filter indexes · web: a "Broker recommendation" section on the Opportunity detail screen (Manager-only threshold control, Placement-only draft form, Manager-only Approve, Placement/Compliance COI disclosure form, Send with the block reasons listed) | `Recommendation` is **not** a `WorkflowTransitionService` entity (no `status` column — its lifecycle is nullable timestamps; the parent `Opportunity` carries the same progression through the engine); one recommendation per Opportunity pointing at **one** quote — a multi-line programme's per-line recommendation is a deferred edge (schema constraint, like #7's one-programme-per-`RiskProfile`); the **10% comparable-premium band** and **2 pp material-commission** figures are `ibms-app` product decisions, drafted, **unsourced** — `/brain-gap` candidates; the COI check can only assess quotes that captured a `commissionRatePercent` at #13 (no rate → not flagged); `CommissionAgreement.ratePercent` (the governed rate table, Finance) is not consulted — the check uses the per-quote rate; draft requires the Opportunity to be **at** `COMPARISON_BUILT`, which is an adequate proxy for "a comparison was built" but not a hard FK to a `ComparisonMatrix` row; `recommendation.draft` / `.send` are role-level (no per-officer queue); the disclosure records that a disclosure was **made to the client** — the system does not itself send anything to the client |
+| 17 | Client Decision Handling | **new module** `apps/api/src/modules/client-decision/` · `POST /client-decisions` (`{ opportunityId, decision, evidenceType, evidenceRef, notes? }`, `client-decision.capture`/Sales, Placement) records the client's **single** decision on a **sent** `Recommendation` — one `ClientDecision` per Opportunity (`opportunityId @unique` → 409); the precondition is `Recommendation.sentToClientAt != null` (authoritative — the Opportunity status can lag a #16 best-effort advance) · the six `ClientDecisionType` values collapse to three routes (`routeFor`, pure): **ACCEPT → PLACEMENT**, **REJECT → CLOSED_LOST**, and the four **REQUEST_\* → RENEGOTIATE** · the route is the parent Opportunity's engine walk `<current> → SENT_TO_CLIENT → CLIENT_DECISION → <route>`, applied **best-effort** (logged, never thrown — the `ClientDecision` row + `routeFor(decision)` is the authoritative record; the response carries `route` / `routeLabel` / `routingComplete`) · `evidenceType` ∈ `signature \| e-signature \| email_confirmation` + a non-empty `evidenceRef` are required (Part 4.1 — a decision of record needs a reference) · `GET /client-decisions?opportunityId=\|customerId=` + `/:id` (`client-decision.read` — **new perm**, Sales/Placement/Manager/Exec) · migration `20260902120000` adds `ClientDecision.notes` + `capturedByUserId` · web: a "Client decision" section on the Opportunity detail screen (Sales/Placement form once a recommendation is sent, read-only after) | `ClientDecision` is **not** a `WorkflowTransitionService` entity (`decision` is a one-shot enum, not a state machine) and has no maker/checker (recording the client's stated decision is a factual, single-actor Sales/Placement act); **one decision per Opportunity** — a RENEGOTIATE loop that produces a *second* client decision is blocked by the `@unique` (schema constraint, same class as #16's one-recommendation-per-Opportunity); the RENEGOTIATE route lands the Opportunity at `RENEGOTIATE` and stops — it does **not** auto-advance to `RFQ_ISSUED` or relax the one-RFQ-per-`(opportunity, line)` constraint (re-marketing a line is still a deferred edge from #11; new quote versions / negotiation rounds via #13/#15 work on the existing RFQ regardless); the routing transitions are best-effort (a partial failure leaves the Opportunity mid-route with `routingComplete: false` and no re-trigger endpoint); `client-decision.capture` is role-level (no per-officer queue); the six decision types are not otherwise differentiated (all four REQUEST_* behave identically beyond the recorded `decision` value + `notes`) |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
-  Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, and #16 Broker
-  Recommendation are **built** — see the Domain B table above; #17–22 client decision /
-  policy issuance / checking / delivery / endorsement remain), Claims
+  Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, #16 Broker
+  Recommendation, and #17 Client Decision Handling are **built** — see the Domain B table
+  above; #18–22 policy issuance / checking / delivery / endorsement remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -2203,6 +2207,86 @@ narrows a gap.
   OK, api + web + db `typecheck` + `eslint` clean. Migration applied to `db` + `db-test`;
   `prisma validate` OK, `prisma migrate status` clean; seed re-run (**142** permissions —
   `opportunity.set-target-threshold`, `recommendation.read`, `recommendation.send` new).
+
+**Part C #17 — Client Decision Handling (Domain B, Process 17)**
+
+- **New module** `apps/api/src/modules/client-decision/` (+ `apps/api/src/repositories/client-decision.repository.ts`).
+  The `ClientDecision` model + the `ClientDecisionType` enum (six values) already existed —
+  this item is their first consumer. Backlog: capture one of six decision types and route
+  each to a different path (placement / close the request / renewed negotiation).
+- **`ClientDecision` is NOT a `WorkflowTransitionService` entity** — `decision` is a
+  one-shot enum, not a state machine (same "no engine entity" call as #13–16). Its
+  *routing* is the parent `Opportunity`'s engine transitions. No maker/checker — recording
+  the client's stated decision is a factual, single-actor Sales/Placement act.
+- **`POST /client-decisions`** (`client-decision.capture`, Sales / Placement) — one per
+  Opportunity (`opportunityId @unique` → a friendly pre-check 409, `P2002` → 409). The
+  precondition is checked against `Recommendation.sentToClientAt != null`
+  (**authoritative** — the Opportunity status can lag a #16 best-effort advance; 422 "there
+  is nothing to decide on" otherwise). `evidenceType` (∈ `signature` / `e-signature` /
+  `email_confirmation`) and a non-empty `evidenceRef` are required (Part 4.1). `notes` are
+  optional and **Confidential** — the audit snapshot carries a `hasNotes` boolean, never
+  the text.
+- **The six → three routing** (`routeFor`, `client-decision.config.ts`, pure & total over
+  the enum): `ACCEPT → PLACEMENT`, `REJECT → CLOSED_LOST`, and
+  `REQUEST_FURTHER_NEGOTIATION` / `REQUEST_ALTERNATIVE_OPTIONS` / `REQUEST_PRICE_REDUCTION`
+  / `REQUEST_COVERAGE_INCREASE → RENEGOTIATE`. The route is applied as an
+  Opportunity engine walk — `ROUTE_PATH_FROM` indexes the fixed path
+  `[SENT_TO_CLIENT, CLIENT_DECISION, <route>]` so the walk starts from wherever the
+  Opportunity currently sits (`RECOMMENDATION_DRAFTED` → all three hops, catching up a
+  lagging #16 advance; `SENT_TO_CLIENT` → two; `CLIENT_DECISION` → one; anything else →
+  logged, not routed). **Best-effort** (logged, never thrown — the `ClientDecision` row +
+  `routeFor(decision)` is the authoritative record, same philosophy as #13–16). The view
+  carries `route` / `routeLabel` / `opportunityStatus` / `routingComplete`.
+- **`GET /client-decisions?opportunityId=|customerId=`** + `/:id` (`client-decision.read` —
+  **new seeded perm**, Sales/Placement/Manager/Exec). Visibility mirrors #16 (the decision
+  inherits its Opportunity's Customer's visibility; no Compliance-reach needed here).
+- **Migration `20260902120000_add_client_decision_capture`** (hand-authored + `migrate
+  deploy`; `db` + `db-test`) — `ClientDecision.notes TEXT` + `capturedByUserId TEXT`. No
+  new index (`opportunityId` is already `@unique`). `RecommendationModule` now
+  `exports: [RecommendationRepository]`.
+- **`apps/web/app/(app)/opportunities/[id]/`** — a "Client decision" section
+  (`components/client-decision/ClientDecisionSection.tsx`): a Sales/Placement form (decision
+  type + evidence type + evidence ref + notes) that appears once the Opportunity is at a
+  post-recommendation state, then a read-only display of the recorded decision + its route.
+  No new nav item.
+- **`@code-reviewer` (mandatory — workflow/routing logic)** → **APPROVE WITH MINORS, no
+  blockers, no MAJOR, no lex violation** (transitions all go through
+  `WorkflowTransitionService`, every route target + path hop is a legal `Opportunity` move
+  from every start point, `@unique` is the race backstop, `notes` never in the audit /
+  logs). Minors fixed: (1) `routeOpportunity` now **re-reads the live `Opportunity.status`
+  before every hop** and derives the next hop from it — so a hop a concurrent actor
+  already applied is skipped (self-healing) rather than aborting the walk; it stops only on
+  a genuine `transition` failure, on reaching the route, or on an off-path status; (2) the
+  stacked double "Process 17 —" `///` block on `model ClientDecision` collapsed to one.
+  NITs: dropped a redundant `evidenceRef.trim()` (the DTO already trims), fixed a stale
+  e2e comment.
+- **Deferred**: **one decision per Opportunity** — a RENEGOTIATE loop that produces a
+  *second* client decision is blocked by the `@unique` (schema constraint, same class as
+  #16); the RENEGOTIATE route stops at `RENEGOTIATE` — it does **not** auto-advance to
+  `RFQ_ISSUED` or relax the one-RFQ-per-`(opportunity, line)` constraint (re-marketing a
+  line is a deferred edge from #11; new quote versions / negotiation rounds via #13/#15
+  still work on the existing RFQ); the routing transitions are best-effort with no
+  re-trigger endpoint if a hop fails mid-route (`routingComplete: false` signals it); the
+  four `REQUEST_*` types behave identically beyond the recorded `decision` + `notes`;
+  `client-decision.capture` is role-level (no per-officer queue).
+- **Verification**: +24 api unit — `client-decision.config.spec.ts` ×10 (`routeFor` for all
+  six types + the 6→3 completeness check; `routeLabel`; `clientDecisionAuditSnapshot` —
+  never the notes text), `client-decision.service.spec.ts` ×14 (the three routes + the
+  RECOMMENDATION_DRAFTED catch-up walk + the **self-healing skip-a-hop-a-concurrent-actor-
+  already-applied** case + unexpected-status-does-not-route + best-effort stops after one
+  failed hop; 422 no/unsent recommendation; 409 pre-check + `P2002`; 404 visibility;
+  list/get — a **stateful** Opportunity mock where each `transition` moves the status so
+  the re-reading walk progresses naturally). **New** `test/client-decision.e2e-spec.ts` ×2
+  — the six types down three real Opportunity paths (ACCEPT → `PLACEMENT`, REJECT →
+  `CLOSED_LOST`, REQUEST_PRICE_REDUCTION → `RENEGOTIATE`, each verified via
+  `GET /opportunities/:id`), a second decision is a 409, and 422 / 400 edges (no sent
+  recommendation, bad decision / evidence type). Full suites green: **772** api unit (62
+  files, workspace-scoped), api contract 4/4, **api e2e 105/105** (17 files, + the new
+  client-decision e2e), `npm audit` 0 high, `nest build` OK, web unit 6, web Playwright
+  **rfq.spec.ts 12/12** (+1: record a client decision and see its route), `next build` OK,
+  api + web + db `typecheck` + `eslint` clean. Migration applied to `db` + `db-test`;
+  `prisma validate` OK, `prisma migrate status` clean; seed re-run (**143** permissions —
+  `client-decision.read` new).
 
 ## Deployment
 

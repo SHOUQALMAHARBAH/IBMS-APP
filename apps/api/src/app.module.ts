@@ -25,6 +25,7 @@ import { RfqModule } from './modules/rfq/rfq.module';
 import { QuotationModule } from './modules/quotation/quotation.module';
 import { ComparisonModule } from './modules/comparison/comparison.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
+import { ClientDecisionModule } from './modules/client-decision/client-decision.module';
 
 @Module({
   imports: [
@@ -148,6 +149,14 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
     // WorkflowModule for the best-effort Opportunity COMPARISON_BUILT ->
     // RECOMMENDATION_DRAFTED -> SENT_TO_CLIENT moves.
     RecommendationModule,
+    // Part C backlog #17 (Client Decision Handling) — captures the client's
+    // single decision on a sent recommendation (one ClientDecision per
+    // Opportunity) and routes the parent: the six ClientDecisionType values
+    // collapse to three Opportunity paths — ACCEPT -> PLACEMENT, REJECT ->
+    // CLOSED_LOST, the four REQUEST_* -> RENEGOTIATE (via the engine,
+    // SENT_TO_CLIENT -> CLIENT_DECISION -> <route>, best-effort). Depends on
+    // OpportunityModule / RecommendationModule / CustomerModule.
+    ClientDecisionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

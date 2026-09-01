@@ -17,10 +17,12 @@ import {
   rfqCardStyle,
 } from '../../../../components/rfq/rfq.styles';
 import { RecommendationSection } from '../../../../components/recommendation/RecommendationSection';
+import { ClientDecisionSection } from '../../../../components/client-decision/ClientDecisionSection';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
+const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
 function statusBreakdown(rfq: Rfq): string {
   if (rfq.insurerSubmissions.length === 0) return 'no insurers yet';
@@ -81,6 +83,7 @@ export default function OpportunityDetailPage() {
   const isPlacement = user.roles.includes(PLACEMENT_ROLE);
   const isManager = user.roles.includes(MANAGER_ROLE);
   const isCompliance = user.roles.includes(COMPLIANCE_ROLE);
+  const isSales = user.roles.includes(SALES_ROLE);
 
   return (
     <main style={pageStyle}>
@@ -192,6 +195,12 @@ export default function OpportunityDetailPage() {
             isPlacement={isPlacement}
             isManager={isManager}
             isCompliance={isCompliance}
+            onOpportunityChanged={() => void load()}
+          />
+
+          <ClientDecisionSection
+            opportunity={opportunity}
+            canCapture={isSales || isPlacement}
             onOpportunityChanged={() => void load()}
           />
         </>
