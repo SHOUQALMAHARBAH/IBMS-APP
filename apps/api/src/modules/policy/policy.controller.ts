@@ -2,10 +2,13 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PolicyService } from './policy.service';
 import { PolicyCheckingService } from './policy-checking.service';
+import { PolicyDeliveryService } from './policy-delivery.service';
 import { PlacePolicyDto } from './dto/place-policy.dto';
 import { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
 import { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
+import { RecordPolicyDeliveryDto } from './dto/record-policy-delivery.dto';
+import { AcknowledgeReceiptDto } from './dto/acknowledge-receipt.dto';
 import { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -22,6 +25,7 @@ export class PolicyController {
   constructor(
     private readonly policies: PolicyService,
     private readonly policyChecking: PolicyCheckingService,
+    private readonly policyDelivery: PolicyDeliveryService,
   ) {}
 
   @RequirePermissions('policy.create')
@@ -84,5 +88,31 @@ export class PolicyController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.policyChecking.check(id, dto, user);
+  }
+
+  /** Process 21 — record that the issued policy document was delivered to the
+   * client (`method` / `recipient` / `deliveredAt`). Drives `VERIFIED →
+   * DELIVERED`. */
+  @RequirePermissions('policy.deliver')
+  @Post(':id/delivery')
+  recordDelivery(
+    @Param('id') id: string,
+    @Body() dto: RecordPolicyDeliveryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policyDelivery.recordDelivery(id, dto, user);
+  }
+
+  /** Process 21 — record the client's confirmation of receipt. Stamps
+   * `DeliveryRecord.receiptAcknowledgedAt` and best-effort advances the
+   * policy `DELIVERED → ACTIVE`. */
+  @RequirePermissions('policy.deliver')
+  @Post(':id/delivery/acknowledge-receipt')
+  acknowledgeReceipt(
+    @Param('id') id: string,
+    @Body() dto: AcknowledgeReceiptDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policyDelivery.acknowledgeReceipt(id, dto, user);
   }
 }

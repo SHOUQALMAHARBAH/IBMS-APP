@@ -79,6 +79,14 @@ interface PolicyCheckingView {
   createdAt: Date;
 }
 
+/** Process 21 — the one delivery record, or null. */
+interface PolicyDeliveryView {
+  deliveredAt: Date;
+  method: string;
+  recipient: string;
+  receiptAcknowledgedAt: Date | null;
+}
+
 /** A policy as the API returns it. `premiumVariance` is the signed
  * issued-minus-requested delta (null until issued); `issuanceComplete` is
  * true once the policy has moved past `PLACEMENT_CONFIRMED` and carries at
@@ -103,10 +111,16 @@ export interface PolicyView {
   schedules: PolicyScheduleView[];
   documents: PolicyDocumentView[];
   checking: PolicyCheckingView | null;
+  delivery: PolicyDeliveryView | null;
   issuanceComplete: boolean;
   /** Process 20 — the check has been recorded AND the policy has settled to
    * `VERIFIED` or `DISCREPANCY`. */
   checkingComplete: boolean;
+  /** Process 21 — the client has acknowledged receipt of the delivery
+   * (`DeliveryRecord.receiptAcknowledgedAt` is set). The authoritative
+   * "client confirmed" signal; the best-effort `DELIVERED → ACTIVE` advance
+   * may still be catching up, so `status` is not necessarily `ACTIVE` yet. */
+  deliveryComplete: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -223,7 +237,12 @@ export class PolicyService {
     return { id: opportunity.id, customerId: opportunity.customerId };
   }
 
-  private async loadVisible(
+  /** Loads a `Policy` (with its schedules / documents / checking / delivery
+   * context) and enforces the caller's visibility on its Customer; every
+   * failure mode collapses to one NotFoundException. Public so the
+   * per-process sub-services (`PolicyCheckingService`, `PolicyDeliveryService`)
+   * resolve visibility the exact same way. */
+  async loadVisible(
     id: string,
     actor: AuthenticatedUser,
     label = 'Policy not found',
@@ -301,11 +320,20 @@ export class PolicyService {
             createdAt: policy.checking.createdAt,
           }
         : null,
+      delivery: policy.deliveryRecord
+        ? {
+            deliveredAt: policy.deliveryRecord.deliveredAt,
+            method: policy.deliveryRecord.method,
+            recipient: policy.deliveryRecord.recipient,
+            receiptAcknowledgedAt: policy.deliveryRecord.receiptAcknowledgedAt,
+          }
+        : null,
       issuanceComplete:
         policy.status !== 'PLACEMENT_CONFIRMED' && policy.schedules.length > 0,
       checkingComplete:
         policy.checking !== null &&
         (policy.status === 'VERIFIED' || policy.status === 'DISCREPANCY'),
+      deliveryComplete: policy.deliveryRecord?.receiptAcknowledgedAt != null,
       createdAt: policy.createdAt,
       updatedAt: policy.updatedAt,
     };

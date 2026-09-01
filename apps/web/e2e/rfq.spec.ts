@@ -155,6 +155,7 @@ async function mockRfqApi(
         namedPerils?: string[];
       };
     }) => void;
+    onRecordDelivery?: (body: { method: string; recipient: string }) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     opportunityStatus?: string;
@@ -482,8 +483,10 @@ async function mockRfqApi(
         ],
         documents: [],
         checking: null,
+        delivery: null,
         issuanceComplete: true,
         checkingComplete: false,
+        deliveryComplete: false,
         createdAt: "2026-09-15T00:00:00.000Z",
         updatedAt: "2026-10-01T00:00:00.000Z",
       }
@@ -572,6 +575,40 @@ async function mockRfqApi(
       };
       return route.fulfill({ status: 201, json: policy });
     }
+    if (
+      method === "POST" &&
+      /\/policies\/[^/]+\/delivery\/acknowledge-receipt(\?|$)/.test(url)
+    ) {
+      policy = {
+        ...(policy ?? {}),
+        status: "ACTIVE",
+        deliveryComplete: true,
+        delivery: {
+          ...((policy?.delivery as Record<string, unknown>) ?? {}),
+          receiptAcknowledgedAt: "2026-10-10T00:00:00.000Z",
+        },
+      };
+      return route.fulfill({ status: 201, json: policy });
+    }
+    if (method === "POST" && /\/policies\/[^/]+\/delivery(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        method: string;
+        recipient: string;
+      };
+      opts.onRecordDelivery?.(b);
+      policy = {
+        ...(policy ?? {}),
+        status: "DELIVERED",
+        delivery: {
+          deliveredAt: "2026-10-08T00:00:00.000Z",
+          method: b.method,
+          recipient: b.recipient,
+          receiptAcknowledgedAt: null,
+        },
+        deliveryComplete: false,
+      };
+      return route.fulfill({ status: 201, json: policy });
+    }
     if (method === "POST" && /\/policies\/[^/]+\/documents(\?|$)/.test(url)) {
       const b = route.request().postDataJSON() as {
         documents: { category: string; classification: string; fileName: string }[];
@@ -620,8 +657,10 @@ async function mockRfqApi(
         schedules: [],
         documents: [],
         checking: null,
+        delivery: null,
         issuanceComplete: false,
         checkingComplete: false,
+        deliveryComplete: false,
         createdAt: "2026-09-15T00:00:00.000Z",
         updatedAt: "2026-09-15T00:00:00.000Z",
       };
@@ -1021,6 +1060,50 @@ test("a Policy Checking Officer runs the QC check and sees a discrepancy block D
   await expect(
     page.getByText("A Professional Indemnity risk event has been logged."),
   ).toBeVisible();
+});
+
+test("records policy delivery and the client receipt acknowledgement", async ({
+  page,
+}) => {
+  // dual-hatted so the QC check (which reveals the delivery form once the
+  // policy is VERIFIED) and the delivery can both be driven from one session
+  await mockAuth(page, [
+    "PLACEMENT_TECHNICAL_OFFICER",
+    "POLICY_CHECKING_OFFICER",
+  ]);
+  let delivered: { method: string; recipient: string } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onRecordDelivery: (b) => {
+      delivered = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Policy", exact: true }),
+  ).toBeVisible();
+
+  // clean QC check -> VERIFIED, which reveals the "Record delivery" form
+  await page
+    .getByLabel("Requested limits (JSON)")
+    .fill('{ "buildings": "5000000.000" }');
+  await page
+    .getByLabel("Requested sums insured (JSON)")
+    .fill('{ "total": "5000000.000" }');
+  await page.getByRole("button", { name: "Run check" }).click();
+
+  await expect(page.getByRole("button", { name: "Record delivery" })).toBeVisible();
+  await page.getByLabel("Method").selectOption("courier");
+  await page.getByLabel("Recipient").fill("Acme Risk Dept");
+  await page.getByRole("button", { name: "Record delivery" }).click();
+
+  await expect.poll(() => delivered?.recipient).toBe("Acme Risk Dept");
+  await expect(page.getByText("awaiting client acknowledgement")).toBeVisible();
+
+  await page.getByRole("button", { name: "Acknowledge receipt" }).click();
+  await expect(page.getByText("ACTIVE", { exact: true })).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

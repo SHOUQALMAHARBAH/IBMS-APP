@@ -211,6 +211,7 @@ export default function OpportunityDetailPage() {
             opportunity={opportunity}
             isPlacement={isPlacement}
             canCheck={isPolicyChecker}
+            canDeliver={isSales || isPlacement}
             onOpportunityChanged={() => void load()}
           />
         </>

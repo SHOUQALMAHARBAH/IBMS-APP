@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
@@ -10,10 +9,8 @@ import type { PolicyStatus } from '@ibms/db';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import type { PolicyWithContext } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
-import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { POLICY_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
 import { assertCoverageFigures } from './policy.config';
 import {
@@ -67,17 +64,10 @@ export class PolicyCheckingService {
   constructor(
     private readonly checkings: PolicyCheckingRepository,
     private readonly policies: PolicyRepository,
-    private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly policyService: PolicyService,
   ) {}
-
-  private canReachAnyPolicy(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      (POLICY_CROSS_OWNER_ROLES as readonly string[]).includes(role),
-    );
-  }
 
   /** Logged, not thrown — the real write already committed. */
   private async safeAudit(
@@ -91,24 +81,6 @@ export class PolicyCheckingService {
         err as Error,
       );
     }
-  }
-
-  private async loadVisiblePolicy(
-    id: string,
-    actor: AuthenticatedUser,
-  ): Promise<PolicyWithContext> {
-    const policy = await this.policies.findById(id);
-    if (!policy) {
-      throw new NotFoundException('Policy not found');
-    }
-    const customer = await this.customers.findById(policy.customerId);
-    if (
-      !customer ||
-      (!this.canReachAnyPolicy(actor) && customer.ownerUserId !== actor.id)
-    ) {
-      throw new NotFoundException('Policy not found');
-    }
-    return policy;
   }
 
   /** The current open coverage schedule (`effectiveTo` null) — what the
@@ -182,7 +154,7 @@ export class PolicyCheckingService {
     dto: RecordPolicyCheckingDto,
     actor: AuthenticatedUser,
   ): Promise<PolicyView> {
-    const policy = await this.loadVisiblePolicy(policyId, actor);
+    const policy = await this.policyService.loadVisible(policyId, actor);
 
     if (policy.placedByUserId === null) {
       throw new UnprocessableEntityException(

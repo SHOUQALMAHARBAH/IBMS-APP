@@ -80,6 +80,21 @@ export interface PolicyChecking {
   createdAt: string;
 }
 
+export const DELIVERY_METHOD_OPTIONS = [
+  { value: 'email', label: 'Email' },
+  { value: 'portal', label: 'Client portal' },
+  { value: 'courier', label: 'Courier' },
+  { value: 'in_person', label: 'In person' },
+] as const;
+export type DeliveryMethod = (typeof DELIVERY_METHOD_OPTIONS)[number]['value'];
+
+export interface PolicyDelivery {
+  deliveredAt: string;
+  method: string;
+  recipient: string;
+  receiptAcknowledgedAt: string | null;
+}
+
 export interface Policy {
   id: string;
   opportunityId: string;
@@ -100,8 +115,10 @@ export interface Policy {
   schedules: PolicySchedule[];
   documents: PolicyDocument[];
   checking: PolicyChecking | null;
+  delivery: PolicyDelivery | null;
   issuanceComplete: boolean;
   checkingComplete: boolean;
+  deliveryComplete: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -167,4 +184,21 @@ export function checkPolicy(
   return apiPost(`/policies/${encodeURIComponent(id)}/checking`, {
     requestedCoverage,
   });
+}
+
+export function recordPolicyDelivery(
+  id: string,
+  input: { method: DeliveryMethod; recipient: string; deliveredAt?: string },
+): Promise<Policy> {
+  return apiPost(`/policies/${encodeURIComponent(id)}/delivery`, input);
+}
+
+export function acknowledgePolicyReceipt(
+  id: string,
+  acknowledgedAt?: string,
+): Promise<Policy> {
+  return apiPost(
+    `/policies/${encodeURIComponent(id)}/delivery/acknowledge-receipt`,
+    acknowledgedAt ? { acknowledgedAt } : {},
+  );
 }

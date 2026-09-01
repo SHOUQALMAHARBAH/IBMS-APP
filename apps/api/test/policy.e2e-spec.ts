@@ -47,12 +47,19 @@ interface PolicyBody {
   documents: { id: string; category: string; classification: string }[];
   issuanceComplete: boolean;
   checkingComplete: boolean;
+  deliveryComplete: boolean;
   checking: {
     placedByUserId: string;
     checkedByUserId: string | null;
     discrepancyFound: boolean;
     discrepancyLoggedAsPiRiskEvent: boolean;
     discrepancyDetail: string | null;
+  } | null;
+  delivery: {
+    deliveredAt: string;
+    method: string;
+    recipient: string;
+    receiptAcknowledgedAt: string | null;
   } | null;
 }
 
@@ -263,6 +270,24 @@ async function issuedPolicy(
       schedule: ISSUED_SCHEDULE,
       documents: [],
     })
+    .expect(201);
+  return policyId;
+}
+
+/** ... plus a clean Process 20 check by `checkerToken` (a different officer),
+ * leaving the policy at VERIFIED and ready for Process 21 delivery. */
+async function verifiedPolicy(
+  app: INestApplication<App>,
+  placerToken: string,
+  checkerToken: string,
+  ownerUserId: string,
+  tag: string,
+): Promise<string> {
+  const policyId = await issuedPolicy(app, placerToken, ownerUserId, tag);
+  await request(app.getHttpServer())
+    .post(`/policies/${policyId}/checking`)
+    .set(bearer(checkerToken))
+    .send({ requestedCoverage: ISSUED_SCHEDULE })
     .expect(201);
   return policyId;
 }
@@ -557,5 +582,89 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       .send({ requestedCoverage: ISSUED_SCHEDULE })
       .expect(201);
     expect((cleared.body as PolicyBody).status).toBe('VERIFIED');
+  });
+
+  it('Process 21 — records delivery of a VERIFIED policy and the client receipt acknowledgement, driving it to ACTIVE', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'del-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'del-chk', 'POLICY_CHECKING_OFFICER');
+
+    // delivery is refused before the policy is VERIFIED
+    const issuedId = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'del-early',
+    );
+    await request(app.getHttpServer())
+      .post(`/policies/${issuedId}/delivery`)
+      .set(bearer(plc.accessToken))
+      .send({ method: 'email', recipient: 'ops@acme.test' })
+      .expect(422);
+
+    const policyId = await verifiedPolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'del-happy',
+    );
+
+    const delivered = await request(app.getHttpServer())
+      .post(`/policies/${policyId}/delivery`)
+      .set(bearer(plc.accessToken))
+      .send({ method: 'courier', recipient: 'Acme Risk Dept' })
+      .expect(201);
+    const dBody = delivered.body as PolicyBody;
+    expect(dBody.status).toBe('DELIVERED');
+    expect(dBody.delivery?.method).toBe('courier');
+    expect(dBody.delivery?.recipient).toBe('Acme Risk Dept');
+    expect(dBody.delivery?.receiptAcknowledgedAt).toBeNull();
+    expect(dBody.deliveryComplete).toBe(false);
+
+    // one delivery per policy
+    await request(app.getHttpServer())
+      .post(`/policies/${policyId}/delivery`)
+      .set(bearer(plc.accessToken))
+      .send({ method: 'email', recipient: 'x@y.test' })
+      .expect(422);
+
+    // an acknowledgement dated before the delivery is rejected
+    await request(app.getHttpServer())
+      .post(`/policies/${policyId}/delivery/acknowledge-receipt`)
+      .set(bearer(plc.accessToken))
+      .send({ acknowledgedAt: '2020-01-01T00:00:00Z' })
+      .expect(422);
+
+    const acked = await request(app.getHttpServer())
+      .post(`/policies/${policyId}/delivery/acknowledge-receipt`)
+      .set(bearer(plc.accessToken))
+      .send({})
+      .expect(201);
+    const aBody = acked.body as PolicyBody;
+    expect(aBody.status).toBe('ACTIVE');
+    expect(aBody.delivery?.receiptAcknowledgedAt).not.toBeNull();
+    expect(aBody.deliveryComplete).toBe(true);
+
+    // a second acknowledgement is a 409
+    await request(app.getHttpServer())
+      .post(`/policies/${policyId}/delivery/acknowledge-receipt`)
+      .set(bearer(plc.accessToken))
+      .send({})
+      .expect(409);
+
+    // every Policy status move went through the engine and wrote a TRANSITION
+    // audit row — PLACEMENT_CONFIRMED->ISSUED (#19), ISSUED->CHECKING_IN_PROGRESS
+    // ->VERIFIED (#20), then VERIFIED->DELIVERED->ACTIVE (#21): 5 rows. A
+    // direct `.status =` write anywhere in that chain would drop the count.
+    const transitionRows = await prisma.auditLogEntry.count({
+      where: { entityType: 'Policy', entityId: policyId, action: 'TRANSITION' },
+    });
+    expect(transitionRows).toBe(5);
   });
 });

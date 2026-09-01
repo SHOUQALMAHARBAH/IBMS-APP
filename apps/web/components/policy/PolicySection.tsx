@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  acknowledgePolicyReceipt,
   attachPolicyDocuments,
   checkPolicy,
   listPoliciesForOpportunity,
   placePolicy,
+  recordPolicyDelivery,
   recordPolicyIssuance,
   DATA_CLASSIFICATION_OPTIONS,
+  DELIVERY_METHOD_OPTIONS,
   DOCUMENT_CATEGORY_OPTIONS,
   type DataClassification,
+  type DeliveryMethod,
   type DocumentCategory,
   type Policy,
   type PolicyDocumentInput,
@@ -24,6 +28,7 @@ interface Props {
   opportunity: OpportunityWithContext;
   isPlacement: boolean;
   canCheck: boolean;
+  canDeliver: boolean;
   onOpportunityChanged: () => void;
 }
 
@@ -152,6 +157,7 @@ export function PolicySection({
   opportunity,
   isPlacement,
   canCheck,
+  canDeliver,
   onOpportunityChanged,
 }: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
@@ -181,6 +187,10 @@ export function PolicySection({
   const [chkSumsText, setChkSumsText] = useState('{\n  "total": "5000000.000"\n}');
   const [chkPerilsText, setChkPerilsText] = useState('fire, flood, theft');
   const [chkExtensionsText, setChkExtensionsText] = useState('');
+
+  // Process 21 — delivery.
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('email');
+  const [deliveryRecipient, setDeliveryRecipient] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -589,6 +599,83 @@ export function PolicySection({
                 }
               >
                 {busy ? 'Checking…' : 'Run check'}
+              </button>
+            </div>
+          ) : null}
+
+          {policy.delivery ? (
+            <div style={{ marginTop: '0.8rem' }}>
+              <p style={{ fontWeight: 600 }}>Delivery</p>
+              <p style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
+                {policy.delivery.method} · to {policy.delivery.recipient} ·{' '}
+                {new Date(policy.delivery.deliveredAt).toLocaleDateString()}
+                {' · '}
+                {policy.delivery.receiptAcknowledgedAt
+                  ? `receipt acknowledged ${new Date(policy.delivery.receiptAcknowledgedAt).toLocaleDateString()}`
+                  : 'awaiting client acknowledgement'}
+              </p>
+              {canDeliver && !policy.delivery.receiptAcknowledgedAt ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  style={{ ...buttonStyle, width: 'auto' }}
+                  onClick={() =>
+                    void run(async () => {
+                      await acknowledgePolicyReceipt(policy.id);
+                      onOpportunityChanged();
+                    })
+                  }
+                >
+                  Acknowledge receipt
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canDeliver && !policy.delivery && policy.status === 'VERIFIED' ? (
+            <div style={{ marginTop: '0.8rem', maxWidth: '30rem' }}>
+              <strong>Record delivery</strong>
+              <div style={quoteFieldStyle}>
+                <label htmlFor="del-method">Method</label>
+                <select
+                  id="del-method"
+                  value={deliveryMethod}
+                  onChange={(e) =>
+                    setDeliveryMethod(e.target.value as DeliveryMethod)
+                  }
+                >
+                  {DELIVERY_METHOD_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={quoteFieldStyle}>
+                <label htmlFor="del-recipient">Recipient</label>
+                <input
+                  id="del-recipient"
+                  value={deliveryRecipient}
+                  maxLength={200}
+                  placeholder="name / email / courier reference"
+                  onChange={(e) => setDeliveryRecipient(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={busy || deliveryRecipient.trim().length < 2}
+                style={{ ...buttonStyle, width: 'auto' }}
+                onClick={() =>
+                  void run(async () => {
+                    await recordPolicyDelivery(policy.id, {
+                      method: deliveryMethod,
+                      recipient: deliveryRecipient.trim(),
+                    });
+                    onOpportunityChanged();
+                  })
+                }
+              >
+                {busy ? 'Recording…' : 'Record delivery'}
               </button>
             </div>
           ) : null}

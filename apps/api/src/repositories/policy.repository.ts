@@ -22,6 +22,8 @@ const POLICY_INCLUDE = {
   documents: { orderBy: { createdAt: 'desc' } },
   // Process 20 — the one maker/checker quality-control row (or null).
   checking: true,
+  // Process 21 — the one delivery record (or null).
+  deliveryRecord: true,
 } as const;
 
 /** A policy with its insurer identity, its coverage-schedule versions and its

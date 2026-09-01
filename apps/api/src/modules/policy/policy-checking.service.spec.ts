@@ -9,7 +9,6 @@ import { Prisma } from '@ibms/db';
 import { PolicyCheckingService } from './policy-checking.service';
 import type { PolicyRepository } from '../../repositories/policy.repository';
 import type { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
-import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { PolicyService } from './policy.service';
@@ -48,7 +47,8 @@ interface Opts {
   policyStatus?: string;
   placedByUserId?: string | null;
   issuedByUserId?: string | null;
-  customerOwner?: string;
+  /** PolicyService.loadVisible rejects (the caller can't see the policy). */
+  notVisible?: boolean;
   existingChecking?: { discrepancyLoggedAsPiRiskEvent: boolean } | null;
   transitionRejects?: boolean;
   noSchedule?: boolean;
@@ -91,9 +91,6 @@ function makeDeps(opts: Opts = {}) {
     checking: opts.existingChecking ?? null,
   });
 
-  const findById = vi
-    .fn()
-    .mockImplementation(() => Promise.resolve(policyRow()));
   let findStatusCalls = 0;
   const findStatus = vi.fn().mockImplementation(() => {
     findStatusCalls += 1;
@@ -102,7 +99,7 @@ function makeDeps(opts: Opts = {}) {
     }
     return Promise.resolve({ id: 'pol-1', status: state.status });
   });
-  const policies = { findById, findStatus } as unknown as PolicyRepository;
+  const policies = { findStatus } as unknown as PolicyRepository;
 
   const recordChecking = vi
     .fn<
@@ -130,14 +127,6 @@ function makeDeps(opts: Opts = {}) {
     findLatestPiPolicyId,
   } as unknown as PolicyCheckingRepository;
 
-  const findCustomerById = vi.fn().mockResolvedValue({
-    id: 'cust-1',
-    ownerUserId: opts.customerOwner ?? 'x',
-  });
-  const customers = {
-    findById: findCustomerById,
-  } as unknown as CustomerRepository;
-
   const record = vi
     .fn<(input: { action: string; entityType: string }) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -154,29 +143,33 @@ function makeDeps(opts: Opts = {}) {
     });
   const workflow = { transition } as unknown as WorkflowTransitionService;
 
+  const loadVisible = vi.fn().mockImplementation(() => {
+    if (opts.notVisible) {
+      return Promise.reject(new NotFoundException('Policy not found'));
+    }
+    return Promise.resolve(policyRow());
+  });
   const get = vi
     .fn()
     .mockImplementation(() =>
       Promise.resolve({ id: 'pol-1', status: state.status }),
     );
-  const policyService = { get } as unknown as PolicyService;
+  const policyService = { loadVisible, get } as unknown as PolicyService;
 
   return {
     service: new PolicyCheckingService(
       checkings,
       policies,
-      customers,
       audit,
       workflow,
       policyService,
     ),
     state,
     mocks: {
-      findById,
+      loadVisible,
       findStatus,
       recordChecking,
       findLatestPiPolicyId,
-      findCustomerById,
       record,
       transition,
       get,
@@ -342,14 +335,11 @@ describe('PolicyCheckingService.check', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('404s a policy the caller cannot see', async () => {
-    const { service } = makeDeps({ customerOwner: 'someone-else' });
+  it('404s a policy the caller cannot see (PolicyService.loadVisible rejects)', async () => {
+    const { service, mocks } = makeDeps({ notVisible: true });
     await expect(
-      service.check(
-        'pol-1',
-        MATCHING_DTO,
-        checker({ id: 'sales-9', roles: ['SALES_RELATIONSHIP_OFFICER'] }),
-      ),
+      service.check('pol-1', MATCHING_DTO, checker()),
     ).rejects.toThrow(NotFoundException);
+    expect(mocks.recordChecking).not.toHaveBeenCalled();
   });
 });

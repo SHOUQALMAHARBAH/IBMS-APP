@@ -412,7 +412,8 @@ build actually is today:
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
   Recommendation (#16) + Client Decision Handling (#17) + Policy Placement & Issuance
-  (#18–19) + Policy Checking / Quality Control (#20) — built and verified.** A minimal
+  (#18–19) + Policy Checking / Quality Control (#20) + Policy Delivery (#21) — built and
+  verified.** A minimal
   `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
@@ -439,7 +440,10 @@ build actually is today:
   (never the officer who placed *or* issued it) runs a line-by-line comparison of the
   requested coverage against the issued schedule; a discrepancy drives the `Policy` to
   `DISCREPANCY` (structurally blocking Delivery) and auto-logs a
-  `ProfessionalIndemnityRiskEvent`, a clean check drives it to `VERIFIED`. Detail below.
+  `ProfessionalIndemnityRiskEvent`, a clean check drives it to `VERIFIED`. A verified
+  policy is then **delivered** (a `DeliveryRecord` with method / recipient / date moves it
+  `VERIFIED → DELIVERED`) and, once the client acknowledges receipt, moves
+  `DELIVERED → ACTIVE`. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -457,7 +461,7 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–20 — built, with these deferrals
+### Part C · Domain B #11–21 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -470,14 +474,15 @@ build actually is today:
 | 17 | Client Decision Handling | **new module** `apps/api/src/modules/client-decision/` · `POST /client-decisions` (`{ opportunityId, decision, evidenceType, evidenceRef, notes? }`, `client-decision.capture`/Sales, Placement) records the client's **single** decision on a **sent** `Recommendation` — one `ClientDecision` per Opportunity (`opportunityId @unique` → 409); the precondition is `Recommendation.sentToClientAt != null` (authoritative — the Opportunity status can lag a #16 best-effort advance) · the six `ClientDecisionType` values collapse to three routes (`routeFor`, pure): **ACCEPT → PLACEMENT**, **REJECT → CLOSED_LOST**, and the four **REQUEST_\* → RENEGOTIATE** · the route is the parent Opportunity's engine walk `<current> → SENT_TO_CLIENT → CLIENT_DECISION → <route>`, applied **best-effort** (logged, never thrown — the `ClientDecision` row + `routeFor(decision)` is the authoritative record; the response carries `route` / `routeLabel` / `routingComplete`) · `evidenceType` ∈ `signature \| e-signature \| email_confirmation` + a non-empty `evidenceRef` are required (Part 4.1 — a decision of record needs a reference) · `GET /client-decisions?opportunityId=\|customerId=` + `/:id` (`client-decision.read` — **new perm**, Sales/Placement/Manager/Exec) · migration `20260902120000` adds `ClientDecision.notes` + `capturedByUserId` · web: a "Client decision" section on the Opportunity detail screen (Sales/Placement form once a recommendation is sent, read-only after) | `ClientDecision` is **not** a `WorkflowTransitionService` entity (`decision` is a one-shot enum, not a state machine) and has no maker/checker (recording the client's stated decision is a factual, single-actor Sales/Placement act); **one decision per Opportunity** — a RENEGOTIATE loop that produces a *second* client decision is blocked by the `@unique` (schema constraint, same class as #16's one-recommendation-per-Opportunity); the RENEGOTIATE route lands the Opportunity at `RENEGOTIATE` and stops — it does **not** auto-advance to `RFQ_ISSUED` or relax the one-RFQ-per-`(opportunity, line)` constraint (re-marketing a line is still a deferred edge from #11; new quote versions / negotiation rounds via #13/#15 work on the existing RFQ regardless); the routing transitions are best-effort (a partial failure leaves the Opportunity mid-route with `routingComplete: false` and no re-trigger endpoint); `client-decision.capture` is role-level (no per-officer queue); the six decision types are not otherwise differentiated (all four REQUEST_* behave identically beyond the recorded `decision` value + `notes`) |
 | 18–19 | Policy Placement & Issuance | **new module** `apps/api/src/modules/policy/` · **`Policy` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine (the first Domain B one); **no maker/checker** here (placing + recording issuance is single-actor Placement work — the mandatory independent check is Process 20 `PolicyChecking`) · `POST /policies` (`{ opportunityId, inceptionDate, expiryDate? }`, `policy.create`/Placement — already seeded) creates the `Policy` at the schema `@default(PLACEMENT_CONFIRMED)` (NOT via the engine — initial creation, like `Opportunity` at `NEEDS_CONFIRMED`); the **authoritative precondition is a `ClientDecision` of `ACCEPT`** (the Opp status can lag #17's best-effort route — 422 otherwise); insurer / insurance line / requested premium / currency come from the accepted `Recommendation.recommendedQuotation`, **not the body**; `opportunityId @unique` → pre-check 409 + `P2002` → 409 · `POST /policies/:id/issuance` (`{ policyNumber, issuedPremium, inceptionDate?, expiryDate?, schedule: { effectiveFrom?, limits, sumsInsured, namedPerils?, extensions? }, documents: [{ category, classification, fileName, storageRef }] }`, `policy.issue`/Placement — already seeded) drives `Policy PLACEMENT_CONFIRMED → ISSUED` through `WorkflowTransitionService.transition` with the issued scalars (`policyNumber` / `issuedPremium` / `issuedByUserId` + optional period corrections) passed as the transition `data` — so the status flip and the scalar write are **one atomic, engine-audited write** (its status-conditional `updateMany` is the race gate — 0 rows → 409); then `PolicyRepository.createIssuanceArtifacts` writes the opening `PolicySchedule` + the insurer-issued `Document` rows in **one Prisma `$transaction`** (local exception, like `QuotationRepository.reviseChain`) · a **crash-recovery re-entry branch** completes a partially-done issuance (status already `ISSUED`, no open schedule, payload byte-matches `policyNumber` + `compareMoney(issuedPremium)`) without re-transitioning and with no `UPDATE Policy` audit row; any other state / mismatched payload → 422 "issuance is recorded once" · `POST /policies/:id/documents` (`document.manage` — existing perm) appends `Document` rows to the electronic Insurance File (Part 4.2) at any lifecycle stage · `GET /policies?opportunityId=\|customerId=` + `/:id` (`policy.read` — **new seeded perm**, Sales/Placement/Manager/Exec) — the view carries `premiumVariance` (signed `subtractMoney(issued, requested)`, `null` until issued) + `issuanceComplete` · migration `20260902140000` adds `Policy.placedByUserId` / `Policy.issuedByUserId` (TEXT provenance scalars) + a **partial `UNIQUE`** `PolicySchedule_one_open_per_policy` (`effectiveTo IS NULL`) — raw SQL, Prisma can't express it (`race-safe-invariants.md`) · audit snapshots are **metadata not body**: schedule snapshot = coverage-key *names* + counts (never the figures), document snapshot **excludes `fileName` + `storageRef`** (a health-cert filename can name insured persons — HIGHLY_CONFIDENTIAL; `storageRef` is an internal object key) · web: a "Policy" section on the Opportunity detail screen (Placement place form once the Opp is at `PLACEMENT`, an issuance form — policy number / issued premium / limits+sums JSON / perils+extensions / repeatable document rows — then the issued policy + schedule + documents, with a post-issuance "attach a document" control) | `Policy` creation takes the schema `@default` status without the engine (initial creation, matches `Opportunity`/`RFQ`); the **transition-then-artefacts ordering** has one seam — if the schedule/documents `$transaction` fails after the status flip committed, the `Policy` is `ISSUED` with no schedule (recoverable via the re-entry branch; a hard crash *between* the engine's `updateMany` and its own audit write would additionally leave the TRANSITION row unwritten — bounded, rare, separately alarmed); `limits` / `sumsInsured` are stored opaquely (a non-empty flat object of string/number values — no per-figure `Decimal(18,3)` precision until a consumer does arithmetic on them, e.g. a Claim resolving "coverage in force at the loss date"); a `CoverNote` / binder interim state (Process 18) is modeled in the schema but has no endpoint; one `Policy` per Opportunity; `policy.create` / `policy.issue` are role-level (no per-officer queue); no `Endorsement`-driven schedule versioning (#22) — the partial `UNIQUE` is in place for it |
 | 20 | Policy Checking / Quality Control | **no migration** — `PolicyChecking`, the `PolicyChecking_maker_checker_distinct` CHECK (migration `20260826091424`, `checkedByUserId <> placedByUserId`), `ProfessionalIndemnityRiskEvent`, the `policy.check` perm, and the `ISSUED → CHECKING_IN_PROGRESS → DISCREPANCY \| VERIFIED` / `DISCREPANCY → CHECKING_IN_PROGRESS` map all already existed · `POST /policies/:id/checking` (`{ requestedCoverage: { limits, sumsInsured, namedPerils?, extensions? } }`, `policy.check`/**Policy Checking Officer**) — `diffCoverage` (pure) does a **line-by-line comparison** of the checker's transcribed Requested Coverage vs the current open `PolicySchedule` over exactly the four backlog dimensions: `limits` / `sumsInsured` per-key (money-equal via `compareMoney` so `"5000000"` == `"5000000.000"`, else a **case / whitespace-normalised** compare so a `"Fire"`/`"fire"` transcription is not a discrepancy), `namedPerils` / `extensions` as `missing` / `extra` set diffs · `discrepancyFound` is **derived**, never caller-asserted · **maker/checker**: `assertDifferentActors(placedByUserId, actor)` (app) + the DB CHECK (structural), **and** `assertDifferentActors(issuedByUserId, actor)` app-side — stricter than the lex row, which maps only the placer (`/brain-gap` filed) · 422 if `placedByUserId` is null · on a discrepancy: `PolicyChecking.discrepancyFound = true` + a linked `ProfessionalIndemnityRiskEvent` created **in the same `$transaction`** as the checking `upsert` (a discrepancy is recorded ⟺ a PI event exists); a re-check with the **same** detail does not double-log, one with a **materially changed** detail refreshes the existing PI event's `description` · the `Policy` is then walked `(ISSUED \| DISCREPANCY) → CHECKING_IN_PROGRESS → (VERIFIED \| DISCREPANCY)` through the engine — best-effort for a clean `VERIFIED` outcome, but an **unappliable `DISCREPANCY` outcome is a hard 409** (a concurrent divergent check verified the policy first — otherwise Delivery would be silently unblocked) · **Delivery is blocked structurally** — the `WORKFLOW_TRANSITIONS.Policy` map has no `DISCREPANCY → DELIVERED` edge, so #20 only needs to reach `DISCREPANCY` · `checking` (+ `checkingComplete`) folded into `PolicyView` · `POLICY_CHECKING_OFFICER` added to `policy.read` (seed, additive) + to the shared `POLICY_CROSS_OWNER_ROLES` (visibility) · web: the "Policy" section gains a checker-only QC form + the discrepancy / PI-event-logged display | `PolicyChecking` is **not** a `WorkflowTransitionService` entity (no `status` — its lifecycle is the parent `Policy`'s status); "Requested Coverage" is **transcribed by the checker** into the request body (there is no separately-stored requested schedule) — a corrected re-check by the same checker, or the insurer re-issuing a corrected `PolicySchedule` (which needs #22 `Endorsement`, not built), are the only exits from `DISCREPANCY`; the `complianceOverrideByUserId` column is surfaced in the view but no endpoint sets it (a discrepancy override is deferred — clearing a `DISCREPANCY` is currently single-actor); two officers checking one policy near-simultaneously with divergent transcriptions can still race on `PolicyChecking.discrepancyFound` itself (`policyId @unique` serialises the row, `P2002` → 409, but not the *value*) — per-policy serialisation of the check would close it (`/brain-gap` filed); the audit snapshot withholds the `checklistResult` / `discrepancyDetail` (coverage figures) but the PI event `description` carries them by design (Process 54); `policy.check` is role-level (no per-officer queue) |
+| 21 | Policy Delivery | **no migration** — the `DeliveryRecord` model (`policyId @unique`, `deliveredAt`, `method`, `recipient`, `receiptAcknowledgedAt`), the `policy.deliver` perm (`[SALES, PLACEMENT]`), and the `VERIFIED → DELIVERED → ACTIVE` map all already existed · new `PolicyDeliveryService` + `PolicyDeliveryRepository` in the `policy` module · `POST /policies/:id/delivery` (`{ method ∈ email \| portal \| courier \| in_person, recipient, deliveredAt? }`, `policy.deliver`) drives `Policy VERIFIED → DELIVERED` through `WorkflowTransitionService.transition` (its status-conditional `updateMany` is the race gate — a concurrent delivery → `409`; an "already in status DELIVERED" engine rejection is **normalised to the same 409** so the loser's status code is deterministic), then creates the one `DeliveryRecord` (`policyId @unique` → `P2002` → `409`) · a **crash-recovery re-entry branch** (status already `DELIVERED`, no `DeliveryRecord`) creates the missing record without re-transitioning · `POST /policies/:id/delivery/acknowledge-receipt` (`{ acknowledgedAt? }`, `policy.deliver`) stamps `DeliveryRecord.receiptAcknowledgedAt` via a status-conditional `updateMany` (double-ack → `409`) and **best-effort** advances `Policy DELIVERED → ACTIVE` (logged, never thrown — the stamp is the authoritative "client confirmed" record, and `ACTIVE` is *not* a safety gate the way `DISCREPANCY` is, so failing to reach it leaves the policy in the *more* restrictive `DELIVERED` state; a resume branch does just the `ACTIVE` advance when the stamp already committed) · `deliveredAt` / `acknowledgedAt` are parsed with `parseHistoricalInstant` (past-only, an explicit offset required on datetimes); `422` if `acknowledgedAt < deliveredAt` · `DeliveryRecord` is **not** a `WorkflowTransitionService` entity (no `status`) · audit `CREATE` / `UPDATE DeliveryRecord` carries `method` / `recipient` / `deliveredAt` (delivery is an accountability record) · `delivery` (+ `deliveryComplete` = `receiptAcknowledgedAt` set) folded into `PolicyView` · **refactor**: `PolicyService.loadVisible` promoted to **public** so `PolicyCheckingService` + `PolicyDeliveryService` share one visibility path — `PolicyCheckingService` drops its own copy + its `CustomerRepository` dependency · web: the "Policy" section gains a Sales/Placement delivery form + an "Acknowledge receipt" button + a read-only display | `DeliveryRecord` has no `status`; the `DELIVERED → ACTIVE` advance is best-effort (fail-safe — a stuck policy sits in the more restrictive `DELIVERED`, self-heals on the next ack call, and `deliveryComplete` is still true); `ACTIVE` here just means "delivered + client-confirmed" — **premium-collection / inception-date gating of `ACTIVE`** is a Finance concern (#31+) not modelled; delivery is single-actor factual recording (no maker/checker — `maker-checker-segregation.md` § "what does NOT trigger this rule"); `deliveredAt` may be backdated before the policy's own issuance date (bounded only by "not in the future", same latitude as #19/#20's historical instants); `policy.deliver` is role-level (no per-officer queue); no reminder / SLA timer for an unacknowledged delivery (Policy Delivery has no row in `pdpl-sla-timers.md`) |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
   Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, #16 Broker
-  Recommendation, #17 Client Decision Handling, #18–19 Policy Placement & Issuance, and
-  #20 Policy Checking are **built** — see the Domain B table above; #21 delivery, #22
-  endorsement / cancellation remain), Claims
+  Recommendation, #17 Client Decision Handling, #18–19 Policy Placement & Issuance, #20
+  Policy Checking, and #21 Policy Delivery are **built** — see the Domain B table above;
+  #22 endorsement / cancellation remains), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -2581,6 +2586,107 @@ narrows a gap.
   permissions — `POLICY_CHECKING_OFFICER` gains `policy.read`, additive). The known
   `rbac.e2e-spec.ts` MFA-timing flake surfaced once under full-suite load and passed on
   isolation / re-run (documented in `vitest-e2e.config.ts`), unrelated.
+
+**Part C #21 — Policy Delivery (Domain B, Process 21)**
+
+- **Extends the `policy` module** — new `apps/api/src/modules/policy/policy-delivery.service.ts`
+  + `policy-delivery.config.ts` + `apps/api/src/repositories/policy-delivery.repository.ts`.
+  Backlog: record date / method / recipient / receipt acknowledgement.
+- **No migration.** The `DeliveryRecord` model (`policyId @unique`, `deliveredAt
+  @default(now())`, `method`, `recipient`, `receiptAcknowledgedAt DateTime?`), the
+  `policy.deliver` permission (`[SALES, PLACEMENT]`), and the `VERIFIED → [DELIVERED]` /
+  `DELIVERED → [ACTIVE]` transition-map entries all already existed. **No seed change.**
+- **`POST /policies/:id/delivery`** (`{ method ∈ email | portal | courier | in_person,
+  recipient, deliveredAt? }`, `policy.deliver`). Drives `Policy VERIFIED → DELIVERED`
+  through `WorkflowTransitionService.transition` — the engine's status-conditional
+  `updateMany` is the race gate; a concurrent delivery matches 0 rows → `ConflictException`
+  → `409`. The engine can also reject a concurrent delivery with an
+  `UnprocessableEntityException` ("already in status DELIVERED", from its own pre-read) —
+  since the pre-check already ruled out the non-racing bad-state case, **both are
+  normalised to one `409`** so the loser's status code is deterministic (`@code-reviewer`
+  MINOR). Then `DeliveryRecord.create` (`policyId @unique` → `P2002` → `409`). A
+  **crash-recovery re-entry branch** (status already `DELIVERED`, no `DeliveryRecord` yet)
+  creates the missing record without re-transitioning; any other state → `422`.
+- **`POST /policies/:id/delivery/acknowledge-receipt`** (`{ acknowledgedAt? }`,
+  `policy.deliver`). `422` if no `DeliveryRecord`. Stamps `receiptAcknowledgedAt` via a
+  status-conditional `updateMany WHERE receiptAcknowledgedAt IS NULL` (0 rows → `409`),
+  then **best-effort** advances `Policy DELIVERED → ACTIVE` (`advance` re-reads the live
+  status before the hop; logged, never thrown). A **resume branch** — `receiptAcknowledgedAt`
+  already set but `status === 'DELIVERED'` — does just the `ACTIVE` advance rather than
+  `409`ing.
+- **Why the `DELIVERED → ACTIVE` advance is best-effort, not a hard error** — `#20`'s
+  `/brain-gap` rule ("a best-effort status walk whose terminal state is a safety gate must
+  fail loudly") is scoped to a terminal state that *is itself a control*: reaching
+  `DISCREPANCY` **blocks Delivery**, so a swallowed failure there leaves a policy
+  `VERIFIED` with `discrepancyFound = true` and Delivery unblocked. `ACTIVE` is not such a
+  gate — failing to reach it leaves the policy in the *more* restrictive `DELIVERED`
+  state, self-healing on the next call, and observable (`deliveryComplete: true` while
+  `status: DELIVERED`). Every move still goes through the engine, so
+  `workflow-state-transitions.md` is satisfied.
+- **Dates** — `deliveredAt` / `acknowledgedAt` are parsed with `parseHistoricalInstant`
+  (a delivery / acknowledgement is a past event: not-future, an explicit offset required
+  on datetimes). `acknowledgedAt < deliveredAt` → `422`. `deliveredAt` **can** be
+  backdated to before the policy's own issuance date (bounded only by not-future — the
+  same latitude as `parseCalendarDate` at #18/#19).
+- **`DeliveryRecord` is NOT a `WorkflowTransitionService` entity** (no `status`). **No
+  maker/checker** — recording where / how / when a policy document was sent is single-actor
+  factual work (`maker-checker-segregation.md` § "what does NOT trigger this rule").
+- **Audit** — `CREATE` / `UPDATE DeliveryRecord` carry `method` / `recipient` /
+  `deliveredAt`. `recipient` (a name / email / courier ref) stays in the trail: delivery is
+  an accountability record ("we sent it to X, this way, on this date"), `recipient` is not
+  Highly Confidential (the only tier `sensitive-data-handling.md` bars from the audit
+  trail), and `AuditLogEntry` is the Part 10.3 accountability record — materially the same
+  as the user emails already on `LOGIN` rows.
+- **Refactor (touches #20's reviewed code)** — `PolicyService.loadVisible` promoted from
+  `private` to `public` so `PolicyCheckingService` and `PolicyDeliveryService` resolve
+  visibility through one path; `PolicyCheckingService` **drops** its own `loadVisiblePolicy`
+  + `canReachAnyPolicy` + its `CustomerRepository` dependency (a behaviour-preserving
+  equivalence — same `POLICY_CROSS_OWNER_ROLES` + owner check, same collapse-to-404). No
+  circular DI (`PolicyService` injects neither sub-service). `POLICY_INCLUDE` gains
+  `deliveryRecord: true`; `PolicyView` gains `delivery` + `deliveryComplete`.
+- **`apps/web/app/(app)/opportunities/[id]/`** — the "Policy" section gains a Sales/Placement
+  delivery form (method select + recipient) shown once the policy is `VERIFIED`, an
+  "Acknowledge receipt" button while `receiptAcknowledgedAt` is null, and a read-only
+  delivery display. `canDeliver = isSales || isPlacement`. No new nav item.
+- **`@code-reviewer` (mandatory — `Policy` status transitions + a two-endpoint state
+  machine + audit)** → **APPROVE WITH MINORS, no BLOCKER, no MAJOR, no lex violation**
+  (all six mandatory checks pass — no money arithmetic; every `Policy` status move through
+  the engine; no approval step, so no maker/checker; no Highly Confidential field logged;
+  no PDPL-registry SLA). MINORs fixed: (1) a concurrent-delivery loser now always gets a
+  `409` (was `409`-or-`422` depending on which way the engine rejected); (2) the
+  `deliveryComplete` doc comment corrected to say it tracks the `receiptAcknowledgedAt`
+  stamp, not `status === 'ACTIVE'` (the best-effort `ACTIVE` advance may still be catching
+  up). NITs: the e2e now asserts **exactly 5** `TRANSITION` audit rows across the
+  `PLACEMENT_CONFIRMED → ISSUED → CHECKING_IN_PROGRESS → VERIFIED → DELIVERED → ACTIVE`
+  chain (a direct `.status =` write anywhere in that chain would drop the count and fail).
+- **Deferred**: no compliance / management sign-off on delivery — it is single-actor.
+  `ACTIVE` here means only "delivered + client-confirmed"; **premium-collection or
+  inception-date gating of `ACTIVE`** is a Finance concern (#31+) not modelled. No reminder
+  / escalation for a delivery left unacknowledged (Policy Delivery has no `pdpl-sla-timers.md`
+  row and no statutory basis, so no timer). `policy.deliver` is role-level (no per-officer
+  queue). `deliveredAt` backdating is unbounded on the past side.
+- **Verification**: +18 api unit — `policy-delivery.config.spec.ts` (the method
+  vocabulary; both audit snapshots serialise the timestamps as ISO strings),
+  `policy-delivery.service.spec.ts` (`recordDelivery` — the `VERIFIED → DELIVERED` walk
+  + `CREATE DeliveryRecord`; `409` on the engine `ConflictException` **and** on the
+  "already in status" `UnprocessableEntityException`; `422` off-state; the re-entry branch;
+  `422` when `DELIVERED` + a record exists; `409` on the `policyId` `P2002`; `404`
+  visibility. `acknowledgeReceipt` — stamp + `UPDATE` audit + best-effort `DELIVERED →
+  ACTIVE`; `422` no record; `409` already-acked (past `DELIVERED`); the resume branch does
+  just the `ACTIVE` advance; `422` `acknowledgedAt < deliveredAt`; `409` on the stamp race;
+  the acknowledgement still records when the `ACTIVE` advance fails — a **stateful** Policy
+  mock where each `transition` moves `state.status`). `test/policy.e2e-spec.ts` gains a 4th
+  test — delivery refused pre-`VERIFIED` → `422`; a `verifiedPolicy` helper
+  (place + issue + a clean check by a *different* officer); `POST /delivery` → `DELIVERED`
+  with the method / recipient echoed; a second delivery → `422`; an acknowledgement dated
+  before the delivery → `422`; `POST /acknowledge-receipt` → `ACTIVE`, `deliveryComplete`;
+  a second acknowledgement → `409`; and the exactly-5-`TRANSITION`-rows assertion. Full
+  suites green: **852** api unit (68 files), api contract 4/4, **api e2e 109/109** (18
+  files), `npm audit` 0 vulnerabilities, `nest build` OK, web unit 6, web Playwright
+  **rfq.spec.ts 15/15** (+1: records policy delivery and the client receipt
+  acknowledgement), `next build` OK, api + web + db `typecheck` + `eslint` clean. **No
+  migration; no seed change** (`policy.deliver` already seeded); `prisma validate` OK,
+  `prisma migrate status` clean (29 migrations, unchanged).
 
 ## Deployment
 
