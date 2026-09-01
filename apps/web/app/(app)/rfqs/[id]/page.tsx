@@ -19,6 +19,7 @@ import {
 } from '../../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { QuotationsSection } from '../../../../components/quotation/QuotationsSection';
+import { ComparisonSection } from '../../../../components/comparison/ComparisonSection';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
 import {
@@ -377,6 +378,8 @@ export default function RfqDetailPage() {
             isPlacement={isPlacement}
             submissions={rfq.insurerSubmissions}
           />
+
+          <ComparisonSection rfqId={rfq.id} isPlacement={isPlacement} />
 
           <h2 style={{ marginTop: '2.5rem' }}>Correspondence</h2>
           <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>

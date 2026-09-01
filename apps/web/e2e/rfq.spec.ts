@@ -101,6 +101,10 @@ async function mockRfqApi(
     onLogComm?: (body: { direction: string; body: string }) => void;
     onCaptureQuote?: (body: { insurerId: string; premium: string }) => void;
     onReviseQuote?: (body: { premium: string }) => void;
+    onBuildComparison?: (body: {
+      rfqId: string;
+      scores?: { insurerId: string }[];
+    }) => void;
   } = {},
 ) {
   // Correspondence log — starts empty, a POST appends so the list re-renders
@@ -164,6 +168,52 @@ async function mockRfqApi(
     }
     return route.fulfill({ status: 200, json: chains });
   });
+
+  // Comparison matrix — 404 until built, then a POST returns/stores it.
+  let matrix: Record<string, unknown> | null = null;
+  const buildMatrix = () => ({
+    id: "cm-1",
+    rfqId: "rfq-1",
+    insuranceLine: "Property All Risks",
+    builtAt: "2026-03-07T00:00:00.000Z",
+    builtByUserId: "user-1",
+    rows: [
+      {
+        id: "row-1",
+        quotationId: "q-1",
+        insurerQualityScore: null,
+        serviceScore: null,
+        quotation: quoteVersion({ premium: "125000.500" }),
+      },
+    ],
+    missingInsurers: [
+      { id: "ins-2", name: "Middle East Assurance", status: "NO_RESPONSE" },
+    ],
+    declinedInsurers: [] as { id: string; name: string }[],
+  });
+
+  await page.route(
+    "http://localhost:4000/comparison-matrices**",
+    (route) => {
+      const method = route.request().method();
+      if (method === "POST") {
+        const b = route.request().postDataJSON() as {
+          rfqId: string;
+          scores?: { insurerId: string }[];
+        };
+        opts.onBuildComparison?.(b);
+        matrix = buildMatrix();
+        return route.fulfill({ status: 201, json: matrix });
+      }
+      if (matrix === null) {
+        return route.fulfill({
+          status: 404,
+          json: { message: "No comparison matrix has been built for this RFQ yet." },
+        });
+      }
+      return route.fulfill({ status: 200, json: matrix });
+    },
+  );
 
   await page.route("http://localhost:4000/opportunities**", (route) => {
     const url = route.request().url();
@@ -343,6 +393,45 @@ test("revises a captured quotation into a new version", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Version history" }),
   ).toBeVisible();
+});
+
+test("builds the comparison matrix and shows the missing-insurer flag", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  let built: { rfqId: string } | null = null;
+  await mockRfqApi(page, { onBuildComparison: (b) => { built = b; } });
+
+  await page.goto("/rfqs/rfq-1");
+  await expect(
+    page.getByRole("heading", { name: "Comparison" }),
+  ).toBeVisible();
+  await expect(page.getByText("No comparison built yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Build comparison" }).click();
+
+  await expect.poll(() => built?.rfqId).toBe("rfq-1");
+  await expect(
+    page.getByRole("button", { name: "Rebuild comparison" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Middle East Assurance (NO_RESPONSE)"),
+  ).toBeVisible();
+});
+
+test("a non-Placement user sees the comparison but no build control", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await mockRfqApi(page);
+
+  await page.goto("/rfqs/rfq-1");
+  await expect(
+    page.getByRole("heading", { name: "Comparison" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Build comparison|Rebuild comparison/ }),
+  ).toHaveCount(0);
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

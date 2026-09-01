@@ -23,6 +23,7 @@ import { CrmModule } from './modules/crm/crm.module';
 import { OpportunityModule } from './modules/opportunity/opportunity.module';
 import { RfqModule } from './modules/rfq/rfq.module';
 import { QuotationModule } from './modules/quotation/quotation.module';
+import { ComparisonModule } from './modules/comparison/comparison.module';
 
 @Module({
   imports: [
@@ -127,6 +128,15 @@ import { QuotationModule } from './modules/quotation/quotation.module';
     // reuses WorkflowModule for the best-effort RFQInsurer -> QUOTED and
     // Opportunity RFQ_ISSUED -> QUOTES_RECEIVED moves.
     QuotationModule,
+    // Part C backlog #14 (Quote Comparison) — (re)assembles a
+    // ComparisonMatrix for an RFQ from every current-version Quotation on it
+    // (one row each; the objective dimensions live on the linked Quotation),
+    // flags the shortlisted insurers with no quote to compare, and
+    // optionally carries per-insurer quality/service scores. Depends on
+    // QuotationModule's exported QuotationRepository plus RfqModule /
+    // OpportunityModule / CustomerModule; reuses WorkflowModule for the
+    // best-effort Opportunity QUOTES_RECEIVED -> COMPARISON_BUILT move.
+    ComparisonModule,
   ],
   controllers: [AppController],
   providers: [AppService],

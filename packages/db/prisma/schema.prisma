@@ -1049,14 +1049,27 @@ model Quotation {
   @@index([insurerId])
 }
 
-/// Process 14 — structured comparison across price + coverage + exclusions
-/// + deductibles + limits + insurer quality + service. Never price alone.
+/// Process 14 — Quote Comparison (backlog Part C #14). Structured comparison
+/// across price + coverage + exclusions + deductibles + limits + insurer
+/// quality + service — **never price alone**
+/// (ibms-brain/meta/context/policy-lifecycle.md § "The rules that aren't
+/// obvious"). One matrix per RFQ (`rfqId @unique`); `ComparisonService.build`
+/// (re)assembles it deterministically from every **current-version**
+/// `Quotation` on the RFQ (one `ComparisonMatrixRow` each — the objective
+/// columns live on the linked `Quotation`), and records the shortlisted
+/// insurers with no current quote in `missingInsurers` (insurer ids). A
+/// build best-effort advances the parent `Opportunity`
+/// QUOTES_RECEIVED -> COMPARISON_BUILT through the workflow engine.
 model ComparisonMatrix {
   id        String   @id @default(uuid())
   rfqId     String   @unique
   rfq       RFQ      @relation(fields: [rfqId], references: [id])
   builtAt   DateTime @default(now())
-  missingInsurers String[] // insurers that did not respond, flagged in output
+  missingInsurers String[] // insurer ids: on the RFQ shortlist, no current Quotation, not DECLINED — flagged in the output
+  /// Backlog Part C #14 provenance — the Placement Officer who built this
+  /// matrix. Bare scalar, no relation; the AuditLogEntry row is the
+  /// authoritative trail (same shape as Quotation.capturedByUserId).
+  builtByUserId String?
 
   rows      ComparisonMatrixRow[]
 }
@@ -1067,8 +1080,19 @@ model ComparisonMatrixRow {
   comparisonMatrix   ComparisonMatrix @relation(fields: [comparisonMatrixId], references: [id])
   quotationId        String
   quotation          Quotation @relation(fields: [quotationId], references: [id])
+  /// Optional subjective scores (0-100, 2dp) supplied by Placement on the
+  /// build request — there is no Insurer-scoring module yet (narrative
+  /// Process 61). Null when not supplied.
   insurerQualityScore Decimal? @db.Decimal(5, 2)
   serviceScore        Decimal? @db.Decimal(5, 2)
+
+  // One row per (matrix, quotation) — a rebuild replaces rows wholesale, and
+  // this keeps two interleaved rebuilds from doubling a row
+  // (ibms-brain/meta/lex/race-safe-invariants.md; Prisma-expressible, no raw
+  // SQL — same as CrossSellOpportunity's @@unique).
+  @@unique([comparisonMatrixId, quotationId])
+  @@index([comparisonMatrixId])
+  @@index([quotationId])
 }
 
 /// Process 16 — the broker's documented, reasoned advice — retained as

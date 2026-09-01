@@ -33,5 +33,8 @@ import { CustomerModule } from '../customer/customer.module';
   ],
   controllers: [QuotationController],
   providers: [QuotationService, QuotationRepository],
+  // ComparisonModule (backlog Part C #14) reads every current-version
+  // Quotation on an RFQ through QuotationRepository.
+  exports: [QuotationRepository],
 })
 export class QuotationModule {}
