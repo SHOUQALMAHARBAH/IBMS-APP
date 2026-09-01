@@ -119,10 +119,22 @@ const insuranceOperations: PermissionSeed[] = [
   { code: 'policy.check', module: 'insurance-operations', description: 'Independently check an issued policy against requested coverage line-by-line (maker/checker: never the officer who placed it) — a discrepancy blocks Delivery and auto-logs a PI risk event', roles: [POLICY_CHECK] },
   { code: 'policy.deliver', module: 'insurance-operations', description: 'Record policy delivery date/method/recipient/acknowledgement', roles: [SALES, PLACEMENT] },
   { code: 'endorsement.create', module: 'insurance-operations', description: 'Request a positive/negative endorsement', roles: [PLACEMENT] },
-  { code: 'endorsement.apply', module: 'insurance-operations', description: 'Apply a confirmed endorsement and version the policy schedule', roles: [PLACEMENT] },
+  { code: 'endorsement.apply', module: 'insurance-operations', description: 'Advance a confirmed endorsement through the financial-adjustment / apply steps and version the policy schedule', roles: [PLACEMENT] },
+  { code: 'endorsement.read', module: 'insurance-operations', description: 'List/read endorsements, their premium adjustment, the tied commission reversal, the refund approval state and the versioned coverage schedule', roles: [SALES, PLACEMENT, FINANCE, MANAGER, EXEC] },
   { code: 'cancellation.create', module: 'insurance-operations', description: 'Raise a cancellation request (short-period/pro-rata)', roles: [PLACEMENT] },
+  // refund.raise is reserved for a future standalone refund-raise endpoint
+  // (e.g. an overpayment refund not tied to an endorsement). The Process 22
+  // endorsement-driven Refund is created transactionally with its
+  // CommissionReversal inside POST /endorsements/:id/calculate-adjustment
+  // (gated by endorsement.apply) because the two figures must move together —
+  // it is not independently gated by refund.raise.
   { code: 'refund.raise', module: 'insurance-operations', description: 'Raise a refund (maker side)', roles: [PLACEMENT, FINANCE] },
-  { code: 'refund.approve', module: 'insurance-operations', description: 'Approve a refund above the configurable value threshold (maker/checker: never the raiser)', roles: [MANAGER] },
+  // maker-checker-segregation.md maps the refund checker to a "Finance
+  // approver above the value threshold"; the Branch/Department Manager is
+  // retained as well (a small brokerage may have no separate Finance approver
+  // on hand). The structural control is assertDifferentActors + the
+  // Refund_maker_checker_distinct CHECK — never the raiser.
+  { code: 'refund.approve', module: 'insurance-operations', description: 'Approve a refund at or above the configurable value threshold (maker/checker: never the raiser)', roles: [MANAGER, FINANCE] },
   { code: 'commission-reversal.create', module: 'insurance-operations', description: 'Record a commission reversal tied 1:1 to a negative premium adjustment', roles: [FINANCE] },
 ];
 

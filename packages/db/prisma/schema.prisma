@@ -1369,24 +1369,46 @@ enum EndorsementStatus {
 
 /// Process 22 / Part 3.5 — mid-term amendment. Positive (adds premium) or
 /// negative (returns premium) — never overwrites prior history.
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most one in-flight
+/// cancellation per policy — enforced by the partial UNIQUE index
+/// `Endorsement_one_live_cancellation_per_policy` (raw SQL, migration
+/// 20260902170000: `WHERE "changeType" = 'cancellation' AND "status" <>
+/// 'CLIENT_NOTIFIED'`; Prisma cannot express a two-column partial UNIQUE with
+/// a predicate on the mutable `status`). Without it a second cancellation
+/// Endorsement could be raised while the first is still in flight (the Policy
+/// stays ACTIVE until APPLY) and mint a duplicate Refund + CommissionReversal.
 model Endorsement {
   id              String   @id @default(uuid())
   policyId        String
   policy          Policy   @relation(fields: [policyId], references: [id])
   type            EndorsementType
-  changeType      String   // add_vehicle | remove_vehicle | add_employee | remove_employee | address_change | sum_insured_increase | add_location | change_beneficiary | coverage_amendment
+  changeType      String   // add_vehicle | remove_vehicle | add_employee | remove_employee | address_change | sum_insured_increase | add_location | change_beneficiary | coverage_amendment | cancellation
   status          EndorsementStatus @default(REQUESTED)
   premiumAdjustment Decimal @db.Decimal(18, 3) // positive or negative amount
+  // Process 22 — when the amendment takes effect; the boundary date of the
+  // new PolicySchedule version created at APPLY.
+  effectiveFrom   DateTime?
   requestedByUserId String
+  submittedToInsurerAt DateTime?
   insurerConfirmedAt DateTime?
+  financialAdjustmentCalculatedAt DateTime?
   appliedAt       DateTime?
   clientNotifiedAt DateTime?
+  // Process 22 (backlog Part C #22) — the post-amendment coverage snapshot,
+  // captured at request time and materialised into a NEW PolicySchedule
+  // version when the endorsement is APPLIED (never overwrites the prior
+  // version). `{ limits, sumsInsured, namedPerils, extensions }`; null means
+  // "carry the current coverage forward, just mark the new version boundary".
+  targetCoverage  Json?
   createdAt       DateTime @default(now())
 
   schedule        PolicySchedule?
   refund          Refund?
   commissionReversal CommissionReversal?
   cancellation    Cancellation?
+
+  @@index([policyId])
 }
 
 /// Process 22/37 — cancellation request, always paired with a commission

@@ -158,6 +158,75 @@ export class PolicyRepository {
     });
   }
 
+  /**
+   * Process 22 — version the coverage schedule for an APPLIED endorsement.
+   * ONE interactive transaction (same local-exception rationale as
+   * `createIssuanceArtifacts`), so the prior version is closed and the new
+   * one opened atomically — "never overwritten", and the partial UNIQUE
+   * `PolicySchedule_one_open_per_policy` never sees two open rows:
+   *   1. close the current open schedule (`effectiveTo := effectiveFrom`),
+   *      reading its coverage first so a null `targetCoverage` carries it
+   *      forward;
+   *   2. unless this is a cancellation, open a NEW schedule from
+   *      `effectiveFrom`, linked by `sourceEndorsementId` (its own `@unique`
+   *      — a re-run rolls back on `P2002`, the caller maps it to 409).
+   * Returns the new schedule, or `null` for a cancellation (cover ends — no
+   * successor row).
+   */
+  versionScheduleForEndorsement(input: {
+    policyId: string;
+    endorsementId: string;
+    effectiveFrom: Date;
+    isCancellation: boolean;
+    targetCoverage: {
+      limits: Prisma.InputJsonValue;
+      sumsInsured: Prisma.InputJsonValue;
+      namedPerils: string[];
+      extensions: string[];
+    } | null;
+  }): Promise<PolicySchedule | null> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const open = await tx.policySchedule.findFirst({
+        where: { policyId: input.policyId, effectiveTo: null },
+      });
+      if (!open) {
+        return null;
+      }
+      await tx.policySchedule.update({
+        where: { id: open.id },
+        data: { effectiveTo: input.effectiveFrom },
+      });
+      if (input.isCancellation) {
+        return null;
+      }
+      const coverage = input.targetCoverage ?? {
+        limits: open.limits as Prisma.InputJsonValue,
+        sumsInsured: open.sumsInsured as Prisma.InputJsonValue,
+        namedPerils: open.namedPerils,
+        extensions: open.extensions,
+      };
+      return tx.policySchedule.create({
+        data: {
+          policyId: input.policyId,
+          effectiveFrom: input.effectiveFrom,
+          sourceEndorsementId: input.endorsementId,
+          limits: coverage.limits,
+          sumsInsured: coverage.sumsInsured,
+          namedPerils: coverage.namedPerils,
+          extensions: coverage.extensions,
+        },
+      });
+    });
+  }
+
+  scheduleForEndorsement(
+    endorsementId: string,
+  ): Promise<PolicySchedule | null> {
+    return this.prisma.client.policySchedule.findUnique({
+      where: { sourceEndorsementId: endorsementId },
+    });
+  }
+
   /** Attach documents to the policy's electronic file at any lifecycle stage
    * (Part 4.2). One `createManyAndReturn` — atomic on its own, no transaction
    * wrapper needed. */

@@ -412,8 +412,8 @@ build actually is today:
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
   Recommendation (#16) + Client Decision Handling (#17) + Policy Placement & Issuance
-  (#18–19) + Policy Checking / Quality Control (#20) + Policy Delivery (#21) — built and
-  verified.** A minimal
+  (#18–19) + Policy Checking / Quality Control (#20) + Policy Delivery (#21) + Endorsement
+  Management (#22) — built and verified.** A minimal
   `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
@@ -443,7 +443,12 @@ build actually is today:
   `ProfessionalIndemnityRiskEvent`, a clean check drives it to `VERIFIED`. A verified
   policy is then **delivered** (a `DeliveryRecord` with method / recipient / date moves it
   `VERIFIED → DELIVERED`) and, once the client acknowledges receipt, moves
-  `DELIVERED → ACTIVE`. Detail below.
+  `DELIVERED → ACTIVE`. On an active policy, a mid-term **endorsement** (positive or
+  negative) or a **cancellation** can be raised: the signed premium adjustment is
+  calculated, a negative one auto-creates the commission reversal tied 1:1 to it plus a
+  maker/checker-gated `Refund` above a configurable value threshold, and applying it opens
+  a new `PolicySchedule` version (the prior one closed, never overwritten) — a cancellation
+  also drives the `Policy` to `CANCELLED`. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -461,7 +466,7 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–21 — built, with these deferrals
+### Part C · Domain B #11–22 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -475,14 +480,15 @@ build actually is today:
 | 18–19 | Policy Placement & Issuance | **new module** `apps/api/src/modules/policy/` · **`Policy` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine (the first Domain B one); **no maker/checker** here (placing + recording issuance is single-actor Placement work — the mandatory independent check is Process 20 `PolicyChecking`) · `POST /policies` (`{ opportunityId, inceptionDate, expiryDate? }`, `policy.create`/Placement — already seeded) creates the `Policy` at the schema `@default(PLACEMENT_CONFIRMED)` (NOT via the engine — initial creation, like `Opportunity` at `NEEDS_CONFIRMED`); the **authoritative precondition is a `ClientDecision` of `ACCEPT`** (the Opp status can lag #17's best-effort route — 422 otherwise); insurer / insurance line / requested premium / currency come from the accepted `Recommendation.recommendedQuotation`, **not the body**; `opportunityId @unique` → pre-check 409 + `P2002` → 409 · `POST /policies/:id/issuance` (`{ policyNumber, issuedPremium, inceptionDate?, expiryDate?, schedule: { effectiveFrom?, limits, sumsInsured, namedPerils?, extensions? }, documents: [{ category, classification, fileName, storageRef }] }`, `policy.issue`/Placement — already seeded) drives `Policy PLACEMENT_CONFIRMED → ISSUED` through `WorkflowTransitionService.transition` with the issued scalars (`policyNumber` / `issuedPremium` / `issuedByUserId` + optional period corrections) passed as the transition `data` — so the status flip and the scalar write are **one atomic, engine-audited write** (its status-conditional `updateMany` is the race gate — 0 rows → 409); then `PolicyRepository.createIssuanceArtifacts` writes the opening `PolicySchedule` + the insurer-issued `Document` rows in **one Prisma `$transaction`** (local exception, like `QuotationRepository.reviseChain`) · a **crash-recovery re-entry branch** completes a partially-done issuance (status already `ISSUED`, no open schedule, payload byte-matches `policyNumber` + `compareMoney(issuedPremium)`) without re-transitioning and with no `UPDATE Policy` audit row; any other state / mismatched payload → 422 "issuance is recorded once" · `POST /policies/:id/documents` (`document.manage` — existing perm) appends `Document` rows to the electronic Insurance File (Part 4.2) at any lifecycle stage · `GET /policies?opportunityId=\|customerId=` + `/:id` (`policy.read` — **new seeded perm**, Sales/Placement/Manager/Exec) — the view carries `premiumVariance` (signed `subtractMoney(issued, requested)`, `null` until issued) + `issuanceComplete` · migration `20260902140000` adds `Policy.placedByUserId` / `Policy.issuedByUserId` (TEXT provenance scalars) + a **partial `UNIQUE`** `PolicySchedule_one_open_per_policy` (`effectiveTo IS NULL`) — raw SQL, Prisma can't express it (`race-safe-invariants.md`) · audit snapshots are **metadata not body**: schedule snapshot = coverage-key *names* + counts (never the figures), document snapshot **excludes `fileName` + `storageRef`** (a health-cert filename can name insured persons — HIGHLY_CONFIDENTIAL; `storageRef` is an internal object key) · web: a "Policy" section on the Opportunity detail screen (Placement place form once the Opp is at `PLACEMENT`, an issuance form — policy number / issued premium / limits+sums JSON / perils+extensions / repeatable document rows — then the issued policy + schedule + documents, with a post-issuance "attach a document" control) | `Policy` creation takes the schema `@default` status without the engine (initial creation, matches `Opportunity`/`RFQ`); the **transition-then-artefacts ordering** has one seam — if the schedule/documents `$transaction` fails after the status flip committed, the `Policy` is `ISSUED` with no schedule (recoverable via the re-entry branch; a hard crash *between* the engine's `updateMany` and its own audit write would additionally leave the TRANSITION row unwritten — bounded, rare, separately alarmed); `limits` / `sumsInsured` are stored opaquely (a non-empty flat object of string/number values — no per-figure `Decimal(18,3)` precision until a consumer does arithmetic on them, e.g. a Claim resolving "coverage in force at the loss date"); a `CoverNote` / binder interim state (Process 18) is modeled in the schema but has no endpoint; one `Policy` per Opportunity; `policy.create` / `policy.issue` are role-level (no per-officer queue); no `Endorsement`-driven schedule versioning (#22) — the partial `UNIQUE` is in place for it |
 | 20 | Policy Checking / Quality Control | **no migration** — `PolicyChecking`, the `PolicyChecking_maker_checker_distinct` CHECK (migration `20260826091424`, `checkedByUserId <> placedByUserId`), `ProfessionalIndemnityRiskEvent`, the `policy.check` perm, and the `ISSUED → CHECKING_IN_PROGRESS → DISCREPANCY \| VERIFIED` / `DISCREPANCY → CHECKING_IN_PROGRESS` map all already existed · `POST /policies/:id/checking` (`{ requestedCoverage: { limits, sumsInsured, namedPerils?, extensions? } }`, `policy.check`/**Policy Checking Officer**) — `diffCoverage` (pure) does a **line-by-line comparison** of the checker's transcribed Requested Coverage vs the current open `PolicySchedule` over exactly the four backlog dimensions: `limits` / `sumsInsured` per-key (money-equal via `compareMoney` so `"5000000"` == `"5000000.000"`, else a **case / whitespace-normalised** compare so a `"Fire"`/`"fire"` transcription is not a discrepancy), `namedPerils` / `extensions` as `missing` / `extra` set diffs · `discrepancyFound` is **derived**, never caller-asserted · **maker/checker**: `assertDifferentActors(placedByUserId, actor)` (app) + the DB CHECK (structural), **and** `assertDifferentActors(issuedByUserId, actor)` app-side — stricter than the lex row, which maps only the placer (`/brain-gap` filed) · 422 if `placedByUserId` is null · on a discrepancy: `PolicyChecking.discrepancyFound = true` + a linked `ProfessionalIndemnityRiskEvent` created **in the same `$transaction`** as the checking `upsert` (a discrepancy is recorded ⟺ a PI event exists); a re-check with the **same** detail does not double-log, one with a **materially changed** detail refreshes the existing PI event's `description` · the `Policy` is then walked `(ISSUED \| DISCREPANCY) → CHECKING_IN_PROGRESS → (VERIFIED \| DISCREPANCY)` through the engine — best-effort for a clean `VERIFIED` outcome, but an **unappliable `DISCREPANCY` outcome is a hard 409** (a concurrent divergent check verified the policy first — otherwise Delivery would be silently unblocked) · **Delivery is blocked structurally** — the `WORKFLOW_TRANSITIONS.Policy` map has no `DISCREPANCY → DELIVERED` edge, so #20 only needs to reach `DISCREPANCY` · `checking` (+ `checkingComplete`) folded into `PolicyView` · `POLICY_CHECKING_OFFICER` added to `policy.read` (seed, additive) + to the shared `POLICY_CROSS_OWNER_ROLES` (visibility) · web: the "Policy" section gains a checker-only QC form + the discrepancy / PI-event-logged display | `PolicyChecking` is **not** a `WorkflowTransitionService` entity (no `status` — its lifecycle is the parent `Policy`'s status); "Requested Coverage" is **transcribed by the checker** into the request body (there is no separately-stored requested schedule) — a corrected re-check by the same checker, or the insurer re-issuing a corrected `PolicySchedule` (which needs #22 `Endorsement`, not built), are the only exits from `DISCREPANCY`; the `complianceOverrideByUserId` column is surfaced in the view but no endpoint sets it (a discrepancy override is deferred — clearing a `DISCREPANCY` is currently single-actor); two officers checking one policy near-simultaneously with divergent transcriptions can still race on `PolicyChecking.discrepancyFound` itself (`policyId @unique` serialises the row, `P2002` → 409, but not the *value*) — per-policy serialisation of the check would close it (`/brain-gap` filed); the audit snapshot withholds the `checklistResult` / `discrepancyDetail` (coverage figures) but the PI event `description` carries them by design (Process 54); `policy.check` is role-level (no per-officer queue) |
 | 21 | Policy Delivery | **no migration** — the `DeliveryRecord` model (`policyId @unique`, `deliveredAt`, `method`, `recipient`, `receiptAcknowledgedAt`), the `policy.deliver` perm (`[SALES, PLACEMENT]`), and the `VERIFIED → DELIVERED → ACTIVE` map all already existed · new `PolicyDeliveryService` + `PolicyDeliveryRepository` in the `policy` module · `POST /policies/:id/delivery` (`{ method ∈ email \| portal \| courier \| in_person, recipient, deliveredAt? }`, `policy.deliver`) drives `Policy VERIFIED → DELIVERED` through `WorkflowTransitionService.transition` (its status-conditional `updateMany` is the race gate — a concurrent delivery → `409`; an "already in status DELIVERED" engine rejection is **normalised to the same 409** so the loser's status code is deterministic), then creates the one `DeliveryRecord` (`policyId @unique` → `P2002` → `409`) · a **crash-recovery re-entry branch** (status already `DELIVERED`, no `DeliveryRecord`) creates the missing record without re-transitioning · `POST /policies/:id/delivery/acknowledge-receipt` (`{ acknowledgedAt? }`, `policy.deliver`) stamps `DeliveryRecord.receiptAcknowledgedAt` via a status-conditional `updateMany` (double-ack → `409`) and **best-effort** advances `Policy DELIVERED → ACTIVE` (logged, never thrown — the stamp is the authoritative "client confirmed" record, and `ACTIVE` is *not* a safety gate the way `DISCREPANCY` is, so failing to reach it leaves the policy in the *more* restrictive `DELIVERED` state; a resume branch does just the `ACTIVE` advance when the stamp already committed) · `deliveredAt` / `acknowledgedAt` are parsed with `parseHistoricalInstant` (past-only, an explicit offset required on datetimes); `422` if `acknowledgedAt < deliveredAt` · `DeliveryRecord` is **not** a `WorkflowTransitionService` entity (no `status`) · audit `CREATE` / `UPDATE DeliveryRecord` carries `method` / `recipient` / `deliveredAt` (delivery is an accountability record) · `delivery` (+ `deliveryComplete` = `receiptAcknowledgedAt` set) folded into `PolicyView` · **refactor**: `PolicyService.loadVisible` promoted to **public** so `PolicyCheckingService` + `PolicyDeliveryService` share one visibility path — `PolicyCheckingService` drops its own copy + its `CustomerRepository` dependency · web: the "Policy" section gains a Sales/Placement delivery form + an "Acknowledge receipt" button + a read-only display | `DeliveryRecord` has no `status`; the `DELIVERED → ACTIVE` advance is best-effort (fail-safe — a stuck policy sits in the more restrictive `DELIVERED`, self-heals on the next ack call, and `deliveryComplete` is still true); `ACTIVE` here just means "delivered + client-confirmed" — **premium-collection / inception-date gating of `ACTIVE`** is a Finance concern (#31+) not modelled; delivery is single-actor factual recording (no maker/checker — `maker-checker-segregation.md` § "what does NOT trigger this rule"); `deliveredAt` may be backdated before the policy's own issuance date (bounded only by "not in the future", same latitude as #19/#20's historical instants); `policy.deliver` is role-level (no per-officer queue); no reminder / SLA timer for an unacknowledged delivery (Policy Delivery has no row in `pdpl-sla-timers.md`) |
+| 22 | Endorsement Management | **new module** `apps/api/src/modules/endorsement/` (+ `repositories/endorsement.repository.ts`) — `Endorsement` / `Cancellation` / `Refund` / `CommissionReversal` / `PolicySchedule` models + the `Refund_maker_checker_distinct` CHECK (`20260826091424`, `approvedByUserId <> raisedByUserId`) all already existed · **`Endorsement` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine `REQUESTED → SUBMITTED_TO_INSURER → INSURER_CONFIRMED → FINANCIAL_ADJUSTMENT_CALCULATED → (REFUND_APPROVAL_PENDING →) APPLIED → CLIENT_NOTIFIED`; the child `Cancellation` / `Refund` / `CommissionReversal` have **no `status`** (lifecycle = the parent endorsement's), same shape as `PolicyChecking` / `DeliveryRecord` · `POST /policies/:id/endorsements` (`{ type ∈ POSITIVE \| NEGATIVE, changeType, premiumAmount (unsigned), effectiveFrom, targetCoverage? }`, `endorsement.create`/Placement) — Policy must be `ACTIVE` (422); `signedPremiumAdjustment` (pure) signs the fils-quantized amount by `type` (a NEGATIVE endorsement returns premium → negative `premiumAdjustment`) · `POST /policies/:id/cancellation` (`{ reason, basis ∈ short_period \| pro_rata, effectiveFrom }`, `cancellation.create`/Placement) — a NEGATIVE endorsement `changeType: cancellation`; `cancellationReturnPremium` (pure) — `pro_rata` = `issuedPremium × unexpiredDays / totalDays` (via `money.util.ts` `applyPercentage`), `short_period` = **drafted, unsourced** `SHORT_PERIOD_CLIENT_RETURN_PERCENT = '90'`% of the pro-rata figure; the `Endorsement` + its `Cancellation` child created in **one `$transaction`** (local exception) · `POST /endorsements/:id/advance` (`endorsement.create`) walks the two pre-financial hops · `POST /endorsements/:id/calculate-adjustment` (`{ premiumAmount? }` insurer-confirmed override for a non-cancellation, `endorsement.apply`) — for a NEGATIVE endorsement creates the auto-tied `Refund` (maker side) **+** `CommissionReversal` (`|premiumAdjustment| × recommendedQuotation.commissionRatePercent`, `commissionReversalAmount` pure — **never a separate hand calc**, `policy-lifecycle.md`) in **one `$transaction`** (`P2002` → 409), transitions to FINANCIAL_ADJUSTMENT_CALCULATED, then to REFUND_APPROVAL_PENDING iff the refund is `≥` the **drafted, unsourced** `REFUND_APPROVAL_THRESHOLD_JOD = '5000.000'` · `POST /endorsements/:id/apply` (`endorsement.apply`) — FINANCIAL_ADJUSTMENT_CALCULATED → APPLIED; **`applyCore` refuses outright if an at/above-threshold `Refund` is still unapproved — regardless of status** (the maker/checker gate is structural, not just the `REFUND_APPROVAL_PENDING` status, `@code-reviewer` BLOCKER); `PolicyRepository.versionScheduleForEndorsement` closes the open `PolicySchedule` at `effectiveFrom` and opens a **NEW** version (`sourceEndorsementId @unique`, coverage from `targetCoverage` or carried forward) in **one `$transaction`** — the prior version is never overwritten; a **cancellation apply drives `Policy ACTIVE → CANCELLED` and throws a hard 409 if that cannot be applied** (already-`CANCELLED` = success; the endorsement is already APPLIED so a retry of `apply` is re-entrant); 422 while REFUND_APPROVAL_PENDING · `POST /refunds/:id/approve` (`refund.approve`/**Manager or Finance**, already seeded) — **maker/checker** `assertDifferentActors(raisedByUserId, actor)` (403) + the CHECK; status-conditional `recordRefundApproval` (0 rows → 409); on success runs the apply path (→ APPLIED + schedule version) · `POST /endorsements/:id/notify-client` (`endorsement.apply`) — APPLIED → CLIENT_NOTIFIED (+ stamps `Cancellation.clientNotifiedAt`) · `GET /policies/:id/endorsements` + `GET /endorsements/:id` (**new perm `endorsement.read`**/Sales,Placement,Finance,Manager,Exec) · migration `20260902160000` adds `Endorsement.targetCoverage JSONB`, `effectiveFrom` / `submittedToInsurerAt` / `financialAdjustmentCalculatedAt` timestamps, `Endorsement_policyId_idx`; **migration `20260902170000` adds the partial `UNIQUE` `Endorsement_one_live_cancellation_per_policy` (`WHERE changeType='cancellation' AND status<>'CLIENT_NOTIFIED'`, `@code-reviewer` MAJOR — at most one in-flight cancellation per policy)** — no new `Decimal` columns · audit snapshots **metadata not body** (money as fixed strings, `hasReason` boolean, never the `reason` text; a CREATE row per `Endorsement` / `Cancellation` / `Refund` / `CommissionReversal` / `PolicySchedule`) · web: a new "Endorsements" section (`components/policy/EndorsementSection.tsx`) — Placement request/cancellation forms while the Policy is ACTIVE, per-endorsement one-action buttons, Manager "Approve refund" | `SHORT_PERIOD_CLIENT_RETURN_PERCENT` (90%) and `REFUND_APPROVAL_THRESHOLD_JOD` (5,000) are **drafted, unsourced** module constants — no market short-period scale table, no CBJ / Finance approval-matrix source (a real Finance config surface, narrative Process 37/40, does not exist); **filed via `/brain-gap`** (ibms-brain `7b60bbd`), same pattern as #16's drafted 10% / 2 pp bands · `commissionRatePercent` comes from the accepted `Recommendation.recommendedQuotation` — 422 if the quote captured none · the premium-adjustment override at `calculate-adjustment` only applies before FINANCIAL_ADJUSTMENT_CALCULATED and never to a cancellation (a materially different late override is a 422, not a silent no-op) · a below-threshold `Refund` is auto-cleared (`approvalThresholdMatrixLevel = below_threshold_auto`, `approvedByUserId` stays null — no separate approval row) · the parent-`Opportunity` progression is best-effort (the `Endorsement` + its money are authoritative) · `Refund.paidAt` is surfaced but no endpoint stamps it (payment execution is Finance, #37) · a stuck in-flight cancellation permanently blocks re-raising until it is pushed through (no void/withdraw endpoint) · `endorsement.create` / `.apply` / `refund.approve` are role-level (no per-officer queue); no SLA timer on an unapplied endorsement |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
   Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, #16 Broker
   Recommendation, #17 Client Decision Handling, #18–19 Policy Placement & Issuance, #20
-  Policy Checking, and #21 Policy Delivery are **built** — see the Domain B table above;
-  #22 endorsement / cancellation remains), Claims
+  Policy Checking, #21 Policy Delivery, and #22 Endorsement Management are **built** — see
+  the Domain B table above; that completes Domain B), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -2687,6 +2693,222 @@ narrows a gap.
   acknowledgement), `next build` OK, api + web + db `typecheck` + `eslint` clean. **No
   migration; no seed change** (`policy.deliver` already seeded); `prisma validate` OK,
   `prisma migrate status` clean (29 migrations, unchanged).
+
+**Part C #22 — Endorsement Management (Domain B, Process 22)**
+
+- **New module** `apps/api/src/modules/endorsement/` — `endorsement.service.ts` +
+  `endorsement.config.ts` (pure) + `endorsement.controller.ts` + `endorsement.module.ts` +
+  `apps/api/src/repositories/endorsement.repository.ts`. Backlog: positive/negative
+  endorsement + premium-adjustment calculation + a new (never-overwritten) policy-schedule
+  version; the cancellation sub-flow (short-period / pro-rata return premium); refund
+  approval via maker/checker with a configurable value threshold; commission reversal tied
+  1:1 automatically to the same premium adjustment.
+- **`Endorsement` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through
+  the engine along `REQUESTED → SUBMITTED_TO_INSURER → INSURER_CONFIRMED →
+  FINANCIAL_ADJUSTMENT_CALCULATED → (REFUND_APPROVAL_PENDING →) APPLIED → CLIENT_NOTIFIED`
+  (`workflow-transitions.config.ts` already carried the map). The child `Cancellation` /
+  `Refund` / `CommissionReversal` are **NOT** `WorkflowTransitionService` entities (no
+  `status` column — their lifecycle is the parent endorsement's), the same shape as
+  `PolicyChecking` / `DeliveryRecord`.
+- **`POST /policies/:id/endorsements`** (`{ type ∈ POSITIVE | NEGATIVE, changeType ∈` the
+  nine `ENDORSEMENT_CHANGE_TYPES `, premiumAmount` (unsigned) `, effectiveFrom, targetCoverage? }`,
+  `endorsement.create`/Placement). Policy must be `ACTIVE` → `422` otherwise.
+  `signedPremiumAdjustment(type, amount)` (pure) fils-quantizes via `money.util.ts` and
+  signs by `type` — a NEGATIVE (return-premium) endorsement stores a negative
+  `premiumAdjustment`. `targetCoverage` (optional) is validated with `assertCoverageFigures`
+  (the #18/#19 helper) and materialised into the new schedule version at APPLY; omitted →
+  the current coverage is carried forward, the new version just marking the "as amended by
+  endorsement X from date Y" boundary.
+- **`POST /policies/:id/cancellation`** (`{ reason, basis ∈ short_period | pro_rata,
+  effectiveFrom }`, `cancellation.create`/Placement) — implemented as a NEGATIVE
+  endorsement with `changeType: cancellation`. `cancellationReturnPremium` (pure):
+  `pro_rata` = `issuedPremium × unexpiredDays / totalDayCount` (the ratio expressed as a
+  percentage so `money.util.ts` `applyPercentage` does the quantized multiply);
+  `short_period` = `SHORT_PERIOD_CLIENT_RETURN_PERCENT`% of the pro-rata figure (the client
+  gets 90% — a 10% early-cancellation penalty; the constant was renamed from
+  `SHORT_PERIOD_RETAINED_PERCENT` per a `@code-reviewer` MINOR, the old name read as
+  "retained by whom?"). `422` if the policy has no `issuedPremium` / `inceptionDate` /
+  `expiryDate` on record, or the period is zero / inverted, or `effectiveFrom` falls
+  outside `[currentOpenSchedule.effectiveFrom, policy.expiryDate]` (a backdated value would
+  corrupt the "coverage in force at the loss date" resolution). The `Endorsement` and its
+  `Cancellation` child are created in **one Prisma `$transaction`**
+  (`EndorsementRepository.createCancellationEndorsement`) — a documented local exception to
+  the no-`$transaction` convention (like `QuotationRepository.reviseChain`), since the pair
+  is meaningless apart and a crash between them would strand an un-appliable endorsement.
+- **At most one in-flight cancellation per policy** (`@code-reviewer` MAJOR) — the `Policy`
+  stays `ACTIVE` from cancellation-request until the first cancellation is APPLIED, so a
+  plain status check lets a second cancellation `Endorsement` be raised (wrong `basis`
+  picked, re-raised — there is no void/withdraw endpoint) and driven independently to
+  APPLIED, **minting a second `Refund` + `CommissionReversal`**. Backed by the partial
+  `UNIQUE` index `Endorsement_one_live_cancellation_per_policy` (migration `20260902170000`,
+  `WHERE "changeType" = 'cancellation' AND "status" <> 'CLIENT_NOTIFIED'` — raw SQL, Prisma
+  can't express a two-column partial `UNIQUE` on the mutable `status`), a friendly
+  pre-check (`findLiveCancellation` → `409`), and `P2002 → 409`. A cancellation reaching
+  terminal `CLIENT_NOTIFIED` drops out of the index (a later cancellation of a reinstated
+  policy stays possible); a stuck in-flight one blocks re-raising until pushed through.
+- **`SHORT_PERIOD_CLIENT_RETURN_PERCENT = '90'` and `REFUND_APPROVAL_THRESHOLD_JOD = '5000.000'`
+  are drafted, unsourced module constants.** No market short-period scale table (by months
+  elapsed) is available, and no CBJ / Part-3.5 / Finance approval-matrix source specifies a
+  refund threshold — a real Finance approval matrix (narrative Process 37/40) belongs to a
+  Finance-config surface that does not exist yet. Both are the same pattern as #16's drafted
+  10% / 2 pp conflict-of-interest bands. **Filed via `/brain-gap`** to
+  `ibms-brain/meta/context/policy-lifecycle.md` § "The rules that aren't obvious"
+  (`ibms-brain` `7b60bbd`, pushed; submodule pin bumped in this commit).
+- **`POST /endorsements/:id/advance`** (`endorsement.create`) — walks one hop of
+  `REQUESTED → SUBMITTED_TO_INSURER → INSURER_CONFIRMED`, stamping the milestone timestamp
+  (`occurredAt?` backdates it via `parseHistoricalInstant`, past-only). `422` once past
+  `INSURER_CONFIRMED`.
+- **`POST /endorsements/:id/calculate-adjustment`** (`{ premiumAmount? }`,
+  `endorsement.apply`) — from `INSURER_CONFIRMED` (idempotent re-call from
+  `FINANCIAL_ADJUSTMENT_CALCULATED`). An optional `premiumAmount` overrides the
+  request-time figure with the insurer's final confirmed number — accepted only on the
+  first call (from `INSURER_CONFIRMED`); a materially different value on a later re-call
+  (once the Refund + CommissionReversal have been minted from it) is a loud `422`, not a
+  silent no-op (`@code-reviewer` MINOR). Ignored for a cancellation. For a NEGATIVE
+  endorsement it then creates the auto-tied **`Refund`** (maker side,
+  `raisedByUserId = actor`) **and `CommissionReversal`** (`|premiumAdjustment| ×
+  recommendedQuotation.commissionRatePercent`, `commissionReversalAmount` pure — the "two
+  numbers must move together", `policy-lifecycle.md`; `422` if the placed quote captured no
+  commission rate) in **one `$transaction`** (`EndorsementRepository.createRefundAndReversal` —
+  both rows always, so `Refund` existing ⟺ `CommissionReversal` existing; `P2002` → `409`).
+  Then transitions to `FINANCIAL_ADJUSTMENT_CALCULATED`, and further to
+  `REFUND_APPROVAL_PENDING` iff `refundNeedsApproval` (refund `≥`
+  `REFUND_APPROVAL_THRESHOLD_JOD`). A below-threshold refund is auto-cleared
+  (`approvalThresholdMatrixLevel = below_threshold_auto`, `approvedByUserId` stays null).
+- **`POST /endorsements/:id/apply`** (`endorsement.apply`) — `FINANCIAL_ADJUSTMENT_CALCULATED
+  → APPLIED` (stamping `appliedAt` in the same engine write). **`applyCore` first refuses
+  outright** when `refund != null && refundNeedsApproval(refund.amount) &&
+  refund.approvedByUserId == null` — regardless of status (`@code-reviewer` BLOCKER: the
+  `→ REFUND_APPROVAL_PENDING` hop is a *separate* best-effort transition, so a crash or a
+  concurrent `apply` between the two writes could otherwise strand the endorsement at
+  `FINANCIAL_ADJUSTMENT_CALCULATED` with an unapproved above-threshold refund, and the
+  engine map allows `→ APPLIED` unconditionally — the maker/checker gate must be structural,
+  not status-only). `PolicyRepository.versionScheduleForEndorsement` — in **one
+  `$transaction`** — closes the open `PolicySchedule` at `effectiveFrom` and, unless this is
+  a cancellation, opens a **NEW** version (`sourceEndorsementId @unique` — `P2002` → `409`;
+  coverage from `targetCoverage` or carried forward from the closed row). The prior version
+  is never updated in place. A **cancellation** apply then drives `Policy ACTIVE → CANCELLED`
+  through the engine and **throws a hard `409` if that cannot be applied** (`@code-reviewer`
+  MINOR — a policy left `ACTIVE` after its cover was cancelled still accepts claims /
+  renewals; same "a control-action status walk must fail loudly" generalisation as #20);
+  already-`CANCELLED` (a concurrent apply won) is success, and the endorsement is already
+  APPLIED so a retry of `apply` is re-entrant and just re-attempts the policy transition.
+  `422` while `REFUND_APPROVAL_PENDING`
+  ("apply via `POST /refunds/:id/approve`").
+- **`POST /refunds/:id/approve`** (`refund.approve`/**Manager or Finance** — seed row
+  widened to `[MANAGER, FINANCE_COLLECTIONS_OFFICER]` per a `@code-reviewer` MINOR, since
+  `maker-checker-segregation.md` maps the refund checker to a "Finance approver"; the
+  Branch/Department Manager is kept for a small brokerage with no separate Finance
+  approver on hand) — **maker/checker**: `assertDifferentActors(refund.raisedByUserId,
+  actor)` (`403`) **plus** the pre-existing `Refund_maker_checker_distinct` CHECK
+  (structural). `422` if the endorsement is not `REFUND_APPROVAL_PENDING`; `409` if the
+  refund row already shows an approver; status-conditional `recordRefundApproval`
+  `updateMany WHERE approvedByUserId IS NULL` (0 rows → `409`, a concurrent approver won —
+  and it sets `approvalThresholdMatrixLevel = 'approved_above_threshold'`, keeping the
+  "was above threshold" signal). On success it runs the shared apply path
+  (`REFUND_APPROVAL_PENDING → APPLIED` + schedule version + hard policy-cancel for a
+  cancellation).
+- **`POST /endorsements/:id/notify-client`** (`endorsement.apply`) — `APPLIED →
+  CLIENT_NOTIFIED`, and stamps `Cancellation.clientNotifiedAt` for a cancellation.
+- **`GET /policies/:id/endorsements`** + **`GET /endorsements/:id`** (**new seeded perm
+  `endorsement.read`** — `[SALES, PLACEMENT, FINANCE_COLLECTIONS_OFFICER, BRANCH_DEPARTMENT_MANAGER,
+  EXECUTIVE_MANAGEMENT]`). Visibility: `EndorsementService.CROSS_OWNER_ROLES` =
+  `CUSTOMER_FILE_CROSS_OWNER_ROLES` + `FINANCE_COLLECTIONS_OFFICER`, else the customer's
+  `ownerUserId`; every miss collapses to one `404`.
+- **Migrations** (both hand-authored, `migrate deploy`, applied to `db` + `db-test`):
+  `20260902160000_add_endorsement_management` — `Endorsement.targetCoverage JSONB`,
+  `effectiveFrom` / `submittedToInsurerAt` / `financialAdjustmentCalculatedAt TIMESTAMP(3)`,
+  `Endorsement_policyId_idx` (the `effectiveFrom` column was folded in during the same
+  session with `ADD COLUMN IF NOT EXISTS` per a `@code-reviewer` MINOR, and
+  `_prisma_migrations` checksum reconciled — a `///` NOTE records it).
+  `20260902170000_endorsement_one_live_cancellation` — the partial `UNIQUE`
+  `Endorsement_one_live_cancellation_per_policy` (the `@code-reviewer` MAJOR fix, above).
+  **No new `Decimal` columns** — all four money fields (`Endorsement.premiumAdjustment`,
+  `Cancellation.returnPremium`, `Refund.amount`, `CommissionReversal.amount`) were already
+  classified in `MONEY_DECIMAL_FIELDS`.
+- **Audit — metadata not body.** `endorsementAuditSnapshot` / `cancellationAuditSnapshot` /
+  `refundAuditSnapshot` / `commissionReversalAuditSnapshot` carry ids, counts, booleans and
+  money as fixed 3dp strings — never the cancellation `reason` (only `hasReason: true`). A
+  `CREATE` row is written per `Endorsement`, `Cancellation`, `Refund`, `CommissionReversal`
+  and `PolicySchedule`; the engine writes the `TRANSITION` rows.
+- **`advance` ordering** (`@code-reviewer` NIT) — the `SUBMITTED_TO_INSURER →
+  INSURER_CONFIRMED` hop rejects an `occurredAt` earlier than the recorded
+  `submittedToInsurerAt`.
+- **Bug fixed pre-review** — `EndorsementService.calculateAdjustment` passed `e.policy.id`
+  (the Policy id) to `commissionRateFor`, which expects an `opportunityId`;
+  `ENDORSEMENT_INCLUDE` now also selects `policy.opportunityId` and the call uses it.
+- **`apps/web/app/(app)/opportunities/[id]/`** — a new **"Endorsements"** section
+  (`components/policy/EndorsementSection.tsx`, mounted below `PolicySection`). It fetches
+  the opportunity's policy, and while that policy is `ACTIVE` shows Placement
+  request-endorsement / request-cancellation forms; every endorsement row shows its status,
+  premium adjustment, tied commission reversal, refund state and schedule-version marker
+  plus the one action its status offers (`Advance` / `Calculate adjustment` / `Apply` /
+  `Notify client` for Placement, `Approve refund` for Manager). `canManage = isPlacement`,
+  `canApproveRefund = isManager`. No new nav item.
+- **Deferred**: `SHORT_PERIOD_CLIENT_RETURN_PERCENT` and `REFUND_APPROVAL_THRESHOLD_JOD` are
+  drafted constants (filed, above). `Refund.paidAt` is surfaced in the view but no endpoint
+  stamps it — payment execution is Finance (#37). The parent-`Opportunity` progression is
+  best-effort. There is no void/withdraw endpoint, so a stuck in-flight cancellation blocks
+  re-raising until it is pushed through. `endorsement.create` / `.apply` / `refund.approve`
+  are role-level (no per-officer queue). No SLA timer on an unapplied endorsement
+  (Endorsement Management has no `pdpl-sla-timers.md` row). A positive endorsement's
+  `targetCoverage` is stored opaquely (a non-empty flat object of string/number values — no
+  per-figure `Decimal(18,3)` precision until a consumer does arithmetic on it, same
+  treatment as `PolicySchedule` at #18/#19). Residual race: two near-simultaneous
+  cancellations still serialise on the partial `UNIQUE` (one wins, the other `409`s) but
+  two divergent *non-cancellation* negative endorsements on one policy are both allowed.
+- **`@code-reviewer` (mandatory — workflow transitions + maker/checker + financial
+  calculation + a migration)** → **CHANGES REQUESTED → resolved.** One **BLOCKER**: the
+  maker/checker gate on an above-threshold refund was enforced only by the
+  `REFUND_APPROVAL_PENDING` status, set by a *separate* best-effort transition — a crash or
+  concurrent `apply` between the two writes could reach `APPLIED` with an unapproved refund.
+  Fixed: `applyCore` refuses `refund && needsApproval && approvedByUserId == null`
+  regardless of status (+ unit test simulating the stranded state). One **MAJOR**: double
+  cancellation → double `Refund` + `CommissionReversal` (the `Policy` stays `ACTIVE` until
+  APPLY, so the status check let a second one through). Fixed: partial `UNIQUE`
+  `Endorsement_one_live_cancellation_per_policy` (migration `20260902170000`) + pre-check +
+  `P2002 → 409` (+ 2 unit tests). MINORs fixed: (1) `effectiveFrom` bounded to
+  `[openSchedule.effectiveFrom, expiry]`; (2) the cancellation `Policy → CANCELLED` walk is
+  a hard `409` on an unappliable outcome, not a swallowed warn; (3) `SHORT_PERIOD_RETAINED_PERCENT`
+  renamed `SHORT_PERIOD_CLIENT_RETURN_PERCENT` (+ comment) — the old name/behaviour
+  mismatched; (4) both drafted constants filed via `/brain-gap` (`ibms-brain` `7b60bbd`);
+  (5) `refund.approve` widened to `[MANAGER, FINANCE]` to match `maker-checker-segregation.md`;
+  (6) a materially different late `premiumAmount` override at `calculate-adjustment` is a
+  `422`, not a silent no-op; (7) the folded `effectiveFrom` ALTER carries `IF NOT EXISTS`.
+  NITs: dead `skipRefund` / `skipReversal` flags removed (the pair is atomic); `advance`
+  rejects an out-of-order `occurredAt`; `approvalThresholdMatrixLevel` keeps the
+  above-threshold signal on approval.
+- **Verification**: +47 api unit — `endorsement.config.spec.ts` (16 — `signedPremiumAdjustment`
+  sign/quantize; `cancellationReturnPremium` pro-rata / short-period / clamp-before-inception
+  / zero-period `422` / inverted-period `422`; `commissionReversalAmount`;
+  `refundNeedsApproval` threshold boundary; the four audit snapshots withhold free text),
+  `endorsement.service.spec.ts` (31 — a stateful `Endorsement` + `Policy` mock where
+  `workflow.transition` moves the status: request POSITIVE / NEGATIVE; `422` non-`ACTIVE`;
+  `422` `effectiveFrom` before the open schedule; `404` visibility; cancellation pro-rata +
+  both audit rows; `422` no premium/period; `409` live-cancellation pre-check; `409`
+  `P2002`; `422` cancel `effectiveFrom` past expiry; the `advance` walk + `422` past
+  `INSURER_CONFIRMED`; `calculateAdjustment` POSITIVE no-refund, NEGATIVE below-threshold
+  auto-clear + reversal tied 1:1, NEGATIVE at/above threshold → `REFUND_APPROVAL_PENDING`,
+  `422` no commission rate, `P2002` → `409`; `apply` → schedule version, `422` while pending
+  approval, **`422` when an above-threshold refund is unapproved even if stranded at
+  FINANCIAL_ADJUSTMENT_CALCULATED**, cancellation → `Policy CANCELLED` + no successor
+  schedule, **`409` when the `Policy → CANCELLED` walk cannot apply**; `approveRefund` `403`
+  self-approve, distinct approver applies + versions, `409` race, `409` already-approved,
+  `422` not pending; `notifyClient` + cancellation stamp, `422` not `APPLIED`; list/get
+  visibility). `test/endorsement.e2e-spec.ts` (**new** — 4 tests: the full positive
+  lifecycle applying the insurer-confirmed premium and asserting a NEW schedule version +
+  exactly 5 `TRANSITION` rows; a negative endorsement above threshold where the raiser gets
+  `403` and a distinct manager approves; a pro-rata cancellation that auto-clears, applies
+  and drives the `Policy` to `CANCELLED`; `422` on an endorsement against a non-`ACTIVE`
+  policy). Full suites green: **api unit 899** (70 files), api contract 4/4, **api e2e
+  112/113** (19 files — the one failure is the pre-existing `insurance-program.e2e-spec.ts`
+  MFA-timing flake under full-suite load, unrelated to #22, passes 7/7 on isolation;
+  `endorsement.e2e-spec.ts` + `policy.e2e-spec.ts` 8/8 after the review fixes),
+  `npm audit` 0 vulnerabilities, `nest build` OK, web unit + Playwright **rfq.spec.ts 16/16**
+  (+1: raises a positive endorsement on an ACTIVE policy) incl. `@a11y`, `next build` OK,
+  api + web + db `typecheck` + `eslint` clean. Both migrations applied to `db` + `db-test`;
+  `prisma validate` OK, `prisma migrate status` clean (31 migrations); seed re-run (**145**
+  permissions — new `endorsement.read`; `refund.approve` grant widened to Finance).
 
 ## Deployment
 

@@ -27,6 +27,7 @@ import { ComparisonModule } from './modules/comparison/comparison.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
 import { ClientDecisionModule } from './modules/client-decision/client-decision.module';
 import { PolicyModule } from './modules/policy/policy.module';
+import { EndorsementModule } from './modules/endorsement/endorsement.module';
 
 @Module({
   imports: [
@@ -167,6 +168,18 @@ import { PolicyModule } from './modules/policy/policy.module';
     // Depends on OpportunityModule / RecommendationModule /
     // ClientDecisionModule / CustomerModule.
     PolicyModule,
+    // Part C backlog #22 (Endorsement Management) — raises and works a
+    // positive/negative mid-term endorsement or a cancellation on an ACTIVE
+    // Policy: the signed premium adjustment, a NEW (never-overwritten)
+    // PolicySchedule version at APPLY, the cancellation short-period/pro-rata
+    // return-premium calculation, a maker/checker-gated Refund above a
+    // configurable value threshold, and the CommissionReversal tied 1:1
+    // automatically to the same premium adjustment. Depends on PolicyModule
+    // (the parent Policy + schedule versioning) / RecommendationModule (the
+    // placed quotation's commission rate) / CustomerModule; reuses
+    // WorkflowModule for the Endorsement status walk and the best-effort
+    // Policy ACTIVE -> CANCELLED move.
+    EndorsementModule,
   ],
   controllers: [AppController],
   providers: [AppService],

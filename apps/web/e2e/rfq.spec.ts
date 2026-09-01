@@ -156,8 +156,15 @@ async function mockRfqApi(
       };
     }) => void;
     onRecordDelivery?: (body: { method: string; recipient: string }) => void;
+    onRequestEndorsement?: (body: {
+      type: string;
+      changeType: string;
+      premiumAmount: string;
+    }) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
+    /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
+    seedActivePolicy?: boolean;
     opportunityStatus?: string;
   } = {},
 ) {
@@ -450,50 +457,140 @@ async function mockRfqApi(
   // Policy (Part C #18-19) — starts empty; a POST /policies places it
   // (PLACEMENT_CONFIRMED), a POST /policies/:id/issuance moves it to ISSUED
   // with a schedule + documents, a POST /policies/:id/documents appends more.
-  let policy: Record<string, unknown> | null = opts.seedIssuedPolicy
-    ? {
-        id: "pol-1",
-        opportunityId: "opp-1",
-        customerId: "cust-1",
-        insurerId: "ins-1",
-        insurer: INSURER_IDENTITY,
-        policyNumber: "POL-SEED-1",
-        insuranceLine: "Property All Risks",
-        status: "ISSUED",
-        inceptionDate: "2026-10-01T00:00:00.000Z",
-        expiryDate: null,
-        requestedPremium: "120000.000",
-        issuedPremium: "120000.000",
-        premiumVariance: "0.000",
-        currency: "JOD",
-        placedByUserId: "someone-else",
-        issuedByUserId: "someone-else",
-        schedules: [
-          {
-            id: "sch-1",
-            effectiveFrom: "2026-10-01T00:00:00.000Z",
-            effectiveTo: null,
-            limits: { buildings: "5000000.000" },
-            sumsInsured: { total: "5000000.000" },
-            namedPerils: ["fire", "flood"],
-            extensions: [],
-            sourceEndorsementId: null,
-            createdAt: "2026-10-01T00:00:00.000Z",
-          },
-        ],
-        documents: [],
-        checking: null,
-        delivery: null,
-        issuanceComplete: true,
-        checkingComplete: false,
-        deliveryComplete: false,
-        createdAt: "2026-09-15T00:00:00.000Z",
-        updatedAt: "2026-10-01T00:00:00.000Z",
-      }
-    : null;
+  const seededSchedule = {
+    id: "sch-1",
+    effectiveFrom: "2026-10-01T00:00:00.000Z",
+    effectiveTo: null,
+    limits: { buildings: "5000000.000" },
+    sumsInsured: { total: "5000000.000" },
+    namedPerils: ["fire", "flood"],
+    extensions: [],
+    sourceEndorsementId: null,
+    createdAt: "2026-10-01T00:00:00.000Z",
+  };
+  let policy: Record<string, unknown> | null =
+    opts.seedIssuedPolicy || opts.seedActivePolicy
+      ? {
+          id: "pol-1",
+          opportunityId: "opp-1",
+          customerId: "cust-1",
+          insurerId: "ins-1",
+          insurer: INSURER_IDENTITY,
+          policyNumber: "POL-SEED-1",
+          insuranceLine: "Property All Risks",
+          status: opts.seedActivePolicy ? "ACTIVE" : "ISSUED",
+          inceptionDate: "2026-10-01T00:00:00.000Z",
+          expiryDate: opts.seedActivePolicy ? "2027-10-01T00:00:00.000Z" : null,
+          requestedPremium: "120000.000",
+          issuedPremium: "120000.000",
+          premiumVariance: "0.000",
+          currency: "JOD",
+          placedByUserId: "someone-else",
+          issuedByUserId: "someone-else",
+          schedules: [seededSchedule],
+          documents: [],
+          checking: opts.seedActivePolicy
+            ? {
+                placedByUserId: "someone-else",
+                checkedByUserId: "chk-1",
+                checkedAt: "2026-10-05T00:00:00.000Z",
+                discrepancyFound: false,
+                discrepancyDetail: null,
+                discrepancyLoggedAsPiRiskEvent: false,
+                complianceOverrideByUserId: null,
+                checklist: {},
+                createdAt: "2026-10-05T00:00:00.000Z",
+              }
+            : null,
+          delivery: opts.seedActivePolicy
+            ? {
+                deliveredAt: "2026-10-08T00:00:00.000Z",
+                method: "courier",
+                recipient: "Acme Risk Dept",
+                receiptAcknowledgedAt: "2026-10-10T00:00:00.000Z",
+              }
+            : null,
+          issuanceComplete: true,
+          checkingComplete: Boolean(opts.seedActivePolicy),
+          deliveryComplete: Boolean(opts.seedActivePolicy),
+          createdAt: "2026-09-15T00:00:00.000Z",
+          updatedAt: "2026-10-01T00:00:00.000Z",
+        }
+      : null;
+
+  // Process 22 — endorsements against the policy. Starts empty; a POST
+  // /policies/:id/endorsements (or /cancellation) appends a REQUESTED row.
+  const endorsements: Record<string, unknown>[] = [];
   await page.route("http://localhost:4000/policies**", (route) => {
     const url = route.request().url();
     const method = route.request().method();
+    if (/\/policies\/[^/]+\/endorsements(\?|$)/.test(url)) {
+      if (method === "POST") {
+        const b = route.request().postDataJSON() as {
+          type: "POSITIVE" | "NEGATIVE";
+          changeType: string;
+          premiumAmount: string;
+        };
+        opts.onRequestEndorsement?.(b);
+        const row = {
+          id: `end-${endorsements.length + 1}`,
+          policyId: "pol-1",
+          customerId: "cust-1",
+          type: b.type,
+          changeType: b.changeType,
+          status: "REQUESTED",
+          premiumAdjustment:
+            (b.type === "NEGATIVE" ? "-" : "") + b.premiumAmount,
+          requestedByUserId: "user-1",
+          submittedToInsurerAt: null,
+          insurerConfirmedAt: null,
+          financialAdjustmentCalculatedAt: null,
+          appliedAt: null,
+          clientNotifiedAt: null,
+          cancellation: null,
+          refund: null,
+          commissionReversal: null,
+          scheduleVersioned: false,
+          createdAt: "2026-11-01T00:00:00.000Z",
+        };
+        endorsements.push(row);
+        return route.fulfill({ status: 201, json: row });
+      }
+      return route.fulfill({ status: 200, json: endorsements });
+    }
+    if (method === "POST" && /\/policies\/[^/]+\/cancellation(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        reason: string;
+        basis: string;
+      };
+      const row = {
+        id: `end-${endorsements.length + 1}`,
+        policyId: "pol-1",
+        customerId: "cust-1",
+        type: "NEGATIVE",
+        changeType: "cancellation",
+        status: "REQUESTED",
+        premiumAdjustment: "-1972.603",
+        requestedByUserId: "user-1",
+        submittedToInsurerAt: null,
+        insurerConfirmedAt: null,
+        financialAdjustmentCalculatedAt: null,
+        appliedAt: null,
+        clientNotifiedAt: null,
+        cancellation: {
+          reason: b.reason,
+          basis: b.basis,
+          returnPremium: "1972.603",
+          clientNotifiedAt: null,
+        },
+        refund: null,
+        commissionReversal: null,
+        scheduleVersioned: false,
+        createdAt: "2026-11-01T00:00:00.000Z",
+      };
+      endorsements.push(row);
+      return route.fulfill({ status: 201, json: row });
+    }
     if (method === "POST" && /\/policies\/[^/]+\/issuance(\?|$)/.test(url)) {
       const b = route.request().postDataJSON() as {
         policyNumber: string;
@@ -1104,6 +1201,44 @@ test("records policy delivery and the client receipt acknowledgement", async ({
 
   await page.getByRole("button", { name: "Acknowledge receipt" }).click();
   await expect(page.getByText("ACTIVE", { exact: true })).toBeVisible();
+});
+
+test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  let requested: {
+    type: string;
+    changeType: string;
+    premiumAmount: string;
+  } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedActivePolicy: true,
+    onRequestEndorsement: (b) => {
+      requested = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Endorsements", exact: true }),
+  ).toBeVisible();
+
+  await page.getByLabel("Type", { exact: true }).selectOption("POSITIVE");
+  await page.getByLabel("Change", { exact: true }).selectOption("sum_insured_increase");
+  await page.getByLabel("Premium amount (unsigned)").fill("2500.000");
+  await page.getByLabel("Effective from").fill("2026-12-01");
+  await page
+    .getByRole("button", { name: "Request endorsement" })
+    .click();
+
+  await expect.poll(() => requested?.premiumAmount).toBe("2500.000");
+  await expect(page.getByText("REQUESTED", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Premium adjustment JOD 2,500.000"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Advance to insurer" }),
+  ).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {
