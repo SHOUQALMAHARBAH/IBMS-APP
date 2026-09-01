@@ -41,13 +41,17 @@ export class AccessRecertificationRepository {
     return assignments.map((a) => a.role.name);
   }
 
-  createItem(
+  /** One `INSERT ... RETURNING` for every (subject, reviewer) pair in the
+   * cycle — `startCycle` builds the full list first, so this replaces N
+   * sequential `create()` round-trips (which, over the whole active-user
+   * set, was the slow path that made the access-recertification e2e flaky
+   * under load). Returned rows are in `pairs` order. */
+  createManyItems(
     cycleId: string,
-    subjectUserId: string,
-    reviewerUserId: string,
-  ): Promise<AccessRecertificationItem> {
-    return this.prisma.client.accessRecertificationItem.create({
-      data: { cycleId, subjectUserId, reviewerUserId },
+    pairs: { subjectUserId: string; reviewerUserId: string }[],
+  ): Promise<AccessRecertificationItem[]> {
+    return this.prisma.client.accessRecertificationItem.createManyAndReturn({
+      data: pairs.map((pair) => ({ cycleId, ...pair })),
     });
   }
 

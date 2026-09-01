@@ -27,6 +27,15 @@ export default defineConfig({
     // this file count. Slower, but a flaky e2e gate provides no real
     // evidence (ibms-brain/meta/lex/definition-of-done.md) — reliability
     // wins over the ~50s saved.
+    //
+    // Even serialized, `rbac.e2e-spec.ts`'s access-recertification tests
+    // stayed slow-then-timeout by the time the shared test DB had
+    // accumulated ~14 files' worth of `makeUser` rows: `startCycle` did 2
+    // sequential writes per active subject, and `listItemsForReviewer` did
+    // one role-lookup per item. Both are now batched into a single query
+    // each (AuditService.recordMany, AccessRecertificationRepository.
+    // createManyItems, UserRepository.getRoleNamesByIds), so the endpoints
+    // are O(1) round-trips regardless of user count.
     fileParallelism: false,
   },
   plugins: [swc.vite()],
