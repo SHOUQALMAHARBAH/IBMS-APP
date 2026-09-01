@@ -149,6 +149,14 @@ async function mockRfqApi(
       policyNumber: string;
       issuedPremium: string;
     }) => void;
+    onCheckPolicy?: (body: {
+      requestedCoverage: {
+        limits: Record<string, unknown>;
+        namedPerils?: string[];
+      };
+    }) => void;
+    /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
+    seedIssuedPolicy?: boolean;
     opportunityStatus?: string;
   } = {},
 ) {
@@ -441,7 +449,45 @@ async function mockRfqApi(
   // Policy (Part C #18-19) — starts empty; a POST /policies places it
   // (PLACEMENT_CONFIRMED), a POST /policies/:id/issuance moves it to ISSUED
   // with a schedule + documents, a POST /policies/:id/documents appends more.
-  let policy: Record<string, unknown> | null = null;
+  let policy: Record<string, unknown> | null = opts.seedIssuedPolicy
+    ? {
+        id: "pol-1",
+        opportunityId: "opp-1",
+        customerId: "cust-1",
+        insurerId: "ins-1",
+        insurer: INSURER_IDENTITY,
+        policyNumber: "POL-SEED-1",
+        insuranceLine: "Property All Risks",
+        status: "ISSUED",
+        inceptionDate: "2026-10-01T00:00:00.000Z",
+        expiryDate: null,
+        requestedPremium: "120000.000",
+        issuedPremium: "120000.000",
+        premiumVariance: "0.000",
+        currency: "JOD",
+        placedByUserId: "someone-else",
+        issuedByUserId: "someone-else",
+        schedules: [
+          {
+            id: "sch-1",
+            effectiveFrom: "2026-10-01T00:00:00.000Z",
+            effectiveTo: null,
+            limits: { buildings: "5000000.000" },
+            sumsInsured: { total: "5000000.000" },
+            namedPerils: ["fire", "flood"],
+            extensions: [],
+            sourceEndorsementId: null,
+            createdAt: "2026-10-01T00:00:00.000Z",
+          },
+        ],
+        documents: [],
+        checking: null,
+        issuanceComplete: true,
+        checkingComplete: false,
+        createdAt: "2026-09-15T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }
+    : null;
   await page.route("http://localhost:4000/policies**", (route) => {
     const url = route.request().url();
     const method = route.request().method();
@@ -466,6 +512,8 @@ async function mockRfqApi(
         premiumVariance: "-1500.000",
         issuedByUserId: "user-1",
         issuanceComplete: true,
+        checking: null,
+        checkingComplete: false,
         schedules: [
           {
             id: "sch-1",
@@ -488,6 +536,39 @@ async function mockRfqApi(
           uploadedByUserId: "user-1",
           createdAt: "2026-10-01T00:00:00.000Z",
         })),
+      };
+      return route.fulfill({ status: 201, json: policy });
+    }
+    if (method === "POST" && /\/policies\/[^/]+\/checking(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        requestedCoverage: {
+          limits: Record<string, unknown>;
+          namedPerils?: string[];
+        };
+      };
+      opts.onCheckPolicy?.(b);
+      const issuedLimits =
+        ((policy?.schedules as { limits?: Record<string, unknown> }[]) ?? [])[0]
+          ?.limits ?? {};
+      const mismatch =
+        JSON.stringify(b.requestedCoverage.limits) !== JSON.stringify(issuedLimits);
+      policy = {
+        ...(policy ?? {}),
+        status: mismatch ? "DISCREPANCY" : "VERIFIED",
+        checkingComplete: true,
+        checking: {
+          placedByUserId: "user-1",
+          checkedByUserId: "chk-1",
+          checkedAt: "2026-10-05T00:00:00.000Z",
+          discrepancyFound: mismatch,
+          discrepancyDetail: mismatch
+            ? "limits.buildings: requested 8000000.000, issued 5000000.000"
+            : null,
+          discrepancyLoggedAsPiRiskEvent: mismatch,
+          complianceOverrideByUserId: null,
+          checklist: {},
+          createdAt: "2026-10-05T00:00:00.000Z",
+        },
       };
       return route.fulfill({ status: 201, json: policy });
     }
@@ -538,7 +619,9 @@ async function mockRfqApi(
         issuedByUserId: null,
         schedules: [],
         documents: [],
+        checking: null,
         issuanceComplete: false,
+        checkingComplete: false,
         createdAt: "2026-09-15T00:00:00.000Z",
         updatedAt: "2026-09-15T00:00:00.000Z",
       };
@@ -899,6 +982,45 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await expect.poll(() => issued?.issuedPremium).toBe("118500.000");
   await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
   await expect(page.getByText("POL-WEB-1")).toBeVisible();
+});
+
+test("a Policy Checking Officer runs the QC check and sees a discrepancy block Delivery", async ({
+  page,
+}) => {
+  await mockAuth(page, ["POLICY_CHECKING_OFFICER"]);
+  let checked: {
+    requestedCoverage: { limits: Record<string, unknown> };
+  } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onCheckPolicy: (b) => {
+      checked = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Policy", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Quality-control check")).toBeVisible();
+
+  // requested buildings limit higher than the issued 5,000,000 -> discrepancy
+  await page
+    .getByLabel("Requested limits (JSON)")
+    .fill('{ "buildings": "8000000.000" }');
+  await page
+    .getByLabel("Requested sums insured (JSON)")
+    .fill('{ "total": "5000000.000" }');
+  await page.getByRole("button", { name: "Run check" }).click();
+
+  await expect
+    .poll(() => (checked?.requestedCoverage.limits as { buildings?: string })?.buildings)
+    .toBe("8000000.000");
+  await expect(page.getByText("DISCREPANCY — Delivery blocked")).toBeVisible();
+  await expect(
+    page.getByText("A Professional Indemnity risk event has been logged."),
+  ).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   attachPolicyDocuments,
+  checkPolicy,
   listPoliciesForOpportunity,
   placePolicy,
   recordPolicyIssuance,
@@ -22,8 +23,15 @@ import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.sty
 interface Props {
   opportunity: OpportunityWithContext;
   isPlacement: boolean;
+  canCheck: boolean;
   onOpportunityChanged: () => void;
 }
+
+const CHECKABLE_STATES = new Set([
+  'ISSUED',
+  'DISCREPANCY',
+  'CHECKING_IN_PROGRESS',
+]);
 
 /** The section only makes sense once the client has accepted (the Opportunity
  * reaches PLACEMENT) — or a Policy already exists (a status that lagged the
@@ -140,7 +148,12 @@ function DocumentRowsEditor({
   );
 }
 
-export function PolicySection({ opportunity, isPlacement, onOpportunityChanged }: Props) {
+export function PolicySection({
+  opportunity,
+  isPlacement,
+  canCheck,
+  onOpportunityChanged,
+}: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -160,6 +173,14 @@ export function PolicySection({ opportunity, isPlacement, onOpportunityChanged }
   ]);
 
   const [attachDocs, setAttachDocs] = useState<PolicyDocumentInput[]>([emptyDocRow()]);
+
+  // Process 20 — the checker's transcription of the Requested Coverage.
+  const [chkLimitsText, setChkLimitsText] = useState(
+    '{\n  "buildings": "5000000.000"\n}',
+  );
+  const [chkSumsText, setChkSumsText] = useState('{\n  "total": "5000000.000"\n}');
+  const [chkPerilsText, setChkPerilsText] = useState('fire, flood, theft');
+  const [chkExtensionsText, setChkExtensionsText] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -466,6 +487,108 @@ export function PolicySection({ opportunity, isPlacement, onOpportunityChanged }
                 }
               >
                 Attach
+              </button>
+            </div>
+          ) : null}
+
+          {policy.checking ? (
+            <div
+              style={{
+                marginTop: '0.8rem',
+                padding: '0.6rem',
+                borderLeft: `3px solid ${policy.checking.discrepancyFound ? 'var(--error, #c00)' : 'var(--ok, #2a7)'}`,
+              }}
+            >
+              <p style={{ fontWeight: 600, margin: 0 }}>
+                Quality-control check:{' '}
+                {policy.checking.discrepancyFound
+                  ? 'DISCREPANCY — Delivery blocked'
+                  : 'verified'}
+              </p>
+              {policy.checking.discrepancyDetail ? (
+                <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
+                  {policy.checking.discrepancyDetail}
+                </p>
+              ) : null}
+              {policy.checking.discrepancyLoggedAsPiRiskEvent ? (
+                <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>
+                  A Professional Indemnity risk event has been logged.
+                </p>
+              ) : null}
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', opacity: 0.6 }}>
+                Checked by {policy.checking.checkedByUserId ?? '—'}
+                {policy.checking.checkedAt
+                  ? ` on ${new Date(policy.checking.checkedAt).toLocaleString()}`
+                  : ''}
+              </p>
+            </div>
+          ) : null}
+
+          {canCheck && CHECKABLE_STATES.has(policy.status) ? (
+            <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
+              <strong>
+                {policy.checking ? 'Re-run the quality-control check' : 'Quality-control check'}
+              </strong>
+              <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.2rem 0' }}>
+                Enter the Requested Coverage — the system compares it line-by-line
+                against the issued schedule. A discrepancy blocks Delivery and
+                logs a PI risk event. You cannot check a policy you placed.
+              </p>
+              <div style={quoteFieldStyle}>
+                <label htmlFor="chk-limits">Requested limits (JSON)</label>
+                <textarea
+                  id="chk-limits"
+                  rows={3}
+                  value={chkLimitsText}
+                  onChange={(e) => setChkLimitsText(e.target.value)}
+                />
+              </div>
+              <div style={quoteFieldStyle}>
+                <label htmlFor="chk-sums">Requested sums insured (JSON)</label>
+                <textarea
+                  id="chk-sums"
+                  rows={3}
+                  value={chkSumsText}
+                  onChange={(e) => setChkSumsText(e.target.value)}
+                />
+              </div>
+              <div style={quoteFieldStyle}>
+                <label htmlFor="chk-perils">Requested named perils (comma-separated)</label>
+                <input
+                  id="chk-perils"
+                  value={chkPerilsText}
+                  onChange={(e) => setChkPerilsText(e.target.value)}
+                />
+              </div>
+              <div style={quoteFieldStyle}>
+                <label htmlFor="chk-extensions">Requested extensions (comma-separated)</label>
+                <input
+                  id="chk-extensions"
+                  value={chkExtensionsText}
+                  onChange={(e) => setChkExtensionsText(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={
+                  busy ||
+                  parseJsonObject(chkLimitsText) === null ||
+                  parseJsonObject(chkSumsText) === null
+                }
+                style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
+                onClick={() =>
+                  void run(async () => {
+                    await checkPolicy(policy.id, {
+                      limits: parseJsonObject(chkLimitsText) ?? {},
+                      sumsInsured: parseJsonObject(chkSumsText) ?? {},
+                      namedPerils: splitList(chkPerilsText),
+                      extensions: splitList(chkExtensionsText),
+                    });
+                    onOpportunityChanged();
+                  })
+                }
+              >
+                {busy ? 'Checking…' : 'Run check'}
               </button>
             </div>
           ) : null}

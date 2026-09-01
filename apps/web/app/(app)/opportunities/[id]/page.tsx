@@ -24,6 +24,7 @@ const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
 const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
+const POLICY_CHECK_ROLE = 'POLICY_CHECKING_OFFICER';
 
 function statusBreakdown(rfq: Rfq): string {
   if (rfq.insurerSubmissions.length === 0) return 'no insurers yet';
@@ -85,6 +86,7 @@ export default function OpportunityDetailPage() {
   const isManager = user.roles.includes(MANAGER_ROLE);
   const isCompliance = user.roles.includes(COMPLIANCE_ROLE);
   const isSales = user.roles.includes(SALES_ROLE);
+  const isPolicyChecker = user.roles.includes(POLICY_CHECK_ROLE);
 
   return (
     <main style={pageStyle}>
@@ -208,6 +210,7 @@ export default function OpportunityDetailPage() {
           <PolicySection
             opportunity={opportunity}
             isPlacement={isPlacement}
+            canCheck={isPolicyChecker}
             onOpportunityChanged={() => void load()}
           />
         </>

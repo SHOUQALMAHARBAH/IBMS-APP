@@ -68,6 +68,18 @@ export interface PolicySchedule {
   createdAt: string;
 }
 
+export interface PolicyChecking {
+  placedByUserId: string;
+  checkedByUserId: string | null;
+  checkedAt: string | null;
+  discrepancyFound: boolean;
+  discrepancyDetail: string | null;
+  discrepancyLoggedAsPiRiskEvent: boolean;
+  complianceOverrideByUserId: string | null;
+  checklist: unknown;
+  createdAt: string;
+}
+
 export interface Policy {
   id: string;
   opportunityId: string;
@@ -87,9 +99,18 @@ export interface Policy {
   issuedByUserId: string | null;
   schedules: PolicySchedule[];
   documents: PolicyDocument[];
+  checking: PolicyChecking | null;
   issuanceComplete: boolean;
+  checkingComplete: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RequestedCoverageInput {
+  limits: Record<string, unknown>;
+  sumsInsured: Record<string, unknown>;
+  namedPerils?: string[];
+  extensions?: string[];
 }
 
 export interface PlacePolicyInput {
@@ -136,5 +157,14 @@ export function attachPolicyDocuments(
 ): Promise<Policy> {
   return apiPost(`/policies/${encodeURIComponent(id)}/documents`, {
     documents,
+  });
+}
+
+export function checkPolicy(
+  id: string,
+  requestedCoverage: RequestedCoverageInput,
+): Promise<Policy> {
+  return apiPost(`/policies/${encodeURIComponent(id)}/checking`, {
+    requestedCoverage,
   });
 }

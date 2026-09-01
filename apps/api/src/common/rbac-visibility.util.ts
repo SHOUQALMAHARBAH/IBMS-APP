@@ -56,3 +56,13 @@ export const CUSTOMER_FILE_CROSS_OWNER_ROLES: RoleName[] = [
   'BRANCH_DEPARTMENT_MANAGER',
   'EXECUTIVE_MANAGEMENT',
 ];
+
+/** Roles that reach any `Policy` regardless of who owns the Customer — the
+ * whole-commercial-book roles plus the Policy Checking Officer (Process 20
+ * quality control is a cross-book control function, like Compliance for KYC).
+ * Shared by `PolicyService` and `PolicyCheckingService` (backlog Part C
+ * #18-20). */
+export const POLICY_CROSS_OWNER_ROLES: RoleName[] = [
+  ...CUSTOMER_FILE_CROSS_OWNER_ROLES,
+  'POLICY_CHECKING_OFFICER',
+];

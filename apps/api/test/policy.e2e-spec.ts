@@ -46,7 +46,22 @@ interface PolicyBody {
   schedules: { id: string; effectiveFrom: string; namedPerils: string[] }[];
   documents: { id: string; category: string; classification: string }[];
   issuanceComplete: boolean;
+  checkingComplete: boolean;
+  checking: {
+    placedByUserId: string;
+    checkedByUserId: string | null;
+    discrepancyFound: boolean;
+    discrepancyLoggedAsPiRiskEvent: boolean;
+    discrepancyDetail: string | null;
+  } | null;
 }
+
+const ISSUED_SCHEDULE = {
+  limits: { buildings: '5000000.000', contents: '1200000.000' },
+  sumsInsured: { total: '6200000.000' },
+  namedPerils: ['fire', 'flood', 'theft'],
+  extensions: ['debris removal'],
+};
 
 const FACTORS = {
   coverage: 'Matches every requested peril plus the two extensions.',
@@ -216,6 +231,40 @@ async function acceptedOpportunity(
     })
     .expect(201);
   return { opportunityId, insurerId };
+}
+
+/** Place + issue a policy (with ISSUED_SCHEDULE coverage), leaving it at
+ * ISSUED and ready for the Process 20 quality-control check. */
+async function issuedPolicy(
+  app: INestApplication<App>,
+  token: string,
+  ownerUserId: string,
+  tag: string,
+): Promise<string> {
+  const { opportunityId } = await acceptedOpportunity(
+    app,
+    token,
+    ownerUserId,
+    tag,
+  );
+  const placed = await request(app.getHttpServer())
+    .post('/policies')
+    .set(bearer(token))
+    .send({ opportunityId, inceptionDate: '2026-10-01' })
+    .expect(201);
+  const policyId = (placed.body as PolicyBody).id;
+  const policyNumber = `POL-CHK-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await request(app.getHttpServer())
+    .post(`/policies/${policyId}/issuance`)
+    .set(bearer(token))
+    .send({
+      policyNumber,
+      issuedPremium: '120000.000',
+      schedule: ISSUED_SCHEDULE,
+      documents: [],
+    })
+    .expect(201);
+  return policyId;
 }
 
 describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
@@ -400,5 +449,113 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       .set(bearer(plc.accessToken))
       .send({ opportunityId: accepted.opportunityId })
       .expect(400);
+  });
+
+  it('Process 20 — a checker (not the placing officer) verifies a clean policy and rejects a discrepant one, logging a PI risk event', async () => {
+    const app = await boot();
+    // dual-hatted: holds policy.check too, so the 403 below is the
+    // assertDifferentActors maker/checker rejection, not the RBAC guard
+    const plc = await makeUser(
+      app,
+      'chk-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+      'POLICY_CHECKING_OFFICER',
+    );
+    const chk = await makeUser(app, 'chk-off', 'POLICY_CHECKING_OFFICER');
+
+    // --- clean check -> VERIFIED ---
+    const cleanId = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'clean',
+    );
+
+    // maker/checker: the officer who placed the cover cannot check it — even
+    // though this user now holds policy.check, assertDifferentActors rejects
+    // it because they are the placing officer
+    await request(app.getHttpServer())
+      .post(`/policies/${cleanId}/checking`)
+      .set(bearer(plc.accessToken))
+      .send({ requestedCoverage: ISSUED_SCHEDULE })
+      .expect(403);
+
+    const verified = await request(app.getHttpServer())
+      .post(`/policies/${cleanId}/checking`)
+      .set(bearer(chk.accessToken))
+      .send({ requestedCoverage: ISSUED_SCHEDULE })
+      .expect(201);
+    const vBody = verified.body as PolicyBody;
+    expect(vBody.status).toBe('VERIFIED');
+    expect(vBody.checkingComplete).toBe(true);
+    expect(vBody.checking?.discrepancyFound).toBe(false);
+    expect(vBody.checking?.checkedByUserId).toBe(chk.userId);
+    expect(vBody.checking?.placedByUserId).toBe(plc.userId);
+
+    // --- discrepant check -> DISCREPANCY + a PI risk event ---
+    const dirtyId = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'dirty',
+    );
+    const discrepant = await request(app.getHttpServer())
+      .post(`/policies/${dirtyId}/checking`)
+      .set(bearer(chk.accessToken))
+      .send({
+        requestedCoverage: {
+          ...ISSUED_SCHEDULE,
+          // requested JOD 5m buildings, but the insurer issued the same 5m —
+          // so change a figure the checker believes was agreed higher
+          limits: { buildings: '8000000.000', contents: '1200000.000' },
+          namedPerils: ['fire', 'flood', 'theft', 'storm'],
+        },
+      })
+      .expect(201);
+    const dBody = discrepant.body as PolicyBody;
+    expect(dBody.status).toBe('DISCREPANCY');
+    expect(dBody.checking?.discrepancyFound).toBe(true);
+    expect(dBody.checking?.discrepancyLoggedAsPiRiskEvent).toBe(true);
+    expect(dBody.checking?.discrepancyDetail).toContain('limits.buildings');
+
+    // the PI risk event exists and links back to this checking row
+    const checkingRow = await prisma.policyChecking.findUnique({
+      where: { policyId: dirtyId },
+    });
+    const piEvents = await prisma.professionalIndemnityRiskEvent.findMany({
+      where: { sourcePolicyCheckingId: checkingRow?.id },
+    });
+    expect(piEvents).toHaveLength(1);
+    expect(piEvents[0].description).toContain('Policy-checking discrepancy');
+
+    // a re-check that still finds a discrepancy does not double-log — but if
+    // the discrepancy detail materially changed, the existing PI risk event's
+    // description is refreshed (it must not go stale)
+    await request(app.getHttpServer())
+      .post(`/policies/${dirtyId}/checking`)
+      .set(bearer(chk.accessToken))
+      .send({
+        requestedCoverage: {
+          ...ISSUED_SCHEDULE,
+          limits: { buildings: '9500000.000', contents: '1200000.000' },
+        },
+      })
+      .expect(201);
+    const piEventsAfter = await prisma.professionalIndemnityRiskEvent.findMany({
+      where: { sourcePolicyCheckingId: checkingRow?.id },
+    });
+    expect(piEventsAfter).toHaveLength(1);
+    expect(piEventsAfter[0].description).toContain('9500000.000');
+
+    // Delivery is structurally blocked from DISCREPANCY — the engine map has
+    // no DISCREPANCY -> DELIVERED edge. A re-check with the correct requested
+    // coverage clears it to VERIFIED.
+    const cleared = await request(app.getHttpServer())
+      .post(`/policies/${dirtyId}/checking`)
+      .set(bearer(chk.accessToken))
+      .send({ requestedCoverage: ISSUED_SCHEDULE })
+      .expect(201);
+    expect((cleared.body as PolicyBody).status).toBe('VERIFIED');
   });
 });

@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PolicyService } from './policy.service';
+import { PolicyCheckingService } from './policy-checking.service';
 import { PlacePolicyDto } from './dto/place-policy.dto';
 import { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
+import { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
 import { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -17,7 +19,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('policies')
 @Controller('policies')
 export class PolicyController {
-  constructor(private readonly policies: PolicyService) {}
+  constructor(
+    private readonly policies: PolicyService,
+    private readonly policyChecking: PolicyCheckingService,
+  ) {}
 
   @RequirePermissions('policy.create')
   @Post()
@@ -64,5 +69,20 @@ export class PolicyController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.policies.attachDocuments(id, dto, user);
+  }
+
+  /** Process 20 — the mandatory maker/checker quality-control check: a
+   * line-by-line comparison of Requested Coverage vs the issued policy
+   * schedule. The checker must not be the officer who placed the cover; a
+   * discrepancy drives the policy to `DISCREPANCY` (blocking Delivery) and
+   * auto-logs a Professional Indemnity risk event. */
+  @RequirePermissions('policy.check')
+  @Post(':id/checking')
+  check(
+    @Param('id') id: string,
+    @Body() dto: RecordPolicyCheckingDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policyChecking.check(id, dto, user);
   }
 }

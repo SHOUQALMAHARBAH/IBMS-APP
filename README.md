@@ -412,7 +412,7 @@ build actually is today:
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
   Recommendation (#16) + Client Decision Handling (#17) + Policy Placement & Issuance
-  (#18–19) — built and verified.** A minimal
+  (#18–19) + Policy Checking / Quality Control (#20) — built and verified.** A minimal
   `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
@@ -434,7 +434,12 @@ build actually is today:
   is created from the accepted recommendation's quotation (inception date set at
   placement) and, once the insurer issues, its number / issued premium / coverage
   `PolicySchedule` / electronic-file `Document`s are recorded and the `Policy` moves
-  `PLACEMENT_CONFIRMED → ISSUED` through the workflow engine. Detail below.
+  `PLACEMENT_CONFIRMED → ISSUED` through the workflow engine. An issued policy is then
+  put through the mandatory maker/checker **Policy Checking** — a Policy Checking Officer
+  (never the officer who placed *or* issued it) runs a line-by-line comparison of the
+  requested coverage against the issued schedule; a discrepancy drives the `Policy` to
+  `DISCREPANCY` (structurally blocking Delivery) and auto-logs a
+  `ProfessionalIndemnityRiskEvent`, a clean check drives it to `VERIFIED`. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -452,7 +457,7 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–19 — built, with these deferrals
+### Part C · Domain B #11–20 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -464,13 +469,14 @@ build actually is today:
 | 16 | Broker Recommendation | **new module** `apps/api/src/modules/recommendation/` · `POST /recommendations` (`{ opportunityId, recommendedQuotationId, rationale, rationaleFactors }`, `recommendation.draft`/Placement) — one `Recommendation` per Opportunity (`opportunityId @unique`), pointing at one **current-version** `Quotation` on one of its RFQs; the Opportunity must be at `COMPARISON_BUILT`; `rationaleFactors` requires a non-empty note for **all six** dimensions (coverage / price / financial strength / claims service / deductible / policy conditions — "never price alone") · two gate flags snapshot at draft: `approvalRequired` (recommended premium > the Opportunity's `targetPremiumThreshold`) and `conflictOfInterestFlagged` (`detectConflictOfInterest`, pure — a competing current-version quote priced within a **drafted, unsourced** 10% band carries a commission rate at least a **drafted, unsourced** 2 percentage points lower) · `PATCH /opportunities/:id/target-premium-threshold` (`opportunity.set-target-threshold`/**Manager, Exec** — new perm) sets/clears the configurable threshold · `POST /recommendations/:id/approve` (`recommendation.approve`/**Manager**) — only when `approvalRequired`, **maker/checker**: `assertDifferentActors(draftedByUserId, actor)` + the existing `Recommendation_maker_checker_distinct` CHECK; a status-conditional `updateMany` stamps `approvedByUserId`/`approvedAt` (0 rows → 409) · `POST /recommendations/:id/conflict-of-interest-disclosure` (`conflict-of-interest.disclose`/Placement, Compliance) — only when flagged, acknowledger ≠ drafter, one per recommendation · `POST /recommendations/:id/send` (`recommendation.send`/**Placement** — new perm) — 422 while a required approval or COI disclosure is outstanding, else stamps `sentToClientAt` and best-effort advances `Opportunity RECOMMENDATION_DRAFTED → SENT_TO_CLIENT` · `GET /recommendations?opportunityId=\|customerId=` + `/:id` (`recommendation.read` — new perm, Sales/Placement/Manager/Exec) return the recommendation + its quotation + the COI disclosure + a computed `blockedFromSend` list · a successful draft best-effort advances `Opportunity COMPARISON_BUILT → RECOMMENDATION_DRAFTED` · migration `20260901200000` adds `Recommendation.rationaleFactors`/`approvalRequired`/`conflictOfInterestFlagged`/`coiCompetingQuotationId`/`coiCommissionDiffPercent`/`sentByUserId` + FK/filter indexes · web: a "Broker recommendation" section on the Opportunity detail screen (Manager-only threshold control, Placement-only draft form, Manager-only Approve, Placement/Compliance COI disclosure form, Send with the block reasons listed) | `Recommendation` is **not** a `WorkflowTransitionService` entity (no `status` column — its lifecycle is nullable timestamps; the parent `Opportunity` carries the same progression through the engine); one recommendation per Opportunity pointing at **one** quote — a multi-line programme's per-line recommendation is a deferred edge (schema constraint, like #7's one-programme-per-`RiskProfile`); the **10% comparable-premium band** and **2 pp material-commission** figures are `ibms-app` product decisions, drafted, **unsourced** — `/brain-gap` candidates; the COI check can only assess quotes that captured a `commissionRatePercent` at #13 (no rate → not flagged); `CommissionAgreement.ratePercent` (the governed rate table, Finance) is not consulted — the check uses the per-quote rate; draft requires the Opportunity to be **at** `COMPARISON_BUILT`, which is an adequate proxy for "a comparison was built" but not a hard FK to a `ComparisonMatrix` row; `recommendation.draft` / `.send` are role-level (no per-officer queue); the disclosure records that a disclosure was **made to the client** — the system does not itself send anything to the client |
 | 17 | Client Decision Handling | **new module** `apps/api/src/modules/client-decision/` · `POST /client-decisions` (`{ opportunityId, decision, evidenceType, evidenceRef, notes? }`, `client-decision.capture`/Sales, Placement) records the client's **single** decision on a **sent** `Recommendation` — one `ClientDecision` per Opportunity (`opportunityId @unique` → 409); the precondition is `Recommendation.sentToClientAt != null` (authoritative — the Opportunity status can lag a #16 best-effort advance) · the six `ClientDecisionType` values collapse to three routes (`routeFor`, pure): **ACCEPT → PLACEMENT**, **REJECT → CLOSED_LOST**, and the four **REQUEST_\* → RENEGOTIATE** · the route is the parent Opportunity's engine walk `<current> → SENT_TO_CLIENT → CLIENT_DECISION → <route>`, applied **best-effort** (logged, never thrown — the `ClientDecision` row + `routeFor(decision)` is the authoritative record; the response carries `route` / `routeLabel` / `routingComplete`) · `evidenceType` ∈ `signature \| e-signature \| email_confirmation` + a non-empty `evidenceRef` are required (Part 4.1 — a decision of record needs a reference) · `GET /client-decisions?opportunityId=\|customerId=` + `/:id` (`client-decision.read` — **new perm**, Sales/Placement/Manager/Exec) · migration `20260902120000` adds `ClientDecision.notes` + `capturedByUserId` · web: a "Client decision" section on the Opportunity detail screen (Sales/Placement form once a recommendation is sent, read-only after) | `ClientDecision` is **not** a `WorkflowTransitionService` entity (`decision` is a one-shot enum, not a state machine) and has no maker/checker (recording the client's stated decision is a factual, single-actor Sales/Placement act); **one decision per Opportunity** — a RENEGOTIATE loop that produces a *second* client decision is blocked by the `@unique` (schema constraint, same class as #16's one-recommendation-per-Opportunity); the RENEGOTIATE route lands the Opportunity at `RENEGOTIATE` and stops — it does **not** auto-advance to `RFQ_ISSUED` or relax the one-RFQ-per-`(opportunity, line)` constraint (re-marketing a line is still a deferred edge from #11; new quote versions / negotiation rounds via #13/#15 work on the existing RFQ regardless); the routing transitions are best-effort (a partial failure leaves the Opportunity mid-route with `routingComplete: false` and no re-trigger endpoint); `client-decision.capture` is role-level (no per-officer queue); the six decision types are not otherwise differentiated (all four REQUEST_* behave identically beyond the recorded `decision` value + `notes`) |
 | 18–19 | Policy Placement & Issuance | **new module** `apps/api/src/modules/policy/` · **`Policy` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine (the first Domain B one); **no maker/checker** here (placing + recording issuance is single-actor Placement work — the mandatory independent check is Process 20 `PolicyChecking`) · `POST /policies` (`{ opportunityId, inceptionDate, expiryDate? }`, `policy.create`/Placement — already seeded) creates the `Policy` at the schema `@default(PLACEMENT_CONFIRMED)` (NOT via the engine — initial creation, like `Opportunity` at `NEEDS_CONFIRMED`); the **authoritative precondition is a `ClientDecision` of `ACCEPT`** (the Opp status can lag #17's best-effort route — 422 otherwise); insurer / insurance line / requested premium / currency come from the accepted `Recommendation.recommendedQuotation`, **not the body**; `opportunityId @unique` → pre-check 409 + `P2002` → 409 · `POST /policies/:id/issuance` (`{ policyNumber, issuedPremium, inceptionDate?, expiryDate?, schedule: { effectiveFrom?, limits, sumsInsured, namedPerils?, extensions? }, documents: [{ category, classification, fileName, storageRef }] }`, `policy.issue`/Placement — already seeded) drives `Policy PLACEMENT_CONFIRMED → ISSUED` through `WorkflowTransitionService.transition` with the issued scalars (`policyNumber` / `issuedPremium` / `issuedByUserId` + optional period corrections) passed as the transition `data` — so the status flip and the scalar write are **one atomic, engine-audited write** (its status-conditional `updateMany` is the race gate — 0 rows → 409); then `PolicyRepository.createIssuanceArtifacts` writes the opening `PolicySchedule` + the insurer-issued `Document` rows in **one Prisma `$transaction`** (local exception, like `QuotationRepository.reviseChain`) · a **crash-recovery re-entry branch** completes a partially-done issuance (status already `ISSUED`, no open schedule, payload byte-matches `policyNumber` + `compareMoney(issuedPremium)`) without re-transitioning and with no `UPDATE Policy` audit row; any other state / mismatched payload → 422 "issuance is recorded once" · `POST /policies/:id/documents` (`document.manage` — existing perm) appends `Document` rows to the electronic Insurance File (Part 4.2) at any lifecycle stage · `GET /policies?opportunityId=\|customerId=` + `/:id` (`policy.read` — **new seeded perm**, Sales/Placement/Manager/Exec) — the view carries `premiumVariance` (signed `subtractMoney(issued, requested)`, `null` until issued) + `issuanceComplete` · migration `20260902140000` adds `Policy.placedByUserId` / `Policy.issuedByUserId` (TEXT provenance scalars) + a **partial `UNIQUE`** `PolicySchedule_one_open_per_policy` (`effectiveTo IS NULL`) — raw SQL, Prisma can't express it (`race-safe-invariants.md`) · audit snapshots are **metadata not body**: schedule snapshot = coverage-key *names* + counts (never the figures), document snapshot **excludes `fileName` + `storageRef`** (a health-cert filename can name insured persons — HIGHLY_CONFIDENTIAL; `storageRef` is an internal object key) · web: a "Policy" section on the Opportunity detail screen (Placement place form once the Opp is at `PLACEMENT`, an issuance form — policy number / issued premium / limits+sums JSON / perils+extensions / repeatable document rows — then the issued policy + schedule + documents, with a post-issuance "attach a document" control) | `Policy` creation takes the schema `@default` status without the engine (initial creation, matches `Opportunity`/`RFQ`); the **transition-then-artefacts ordering** has one seam — if the schedule/documents `$transaction` fails after the status flip committed, the `Policy` is `ISSUED` with no schedule (recoverable via the re-entry branch; a hard crash *between* the engine's `updateMany` and its own audit write would additionally leave the TRANSITION row unwritten — bounded, rare, separately alarmed); `limits` / `sumsInsured` are stored opaquely (a non-empty flat object of string/number values — no per-figure `Decimal(18,3)` precision until a consumer does arithmetic on them, e.g. a Claim resolving "coverage in force at the loss date"); a `CoverNote` / binder interim state (Process 18) is modeled in the schema but has no endpoint; one `Policy` per Opportunity; `policy.create` / `policy.issue` are role-level (no per-officer queue); no `Endorsement`-driven schedule versioning (#22) — the partial `UNIQUE` is in place for it |
+| 20 | Policy Checking / Quality Control | **no migration** — `PolicyChecking`, the `PolicyChecking_maker_checker_distinct` CHECK (migration `20260826091424`, `checkedByUserId <> placedByUserId`), `ProfessionalIndemnityRiskEvent`, the `policy.check` perm, and the `ISSUED → CHECKING_IN_PROGRESS → DISCREPANCY \| VERIFIED` / `DISCREPANCY → CHECKING_IN_PROGRESS` map all already existed · `POST /policies/:id/checking` (`{ requestedCoverage: { limits, sumsInsured, namedPerils?, extensions? } }`, `policy.check`/**Policy Checking Officer**) — `diffCoverage` (pure) does a **line-by-line comparison** of the checker's transcribed Requested Coverage vs the current open `PolicySchedule` over exactly the four backlog dimensions: `limits` / `sumsInsured` per-key (money-equal via `compareMoney` so `"5000000"` == `"5000000.000"`, else a **case / whitespace-normalised** compare so a `"Fire"`/`"fire"` transcription is not a discrepancy), `namedPerils` / `extensions` as `missing` / `extra` set diffs · `discrepancyFound` is **derived**, never caller-asserted · **maker/checker**: `assertDifferentActors(placedByUserId, actor)` (app) + the DB CHECK (structural), **and** `assertDifferentActors(issuedByUserId, actor)` app-side — stricter than the lex row, which maps only the placer (`/brain-gap` filed) · 422 if `placedByUserId` is null · on a discrepancy: `PolicyChecking.discrepancyFound = true` + a linked `ProfessionalIndemnityRiskEvent` created **in the same `$transaction`** as the checking `upsert` (a discrepancy is recorded ⟺ a PI event exists); a re-check with the **same** detail does not double-log, one with a **materially changed** detail refreshes the existing PI event's `description` · the `Policy` is then walked `(ISSUED \| DISCREPANCY) → CHECKING_IN_PROGRESS → (VERIFIED \| DISCREPANCY)` through the engine — best-effort for a clean `VERIFIED` outcome, but an **unappliable `DISCREPANCY` outcome is a hard 409** (a concurrent divergent check verified the policy first — otherwise Delivery would be silently unblocked) · **Delivery is blocked structurally** — the `WORKFLOW_TRANSITIONS.Policy` map has no `DISCREPANCY → DELIVERED` edge, so #20 only needs to reach `DISCREPANCY` · `checking` (+ `checkingComplete`) folded into `PolicyView` · `POLICY_CHECKING_OFFICER` added to `policy.read` (seed, additive) + to the shared `POLICY_CROSS_OWNER_ROLES` (visibility) · web: the "Policy" section gains a checker-only QC form + the discrepancy / PI-event-logged display | `PolicyChecking` is **not** a `WorkflowTransitionService` entity (no `status` — its lifecycle is the parent `Policy`'s status); "Requested Coverage" is **transcribed by the checker** into the request body (there is no separately-stored requested schedule) — a corrected re-check by the same checker, or the insurer re-issuing a corrected `PolicySchedule` (which needs #22 `Endorsement`, not built), are the only exits from `DISCREPANCY`; the `complianceOverrideByUserId` column is surfaced in the view but no endpoint sets it (a discrepancy override is deferred — clearing a `DISCREPANCY` is currently single-actor); two officers checking one policy near-simultaneously with divergent transcriptions can still race on `PolicyChecking.discrepancyFound` itself (`policyId @unique` serialises the row, `P2002` → 409, but not the *value*) — per-policy serialisation of the check would close it (`/brain-gap` filed); the audit snapshot withholds the `checklistResult` / `discrepancyDetail` (coverage figures) but the PI event `description` carries them by design (Process 54); `policy.check` is role-level (no per-officer queue) |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
   Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, #16 Broker
-  Recommendation, #17 Client Decision Handling, and #18–19 Policy Placement & Issuance are
-  **built** — see the Domain B table above; #20 policy checking, #21 delivery, #22
+  Recommendation, #17 Client Decision Handling, #18–19 Policy Placement & Issuance, and
+  #20 Policy Checking are **built** — see the Domain B table above; #21 delivery, #22
   endorsement / cancellation remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
@@ -2441,6 +2447,140 @@ narrows a gap.
   permissions — `policy.read` new). One pre-existing MFA-timing flake in `rbac.e2e-spec.ts`
   surfaced once under load during a full-suite run and passed on isolation / re-run
   (documented in `vitest-e2e.config.ts`), unrelated to this change.
+
+**Part C #20 — Policy Checking / Quality Control (Domain B, Process 20)**
+
+- **Extends the `policy` module** (`apps/api/src/modules/policy/policy-checking.*` +
+  `apps/api/src/repositories/policy-checking.repository.ts`). Backlog: a line-by-line
+  comparison of Requested Coverage vs Issued Policy (limits / sums insured / named perils /
+  extensions); actually enforce maker/checker `placedByUserId != checkedByUserId`; on a
+  discrepancy → `DISCREPANCY` state, block Delivery, auto-log a
+  `ProfessionalIndemnityRiskEvent`.
+- **No migration.** The `PolicyChecking` model, the `PolicyChecking_maker_checker_distinct`
+  CHECK constraint (`checkedByUserId IS NULL OR checkedByUserId <> placedByUserId`,
+  migration `20260826091424`), the `ProfessionalIndemnityRiskEvent` model, the `policy.check`
+  permission (`POLICY_CHECKING_OFFICER`), and the full `ISSUED → CHECKING_IN_PROGRESS →
+  DISCREPANCY | VERIFIED` / `DISCREPANCY → CHECKING_IN_PROGRESS` transition map all already
+  existed. The only seed change is **additive**: `POLICY_CHECKING_OFFICER` gains `policy.read`
+  (so a checker can read the policy it checks) and is added to a new shared
+  `POLICY_CROSS_OWNER_ROLES` visibility constant.
+- **`PolicyChecking` is NOT a `WorkflowTransitionService` entity** (no `status` column — its
+  lifecycle is the parent `Policy`'s status). `Policy` IS, and every status move goes
+  through the engine.
+- **`POST /policies/:id/checking`** (`{ requestedCoverage: { limits, sumsInsured,
+  namedPerils?, extensions? } }`, `policy.check`). The "issued" side is the current open
+  `PolicySchedule` (from #19); the "requested" side is **transcribed by the Policy Checking
+  Officer** into the same shape (there is no separately-stored requested schedule). The pure
+  `diffCoverage` derives the comparison:
+  - `limits` / `sumsInsured` — per-key (union of keys, sorted). A pair is equal if both
+    parse as money (compared at fils precision via `compareMoney` — `"5000000"` equals
+    `"5000000.000"`, never a float compare) else as **case- and whitespace-normalised**
+    descriptors (so `"Fire"` vs `"fire"` or `"debris  removal"` vs `"debris removal"` is not
+    a discrepancy). A key on only one side → `match: false` with `null` for the missing side.
+  - `namedPerils` / `extensions` — set diffs → `missing` (requested, not issued) / `extra`
+    (issued, not requested), same normalisation.
+  - `discrepancyFound = mismatchCount > 0` — **derived, never caller-asserted**. `summary`
+    is a human-readable mismatch list that embeds the differing figures (→
+    `PolicyChecking.discrepancyDetail` + the PI event description).
+- **Maker/checker** (`ibms-brain/meta/lex/maker-checker-segregation.md`) — enforced both in
+  the app (`assertDifferentActors(placedByUserId, actor)`, throws `ForbiddenException`) and
+  structurally (the pre-existing DB CHECK). `assertDifferentActors(issuedByUserId, actor)`
+  is **also** applied app-side — the checker should not be whoever transcribed the issued
+  record either; the lex table maps only the placer today, so this is a stricter-than-lex
+  belt (`/brain-gap` filed to decide whether the DB CHECK should extend). A `422` is raised
+  if `Policy.placedByUserId` is null (a maker-less policy can't be checked — defensive
+  against a future backfill / integration).
+- **On a discrepancy** — `PolicyCheckingRepository.recordChecking` does the `PolicyChecking`
+  `upsert` (`policyId @unique`; a re-check UPDATEs the row) **and** creates the linked
+  `ProfessionalIndemnityRiskEvent` (`sourcePolicyCheckingId`, optional `piPolicyId` from the
+  broker's latest PI policy) **in one Prisma `$transaction`** — a documented local exception
+  (like `QuotationRepository.reviseChain`), so "a discrepancy is recorded" and "a PI risk
+  event exists" can never diverge. A re-check that still finds the **same** discrepancy does
+  not double-log (a `discrepancyLoggedAsPiRiskEvent` guard); a re-check that finds a
+  **materially changed** discrepancy refreshes the existing event's `description` (a Process
+  54 risk-register entry must not go stale).
+- **The status walk** — `PolicyCheckingService.driveCheckingOutcome` walks the `Policy`
+  `(ISSUED | DISCREPANCY) → CHECKING_IN_PROGRESS → (VERIFIED | DISCREPANCY)` through
+  `WorkflowTransitionService.transition`, re-reading the live status before every hop
+  (self-healing; a re-call from a stalled `CHECKING_IN_PROGRESS` resumes). It is
+  **best-effort for a clean `VERIFIED` outcome** (a clean result that can't be applied
+  because the policy moved on is harmless) but **a `DISCREPANCY` outcome that can no longer
+  be applied is a hard `409`** (a concurrent divergent check verified the policy first, and
+  the map has no edge back onto the checking path) — otherwise a policy could sit at
+  `VERIFIED` with `discrepancyFound = true` and its PI event logged, yet Delivery unblocked:
+  the exact PI-claim failure mode Process 20 exists to catch. The check row + PI event stay
+  on record; the `409` forces manual resolution. `/brain-gap` filed on this class ("a
+  best-effort status walk whose terminal state is a safety gate must fail loudly").
+- **Delivery block is structural** — `WORKFLOW_TRANSITIONS.Policy` has `DISCREPANCY →
+  [CHECKING_IN_PROGRESS]` only (never `→ DELIVERED`), and every intermediate state
+  (`ISSUED` / `CHECKING_IN_PROGRESS`) likewise has no `DELIVERED` edge. So #20 only needs to
+  drive the status to `DISCREPANCY`; no separate Delivery guard.
+- **Audit — metadata not body** — `policyCheckingAuditSnapshot` = counts + ids + booleans
+  only. The `checklistResult` JSON and `discrepancyDetail` embed coverage figures, so they
+  never enter the audit trail (a `JSON.stringify` unit assertion enforces it). The
+  `ProfessionalIndemnityRiskEvent.description` **does** carry the figures — that is the
+  Process 54 risk-register entry's purpose ("requested Sum Insured not matching amount sent
+  to insurer"). `PolicyView.checking.checklist` / `.discrepancyDetail` are returned to
+  authorised `policy.read` readers — coverage data (Confidential, not Highly Confidential),
+  the same tier as the schedule figures those roles already see; not logged.
+- **`apps/web/app/(app)/opportunities/[id]/`** — the "Policy" section gains a checker-only
+  QC-check form (`limits` / `sumsInsured` JSON textareas + perils / extensions comma-lists
+  + "Run check") and a discrepancy display (the mismatch detail + a "PI risk event logged"
+  note + "DISCREPANCY — Delivery blocked" / "verified"). No new nav item.
+- **`@code-reviewer` (mandatory — workflow logic + maker/checker + Confidential data + a
+  regulatory obligation)** → **APPROVE WITH MINORS, no BLOCKER, no MAJOR, no lex violation**
+  (maker/checker enforced app + DB; every `Policy` status move through the engine; audit
+  withholds the coverage figures; money equality via `compareMoney`, never a float; no PDPL
+  SLA row; no privacy rule re-derived). MINORs fixed: (1) an unappliable `DISCREPANCY` walk
+  outcome now throws `409` instead of a swallowed warn; (2) case/whitespace-normalised
+  free-text comparison — no false-positive PI events from a `"Fire"`/`"fire"` transcription;
+  (3) a materially-changed re-check refreshes the linked PI event's `description`;
+  (4) `assertDifferentActors` also rejects the issuing officer; (5) `recordChecking` `P2002`
+  → `409` (two concurrent first checks); (6) the maker/checker e2e now dual-hats the placer
+  so the `403` is the `assertDifferentActors` rejection, not the RBAC guard. NITs: dropped
+  two unused repo methods; extracted the shared `POLICY_CROSS_OWNER_ROLES` helper.
+  `/brain-gap` filed + pushed (`ibms-brain` `3b246ad` — `policy-lifecycle.md` § "The rules
+  that aren't obvious", Policy Checking row: the "unappliable discrepancy must throw" rule
+  and the issuer-segregation open question).
+- **Deferred**: "Requested Coverage" is transcribed by the checker each time — a corrected
+  re-check (the checker fixes their transcription) or an insurer-re-issued corrected
+  `PolicySchedule` (which needs #22 `Endorsement`, not built) are the only exits from
+  `DISCREPANCY`. `PolicyChecking.complianceOverrideByUserId` is surfaced in the view but no
+  endpoint sets it — a compliance override that bypasses a discrepancy is deferred, so
+  clearing a `DISCREPANCY` is currently single-actor. The concurrent-divergent-checks race
+  on `PolicyChecking.discrepancyFound` itself (`policyId @unique` serialises the row and a
+  `P2002` → `409`, but not the *value*) needs per-policy serialisation of the check to fully
+  close. `policy.check` is role-level (no per-officer queue). A re-check that clears a prior
+  discrepancy leaves the earlier PI risk event on the register unannotated (closing it out
+  is a Process 54 concern).
+- **Verification**: +23 api unit — `policy-checking.config.spec.ts` ×9 (`diffCoverage` —
+  clean; money trailing-zero equality; a lowered limit; a one-sided key; a
+  missing-peril / extra-extension; **a casing / whitespace-only difference is NOT a
+  discrepancy**; `piRiskEventDescription`; `policyCheckingAuditSnapshot` excludes the
+  checklist / figures via `JSON.stringify`), `policy-checking.service.spec.ts` ×14 (clean →
+  APPROVE audit + `ISSUED → CHECKING_IN_PROGRESS → VERIFIED` walk; discrepancy → REJECT
+  audit + PI event passed to the repo + `→ DISCREPANCY` walk; 403 self-check /
+  issuer-check; 422 no placing officer / not-checkable status / no open schedule; a
+  re-check from `DISCREPANCY` still-dirty does not move the status; a re-check now-clean
+  walks to `VERIFIED`; a resumed walk from `CHECKING_IN_PROGRESS`; **best-effort walk still
+  records the QC result on a transition failure**; **409 when a discrepancy outcome can no
+  longer be applied (concurrent verify mid-walk)**; **409 on a concurrent first-check unique
+  violation**; 404 visibility — a **stateful** Policy mock where each `transition` moves
+  `state.status`) → **834** api unit (66 files, workspace-scoped). `test/policy.e2e-spec.ts`
+  gains a 3rd test — a real checker verifies a clean policy → `VERIFIED`; a discrepant check
+  → `DISCREPANCY` + a real `ProfessionalIndemnityRiskEvent` row linked by
+  `sourcePolicyCheckingId`; a re-check with a materially changed discrepancy does not
+  double-log but **refreshes the PI event description**; a re-check with the correct
+  requested coverage clears to `VERIFIED`; the placing officer (dual-hatted with
+  `policy.check`) checking → `403` (the `assertDifferentActors` rejection). Full suites
+  green: **834** api unit, api contract 4/4, **api e2e 108/108** (18 files), `npm audit` 0
+  vulnerabilities, `nest build` OK, web unit 6, web Playwright **rfq.spec.ts 14/14** (+1: a
+  Policy Checking Officer runs the QC check and sees a discrepancy block Delivery), `next
+  build` OK, api + web + db `typecheck` + `eslint` clean. No migration; `prisma validate`
+  OK, `prisma migrate status` clean (29 migrations, unchanged); seed re-run (**144**
+  permissions — `POLICY_CHECKING_OFFICER` gains `policy.read`, additive). The known
+  `rbac.e2e-spec.ts` MFA-timing flake surfaced once under full-suite load and passed on
+  isolation / re-run (documented in `vitest-e2e.config.ts`), unrelated.
 
 ## Deployment
 

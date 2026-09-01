@@ -18,7 +18,7 @@ import { ClientDecisionRepository } from '../../repositories/client-decision.rep
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { POLICY_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
 import {
   compareMoney,
   formatMoney,
@@ -64,6 +64,21 @@ interface PolicyDocumentView {
   createdAt: Date;
 }
 
+/** Process 20 — the maker/checker quality-control check, or null. `checklist`
+ * is the structured field-by-field comparison (returned to authorised
+ * `policy.read` readers — coverage data, not logged). */
+interface PolicyCheckingView {
+  placedByUserId: string;
+  checkedByUserId: string | null;
+  checkedAt: Date | null;
+  discrepancyFound: boolean;
+  discrepancyDetail: string | null;
+  discrepancyLoggedAsPiRiskEvent: boolean;
+  complianceOverrideByUserId: string | null;
+  checklist: Prisma.JsonValue;
+  createdAt: Date;
+}
+
 /** A policy as the API returns it. `premiumVariance` is the signed
  * issued-minus-requested delta (null until issued); `issuanceComplete` is
  * true once the policy has moved past `PLACEMENT_CONFIRMED` and carries at
@@ -87,7 +102,11 @@ export interface PolicyView {
   issuedByUserId: string | null;
   schedules: PolicyScheduleView[];
   documents: PolicyDocumentView[];
+  checking: PolicyCheckingView | null;
   issuanceComplete: boolean;
+  /** Process 20 — the check has been recorded AND the policy has settled to
+   * `VERIFIED` or `DISCREPANCY`. */
+  checkingComplete: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -128,10 +147,11 @@ function isUniqueViolation(err: unknown): boolean {
  *    `customerId`.
  *
  * `Policy` IS a `WorkflowTransitionService` entity — its `status` moves only
- * through the engine. It is NOT maker/checker at this stage (placing and
- * recording issuance is single-actor Placement work; the mandatory
- * independent check is Process 20, `PolicyChecking`). Visibility mirrors
- * `RecommendationService`: a policy inherits its Customer's visibility.
+ * through the engine. `place` / `recordIssuance` are single-actor Placement
+ * work with no maker/checker; the mandatory independent maker/checker check
+ * is Process 20 (`PolicyCheckingService`, same module). Visibility mirrors
+ * `RecommendationService` — a policy inherits its Customer's visibility — plus
+ * a Policy Checking Officer reaches any policy (cross-book QC).
  */
 @Injectable()
 export class PolicyService {
@@ -147,9 +167,13 @@ export class PolicyService {
     private readonly workflow: WorkflowTransitionService,
   ) {}
 
+  /** Placement / Manager / Executive work the whole book; a Policy Checking
+   * Officer must be able to reach any policy to perform Process 20 QC (a
+   * cross-book control function, like Compliance for KYC). Sales sees only
+   * policies on a Customer they own. */
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
     return actor.roles.some((role) =>
-      (CUSTOMER_FILE_CROSS_OWNER_ROLES as readonly string[]).includes(role),
+      (POLICY_CROSS_OWNER_ROLES as readonly string[]).includes(role),
     );
   }
 
@@ -262,8 +286,26 @@ export class PolicyService {
         uploadedByUserId: d.uploadedByUserId,
         createdAt: d.createdAt,
       })),
+      checking: policy.checking
+        ? {
+            placedByUserId: policy.checking.placedByUserId,
+            checkedByUserId: policy.checking.checkedByUserId,
+            checkedAt: policy.checking.checkedAt,
+            discrepancyFound: policy.checking.discrepancyFound,
+            discrepancyDetail: policy.checking.discrepancyDetail,
+            discrepancyLoggedAsPiRiskEvent:
+              policy.checking.discrepancyLoggedAsPiRiskEvent,
+            complianceOverrideByUserId:
+              policy.checking.complianceOverrideByUserId,
+            checklist: policy.checking.checklistResult ?? null,
+            createdAt: policy.checking.createdAt,
+          }
+        : null,
       issuanceComplete:
         policy.status !== 'PLACEMENT_CONFIRMED' && policy.schedules.length > 0,
+      checkingComplete:
+        policy.checking !== null &&
+        (policy.status === 'VERIFIED' || policy.status === 'DISCREPANCY'),
       createdAt: policy.createdAt,
       updatedAt: policy.updatedAt,
     };

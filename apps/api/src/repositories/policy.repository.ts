@@ -5,6 +5,7 @@ import type {
   DocumentCategory,
   Policy,
   PolicySchedule,
+  PolicyStatus,
   Prisma,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +20,8 @@ const POLICY_INCLUDE = {
   insurer: { select: INSURER_IDENTITY_SELECT },
   schedules: { orderBy: { effectiveFrom: 'desc' } },
   documents: { orderBy: { createdAt: 'desc' } },
+  // Process 20 — the one maker/checker quality-control row (or null).
+  checking: true,
 } as const;
 
 /** A policy with its insurer identity, its coverage-schedule versions and its
@@ -84,6 +87,16 @@ export class PolicyRepository {
     return this.prisma.client.policy.findUnique({
       where: { id },
       include: POLICY_INCLUDE,
+    });
+  }
+
+  /** Just the id + status — for a bounded status-walk loop
+   * (`PolicyCheckingService.driveCheckingOutcome`) that re-reads the live
+   * status before every hop and does not need the full include. */
+  findStatus(id: string): Promise<{ id: string; status: PolicyStatus } | null> {
+    return this.prisma.client.policy.findUnique({
+      where: { id },
+      select: { id: true, status: true },
     });
   }
 
