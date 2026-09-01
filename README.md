@@ -1103,6 +1103,14 @@ narrows a gap.
   reliably; the previous (parallel) default was flaky at this file count. Slower
   (~15s -> ~90-100s total), but a flaky e2e gate is not real evidence
   (`ibms-brain/meta/lex/definition-of-done.md`).
+  **Update (Part C #14 follow-up):** even serialized, `rbac.e2e-spec.ts`'s
+  access-recertification tests (`:203` / `:264`) later became slow-then-timeout once the
+  shared test DB had ~14 files' worth of accumulated users — `startCycle` did 2 sequential
+  writes per active subject and `listItemsForReviewer` one role-lookup per item. Both are
+  now batched into a single query each (`AccessRecertificationRepository.createManyItems`,
+  `AuditService.recordMany`, `UserRepository.getRoleNamesByIds`), so those endpoints are
+  O(1) round-trips regardless of user count. `rbac.e2e-spec.ts` back to 5/5 in ~18s; full
+  api e2e **98/98**.
 
 **Part C #5 — Needs Assessment (Domain A, Process 5)**
 
@@ -1962,10 +1970,15 @@ narrows a gap.
   workspace-scoped), api contract 4/4, `npm audit` 0 high, `nest build` OK, web unit 6, web
   Playwright **97/97**, `next build` OK, api + web + db `typecheck` + `eslint` clean.
   Migration applied to `db` + `db-test` via `migrate deploy`; `prisma validate` OK; seed
-  re-run (**139** permissions). api e2e **96/98** — the 2 failures are the **pre-existing
-  `test/rbac.e2e-spec.ts` access-recertification flake** (`startCycle` timing out under
-  concurrent load with a `PrismaClientUnknownRequestError`, documented since #11; the
-  earlier isolated run this session got 98/98), in a module this item does not touch.
+  re-run (**139** permissions). api e2e initially came back **96/98** — the 2 failures were
+  the long-standing `test/rbac.e2e-spec.ts:203/264` access-recertification flake
+  (`startCycle` timing out with a `PrismaClientUnknownRequestError`, in a module this item
+  does not touch). That flake is now **fixed** in a follow-up commit — `startCycle` and
+  `listItemsForReviewer` were doing O(N)-over-every-active-user writes that blew the 30s
+  e2e timeout once the shared test DB had accumulated enough users; they now batch into one
+  `INSERT … RETURNING` each (`AccessRecertificationRepository.createManyItems`,
+  `AuditService.recordMany`, `UserRepository.getRoleNamesByIds`). Full api e2e **98/98**
+  after the fix; `rbac.e2e-spec.ts` 5/5 in ~18s (was ~69s).
 
 ## Deployment
 
