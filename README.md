@@ -410,15 +410,17 @@ build actually is today:
 - **Part C — Domain A, Processes 1–10 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
-  Quotation Management (#13) + Quote Comparison (#14) — built and verified.** A minimal
-  `Opportunity` parent (created from a FINALIZED `InsuranceProgram`) plus `RFQ` /
-  `RFQInsurer` — one RFQ per insurance line, an insurer shortlist, per-insurer response
-  tracking, a nightly business-day follow-up sweep (alerts *and* auto-advances a silent
-  insurer to `NO_RESPONSE`), a broker↔insurer correspondence log on each RFQ (the widened
-  `CommunicationLog`), each insurer's `Quotation` captured against an RFQ line and versioned
-  on every renegotiation (`previousVersionId` / `isCurrentVersion`, the old version never
-  overwritten), and a `ComparisonMatrix` (re)built from every current-version quotation —
-  price alongside coverage / exclusions / deductibles / limits / optional quality & service
+  Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) — built and
+  verified.** A minimal `Opportunity` parent (created from a FINALIZED `InsuranceProgram`)
+  plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an insurer shortlist, per-insurer
+  response tracking, a nightly business-day follow-up sweep (alerts *and* auto-advances a
+  silent insurer to `NO_RESPONSE`), a broker↔insurer correspondence log on each RFQ (the
+  widened `CommunicationLog`), each insurer's `Quotation` captured against an RFQ line and
+  versioned on every negotiation round (`previousVersionId` / `isCurrentVersion`, the old
+  version never overwritten — and, from #15, "never deleted or replaced" is enforced by a
+  DB immutability trigger, with each round carrying the broker's rationale + a premium
+  delta), and a `ComparisonMatrix` (re)built from every current-version quotation — price
+  alongside coverage / exclusions / deductibles / limits / optional quality & service
   scores, with the shortlisted insurers that didn't quote flagged. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
@@ -437,21 +439,22 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–14 — built, with these deferrals
+### Part C · Domain B #11–15 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
-| 11 | RFQ / Market Submission | minimal `Opportunity` parent — `POST /opportunities` (`{ insuranceProgramId }`) creates a `NEEDS_CONFIRMED` Opportunity from a **FINALIZED** `InsuranceProgram`, `customerId` resolved server-side · `GET /opportunities?customerId=` + `/:id` · `POST /rfqs` (one RFQ per `insuranceLine`, a SENT `RFQInsurer` per shortlisted insurer, `followUpThresholdDays` override) — the first RFQ drives `Opportunity` `NEEDS_CONFIRMED → RFQ_ISSUED` through the workflow engine · `GET /rfqs/selectable-insurers` (read-only `Insurer` master data) · `GET /rfqs?opportunityId=\|customerId=` + `/:id` · `POST /rfqs/:id/insurers` (broaden the shortlist) · `POST /rfq-insurers/:id/transition` (VIEWED/QUOTED/DECLINED/NO_RESPONSE via the workflow engine; QUOTED/DECLINED stamp `respondedAt`) · nightly `@Cron('0 6 * * *')` follow-up sweep (see #12 for its behaviour) · `@@unique([opportunityId, insuranceLine])` + partial `UNIQUE` `Opportunity(insuranceProgramId) WHERE status <> 'CLOSED_LOST'` (`race-safe-invariants.md`) · web: opportunities + RFQ list/detail/new, per-insurer status control, "Take to market" on a FINALIZED programme, one nav item | **full Opportunity lifecycle is #16–17** — no Recommendation, no Client Decision (6 outcomes), no renegotiation, no close-lost endpoint, no `targetPremiumThreshold`; new-business Opportunities with no `InsuranceProgram` are not supported (a FINALIZED programme is the only entry point); the business-day threshold is a **lower bound** (no Jordanian public-holiday calendar exists — `ibms-brain/meta/context/business-day-calendar.md`); one RFQ per `(opportunity, line)` — re-marketing a line needs a deliberate relaxation (#15/#17); `Insurer` master data is read-only (a real Insurer-management module is narrative Process 31); no maker/checker (issuing an RFQ is single-actor Placement work); `rfq.create` / `opportunity.create` are role-level (no per-officer queue); `Recommendation` (#16) is not built |
+| 11 | RFQ / Market Submission | minimal `Opportunity` parent — `POST /opportunities` (`{ insuranceProgramId }`) creates a `NEEDS_CONFIRMED` Opportunity from a **FINALIZED** `InsuranceProgram`, `customerId` resolved server-side · `GET /opportunities?customerId=` + `/:id` · `POST /rfqs` (one RFQ per `insuranceLine`, a SENT `RFQInsurer` per shortlisted insurer, `followUpThresholdDays` override) — the first RFQ drives `Opportunity` `NEEDS_CONFIRMED → RFQ_ISSUED` through the workflow engine · `GET /rfqs/selectable-insurers` (read-only `Insurer` master data) · `GET /rfqs?opportunityId=\|customerId=` + `/:id` · `POST /rfqs/:id/insurers` (broaden the shortlist) · `POST /rfq-insurers/:id/transition` (VIEWED/QUOTED/DECLINED/NO_RESPONSE via the workflow engine; QUOTED/DECLINED stamp `respondedAt`) · nightly `@Cron('0 6 * * *')` follow-up sweep (see #12 for its behaviour) · `@@unique([opportunityId, insuranceLine])` + partial `UNIQUE` `Opportunity(insuranceProgramId) WHERE status <> 'CLOSED_LOST'` (`race-safe-invariants.md`) · web: opportunities + RFQ list/detail/new, per-insurer status control, "Take to market" on a FINALIZED programme, one nav item | **full Opportunity lifecycle is #16–17** — no Recommendation, no Client Decision (6 outcomes), no renegotiation, no close-lost endpoint, no `targetPremiumThreshold`; new-business Opportunities with no `InsuranceProgram` are not supported (a FINALIZED programme is the only entry point); the business-day threshold is a **lower bound** (no Jordanian public-holiday calendar exists — `ibms-brain/meta/context/business-day-calendar.md`); one RFQ per `(opportunity, line)` — re-marketing a line needs a deliberate relaxation (#17); `Insurer` master data is read-only (a real Insurer-management module is narrative Process 31); no maker/checker (issuing an RFQ is single-actor Placement work); `rfq.create` / `opportunity.create` are role-level (no per-officer queue); `Recommendation` (#16) is not built |
 | 12 | Market Placement | `CommunicationLog` **widened** (not a new model) to carry broker↔insurer RFQ correspondence alongside its Process-44 role — nullable `customerId`/`languageUsed`, new `direction CommunicationDirection @default(OUTBOUND)` (enum `INBOUND\|OUTBOUND`), `rfqId?`/`rfqInsurerId?` FKs, `subject?`/`body?`/`loggedByUserId?`/`createdAt` (migration `20260829120000`) · `POST /rfqs/:id/communications` (`{ direction, channel, body, subject?, rfqInsurerId?, occurredAt? }`, new perm `rfq.communication.log`/Placement — `rfqInsurerId` must be on the RFQ; `occurredAt` offset-required + not-future) + `GET /rfqs/:id/communications` (`rfq.read`) — factual log, no status/maker-checker, CREATE audit is **metadata only, never `body`** (Confidential) · the nightly follow-up sweep now also **auto-advances** `SENT`/`VIEWED → NO_RESPONSE` through the workflow engine once past the business-day threshold (race-safe: a concurrent manual QUOTED/DECLINED → no-op, counted `transitionSkipped`) · shared `parseHistoricalInstant` (`common/historical-instant.util.ts`) reused by CRM + RFQ · web: a "Correspondence" section on the RFQ detail screen (list + Placement-only log form) | no attachment upload for "additional information" (free-text note only — a Document-module concern); no per-insurer thread view / pagination on the correspondence list; a placement row leaves `respectedConsent`/`languageUsed`/`templateId` unused; auto-`NO_RESPONSE` inherits the same business-day **lower bound**; Process 44 (outbound customer communication) itself is unbuilt and will share the widened table |
-| 13 | Quotation Management | `POST /quotations` (`{ rfqId, insurerId, premium, currency?, deductible?, limits?, biPeriodMonths?, liabilityLimit?, exclusions?, conditions?, commissionRatePercent? }`, `quotation.capture`/Placement) captures an insurer's quote as a version-1 `Quotation` — the insurer must be on the RFQ's shortlist and not `DECLINED`, and must not already have a current quotation (409 → revise) · `POST /quotations/:id/revise` (`quotation.negotiate`/Placement) records a renegotiation round as a NEW version linked by `previousVersionId`, flipping `isCurrentVersion` — the old row is kept verbatim · `GET /quotations?rfqId=\|opportunityId=\|customerId=` + `/:id` (`quotation.read` — new seeded perm, Sales/Placement/Manager/Exec) return per-insurer version chains · every monetary field is fils-quantized through `money.util.ts` (`normalizeQuotationTerms`, pure) · partial `UNIQUE` `Quotation(rfqId, insurerId) WHERE isCurrentVersion` + the existing `previousVersionId @unique` are the race backstops (`race-safe-invariants.md`) · a successful capture / revise **best-effort** advances the matching `RFQInsurer → QUOTED` (stamping `respondedAt`) and the `Opportunity RFQ_ISSUED → QUOTES_RECEIVED` through the workflow engine (logged, never thrown) · web: a "Quotations" section on the RFQ detail screen (per-insurer chain cards + version history + a Placement-only capture / revise form) | `Quotation` is **not** a `WorkflowTransitionService` entity (`isCurrentVersion` is a boolean, not a status) and has no maker/checker (capturing what an insurer sent is a factual single-actor record); `limits` is stored as opaque JSON — its internal shape is not validated; `commissionRatePercent` is captured verbatim, not applied (Finance, #31+); the best-effort workflow advances are **not authoritative** — derive "this insurer has quoted" from the `Quotation` table, not `RFQInsurer.status`; no `Recommendation` (#16) consuming these quotes yet; no `apps/api` e2e (carried from #11–12); the `revise` two writes run in one Prisma `$transaction` (`reviseChain`) — a deliberate local exception to this codebase's no-`$transaction` convention, since a crash between the predecessor-clear and the successor-insert would otherwise leave the chain headless; the nightly RFQ follow-up sweep (#12) now **drops any open submission whose `(rfqId, insurerId)` already has a current `Quotation`** (`RfqRepository.findCurrentQuotationKeys` → `FollowUpScanResult.skippedQuoted`) — an insurer that quoted is not "silent" even if its best-effort `→ QUOTED` move failed (`/brain-gap` filed + solved, `ibms-brain/meta/context/policy-lifecycle.md`) |
+| 13 | Quotation Management | `POST /quotations` (`{ rfqId, insurerId, premium, currency?, deductible?, limits?, biPeriodMonths?, liabilityLimit?, exclusions?, conditions?, commissionRatePercent? }`, `quotation.capture`/Placement) captures an insurer's quote as a version-1 `Quotation` — the insurer must be on the RFQ's shortlist and not `DECLINED`, and must not already have a current quotation (409 → revise) · `POST /quotations/:id/revise` (`quotation.negotiate`/Placement) records a renegotiation round as a NEW version linked by `previousVersionId`, flipping `isCurrentVersion` — the old row is kept verbatim · `GET /quotations?rfqId=\|opportunityId=\|customerId=` + `/:id` (`quotation.read` — new seeded perm, Sales/Placement/Manager/Exec) return per-insurer version chains · every monetary field is fils-quantized through `money.util.ts` (`normalizeQuotationTerms`, pure) · partial `UNIQUE` `Quotation(rfqId, insurerId) WHERE isCurrentVersion` + the existing `previousVersionId @unique` are the race backstops (`race-safe-invariants.md`) · a successful capture / revise **best-effort** advances the matching `RFQInsurer → QUOTED` (stamping `respondedAt`) and the `Opportunity RFQ_ISSUED → QUOTES_RECEIVED` through the workflow engine (logged, never thrown) · web: a "Quotations" section on the RFQ detail screen (per-insurer chain cards + version history + a Placement-only capture / revise form) | `Quotation` is **not** a `WorkflowTransitionService` entity (`isCurrentVersion` is a boolean, not a status) and has no maker/checker (capturing what an insurer sent is a factual single-actor record); `limits` is stored as opaque JSON — its internal shape is not validated; `commissionRatePercent` is captured verbatim, not applied (Finance, #31+); the best-effort workflow advances are **not authoritative** — derive "this insurer has quoted" from the `Quotation` table, not `RFQInsurer.status`; no `Recommendation` (#16) consuming these quotes yet; the `apps/api` e2e gap carried from #11–12 is **closed for this module at #15** (`test/quotation.e2e-spec.ts` drives the real capture / revise path + the immutability trigger); the `revise` two writes run in one Prisma `$transaction` (`reviseChain`) — a deliberate local exception to this codebase's no-`$transaction` convention, since a crash between the predecessor-clear and the successor-insert would otherwise leave the chain headless; the nightly RFQ follow-up sweep (#12) now **drops any open submission whose `(rfqId, insurerId)` already has a current `Quotation`** (`RfqRepository.findCurrentQuotationKeys` → `FollowUpScanResult.skippedQuoted`) — an insurer that quoted is not "silent" even if its best-effort `→ QUOTED` move failed (`/brain-gap` filed + solved, `ibms-brain/meta/context/policy-lifecycle.md`) |
 | 14 | Quote Comparison | `POST /comparison-matrices` (`{ rfqId, scores?: [{ insurerId, insurerQualityScore?, serviceScore? }] }`, `comparison.build`/Placement) **(re)builds** the one `ComparisonMatrix` per RFQ from every **current-version** `Quotation` on it — one `ComparisonMatrixRow` each (the objective dimensions — premium / deductible / `limits` / BI period / liability limit / exclusions / conditions / commission rate — live on the linked `Quotation`, so the matrix is **never price alone**, `policy-lifecycle.md` § controls) · shortlisted insurers with no quote in the matrix are flagged — the `missing` / `declined` buckets are **recomputed live on every read** from the current shortlist (so they stay disjoint after a post-build status change); `ComparisonMatrix.missingInsurers` stores the build-time snapshot for the audit counts only · optional per-insurer `insurerQualityScore` / `serviceScore` (0–100, 2dp) — Placement's judgement, there is no Insurer-scoring module (Process 61) · `GET /comparison-matrices?rfqId=` + `/:id` (`comparison.read` — **new seeded perm**, Sales/Placement/Manager/Exec) · a build **best-effort** advances `Opportunity QUOTES_RECEIVED → COMPARISON_BUILT` through the workflow engine (logged, never thrown) · upsert-matrix + replace-rows run in one Prisma `$transaction` (`ComparisonRepository.buildOrRebuild`, which also reports created-vs-rebuilt for the audit action); `@@unique([comparisonMatrixId, quotationId])` backstops a doubled row (`race-safe-invariants.md`) · migration `20260901160000` adds `ComparisonMatrix.builtByUserId` + the FK/filter indexes + that `@@unique` · web: a "Comparison" section on the RFQ detail screen (a wide scrollable table + missing / declined callouts + a "· superseded" marker on a row whose quote was revised since the build + a Placement-only build / rebuild control with an optional score grid) | `ComparisonMatrix` is **not** a `WorkflowTransitionService` entity (no status) and has no maker/checker (a derived artefact — the gate sits downstream at the Recommendation, #16); the two subjective scores are manual free inputs (no Insurer-scoring module — Process 61) and `Insurer.financialStrengthRating` is not mapped in; a row's **quote terms** can go stale (a `Quotation` revised since the build — `builtAt` and the row's `quotation.isCurrentVersion` / "superseded" marker signal it; rebuild to refresh); rows carry no computed ranking / "best value" (that reasoning is the Recommendation, #16 — and row order is deliberately by insurer, not by premium); no `apps/api` e2e (carried from #11–13); `comparison.build` is role-level (no per-officer queue) |
+| 15 | Negotiation | the negotiation mechanism is `POST /quotations/:id/revise` from #13 — a round is a NEW `Quotation` version (`versionNumber+1`, linked by `previousVersionId`, `isCurrentVersion` flipped, the predecessor kept verbatim) · #15 makes **"never deleted or replaced" a real DB-layer guarantee**: migration `20260901180000` adds `negotiationNotes TEXT` + a trigger (`prevent_quotation_version_mutation`, same pattern as the `AuditLogEntry` immutability trigger) that rejects any `DELETE` of a `Quotation` row, any `UPDATE` of an already-superseded version, and any `UPDATE` of a live version that changes anything other than `isCurrentVersion` true→false (the supersede flip — asserted column-by-column via `to_jsonb(NEW) - 'isCurrentVersion' IS DISTINCT FROM to_jsonb(OLD) - 'isCurrentVersion'`) · a revise round now carries the broker's optional `negotiationNotes` (the rationale — what was asked / conceded; Confidential, audited as a `hasNegotiationNotes` boolean only) · every quotation read returns a pure `history: NegotiationRound[]` projection (`buildNegotiationHistory`) — round 0 is the opening quote, each later round is diffed against the version its `previousVersionId` names and carries `premiumDeltaFromPrevious` (fils-quantized via `money.util.ts`, sign preserved, `null` when the round changed `currency`) + `changedTermFields` + that round's notes · web: the "Quotations" version-history table gains Round / Δ premium / Terms-changed columns + the round rationale, and the revise form gains a "Negotiation notes" field | `Quotation` is still **not** a `WorkflowTransitionService` entity and has no maker/checker (recording a negotiated term set is a factual single-actor Placement record; the approval gate is the Broker Recommendation, #16); no structured "negotiation ask vs. counter" model — `negotiationNotes` is one free-text field per round; the DB trigger's documented residual risk is identical to the `AuditLogEntry` trigger's (a session on the shared `ibms` Postgres role can still `SET session_replication_role = replica` — a least-privilege app role is a separate infra change); a data fix or PDPL Correction DSR touching a historical version now requires that privileged bypass (same posture as `AuditLogEntry`); `changedTermFields` treats a `limits` JSON key reorder as a change (stringify compare, a display aid not a semantic diff) |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
-  Placement, #13 Quotation Management, and #14 Quote Comparison are **built** — see the
-  Domain B table above; #15–22 recommendation / client decision / policy issuance /
-  checking / delivery / endorsement remain), Claims
+  Placement, #13 Quotation Management, #14 Quote Comparison, and #15 Negotiation are
+  **built** — see the Domain B table above; #16–22 recommendation / client decision /
+  policy issuance / checking / delivery / endorsement remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -1979,6 +1982,98 @@ narrows a gap.
   `INSERT … RETURNING` each (`AccessRecertificationRepository.createManyItems`,
   `AuditService.recordMany`, `UserRepository.getRoleNamesByIds`). Full api e2e **98/98**
   after the fix; `rbac.e2e-spec.ts` 5/5 in ~18s (was ~69s).
+
+**Part C #15 — Negotiation (Domain B, Process 15)**
+
+- **No new module** — negotiation is the `POST /quotations/:id/revise` mechanism already
+  built at #13 (a round is a NEW `Quotation` version: `versionNumber+1`, linked by
+  `previousVersionId`, `isCurrentVersion` flipped, the predecessor kept verbatim). The
+  backlog's single requirement — "every negotiation round is recorded as a new quotation
+  version — never deleted or replaced" — was mechanically satisfied by #13; #15 makes the
+  **"never deleted or replaced"** half a real guarantee rather than a convention, and gives
+  a negotiation round a documented rationale and a history surface.
+- **Migration `20260901180000_add_quotation_negotiation`** — `Quotation.negotiationNotes
+  TEXT` plus a DB-layer immutability trigger, `prevent_quotation_version_mutation`, on
+  `BEFORE DELETE` and `BEFORE UPDATE` (same pattern as `prevent_audit_log_entry_mutation`,
+  migration `20260826083942`): any `DELETE` of a `Quotation` row is rejected; any `UPDATE`
+  of an already-superseded version (`isCurrentVersion = false`) is rejected; the only
+  `UPDATE` a live version accepts is the supersede flip itself (`isCurrentVersion`
+  true→false — what `QuotationRepository.reviseChain` issues). The application layer already
+  had no other path; this holds regardless of caller (raw SQL, a future code path, a
+  mistaken migration). Verified against `db-test` with a hand-run 4-case `psql` script
+  (superseded-`UPDATE` rejected, `DELETE` rejected, live in-place edit rejected, the
+  supersede flip allowed; after the `@code-reviewer` fix, a 5th case — a flip that also
+  rewrites a term — is rejected too) and by `test/quotation.e2e-spec.ts`.
+- **Column-level freeze on the supersede flip** — the one permitted `UPDATE`
+  (`isCurrentVersion` true→false) must touch nothing else: the trigger raises if
+  `to_jsonb(NEW) - 'isCurrentVersion' IS DISTINCT FROM to_jsonb(OLD) - 'isCurrentVersion'`,
+  so a `SET isCurrentVersion = false, premium = …` in the same statement is rejected too
+  (`@code-reviewer` MINOR — closed the narrow "rewrite a term as a version is frozen" gap).
+- **Same documented residual risk as the `AuditLogEntry` trigger** — `apps/api` and Prisma
+  Migrate share one Postgres role (`ibms`), so a session as that role can still bypass a
+  trigger via `SET session_replication_role = replica`; a true fix needs a least-privilege
+  app role with `REVOKE UPDATE, DELETE` (separate infra change). A data fix or a PDPL
+  Correction DSR touching a historical version now requires that privileged, logged bypass
+  — the same posture `AuditLogEntry` already has (`data-model.md`), disclosed here and in
+  the migration; carry it into #16 and any retention/disposal work.
+- **`negotiationNotes`** — the broker's rationale for a round (what was requested /
+  conceded), added to `ReviseQuotationDto` **only** (a version-1 `capture` is an insurer's
+  opening quote, not a negotiation round; `CaptureQuotationDto` has no such field). Treated
+  as Confidential commercial correspondence: `quotationAuditSnapshot` carries only a
+  `hasNegotiationNotes` boolean, never the text — same "metadata not body" shape as
+  `exclusions` / `conditions` (Part 6.1).
+- **`buildNegotiationHistory`** (`quotation.config.ts`, pure) — every quotation read
+  (`QuotationChainView`) now also carries `history: NegotiationRound[]`: round 0 is the
+  opening quote; each later round is diffed against the version its `previousVersionId`
+  names (positional fallback if absent) and carries `premiumDeltaFromPrevious` (sign
+  preserved, fils-quantized through `money.util.ts`'s `subtractMoney` / `formatMoney` —
+  never a raw Decimal op; `null` when that round changed `currency`, a cross-currency
+  subtraction being meaningless — the currency move is still in `changedTermFields`),
+  `changedTermFields` (which of the nine versioned terms moved — a `limits` key reorder
+  counts as a change, a stringify compare being a display aid not a semantic diff), and
+  that round's `negotiationNotes`. Deterministic, same shape as `planComparison` (#14) /
+  `buildCustomerTimeline` (#10).
+- **`Quotation` is still not a `WorkflowTransitionService` entity** and has no maker/checker
+  — recording a negotiated term set is a factual, single-actor Placement record; the
+  approval gate is the Broker Recommendation (#16). `quotation.negotiate` already existed
+  (seeded at #13); its description was updated. No new permission, no new nav item.
+- **`apps/web/app/(app)/rfqs/[id]/`** — the "Quotations" version-history table gains
+  Round / Δ premium / Terms-changed columns and shows a round's rationale inline; the
+  revise form gains a "Negotiation notes" textarea (revise only).
+- **`@code-reviewer` (mandatory — workflow logic + financial calc + Confidential data +
+  a DB migration/trigger)** → **APPROVE WITH MINORS, no blockers, no MAJOR, no lex
+  violation** (all six mandatory lex checks pass — money / transitions / maker-checker /
+  sensitive-data / SLA / race-safe). Both MINORs fixed: (1) `premiumDeltaFromPrevious` is
+  `null` on a currency change instead of a meaningless cross-currency subtraction; (2) the
+  supersede-flip trigger now asserts column-by-column that only `isCurrentVersion` moved.
+  NITs fixed: history diffs against `previousVersionId` (not just the adjacent row); the
+  web Δ-sign glyph is picked by string inspection, no float round-trip; the e2e now does a
+  second consecutive revise (proves the flip still works with a superseded predecessor
+  present) and asserts the column-freeze guard.
+- **Deferred**: no structured "negotiation ask vs. insurer counter" model (`negotiationNotes`
+  is one free-text field per round); no per-round approval or premium-threshold gate (that
+  is #16's `Opportunity.targetPremiumThreshold`); a foreign-currency round is captured
+  as-sent with no FX (and its premium delta is suppressed); `changedTermFields` is
+  field-level, not a value-diff.
+- **Verification**: +15 api unit tests — `quotation.config.spec.ts` ×24 (was 14: +
+  `negotiationNotes` trim/default, `hasNegotiationNotes` in the snapshot + never the text,
+  and `buildNegotiationHistory` ×9 — round numbering / sort / signed delta / changed-field
+  detection incl. a `limits` null→object transition / notes pass-through / currency-change
+  delta suppression / `previousVersionId` linkage),
+  `quotation.service.spec.ts` ×22 (was 20: + rationale passed to `reviseChain`, + the
+  chain view's `history`). **New** `test/quotation.e2e-spec.ts` ×2 — the real capture →
+  revise → revise path (history + deltas + notes across 3 versions) and the immutability
+  trigger (raw `UPDATE` of a superseded version rejected, a flip-that-rewrites-a-term
+  rejected, `DELETE` of any version rejected, every version survives, a `revise` of a
+  superseded version is 422). Full suites green: **697** api unit (58 files,
+  workspace-scoped), api contract 4/4, **api e2e 100/100** (15 files, + the new
+  quotation e2e), `npm audit` 0 high, `nest build` OK, web unit 6, web Playwright
+  **rfq.spec.ts 10/10** (the "revises a captured quotation" test now also fills the
+  negotiation-notes field and asserts the round rationale + "Round 1" render), `next build`
+  OK, api + web + db `typecheck` + `eslint` clean. Migration applied to `db` + `db-test`
+  (function re-applied + checksum reconciled after the `@code-reviewer` MINOR fix);
+  `prisma validate` OK, `prisma migrate status` clean; seed re-run (**139** permissions —
+  description-only change).
 
 ## Deployment
 

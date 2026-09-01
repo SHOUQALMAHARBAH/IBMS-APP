@@ -1,3 +1,6 @@
+import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { emptyStringToUndefined } from '../../../common/dto.util';
 import { QuotationTermsDto } from './quotation-terms.dto';
 
 /** Process 13 — record a renegotiation round as a NEW `Quotation` version.
@@ -10,4 +13,15 @@ import { QuotationTermsDto } from './quotation-terms.dto';
  * an optional field left out becomes `null` on the successor row (the web
  * form pre-fills every field from the current version so a human never
  * silently drops a term; a direct API caller must send the full set). */
-export class ReviseQuotationDto extends QuotationTermsDto {}
+export class ReviseQuotationDto extends QuotationTermsDto {
+  /** Backlog Part C #15 — the broker's documented rationale for this
+   * negotiation round (what was requested / conceded). Optional, free text,
+   * Confidential (never in the audit snapshot — only a presence boolean).
+   * Not part of `QuotationTermsDto`: a version-1 `capture` is an insurer's
+   * opening quote, not a negotiation round. */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @MaxLength(4000)
+  negotiationNotes?: string;
+}

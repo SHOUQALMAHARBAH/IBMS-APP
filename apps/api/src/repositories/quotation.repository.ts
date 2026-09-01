@@ -75,6 +75,10 @@ export class QuotationRepository {
       exclusions: terms.exclusions,
       conditions: terms.conditions,
       commissionRatePercent: terms.commissionRatePercent,
+      // Part C #15 — the negotiation-round rationale. Always null on the
+      // version-1 `createInitial` (a capture DTO carries no such field);
+      // set only by `revise`.
+      negotiationNotes: terms.negotiationNotes,
       limits:
         terms.limits === null
           ? undefined

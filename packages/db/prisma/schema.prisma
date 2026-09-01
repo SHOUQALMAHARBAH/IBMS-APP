@@ -1002,6 +1002,14 @@ model RFQInsurer {
 /// A "version chain" is every row sharing one `(rfqId, insurerId)` — one
 /// insurer's successive quotes on one RFQ line.
 ///
+/// Process 15 — Negotiation (backlog Part C #15) is the same mechanism: every
+/// negotiation round is a NEW version, "never deleted or replaced". That is
+/// enforced at the DB layer, not just by convention — migration
+/// 20260901180000 adds a trigger (same pattern as
+/// prevent_audit_log_entry_mutation) that rejects any DELETE of a Quotation
+/// row, any UPDATE of an already-superseded version, and any UPDATE of a live
+/// version other than the supersede flip itself.
+///
 /// `isCurrentVersion` is NOT a workflow `status` (it is a boolean, and the
 /// chain has no state machine), so Quotation is not a
 /// WorkflowTransitionService entity — same as Interaction (#10) /
@@ -1041,6 +1049,13 @@ model Quotation {
   /// authoritative trail (same shape as RFQ.issuedByUserId, migration
   /// 20260828120000).
   capturedByUserId String?
+  /// Backlog Part C #15 — the broker's documented rationale for THIS
+  /// negotiation round (what was requested / conceded). NULL on a version-1
+  /// capture: an insurer's opening quote is not a negotiation round. Treated
+  /// as Confidential commercial correspondence — the AuditLogEntry snapshot
+  /// carries only a `hasNegotiationNotes` boolean, never this text (Part 6.1,
+  /// same "metadata not body" shape as exclusions / conditions).
+  negotiationNotes String?
 
   comparisonRows ComparisonMatrixRow[]
   recommendation Recommendation? @relation("RecommendedQuotation")

@@ -44,6 +44,8 @@ interface FormState {
   commissionRatePercent: string;
   exclusions: string;
   conditions: string;
+  /** Only used on a revise — the broker's rationale for this round. */
+  negotiationNotes: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -55,6 +57,7 @@ const EMPTY_FORM: FormState = {
   commissionRatePercent: '',
   exclusions: '',
   conditions: '',
+  negotiationNotes: '',
 };
 
 function formFor(version: QuotationVersion): FormState {
@@ -68,6 +71,8 @@ function formFor(version: QuotationVersion): FormState {
     commissionRatePercent: version.commissionRatePercent ?? '',
     exclusions: version.exclusions ?? '',
     conditions: version.conditions ?? '',
+    // A fresh round's rationale — never carried forward from the prior version.
+    negotiationNotes: '',
   };
 }
 
@@ -96,6 +101,15 @@ function fmtMoney(value: string | null, currency: string): string {
 
 function fmtDateTime(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+/** '+' for a strictly-positive money-delta string, '' otherwise (a negative
+ * one already carries its own '-', zero needs no sign). String inspection —
+ * no float round-trip. */
+function deltaSign(delta: string): string {
+  const trimmed = delta.trim();
+  if (trimmed.startsWith('-')) return '';
+  return /[1-9]/.test(trimmed) ? '+' : '';
 }
 
 export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
@@ -166,7 +180,11 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
           ...toTermsInput(form),
         });
       } else {
-        await reviseQuotation(mode.reviseId, toTermsInput(form));
+        const notes = form.negotiationNotes.trim();
+        await reviseQuotation(mode.reviseId, {
+          ...toTermsInput(form),
+          negotiationNotes: notes.length > 0 ? notes : undefined,
+        });
       }
       startCapture();
       await load();
@@ -317,32 +335,66 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 <table style={rfqTableStyle}>
                   <thead>
                     <tr>
-                      <th style={rfqCellStyle}>Version</th>
+                      <th style={rfqCellStyle}>Round</th>
                       <th style={rfqCellStyle}>Premium</th>
-                      <th style={rfqCellStyle}>Deductible</th>
+                      <th style={rfqCellStyle}>Δ premium</th>
+                      <th style={rfqCellStyle}>Terms changed</th>
                       <th style={rfqCellStyle}>Captured</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {chain.versions.map((v) => (
-                      <tr key={v.id}>
-                        <td style={rfqCellStyle}>
-                          v{v.versionNumber}
-                          {v.isCurrentVersion ? (
-                            <span style={{ ...rfqBadgeStyle, marginLeft: '0.4rem' }}>
-                              current
-                            </span>
-                          ) : null}
-                        </td>
-                        <td style={rfqCellStyle}>
-                          {fmtMoney(v.premium, v.currency)}
-                        </td>
-                        <td style={rfqCellStyle}>
-                          {fmtMoney(v.deductible, v.currency)}
-                        </td>
-                        <td style={rfqCellStyle}>{fmtDateTime(v.receivedAt)}</td>
-                      </tr>
-                    ))}
+                    {chain.versions.map((v) => {
+                      const round = chain.history.find(
+                        (r) => r.versionNumber === v.versionNumber,
+                      );
+                      return (
+                        <tr key={v.id}>
+                          <td style={rfqCellStyle}>
+                            {round && round.round > 0
+                              ? `Round ${round.round}`
+                              : 'Opening quote'}{' '}
+                            <span style={{ opacity: 0.6 }}>v{v.versionNumber}</span>
+                            {v.isCurrentVersion ? (
+                              <span
+                                style={{ ...rfqBadgeStyle, marginLeft: '0.4rem' }}
+                              >
+                                current
+                              </span>
+                            ) : null}
+                            {v.negotiationNotes ? (
+                              <span
+                                style={{
+                                  display: 'block',
+                                  opacity: 0.75,
+                                  fontSize: '0.85rem',
+                                  marginTop: '0.2rem',
+                                }}
+                              >
+                                “{v.negotiationNotes}”
+                              </span>
+                            ) : null}
+                          </td>
+                          <td style={rfqCellStyle}>
+                            {fmtMoney(v.premium, v.currency)}
+                          </td>
+                          <td style={rfqCellStyle}>
+                            {round?.premiumDeltaFromPrevious == null
+                              ? '—'
+                              : `${deltaSign(round.premiumDeltaFromPrevious)}${fmtMoney(round.premiumDeltaFromPrevious, v.currency)}`}
+                          </td>
+                          <td style={rfqCellStyle}>
+                            {round && round.changedTermFields.length > 0
+                              ? round.changedTermFields.join(', ')
+                              : round && round.round > 0
+                                ? 'no term change'
+                                : '—'}
+                          </td>
+                          <td style={rfqCellStyle}>
+                            {fmtDateTime(v.receivedAt)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               ) : null}
@@ -484,6 +536,21 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               onChange={(e) => set('conditions', e.target.value)}
             />
           </div>
+          {mode === 'capture' ? null : (
+            <div style={quoteFieldStyle}>
+              <label htmlFor="quote-negotiation-notes">
+                Negotiation notes (what was requested / conceded this round)
+              </label>
+              <textarea
+                id="quote-negotiation-notes"
+                value={form.negotiationNotes}
+                rows={2}
+                maxLength={4000}
+                placeholder="e.g. asked for 5% off and the flood exclusion struck"
+                onChange={(e) => set('negotiationNotes', e.target.value)}
+              />
+            </div>
+          )}
 
           <button
             type="button"

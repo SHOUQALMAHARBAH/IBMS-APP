@@ -76,6 +76,7 @@ function quotationRow(overrides: Record<string, unknown> = {}) {
     exclusions: null,
     conditions: null,
     commissionRatePercent: null,
+    negotiationNotes: null,
     receivedAt: new Date(),
     capturedByUserId: 'plc-1',
     insurer: INSURER,
@@ -347,6 +348,46 @@ describe('QuotationService', () => {
       );
       expect(view.current.id).toBe('q-2');
       expect(view.versions).toHaveLength(2);
+    });
+
+    it('passes the round rationale (negotiationNotes) through to reviseChain', async () => {
+      const { service, mocks } = makeDeps();
+      await service.revise(
+        'q-1',
+        { ...REVISE_DTO, negotiationNotes: '  asked for 5% off  ' },
+        placement(),
+      );
+      expect(mocks.reviseChain).toHaveBeenCalledWith(
+        expect.objectContaining({ negotiationNotes: 'asked for 5% off' }),
+      );
+    });
+
+    it('returns a negotiation history: round 0 for the opening quote, round 1 with the premium delta', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findManyByRfqId.mockResolvedValue([
+        quotationRow({
+          id: 'q-1',
+          versionNumber: 1,
+          isCurrentVersion: false,
+          premium: new Prisma.Decimal('125000.000'),
+        }),
+        quotationRow({
+          id: 'q-2',
+          versionNumber: 2,
+          previousVersionId: 'q-1',
+          isCurrentVersion: true,
+          premium: new Prisma.Decimal('119000.000'),
+          negotiationNotes: 'insurer agreed 5% reduction',
+        }),
+      ]);
+      const view = await service.revise('q-1', REVISE_DTO, placement());
+      expect(view.history.map((r) => r.round)).toEqual([0, 1]);
+      expect(view.history[0].premiumDeltaFromPrevious).toBeNull();
+      expect(view.history[1]).toMatchObject({
+        premiumDeltaFromPrevious: '-6000.000',
+        changedTermFields: ['premium'],
+        negotiationNotes: 'insurer agreed 5% reduction',
+      });
     });
 
     it('422 when the target is not the current version of its chain', async () => {

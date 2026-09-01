@@ -32,8 +32,26 @@ export interface QuotationVersion {
   commissionRatePercent: string | null;
   receivedAt: string;
   capturedByUserId: string | null;
+  /** Part C #15 — the broker's rationale for the negotiation round this
+   * version records. Always null on version 1 (an opening quote). */
+  negotiationNotes: string | null;
   insurer: QuotationInsurer;
   rfq: { id: string; opportunityId: string; insuranceLine: string };
+}
+
+/** Part C #15 — one entry in a chain's negotiation history. Round 0 is the
+ * opening quote; each later round carries the premium delta from the round
+ * before it and the list of term fields that moved. */
+export interface NegotiationRound {
+  round: number;
+  versionNumber: number;
+  isCurrentVersion: boolean;
+  receivedAt: string;
+  capturedByUserId: string | null;
+  premium: string;
+  premiumDeltaFromPrevious: string | null;
+  changedTermFields: string[];
+  negotiationNotes: string | null;
 }
 
 /** One insurer's full quotation history on one RFQ line. */
@@ -44,6 +62,7 @@ export interface QuotationChain {
   insurer: QuotationInsurer;
   current: QuotationVersion;
   versions: QuotationVersion[];
+  history: NegotiationRound[];
 }
 
 /** The quote terms — shared by capture and revise. Every monetary field is
@@ -66,6 +85,12 @@ export interface CaptureQuotationInput extends QuotationTermsInput {
   insurerId: string;
 }
 
+/** Revise carries the full term set (it replaces, not patches) plus an
+ * optional rationale for the round (Part C #15). */
+export interface ReviseQuotationInput extends QuotationTermsInput {
+  negotiationNotes?: string;
+}
+
 export function listQuotationsForRfq(
   rfqId: string,
 ): Promise<QuotationChain[]> {
@@ -80,7 +105,7 @@ export function captureQuotation(
 
 export function reviseQuotation(
   id: string,
-  input: QuotationTermsInput,
+  input: ReviseQuotationInput,
 ): Promise<QuotationChain> {
   return apiPost(`/quotations/${id}/revise`, input);
 }

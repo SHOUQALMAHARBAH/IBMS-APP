@@ -92,7 +92,7 @@ const insuranceOperations: PermissionSeed[] = [
   { code: 'rfq.insurer.update', module: 'insurance-operations', description: "Update an insurer's RFQ response status", roles: [PLACEMENT] },
   { code: 'rfq.communication.log', module: 'insurance-operations', description: 'Record an inbound insurer query or an outbound response / additional-information note on an RFQ (Process 12). Reading the correspondence is covered by rfq.read.', roles: [PLACEMENT] },
   { code: 'quotation.capture', module: 'insurance-operations', description: "Capture an insurer's quotation", roles: [PLACEMENT] },
-  { code: 'quotation.negotiate', module: 'insurance-operations', description: 'Record a renegotiation round as a new quotation version', roles: [PLACEMENT] },
+  { code: 'quotation.negotiate', module: 'insurance-operations', description: 'Record a negotiation round as a new quotation version (the prior version is never deleted or replaced — Process 15)', roles: [PLACEMENT] },
   { code: 'quotation.read', module: 'insurance-operations', description: 'List/read insurer quotations and their version history', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'comparison.build', module: 'insurance-operations', description: 'Build/rebuild the quote comparison matrix from the current-version quotations', roles: [PLACEMENT] },
   { code: 'comparison.read', module: 'insurance-operations', description: 'List/read the quote comparison matrix', roles: [SALES, PLACEMENT, MANAGER, EXEC] },

@@ -21,8 +21,10 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
 import {
+  buildNegotiationHistory,
   normalizeQuotationTerms,
   quotationAuditSnapshot,
+  type NegotiationRound,
 } from './quotation.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CaptureQuotationDto } from './dto/capture-quotation.dto';
@@ -31,7 +33,10 @@ import type { ListQuotationsQueryDto } from './dto/list-quotations-query.dto';
 
 /** One insurer's full quotation history on one RFQ line — the shape every
  * quotation read returns. `current` is the live version (`isCurrentVersion`);
- * `versions` is the whole chain, oldest first, never pruned. */
+ * `versions` is the whole chain, oldest first, never pruned; `history` is
+ * the same chain projected round-by-round (Part C #15 — round 0 is the
+ * opening quote, each later round carries the premium delta + which terms
+ * moved). */
 export interface QuotationChainView {
   rfqId: string;
   insurerId: string;
@@ -39,6 +44,7 @@ export interface QuotationChainView {
   insurer: QuotationWithContext['insurer'];
   current: QuotationWithContext;
   versions: QuotationWithContext[];
+  history: NegotiationRound[];
 }
 
 const P2002 = 'P2002';
@@ -69,11 +75,15 @@ const QUOTABLE_FROM: readonly RfqInsurerStatus[] = [
  *    (`race-safe-invariants.md` — the PARTIAL UNIQUE index on
  *    `(rfqId, insurerId) WHERE isCurrentVersion` is the real guard, mapped
  *    to a 409 here).
- *  - `revise` — a renegotiation round: a NEW version row linked to its
- *    predecessor by `previousVersionId`, with the old row kept verbatim
+ *  - `revise` — a negotiation round (Process 15): a NEW version row linked to
+ *    its predecessor by `previousVersionId`, with the old row kept verbatim
  *    (`isCurrentVersion` flipped to false). Never an overwrite (Part 4.1,
  *    Part 3.3 Controls: "full version history retained for every
- *    quotation"). The predecessor-clear + successor-insert run in ONE
+ *    quotation") — and, from Part C #15, "never deleted or replaced" is
+ *    enforced at the DB layer by an immutability trigger (migration
+ *    20260901180000), not just by this module having no such path. The
+ *    round's optional `negotiationNotes` (the broker's rationale) rides on
+ *    the new version. The predecessor-clear + successor-insert run in ONE
  *    `reviseChain` transaction (`quotation.repository.ts`); concurrency is
  *    held by two DB constraints — the PARTIAL UNIQUE (≤1 current per chain)
  *    and `previousVersionId`'s own `@unique` (≤1 successor per node) — plus
@@ -244,6 +254,7 @@ export class QuotationService {
         insurer: head.insurer,
         current: ordered.find((v) => v.isCurrentVersion) ?? head,
         versions: ordered,
+        history: buildNegotiationHistory(ordered),
       });
     }
     return views;

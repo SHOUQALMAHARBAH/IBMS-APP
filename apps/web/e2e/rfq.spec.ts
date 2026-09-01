@@ -85,12 +85,42 @@ function quoteVersion(over: Record<string, unknown> = {}) {
     exclusions: null,
     conditions: null,
     commissionRatePercent: null,
+    negotiationNotes: null,
     receivedAt: "2026-03-05T00:00:00.000Z",
     capturedByUserId: "user-1",
     insurer: INSURER_IDENTITY,
     rfq: { id: "rfq-1", opportunityId: "opp-1", insuranceLine: "Property All Risks" },
     ...over,
   };
+}
+
+/** Part C #15 — the round-by-round projection the API returns alongside a
+ * chain's raw versions. `versions` here are ordered oldest-first. */
+function negotiationHistory(
+  versions: ReturnType<typeof quoteVersion>[],
+): Record<string, unknown>[] {
+  return versions.map((v, index) => {
+    const prev = index === 0 ? null : versions[index - 1];
+    return {
+      round: index,
+      versionNumber: v.versionNumber,
+      isCurrentVersion: v.isCurrentVersion,
+      receivedAt: v.receivedAt,
+      capturedByUserId: v.capturedByUserId,
+      premium: v.premium,
+      premiumDeltaFromPrevious:
+        prev === null
+          ? null
+          : (Number(v.premium) - Number(prev.premium)).toFixed(3),
+      changedTermFields:
+        prev === null
+          ? []
+          : Number(v.premium) === Number(prev.premium)
+            ? []
+            : ["premium"],
+      negotiationNotes: v.negotiationNotes ?? null,
+    };
+  });
 }
 
 async function mockRfqApi(
@@ -100,7 +130,7 @@ async function mockRfqApi(
     onTransition?: (status: string) => void;
     onLogComm?: (body: { direction: string; body: string }) => void;
     onCaptureQuote?: (body: { insurerId: string; premium: string }) => void;
-    onReviseQuote?: (body: { premium: string }) => void;
+    onReviseQuote?: (body: { premium: string; negotiationNotes?: string }) => void;
     onBuildComparison?: (body: {
       rfqId: string;
       scores?: { insurerId: string }[];
@@ -120,6 +150,7 @@ async function mockRfqApi(
     insurer: typeof INSURER_IDENTITY;
     current: ReturnType<typeof quoteVersion>;
     versions: ReturnType<typeof quoteVersion>[];
+    history: Record<string, unknown>[];
   };
   let chains: QuoteChain[] = [];
 
@@ -127,13 +158,18 @@ async function mockRfqApi(
     const url = route.request().url();
     const method = route.request().method();
     if (method === "POST" && /\/quotations\/[^/]+\/revise(\?|$)/.test(url)) {
-      const b = route.request().postDataJSON() as { premium: string };
+      const b = route.request().postDataJSON() as {
+        premium: string;
+        negotiationNotes?: string;
+      };
       opts.onReviseQuote?.(b);
+      const v1 = quoteVersion({ isCurrentVersion: false });
       const v2 = quoteVersion({
         id: "q-2",
         versionNumber: 2,
         previousVersionId: "q-1",
         premium: b.premium,
+        negotiationNotes: b.negotiationNotes ?? null,
       });
       chains = [
         {
@@ -142,7 +178,8 @@ async function mockRfqApi(
           insuranceLine: "Property All Risks",
           insurer: INSURER_IDENTITY,
           current: v2,
-          versions: [quoteVersion({ isCurrentVersion: false }), v2],
+          versions: [v1, v2],
+          history: negotiationHistory([v1, v2]),
         },
       ];
       return route.fulfill({ status: 201, json: chains[0] });
@@ -162,6 +199,7 @@ async function mockRfqApi(
           insurer: INSURER_IDENTITY,
           current: v1,
           versions: [v1],
+          history: negotiationHistory([v1]),
         },
       ];
       return route.fulfill({ status: 201, json: chains[0] });
@@ -372,7 +410,7 @@ test("captures a quotation for a shortlisted insurer on the RFQ detail screen", 
 test("revises a captured quotation into a new version", async ({ page }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   let captured = false;
-  let revised: { premium: string } | null = null;
+  let revised: { premium: string; negotiationNotes?: string } | null = null;
   await mockRfqApi(page, {
     onCaptureQuote: () => { captured = true; },
     onReviseQuote: (b) => { revised = b; },
@@ -386,12 +424,21 @@ test("revises a captured quotation into a new version", async ({ page }) => {
 
   await page.getByRole("button", { name: "Revise (new version)" }).click();
   await page.getByLabel("Premium *").fill("119000.000");
+  await page
+    .getByLabel("Negotiation notes (what was requested / conceded this round)")
+    .fill("asked for 5% off and the flood exclusion struck");
   await page.getByRole("button", { name: "Save new version" }).click();
 
   await expect.poll(() => revised?.premium).toBe("119000.000");
+  await expect
+    .poll(() => revised?.negotiationNotes)
+    .toBe("asked for 5% off and the flood exclusion struck");
   // The chain now has two versions, so the history toggle appears.
+  await page.getByRole("button", { name: "Version history" }).click();
+  // Round 1's premium delta and the round rationale both render.
+  await expect(page.getByText("Round 1")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Version history" }),
+    page.getByText("“asked for 5% off and the flood exclusion struck”"),
   ).toBeVisible();
 });
 

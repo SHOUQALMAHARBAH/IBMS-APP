@@ -4,6 +4,7 @@ import {
   compareMoney,
   formatMoney,
   quantizeMoney,
+  subtractMoney,
   toMoney,
   MONEY_ROUNDING,
   type MoneyInput,
@@ -51,6 +52,11 @@ export interface QuotationTermsInput {
   exclusions?: string | null;
   conditions?: string | null;
   commissionRatePercent?: MoneyInput | null;
+  /** Backlog Part C #15 — the broker's rationale for this negotiation round.
+   * Only ever supplied by `revise` (a version-1 capture is an insurer's
+   * opening quote, not a negotiation round); `capture`'s DTO has no such
+   * field, so this is `undefined` there and normalizes to `null`. */
+  negotiationNotes?: string | null;
 }
 
 /** Every field normalized and ready to persist: money as `Prisma.Decimal`
@@ -65,6 +71,7 @@ export interface NormalizedQuotationTerms {
   exclusions: string | null;
   conditions: string | null;
   commissionRatePercent: Prisma.Decimal | null;
+  negotiationNotes: string | null;
 }
 
 function requireNonNegativeMoney(
@@ -166,14 +173,16 @@ export function normalizeQuotationTerms(
     exclusions: trimOrNull(input.exclusions),
     conditions: trimOrNull(input.conditions),
     commissionRatePercent,
+    negotiationNotes: trimOrNull(input.negotiationNotes),
   };
 }
 
 /**
  * The structural + monetary metadata of a quotation row, for an
  * `AuditLogEntry.afterValue`. Deliberately excludes the free-text
- * `exclusions` / `conditions` (insurer policy wording, Confidential — Part
- * 6.1; carried as presence booleans instead) and the `limits` blob, same
+ * `exclusions` / `conditions` / `negotiationNotes` (insurer policy wording
+ * and commercial negotiation correspondence, Confidential — Part 6.1;
+ * carried as presence booleans instead) and the `limits` blob, same
  * "metadata not body" shape as the RFQ correspondence audit (#12). Premium
  * and the other amounts DO go in — money in an audit `afterValue` is an
  * established pattern here (up-sell logs `currentSumInsured` / `shortfall`).
@@ -193,6 +202,7 @@ export function quotationAuditSnapshot(row: {
   exclusions: string | null;
   conditions: string | null;
   limits: unknown;
+  negotiationNotes: string | null;
 }): Prisma.InputJsonObject {
   return {
     rfqId: row.rfqId,
@@ -213,5 +223,153 @@ export function quotationAuditSnapshot(row: {
     hasExclusions: row.exclusions !== null,
     hasConditions: row.conditions !== null,
     hasLimits: row.limits !== null && row.limits !== undefined,
+    hasNegotiationNotes: row.negotiationNotes !== null,
   };
+}
+
+/** The subset of a `Quotation` row `buildNegotiationHistory` reads — every
+ * versioned term plus the chain-linkage / provenance scalars. */
+export interface QuotationVersionLike {
+  id: string;
+  versionNumber: number;
+  isCurrentVersion: boolean;
+  previousVersionId: string | null;
+  receivedAt: Date;
+  capturedByUserId: string | null;
+  negotiationNotes: string | null;
+  premium: Prisma.Decimal;
+  currency: string;
+  deductible: Prisma.Decimal | null;
+  limits: unknown;
+  biPeriodMonths: number | null;
+  liabilityLimit: Prisma.Decimal | null;
+  exclusions: string | null;
+  conditions: string | null;
+  commissionRatePercent: Prisma.Decimal | null;
+}
+
+/** One entry in a version chain's negotiation history. */
+export interface NegotiationRound {
+  /** 0 = the insurer's opening quote (version 1); 1..n = negotiation rounds. */
+  round: number;
+  versionNumber: number;
+  isCurrentVersion: boolean;
+  receivedAt: Date;
+  capturedByUserId: string | null;
+  /** Fixed 3dp string, this version's premium. */
+  premium: string;
+  /** `this.premium - previous.premium`, fixed 3dp, sign preserved (negative =
+   * the round brought the premium down). `null` for round 0, and for any
+   * round that changed `currency` (a cross-currency delta is meaningless). */
+  premiumDeltaFromPrevious: string | null;
+  /** Which versioned term fields differ from the previous version. Empty for
+   * round 0 (nothing to compare against). */
+  changedTermFields: string[];
+  /** The broker's documented rationale for this round, verbatim — `null`
+   * when none was recorded (always the case for round 0: `capture` has no
+   * such field). */
+  negotiationNotes: string | null;
+}
+
+/** The versioned term fields `buildNegotiationHistory` diffs round-to-round.
+ * `negotiationNotes` is deliberately excluded — it is the rationale *for* a
+ * round, not one of the quoted terms. */
+const DIFFED_TERM_FIELDS = [
+  'premium',
+  'currency',
+  'deductible',
+  'limits',
+  'biPeriodMonths',
+  'liabilityLimit',
+  'exclusions',
+  'conditions',
+  'commissionRatePercent',
+] as const;
+
+function moneyEqual(
+  a: Prisma.Decimal | null,
+  b: Prisma.Decimal | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  return compareMoney(a, b) === 0;
+}
+
+function termFieldChanged(
+  field: (typeof DIFFED_TERM_FIELDS)[number],
+  prev: QuotationVersionLike,
+  cur: QuotationVersionLike,
+): boolean {
+  switch (field) {
+    case 'premium':
+      return !moneyEqual(prev.premium, cur.premium);
+    case 'deductible':
+      return !moneyEqual(prev.deductible, cur.deductible);
+    case 'liabilityLimit':
+      return !moneyEqual(prev.liabilityLimit, cur.liabilityLimit);
+    case 'commissionRatePercent':
+      return !moneyEqual(prev.commissionRatePercent, cur.commissionRatePercent);
+    case 'limits':
+      // Stored verbatim as the DTO sent it; a stringify compare is a display
+      // aid, not a semantic diff (key reordering would read as a change).
+      return (
+        JSON.stringify(prev.limits ?? null) !==
+        JSON.stringify(cur.limits ?? null)
+      );
+    default:
+      return prev[field] !== cur[field];
+  }
+}
+
+/**
+ * Process 15 — Negotiation (backlog Part C #15). Turns one insurer's version
+ * chain into a round-by-round history: round 0 is the opening quote (version
+ * 1), each subsequent version is a negotiation round carrying the premium
+ * delta from the round before it and the list of term fields that moved.
+ * Pure and deterministic — no I/O, same input always yields the same
+ * history (same shape as `planComparison` / `buildCustomerTimeline`).
+ *
+ * `versions` may arrive in any order; it is sorted by `versionNumber`
+ * ascending here. Each round is diffed against the row its `previousVersionId`
+ * names (the real chain linkage), falling back to the version-adjacent row if
+ * that predecessor is not in the set. A single-version chain yields exactly
+ * one round-0 entry.
+ *
+ * `premiumDeltaFromPrevious` is only meaningful within one currency — if a
+ * round changes `currency`, the delta is `null` (the currency move is still
+ * reported in `changedTermFields`).
+ */
+export function buildNegotiationHistory(
+  versions: QuotationVersionLike[],
+): NegotiationRound[] {
+  const ordered = [...versions].sort(
+    (a, b) => a.versionNumber - b.versionNumber,
+  );
+  const byId = new Map(ordered.map((v) => [v.id, v]));
+  return ordered.map((version, index) => {
+    const previous =
+      (version.previousVersionId != null
+        ? byId.get(version.previousVersionId)
+        : undefined) ?? (index === 0 ? null : ordered[index - 1]);
+    const sameCurrency =
+      previous !== null && previous.currency === version.currency;
+    return {
+      round: index,
+      versionNumber: version.versionNumber,
+      isCurrentVersion: version.isCurrentVersion,
+      receivedAt: version.receivedAt,
+      capturedByUserId: version.capturedByUserId,
+      premium: formatMoney(version.premium),
+      premiumDeltaFromPrevious:
+        previous === null || !sameCurrency
+          ? null
+          : formatMoney(subtractMoney(version.premium, previous.premium)),
+      changedTermFields:
+        previous === null
+          ? []
+          : DIFFED_TERM_FIELDS.filter((field) =>
+              termFieldChanged(field, previous, version),
+            ),
+      negotiationNotes: version.negotiationNotes,
+    };
+  });
 }
