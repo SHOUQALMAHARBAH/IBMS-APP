@@ -995,8 +995,26 @@ model RFQInsurer {
   @@index([status])
 }
 
-/// Process 13 — insurer quotation. Versioned, NEVER overwritten (Part 4.1,
-/// Part 3.3 Controls: "full version history retained for every quotation").
+/// Process 13 — insurer quotation (backlog Part C #13). Versioned, NEVER
+/// overwritten (Part 4.1, Part 3.3 Controls: "full version history retained
+/// for every quotation"): a renegotiation `create()`s a new row linked to
+/// its predecessor via `previousVersionId` and flips `isCurrentVersion`.
+/// A "version chain" is every row sharing one `(rfqId, insurerId)` — one
+/// insurer's successive quotes on one RFQ line.
+///
+/// `isCurrentVersion` is NOT a workflow `status` (it is a boolean, and the
+/// chain has no state machine), so Quotation is not a
+/// WorkflowTransitionService entity — same as Interaction (#10) /
+/// CommunicationLog (#12). It has no maker/checker (capturing what an
+/// insurer sent is a factual, single-actor Placement record).
+///
+/// "At most one current version per chain" is a real DB invariant, not a
+/// read-then-write in QuotationService
+/// (ibms-brain/meta/lex/race-safe-invariants.md): a PARTIAL UNIQUE index
+/// `("rfqId", "insurerId") WHERE "isCurrentVersion" = true` that Prisma
+/// can't express here — see migration 20260901120000. `previousVersionId`'s
+/// own `@unique` additionally serializes two concurrent revisions of the
+/// same node (only one successor can exist).
 model Quotation {
   id             String   @id @default(uuid())
   rfqId          String
@@ -1018,11 +1036,17 @@ model Quotation {
   conditions     String?
   commissionRatePercent Decimal? @db.Decimal(5, 2)
   receivedAt     DateTime @default(now())
+  /// Backlog Part C #13 provenance — the Placement Officer who captured this
+  /// version. Bare scalar, no relation; the AuditLogEntry CREATE row is the
+  /// authoritative trail (same shape as RFQ.issuedByUserId, migration
+  /// 20260828120000).
+  capturedByUserId String?
 
   comparisonRows ComparisonMatrixRow[]
   recommendation Recommendation? @relation("RecommendedQuotation")
 
   @@index([rfqId])
+  @@index([insurerId])
 }
 
 /// Process 14 — structured comparison across price + coverage + exclusions

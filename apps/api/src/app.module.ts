@@ -22,6 +22,7 @@ import { UpSellModule } from './modules/up-sell/up-sell.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { OpportunityModule } from './modules/opportunity/opportunity.module';
 import { RfqModule } from './modules/rfq/rfq.module';
+import { QuotationModule } from './modules/quotation/quotation.module';
 
 @Module({
   imports: [
@@ -117,6 +118,15 @@ import { RfqModule } from './modules/rfq/rfq.module';
     // RFQ_ISSUED and the RFQInsurer response-status transitions.
     OpportunityModule,
     RfqModule,
+    // Part C backlog #13 (Quotation Management) — captures an insurer's
+    // quote against one RFQ line (premium / deductible / limits / BI period
+    // / liability limit / exclusions / conditions) and versions it on every
+    // renegotiation via the `previousVersionId` / `isCurrentVersion` chain,
+    // never overwriting. Depends on RfqModule's exported RfqRepository (the
+    // shortlist) plus OpportunityModule / CustomerModule (visibility) and
+    // reuses WorkflowModule for the best-effort RFQInsurer -> QUOTED and
+    // Opportunity RFQ_ISSUED -> QUOTES_RECEIVED moves.
+    QuotationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

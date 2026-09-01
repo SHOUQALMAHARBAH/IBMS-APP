@@ -61,17 +61,109 @@ const RFQ = {
   ],
 };
 
+const INSURER_IDENTITY = {
+  id: "ins-1",
+  name: "Jordan Insurance Co",
+  nameAr: null,
+  financialStrengthRating: "A-",
+};
+
+function quoteVersion(over: Record<string, unknown> = {}) {
+  return {
+    id: "q-1",
+    rfqId: "rfq-1",
+    insurerId: "ins-1",
+    versionNumber: 1,
+    previousVersionId: null,
+    isCurrentVersion: true,
+    premium: "125000.5",
+    currency: "JOD",
+    deductible: null,
+    limits: null,
+    biPeriodMonths: null,
+    liabilityLimit: null,
+    exclusions: null,
+    conditions: null,
+    commissionRatePercent: null,
+    receivedAt: "2026-03-05T00:00:00.000Z",
+    capturedByUserId: "user-1",
+    insurer: INSURER_IDENTITY,
+    rfq: { id: "rfq-1", opportunityId: "opp-1", insuranceLine: "Property All Risks" },
+    ...over,
+  };
+}
+
 async function mockRfqApi(
   page: Page,
   opts: {
     onCreateRfq?: () => void;
     onTransition?: (status: string) => void;
     onLogComm?: (body: { direction: string; body: string }) => void;
+    onCaptureQuote?: (body: { insurerId: string; premium: string }) => void;
+    onReviseQuote?: (body: { premium: string }) => void;
   } = {},
 ) {
   // Correspondence log — starts empty, a POST appends so the list re-renders
   // with the new row.
   const comms: Record<string, unknown>[] = [];
+
+  // Quotation chains — starts empty; a capture POST adds a chain, a revise
+  // POST appends a version so the section re-renders.
+  type QuoteChain = {
+    rfqId: string;
+    insurerId: string;
+    insuranceLine: string;
+    insurer: typeof INSURER_IDENTITY;
+    current: ReturnType<typeof quoteVersion>;
+    versions: ReturnType<typeof quoteVersion>[];
+  };
+  let chains: QuoteChain[] = [];
+
+  await page.route("http://localhost:4000/quotations**", (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+    if (method === "POST" && /\/quotations\/[^/]+\/revise(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as { premium: string };
+      opts.onReviseQuote?.(b);
+      const v2 = quoteVersion({
+        id: "q-2",
+        versionNumber: 2,
+        previousVersionId: "q-1",
+        premium: b.premium,
+      });
+      chains = [
+        {
+          rfqId: "rfq-1",
+          insurerId: "ins-1",
+          insuranceLine: "Property All Risks",
+          insurer: INSURER_IDENTITY,
+          current: v2,
+          versions: [quoteVersion({ isCurrentVersion: false }), v2],
+        },
+      ];
+      return route.fulfill({ status: 201, json: chains[0] });
+    }
+    if (method === "POST" && /\/quotations(\?|$)/.test(url.split("?")[0])) {
+      const b = route.request().postDataJSON() as {
+        insurerId: string;
+        premium: string;
+      };
+      opts.onCaptureQuote?.(b);
+      const v1 = quoteVersion({ premium: b.premium });
+      chains = [
+        {
+          rfqId: "rfq-1",
+          insurerId: "ins-1",
+          insuranceLine: "Property All Risks",
+          insurer: INSURER_IDENTITY,
+          current: v1,
+          versions: [v1],
+        },
+      ];
+      return route.fulfill({ status: 201, json: chains[0] });
+    }
+    return route.fulfill({ status: 200, json: chains });
+  });
 
   await page.route("http://localhost:4000/opportunities**", (route) => {
     const url = route.request().url();
@@ -204,6 +296,53 @@ test("a non-Placement user sees the list but no create controls", async ({ page 
   await page.goto("/opportunities/opp-1");
   await expect(page.getByText("Status: NEEDS_CONFIRMED")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create RFQ for a line" })).toHaveCount(0);
+});
+
+test("captures a quotation for a shortlisted insurer on the RFQ detail screen", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  let captured: { insurerId: string; premium: string } | null = null;
+  await mockRfqApi(page, { onCaptureQuote: (b) => { captured = b; } });
+
+  await page.goto("/rfqs/rfq-1");
+  await expect(page.getByRole("heading", { name: "Quotations" })).toBeVisible();
+  await page.getByLabel("Insurer", { exact: true }).selectOption("ins-1");
+  await page.getByLabel("Premium *").fill("125000.500");
+  await page.getByRole("button", { name: "Capture quote" }).click();
+
+  await expect.poll(() => captured?.insurerId).toBe("ins-1");
+  await expect.poll(() => captured?.premium).toBe("125000.500");
+  // The captured chain now renders with a per-chain Revise control.
+  await expect(
+    page.getByRole("button", { name: "Revise (new version)" }),
+  ).toBeVisible();
+});
+
+test("revises a captured quotation into a new version", async ({ page }) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  let captured = false;
+  let revised: { premium: string } | null = null;
+  await mockRfqApi(page, {
+    onCaptureQuote: () => { captured = true; },
+    onReviseQuote: (b) => { revised = b; },
+  });
+
+  await page.goto("/rfqs/rfq-1");
+  await page.getByLabel("Insurer", { exact: true }).selectOption("ins-1");
+  await page.getByLabel("Premium *").fill("125000.500");
+  await page.getByRole("button", { name: "Capture quote" }).click();
+  await expect.poll(() => captured).toBe(true);
+
+  await page.getByRole("button", { name: "Revise (new version)" }).click();
+  await page.getByLabel("Premium *").fill("119000.000");
+  await page.getByRole("button", { name: "Save new version" }).click();
+
+  await expect.poll(() => revised?.premium).toBe("119000.000");
+  // The chain now has two versions, so the history toggle appears.
+  await expect(
+    page.getByRole("button", { name: "Version history" }),
+  ).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

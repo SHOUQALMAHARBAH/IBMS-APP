@@ -18,6 +18,7 @@ import {
   type SelectableInsurer,
 } from '../../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../../lib/auth/api-client';
+import { QuotationsSection } from '../../../../components/quotation/QuotationsSection';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
 import {
@@ -370,6 +371,12 @@ export default function RfqDetailPage() {
               )}
             </div>
           ) : null}
+
+          <QuotationsSection
+            rfqId={rfq.id}
+            isPlacement={isPlacement}
+            submissions={rfq.insurerSubmissions}
+          />
 
           <h2 style={{ marginTop: '2.5rem' }}>Correspondence</h2>
           <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>

@@ -17,3 +17,12 @@ export function emptyStringToUndefined({ value }: TransformFnParams): unknown {
 export function trimIfString({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
 }
+
+/** Fils-precision decimal string — at most 3 decimal places (Part 3.6 /
+ * ibms-brain/meta/lex/money-decimal-jod.md), the shape money.util.ts's
+ * `toMoney` / `quantizeMoney` expect. No sign, no currency symbol, no
+ * thousands separator: `"125000"` or `"125000.500"`. Pair with `@Matches`
+ * on any DTO field that lands in a `@db.Decimal(18, 3)` column. Predates its
+ * consolidation here — `risk-profile.config.ts` and `create-prospect.dto.ts`
+ * still carry their own copies. */
+export const MONEY_STRING = /^\d{1,15}(\.\d{1,3})?$/;

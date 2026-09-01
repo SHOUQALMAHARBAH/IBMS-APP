@@ -36,5 +36,9 @@ import { InsuranceProgramModule } from '../insurance-program/insurance-program.m
   ],
   controllers: [RfqController, RfqInsurerController],
   providers: [RfqService, RfqRepository, RfqFollowUpScheduler],
+  // QuotationModule (backlog Part C #13) reads the parent RFQ + its insurer
+  // shortlist through RfqRepository — a quote can only come from a
+  // shortlisted insurer.
+  exports: [RfqRepository],
 })
 export class RfqModule {}
