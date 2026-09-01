@@ -15,6 +15,7 @@ function makeDeps() {
     alerted: 0,
     autoNoResponse: 0,
     transitionSkipped: 0,
+    skippedQuoted: 0,
     failed: 0,
   });
   const rfqs = { runFollowUpScan } as unknown as RfqService;
@@ -58,6 +59,7 @@ describe('RfqFollowUpScheduler.runSweep', () => {
       alerted: 0,
       autoNoResponse: 1,
       transitionSkipped: 0,
+      skippedQuoted: 0,
       failed: 0,
     });
     const logSpy = vi
@@ -72,6 +74,32 @@ describe('RfqFollowUpScheduler.runSweep', () => {
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('moved to NO_RESPONSE'),
+    );
+  });
+
+  it('logs a summary when the sweep only skipped already-quoted submissions', async () => {
+    const { scheduler, mocks } = makeDeps();
+    mocks.runFollowUpScan.mockResolvedValue({
+      candidates: 2,
+      due: 0,
+      alerted: 0,
+      autoNoResponse: 0,
+      transitionSkipped: 0,
+      skippedQuoted: 2,
+      failed: 0,
+    });
+    const logSpy = vi
+      .spyOn(
+        (scheduler as unknown as { logger: { log: (m: string) => void } })
+          .logger,
+        'log',
+      )
+      .mockImplementation(() => undefined);
+
+    await scheduler.runSweep();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('skipped (already quoted)'),
     );
   });
 });

@@ -16,7 +16,9 @@ const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
  * SENT / VIEWED) whose RFQ's business-day `followUpThresholdDays` has elapsed
  * since `sentAt`, stamps `followUpAlertSentAt` + writes an audit row, and
  * moves it SENT/VIEWED -> NO_RESPONSE through the workflow engine (a late
- * responder can still be moved NO_RESPONSE -> QUOTED/DECLINED). Idempotent:
+ * responder can still be moved NO_RESPONSE -> QUOTED/DECLINED). A submission
+ * whose insurer already has a current `Quotation` (backlog Part C #13) is
+ * dropped first — it responded, whatever its status column says. Idempotent:
  * `stampFollowUpAlert` is conditional on the timestamp still being null, and
  * once NO_RESPONSE the row is out of the candidate set; a concurrent manual
  * QUOTED/DECLINED makes the transition a safe no-op.
@@ -55,10 +57,11 @@ export class RfqFollowUpScheduler {
       result.alerted > 0 ||
       result.autoNoResponse > 0 ||
       result.transitionSkipped > 0 ||
+      result.skippedQuoted > 0 ||
       result.failed > 0
     ) {
       this.logger.log(
-        `RFQ follow-up sweep: ${result.candidates} open submission(s) awaiting a response, ${result.due} past threshold, ${result.alerted} newly alerted, ${result.autoNoResponse} moved to NO_RESPONSE, ${result.transitionSkipped} skipped (insurer responded), ${result.failed} failed.`,
+        `RFQ follow-up sweep: ${result.candidates} open submission(s) awaiting a response, ${result.due} past threshold, ${result.alerted} newly alerted, ${result.autoNoResponse} moved to NO_RESPONSE, ${result.transitionSkipped} skipped (insurer responded), ${result.skippedQuoted} skipped (already quoted), ${result.failed} failed.`,
       );
     }
   }

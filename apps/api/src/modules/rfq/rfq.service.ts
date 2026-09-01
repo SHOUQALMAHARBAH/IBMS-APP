@@ -30,9 +30,11 @@ import type { LogRfqCommunicationDto } from './dto/log-rfq-communication.dto';
 import type { ListRfqsQueryDto } from './dto/list-rfqs-query.dto';
 
 /** Result of one follow-up sweep run — logged by the scheduler. Only
- * `candidates` and `due` are row counts; the four tallies below are per-step
- * and **overlap** — one due row can bump `alerted` *and* `autoNoResponse`, or
- * `alerted` *and* `failed`, in the same iteration. `due` is not their sum. */
+ * `candidates` and `due` are row counts; the tallies below are per-step and
+ * **overlap** — one due row can bump `alerted` *and* `autoNoResponse`, or
+ * `alerted` *and* `failed`, in the same iteration. `due` is not their sum.
+ * `skippedQuoted` does NOT overlap the rest — such a row is dropped before
+ * the threshold check, so it is not in `due`. */
 export interface FollowUpScanResult {
   /** Open submissions (SENT / VIEWED) examined. */
   candidates: number;
@@ -49,6 +51,12 @@ export interface FollowUpScanResult {
    * responded concurrently (engine ConflictException / illegal-move 422) —
    * expected, not an error. */
   transitionSkipped: number;
+  /** Open submissions dropped because their `(rfqId, insurerId)` already has
+   * a current `Quotation` (backlog Part C #13) — an insurer that quoted is
+   * not "silent" even if its best-effort `RFQInsurer -> QUOTED` move failed
+   * on capture. Skipped before the threshold check, so NOT counted in `due`.
+   * See ibms-brain/meta/context/policy-lifecycle.md § RFQ follow-up. */
+  skippedQuoted: number;
   /** Rows that threw unexpectedly and were skipped — the next run retries. */
   failed: number;
 }
@@ -89,6 +97,9 @@ function isUniqueViolation(err: unknown): boolean {
  *    SENT/VIEWED -> NO_RESPONSE through the workflow engine. Race-safe: a
  *    concurrent manual QUOTED/DECLINED makes the transition a no-op (engine
  *    ConflictException / illegal-move 422), caught and counted as skipped.
+ *    A submission whose insurer already has a current `Quotation` (#13) is
+ *    dropped before the threshold check — it responded, whatever its status
+ *    column says.
  *
  * No maker/checker: issuing an RFQ, recording insurer responses, and logging
  * correspondence is single-actor Placement work, and the coverage set was
@@ -593,6 +604,15 @@ export class RfqService {
    *      no-op (ConflictException, or an illegal-move 422 from a terminal
    *      state) — caught and counted as `transitionSkipped`, not `failed`.
    *      `respondedAt` is left null — NO_RESPONSE means no response.
+   *
+   * A submission whose `(rfqId, insurerId)` already has a current
+   * `Quotation` (backlog Part C #13) is dropped up front — an insurer that
+   * quoted is not "silent" even if its best-effort `RFQInsurer -> QUOTED`
+   * move failed on capture, so it must not be auto-marked NO_RESPONSE
+   * (ibms-brain/meta/context/policy-lifecycle.md § RFQ follow-up:
+   * `RFQInsurer.status` is not the authoritative "has this insurer quoted?"
+   * signal — the `Quotation` table is).
+   *
    * Per-row isolation so one bad row does not abandon the rest of the run
    * (same shape as CrossSellDetectionScheduler).
    */
@@ -600,13 +620,30 @@ export class RfqService {
     const now = new Date();
     const candidates = await this.rfqs.findOpenSubmissionsForFollowUp();
 
+    // One query for every candidate RFQ: which (rfqId, insurerId) pairs
+    // already have a current Quotation. Cheap at Domain B's current volume;
+    // revisit alongside `findOpenSubmissionsForFollowUp`'s own pagination
+    // TODO if real RFQ traffic arrives.
+    const quotedKeys = new Set(
+      (
+        await this.rfqs.findCurrentQuotationKeys([
+          ...new Set(candidates.map((c) => c.rfqId)),
+        ])
+      ).map((k) => `${k.rfqId}::${k.insurerId}`),
+    );
+
     let due = 0;
     let alerted = 0;
     let autoNoResponse = 0;
     let transitionSkipped = 0;
+    let skippedQuoted = 0;
     let failed = 0;
 
     for (const submission of candidates) {
+      if (quotedKeys.has(`${submission.rfqId}::${submission.insurerId}`)) {
+        skippedQuoted += 1;
+        continue;
+      }
       if (
         !isFollowUpDue(
           submission.sentAt,
@@ -671,6 +708,7 @@ export class RfqService {
       alerted,
       autoNoResponse,
       transitionSkipped,
+      skippedQuoted,
       failed,
     };
   }

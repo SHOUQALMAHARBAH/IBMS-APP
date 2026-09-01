@@ -137,15 +137,19 @@ export const WORKFLOW_TRANSITIONS: {
     CLOSED_LOST: [],
   },
 
-  // Inferred (no dedicated lifecycle doc yet — see file header, and the
-  // `/brain-gap` filed for ibms-brain/meta/context/policy-lifecycle.md).
+  // The move map itself is inferred from field semantics (no Part-3.3
+  // paragraph draws these arrows); the NO_RESPONSE mechanics are documented
+  // in ibms-brain/meta/context/policy-lifecycle.md § "The rules that aren't
+  // obvious" (filed via `/brain-gap` at backlog Part C #12, extended at #13).
   // SENT -> insurer views and/or responds. NO_RESPONSE is reached two ways:
   // a Placement Officer records it manually (Process 12, `rfq.insurer.update`),
   // OR the nightly follow-up sweep (backlog Part C #12) auto-advances a
   // SENT/VIEWED submission once its RFQ's business-day `followUpThresholdDays`
   // has lapsed (see rfq-followup.scheduler.ts / RfqService.runFollowUpScan —
-  // it also stamps `followUpAlertSentAt` + audits). A late responder can
-  // still submit a quote or decline afterward, hence
+  // it also stamps `followUpAlertSentAt` + audits). The sweep first drops any
+  // submission whose insurer has a current `Quotation` (backlog Part C #13) —
+  // that insurer responded even if this status column never caught up. A late
+  // responder can still submit a quote or decline afterward, hence
   // NO_RESPONSE -> QUOTED/DECLINED.
   RFQInsurer: {
     SENT: ['VIEWED', 'QUOTED', 'DECLINED', 'NO_RESPONSE'],

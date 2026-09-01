@@ -96,6 +96,7 @@ function makeDeps() {
   const findExistingShortlistInsurerIds = vi.fn().mockResolvedValue([]);
   const stampFollowUpAlert = vi.fn().mockResolvedValue(1);
   const findOpenSubmissionsForFollowUp = vi.fn().mockResolvedValue([]);
+  const findCurrentQuotationKeys = vi.fn().mockResolvedValue([]);
   const findSelectableInsurers = vi.fn().mockResolvedValue([]);
   const countInsurersByIds = vi
     .fn()
@@ -124,6 +125,7 @@ function makeDeps() {
     findExistingShortlistInsurerIds,
     stampFollowUpAlert,
     findOpenSubmissionsForFollowUp,
+    findCurrentQuotationKeys,
     findSelectableInsurers,
     countInsurersByIds,
     createCommunication,
@@ -186,6 +188,7 @@ function makeDeps() {
       findExistingShortlistInsurerIds,
       stampFollowUpAlert,
       findOpenSubmissionsForFollowUp,
+      findCurrentQuotationKeys,
       findSelectableInsurers,
       countInsurersByIds,
       createCommunication,
@@ -481,6 +484,7 @@ describe('RfqService', () => {
         alerted: 1,
         autoNoResponse: 1,
         transitionSkipped: 0,
+        skippedQuoted: 0,
         failed: 0,
       });
       expect(mocks.stampFollowUpAlert).toHaveBeenCalledWith(
@@ -542,6 +546,7 @@ describe('RfqService', () => {
         alerted: 2,
         autoNoResponse: 1,
         transitionSkipped: 1,
+        skippedQuoted: 0,
         failed: 0,
       });
     });
@@ -568,6 +573,7 @@ describe('RfqService', () => {
         alerted: 0,
         autoNoResponse: 1,
         transitionSkipped: 0,
+        skippedQuoted: 0,
         failed: 0,
       });
       expect(mocks.record).not.toHaveBeenCalled();
@@ -585,6 +591,7 @@ describe('RfqService', () => {
         alerted: 0,
         autoNoResponse: 0,
         transitionSkipped: 0,
+        skippedQuoted: 0,
         failed: 0,
       });
       expect(mocks.stampFollowUpAlert).not.toHaveBeenCalled();
@@ -607,8 +614,45 @@ describe('RfqService', () => {
         alerted: 1,
         autoNoResponse: 1,
         transitionSkipped: 0,
+        skippedQuoted: 0,
         failed: 1,
       });
+    });
+
+    it('drops a submission whose insurer already has a current Quotation — not due, counted skippedQuoted', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findOpenSubmissionsForFollowUp.mockResolvedValue([
+        dueRow({ id: 'sub-1', rfqId: 'rfq-1', insurerId: 'ins-1' }),
+        dueRow({ id: 'sub-2', rfqId: 'rfq-1', insurerId: 'ins-2' }),
+      ]);
+      // ins-1 quoted (best-effort RFQInsurer -> QUOTED failed, so still SENT);
+      // ins-2 is genuinely silent.
+      mocks.findCurrentQuotationKeys.mockResolvedValue([
+        { rfqId: 'rfq-1', insurerId: 'ins-1' },
+      ]);
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(mocks.findCurrentQuotationKeys).toHaveBeenCalledWith(['rfq-1']);
+      expect(result).toEqual({
+        candidates: 2,
+        due: 1,
+        alerted: 1,
+        autoNoResponse: 1,
+        transitionSkipped: 0,
+        skippedQuoted: 1,
+        failed: 0,
+      });
+      // Only the silent ins-2 submission was touched.
+      expect(mocks.stampFollowUpAlert).toHaveBeenCalledTimes(1);
+      expect(mocks.stampFollowUpAlert).toHaveBeenCalledWith(
+        'sub-2',
+        expect.any(Date),
+      );
+      expect(mocks.transition).toHaveBeenCalledTimes(1);
+      expect(mocks.transition).toHaveBeenCalledWith(
+        expect.objectContaining({ entityId: 'sub-2', toStatus: 'NO_RESPONSE' }),
+      );
     });
   });
 

@@ -242,6 +242,25 @@ export class RfqRepository {
     });
   }
 
+  /** The `(rfqId, insurerId)` pairs, among the given RFQs, that already have
+   * a current `Quotation` (backlog Part C #13). The follow-up sweep drops
+   * these from its candidate set — an insurer that quoted is not "silent"
+   * even if its best-effort `RFQInsurer -> QUOTED` move failed on capture
+   * (ibms-brain/meta/context/policy-lifecycle.md § RFQ follow-up:
+   * `RFQInsurer.status` is not the authoritative "has this insurer quoted?"
+   * signal — the `Quotation` table is). Reads `Quotation` the same way this
+   * repository already reads `Insurer` / `CommunicationLog` — cross-entity,
+   * there is no Quotation repository dependency to inject. */
+  findCurrentQuotationKeys(
+    rfqIds: readonly string[],
+  ): Promise<{ rfqId: string; insurerId: string }[]> {
+    if (rfqIds.length === 0) return Promise.resolve([]);
+    return this.prisma.client.quotation.findMany({
+      where: { rfqId: { in: [...rfqIds] }, isCurrentVersion: true },
+      select: { rfqId: true, insurerId: true },
+    });
+  }
+
   /** The insurer master data the shortlist picker offers (backlog Part C
    * #11 — "select an insurer shortlist"). Read-only — there is no Insurer
    * module yet (narrative Process 31). */
