@@ -1257,6 +1257,14 @@ model Policy {
   requestedPremium Decimal @db.Decimal(18, 3)
   issuedPremium  Decimal? @db.Decimal(18, 3)
   currency       String   @default("JOD")
+  // Process 18-19 (backlog Part C #18-19) provenance — bare scalars, no
+  // relation. placedByUserId is the Placement Officer who bound the cover;
+  // issuedByUserId is stamped on the PLACEMENT_CONFIRMED -> ISSUED
+  // transition. The AuditLogEntry CREATE / TRANSITION rows are the
+  // authoritative trail (same pattern as Opportunity.createdByUserId /
+  // RFQ.issuedByUserId).
+  placedByUserId String?
+  issuedByUserId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -1282,6 +1290,11 @@ model Policy {
 /// Requested/issued coverage snapshot — limits, sums insured, named perils,
 /// extensions (Part 3.4). Kept as a distinct versioned row so a Claim can
 /// resolve to "coverage in force at the loss date" (Part 3.7, data-model rule).
+/// "At most one OPEN schedule (effectiveTo IS NULL) per Policy" is a real DB
+/// invariant — the partial UNIQUE index `PolicySchedule_one_open_per_policy`
+/// (migration 20260902140000_add_policy_placement_issuance,
+/// ibms-brain/meta/lex/race-safe-invariants.md). Prisma can't express a
+/// partial UNIQUE here, so it lives in raw SQL in that migration.
 model PolicySchedule {
   id            String   @id @default(uuid())
   policyId      String

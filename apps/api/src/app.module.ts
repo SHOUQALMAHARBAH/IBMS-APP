@@ -26,6 +26,7 @@ import { QuotationModule } from './modules/quotation/quotation.module';
 import { ComparisonModule } from './modules/comparison/comparison.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
 import { ClientDecisionModule } from './modules/client-decision/client-decision.module';
+import { PolicyModule } from './modules/policy/policy.module';
 
 @Module({
   imports: [
@@ -157,6 +158,15 @@ import { ClientDecisionModule } from './modules/client-decision/client-decision.
     // SENT_TO_CLIENT -> CLIENT_DECISION -> <route>, best-effort). Depends on
     // OpportunityModule / RecommendationModule / CustomerModule.
     ClientDecisionModule,
+    // Part C backlog #18-19 (Policy Placement & Issuance) — creates the
+    // Policy from a client-ACCEPTed Opportunity (insurer / line / premium /
+    // currency taken from the accepted recommendation's quotation, caller
+    // sets the inception date), then records the insurer-issued policy /
+    // schedule / documents / premium invoice and drives the Policy
+    // PLACEMENT_CONFIRMED -> ISSUED transition through the workflow engine.
+    // Depends on OpportunityModule / RecommendationModule /
+    // ClientDecisionModule / CustomerModule.
+    PolicyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

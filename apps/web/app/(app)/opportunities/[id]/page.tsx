@@ -18,6 +18,7 @@ import {
 } from '../../../../components/rfq/rfq.styles';
 import { RecommendationSection } from '../../../../components/recommendation/RecommendationSection';
 import { ClientDecisionSection } from '../../../../components/client-decision/ClientDecisionSection';
+import { PolicySection } from '../../../../components/policy/PolicySection';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
@@ -201,6 +202,12 @@ export default function OpportunityDetailPage() {
           <ClientDecisionSection
             opportunity={opportunity}
             canCapture={isSales || isPlacement}
+            onOpportunityChanged={() => void load()}
+          />
+
+          <PolicySection
+            opportunity={opportunity}
+            isPlacement={isPlacement}
             onOpportunityChanged={() => void load()}
           />
         </>

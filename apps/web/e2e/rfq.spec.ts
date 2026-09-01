@@ -144,6 +144,11 @@ async function mockRfqApi(
       decision: string;
       evidenceRef: string;
     }) => void;
+    onPlacePolicy?: (body: { opportunityId: string; inceptionDate: string }) => void;
+    onRecordIssuance?: (body: {
+      policyNumber: string;
+      issuedPremium: string;
+    }) => void;
     opportunityStatus?: string;
   } = {},
 ) {
@@ -431,6 +436,115 @@ async function mockRfqApi(
       status: 200,
       json: clientDecision ? [clientDecision] : [],
     });
+  });
+
+  // Policy (Part C #18-19) — starts empty; a POST /policies places it
+  // (PLACEMENT_CONFIRMED), a POST /policies/:id/issuance moves it to ISSUED
+  // with a schedule + documents, a POST /policies/:id/documents appends more.
+  let policy: Record<string, unknown> | null = null;
+  await page.route("http://localhost:4000/policies**", (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+    if (method === "POST" && /\/policies\/[^/]+\/issuance(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        policyNumber: string;
+        issuedPremium: string;
+        schedule: {
+          limits: Record<string, unknown>;
+          sumsInsured: Record<string, unknown>;
+          namedPerils?: string[];
+          extensions?: string[];
+        };
+        documents: { category: string; classification: string; fileName: string }[];
+      };
+      opts.onRecordIssuance?.(b);
+      policy = {
+        ...(policy ?? {}),
+        status: "ISSUED",
+        policyNumber: b.policyNumber,
+        issuedPremium: b.issuedPremium,
+        premiumVariance: "-1500.000",
+        issuedByUserId: "user-1",
+        issuanceComplete: true,
+        schedules: [
+          {
+            id: "sch-1",
+            effectiveFrom: "2026-10-01T00:00:00.000Z",
+            effectiveTo: null,
+            limits: b.schedule.limits,
+            sumsInsured: b.schedule.sumsInsured,
+            namedPerils: b.schedule.namedPerils ?? [],
+            extensions: b.schedule.extensions ?? [],
+            sourceEndorsementId: null,
+            createdAt: "2026-10-01T00:00:00.000Z",
+          },
+        ],
+        documents: b.documents.map((d, i) => ({
+          ...d,
+          id: `doc-${i}`,
+          storageRef: `s3://x/${i}`,
+          versionNumber: 1,
+          previousVersionId: null,
+          uploadedByUserId: "user-1",
+          createdAt: "2026-10-01T00:00:00.000Z",
+        })),
+      };
+      return route.fulfill({ status: 201, json: policy });
+    }
+    if (method === "POST" && /\/policies\/[^/]+\/documents(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        documents: { category: string; classification: string; fileName: string }[];
+      };
+      const existing = (policy?.documents as unknown[]) ?? [];
+      policy = {
+        ...(policy ?? {}),
+        documents: [
+          ...existing,
+          ...b.documents.map((d, i) => ({
+            ...d,
+            id: `doc-extra-${i}`,
+            storageRef: `s3://x/extra-${i}`,
+            versionNumber: 1,
+            previousVersionId: null,
+            uploadedByUserId: "user-1",
+            createdAt: "2026-10-02T00:00:00.000Z",
+          })),
+        ],
+      };
+      return route.fulfill({ status: 201, json: policy });
+    }
+    if (method === "POST" && /\/policies(\?|$)/.test(url.split("?")[0])) {
+      const b = route.request().postDataJSON() as {
+        opportunityId: string;
+        inceptionDate: string;
+      };
+      opts.onPlacePolicy?.(b);
+      policy = {
+        id: "pol-1",
+        opportunityId: "opp-1",
+        customerId: "cust-1",
+        insurerId: "ins-1",
+        insurer: INSURER_IDENTITY,
+        policyNumber: null,
+        insuranceLine: "Property All Risks",
+        status: "PLACEMENT_CONFIRMED",
+        inceptionDate: `${b.inceptionDate}T00:00:00.000Z`,
+        expiryDate: null,
+        requestedPremium: "120000.000",
+        issuedPremium: null,
+        premiumVariance: null,
+        currency: "JOD",
+        placedByUserId: "user-1",
+        issuedByUserId: null,
+        schedules: [],
+        documents: [],
+        issuanceComplete: false,
+        createdAt: "2026-09-15T00:00:00.000Z",
+        updatedAt: "2026-09-15T00:00:00.000Z",
+      };
+      return route.fulfill({ status: 201, json: policy });
+    }
+    return route.fulfill({ status: 200, json: policy ? [policy] : [] });
   });
 
   // One route for the whole /rfqs prefix — the last-registered route wins in
@@ -750,6 +864,41 @@ test("records a client decision and shows the route it takes", async ({
   await expect.poll(() => captured?.decision).toBe("REQUEST_PRICE_REDUCTION");
   await expect.poll(() => captured?.evidenceRef).toBe("msg-9931");
   await expect(page.getByText("Renewed negotiation")).toBeVisible();
+});
+
+test("places a policy from an accepted opportunity and records its issuance", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  let placed: { inceptionDate: string } | null = null;
+  let issued: { policyNumber: string; issuedPremium: string } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    onPlacePolicy: (b) => {
+      placed = b;
+    },
+    onRecordIssuance: (b) => {
+      issued = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(page.getByRole("heading", { name: "Policy" })).toBeVisible();
+
+  await page.getByLabel("Inception date").fill("2026-10-01");
+  await page.getByRole("button", { name: "Place policy" }).click();
+
+  await expect.poll(() => placed?.inceptionDate).toBe("2026-10-01");
+  await expect(page.getByText("PLACEMENT_CONFIRMED")).toBeVisible();
+
+  await page.getByLabel("Policy number").fill("POL-WEB-1");
+  await page.getByLabel("Issued premium").fill("118500.000");
+  await page.getByRole("button", { name: "Record issuance" }).click();
+
+  await expect.poll(() => issued?.policyNumber).toBe("POL-WEB-1");
+  await expect.poll(() => issued?.issuedPremium).toBe("118500.000");
+  await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
+  await expect(page.getByText("POL-WEB-1")).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

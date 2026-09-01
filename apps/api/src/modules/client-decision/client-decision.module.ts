@@ -29,5 +29,8 @@ import { CustomerModule } from '../customer/customer.module';
   ],
   controllers: [ClientDecisionController],
   providers: [ClientDecisionService, ClientDecisionRepository],
+  // PolicyModule (backlog Part C #18-19) reads the ACCEPT decision as the
+  // authoritative precondition for placing a Policy.
+  exports: [ClientDecisionRepository],
 })
 export class ClientDecisionModule {}

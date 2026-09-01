@@ -115,6 +115,7 @@ const insuranceOperations: PermissionSeed[] = [
   { code: 'client-decision.read', module: 'insurance-operations', description: 'List/read the client decision and its routing outcome', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'policy.create', module: 'insurance-operations', description: 'Create a Policy from an accepted Opportunity', roles: [PLACEMENT] },
   { code: 'policy.issue', module: 'insurance-operations', description: 'Record the insurer-issued policy/schedule/certificates/invoice', roles: [PLACEMENT] },
+  { code: 'policy.read', module: 'insurance-operations', description: 'List/read policies, their coverage schedules and their electronic-file documents', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'policy.check', module: 'insurance-operations', description: 'Independently check an issued policy against requested coverage (maker/checker: never the officer who placed it)', roles: [POLICY_CHECK] },
   { code: 'policy.deliver', module: 'insurance-operations', description: 'Record policy delivery date/method/recipient/acknowledgement', roles: [SALES, PLACEMENT] },
   { code: 'endorsement.create', module: 'insurance-operations', description: 'Request a positive/negative endorsement', roles: [PLACEMENT] },

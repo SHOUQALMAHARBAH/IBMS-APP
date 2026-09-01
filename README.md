@@ -411,7 +411,8 @@ build actually is today:
   Playwright/axe green). Per-process detail below.
 - **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
-  Recommendation (#16) + Client Decision Handling (#17) — built and verified.** A minimal
+  Recommendation (#16) + Client Decision Handling (#17) + Policy Placement & Issuance
+  (#18–19) — built and verified.** A minimal
   `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
@@ -429,7 +430,11 @@ build actually is today:
   earns materially more commission than a comparable competing quote, both before it can be
   sent to the client. Once sent, a single `ClientDecision` is recorded (one of six types)
   and routes the Opportunity down one of three paths — Accept → placement, Reject → close
-  the request, any &ldquo;request&rdquo; → renewed negotiation. Detail below.
+  the request, any &ldquo;request&rdquo; → renewed negotiation. On an Accept, a `Policy`
+  is created from the accepted recommendation's quotation (inception date set at
+  placement) and, once the insurer issues, its number / issued premium / coverage
+  `PolicySchedule` / electronic-file `Document`s are recorded and the `Policy` moves
+  `PLACEMENT_CONFIRMED → ISSUED` through the workflow engine. Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -447,7 +452,7 @@ build actually is today:
 | 9 | Up-Selling | nightly `@Cron` sweep + on-demand `POST /up-sell-recommendations/detect` compare a customer's designed property Sum Insured (Σ the "Property All Risks" line of their live `InsuranceProgram`, #7) against the current value of their surveyed assets (`deriveSumInsured`, #6) and raise an `UpSellRecommendation` when the shortfall clears a drafted 10% threshold · `UpSellStatus` OPEN → CONVERTED\|DISMISSED through the workflow engine (18th entity) · **partial** `UNIQUE` (one OPEN per customer, so a resolved one can re-flag once assets grow) · per-customer list + detail screen with the two figures + inline convert/dismiss | comparison is **property/asset value only** — a BI up-sell on profit growth is out of scope; `currentSumInsured` comes from the designed `InsuranceProgram` line, not an in-force `Policy` (Domain B not built) — the two converge once `reassemble` runs, so the job catches a survey that grew without a re-assembly/endorsement; the 10% threshold is a drafted default (no sourced underwriting figure); a resolved recommendation is not re-raised until assets grow past the last flagged value (a pre-check heuristic); the `CONVERTED → endorsement/re-quote` link is Process 22 / 11+; no maker/checker; no per-officer queue; no reassignment |
 | 10 | Relationship Management / CRM | `POST/GET /customers/:id/interactions` log & list every touchpoint (`InteractionChannel` — meeting/call/email/WhatsApp/visit/proposal/renewal/claim/complaint/portal/SMS/other) · `GET /customers/:id/360-view` aggregates interactions + policies + claims + complaints into one pure, deterministic reverse-chronological timeline (`buildCustomerTimeline`) · customer-timeline screen + nav item + customer-profile section | **Policy/Claim/Complaint modules (Domains B/C/E) are not built, so those three collections are always empty and the timeline is interactions-only** — same "built ahead of its data source" shape as #8; `Interaction` carries no workflow status (not a `WorkflowTransitionService` entity) and no maker/checker (a factual log); logging is gated by `interaction.log` alone (not customer ownership — cross-functional staff log against customers they don't own), reads by the `customer.360-view.read` visibility rule; no edit/delete of a logged interaction; the claim projection is ids/status/dates only (HIGHLY_CONFIDENTIAL — no `causeOfLoss`/`lossLocation`/money), and the 360° read is audit-logged (`READ`, `isSensitiveDataAccess` when a claim is present); no `CommunicationLog`/`ConsentRecord` link (Process 44 / Part D); no pagination on the interaction list |
 
-### Part C · Domain B #11–17 — built, with these deferrals
+### Part C · Domain B #11–19 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -458,13 +463,15 @@ build actually is today:
 | 15 | Negotiation | the negotiation mechanism is `POST /quotations/:id/revise` from #13 — a round is a NEW `Quotation` version (`versionNumber+1`, linked by `previousVersionId`, `isCurrentVersion` flipped, the predecessor kept verbatim) · #15 makes **"never deleted or replaced" a real DB-layer guarantee**: migration `20260901180000` adds `negotiationNotes TEXT` + a trigger (`prevent_quotation_version_mutation`, same pattern as the `AuditLogEntry` immutability trigger) that rejects any `DELETE` of a `Quotation` row, any `UPDATE` of an already-superseded version, and any `UPDATE` of a live version that changes anything other than `isCurrentVersion` true→false (the supersede flip — asserted column-by-column via `to_jsonb(NEW) - 'isCurrentVersion' IS DISTINCT FROM to_jsonb(OLD) - 'isCurrentVersion'`) · a revise round now carries the broker's optional `negotiationNotes` (the rationale — what was asked / conceded; Confidential, audited as a `hasNegotiationNotes` boolean only) · every quotation read returns a pure `history: NegotiationRound[]` projection (`buildNegotiationHistory`) — round 0 is the opening quote, each later round is diffed against the version its `previousVersionId` names and carries `premiumDeltaFromPrevious` (fils-quantized via `money.util.ts`, sign preserved, `null` when the round changed `currency`) + `changedTermFields` + that round's notes · web: the "Quotations" version-history table gains Round / Δ premium / Terms-changed columns + the round rationale, and the revise form gains a "Negotiation notes" field | `Quotation` is still **not** a `WorkflowTransitionService` entity and has no maker/checker (recording a negotiated term set is a factual single-actor Placement record; the approval gate is the Broker Recommendation, #16); no structured "negotiation ask vs. counter" model — `negotiationNotes` is one free-text field per round; the DB trigger's documented residual risk is identical to the `AuditLogEntry` trigger's (a session on the shared `ibms` Postgres role can still `SET session_replication_role = replica` — a least-privilege app role is a separate infra change); a data fix or PDPL Correction DSR touching a historical version now requires that privileged bypass (same posture as `AuditLogEntry`); `changedTermFields` treats a `limits` JSON key reorder as a change (stringify compare, a display aid not a semantic diff) |
 | 16 | Broker Recommendation | **new module** `apps/api/src/modules/recommendation/` · `POST /recommendations` (`{ opportunityId, recommendedQuotationId, rationale, rationaleFactors }`, `recommendation.draft`/Placement) — one `Recommendation` per Opportunity (`opportunityId @unique`), pointing at one **current-version** `Quotation` on one of its RFQs; the Opportunity must be at `COMPARISON_BUILT`; `rationaleFactors` requires a non-empty note for **all six** dimensions (coverage / price / financial strength / claims service / deductible / policy conditions — "never price alone") · two gate flags snapshot at draft: `approvalRequired` (recommended premium > the Opportunity's `targetPremiumThreshold`) and `conflictOfInterestFlagged` (`detectConflictOfInterest`, pure — a competing current-version quote priced within a **drafted, unsourced** 10% band carries a commission rate at least a **drafted, unsourced** 2 percentage points lower) · `PATCH /opportunities/:id/target-premium-threshold` (`opportunity.set-target-threshold`/**Manager, Exec** — new perm) sets/clears the configurable threshold · `POST /recommendations/:id/approve` (`recommendation.approve`/**Manager**) — only when `approvalRequired`, **maker/checker**: `assertDifferentActors(draftedByUserId, actor)` + the existing `Recommendation_maker_checker_distinct` CHECK; a status-conditional `updateMany` stamps `approvedByUserId`/`approvedAt` (0 rows → 409) · `POST /recommendations/:id/conflict-of-interest-disclosure` (`conflict-of-interest.disclose`/Placement, Compliance) — only when flagged, acknowledger ≠ drafter, one per recommendation · `POST /recommendations/:id/send` (`recommendation.send`/**Placement** — new perm) — 422 while a required approval or COI disclosure is outstanding, else stamps `sentToClientAt` and best-effort advances `Opportunity RECOMMENDATION_DRAFTED → SENT_TO_CLIENT` · `GET /recommendations?opportunityId=\|customerId=` + `/:id` (`recommendation.read` — new perm, Sales/Placement/Manager/Exec) return the recommendation + its quotation + the COI disclosure + a computed `blockedFromSend` list · a successful draft best-effort advances `Opportunity COMPARISON_BUILT → RECOMMENDATION_DRAFTED` · migration `20260901200000` adds `Recommendation.rationaleFactors`/`approvalRequired`/`conflictOfInterestFlagged`/`coiCompetingQuotationId`/`coiCommissionDiffPercent`/`sentByUserId` + FK/filter indexes · web: a "Broker recommendation" section on the Opportunity detail screen (Manager-only threshold control, Placement-only draft form, Manager-only Approve, Placement/Compliance COI disclosure form, Send with the block reasons listed) | `Recommendation` is **not** a `WorkflowTransitionService` entity (no `status` column — its lifecycle is nullable timestamps; the parent `Opportunity` carries the same progression through the engine); one recommendation per Opportunity pointing at **one** quote — a multi-line programme's per-line recommendation is a deferred edge (schema constraint, like #7's one-programme-per-`RiskProfile`); the **10% comparable-premium band** and **2 pp material-commission** figures are `ibms-app` product decisions, drafted, **unsourced** — `/brain-gap` candidates; the COI check can only assess quotes that captured a `commissionRatePercent` at #13 (no rate → not flagged); `CommissionAgreement.ratePercent` (the governed rate table, Finance) is not consulted — the check uses the per-quote rate; draft requires the Opportunity to be **at** `COMPARISON_BUILT`, which is an adequate proxy for "a comparison was built" but not a hard FK to a `ComparisonMatrix` row; `recommendation.draft` / `.send` are role-level (no per-officer queue); the disclosure records that a disclosure was **made to the client** — the system does not itself send anything to the client |
 | 17 | Client Decision Handling | **new module** `apps/api/src/modules/client-decision/` · `POST /client-decisions` (`{ opportunityId, decision, evidenceType, evidenceRef, notes? }`, `client-decision.capture`/Sales, Placement) records the client's **single** decision on a **sent** `Recommendation` — one `ClientDecision` per Opportunity (`opportunityId @unique` → 409); the precondition is `Recommendation.sentToClientAt != null` (authoritative — the Opportunity status can lag a #16 best-effort advance) · the six `ClientDecisionType` values collapse to three routes (`routeFor`, pure): **ACCEPT → PLACEMENT**, **REJECT → CLOSED_LOST**, and the four **REQUEST_\* → RENEGOTIATE** · the route is the parent Opportunity's engine walk `<current> → SENT_TO_CLIENT → CLIENT_DECISION → <route>`, applied **best-effort** (logged, never thrown — the `ClientDecision` row + `routeFor(decision)` is the authoritative record; the response carries `route` / `routeLabel` / `routingComplete`) · `evidenceType` ∈ `signature \| e-signature \| email_confirmation` + a non-empty `evidenceRef` are required (Part 4.1 — a decision of record needs a reference) · `GET /client-decisions?opportunityId=\|customerId=` + `/:id` (`client-decision.read` — **new perm**, Sales/Placement/Manager/Exec) · migration `20260902120000` adds `ClientDecision.notes` + `capturedByUserId` · web: a "Client decision" section on the Opportunity detail screen (Sales/Placement form once a recommendation is sent, read-only after) | `ClientDecision` is **not** a `WorkflowTransitionService` entity (`decision` is a one-shot enum, not a state machine) and has no maker/checker (recording the client's stated decision is a factual, single-actor Sales/Placement act); **one decision per Opportunity** — a RENEGOTIATE loop that produces a *second* client decision is blocked by the `@unique` (schema constraint, same class as #16's one-recommendation-per-Opportunity); the RENEGOTIATE route lands the Opportunity at `RENEGOTIATE` and stops — it does **not** auto-advance to `RFQ_ISSUED` or relax the one-RFQ-per-`(opportunity, line)` constraint (re-marketing a line is still a deferred edge from #11; new quote versions / negotiation rounds via #13/#15 work on the existing RFQ regardless); the routing transitions are best-effort (a partial failure leaves the Opportunity mid-route with `routingComplete: false` and no re-trigger endpoint); `client-decision.capture` is role-level (no per-officer queue); the six decision types are not otherwise differentiated (all four REQUEST_* behave identically beyond the recorded `decision` value + `notes`) |
+| 18–19 | Policy Placement & Issuance | **new module** `apps/api/src/modules/policy/` · **`Policy` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine (the first Domain B one); **no maker/checker** here (placing + recording issuance is single-actor Placement work — the mandatory independent check is Process 20 `PolicyChecking`) · `POST /policies` (`{ opportunityId, inceptionDate, expiryDate? }`, `policy.create`/Placement — already seeded) creates the `Policy` at the schema `@default(PLACEMENT_CONFIRMED)` (NOT via the engine — initial creation, like `Opportunity` at `NEEDS_CONFIRMED`); the **authoritative precondition is a `ClientDecision` of `ACCEPT`** (the Opp status can lag #17's best-effort route — 422 otherwise); insurer / insurance line / requested premium / currency come from the accepted `Recommendation.recommendedQuotation`, **not the body**; `opportunityId @unique` → pre-check 409 + `P2002` → 409 · `POST /policies/:id/issuance` (`{ policyNumber, issuedPremium, inceptionDate?, expiryDate?, schedule: { effectiveFrom?, limits, sumsInsured, namedPerils?, extensions? }, documents: [{ category, classification, fileName, storageRef }] }`, `policy.issue`/Placement — already seeded) drives `Policy PLACEMENT_CONFIRMED → ISSUED` through `WorkflowTransitionService.transition` with the issued scalars (`policyNumber` / `issuedPremium` / `issuedByUserId` + optional period corrections) passed as the transition `data` — so the status flip and the scalar write are **one atomic, engine-audited write** (its status-conditional `updateMany` is the race gate — 0 rows → 409); then `PolicyRepository.createIssuanceArtifacts` writes the opening `PolicySchedule` + the insurer-issued `Document` rows in **one Prisma `$transaction`** (local exception, like `QuotationRepository.reviseChain`) · a **crash-recovery re-entry branch** completes a partially-done issuance (status already `ISSUED`, no open schedule, payload byte-matches `policyNumber` + `compareMoney(issuedPremium)`) without re-transitioning and with no `UPDATE Policy` audit row; any other state / mismatched payload → 422 "issuance is recorded once" · `POST /policies/:id/documents` (`document.manage` — existing perm) appends `Document` rows to the electronic Insurance File (Part 4.2) at any lifecycle stage · `GET /policies?opportunityId=\|customerId=` + `/:id` (`policy.read` — **new seeded perm**, Sales/Placement/Manager/Exec) — the view carries `premiumVariance` (signed `subtractMoney(issued, requested)`, `null` until issued) + `issuanceComplete` · migration `20260902140000` adds `Policy.placedByUserId` / `Policy.issuedByUserId` (TEXT provenance scalars) + a **partial `UNIQUE`** `PolicySchedule_one_open_per_policy` (`effectiveTo IS NULL`) — raw SQL, Prisma can't express it (`race-safe-invariants.md`) · audit snapshots are **metadata not body**: schedule snapshot = coverage-key *names* + counts (never the figures), document snapshot **excludes `fileName` + `storageRef`** (a health-cert filename can name insured persons — HIGHLY_CONFIDENTIAL; `storageRef` is an internal object key) · web: a "Policy" section on the Opportunity detail screen (Placement place form once the Opp is at `PLACEMENT`, an issuance form — policy number / issued premium / limits+sums JSON / perils+extensions / repeatable document rows — then the issued policy + schedule + documents, with a post-issuance "attach a document" control) | `Policy` creation takes the schema `@default` status without the engine (initial creation, matches `Opportunity`/`RFQ`); the **transition-then-artefacts ordering** has one seam — if the schedule/documents `$transaction` fails after the status flip committed, the `Policy` is `ISSUED` with no schedule (recoverable via the re-entry branch; a hard crash *between* the engine's `updateMany` and its own audit write would additionally leave the TRANSITION row unwritten — bounded, rare, separately alarmed); `limits` / `sumsInsured` are stored opaquely (a non-empty flat object of string/number values — no per-figure `Decimal(18,3)` precision until a consumer does arithmetic on them, e.g. a Claim resolving "coverage in force at the loss date"); a `CoverNote` / binder interim state (Process 18) is modeled in the schema but has no endpoint; one `Policy` per Opportunity; `policy.create` / `policy.issue` are role-level (no per-officer queue); no `Endorsement`-driven schedule versioning (#22) — the partial `UNIQUE` is in place for it |
 
 ### Not started
 
 - **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
   Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, #16 Broker
-  Recommendation, and #17 Client Decision Handling are **built** — see the Domain B table
-  above; #18–22 policy issuance / checking / delivery / endorsement remain), Claims
+  Recommendation, #17 Client Decision Handling, and #18–19 Policy Placement & Issuance are
+  **built** — see the Domain B table above; #20 policy checking, #21 delivery, #22
+  endorsement / cancellation remain), Claims
   (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -2287,6 +2294,153 @@ narrows a gap.
   api + web + db `typecheck` + `eslint` clean. Migration applied to `db` + `db-test`;
   `prisma validate` OK, `prisma migrate status` clean; seed re-run (**143** permissions —
   `client-decision.read` new).
+
+**Part C #18–19 — Policy Placement & Issuance (Domain B, Processes 18–19)**
+
+- **New module** `apps/api/src/modules/policy/` (+ `apps/api/src/repositories/policy.repository.ts`).
+  The `Policy` / `PolicySchedule` / `Document` models already existed (big migration
+  `20260825124114`) — this item is their first consumer. Backlog: create the Policy from
+  the Opportunity on acceptance and set the inception date; receive and record the
+  insurer-issued policy / schedule / endorsement template / certificates / premium invoice.
+- **`Policy` IS a `WorkflowTransitionService` entity** — the first one in Domain B. Its
+  `status` (`PolicyStatus`) moves ONLY through the engine
+  (`ibms-brain/meta/lex/workflow-state-transitions.md`); the `WORKFLOW_TRANSITIONS.Policy`
+  map (`PLACEMENT_CONFIRMED → ISSUED → CHECKING_IN_PROGRESS → …`) already existed. **No
+  maker/checker at this stage** — placing the cover and recording what the insurer issued
+  is single-actor Placement work; the mandatory *independent* line-by-line check of
+  requested-vs-issued coverage is Process 20 (`PolicyChecking`, `ISSUED →
+  CHECKING_IN_PROGRESS`), not built.
+- **`POST /policies`** (`{ opportunityId, inceptionDate, expiryDate? }`, `policy.create`,
+  Placement — the permission was already seeded). Creates the `Policy` row at the schema
+  `@default(PLACEMENT_CONFIRMED)` — **not** through the engine (initial creation is not a
+  state *change*, same call as `OpportunityService.create` at `NEEDS_CONFIRMED` /
+  `RFQ`/`RFQInsurer`). The **authoritative placement precondition is a `ClientDecision`
+  of `ACCEPT`** for the Opportunity — the Opportunity status can lag #17's best-effort
+  routing, so a `422` is raised against the decision row, not the status (same "authoritative
+  child row, not the parent status" call as #17 checking `Recommendation.sentToClientAt`).
+  Insurer / insurance line / requested premium / currency are taken from the accepted
+  `Recommendation.recommendedQuotation`, **never the request body**. One Policy per
+  Opportunity: `opportunityId @unique` — a friendly pre-check `409` plus a `P2002` → `409`.
+  `requestedPremium = quantizeMoney(quote.premium)`.
+- **`POST /policies/:id/issuance`** (`{ policyNumber, issuedPremium, inceptionDate?,
+  expiryDate?, schedule: { effectiveFrom?, limits, sumsInsured, namedPerils?, extensions? },
+  documents: [{ category, classification, fileName, storageRef }] }`, `policy.issue`,
+  Placement — already seeded). Drives `Policy PLACEMENT_CONFIRMED → ISSUED` through
+  `WorkflowTransitionService.transition`, passing the issued scalars (`policyNumber`,
+  `issuedPremium` (a `Prisma.Decimal` from `quantizeMoney`), `issuedByUserId`, and any
+  `inceptionDate` / `expiryDate` correction) as the transition's **`data`** — so the status
+  flip and the `policyNumber` / `issuedPremium` write are **one atomic, engine-audited
+  `updateMany`** (the engine's `WHERE status='PLACEMENT_CONFIRMED'` is the race gate — a
+  concurrent issuance matches 0 rows → `ConflictException` → `409`; a `policyNumber @unique`
+  collision → `409`). Then `PolicyRepository.createIssuanceArtifacts` writes the opening
+  `PolicySchedule` + the insurer-issued `Document` rows in **one Prisma `$transaction`** — a
+  deliberate local exception to this codebase's no-`$transaction` convention (same as
+  `QuotationRepository.reviseChain` / `ComparisonRepository.buildOrRebuild`), so a crash
+  between the two can't leave an ISSUED policy with a schedule but no documents. A
+  `P2002` there is the partial `UNIQUE` `PolicySchedule_one_open_per_policy` firing → `409`.
+- **Crash-recovery re-entry** — if the engine transition committed (status `ISSUED`, scalars
+  persisted + TRANSITION-audited) but the artefact `$transaction` then failed, calling
+  `POST /policies/:id/issuance` again with a **byte-identical** payload (status `ISSUED`, no
+  open schedule, `policy.policyNumber === dto.policyNumber` **and**
+  `compareMoney(policy.issuedPremium, issuedPremium) === 0`) skips the transition and just
+  writes the missing schedule + documents (from *this* call's payload — the first attempt
+  rolled back entirely, so there is nothing to reconcile against). No `UPDATE Policy` audit
+  row is emitted on a resume (nothing on the Policy changed). Any other state, or a
+  mismatched `policyNumber` / `issuedPremium`, → `422` "issuance is recorded once".
+- **`POST /policies/:id/documents`** (`document.manage` — existing perm) appends `Document`
+  rows to the electronic Insurance File (Part 4.2) at any lifecycle stage — the path used
+  when certificates / an endorsement template / the wording PDF arrive after the issuance
+  call.
+- **`GET /policies?opportunityId=|customerId=`** + `/:id` (`policy.read` — **new seeded
+  perm**, Sales/Placement/Manager/Exec). Visibility mirrors `RecommendationService`
+  (`CUSTOMER_FILE_CROSS_OWNER_ROLES` + the Customer owner; every miss → one
+  `NotFoundException`). The view carries `premiumVariance` (signed
+  `subtractMoney(issued, requested).toFixed(3)`, fils-quantized, `null` until issued) and
+  `issuanceComplete` (past `PLACEMENT_CONFIRMED` **and** ≥1 schedule). `storageRef` /
+  `fileName` are returned to authorised readers — a pointer to the encrypted-at-rest object
+  (Part 10.2), not content, consistent with `customer.service.listDocuments`.
+- **Money** — `requestedPremium` / `issuedPremium` via `quantizeMoney`, `premiumVariance`
+  via `subtractMoney`, the re-entry gate via `compareMoney`, views via `formatMoney`. No
+  raw `Decimal` / float arithmetic; no new `Decimal` schema columns (both premium fields
+  were already in `MONEY_DECIMAL_FIELDS`).
+- **Audit — metadata not body** (`ibms-brain/meta/lex/sensitive-data-handling.md`):
+  `policyScheduleAuditSnapshot` stores the coverage-key *names* + counts, never the
+  figures; `policyDocumentAuditSnapshot` **excludes `fileName` and `storageRef`** (a health
+  certificate's filename can name insured persons — HIGHLY_CONFIDENTIAL — and `storageRef`
+  is an internal object key); logs carry ids only. `policy.config.spec.ts` asserts the
+  exclusion via `JSON.stringify`.
+- **Migration `20260902140000_add_policy_placement_issuance`** (hand-authored + `migrate
+  deploy`; `db` + `db-test`) — `Policy.placedByUserId` / `Policy.issuedByUserId` (bare
+  `TEXT` provenance scalars, no FK — the AuditLogEntry `CREATE` / `TRANSITION` rows are
+  authoritative, same pattern as `Opportunity.createdByUserId` / `RFQ.issuedByUserId`) + a
+  **partial `UNIQUE` index** `PolicySchedule_one_open_per_policy ON
+  "PolicySchedule"("policyId") WHERE "effectiveTo" IS NULL` — "at most one open coverage
+  schedule per Policy" as a real DB invariant, not a read-then-write pre-check
+  (`ibms-brain/meta/lex/race-safe-invariants.md`); Prisma can't express a partial `UNIQUE`
+  so it's raw SQL + a `///` note on `model PolicySchedule`. It backstops the re-entry
+  branch and the schedule versioning a future `Endorsement` module (#22) will drive.
+  `ClientDecisionModule` now `exports: [ClientDecisionRepository]`.
+- **`apps/web/app/(app)/opportunities/[id]/`** — a "Policy" section
+  (`components/policy/PolicySection.tsx` + `lib/policy/policy-api.ts`): a Placement
+  place form (inception + optional expiry) once the Opportunity reaches `PLACEMENT`, then an
+  issuance form (policy number, issued premium, `limits` / `sumsInsured` JSON textareas,
+  perils / extensions comma-separated, a repeatable document-row editor), then a read-only
+  display of the issued policy + coverage schedule + document list with a post-issuance
+  "attach a document" control. No new nav item.
+- **`@code-reviewer` (mandatory — workflow transition + financial calculation +
+  Confidential data + a DB migration)** → **APPROVE WITH MINORS, no BLOCKER, no MAJOR, no
+  lex violation** (all six mandatory lex checks pass: creation-at-`@default` matches the
+  established precedent and is not a state change; both "one of these" invariants are real
+  DB constraints with a `P2002` catch alongside the pre-check; money all funnels through
+  `money.util.ts`; audit rows carry no schedule figures / filenames; no PDPL-registry SLA;
+  no privacy rule re-derived). MINORs fixed: (1) the issuance period check now compares the
+  effective inception against `(expiryOverride ?? policy.expiryDate)` — an
+  `inceptionDate` override alone could previously be pushed past the stored `expiryDate`
+  with no error; (2) the re-entry branch no longer emits an `UPDATE Policy` audit row (on a
+  resume nothing on the Policy row changed — the first attempt already wrote and
+  TRANSITION-audited the scalars — so the row's `issuedByUserId` was drifting to the
+  *retrying* actor). NITs fixed: +2 service specs (the re-entry gate REJECTS a mismatched
+  `policyNumber` / `issuedPremium`; an inception override past the stored expiry), and the
+  `///` partial-`UNIQUE` note relocated onto `model PolicySchedule` to match the migration
+  header wording.
+- **Deferred**: the transition-then-artefacts ordering has one seam — if the schedule /
+  documents `$transaction` fails after the engine transition committed, the `Policy` is
+  `ISSUED` with no schedule (recoverable via the re-entry branch); a hard crash *between*
+  the engine's status `updateMany` and its own audit write would additionally leave the
+  `TRANSITION` row unwritten (bounded, rare, separately alarmed — folding child-table
+  writes into the engine's scalar-only `data` isn't expressible, and an outer `$transaction`
+  would mean re-implementing the transition outside the engine). `limits` / `sumsInsured`
+  are stored opaquely (a non-empty flat object of string / finite-number values) — no
+  per-figure `Decimal(18,3)` precision until a consumer does arithmetic on them (a Claim
+  resolving "coverage in force at the loss date", Part 3.7). A `CoverNote` / binder interim
+  state (Process 18) is in the schema but has no endpoint. One `Policy` per Opportunity.
+  `policy.create` / `policy.issue` are role-level (no per-officer queue). No
+  `Endorsement`-driven schedule versioning (#22) — the partial `UNIQUE` is in place for it.
+- **Verification**: +39 api unit — `policy.config.spec.ts` ×15 (`parseCalendarDate` — bare
+  date as UTC midnight, future allowed, offset-less datetime rejected; `assertCoverageFigures`
+  — non-empty flat object, array / nested / non-finite rejected; `premiumVariance` sign;
+  audit snapshots exclude `fileName` / `storageRef` / the figures), `policy.service.spec.ts`
+  ×24 (`place` — creates from the ACCEPT decision + the quotation's insurer/line/premium,
+  422 without ACCEPT / non-ACCEPT, 409 pre-check + `P2002`, expiry ≤ inception, 404
+  visibility; `recordIssuance` — the atomic engine transition + the schedule / document
+  writes + the three audit rows, 422 negative premium / empty `limits` / off-path status /
+  inception-override-past-stored-expiry, the **resume** path + its **mismatch rejection**,
+  409 on the transition race / the partial-`UNIQUE` / a `policyNumber` collision;
+  `attachDocuments`; list/get scoping — a **stateful** Policy mock where each `transition`
+  moves `state.status`). **New** `test/policy.e2e-spec.ts` ×2 — the full place → issuance
+  (schedule + 2 documents) → attach-a-certificate → read path (`premiumVariance` `-1500.000`,
+  `issuanceComplete`, a `TRANSITION` audit row asserted), a second `POST /policies` → `409`,
+  a re-issuance → `422`; and 422 (no ACCEPT decision) / 400 (missing `inceptionDate`).
+  `policyNumber` is uniquified per run because `Policy.policyNumber @unique` spans the
+  shared cumulative `db-test`. Full suites green: **811** api unit (64 files,
+  workspace-scoped), api contract 4/4, **api e2e 107/107** (18 files, + the new policy e2e),
+  `npm audit` 0 vulnerabilities, `nest build` OK, web unit 6, web Playwright **rfq.spec.ts
+  13/13** (+1: place a policy from an accepted opportunity and record its issuance),
+  `next build` OK, api + web + db `typecheck` + `eslint` clean. Migration applied to `db` +
+  `db-test`; `prisma validate` OK, `prisma migrate status` clean; seed re-run (**144**
+  permissions — `policy.read` new). One pre-existing MFA-timing flake in `rbac.e2e-spec.ts`
+  surfaced once under load during a full-suite run and passed on isolation / re-run
+  (documented in `vitest-e2e.config.ts`), unrelated to this change.
 
 ## Deployment
 
