@@ -5,7 +5,12 @@ import {
   CLAIM_AWAITING_INSURER_STATUSES,
   CLAIM_DOC_TYPES,
   CLAIM_LARGE_THRESHOLD_JOD,
+  CLAIM_SETTLEABLE_STATUSES,
   DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS,
+  computeNetSettlement,
+  deriveSettlementView,
+  isSecondApproverRequired,
+  settlementAuditSnapshot,
   adjusterAssessmentAuditSnapshot,
   adjusterAuditSnapshot,
   buildDocumentChecklist,
@@ -740,6 +745,123 @@ describe('claimFollowUpAlertAuditSnapshot — metadata not body', () => {
       triggeredAt: '2026-05-15T00:00:00.000Z',
       resolvedAt: '2026-05-25T00:00:00.000Z',
       resolvedBy: 'manual',
+    });
+  });
+});
+
+describe('Process 28 — settlement', () => {
+  it('CLAIM_SETTLEABLE_STATUSES is exactly the two SETTLED predecessors', () => {
+    expect([...CLAIM_SETTLEABLE_STATUSES].sort()).toEqual([
+      'APPROVED',
+      'PARTIALLY_APPROVED',
+    ]);
+  });
+
+  it('computeNetSettlement = approved - deductible, quantized (the worked example)', () => {
+    expect(computeNetSettlement('17500', '2500').toString()).toBe('15000');
+    expect(computeNetSettlement('17500.005', '2500').toString()).toBe(
+      '15000.005',
+    );
+    // deductible == approved -> net 0 (allowed)
+    expect(computeNetSettlement('5000', '5000').isZero()).toBe(true);
+  });
+
+  it('isSecondApproverRequired: true at/above the large threshold on the APPROVED amount', () => {
+    expect(
+      isSecondApproverRequired({
+        approvedAmount: CLAIM_LARGE_THRESHOLD_JOD,
+        brokerProcessedPayment: false,
+      }),
+    ).toBe(true);
+    expect(
+      isSecondApproverRequired({
+        approvedAmount: '24999.999',
+        brokerProcessedPayment: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('isSecondApproverRequired: true for any broker-processed payment regardless of amount', () => {
+    expect(
+      isSecondApproverRequired({
+        approvedAmount: '100.000',
+        brokerProcessedPayment: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('deriveSettlementView returns null with no settlement, otherwise the money strings + re-derived gate', () => {
+    expect(
+      deriveSettlementView({ status: 'APPROVED', settlement: null }),
+    ).toBeNull();
+
+    const v = deriveSettlementView({
+      status: 'APPROVED',
+      settlement: {
+        estimatedLoss: new Prisma.Decimal('20000'),
+        approvedAmount: new Prisma.Decimal('30000'),
+        deductible: new Prisma.Decimal('2500'),
+        netSettlement: new Prisma.Decimal('27500'),
+        brokerProcessedPayment: false,
+        approvedByUserId: 'u-1',
+        secondApproverUserId: null,
+        createdAt: d('2026-06-01T00:00:00.000Z'),
+      },
+    });
+    expect(v).toMatchObject({
+      estimatedLoss: '20000.000',
+      approvedAmount: '30000.000',
+      deductible: '2500.000',
+      netSettlement: '27500.000',
+      secondApproverRequired: true, // 30000 >= 25000
+      settled: false,
+      approvedByUserId: 'u-1',
+      secondApproverUserId: null,
+    });
+  });
+
+  it('deriveSettlementView.settled is true once the claim is SETTLED', () => {
+    const v = deriveSettlementView({
+      status: 'SETTLED',
+      settlement: {
+        estimatedLoss: new Prisma.Decimal('1000'),
+        approvedAmount: new Prisma.Decimal('900'),
+        deductible: new Prisma.Decimal('0'),
+        netSettlement: new Prisma.Decimal('900'),
+        brokerProcessedPayment: false,
+        approvedByUserId: 'u-1',
+        secondApproverUserId: null,
+        createdAt: d('2026-06-01T00:00:00.000Z'),
+      },
+    });
+    expect(v?.settled).toBe(true);
+    expect(v?.secondApproverRequired).toBe(false);
+  });
+
+  it('settlementAuditSnapshot carries the four figures as fixed strings, no narrative', () => {
+    const snap = settlementAuditSnapshot({
+      settlementId: 's-1',
+      claimId: 'claim-1',
+      estimatedLoss: new Prisma.Decimal('20000'),
+      approvedAmount: new Prisma.Decimal('17500'),
+      deductible: new Prisma.Decimal('2500'),
+      netSettlement: new Prisma.Decimal('15000'),
+      brokerProcessedPayment: true,
+      approvedByUserId: 'u-1',
+      secondApproverUserId: 'u-2',
+      secondApproverRequired: true,
+    });
+    expect(snap).toEqual({
+      settlementId: 's-1',
+      claimId: 'claim-1',
+      estimatedLoss: '20000.000',
+      approvedAmount: '17500.000',
+      deductible: '2500.000',
+      netSettlement: '15000.000',
+      brokerProcessedPayment: true,
+      approvedByUserId: 'u-1',
+      secondApproverUserId: 'u-2',
+      secondApproverRequired: true,
     });
   });
 });

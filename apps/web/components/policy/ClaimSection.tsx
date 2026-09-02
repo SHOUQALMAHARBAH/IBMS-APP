@@ -7,9 +7,11 @@ import {
   listClaimsForPolicy,
   notifyClaim,
   recordAdjusterProgress,
+  recordClaimSettlement,
   registerClaim,
   resolveClaimFollowUpAlert,
   runClaimFollowUpSweep,
+  secondApproveClaimSettlement,
   submitClaimForAssessment,
   CLAIM_ASSESSMENT_OUTCOMES,
   CLAIM_DOC_CLASSIFICATION_OPTIONS,
@@ -43,6 +45,11 @@ interface Props {
   canAssess: boolean;
   /** Claims — run the insurer non-response follow-up sweep, resolve alerts. */
   canFollowUp: boolean;
+  /** Claims / Manager — record a settlement's four figures (first approver). */
+  canSettle: boolean;
+  /** Manager / Finance — the mandatory second approval on a large / broker
+   * settlement (never the first approver). */
+  canSecondApproveSettlement: boolean;
 }
 
 function money(value: string | null): string {
@@ -541,6 +548,151 @@ function ClaimFollowUp({
   );
 }
 
+const SETTLE_STATUSES: Claim['status'][] = [
+  'APPROVED',
+  'PARTIALLY_APPROVED',
+  'SETTLED',
+  'CLOSED',
+];
+
+/** Process 28 — the four distinct settlement figures + maker/checker. */
+function ClaimSettlement({
+  claim,
+  canSettle,
+  canSecondApproveSettlement,
+  onDone,
+}: {
+  claim: Claim;
+  canSettle: boolean;
+  canSecondApproveSettlement: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [approvedAmount, setApprovedAmount] = useState('');
+  const [deductible, setDeductible] = useState('');
+  const [brokerProcessedPayment, setBrokerProcessedPayment] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!SETTLE_STATUSES.includes(claim.status)) return null;
+
+  const s = claim.settlement;
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'That settlement step could not be completed — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <strong style={{ fontSize: '0.9rem' }}>Settlement</strong>
+      {error ? (
+        <p role="alert" style={errorStyle}>
+          {error}
+        </p>
+      ) : null}
+
+      {s ? (
+        <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
+          Estimated {money(s.estimatedLoss)} · approved{' '}
+          {money(s.approvedAmount)} · deductible {money(s.deductible)} · net{' '}
+          {money(s.netSettlement)}
+          {s.brokerProcessedPayment ? ' · broker-processed' : ''}
+          {s.secondApproverRequired
+            ? s.secondApproverUserId
+              ? ' · second-approved'
+              : ' · awaiting a second approver'
+            : ''}
+          {s.settled ? ' · settled' : ''}
+        </p>
+      ) : null}
+
+      {!s &&
+      canSettle &&
+      (claim.status === 'APPROVED' ||
+        claim.status === 'PARTIALLY_APPROVED') ? (
+        <div style={{ maxWidth: '30rem' }}>
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`stl-appr-${claim.id}`}>Approved amount</label>
+            <input
+              id={`stl-appr-${claim.id}`}
+              inputMode="decimal"
+              placeholder="17500.000"
+              value={approvedAmount}
+              onChange={(ev) => setApprovedAmount(ev.target.value)}
+            />
+          </div>
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`stl-ded-${claim.id}`}>Deductible</label>
+            <input
+              id={`stl-ded-${claim.id}`}
+              inputMode="decimal"
+              placeholder="2500.000"
+              value={deductible}
+              onChange={(ev) => setDeductible(ev.target.value)}
+            />
+          </div>
+          <label style={{ display: 'flex', gap: '0.5rem', margin: '0.5rem 0' }}>
+            <input
+              type="checkbox"
+              checked={brokerProcessedPayment}
+              onChange={(ev) => setBrokerProcessedPayment(ev.target.checked)}
+            />
+            The broker processes this payment (forces a second approver)
+          </label>
+          <button
+            type="button"
+            disabled={
+              busy ||
+              approvedAmount.trim().length === 0 ||
+              deductible.trim().length === 0
+            }
+            style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+            onClick={() =>
+              void run(() =>
+                recordClaimSettlement(claim.id, {
+                  approvedAmount: approvedAmount.trim(),
+                  deductible: deductible.trim(),
+                  brokerProcessedPayment: brokerProcessedPayment || undefined,
+                }),
+              )
+            }
+          >
+            Record settlement
+          </button>
+        </div>
+      ) : null}
+
+      {s &&
+      s.secondApproverRequired &&
+      !s.secondApproverUserId &&
+      canSecondApproveSettlement ? (
+        <button
+          type="button"
+          disabled={busy}
+          style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+          onClick={() =>
+            void run(() => secondApproveClaimSettlement(claim.id))
+          }
+        >
+          Second-approve settlement
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function ClaimSection({
   opportunityId,
   canNotify,
@@ -548,6 +700,8 @@ export function ClaimSection({
   canDocument,
   canAssess,
   canFollowUp,
+  canSettle,
+  canSecondApproveSettlement,
 }: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
@@ -652,6 +806,10 @@ export function ClaimSection({
         (<strong>APPROVED</strong> / <strong>PARTIALLY_APPROVED</strong> /
         <strong>DECLINED</strong>). A nightly job raises a follow-up alert on any
         pre-verdict claim past its per-line insurer non-response threshold.
+        Finally the settlement is recorded as four distinct figures
+        (estimated / approved / deductible / net) — large or broker-processed
+        payments need a second approver, never the first
+        (<strong>SETTLED</strong>).
       </p>
 
       {canFollowUp ? (
@@ -762,6 +920,12 @@ export function ClaimSection({
             <ClaimFollowUp
               claim={c}
               canFollowUp={canFollowUp}
+              onDone={load}
+            />
+            <ClaimSettlement
+              claim={c}
+              canSettle={canSettle}
+              canSecondApproveSettlement={canSecondApproveSettlement}
               onDone={load}
             />
           </div>

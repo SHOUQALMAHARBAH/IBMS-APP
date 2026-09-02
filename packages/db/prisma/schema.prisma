@@ -1535,7 +1535,17 @@ model ClaimStatusHistory {
   @@unique([claimId, toStatus])
 }
 
-/// Process 28 — four DISTINCT figures, never collapsed into one number.
+/// Process 28 — four DISTINCT figures, never collapsed into one number
+/// (estimatedLoss carried from the Claim; netSettlement is always
+/// approvedAmount - deductible, never hand-entered).
+///
+/// maker/checker: approvedByUserId (the officer who recorded the four figures
+/// = first approver) vs secondApproverUserId. The `Settlement_maker_checker_
+/// distinct` CHECK (migration 20260826091424) is the DB backstop for
+/// assertDifferentActors. A second approver is MANDATORY when the settlement
+/// is large (Settlement.approvedAmount re-derived against the live threshold,
+/// NOT Claim.isLargeClaim) OR brokerProcessedPayment is true; `settleCore`
+/// refuses `Claim -> SETTLED` structurally while that is unmet.
 model Settlement {
   id               String   @id @default(uuid())
   claimId          String   @unique
@@ -1544,6 +1554,9 @@ model Settlement {
   approvedAmount   Decimal? @db.Decimal(18, 3)
   deductible       Decimal? @db.Decimal(18, 3)
   netSettlement    Decimal? @db.Decimal(18, 3)
+  // true when the broker (not the insurer direct) processes the payout —
+  // forces a second approver regardless of amount (Process 28).
+  brokerProcessedPayment Boolean @default(false)
   // large claims / broker-processed payments require a second approver
   approvedByUserId String?
   secondApproverUserId String?

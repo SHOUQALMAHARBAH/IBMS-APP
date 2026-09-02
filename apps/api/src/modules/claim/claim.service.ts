@@ -7,7 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { Adjuster, ClaimStatus } from '@ibms/db';
+import type { Adjuster, ClaimStatus, Settlement } from '@ibms/db';
 import {
   ClaimRepository,
   type ClaimDocumentInput,
@@ -32,28 +32,37 @@ import {
   claimFollowUpAlertAuditSnapshot,
   claimNotificationAuditSnapshot,
   claimRegistrationAuditSnapshot,
+  computeNetSettlement,
   coverageGapMessage,
   deriveAssessmentView,
   deriveFollowUpView,
+  deriveSettlementView,
   followUpThresholdDaysFor,
   isAssessmentConcluded,
   isClaimFollowUpDue,
   isLargeClaim,
+  isSecondApproverRequired,
+  isSettleableStatus,
   mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
+  settlementAuditSnapshot,
   thirdPartyClaimantAuditSnapshot,
   type AssessmentView,
   type ClaimAssessmentOutcome,
   type ClaimDocChecklistItem,
   type ClaimDocType,
   type ClaimFollowUpView,
+  type SettlementView,
 } from './claim.config';
+import { assertDifferentActors } from '../../common/maker-checker.util';
+import { compareMoney } from '../../common/money.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
 import type { RegisterClaimDto } from './dto/register-claim.dto';
 import type { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
 import type { RecordAdjusterProgressDto } from './dto/record-adjuster-progress.dto';
 import type { DecideClaimAssessmentDto } from './dto/decide-claim-assessment.dto';
+import type { RecordSettlementDto } from './dto/record-settlement.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 
 const CROSS_OWNER_ROLES: readonly string[] = CLAIM_CROSS_OWNER_ROLES;
@@ -144,6 +153,11 @@ export interface ClaimView {
   /** Process 27 — the insurer non-response follow-up sub-view: the alerts,
    * whether one is open, the per-line threshold and the clock start. */
   followUp: ClaimFollowUpView;
+  /** Process 28 — the settlement sub-view (four figures + maker/checker), or
+   * null until recorded. `settlement.secondApproverRequired` is re-derived
+   * from the approved amount + broker-processed flag — NOT `isLargeClaim`
+   * above, which is the notification-time snapshot. */
+  settlement: SettlementView | null;
   statusHistory: ClaimStatusHistoryView[];
   createdAt: Date;
   updatedAt: Date;
@@ -166,8 +180,8 @@ export interface ClaimFollowUpScanResult {
 }
 
 /**
- * Process 23-27 — Claim Notification + Registration + Documentation +
- * Assessment + Follow-up (backlog Part C #23-27, Domain C).
+ * Process 23-28 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C).
  *
  *  - `notify` (#23) — record a reported loss against a Policy: loss
  *    date/location/cause, the estimated loss, third-party involvement. The
@@ -200,6 +214,17 @@ export interface ClaimFollowUpScanResult {
  *    whose claim has since progressed. `resolveFollowUpAlert` (#27) — a manual
  *    resolve. NOT a `Claim` status change — an alert is an accountability
  *    nudge, not a lifecycle state.
+ *  - `recordSettlement` (#28) — record the `Settlement`'s four distinct
+ *    figures (estimated carried from the claim, net = approved − deductible
+ *    computed, never hand-entered); the recording officer is the first
+ *    approver. `secondApproveSettlement` (#28) — the **mandatory second
+ *    approver** (`assertDifferentActors` + the `Settlement_maker_checker_
+ *    distinct` CHECK) required when the settlement is large (re-derived from
+ *    the approved amount, not `isLargeClaim`) or the broker processes the
+ *    payment. `settleCore` drives `Claim APPROVED | PARTIALLY_APPROVED →
+ *    SETTLED` through the engine and **structurally refuses** to while a
+ *    required second approval is missing (the #22 APPLY-re-checks-approval
+ *    lesson).
  *  - `list` / `get` — read, scoped to exactly one of `policyId` /
  *    `customerId`.
  *
@@ -355,6 +380,10 @@ export class ClaimService {
       coverageResolvedAtLossDate: resolution.ok,
       ...this.assessmentAndDocumentationView(claim),
       followUp: this.followUpView(claim),
+      settlement: deriveSettlementView({
+        status: claim.status,
+        settlement: claim.settlement,
+      }),
       statusHistory: claim.statusHistory.map((h) => ({
         fromStatus: h.fromStatus,
         toStatus: h.toStatus,
@@ -1402,6 +1431,299 @@ export class ClaimService {
       }
     }
     return this.toViewAudited(id, actor, 'claim-followup-resolve');
+  }
+
+  /**
+   * Process 28 — record a claim settlement's four distinct figures
+   * (`claims-lifecycle.md` — "never collapsed into one number"). The claim
+   * must be `APPROVED` / `PARTIALLY_APPROVED` (a `DECLINED` claim has no
+   * payout). `estimatedLoss` is carried from the `Claim`; `netSettlement` is
+   * `approvedAmount - deductible`, computed here — never accepted. The
+   * recording officer is the **first approver** (`Settlement.approvedByUserId`);
+   * a **mandatory second approver** is still needed when the settlement is
+   * large (re-derived from the approved amount vs the live threshold, NOT
+   * `Claim.isLargeClaim`) or `brokerProcessedPayment`. When no second approver
+   * is required the claim is driven straight to `SETTLED`; otherwise it waits
+   * for `secondApproveSettlement`.
+   *
+   * Write-once (`Settlement.claimId @unique`): a byte-identical re-post
+   * finishes a partially-completed settle (crash recovery); any different
+   * figure is a 409.
+   */
+  async recordSettlement(
+    id: string,
+    dto: RecordSettlementDto,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+
+    const approvedAmount = quantizeMoney(dto.approvedAmount);
+    const deductible = quantizeMoney(dto.deductible);
+    const brokerProcessedPayment = dto.brokerProcessedPayment === true;
+
+    if (claim.settlement) {
+      // Write-once. A byte-identical re-post resumes a settle whose transition
+      // did not land; anything different is a 409 (recorded once).
+      const s = claim.settlement;
+      const same =
+        s.approvedAmount != null &&
+        compareMoney(s.approvedAmount, approvedAmount) === 0 &&
+        s.deductible != null &&
+        compareMoney(s.deductible, deductible) === 0 &&
+        s.brokerProcessedPayment === brokerProcessedPayment;
+      if (!same) {
+        throw new ConflictException(
+          `Claim ${id} already has a settlement recorded (approved ${formatMoney(
+            s.approvedAmount ?? new Prisma.Decimal(0),
+          )}, net ${formatMoney(
+            s.netSettlement ?? new Prisma.Decimal(0),
+          )}). Settlement figures are recorded once — a correction is not yet supported.`,
+        );
+      }
+      // Same figures: resume a settle that did not land on the original call
+      // (its transition threw and the claim is still at its verdict status).
+      // Only attempt it when the settlement is fully approved for what it
+      // needs — no second approver required, or one already recorded; a
+      // still-pending second approval is completed via
+      // POST /claims/:id/settlement/second-approve, not here. `settleCore` is
+      // idempotent and its own structural gate is the backstop, so any
+      // `claim.settle.approve` holder can drive this resume — not only the
+      // one user who happened to be the second approver.
+      const secondApprovalSatisfied =
+        !isSecondApproverRequired({ approvedAmount, brokerProcessedPayment }) ||
+        s.secondApproverUserId != null;
+      if (secondApprovalSatisfied) {
+        await this.settleCore(id, actor);
+      }
+      return this.toViewAudited(id, actor, 'claim-record-settlement');
+    }
+
+    if (!isSettleableStatus(claim.status)) {
+      throw new UnprocessableEntityException(
+        isAssessmentConcluded(claim.status)
+          ? `Claim ${id} is ${claim.status}; a settlement is recorded from APPROVED / PARTIALLY_APPROVED (a DECLINED claim has no payout; a SETTLED / CLOSED one is done).`
+          : `Claim ${id} is ${claim.status}; record the insurer's assessment verdict (POST /claims/${id}/assessment/decision) before settling.`,
+      );
+    }
+
+    if (approvedAmount.lessThanOrEqualTo(0)) {
+      throw new UnprocessableEntityException(
+        'approvedAmount must be greater than zero.',
+      );
+    }
+    if (compareMoney(approvedAmount, claim.estimatedLoss) > 0) {
+      throw new UnprocessableEntityException(
+        `approvedAmount (${formatMoney(approvedAmount)}) exceeds the estimated loss (${formatMoney(claim.estimatedLoss)}) — the insurer cannot approve more than the claimed amount.`,
+      );
+    }
+    if (deductible.lessThan(0)) {
+      throw new UnprocessableEntityException('deductible cannot be negative.');
+    }
+    if (compareMoney(deductible, approvedAmount) > 0) {
+      throw new UnprocessableEntityException(
+        `deductible (${formatMoney(deductible)}) exceeds the approved amount (${formatMoney(approvedAmount)}) — the net settlement would be negative.`,
+      );
+    }
+
+    const netSettlement = computeNetSettlement(approvedAmount, deductible);
+    const secondApproverRequired = isSecondApproverRequired({
+      approvedAmount,
+      brokerProcessedPayment,
+    });
+
+    let settlement: Settlement;
+    try {
+      settlement = await this.claims.createSettlement({
+        claimId: id,
+        estimatedLoss: claim.estimatedLoss,
+        approvedAmount,
+        deductible,
+        netSettlement,
+        brokerProcessedPayment,
+        approvedByUserId: actor.id,
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ConflictException(
+          `Claim ${id} already has a settlement recorded (created concurrently).`,
+        );
+      }
+      throw err;
+    }
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'CREATE',
+      entityType: 'Settlement',
+      entityId: settlement.id,
+      afterValue: settlementAuditSnapshot({
+        settlementId: settlement.id,
+        claimId: id,
+        estimatedLoss: settlement.estimatedLoss,
+        approvedAmount: settlement.approvedAmount,
+        deductible: settlement.deductible,
+        netSettlement: settlement.netSettlement,
+        brokerProcessedPayment: settlement.brokerProcessedPayment,
+        approvedByUserId: settlement.approvedByUserId,
+        secondApproverUserId: settlement.secondApproverUserId,
+        secondApproverRequired,
+      }),
+    });
+
+    // Only settle now if no second approver is required; otherwise the claim
+    // waits at its verdict status for POST .../settlement/second-approve.
+    if (!secondApproverRequired) {
+      await this.settleCore(id, actor);
+    }
+
+    return this.toViewAudited(id, actor, 'claim-record-settlement');
+  }
+
+  /**
+   * Process 28 — the mandatory second approval on a settlement that needs one
+   * (large, or broker-processed). Maker/checker: `assertDifferentActors`
+   * (403) + the `Settlement_maker_checker_distinct` CHECK. Re-derives the
+   * "needs a second approver" test from the live `Settlement` figures — never
+   * from `Claim.isLargeClaim`. Idempotent for the same actor / a resumed
+   * settle; a different second approver on an already-approved settlement is a
+   * 409. On success, drives the claim to `SETTLED`.
+   */
+  async secondApproveSettlement(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+    const s = claim.settlement;
+    if (!s || s.approvedAmount == null) {
+      throw new NotFoundException('No settlement recorded for this claim');
+    }
+
+    if (
+      !isSecondApproverRequired({
+        approvedAmount: s.approvedAmount,
+        brokerProcessedPayment: s.brokerProcessedPayment,
+      })
+    ) {
+      throw new UnprocessableEntityException(
+        `Claim ${id}: this settlement does not require a second approver (approved ${formatMoney(s.approvedAmount)}, not broker-processed). Record it via POST /claims/${id}/settlement.`,
+      );
+    }
+
+    if (s.secondApproverUserId != null) {
+      if (s.secondApproverUserId !== actor.id) {
+        throw new ConflictException(
+          `Claim ${id}: this settlement was already second-approved by another user.`,
+        );
+      }
+      // Same approver re-calling — resume the settle if it did not land.
+      await this.settleCore(id, actor);
+      return this.toViewAudited(id, actor, 'claim-settlement-second-approve');
+    }
+
+    if (s.approvedByUserId == null) {
+      // The maker/checker guard must never silently no-op. `approvedByUserId`
+      // is nullable in the schema and the DB CHECK also passes when it is
+      // NULL, so a missing first approver has to fail loudly here rather than
+      // coalesce to `'' === actor.id` (always false).
+      throw new ConflictException(
+        `Claim ${id}: the settlement has no recorded first approver and cannot be second-approved.`,
+      );
+    }
+    assertDifferentActors(
+      s.approvedByUserId,
+      actor.id,
+      'Settlement.secondApprove',
+    );
+
+    const updated = await this.claims.recordSettlementSecondApproval(
+      s.id,
+      actor.id,
+    );
+    if (updated === null) {
+      throw new ConflictException(
+        `Claim ${id}: the settlement was second-approved concurrently.`,
+      );
+    }
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'APPROVE',
+      entityType: 'Settlement',
+      entityId: s.id,
+      afterValue: settlementAuditSnapshot({
+        settlementId: updated.id,
+        claimId: id,
+        estimatedLoss: updated.estimatedLoss,
+        approvedAmount: updated.approvedAmount,
+        deductible: updated.deductible,
+        netSettlement: updated.netSettlement,
+        brokerProcessedPayment: updated.brokerProcessedPayment,
+        approvedByUserId: updated.approvedByUserId,
+        secondApproverUserId: updated.secondApproverUserId,
+        secondApproverRequired: true,
+      }),
+    });
+
+    await this.settleCore(id, actor);
+    return this.toViewAudited(id, actor, 'claim-settlement-second-approve');
+  }
+
+  /**
+   * Process 28 — drive `Claim APPROVED | PARTIALLY_APPROVED → SETTLED` through
+   * the workflow engine + write the domain `ClaimStatusHistory` row.
+   * **Structurally refuses** to transition while a required second approval is
+   * still missing (the #22 "APPLY must re-check approval, not trust a status"
+   * lesson) — this is the last gate no code path can skip. Idempotent: a claim
+   * already `SETTLED` / `CLOSED` is a no-op; a concurrent settle is normalised.
+   */
+  private async settleCore(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    const claim = await this.loadVisibleClaim(id, actor);
+    if (claim.status === 'SETTLED' || claim.status === 'CLOSED') return;
+    if (!isSettleableStatus(claim.status)) return;
+    const s = claim.settlement;
+    if (!s || s.approvedAmount == null) return;
+
+    if (
+      isSecondApproverRequired({
+        approvedAmount: s.approvedAmount,
+        brokerProcessedPayment: s.brokerProcessedPayment,
+      }) &&
+      s.secondApproverUserId == null
+    ) {
+      throw new UnprocessableEntityException(
+        `Claim ${id}: this settlement requires a second approver (POST /claims/${id}/settlement/second-approve) before it can be marked SETTLED.`,
+      );
+    }
+
+    const fromStatus = claim.status;
+    try {
+      await this.workflow.transition({
+        entityType: 'Claim',
+        entityId: id,
+        toStatus: 'SETTLED',
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      // A concurrent settle won the race (engine 0-rows ConflictException, or
+      // its pre-read already saw SETTLED). Reload; if now SETTLED it is an
+      // idempotent no-op, else rethrow.
+      const now = await this.loadVisibleClaim(id, actor);
+      if (now.status === 'SETTLED' || now.status === 'CLOSED') {
+        await this.backfillStatusHistory(
+          id,
+          fromStatus,
+          'SETTLED',
+          now.statusHistory,
+          actor,
+        );
+        return;
+      }
+      throw err;
+    }
+    await this.recordHistoryBestEffort(id, fromStatus, 'SETTLED', actor);
   }
 
   async list(

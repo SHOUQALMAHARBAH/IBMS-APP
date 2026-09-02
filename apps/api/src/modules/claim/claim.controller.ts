@@ -6,22 +6,25 @@ import { RegisterClaimDto } from './dto/register-claim.dto';
 import { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
 import { RecordAdjusterProgressDto } from './dto/record-adjuster-progress.dto';
 import { DecideClaimAssessmentDto } from './dto/decide-claim-assessment.dto';
+import { RecordSettlementDto } from './dto/record-settlement.dto';
 import { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
-/** Process 23-27 — Claim Notification + Registration + Documentation +
- * Assessment + Follow-up (backlog Part C #23-27, Domain C). Record a reported
- * loss against a Policy (with coverage-at-loss-date validation), register it
- * with the insurer and assign the loss adjuster (`NOTIFIED → REGISTERED`), file
- * the mandatory documentation — a per-claim-type checklist — with the first
- * attach advancing `REGISTERED → DOCUMENTATION_IN_PROGRESS`, track the
- * adjuster's survey / investigation, submit the claim for insurer assessment
- * (`DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`, gated on the checklist),
- * record the verdict (`UNDER_ASSESSMENT → APPROVED | PARTIALLY_APPROVED |
- * DECLINED`), and — nightly or on demand — raise a `ClaimFollowUpAlert` on any
- * pre-verdict claim past its per-line insurer non-response threshold. See
+/** Process 23-28 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C). Record
+ * a reported loss against a Policy (with coverage-at-loss-date validation),
+ * register it with the insurer and assign the loss adjuster (`NOTIFIED →
+ * REGISTERED`), file the mandatory documentation — a per-claim-type checklist —
+ * with the first attach advancing `REGISTERED → DOCUMENTATION_IN_PROGRESS`,
+ * track the adjuster's survey / investigation, submit the claim for insurer
+ * assessment (`DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`, gated on the
+ * checklist), record the verdict (`UNDER_ASSESSMENT → APPROVED |
+ * PARTIALLY_APPROVED | DECLINED`), raise a `ClaimFollowUpAlert` (nightly or on
+ * demand) on any pre-verdict claim past its per-line insurer non-response
+ * threshold, and record the settlement's four distinct figures with a mandatory
+ * second approver for large / broker-processed payments (`→ SETTLED`). See
  * claim.service.ts for the rules. Frontend: the "Claims" block in the "Policy"
  * section on apps/web/app/(app)/opportunities/[id]/. */
 @ApiTags('claims')
@@ -119,6 +122,31 @@ export class ClaimController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.claims.resolveFollowUpAlert(id, alertId, user);
+  }
+
+  /** Process 28 — record the settlement's four distinct figures (first
+   * approver). Drives `Claim → SETTLED` immediately unless a mandatory second
+   * approver is required. */
+  @RequirePermissions('claim.settle.approve')
+  @Post(':id/settlement')
+  recordSettlement(
+    @Param('id') id: string,
+    @Body() dto: RecordSettlementDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.recordSettlement(id, dto, user);
+  }
+
+  /** Process 28 — the mandatory second approval on a large / broker-processed
+   * settlement (never the same user as the first approver). Drives `Claim →
+   * SETTLED`. */
+  @RequirePermissions('claim.settle.second-approve')
+  @Post(':id/settlement/second-approve')
+  secondApproveSettlement(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.secondApproveSettlement(id, user);
   }
 
   @RequirePermissions('claim.read')

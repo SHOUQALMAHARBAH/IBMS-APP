@@ -1,13 +1,14 @@
-// Process 23-27 — Claim Notification + Registration + Documentation +
-// Assessment + Follow-up (backlog Part C #23-27, Domain C). Talks to apps/api's
-// claim module: record a reported loss against a Policy (with
+// Process 23-28 — Claim Notification + Registration + Documentation +
+// Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C). Talks
+// to apps/api's claim module: record a reported loss against a Policy (with
 // coverage-at-loss-date validation), register it with the insurer + assign the
 // adjuster (NOTIFIED -> REGISTERED), file the mandatory documentation (a
 // per-claim-type checklist, first attach -> DOCUMENTATION_IN_PROGRESS), track
 // the adjuster's survey / investigation, submit for insurer assessment (->
 // UNDER_ASSESSMENT, gated on the checklist), record the verdict (-> APPROVED |
-// PARTIALLY_APPROVED | DECLINED), and raise / resolve insurer non-response
-// follow-up alerts.
+// PARTIALLY_APPROVED | DECLINED), raise / resolve insurer non-response
+// follow-up alerts, and record the settlement's four distinct figures with a
+// mandatory second approver for large / broker-processed payments (-> SETTLED).
 
 import { apiGet, apiPost } from '../auth/api-client';
 
@@ -126,9 +127,26 @@ export interface Claim {
     awaitingInsurerResponse: boolean;
     awaitingInsurerSince: string | null;
   };
+  settlement: {
+    estimatedLoss: string;
+    approvedAmount: string | null;
+    deductible: string | null;
+    netSettlement: string | null;
+    brokerProcessedPayment: boolean;
+    approvedByUserId: string | null;
+    secondApproverUserId: string | null;
+    secondApproverRequired: boolean;
+    settled: boolean;
+  } | null;
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RecordSettlementInput {
+  approvedAmount: string;
+  deductible: string;
+  brokerProcessedPayment?: boolean;
 }
 
 export interface ClaimFollowUpScanResult {
@@ -246,6 +264,27 @@ export function resolveClaimFollowUpAlert(
     `/claims/${encodeURIComponent(claimId)}/follow-up-alerts/${encodeURIComponent(
       alertId,
     )}/resolve`,
+    {},
+  );
+}
+
+/** Process 28 — record the settlement's four distinct figures (first
+ * approver). Settles the claim straight through unless a second approver is
+ * required. */
+export function recordClaimSettlement(
+  claimId: string,
+  input: RecordSettlementInput,
+): Promise<Claim> {
+  return apiPost(
+    `/claims/${encodeURIComponent(claimId)}/settlement`,
+    input,
+  );
+}
+
+/** Process 28 — the mandatory second approval (never the first approver). */
+export function secondApproveClaimSettlement(claimId: string): Promise<Claim> {
+  return apiPost(
+    `/claims/${encodeURIComponent(claimId)}/settlement/second-approve`,
     {},
   );
 }

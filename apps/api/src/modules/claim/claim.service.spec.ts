@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -79,6 +80,7 @@ function makeDeps(opts: Opts = {}) {
     history: [] as Record<string, unknown>[],
     documents: [] as Record<string, unknown>[],
     followUpAlerts: [] as Record<string, unknown>[],
+    settlement: null as Record<string, unknown> | null,
   };
 
   const claimRepo = {
@@ -260,11 +262,39 @@ function makeDeps(opts: Opts = {}) {
         adjuster: claimState.adjuster,
         documents: claimState.documents,
         followUpAlerts: claimState.followUpAlerts,
+        settlement: claimState.settlement,
         statusHistory: claimState.history,
       });
     }),
     findManyByPolicyId: vi.fn().mockResolvedValue([]),
     findManyByCustomerId: vi.fn().mockResolvedValue([]),
+    // Process 28 — settlement.
+    createSettlement: vi
+      .fn()
+      .mockImplementation((input: Record<string, unknown>) => {
+        claimState.settlement = {
+          id: 'settlement-1',
+          claimId: input.claimId,
+          estimatedLoss: input.estimatedLoss,
+          approvedAmount: input.approvedAmount,
+          deductible: input.deductible,
+          netSettlement: input.netSettlement,
+          brokerProcessedPayment: input.brokerProcessedPayment,
+          approvedByUserId: input.approvedByUserId,
+          secondApproverUserId: null,
+          clientPaymentConfirmedAt: null,
+          createdAt: new Date(),
+        };
+        return Promise.resolve(claimState.settlement);
+      }),
+    recordSettlementSecondApproval: vi
+      .fn()
+      .mockImplementation((_id: string, secondApproverUserId: string) => {
+        const s = claimState.settlement;
+        if (!s || s.secondApproverUserId != null) return Promise.resolve(null);
+        s.secondApproverUserId = secondApproverUserId;
+        return Promise.resolve(s);
+      }),
     // Process 27 — the follow-up sweep. Default: nothing to do.
     findClaimsAwaitingInsurerResponse: vi.fn().mockResolvedValue([]),
     findOpenFollowUpAlertsForRespondedClaims: vi.fn().mockResolvedValue([]),
@@ -335,6 +365,7 @@ function makeDeps(opts: Opts = {}) {
     audit,
     workflow,
     encryption,
+    claimState,
   };
 }
 
@@ -550,6 +581,7 @@ describe('ClaimService reads', () => {
         documents: [],
         statusHistory: [],
         followUpAlerts: [],
+        settlement: null,
       }),
     );
     const view = await service.get('claim-1', claims());
@@ -634,6 +666,7 @@ describe('ClaimService reads', () => {
       documents: [],
       statusHistory: [],
       followUpAlerts: [],
+      settlement: null,
       policy: {
         id: 'pol-1',
         customerId: 'cus-1',
@@ -882,6 +915,7 @@ describe('ClaimService.register', () => {
       adjuster: null,
       statusHistory: [],
       followUpAlerts: [],
+      settlement: null,
     });
 
     await expect(
@@ -961,6 +995,7 @@ describe('ClaimService.register', () => {
       },
       statusHistory: [],
       followUpAlerts: [],
+      settlement: null,
     });
 
     await expect(
@@ -1582,6 +1617,7 @@ describe('ClaimService assessment (Process 26)', () => {
         documents: [],
         statusHistory: [{ toStatus: status }],
         followUpAlerts: [],
+        settlement: null,
       });
       // call #1 (gate check) still sees UNDER_ASSESSMENT; our engine transition
       // then loses the race; the catch-block reload (#2) sees a concurrent
@@ -1988,5 +2024,341 @@ describe('ClaimService follow-up (Process 27)', () => {
         service.resolveFollowUpAlert('claim-1', 'fa-1', sales()),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
+  });
+});
+
+describe('ClaimService settlement (Process 28)', () => {
+  /** notify a claim then poke it to a settleable verdict status. */
+  async function settleableClaim(status = 'APPROVED') {
+    const deps = makeDeps();
+    await deps.service.notify({ ...BASE_DTO }, claims()); // estimatedLoss 20000
+    deps.claimState.status = status;
+    deps.workflow.transition.mockClear();
+    deps.audit.record.mockClear();
+    return deps;
+  }
+
+  const manager = (id = 'mgr-1') =>
+    claims({ id, roles: ['BRANCH_DEPARTMENT_MANAGER'] });
+
+  describe('recordSettlement', () => {
+    it('records the four figures, computes net, and settles straight through when no second approver is needed', async () => {
+      const { service, claimRepo, workflow, audit } = await settleableClaim();
+
+      const view = await service.recordSettlement(
+        'claim-1',
+        { approvedAmount: '17500.000', deductible: '2500.000' },
+        claims(),
+      );
+
+      expect(claimRepo.createSettlement).toHaveBeenCalledWith(
+        expect.objectContaining({ approvedByUserId: 'clm-1' }),
+      );
+      const arg = claimRepo.createSettlement.mock.calls[0][0] as Record<
+        string,
+        unknown
+      >;
+      expect((arg.netSettlement as { toString(): string }).toString()).toBe(
+        '15000',
+      );
+      expect(view.settlement).toMatchObject({
+        estimatedLoss: '20000.000',
+        approvedAmount: '17500.000',
+        deductible: '2500.000',
+        netSettlement: '15000.000',
+        secondApproverRequired: false,
+        approvedByUserId: 'clm-1',
+      });
+      expect(view.status).toBe('SETTLED');
+      expect(workflow.transition).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType: 'Claim', toStatus: 'SETTLED' }),
+      );
+      const created = audit.record.mock.calls.find(
+        (c) => (c[0] as { entityType: string }).entityType === 'Settlement',
+      );
+      expect((created?.[0] as { action: string }).action).toBe('CREATE');
+      expect(
+        (created?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+      ).toMatchObject({
+        approvedAmount: '17500.000',
+        netSettlement: '15000.000',
+      });
+    });
+
+    it('a broker-processed payment blocks the straight-through settle (mandatory second approver)', async () => {
+      const { service, workflow } = await settleableClaim();
+
+      const view = await service.recordSettlement(
+        'claim-1',
+        {
+          approvedAmount: '500.000',
+          deductible: '0.000',
+          brokerProcessedPayment: true,
+        },
+        claims(),
+      );
+
+      expect(view.status).toBe('APPROVED'); // NOT settled
+      expect(view.settlement?.secondApproverRequired).toBe(true);
+      expect(view.settlement?.secondApproverUserId).toBeNull();
+      expect(workflow.transition).not.toHaveBeenCalled();
+    });
+
+    it('422 when the claim is not APPROVED / PARTIALLY_APPROVED', async () => {
+      const { service } = await settleableClaim('UNDER_ASSESSMENT');
+      await expect(
+        service.recordSettlement(
+          'claim-1',
+          { approvedAmount: '100.000', deductible: '0.000' },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('422 when the approved amount exceeds the estimated loss', async () => {
+      const { service } = await settleableClaim();
+      await expect(
+        service.recordSettlement(
+          'claim-1',
+          { approvedAmount: '25000.000', deductible: '0.000' }, // > 20000
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('422 when the deductible exceeds the approved amount (net would be negative)', async () => {
+      const { service } = await settleableClaim();
+      await expect(
+        service.recordSettlement(
+          'claim-1',
+          { approvedAmount: '5000.000', deductible: '6000.000' },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('422 when the approved amount is zero', async () => {
+      const { service } = await settleableClaim();
+      await expect(
+        service.recordSettlement(
+          'claim-1',
+          { approvedAmount: '0.000', deductible: '0.000' },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('409 on a re-post with different figures; a byte-identical re-post resumes the settle', async () => {
+      const { service, workflow } = await settleableClaim();
+      // first record with a broker-processed flag so it does NOT settle
+      await service.recordSettlement(
+        'claim-1',
+        {
+          approvedAmount: '1000.000',
+          deductible: '0.000',
+          brokerProcessedPayment: true,
+        },
+        claims(),
+      );
+      // different figures -> 409
+      await expect(
+        service.recordSettlement(
+          'claim-1',
+          {
+            approvedAmount: '2000.000',
+            deductible: '0.000',
+            brokerProcessedPayment: true,
+          },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      // identical -> no-op (still needs a second approver, so no settle)
+      workflow.transition.mockClear();
+      const again = await service.recordSettlement(
+        'claim-1',
+        {
+          approvedAmount: '1000.000',
+          deductible: '0.000',
+          brokerProcessedPayment: true,
+        },
+        claims(),
+      );
+      expect(again.status).toBe('APPROVED');
+      expect(workflow.transition).not.toHaveBeenCalled();
+    });
+
+    it('a byte-identical re-post resumes a stuck settle once the required second approver is recorded — and any approver can drive it, not only that second approver', async () => {
+      const deps = await settleableClaim('PARTIALLY_APPROVED');
+      await deps.service.recordSettlement(
+        'claim-1',
+        {
+          approvedAmount: '500.000',
+          deductible: '0.000',
+          brokerProcessedPayment: true, // -> needs a 2nd approver
+        },
+        claims(),
+      );
+      // The second approval landed but settleCore's transition threw, so the
+      // claim is still at its verdict status.
+      deps.claimState.settlement!.secondApproverUserId = 'mgr-1';
+      deps.claimState.status = 'PARTIALLY_APPROVED';
+      deps.workflow.transition.mockClear();
+
+      // a DIFFERENT claim.settle.approve holder (neither maker nor checker)
+      const view = await deps.service.recordSettlement(
+        'claim-1',
+        {
+          approvedAmount: '500.000',
+          deductible: '0.000',
+          brokerProcessedPayment: true,
+        },
+        claims({ id: 'clm-2' }),
+      );
+
+      expect(deps.workflow.transition).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType: 'Claim', toStatus: 'SETTLED' }),
+      );
+      expect(view.status).toBe('SETTLED');
+    });
+
+    it('404 for a caller who cannot see the claim', async () => {
+      const deps = makeDeps({ customerOwner: 'someone-else' });
+      await deps.service.notify({ ...BASE_DTO }, claims());
+      deps.claimState.status = 'APPROVED';
+      await expect(
+        deps.service.recordSettlement(
+          'claim-1',
+          { approvedAmount: '100.000', deductible: '0.000' },
+          sales(),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('secondApproveSettlement', () => {
+    async function pendingSecondApproval() {
+      const deps = await settleableClaim();
+      await deps.service.recordSettlement(
+        'claim-1',
+        {
+          approvedAmount: '500.000',
+          deductible: '0.000',
+          brokerProcessedPayment: true,
+        },
+        claims(), // first approver = clm-1
+      );
+      deps.workflow.transition.mockClear();
+      deps.audit.record.mockClear();
+      return deps;
+    }
+
+    it('a different user second-approves -> the claim is SETTLED, an APPROVE audit is written', async () => {
+      const { service, workflow, audit } = await pendingSecondApproval();
+
+      const view = await service.secondApproveSettlement('claim-1', manager());
+
+      expect(view.status).toBe('SETTLED');
+      expect(view.settlement?.secondApproverUserId).toBe('mgr-1');
+      expect(workflow.transition).toHaveBeenCalledWith(
+        expect.objectContaining({ toStatus: 'SETTLED' }),
+      );
+      const appr = audit.record.mock.calls.find(
+        (c) =>
+          (c[0] as { entityType: string; action: string }).entityType ===
+            'Settlement' && (c[0] as { action: string }).action === 'APPROVE',
+      );
+      expect(appr).toBeDefined();
+    });
+
+    it('403 when the second approver is the same user as the first approver (maker/checker)', async () => {
+      const { service } = await pendingSecondApproval();
+      await expect(
+        service.secondApproveSettlement('claim-1', claims()), // clm-1 = first approver
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('409 when another user already second-approved', async () => {
+      const { service } = await pendingSecondApproval();
+      await service.secondApproveSettlement('claim-1', manager('mgr-1'));
+      await expect(
+        service.secondApproveSettlement('claim-1', manager('mgr-2')),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('idempotent for the same second approver (resumes a settle that did not land)', async () => {
+      const { service, workflow } = await pendingSecondApproval();
+      await service.secondApproveSettlement('claim-1', manager('mgr-1'));
+      workflow.transition.mockClear();
+      const again = await service.secondApproveSettlement(
+        'claim-1',
+        manager('mgr-1'),
+      );
+      expect(again.status).toBe('SETTLED');
+      expect(workflow.transition).not.toHaveBeenCalled();
+    });
+
+    it('422 when the settlement does not require a second approver', async () => {
+      const { service } = await settleableClaim();
+      await service.recordSettlement(
+        'claim-1',
+        { approvedAmount: '1000.000', deductible: '0.000' }, // small, not broker
+        claims(),
+      );
+      // already SETTLED; second-approve is not applicable
+      await expect(
+        service.secondApproveSettlement('claim-1', manager()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('404 when there is no settlement recorded', async () => {
+      const { service } = await settleableClaim();
+      await expect(
+        service.secondApproveSettlement('claim-1', manager()),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('409 when the second approval is recorded concurrently (0 rows)', async () => {
+      const { service, claimRepo } = await pendingSecondApproval();
+      claimRepo.recordSettlementSecondApproval.mockResolvedValueOnce(null);
+      await expect(
+        service.secondApproveSettlement('claim-1', manager()),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('fails loudly (never silently passes maker/checker) when the settlement has no recorded first approver', async () => {
+      const deps = await pendingSecondApproval();
+      // A first approver is always set by createSettlement, but the column is
+      // nullable and the DB CHECK also passes when it is NULL — the guard must
+      // not coalesce a missing maker to `'' === actor.id`.
+      deps.claimState.settlement!.approvedByUserId = null;
+      await expect(
+        deps.service.secondApproveSettlement('claim-1', manager()),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  it('settleCore structurally refuses SETTLED while a required second approval is missing', async () => {
+    const { service, workflow } = await settleableClaim();
+    await service.recordSettlement(
+      'claim-1',
+      {
+        approvedAmount: '900.000',
+        deductible: '0.000',
+        brokerProcessedPayment: true,
+      },
+      claims(),
+    );
+    workflow.transition.mockClear();
+    const view = await service.recordSettlement(
+      'claim-1',
+      {
+        approvedAmount: '900.000',
+        deductible: '0.000',
+        brokerProcessedPayment: true,
+      },
+      claims(),
+    );
+    expect(view.status).toBe('APPROVED');
+    expect(workflow.transition).not.toHaveBeenCalled();
   });
 });

@@ -413,8 +413,9 @@ build actually is today:
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
   Recommendation (#16) + Client Decision Handling (#17) + Policy Placement & Issuance
   (#18–19) + Policy Checking / Quality Control (#20) + Policy Delivery (#21) + Endorsement
-  Management (#22) — built and verified. Domain C (Claims) has begun with Claim
-  Notification (#23).** A minimal
+  Management (#22) — built and verified. Domain C (Claims) is underway —
+  Processes 23–28 (Notification → Registration → Documentation → Assessment →
+  Follow-up → Settlement) are built.** A minimal
   `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
@@ -489,7 +490,7 @@ build actually is today:
 | 21 | Policy Delivery | **no migration** — the `DeliveryRecord` model (`policyId @unique`, `deliveredAt`, `method`, `recipient`, `receiptAcknowledgedAt`), the `policy.deliver` perm (`[SALES, PLACEMENT]`), and the `VERIFIED → DELIVERED → ACTIVE` map all already existed · new `PolicyDeliveryService` + `PolicyDeliveryRepository` in the `policy` module · `POST /policies/:id/delivery` (`{ method ∈ email \| portal \| courier \| in_person, recipient, deliveredAt? }`, `policy.deliver`) drives `Policy VERIFIED → DELIVERED` through `WorkflowTransitionService.transition` (its status-conditional `updateMany` is the race gate — a concurrent delivery → `409`; an "already in status DELIVERED" engine rejection is **normalised to the same 409** so the loser's status code is deterministic), then creates the one `DeliveryRecord` (`policyId @unique` → `P2002` → `409`) · a **crash-recovery re-entry branch** (status already `DELIVERED`, no `DeliveryRecord`) creates the missing record without re-transitioning · `POST /policies/:id/delivery/acknowledge-receipt` (`{ acknowledgedAt? }`, `policy.deliver`) stamps `DeliveryRecord.receiptAcknowledgedAt` via a status-conditional `updateMany` (double-ack → `409`) and **best-effort** advances `Policy DELIVERED → ACTIVE` (logged, never thrown — the stamp is the authoritative "client confirmed" record, and `ACTIVE` is *not* a safety gate the way `DISCREPANCY` is, so failing to reach it leaves the policy in the *more* restrictive `DELIVERED` state; a resume branch does just the `ACTIVE` advance when the stamp already committed) · `deliveredAt` / `acknowledgedAt` are parsed with `parseHistoricalInstant` (past-only, an explicit offset required on datetimes); `422` if `acknowledgedAt < deliveredAt` · `DeliveryRecord` is **not** a `WorkflowTransitionService` entity (no `status`) · audit `CREATE` / `UPDATE DeliveryRecord` carries `method` / `recipient` / `deliveredAt` (delivery is an accountability record) · `delivery` (+ `deliveryComplete` = `receiptAcknowledgedAt` set) folded into `PolicyView` · **refactor**: `PolicyService.loadVisible` promoted to **public** so `PolicyCheckingService` + `PolicyDeliveryService` share one visibility path — `PolicyCheckingService` drops its own copy + its `CustomerRepository` dependency · web: the "Policy" section gains a Sales/Placement delivery form + an "Acknowledge receipt" button + a read-only display | `DeliveryRecord` has no `status`; the `DELIVERED → ACTIVE` advance is best-effort (fail-safe — a stuck policy sits in the more restrictive `DELIVERED`, self-heals on the next ack call, and `deliveryComplete` is still true); `ACTIVE` here just means "delivered + client-confirmed" — **premium-collection / inception-date gating of `ACTIVE`** is a Finance concern (#31+) not modelled; delivery is single-actor factual recording (no maker/checker — `maker-checker-segregation.md` § "what does NOT trigger this rule"); `deliveredAt` may be backdated before the policy's own issuance date (bounded only by "not in the future", same latitude as #19/#20's historical instants); `policy.deliver` is role-level (no per-officer queue); no reminder / SLA timer for an unacknowledged delivery (Policy Delivery has no row in `pdpl-sla-timers.md`) |
 | 22 | Endorsement Management | **new module** `apps/api/src/modules/endorsement/` (+ `repositories/endorsement.repository.ts`) — `Endorsement` / `Cancellation` / `Refund` / `CommissionReversal` / `PolicySchedule` models + the `Refund_maker_checker_distinct` CHECK (`20260826091424`, `approvedByUserId <> raisedByUserId`) all already existed · **`Endorsement` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine `REQUESTED → SUBMITTED_TO_INSURER → INSURER_CONFIRMED → FINANCIAL_ADJUSTMENT_CALCULATED → (REFUND_APPROVAL_PENDING →) APPLIED → CLIENT_NOTIFIED`; the child `Cancellation` / `Refund` / `CommissionReversal` have **no `status`** (lifecycle = the parent endorsement's), same shape as `PolicyChecking` / `DeliveryRecord` · `POST /policies/:id/endorsements` (`{ type ∈ POSITIVE \| NEGATIVE, changeType, premiumAmount (unsigned), effectiveFrom, targetCoverage? }`, `endorsement.create`/Placement) — Policy must be `ACTIVE` (422); `signedPremiumAdjustment` (pure) signs the fils-quantized amount by `type` (a NEGATIVE endorsement returns premium → negative `premiumAdjustment`) · `POST /policies/:id/cancellation` (`{ reason, basis ∈ short_period \| pro_rata, effectiveFrom }`, `cancellation.create`/Placement) — a NEGATIVE endorsement `changeType: cancellation`; `cancellationReturnPremium` (pure) — `pro_rata` = `issuedPremium × unexpiredDays / totalDays` (via `money.util.ts` `applyPercentage`), `short_period` = **drafted, unsourced** `SHORT_PERIOD_CLIENT_RETURN_PERCENT = '90'`% of the pro-rata figure; the `Endorsement` + its `Cancellation` child created in **one `$transaction`** (local exception) · `POST /endorsements/:id/advance` (`endorsement.create`) walks the two pre-financial hops · `POST /endorsements/:id/calculate-adjustment` (`{ premiumAmount? }` insurer-confirmed override for a non-cancellation, `endorsement.apply`) — for a NEGATIVE endorsement creates the auto-tied `Refund` (maker side) **+** `CommissionReversal` (`|premiumAdjustment| × recommendedQuotation.commissionRatePercent`, `commissionReversalAmount` pure — **never a separate hand calc**, `policy-lifecycle.md`) in **one `$transaction`** (`P2002` → 409), transitions to FINANCIAL_ADJUSTMENT_CALCULATED, then to REFUND_APPROVAL_PENDING iff the refund is `≥` the **drafted, unsourced** `REFUND_APPROVAL_THRESHOLD_JOD = '5000.000'` · `POST /endorsements/:id/apply` (`endorsement.apply`) — FINANCIAL_ADJUSTMENT_CALCULATED → APPLIED; **`applyCore` refuses outright if an at/above-threshold `Refund` is still unapproved — regardless of status** (the maker/checker gate is structural, not just the `REFUND_APPROVAL_PENDING` status, `@code-reviewer` BLOCKER); `PolicyRepository.versionScheduleForEndorsement` closes the open `PolicySchedule` at `effectiveFrom` and opens a **NEW** version (`sourceEndorsementId @unique`, coverage from `targetCoverage` or carried forward) in **one `$transaction`** — the prior version is never overwritten; a **cancellation apply drives `Policy ACTIVE → CANCELLED` and throws a hard 409 if that cannot be applied** (already-`CANCELLED` = success; the endorsement is already APPLIED so a retry of `apply` is re-entrant); 422 while REFUND_APPROVAL_PENDING · `POST /refunds/:id/approve` (`refund.approve`/**Manager or Finance**, already seeded) — **maker/checker** `assertDifferentActors(raisedByUserId, actor)` (403) + the CHECK; status-conditional `recordRefundApproval` (0 rows → 409); on success runs the apply path (→ APPLIED + schedule version) · `POST /endorsements/:id/notify-client` (`endorsement.apply`) — APPLIED → CLIENT_NOTIFIED (+ stamps `Cancellation.clientNotifiedAt`) · `GET /policies/:id/endorsements` + `GET /endorsements/:id` (**new perm `endorsement.read`**/Sales,Placement,Finance,Manager,Exec) · migration `20260902160000` adds `Endorsement.targetCoverage JSONB`, `effectiveFrom` / `submittedToInsurerAt` / `financialAdjustmentCalculatedAt` timestamps, `Endorsement_policyId_idx`; **migration `20260902170000` adds the partial `UNIQUE` `Endorsement_one_live_cancellation_per_policy` (`WHERE changeType='cancellation' AND status<>'CLIENT_NOTIFIED'`, `@code-reviewer` MAJOR — at most one in-flight cancellation per policy)** — no new `Decimal` columns · audit snapshots **metadata not body** (money as fixed strings, `hasReason` boolean, never the `reason` text; a CREATE row per `Endorsement` / `Cancellation` / `Refund` / `CommissionReversal` / `PolicySchedule`) · web: a new "Endorsements" section (`components/policy/EndorsementSection.tsx`) — Placement request/cancellation forms while the Policy is ACTIVE, per-endorsement one-action buttons, Manager "Approve refund" | `SHORT_PERIOD_CLIENT_RETURN_PERCENT` (90%) and `REFUND_APPROVAL_THRESHOLD_JOD` (5,000) are **drafted, unsourced** module constants — no market short-period scale table, no CBJ / Finance approval-matrix source (a real Finance config surface, narrative Process 37/40, does not exist); **filed via `/brain-gap`** (ibms-brain `7b60bbd`), same pattern as #16's drafted 10% / 2 pp bands · `commissionRatePercent` comes from the accepted `Recommendation.recommendedQuotation` — 422 if the quote captured none · the premium-adjustment override at `calculate-adjustment` only applies before FINANCIAL_ADJUSTMENT_CALCULATED and never to a cancellation (a materially different late override is a 422, not a silent no-op) · a below-threshold `Refund` is auto-cleared (`approvalThresholdMatrixLevel = below_threshold_auto`, `approvedByUserId` stays null — no separate approval row) · the parent-`Opportunity` progression is best-effort (the `Endorsement` + its money are authoritative) · `Refund.paidAt` is surfaced but no endpoint stamps it (payment execution is Finance, #37) · a stuck in-flight cancellation permanently blocks re-raising until it is pushed through (no void/withdraw endpoint) · `endorsement.create` / `.apply` / `refund.approve` are role-level (no per-officer queue); no SLA timer on an unapplied endorsement |
 
-### Part C · Domain C #23–27 — built, with these deferrals
+### Part C · Domain C #23–28 — built, with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
@@ -498,13 +499,14 @@ build actually is today:
 | 25 | Claim Documentation | extends the `claim` module — **no seed change**; migration `20260902180000` adds only `@@unique([claimId, toStatus])` on `ClaimStatusHistory` (a `@code-reviewer` MINOR — see #24's row; it also backstops the #25 best-effort `DOCUMENTATION_IN_PROGRESS` history-row write). The `ClaimDocument` / `Document` models, the `DocumentCategory` / `DataClassification` enums and the `claim.document` perm (`[CLAIMS_OFFICER]`) all already existed · `POST /claims/:id/documents` (`{ documents: [{ docType ∈ claim_form\|police_report\|medical_report\|photo\|invoice\|repair_estimate\|expert_report\|correspondence, classification, fileName, storageRef }] }`, `claim.document`/**Claims Officer**) — valid from `REGISTERED` onward (a `NOTIFIED` claim has no insurer reference to file against → 422); each file is a `Document` (`category: CLAIM`, a `storageRef` pointer, never the bytes) + a `ClaimDocument` join carrying the claim-specific `docType`, written in **one `$transaction`** · a `medical_report` **must** be `HIGHLY_CONFIDENTIAL` (`claims-lifecycle.md` — health data is classification-driven from first contact; 422 otherwise) · **the first attach best-effort advances `Claim REGISTERED → DOCUMENTATION_IN_PROGRESS`** through the engine (+ a `ClaimRepository.recordStatusHistory` idempotent domain-trail row) — best-effort because `DOCUMENTATION_IN_PROGRESS` is a forward-progress marker, not a #20-style safety gate, so a failed advance is logged and retried on the next attach, never thrown; the e2e asserts every `Claim` status move is an engine `TRANSITION` row (2 by this point: `REGISTERED`, `DOCUMENTATION_IN_PROGRESS`) · **the mandatory-document checklist per claim type** (`mandatoryDocTypesFor` + `classifyInsuranceLine`, pure) — `Policy.insuranceLine` is free text, so it is classified into a broad line *family* (`property` / `motor` / `medical` / `liability` / `marine` / `other`) by keyword and each family maps to a **drafted, unsourced** required doc set (e.g. `property` → `claim_form` + `photo` + `repair_estimate`; `medical` → `claim_form` + `medical_report` + `invoice`; any third-party loss also → `police_report`); `buildDocumentChecklist` derives `documentationComplete` (every `required` type present) + `missingMandatoryDocuments` · `ClaimView` gains `documents` (no `storageRef`), `documentChecklist`, `documentationComplete`, `missingMandatoryDocuments` · audit: `CREATE ClaimDocument` — ids / `docType` / `category` / `classification` only, **never `fileName` / `storageRef`** (a claim doc filename can name an injured person; same rule as #18-19's `policyDocumentAuditSnapshot`) · **`/brain-gap` filed** (ibms-brain `0dfa33f`): `claims-lifecycle.md` gains a Claim Documentation row + a medical-data sub-point · web: the "Claims" block gains a per-claim checklist display + a single-file attach form (Claims Officer) | The mandatory-document matrix + the `insuranceLine → family` classifier are **drafted, unsourced** (no Part 3.7 per-line matrix, no line taxonomy) — a Business Interruption claim (family `property`) inherits `photo` / `repair_estimate` rather than an accounts requirement (the `docType` enum has no "financial statements" value); the checklist is surfaced but nothing yet *gates* on `documentationComplete` — the `DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT` move + that gate is Process 26; `Document.versionNumber` is always 1 (no claim-doc version chain / re-upload flow); no delete (the schema's `deletionLocked` privileged-override path is unused); a claim `Document` carries no `policyId` (the `ClaimDocument` join is the canonical link — a "full insurance file" union view is deferred); `claim.document` is role-level (no per-officer queue); the transition-then-history-row seam is the same accepted #19/#21/#24 pattern (best-effort here, so even lower stakes) |
 | 26 | Claim Assessment | extends the `claim` module — **no migration, no seed change** (`claim.assess` perm `[CLAIMS_OFFICER]`, `Adjuster.surveyCompletedAt` / `investigationCompletedAt`, `ClaimStatus.UNDER_ASSESSMENT` / `APPROVED` / `PARTIALLY_APPROVED` / `DECLINED` and the `WORKFLOW_TRANSITIONS.Claim` map all pre-existed) · **three endpoints, all `claim.assess`/Claims Officer** — `POST /claims/:id/assessment/adjuster-progress` (`{ surveyCompletedAt?, investigationCompletedAt? }`) stamps the loss adjuster's completion timestamps (past-only via `parseHistoricalInstant`, no earlier than the loss date, **write-once** per field — an identical re-send is a no-op, a different value is a 409); `POST /claims/:id/assessment/submit` drives `Claim DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`; `POST /claims/:id/assessment/decision` (`{ outcome ∈ APPROVED\|PARTIALLY_APPROVED\|DECLINED }`) drives `UNDER_ASSESSMENT → <outcome>` · **every `Claim` status move goes through `WorkflowTransitionService.transition`** and also writes a domain `ClaimStatusHistory` row (best-effort after the loud transition — the #24/#25 seam, backfilled on the next call) · **`submit` is a hard safety gate on the mandatory-document checklist** (`claims-lifecycle.md` — "the checklist is what gates the move to insurer assessment") **recomputed from the live `ClaimDocument` rows** (never a stored `documentationComplete` snapshot — the #16 "re-derive the gate from live data" generalisation): a 422 lists the missing docTypes · **`decision` is gated on the adjuster having completed BOTH survey and investigation** — a **drafted, unsourced** `ibms-app` rule (Part 3.7 tracks the completion data but does not say it blocks the verdict), same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) / the #25 checklist matrix / #16's 10 % / 2 pp · the verdict is **write-once** (a different outcome once one is recorded is a 409 — a disputed verdict routes to Complaint Management, Process 42, not a status walk-back) · **no maker/checker** — recording the insurer's verdict is single-actor Claims work, not the broker approving a payment (`maker-checker-segregation.md` § "what does NOT trigger this rule"; the second approver is at settlement, Process 28) · `ClaimView` gains `assessment` (`surveyCompletedAt` / `investigationCompletedAt` / `adjusterWorkComplete` / `readyForAssessment` / `outcome`) · audit: `UPDATE Adjuster` (ids + the two ISO timestamps, no claim narrative) + the engine `TRANSITION` rows; every assessment endpoint also emits the `READ` sensitive-data-access row that `get` / `list` emit (its response echoes `causeOfLoss` / `documents[].fileName` / the third-party name) — **also retrofitted onto `register` (#24)** for consistency · **`/brain-gap` filed** (ibms-brain `d1dba95`): `claims-lifecycle.md` gains a Process 26 bullet · web: the "Claims" block gains a per-claim "Assessment" sub-block — adjuster survey/investigation stamps, "Submit for assessment" (disabled until the checklist is complete) and a verdict selector | The adjuster-work gate on the verdict and the write-once semantics are **drafted / unsourced** (filed, above) — a desktop assessment with no site survey has no way past the gate today; `Adjuster` survey/investigation stamps have no amend path (write-once); the `submit` / `decision` transition-then-history-row ordering has the same accepted #24/#25 seam (the status can lead its `ClaimStatusHistory` row by one failed call, reconciled on the next); no `Settlement` yet (the four figures + the second approver are Process 28); `DECLINED → CLOSED` and `APPROVED`/`PARTIALLY_APPROVED → SETTLED` are Processes 28–29; `claim.assess` is role-level (no per-officer queue); no SLA timer on a claim sitting in `UNDER_ASSESSMENT` (the insurer-non-response follow-up clock is #27) |
 | 27 | Claim Follow-up | extends the `claim` module — **migration `20260902190000`** adds a partial `UNIQUE ("claimId") WHERE "resolvedAt" IS NULL` + a plain `@@index([claimId])` on `ClaimFollowUpAlert` (the model, the `Claim.followUpAlertThresholdDays` column and the `claim.followup.manage` perm `[CLAIMS_OFFICER]` all pre-existed) · **no seed change** · **`ClaimFollowUpScheduler`** (`@Cron` 07:00 UTC, after the 06:00 RFQ sweep) + an on-demand **`POST /claims/follow-up-sweep`** (`claim.followup.manage`, counts only) both call `ClaimService.runFollowUpScan` — two passes, per-row isolated (the `CrossSellDetectionScheduler` shape): **raise** a `ClaimFollowUpAlert` on every pre-verdict claim (`REGISTERED` / `DOCUMENTATION_IN_PROGRESS` / `UNDER_ASSESSMENT`) whose business-day `followUpAlertThresholdDays` has elapsed since it was `REGISTERED` and which has no open alert; **auto-resolve** open alerts whose claim has since moved past the pre-verdict stage · the raise is `ClaimRepository.raiseFollowUpAlert` = `create` + `P2002` → "already alerted" (the partial `UNIQUE` is the race gate — a concurrent sweep is counted `skippedAlreadyAlerted`, not `failed`); the resolve is a conditional `updateMany` (0 rows = a concurrent resolve — race-safe) · **the clock is a single one from the `REGISTERED` `ClaimStatusHistory.changedAt`** — registration = submission to the insurer; NOT reset at `UNDER_ASSESSMENT` · **the threshold is per broad line family** (`motor` 7, `property` 10, `medical` 7, `liability` / `marine` 15, else 9 — the Part 3.7 worked-example figure) via `followUpThresholdDaysFor` (keyword family from `classifyInsuranceLine`), **drafted / unsourced** (same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) / the #25 checklist matrix / #16's 10 % / 2 pp), and **snapshotted onto `Claim.followUpAlertThresholdDays` at notification** (Process 23's `notify` now sets it) so a later taxonomy change does not retroactively shift live claims · `isFollowUpDue` moved from `rfq.config.ts` to a shared **`common/follow-up.util.ts`** (Jordan business days, `now` injected; `rfq.config.ts` re-exports it) · **`POST /claims/:id/follow-up-alerts/:alertId/resolve`** (`claim.followup.manage`) — a Claims Officer manually resolves an open alert (they chased the insurer); the claim's status is **not** touched; idempotent; a wrong alert id on this claim is a 404 · **an alert is NOT a `Claim` status change** — it is an accountability record (`triggeredAt` / `resolvedAt`) alongside the lifecycle · **no maker/checker** (single-actor operational work) · audit: `CREATE` / `UPDATE ClaimFollowUpAlert` — ids + threshold + clock timestamps + `resolvedBy` (`sweep` / `manual`), never claim narrative · `ClaimView` gains `followUp` (`followUpAlerts` / `followUpAlertOpen` / `followUpAlertThresholdDays` / `awaitingInsurerResponse` / `awaitingInsurerSince`) · **`/brain-gap` filed** (ibms-brain `8618f29`) · web: the "Claims" section gains a "Run follow-up sweep" button + a per-claim open-alert display with a "Resolve" button (Claims Officer) | The per-line threshold map + the `insuranceLine → family` classifier are **drafted / unsourced** (filed, above) · the clock is one clock from `REGISTERED` — a claim that sits in `UNDER_ASSESSMENT` a long time is measured from registration, not from when it was submitted for assessment (a per-status clock is a possible refinement) · auto-resolve happens on the **next sweep** after the claim progresses, not the moment a verdict lands (`ClaimView.followUp.followUpAlertOpen` can be stale for up to a day; `awaitingInsurerResponse` already reads false) · the sweep is a global scan (`FOLLOWUP_SWEEP_LIMIT = 1000`, no pagination) · no escalation ladder (one open alert per claim; a still-stuck claim needs a human via `claim.followup.manage`) · `ClaimFollowUpAlert` has no `resolvedByUserId` scalar (the actor is on the audit row) · `claim.followup.manage` is role-level |
+| 28 | Claim Settlement | extends the `claim` module — **migration `20260902200000`** adds only `Settlement.brokerProcessedPayment BOOLEAN NOT NULL DEFAULT false` (the "any claim payment the broker processes" trigger, re-derived from live data). The `Settlement` model, all four `Settlement` `Decimal` money fields (`estimatedLoss` / `approvedAmount` / `deductible` / `netSettlement`, already in `MONEY_DECIMAL_FIELDS`), the `Settlement_maker_checker_distinct` CHECK (`20260826091424`, `secondApproverUserId <> approvedByUserId`), the `WORKFLOW_TRANSITIONS.Claim` `APPROVED`/`PARTIALLY_APPROVED → SETTLED` edges and the `claim.settle.approve` (`[CLAIMS_OFFICER, MANAGER]`) / `claim.settle.second-approve` (`[MANAGER, FINANCE]`) perms all already existed · `POST /claims/:id/settlement` (`{ approvedAmount, deductible, brokerProcessedPayment? }`, `claim.settle.approve`) — valid only from `APPROVED` / `PARTIALLY_APPROVED` (422 otherwise) · **the four figures are always distinct and never collapsed**: `estimatedLoss` is carried from `Claim.estimatedLoss`, `approvedAmount` + `deductible` are the only inputs, and **`netSettlement` is ALWAYS `approvedAmount − deductible` computed server-side (`subtractMoney`)** — never accepted from the caller · hard bounds — `approvedAmount > 0`, `approvedAmount ≤ estimatedLoss` (422 — an insurer cannot approve more than the claimed amount), `deductible ≥ 0`, `deductible ≤ approvedAmount` (422 — net cannot be negative) · **the recorder of the four figures IS the first approver** (`Settlement.approvedByUserId = actor`); recording is **write-once** — a byte-identical re-`POST` is a 200 no-op / resume, any changed figure is a 409 (`P2002` on the `claimId @unique` → 409 for a concurrent create) · **a mandatory distinct second approver is required iff `approvedAmount ≥ CLAIM_LARGE_THRESHOLD_JOD`** (the **same drafted, unsourced** `= '25000.000'` #23 uses for `isLargeClaim`, **re-derived here from the live approved amount** — never `Claim.isLargeClaim`, the notification-time snapshot) **OR `brokerProcessedPayment = true`** · when neither holds `POST /settlement` drives `Claim → SETTLED` straight through; when either holds the claim holds at its verdict status until `POST /claims/:id/settlement/second-approve` (`claim.settle.second-approve`/**Manager or Finance**) — **maker/checker** `assertDifferentActors(approvedByUserId, actor)` (403) + the DB CHECK; a status-conditional `recordSettlementSecondApproval` `updateMany` (0 rows → 409); a different second approver on an already-approved settlement → 409, the same one → idempotent resume · **`settleCore` structurally re-checks the second approval at the `→ SETTLED` write** — it refuses to walk a claim whose live `Settlement` still needs a second approver while `secondApproverUserId IS NULL`, regardless of path (record + second-approve are separate writes and the engine map allows `→ SETTLED` unconditionally — the #22 "APPLY must re-check approval structurally" generalisation) · every `Claim` status move goes through `WorkflowTransitionService.transition` (+ a best-effort domain `ClaimStatusHistory` row, the #24–27 seam); the e2e asserts exactly **5** `TRANSITION` audit rows across the #23→#28 chain · **`Settlement` is not a `WorkflowTransitionService` entity** (no `status` — its lifecycle is the parent `Claim`'s), same shape as `Adjuster` / `ClaimDocument` / `ThirdPartyClaimant` / `ClaimFollowUpAlert` · audit: `CREATE` / `APPROVE Settlement` — the four figures as fixed strings + `brokerProcessedPayment` + the maker/checker ids + `secondApproverRequired`, **never the claim narrative**; every settlement endpoint also emits the `READ` sensitive-data-access row `get` / `list` emit · `ClaimView` gains `settlement` (`estimatedLoss` / `approvedAmount` / `deductible` / `netSettlement` / `brokerProcessedPayment` / `approvedByUserId` / `secondApproverUserId` / `secondApproverRequired` / `settled`) · **`/brain-gap` filed** (ibms-brain `1999311`): `claims-lifecycle.md` — the four-figures row + the second-approver row extended · web: the "Claims" block gains a per-claim "Settlement" sub-block — a Claims/Manager four-figure record form (with a broker-processed checkbox), a read-only four-figure display, and a Manager/Finance "Second-approve settlement" button | `CLAIM_LARGE_THRESHOLD_JOD` (25,000) is **drafted, unsourced** (no CBJ / Part-3.7 / broker authority-matrix figure — filed, above), same status as #16's 10 % / 2 pp and #22's refund / short-period constants · the four figures are **write-once** — no amend path (a corrected settlement needs a future endpoint; a disputed one routes to Complaint Management, Process 42) · `brokerProcessedPayment` is set once at record time and not re-evaluated · **no payment execution** — `Settlement` records the decision + the four figures; the actual disbursement, `ThirdPartyClaimant.recoveryAmount` / subrogation, and `Claim → CLOSED` are Processes 29–30 · Loss Ratio / Claims Analytics (#29) is still not fed · the record-then-second-approve seam is two writes — `settleCore`'s structural re-check is the backstop, but a crash between the `Settlement` create and the straight-through `→ SETTLED` leaves the settlement recorded with the claim at its verdict status until the next `POST /settlement` (byte-identical) resumes it · `claim.settle.approve` / `claim.settle.second-approve` are role-level (no per-officer queue); no SLA timer on a recorded-but-unsettled claim |
 
 ### Not started
 
-- **Domains C–H** — Claims (#28 Settlement, #29 Loss Ratio / Analytics, #30 closure —
+- **Domains C–H** — Claims (#29 Loss Ratio / Analytics, #30 closure —
   #23 Claim Notification, #24 Claim Registration with Insurer, #25 Claim Documentation,
-  #26 Claim Assessment and #27 Claim Follow-up are **built**, see the Domain C table
-  above), Finance (billing / collection / commission / reconciliation, #31–40), Customer
+  #26 Claim Assessment, #27 Claim Follow-up and #28 Claim Settlement are **built**, see the
+  Domain C table above), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
   (#58–65), Supporting Operations (HR, procurement, IT, document management, vendor
@@ -3529,6 +3531,166 @@ narrows a gap.
   follow-up alert) incl. `@a11y`. `prisma validate` OK, `prisma migrate status` clean
   (**33**); no seed
   change.
+
+**Part C #28 — Claim Settlement (Domain C, Process 28)**
+
+- **Extends** `apps/api/src/modules/claim/` — `claim.config.ts`
+  (`CLAIM_SETTLEABLE_STATUSES`, `computeNetSettlement`, `isSecondApproverRequired`,
+  `deriveSettlementView`, `settlementAuditSnapshot`), `claim.service.ts`
+  (`recordSettlement` / `secondApproveSettlement` / private `settleCore`),
+  `claim.repository.ts` (`createSettlement` / `recordSettlementSecondApproval`,
+  `settlement: true` folded into `CLAIM_INCLUDE`), a new `dto/record-settlement.dto.ts`,
+  two new routes on `claim.controller.ts`. Backlog: always four distinct figures
+  (estimated / approved / deductible / net — never collapsed into one number); a
+  mandatory second approver for large claims (`isLargeClaim`) and any claim payment the
+  broker processes.
+- **Migration `20260902200000_settlement_broker_processed_payment`** — adds only
+  `Settlement.brokerProcessedPayment BOOLEAN NOT NULL DEFAULT false` (the "any claim
+  payment the broker processes" trigger, `IF NOT EXISTS`, hand-authored + `migrate
+  deploy` to `db` + `db-test`). The `Settlement` model, all four `Settlement` `Decimal`
+  money fields (already classified in `money-fields.inventory.ts`), the
+  `Settlement_maker_checker_distinct` CHECK (`20260826091424`,
+  `secondApproverUserId IS NULL OR approvedByUserId IS NULL OR secondApproverUserId <>
+  approvedByUserId`), the `WORKFLOW_TRANSITIONS.Claim` `APPROVED` /
+  `PARTIALLY_APPROVED → SETTLED` edges, and the `claim.settle.approve`
+  (`[CLAIMS_OFFICER, MANAGER]`) / `claim.settle.second-approve` (`[MANAGER, FINANCE]`)
+  permissions all already existed. **No seed change.**
+- **`POST /claims/:id/settlement`** (`{ approvedAmount, deductible,
+  brokerProcessedPayment? }`, `claim.settle.approve`) — valid only from `APPROVED` /
+  `PARTIALLY_APPROVED` (422 otherwise, message distinguishes "record the verdict first"
+  from "already done").
+  - **Four distinct figures, never collapsed** — `estimatedLoss` is carried from
+    `Claim.estimatedLoss`; `approvedAmount` + `deductible` are the only inputs;
+    **`netSettlement` is ALWAYS `approvedAmount − deductible` computed server-side**
+    (`subtractMoney`, fils-quantized) — the DTO does not even accept a `netSettlement`
+    field.
+  - **Hard bounds** — `approvedAmount > 0`; `approvedAmount ≤ estimatedLoss` (422 — an
+    insurer cannot approve more than the claimed amount); `deductible ≥ 0`;
+    `deductible ≤ approvedAmount` (422 — net cannot go negative).
+  - **The recorder of the four figures IS the first approver**
+    (`Settlement.approvedByUserId = actor`). Recording is **write-once**: a
+    byte-identical re-`POST` (all figures + `brokerProcessedPayment` equal via
+    `compareMoney`) is a 200 no-op / resume; any changed figure is a 409; a concurrent
+    create hits `claimId @unique` → `P2002` → 409.
+- **The second-approver gate** is re-derived from **live data**, never from the
+  notification-time `Claim.isLargeClaim` snapshot: `isSecondApproverRequired` =
+  `approvedAmount ≥ CLAIM_LARGE_THRESHOLD_JOD` (the **same drafted, unsourced**
+  `'25000.000'` #23 uses for `isLargeClaim`, applied to the *approved* figure) **OR**
+  `Settlement.brokerProcessedPayment === true`.
+  - Neither → `POST /settlement` drives `Claim → SETTLED` straight through.
+  - Either → the claim holds at its verdict status until
+    **`POST /claims/:id/settlement/second-approve`** (`claim.settle.second-approve` /
+    **Manager or Finance**) — **maker/checker**
+    `assertDifferentActors(approvedByUserId, actor)` (403) + the DB CHECK; a
+    status-conditional `recordSettlementSecondApproval` `updateMany` (0 rows → 409); a
+    *different* second approver on an already-approved settlement → 409, the *same* one
+    → an idempotent `settleCore` resume; 422 if the settlement does not actually need a
+    second approver.
+- **`settleCore` structurally re-checks the second approval at the `→ SETTLED` write** —
+  it refuses to walk a claim whose live `Settlement` `isSecondApproverRequired(...)` is
+  true while `secondApproverUserId IS NULL`, regardless of how it was reached
+  (record-settlement and second-approve are separate writes and the engine map allows
+  `APPROVED` / `PARTIALLY_APPROVED → SETTLED` unconditionally — the #22 "APPLY must
+  re-check approval structurally" generalisation). The `Claim → SETTLED` move goes
+  through `WorkflowTransitionService.transition`; a best-effort domain
+  `ClaimStatusHistory` row follows (the #24–27 seam, backfilled on the next call). The
+  e2e asserts exactly **5** `TRANSITION` audit rows across the #23→#28 chain
+  (`REGISTERED`, `DOCUMENTATION_IN_PROGRESS`, `UNDER_ASSESSMENT`, the verdict, `SETTLED`).
+- **`Settlement` is not a `WorkflowTransitionService` entity** (no `status` — its
+  lifecycle is the parent `Claim`'s), same shape as `Adjuster` / `ClaimDocument` /
+  `ThirdPartyClaimant` / `ClaimFollowUpAlert`.
+- **`ClaimView`** gains `settlement` (`estimatedLoss` / `approvedAmount` / `deductible` /
+  `netSettlement` / `brokerProcessedPayment` / `approvedByUserId` /
+  `secondApproverUserId` / `secondApproverRequired` — re-derived in the view, not stored
+  — / `settled`), or `null` before a settlement is recorded.
+- **Audit** — `CREATE` (record) / `APPROVE` (second-approve) `Settlement` snapshots the
+  four figures as fixed strings + `brokerProcessedPayment` + the maker/checker ids +
+  `secondApproverRequired`, **never the claim narrative**; both endpoints also emit the
+  `READ` `isSensitiveDataAccess` row `get` / `list` emit (the full `ClaimView` response
+  echoes `causeOfLoss` / `documents[].fileName` / the third-party name).
+- **`apps/web/`** — `claim-api.ts` `recordClaimSettlement` / `secondApproveClaimSettlement`
+  + the `Claim.settlement` type; `ClaimSection.tsx` gains a per-claim `ClaimSettlement`
+  block — a four-figure record form (`approvedAmount` / `deductible` inputs + a
+  broker-processed checkbox, `canSettle = isClaims || isManager`), a read-only
+  four-figure display, and a "Second-approve settlement" button
+  (`canSecondApproveSettlement = isManager || isFinance`, shown only while a second
+  approver is required and none is recorded). `opportunities/[id]/page.tsx` wires
+  `isFinance` (`FINANCE_COLLECTIONS_OFFICER`).
+- **`/brain-gap` filed** (ibms-brain `1999311`): `claims-lifecycle.md` § "The rules that
+  aren't obvious" — the four-figures row gains a Process 28 sub-point (net is always
+  computed, never an input; the two hard bounds; the recorder is the first approver;
+  write-once) and the "large / broker-processed needs a second approver" row gains the
+  live-re-derived threshold, the `brokerProcessedPayment` trigger, the
+  `assertDifferentActors` + DB CHECK pair, and the `settleCore` structural re-check.
+- **`@code-reviewer` (mandatory — money arithmetic + maker/checker + Highly Confidential
+  data + a migration)** → **APPROVE WITH MINORS, no blocker, no MAJOR, no lex violation**
+  (all six mandatory checks pass — money is `Decimal` end-to-end through `money.util.ts`
+  with no float / `parseFloat` / `round`; the only `Claim.status` write is the engine
+  `transition({ toStatus: 'SETTLED' })` in `settleCore` and `Settlement` correctly has
+  no `status`; maker/checker = the app guard + the DB CHECK + two distinct identities +
+  the status-conditional `updateMany` + the structural re-check at `→ SETTLED`, and
+  `claim.settle.second-approve` is not granted to `CLAIMS_OFFICER`; the audit snapshot +
+  logs carry ids / `formatMoney` strings / booleans only; settlement has no statutory
+  SLA). No crash/concurrency window to `SETTLED`-unapproved was found. Two MINORs
+  (crash-recovery-seam robustness, integrity preserved either way) fixed: (1)
+  `recordSettlement`'s byte-identical re-post now resumes a stuck-but-fully-approved
+  settle for **any** `claim.settle.approve` holder — `settleCore` is called whenever the
+  second approval is satisfied (not required, or already recorded), not only when a
+  second approver was never required, so recovery is no longer bottlenecked on the one
+  user who happened to second-approve; (2) `secondApproveSettlement` no longer coalesces
+  a missing first approver to `'' === actor.id` (which would silently pass the
+  maker/checker guard) — a `Settlement` with a null `approvedByUserId` now throws a 409.
+  NIT fixed: an `isSettleableStatus(status)` helper in `claim.config.ts` (mirrors
+  `isAssessmentConcluded`) replaces the repeated `(CLAIM_SETTLEABLE_STATUSES as readonly
+  string[]).includes(...)` cast at three sites. NIT noted, not taken: the web
+  "Second-approve settlement" button still renders for a Manager who was the first
+  approver (clicking it returns a clear 403) — hiding it needs the current user id
+  threaded through `ClaimSection`, which the single-identity Playwright auth mock cannot
+  exercise; the server-side guard is the real enforcement. +2 unit tests for the MINORs.
+- **Deferred**: `CLAIM_LARGE_THRESHOLD_JOD` (25,000) is drafted / unsourced (filed,
+  above); the four figures are write-once (no amend path — a corrected settlement needs
+  a future endpoint, a disputed one routes to Complaint Management, Process 42);
+  `brokerProcessedPayment` is set once at record time and not re-evaluated; **no payment
+  execution** — `Settlement` records the decision + the four figures, the actual
+  disbursement, `ThirdPartyClaimant.recoveryAmount` / subrogation, and `Claim → CLOSED`
+  are Processes 29–30; Loss Ratio / Claims Analytics (#29) still not fed; the
+  record-then-second-approve seam is two writes (a crash between the `Settlement` create
+  and a straight-through `→ SETTLED` leaves the settlement recorded with the claim at
+  its verdict status until the next byte-identical `POST /settlement` resumes it —
+  `settleCore`'s structural re-check is the backstop); `claim.settle.approve` /
+  `claim.settle.second-approve` are role-level (no per-officer queue); no SLA timer on a
+  recorded-but-unsettled claim.
+- **Verification**: +9 api unit — `claim.config.spec.ts` (+7 — `CLAIM_SETTLEABLE_STATUSES`
+  / `isSettleableStatus`, `computeNetSettlement` worked example (17,500 − 2,500 = 15,000)
+  + trailing-decimal + net-zero, `isSecondApproverRequired` large / broker / neither,
+  `deriveSettlementView` null / money strings / re-derived gate / `settled` flag,
+  `settlementAuditSnapshot` four fixed strings + no narrative), `claim.service.spec.ts`
+  (+? — straight-through settle + net compute, broker-processed blocks the
+  straight-through settle, 422 wrong status / approved > estimated / deductible >
+  approved / approved zero, 409 different figures, byte-identical re-post resume
+  (**review MINOR 1** — any approver can drive it once the second approver is recorded),
+  404 invisible; `secondApproveSettlement` → `SETTLED` + `APPROVE` audit, 403
+  self-approval, 409 another user, idempotent same approver, 422 not-required, 404 no
+  settlement, 409 concurrent 0-rows, **fails loudly on a null first approver — review
+  MINOR 2**; `settleCore` structural refuse). `test/claim.e2e-spec.ts` (+1 — a small
+  claim: `403` for Sales, `422` approved > estimated, `POST /settlement` → `SETTLED` with
+  all four figures + `secondApproverRequired: false`, `409` on a changed-figure re-post,
+  exactly 5 `TRANSITION` rows, the `Settlement` audit carries `17500.000` not the claim
+  narrative; a large claim (estimated 40,000, `PARTIALLY_APPROVED`): `POST /settlement`
+  (approved 30,000) → still `PARTIALLY_APPROVED` + `secondApproverRequired: true`, the
+  first approver's `second-approve` → `403`, a distinct Manager → `SETTLED` with
+  `secondApproverUserId` set, DB `approvedByUserId <> secondApproverUserId`). Full suites
+  green: **api unit 1073** (74 files), **claim.e2e-spec.ts 9/9** in isolation, **full api
+  e2e 121/122** (the 1 fail = the known full-suite-load flake — this run a 30 s `boot()`
+  timeout in `up-sell.e2e-spec.ts` setup, which passes **8/8 in isolation**; `claim`
+  changes are `claim`-module-only); full turbo `build` +
+  `typecheck` OK, api / web `eslint` OK, Playwright **rfq.spec.ts 23/23** (+2: small
+  settlement straight through / large settlement needs a distinct second approver) incl.
+  `@a11y`. `prisma validate` OK, `prisma migrate status` clean (**34**); no seed change.
+  `npm audit` reports **1 moderate** transitive `qs` advisory (`GHSA-x5fp-wj9c-mxmx` /
+  `GHSA-4mjr-xmp4-gh2g`, published after #27) — **not introduced here**: no
+  `package.json` / `package-lock.json` change in this item; tracked under § Security for
+  a dependency-bump pass.
 
 ## Deployment
 

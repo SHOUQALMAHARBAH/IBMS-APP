@@ -178,6 +178,7 @@ async function mockRfqApi(
     }) => void;
     onClaimAssessment?: (body: Record<string, unknown>) => void;
     onClaimFollowUp?: (body: Record<string, unknown>) => void;
+    onClaimSettlement?: (body: Record<string, unknown>) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -837,6 +838,24 @@ async function mockRfqApi(
       };
     };
 
+    // Process 28 — derive the settlement sub-view.
+    const applySettlement = (row: Record<string, unknown>) => {
+      const s = row.settlement as Record<string, unknown> | null;
+      if (!s) {
+        row.settlement = null;
+        return;
+      }
+      const approved = Number(s.approvedAmount);
+      const secondApproverRequired =
+        s.brokerProcessedPayment === true || approved >= 25000;
+      row.settlement = {
+        ...s,
+        secondApproverRequired,
+        settled: row.status === "SETTLED" || row.status === "CLOSED",
+      };
+    };
+    const money3 = (n: number) => n.toFixed(3);
+
     // Process 27 — the follow-up sub-view + a synthetic "overdue" flag the
     // sweep branch uses (the real due-check is business-day date math).
     const AWAITING = ["REGISTERED", "DOCUMENTATION_IN_PROGRESS", "UNDER_ASSESSMENT"];
@@ -851,6 +870,69 @@ async function mockRfqApi(
         awaitingInsurerSince: "2026-11-05T00:00:00.000Z",
       };
     };
+
+    // Process 28 — record the four settlement figures / second-approve.
+    const settleMatch = /\/claims\/([^/?]+)\/settlement(\?|$)/.exec(url);
+    if (method === "POST" && settleMatch) {
+      const row = claimRows.find((r) => r.id === settleMatch[1]);
+      const b = route.request().postDataJSON() as {
+        approvedAmount: string;
+        deductible: string;
+        brokerProcessedPayment?: boolean;
+      };
+      opts.onClaimSettlement?.({ step: "record", ...b });
+      if (row && !row.settlement) {
+        const approved = Number(b.approvedAmount);
+        const ded = Number(b.deductible);
+        const broker = b.brokerProcessedPayment === true;
+        row.settlement = {
+          estimatedLoss: money3(Number(row.estimatedLoss)),
+          approvedAmount: money3(approved),
+          deductible: money3(ded),
+          netSettlement: money3(approved - ded),
+          brokerProcessedPayment: broker,
+          approvedByUserId: "user-1",
+          secondApproverUserId: null,
+        };
+        if (!broker && approved < 25000) {
+          const from = row.status as string;
+          row.status = "SETTLED";
+          (row.statusHistory as Record<string, unknown>[]).push({
+            fromStatus: from,
+            toStatus: "SETTLED",
+            changedByUserId: "user-1",
+            changedAt: "2026-11-30T00:00:00.000Z",
+          });
+        }
+        applySettlement(row);
+        applyAssessment(row);
+        applyFollowUp(row);
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
+
+    const secondApproveMatch =
+      /\/claims\/([^/?]+)\/settlement\/second-approve(\?|$)/.exec(url);
+    if (method === "POST" && secondApproveMatch) {
+      opts.onClaimSettlement?.({ step: "second-approve" });
+      const row = claimRows.find((r) => r.id === secondApproveMatch[1]);
+      const s = row?.settlement as Record<string, unknown> | undefined;
+      if (row && s && s.secondApproverUserId == null) {
+        s.secondApproverUserId = "user-2";
+        const from = row.status as string;
+        row.status = "SETTLED";
+        (row.statusHistory as Record<string, unknown>[]).push({
+          fromStatus: from,
+          toStatus: "SETTLED",
+          changedByUserId: "user-2",
+          changedAt: "2026-11-30T00:00:00.000Z",
+        });
+        applySettlement(row);
+        applyAssessment(row);
+        applyFollowUp(row);
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
 
     const sweepMatch = /\/claims\/follow-up-sweep(\?|$)/.exec(url);
     if (method === "POST" && sweepMatch) {
@@ -941,6 +1023,7 @@ async function mockRfqApi(
         }
         applyChecklist(row);
         applyAssessment(row);
+        applySettlement(row);
         applyFollowUp(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
@@ -989,6 +1072,7 @@ async function mockRfqApi(
           }
         }
         applyAssessment(row);
+        applySettlement(row);
         applyFollowUp(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
@@ -1021,6 +1105,7 @@ async function mockRfqApi(
           changedAt: "2026-11-05T00:00:00.000Z",
         });
         applyAssessment(row);
+        applySettlement(row);
         applyFollowUp(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
@@ -1077,6 +1162,7 @@ async function mockRfqApi(
           effectiveTo: null,
         },
         coverageResolvedAtLossDate: true,
+        settlement: null,
         statusHistory: [
           {
             fromStatus: null,
@@ -1090,6 +1176,7 @@ async function mockRfqApi(
       };
       applyChecklist(row);
       applyAssessment(row);
+      applySettlement(row);
       applyFollowUp(row);
       claimRows.push(row);
       return route.fulfill({ status: 201, json: row });
@@ -1151,6 +1238,61 @@ async function mockRfqApi(
       json: { ...RFQ.insurerSubmissions[0], status: body.toStatus, respondedAt: "2026-03-05T00:00:00.000Z" },
     });
   });
+}
+
+/** Part C #26/#28 — drive a freshly-notified claim all the way to an insurer
+ * verdict through the UI (notify -> register -> file every mandatory doc ->
+ * stamp the adjuster survey + investigation -> submit -> record the verdict).
+ * The Process 28 settlement controls only appear once the claim is APPROVED /
+ * PARTIALLY_APPROVED. */
+async function driveClaimToVerdict(
+  page: Page,
+  opts: {
+    estimatedLoss: string;
+    verdict: "APPROVED" | "PARTIALLY_APPROVED";
+    insurerRef: string;
+  },
+) {
+  await page.getByLabel("Loss date").fill("2026-11-15");
+  await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
+  await page.getByLabel("Estimated loss").fill(opts.estimatedLoss);
+  await page.getByRole("button", { name: "Notify claim" }).click();
+  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+
+  await page.getByLabel("Insurer claim reference").fill(opts.insurerRef);
+  await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
+  await page
+    .getByRole("button", { name: "Register & assign adjuster" })
+    .click();
+  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+
+  for (const [docType, fileName] of [
+    ["claim_form", "cf.pdf"],
+    ["photo", "ph.jpg"],
+    ["repair_estimate", "re.pdf"],
+  ] as const) {
+    await page.getByLabel("Document type").selectOption(docType);
+    await page.getByLabel("File name").fill(fileName);
+    await page.getByLabel("Storage reference").fill(`s3://claims/${docType}`);
+    await page.getByRole("button", { name: "File document" }).click();
+  }
+  await expect(page.getByText("Documentation · complete")).toBeVisible();
+
+  await page
+    .getByLabel("Completion date (adjuster survey / investigation)")
+    .fill("2026-11-16");
+  await page.getByRole("button", { name: "Mark survey complete" }).click();
+  await page
+    .getByRole("button", { name: "Mark investigation complete" })
+    .click();
+
+  await page.getByRole("button", { name: "Submit for assessment" }).click();
+  await expect(
+    page.getByText("UNDER_ASSESSMENT", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Assessment verdict").selectOption(opts.verdict);
+  await page.getByRole("button", { name: "Record verdict" }).click();
+  await expect(page.getByText(`verdict ${opts.verdict}`)).toBeVisible();
 }
 
 test("opens an opportunity and lists its RFQs", async ({ page }) => {
@@ -1818,6 +1960,105 @@ test("raises an insurer non-response follow-up alert via the sweep and resolves 
   await expect(page.getByText("Insurer follow-up alert")).toHaveCount(0);
 
   expect(steps).toEqual(["sweep", "resolve"]);
+});
+
+test("settles a small claim straight through as four distinct figures", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  let settlement: Record<string, unknown> | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onClaimSettlement: (b) => {
+      settlement = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  await driveClaimToVerdict(page, {
+    estimatedLoss: "20000.000",
+    verdict: "APPROVED",
+    insurerRef: "INS-STL-1",
+  });
+
+  // the settlement form appears once the claim is APPROVED
+  await page.getByLabel("Approved amount").fill("17500.000");
+  await page.getByLabel("Deductible").fill("2500.000");
+  await page.getByRole("button", { name: "Record settlement" }).click();
+
+  // under the large-claim threshold and not broker-processed -> settles now,
+  // and all four distinct figures render (never one collapsed number).
+  await expect(
+    page.getByText(
+      /Estimated .+ · approved .+ · deductible .+ · net .+ · settled/,
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record settlement" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Second-approve settlement" }),
+  ).toHaveCount(0);
+
+  await expect.poll(() => settlement?.approvedAmount).toBe("17500.000");
+  await expect.poll(() => settlement?.deductible).toBe("2500.000");
+});
+
+test("a large claim settlement blocks on a mandatory distinct second approver", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER", "BRANCH_DEPARTMENT_MANAGER"]);
+  const steps: string[] = [];
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onClaimSettlement: (b) => {
+      steps.push(b.step as string);
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  await driveClaimToVerdict(page, {
+    estimatedLoss: "40000.000",
+    verdict: "PARTIALLY_APPROVED",
+    insurerRef: "INS-STL-2",
+  });
+
+  await page.getByLabel("Approved amount").fill("30000.000");
+  await page.getByLabel("Deductible").fill("5000.000");
+  await page.getByRole("button", { name: "Record settlement" }).click();
+
+  // over the large-claim threshold -> all four figures recorded, but NOT
+  // settled: it waits on a second approver who cannot be the first.
+  await expect(
+    page.getByText(
+      /Estimated .+ · approved .+ · deductible .+ · net .+ · awaiting a second approver/,
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/· settled/)).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: "Second-approve settlement" })
+    .click();
+
+  // the second approval settles it
+  await expect(
+    page.getByText(/· second-approved · settled/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Second-approve settlement" }),
+  ).toHaveCount(0);
+
+  expect(steps).toEqual(["record", "second-approve"]);
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

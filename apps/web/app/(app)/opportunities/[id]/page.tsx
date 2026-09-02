@@ -28,6 +28,7 @@ const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
 const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 const POLICY_CHECK_ROLE = 'POLICY_CHECKING_OFFICER';
 const CLAIMS_ROLE = 'CLAIMS_OFFICER';
+const FINANCE_ROLE = 'FINANCE_COLLECTIONS_OFFICER';
 
 function statusBreakdown(rfq: Rfq): string {
   if (rfq.insurerSubmissions.length === 0) return 'no insurers yet';
@@ -91,6 +92,7 @@ export default function OpportunityDetailPage() {
   const isSales = user.roles.includes(SALES_ROLE);
   const isPolicyChecker = user.roles.includes(POLICY_CHECK_ROLE);
   const isClaims = user.roles.includes(CLAIMS_ROLE);
+  const isFinance = user.roles.includes(FINANCE_ROLE);
 
   return (
     <main style={pageStyle}>
@@ -232,6 +234,8 @@ export default function OpportunityDetailPage() {
             canDocument={isClaims}
             canAssess={isClaims}
             canFollowUp={isClaims}
+            canSettle={isClaims || isManager}
+            canSecondApproveSettlement={isManager || isFinance}
           />
         </>
       ) : null}

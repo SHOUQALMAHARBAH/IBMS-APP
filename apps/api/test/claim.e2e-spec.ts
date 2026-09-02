@@ -97,6 +97,17 @@ interface ClaimBody {
     awaitingInsurerResponse: boolean;
     awaitingInsurerSince: string | null;
   };
+  settlement: {
+    estimatedLoss: string;
+    approvedAmount: string | null;
+    deductible: string | null;
+    netSettlement: string | null;
+    brokerProcessedPayment: boolean;
+    approvedByUserId: string | null;
+    secondApproverUserId: string | null;
+    secondApproverRequired: boolean;
+    settled: boolean;
+  } | null;
   statusHistory: {
     fromStatus: string | null;
     toStatus: string;
@@ -283,7 +294,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification + Registration + Documentation + Assessment + Follow-up (e2e) — backlog Part C #23-27', () => {
+describe('Claim Notification + Registration + Documentation + Assessment + Follow-up + Settlement (e2e) — backlog Part C #23-28', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -1196,5 +1207,201 @@ describe('Claim Notification + Registration + Documentation + Assessment + Follo
       .post(`/claims/${claim2}/follow-up-alerts/${alertId}/resolve`)
       .set(bearer(clm.accessToken))
       .expect(404);
+  });
+
+  it('#28 — records the four settlement figures, settles small claims straight through, and requires a distinct second approver for large / broker-processed ones', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'clm28-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const clm = await makeUser(app, 'clm28-officer', 'CLAIMS_OFFICER');
+    const mgr = await makeUser(app, 'clm28-mgr', 'BRANCH_DEPARTMENT_MANAGER');
+    // Sales holds claim.notify but NOT claim.settle.approve.
+    const sales = await makeUser(
+      app,
+      'clm28-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'settle',
+      { inceptionDate: '2026-01-01', expiryDate: '2027-01-01' },
+    );
+    const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // drive a claim to a verdict: notify -> register -> docs -> adjuster -> submit -> decision
+    const approvedClaim = async (
+      lossDate: string,
+      estimatedLoss: string,
+      outcome: 'APPROVED' | 'PARTIALLY_APPROVED',
+    ): Promise<string> => {
+      const n = await request(app.getHttpServer())
+        .post('/claims')
+        .set(bearer(clm.accessToken))
+        .send({
+          policyId,
+          lossDate,
+          causeOfLoss: 'Storm damage to the warehouse.',
+          estimatedLoss,
+        })
+        .expect(201);
+      const cid = (n.body as ClaimBody).id;
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/registration`)
+        .set(bearer(clm.accessToken))
+        .send({
+          insurerClaimReference: `INS-${tag}-${cid.slice(0, 6)}`,
+          adjuster: { name: 'Cunningham Lindsey' },
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/documents`)
+        .set(bearer(clm.accessToken))
+        .send({
+          documents: ['claim_form', 'photo', 'repair_estimate'].map(
+            (docType, i) => ({
+              docType,
+              classification: 'CONFIDENTIAL',
+              fileName: `${docType}-${tag}-${i}.pdf`,
+              storageRef: `s3://claims/${tag}/${cid.slice(0, 6)}/${docType}`,
+            }),
+          ),
+        })
+        .expect(201);
+      // adjuster stamps must be >= the loss date and <= now
+      const surveyAt = new Date(
+        new Date(`${lossDate}T00:00:00.000Z`).getTime() + 8 * 86400000,
+      ).toISOString();
+      const investigationAt = new Date(
+        new Date(`${lossDate}T00:00:00.000Z`).getTime() + 12 * 86400000,
+      ).toISOString();
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/assessment/adjuster-progress`)
+        .set(bearer(clm.accessToken))
+        .send({
+          surveyCompletedAt: surveyAt,
+          investigationCompletedAt: investigationAt,
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/assessment/submit`)
+        .set(bearer(clm.accessToken))
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/assessment/decision`)
+        .set(bearer(clm.accessToken))
+        .send({ outcome })
+        .expect(201);
+      return cid;
+    };
+
+    // --- small settlement: straight through to SETTLED ---
+    const small = await approvedClaim('2026-04-02', '18000.000', 'APPROVED');
+
+    // Sales cannot record a settlement
+    await request(app.getHttpServer())
+      .post(`/claims/${small}/settlement`)
+      .set(bearer(sales.accessToken))
+      .send({ approvedAmount: '15000.000', deductible: '2500.000' })
+      .expect(403);
+
+    // approved > estimated -> 422
+    await request(app.getHttpServer())
+      .post(`/claims/${small}/settlement`)
+      .set(bearer(clm.accessToken))
+      .send({ approvedAmount: '20000.001', deductible: '0.000' })
+      .expect(422);
+
+    const settled = await request(app.getHttpServer())
+      .post(`/claims/${small}/settlement`)
+      .set(bearer(clm.accessToken))
+      .send({ approvedAmount: '17500.000', deductible: '2500.000' })
+      .expect(201);
+    const sBody = settled.body as ClaimBody;
+    expect(sBody.status).toBe('SETTLED');
+    expect(sBody.settlement).toMatchObject({
+      estimatedLoss: '18000.000',
+      approvedAmount: '17500.000',
+      deductible: '2500.000',
+      netSettlement: '15000.000', // computed
+      secondApproverRequired: false,
+      settled: true,
+      approvedByUserId: clm.userId,
+      secondApproverUserId: null,
+    });
+    expect(sBody.statusHistory.map((h) => h.toStatus)).toContain('SETTLED');
+
+    // a second settlement post is a 409 (write-once)
+    await request(app.getHttpServer())
+      .post(`/claims/${small}/settlement`)
+      .set(bearer(clm.accessToken))
+      .send({ approvedAmount: '1.000', deductible: '0.000' })
+      .expect(409);
+
+    // every Claim status move went through the engine: REGISTERED,
+    // DOCUMENTATION_IN_PROGRESS, UNDER_ASSESSMENT, APPROVED, SETTLED = 5
+    const transitionRows = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'Claim', entityId: small, action: 'TRANSITION' },
+    });
+    expect(transitionRows).toHaveLength(5);
+
+    // the Settlement audit rows carry the figures but no claim narrative
+    const settlementRow = await prisma.settlement.findUniqueOrThrow({
+      where: { claimId: small },
+    });
+    const settlementAudits = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'Settlement', entityId: settlementRow.id },
+    });
+    expect(JSON.stringify(settlementAudits)).not.toContain('warehouse');
+    expect(JSON.stringify(settlementAudits)).toContain('17500.000');
+
+    // --- large settlement: needs a distinct second approver ---
+    const large = await approvedClaim(
+      '2026-05-02',
+      '40000.000',
+      'PARTIALLY_APPROVED',
+    );
+    const largeRes = await request(app.getHttpServer())
+      .post(`/claims/${large}/settlement`)
+      .set(bearer(clm.accessToken))
+      .send({ approvedAmount: '30000.000', deductible: '5000.000' })
+      .expect(201);
+    const lBody = largeRes.body as ClaimBody;
+    expect(lBody.status).toBe('PARTIALLY_APPROVED'); // NOT settled yet
+    expect(lBody.settlement).toMatchObject({
+      approvedAmount: '30000.000',
+      deductible: '5000.000',
+      netSettlement: '25000.000',
+      secondApproverRequired: true,
+      secondApproverUserId: null,
+      settled: false,
+    });
+
+    // the first approver cannot second-approve their own settlement
+    await request(app.getHttpServer())
+      .post(`/claims/${large}/settlement/second-approve`)
+      .set(bearer(clm.accessToken))
+      .expect(403);
+
+    // a Manager (distinct user) second-approves -> SETTLED
+    const secondApproved = await request(app.getHttpServer())
+      .post(`/claims/${large}/settlement/second-approve`)
+      .set(bearer(mgr.accessToken))
+      .expect(201);
+    const s2 = secondApproved.body as ClaimBody;
+    expect(s2.status).toBe('SETTLED');
+    expect(s2.settlement?.secondApproverUserId).toBe(mgr.userId);
+    expect(s2.settlement?.settled).toBe(true);
+
+    // the DB CHECK / app guard held: maker != checker
+    const largeSettlement = await prisma.settlement.findUniqueOrThrow({
+      where: { claimId: large },
+    });
+    expect(largeSettlement.approvedByUserId).toBe(clm.userId);
+    expect(largeSettlement.secondApproverUserId).toBe(mgr.userId);
+    expect(largeSettlement.approvedByUserId).not.toBe(
+      largeSettlement.secondApproverUserId,
+    );
   });
 });

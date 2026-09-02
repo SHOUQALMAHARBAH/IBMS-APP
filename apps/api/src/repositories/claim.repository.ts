@@ -8,6 +8,7 @@ import type {
   ClaimStatus,
   DataClassification,
   Document,
+  Settlement,
   ThirdPartyClaimant,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
@@ -47,6 +48,8 @@ const CLAIM_INCLUDE = {
   statusHistory: { orderBy: { changedAt: 'asc' } },
   // Process 27 — the insurer non-response follow-up alerts, newest first.
   followUpAlerts: { orderBy: { triggeredAt: 'desc' } },
+  // Process 28 — the one settlement record (four figures + maker/checker), or null.
+  settlement: true,
   policy: {
     select: {
       id: true,
@@ -126,8 +129,8 @@ export interface ClaimDocumentInput {
 export type ClaimDocumentWithFile = ClaimDocument & { document: Document };
 
 /**
- * Process 23-27 — Claim Notification + Registration + Documentation +
- * Assessment + Follow-up (backlog Part C #23-27, Domain C). Owns `Claim` plus its
+ * Process 23-28 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C). Owns `Claim` plus its
  * children: the `ClaimStatusHistory` trail, the one `ThirdPartyClaimant`
  * (#23), the one loss `Adjuster` (#24, its survey / investigation completion
  * stamps written in #26) and the `ClaimDocument` / `Document` file rows (#25).
@@ -463,5 +466,56 @@ export class ClaimRepository {
       data: { resolvedAt },
     });
     return count;
+  }
+
+  // --- Process 28: claim settlement ------------------------------------
+
+  /**
+   * Create the one `Settlement` for a claim (`claimId @unique` -> `P2002` on a
+   * duplicate, the caller maps it to 409). `approvedByUserId` is the officer
+   * who recorded the four figures = the first approver; `netSettlement` is
+   * `approvedAmount - deductible`, computed by the caller (never hand-entered).
+   */
+  createSettlement(input: {
+    claimId: string;
+    estimatedLoss: Prisma.Decimal;
+    approvedAmount: Prisma.Decimal;
+    deductible: Prisma.Decimal;
+    netSettlement: Prisma.Decimal;
+    brokerProcessedPayment: boolean;
+    approvedByUserId: string;
+  }): Promise<Settlement> {
+    return this.prisma.client.settlement.create({
+      data: {
+        claimId: input.claimId,
+        estimatedLoss: input.estimatedLoss,
+        approvedAmount: input.approvedAmount,
+        deductible: input.deductible,
+        netSettlement: input.netSettlement,
+        brokerProcessedPayment: input.brokerProcessedPayment,
+        approvedByUserId: input.approvedByUserId,
+      },
+    });
+  }
+
+  /**
+   * Stamp `Settlement.secondApproverUserId`, conditional on it not already
+   * being set (`0 rows` => a concurrent second-approval won — the caller maps
+   * that to 409). The `Settlement_maker_checker_distinct` CHECK (migration
+   * `20260826091424`) is the DB backstop for the `assertDifferentActors` guard
+   * the caller runs first.
+   */
+  async recordSettlementSecondApproval(
+    settlementId: string,
+    secondApproverUserId: string,
+  ): Promise<Settlement | null> {
+    const { count } = await this.prisma.client.settlement.updateMany({
+      where: { id: settlementId, secondApproverUserId: null },
+      data: { secondApproverUserId },
+    });
+    if (count === 0) return null;
+    return this.prisma.client.settlement.findUniqueOrThrow({
+      where: { id: settlementId },
+    });
   }
 }

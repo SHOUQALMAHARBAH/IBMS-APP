@@ -1,15 +1,21 @@
 import { Prisma } from '@ibms/db';
 import type { ClaimStatus } from '@ibms/db';
-import { formatMoney, quantizeMoney } from '../../common/money.util';
+import {
+  compareMoney,
+  formatMoney,
+  quantizeMoney,
+  subtractMoney,
+} from '../../common/money.util';
 import { isFollowUpDue } from '../../common/follow-up.util';
 
 /**
- * Process 23-27 — Claim Notification / Registration / Documentation /
- * Assessment / Follow-up (backlog Part C #23-27, Domain C). The pure,
- * deterministic core: resolving the coverage that was in force at the loss
- * date, the drafted large-claim threshold, the mandatory-document checklist
- * per claim type, the assessment-readiness derivation, the per-line follow-up
- * threshold + due predicate, and the audit `afterValue` snapshots.
+ * Process 23-28 — Claim Notification / Registration / Documentation /
+ * Assessment / Follow-up / Settlement (backlog Part C #23-28, Domain C). The
+ * pure, deterministic core: resolving the coverage that was in force at the
+ * loss date, the drafted large-claim threshold, the mandatory-document
+ * checklist per claim type, the assessment-readiness derivation, the per-line
+ * follow-up threshold + due predicate, the settlement net-figure + second-
+ * approver-required derivation, and the audit `afterValue` snapshots.
  *
  * `ibms-brain/meta/context/claims-lifecycle.md` § "The rules that aren't
  * obvious":
@@ -683,5 +689,147 @@ export function claimFollowUpAlertAuditSnapshot(row: {
             : null,
         }
       : {}),
+  };
+}
+
+// --- Process 28: claim settlement --------------------------------------
+
+/**
+ * The claim statuses from which a settlement can be recorded — the two
+ * `WORKFLOW_TRANSITIONS.Claim` predecessors of `SETTLED`. A `DECLINED` claim
+ * has no payout (it goes straight to `CLOSED` at Process 29).
+ */
+export const CLAIM_SETTLEABLE_STATUSES: readonly ClaimStatus[] = [
+  'APPROVED',
+  'PARTIALLY_APPROVED',
+];
+
+/** True while a settlement can still be recorded / applied — mirrors
+ * {@link isAssessmentConcluded}, so call sites do not repeat the
+ * `as readonly string[]` cast. */
+export function isSettleableStatus(status: string): boolean {
+  return (CLAIM_SETTLEABLE_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Net settlement = approved amount − deductible, quantized to fils. **Always
+ * computed, never hand-entered** — the "four distinct figures ... collapsing
+ * these into one number loses the audit trail" rule
+ * (`claims-lifecycle.md`) cuts both ways: the figures are distinct AND
+ * derived consistently. Pure.
+ */
+export function computeNetSettlement(
+  approvedAmount: Prisma.Decimal | string,
+  deductible: Prisma.Decimal | string,
+): Prisma.Decimal {
+  return subtractMoney(approvedAmount, deductible);
+}
+
+/**
+ * Is a mandatory SECOND approver required for this settlement? Re-derived
+ * from LIVE data at the decision point (`claims-lifecycle.md` — never trust
+ * `Claim.isLargeClaim`, the notification-time snapshot): the settlement is
+ * "large" iff the **approved amount** is at / above
+ * {@link CLAIM_LARGE_THRESHOLD_JOD} (the same drafted, unsourced threshold
+ * `isLargeClaim` uses, now applied to the approved figure), **or** the broker
+ * is processing the payment (Part 3.7 — "any claim payment the broker
+ * processes"). Pure.
+ */
+export function isSecondApproverRequired(input: {
+  approvedAmount: Prisma.Decimal | string;
+  brokerProcessedPayment: boolean;
+}): boolean {
+  return (
+    input.brokerProcessedPayment === true ||
+    compareMoney(
+      quantizeMoney(input.approvedAmount),
+      CLAIM_LARGE_THRESHOLD_JOD,
+    ) >= 0
+  );
+}
+
+export interface SettlementView {
+  estimatedLoss: string;
+  approvedAmount: string | null;
+  deductible: string | null;
+  netSettlement: string | null;
+  brokerProcessedPayment: boolean;
+  approvedByUserId: string | null;
+  secondApproverUserId: string | null;
+  /** Re-derived from `approvedAmount` + `brokerProcessedPayment` (NOT
+   * `Claim.isLargeClaim`). */
+  secondApproverRequired: boolean;
+  /** The four figures are recorded, the (any) required second approval is in,
+   * and the `Claim` has reached `SETTLED`. */
+  settled: boolean;
+  createdAt: Date;
+}
+
+/** Derive the Process 28 settlement sub-view from the `Settlement` row (or
+ * null) and the claim status. Pure. */
+export function deriveSettlementView(input: {
+  status: string;
+  settlement: {
+    estimatedLoss: Prisma.Decimal;
+    approvedAmount: Prisma.Decimal | null;
+    deductible: Prisma.Decimal | null;
+    netSettlement: Prisma.Decimal | null;
+    brokerProcessedPayment: boolean;
+    approvedByUserId: string | null;
+    secondApproverUserId: string | null;
+    createdAt: Date;
+  } | null;
+}): SettlementView | null {
+  const s = input.settlement;
+  if (!s) return null;
+  return {
+    estimatedLoss: formatMoney(s.estimatedLoss),
+    approvedAmount: s.approvedAmount ? formatMoney(s.approvedAmount) : null,
+    deductible: s.deductible ? formatMoney(s.deductible) : null,
+    netSettlement: s.netSettlement ? formatMoney(s.netSettlement) : null,
+    brokerProcessedPayment: s.brokerProcessedPayment,
+    approvedByUserId: s.approvedByUserId,
+    secondApproverUserId: s.secondApproverUserId,
+    secondApproverRequired: s.approvedAmount
+      ? isSecondApproverRequired({
+          approvedAmount: s.approvedAmount,
+          brokerProcessedPayment: s.brokerProcessedPayment,
+        })
+      : false,
+    settled: input.status === 'SETTLED' || input.status === 'CLOSED',
+    createdAt: s.createdAt,
+  };
+}
+
+/**
+ * CREATE / APPROVE audit `afterValue` for a `Settlement`. Financial
+ * accountability data — the four figures ARE the point (an insurer dispute
+ * reads this row), recorded as fixed 3dp strings; ids + the flags; never any
+ * claim narrative (`sensitive-data-handling.md` — same treatment as the #22
+ * endorsement money snapshots).
+ */
+export function settlementAuditSnapshot(row: {
+  settlementId: string;
+  claimId: string;
+  estimatedLoss: Prisma.Decimal;
+  approvedAmount: Prisma.Decimal | null;
+  deductible: Prisma.Decimal | null;
+  netSettlement: Prisma.Decimal | null;
+  brokerProcessedPayment: boolean;
+  approvedByUserId: string | null;
+  secondApproverUserId: string | null;
+  secondApproverRequired: boolean;
+}): Prisma.InputJsonObject {
+  return {
+    settlementId: row.settlementId,
+    claimId: row.claimId,
+    estimatedLoss: formatMoney(row.estimatedLoss),
+    approvedAmount: row.approvedAmount ? formatMoney(row.approvedAmount) : null,
+    deductible: row.deductible ? formatMoney(row.deductible) : null,
+    netSettlement: row.netSettlement ? formatMoney(row.netSettlement) : null,
+    brokerProcessedPayment: row.brokerProcessedPayment,
+    approvedByUserId: row.approvedByUserId,
+    secondApproverUserId: row.secondApproverUserId,
+    secondApproverRequired: row.secondApproverRequired,
   };
 }
