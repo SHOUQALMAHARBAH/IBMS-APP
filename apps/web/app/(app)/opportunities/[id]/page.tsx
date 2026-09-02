@@ -21,6 +21,7 @@ import { ClientDecisionSection } from '../../../../components/client-decision/Cl
 import { PolicySection } from '../../../../components/policy/PolicySection';
 import { EndorsementSection } from '../../../../components/policy/EndorsementSection';
 import { ClaimSection } from '../../../../components/policy/ClaimSection';
+import { FinanceSection } from '../../../../components/policy/FinanceSection';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
@@ -225,6 +226,11 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canManage={isPlacement}
             canApproveRefund={isManager}
+          />
+
+          <FinanceSection
+            opportunityId={opportunity.id}
+            canInvoice={isFinance}
           />
 
           <ClaimSection

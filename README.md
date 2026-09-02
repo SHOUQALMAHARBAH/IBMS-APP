@@ -456,7 +456,13 @@ build actually is today:
   validated against the coverage schedule **in force on the exact loss date** (resolved
   against every `PolicySchedule` version window, i.e. the endorsement history, not the
   current schedule), and every read of the Highly Confidential claim is audit-logged.
-  Detail below.
+  Claims are built through Analytics (#30). **Domain D (Finance) has begun with Premium
+  Billing (#31)** — `POST /invoices` raises the one new-business premium `Invoice` per
+  policy: premium carried from `Policy.issuedPremium`, commission auto-derived from the
+  placed quotation's rate, tax + fees supplied by Finance, `totalAmount` always
+  `premium + tax + fees − commission` computed server-side; a partial `UNIQUE` keeps it
+  to one per policy, and the `Invoice` is created at `INVOICED` (the collection cycle is
+  #32). Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -503,6 +509,12 @@ build actually is today:
 | 29 | Claim Closure | extends the `claim` module + a small new `loss-ratio` module — **no migration, no seed change** (the `claim.close` perm `[CLAIMS_OFFICER]`, `ClaimStatus.CLOSED`, the `WORKFLOW_TRANSITIONS.Claim` `SETTLED → CLOSED` / `DECLINED → CLOSED` edges, `Settlement.clientPaymentConfirmedAt`, and the `RenewalCase` / `LossRatio` models all already existed) · `POST /claims/:id/closure` (`{ clientPaymentConfirmedAt? }`, `claim.close`/**Claims Officer**) — **no maker/checker** (closure is single-actor Claims work; the mandatory second approver is at settlement, #28) · a `SETTLED` claim closes only once the client's receipt of the settlement payment is confirmed: `clientPaymentConfirmedAt` is supplied in the body, **write-once** on the `Settlement` (a status-conditional `updateMany`), past-only (`parseHistoricalInstant`) and **no earlier than the loss date** (a tighter "after the `Settlement` was recorded" bound is deliberately not enforced — data-entry lag is normal, the #21 `deliveredAt` latitude); closing without it is a **422**, a *different* instant once one is recorded is a **409**, a byte-identical re-close resumes a stuck close · a `DECLINED` claim closes **directly** — no payout, so a `clientPaymentConfirmedAt` on a declined claim is a **422** · any other status → 422; an already-`CLOSED` claim is a **200 no-op** that does **not** re-fire the recompute · `closeCore` drives `Claim (SETTLED \| DECLINED) → CLOSED` through `WorkflowTransitionService.transition` (+ a best-effort domain `ClaimStatusHistory` row, the #24–28 seam; a concurrent close normalises to an idempotent no-op) and **only the call that actually transitions the claim** best-effort triggers the Loss Ratio recompute (logged, never thrown — closure has committed; the recompute is a downstream input, not a gate) · the e2e asserts exactly **6** `TRANSITION` audit rows across the #23→#29 chain · **new `LossRatioModule`** (`LossRatioService` + `LossRatioRepository`) — `recomputeForPolicy(policyId)` upserts the `LossRatio` for the policy's open `RenewalCase` (`LossRatio.renewalCaseId @unique`); **since the renewal module (Part 3.9) is not built, no policy has a `RenewalCase`, so it is a logged no-op** — a standalone per-claim loss ratio is deliberately NOT created, and the closed claim's `CLOSED` `ClaimStatusHistory` row is the durable trigger record · `computeLossRatio` (pure) — `periodClaims` = Σ `Settlement.netSettlement` over the policy's `SETTLED` / `CLOSED` claims (a `DECLINED` claim contributes 0), `periodPremium` = `Policy.issuedPremium ?? requestedPremium`, `ratio` = `periodClaims ÷ periodPremium` at 4 dp (`ROUND_HALF_UP`; a zero premium → a zero ratio, never a divide-by-zero); **the "period" is drafted / unsourced** — computed all-time for the policy, the renewal module will narrow it to the policy year (same status as `CLAIM_LARGE_THRESHOLD_JOD` etc.) · audit: the engine `TRANSITION` row + an `UPDATE Settlement` row when `clientPaymentConfirmedAt` is stamped (ids + the ISO timestamp, no narrative) + an `UPDATE LossRatio` row per real recompute (ids + the three figures as fixed strings + the trigger); every closure also emits the `READ` sensitive-data-access row `get` / `list` emit · `ClaimView` gains `closedAt` (the `CLOSED` `ClaimStatusHistory.changedAt`, or null) and `settlement.clientPaymentConfirmedAt` · **`/brain-gap` filed** (ibms-brain `194888c`): `claims-lifecycle.md` — a new Claim Closure bullet + the Loss Ratio bullet extended · web: the "Claims" block gains a per-claim "Closure" sub-block — a "Client received the settlement payment on" date input + "Confirm payment & close claim" (SETTLED), a "Close claim" button (DECLINED), and a read-only "Closed …" line (CLOSED); `page.tsx` wires `canClose={isClaims}` | `computeLossRatio`'s "period" (all-time per policy) is **drafted / unsourced** (filed, above) — the renewal module owns the policy-year window · in normal running the recompute takes the logged no-op branch (no policy has a `RenewalCase` until the renewal module lands); the `#29`/`#30` e2e creates a `RenewalCase` so the write path (`loadPolicyForRecompute` + `computeLossRatio` + `upsertLossRatio` + audit) is exercised against a real DB · `Settlement.clientPaymentConfirmedAt` is write-once with no correction path · **no payment execution / disbursement** (`Settlement` records the decision; the money movement, `ThirdPartyClaimant.recoveryAmount` / subrogation are Finance / a later process) · a `CLOSED` claim is terminal — there is no reopen edge in `WORKFLOW_TRANSITIONS.Claim` · `claim.close` is role-level (no per-officer queue); no SLA timer on a SETTLED-but-unclosed claim |
 | 30 | Claims Analytics | extends the `loss-ratio` module — **no migration, no seed change** (the `claims-analytics.view` perm `[CLAIMS_OFFICER, BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR]` was already seeded; `computeLossRatio` from #29 is reused) · **`GET /claims-analytics/loss-ratio?groupBy=customer\|policy\|line`** (`claims-analytics.view`) — the aggregate `Claims ÷ Premium` breakdown that feeds the reporting dashboard and, once built, the renewal workflow · **book-wide** (the perm is a cross-book reporting role, so there is no per-owner visibility filter); optional `customerId` / `policyId` / `insuranceLine` query params just narrow the policy set first · **computed on the fly — there is no stored aggregate table** (the per-`RenewalCase` `LossRatio` row is still #29's) · `LossRatioRepository.loadPoliciesForAnalytics` loads every **written** policy (status past `PLACEMENT_CONFIRMED` — `ISSUED` … `EXPIRED`) with its customer name and its `SETTLED` / `CLOSED` claim net settlements; the pure **`buildLossRatioBreakdown`** groups them and runs `computeLossRatio` per group **over the group's pooled net settlements + pooled written premium** (a **paid, all-time** loss ratio — not a sum or average of per-policy ratios), plus a `totals` row that pools every in-scope policy regardless of `groupBy` · each row carries `key` / `label` / `periodClaims` / `periodPremium` / `ratio` / `ratioCapped` / `claimCount` / `policyCount`; rows are ordered **worst-first** (highest ratio) · a `DECLINED` claim contributes 0; an open (pre-settlement) claim is not counted (a *paid* ratio — an *incurred* one adding open-claim `estimatedLoss` reserves is deferred); a `CANCELLED` / `EXPIRED` policy still contributes its **full written premium** (earned-premium proration is a renewal-module refinement) · `ClaimsAnalyticsService` emits a `READ` audit row (`entityType: 'ClaimsAnalytics'`, `entityId` = the scoping id or `book-wide`, counts / filters only — **never a figure or a customer name** — `isSensitiveDataAccess` when a claim contributed; best-effort, mirrors `CrmService.get360View`) · `ClaimsAnalyticsController` is a new `@Controller('claims-analytics')` in `LossRatioModule` (no `AuthModule` import — the global `PermissionsGuard` / `@CurrentUser` cover it, same as `CrmModule`) · **`/brain-gap` filed** (ibms-brain `d1a0a1a`): `claims-lifecycle.md` — the Loss Ratio bullet gains a Process 30 sub-point · web: a new **"Claims analytics"** screen (`app/(app)/claims-analytics/page.tsx` + `lib/claims-analytics/analytics-api.ts` + an `AppNav` entry) — a group-by selector and a worst-first table of loss-ratio rows + a totals row, with a friendly `claims-analytics.view`-missing message | the "period" is **all-time**, and "written premium" counts a cancelled / expired policy's full premium — both **drafted** (filed, above); the renewal module owns the policy-year window + earned-premium proration · **no incurred loss ratio** (open-claim reserves) — paid only · no date-range / as-of filter (all-time only); no CSV / export; no per-line-family rollup (the raw `Policy.insuranceLine` string is the `line` key — a `Business Interruption` policy and a `Property All Risks` policy are separate lines even though #25's classifier would fold both into `property`) · in-memory aggregation (`findMany` + JS grouping — first `groupBy`-style query in the repo), fine at a broker's book size, unbounded · `claims-analytics.view` is role-level |
 
+### Part C · Domain D #31 — built, with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 31 | Premium Billing | **new module** `apps/api/src/modules/finance/` (+ `repositories/invoice.repository.ts`) — **migration `20260902210000`** adds `Invoice.invoiceType TEXT NOT NULL DEFAULT 'new_business_premium'` + a partial `UNIQUE ("policyId") WHERE "invoiceType" = 'new_business_premium'` + `@@index([policyId])`. The `Invoice` model, its five `Decimal` money columns (already in `MONEY_DECIMAL_FIELDS`), the `InvoiceStatus` enum, the `WORKFLOW_TRANSITIONS.Invoice` map and the `invoice.create` (`[FINANCE_COLLECTIONS_OFFICER]`) / `client-accounting.read` (`[FINANCE, MANAGER, EXEC, AUDITOR]`) perms all already existed · **no seed change** · `POST /invoices` (`{ policyId, taxAmount, feesAmount?, dueDate }`, `invoice.create`/**Finance**) raises the one **new-business premium `Invoice`** per policy · **`premiumAmount` is carried from `Policy.issuedPremium`** (a policy with no issued premium → **422**) · **`commissionDeducted` is auto-derived** — `premiumAmount × Recommendation.recommendedQuotation.commissionRatePercent` for the policy's Opportunity (the rate the policy was *placed* at — the same lookup #22's `commissionRateFor` uses); a quotation that captured **no** rate → **422** (Process 35's `CommissionAgreement` will replace this lookup) · `taxAmount` + `feesAmount` are the **only** money inputs (each `0 ≤ x ≤ premiumAmount`; `feesAmount` defaults to `0`) — there is no governed premium-tax-rate table yet, Finance supplies the applicable tax · **`totalAmount` is ALWAYS `premiumAmount + taxAmount + feesAmount − commissionDeducted`, computed server-side** (`addMoney` then `subtractMoney`); the DTO rejects a `totalAmount` field (the #28 `netSettlement` lesson) · `dueDate` is a required `YYYY-MM-DD`, today .. +365d (`INVOICE_MAX_DUE_DAYS_AHEAD`, drafted) · **one new-business premium invoice per policy** — the partial `UNIQUE` is the race backstop; write-once #24/#28-style: a byte-identical re-`POST` (all five figures + `dueDate` compared) returns the existing invoice, any different figure is a **409**, a concurrent create hits `P2002` → 409 · **`Invoice` IS a `WorkflowTransitionService` entity** but #31 only creates it at the schema `@default(INVOICED)` — no engine transition (same precedent as #23 creating a `Claim` at `@default(NOTIFIED)`); the `INVOICED → COLLECTED` cycle is Process 32 · **no maker/checker** (raising a bill is single-actor Finance work — `maker-checker-segregation.md` § "what does NOT trigger this rule"; the second actor is at refund approval / commission override) · reads are **book-wide** (`client-accounting.read` is a cross-book reporting perm — no per-owner filter, same as `claims-analytics.view`); `GET /invoices` with no `policyId`/`customerId` scope is a **400** (a book-wide dump is Process 33's ageing report), `GET /invoices/:id` returns one · audit: one `CREATE Invoice` row (ids + all five figures as fixed 3dp strings + the commission rate applied + the due date, no free text); reads are **not** audited (an invoice total is Confidential, not Highly Confidential — same tier as `Policy` premium) · **`/brain-gap` filed** (ibms-brain `f8843ed`): **new `meta/context/finance-lifecycle.md`** (Domain D seed) documents Process 31 · web: a "Billing" block in the "Policy" section on the Opportunity detail screen — a read-only premium/tax/fees/less-commission/total/due-date/status card once an invoice exists, a tax + fees + due-date form for Finance otherwise (`canInvoice={isFinance}`) | `commissionDeducted` derives from the *placed quotation's* `commissionRatePercent`, not a governed rate table — Process 35 (`CommissionAgreement`, by insurer + line) will replace the lookup, and a policy whose quotation captured no rate cannot be billed today (422) · **there is no premium-tax-rate table** — `taxAmount` is a raw Finance input (no computed default, no exemption model); a real Jordan insurance-premium-levy figure belongs to a Finance-config surface that does not exist · `INVOICE_MAX_DUE_DAYS_AHEAD` (365) is a **drafted** sanity bound, not a CBJ / Part-3.6 credit-term rule · the five figures are **write-once** — no amend / credit-note path (a correction needs a future endpoint) · `PremiumTransaction` (the schema's generic premium-ledger model) is **not** written — #31 fills `Invoice.premiumAmount` directly; wiring the ledger is deferred to #32/#35/#36 · only the `new_business_premium` invoice is modelled — `endorsement_adjustment` / `renewal_premium` invoices (the other `invoiceType` values, raised from #22 / the renewal module) are not · no `Invoice → COLLECTED` / Receipt / Remittance (Process 32); `invoice.create` / `client-accounting.read` are role-level (no per-officer queue); no PDPL-registry SLA attaches at `INVOICED` (a payment-due follow-up is a #32/#33 concern) |
+
 ### Not started
 
 - **Domains C–H** — Claims **#23–30 are built** (Notification, Registration, Documentation,
@@ -511,7 +523,9 @@ build actually is today:
   renewal module exists, and the #30 aggregate breakdown is all-time / paid-only). **#30
   is the last built Claims process** — Domain C's remaining edges (a real earned-premium
   loss ratio, incurred reserves, the full Claims dashboard #58–65) wait on the renewal /
-  reporting modules. Finance (billing / collection / commission / reconciliation, #31–40),
+  reporting modules. **Finance (Domain D) has begun — Premium Billing (#31) is built** (see
+  the Domain D table above); collection / accounting / commission / reconciliation
+  (#32–40),
   Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
@@ -3926,6 +3940,96 @@ narrows a gap.
   `prisma validate` OK, `prisma migrate status` clean (**34**); no seed change. `npm
   audit` — the same 1 pre-existing moderate transitive `qs` advisory (no `package.json` /
   lock change here).
+
+**Part C #31 — Premium Billing (Domain D, Process 31)**
+
+- **Opens Domain D (Finance).** `POST /invoices` (`invoice.create` / **Finance**) raises
+  the one **new-business premium `Invoice`** per policy: `premiumAmount` carried from
+  `Policy.issuedPremium` (422 if unissued — including a policy that reached `ISSUED` and
+  was later `CANCELLED` / `EXPIRED`, which is deliberately still billable, the mid-term
+  return being a separate #22 `Refund`); `commissionDeducted = applyPercentage(premium,
+  commissionRatePercent)` where the rate is the placed
+  `Recommendation.recommendedQuotation.commissionRatePercent` (422 if none captured);
+  `taxAmount` + `feesAmount` the only money inputs (each `0 ≤ x ≤ premium`; fees
+  default `0`); **`totalAmount` always `premium + tax + fees − commissionDeducted`,
+  computed server-side** (`addMoney` → `subtractMoney`, the DTO rejects a `totalAmount`
+  field). `dueDate` a required `YYYY-MM-DD`, today .. +365d.
+- **One new-business premium invoice per policy** — a partial `UNIQUE ("policyId") WHERE
+  "invoiceType" = 'new_business_premium'` (migration `20260902210000`, raw SQL —
+  `race-safe-invariants.md`); a pre-check + `P2002` → 409. Write-once #24/#28-style: a
+  byte-identical re-`POST` (five figures + `dueDate`) returns the existing invoice, any
+  different figure → **409**. The resume/409 gate runs **before** the input-bound checks
+  (the #28 `recordSettlement` ordering — a MINOR fix, below), so an idempotent retry
+  after the original due date has elapsed still resumes rather than 422-ing.
+- **`Invoice` IS a `WorkflowTransitionService` entity** but #31 only creates it at the
+  schema `@default(INVOICED)` — no engine transition (the `INVOICED → COLLECTED` cycle
+  is Process 32; precedent #23 creating a `Claim` at `@default(NOTIFIED)`).
+- **No maker/checker** (`roles-and-segregation-of-duties.md` lists "raise invoices" as a
+  Finance single-actor duty; the Finance maker/checker pair is refunds / write-offs).
+  Book-wide reads (`client-accounting.read` — Finance, Manager, Exec, Auditor; `GET
+  /invoices` with no `policyId` / `customerId` scope → 400, `GET /invoices/:id` → one).
+- Audit: one best-effort `CREATE Invoice` row (ids + all five figures as fixed 3dp
+  strings + the commission rate + due date, **no free text**); reads are **not** audited
+  (an invoice total is Confidential, not Highly Confidential — same tier as the `Policy`
+  premium read, which #18–21 also do not audit).
+- **`/brain-gap` filed** (`ibms-brain` `f8843ed`): **new `meta/context/finance-lifecycle.md`**
+  (Domain D seed) documents Process 31; `policy-lifecycle.md` § Out of scope now points
+  there. Submodule pin bumped in this commit.
+- **`@code-reviewer` (mandatory — financial calculation + a migration + Confidential
+  financial data) → APPROVE WITH MINORS**, no blocker, no MAJOR, **all six mandatory
+  lex checks pass** (`money-decimal-jod` — every figure through `money.util.ts`,
+  `Prisma.Decimal` end to end; `workflow-state-transitions` — born at `@default`, never
+  assigned; `race-safe-invariants` — "a textbook application"; `maker-checker-segregation`
+  — correctly not applied; `sensitive-data-handling` — snapshot is ids + fixed strings;
+  `pdpl-sla-timers` — nothing to escalate at `INVOICED`). 3 MINORs fixed: (1)
+  `computeInvoiceFigures`'s comment claimed the caller guaranteed a non-negative total
+  but nothing bounded the commission rate at billing time — added a `0 ≤ rate ≤
+  MAX_COMMISSION_RATE_PERCENT` billing-time backstop + a `totalAmount ≥ 0` assert on the
+  new-invoice path, and corrected the comment; (2) the write-once resume/409 check now
+  runs **before** `parseDueDate` + the tax/fees bounds (split into `parseDueDateInstant`
+  + `assertDueDateInWindow`) so a genuine idempotent retry is validation-independent;
+  (3) the stale-commission-rate risk (no `Policy → Quotation` link — a post-recommendation
+  #15 negotiation round could leave the invoice netting the recommended-quote's rate) is
+  now called out in a code comment + here, tracked until Process 35's `CommissionAgreement`
+  replaces the lookup. NITs: `commissionRatePercent.toFixed(2)` replaces
+  `quantizeMoney(...).toFixed(2)` in the audit snapshot (money quantizer over a rate);
+  the `issuedPremium != null` gate has a comment noting `CANCELLED` / `EXPIRED` is
+  intentionally billable; `GET /invoices/:id` keeps a bare `@Param('id')` (matches the
+  claim / policy / endorsement controllers — a non-UUID id falls through to a clean 404).
+  +2 unit tests for the MINOR fixes.
+- **Deferred**: `commissionDeducted` derives from the *placed quotation's* rate, not a
+  governed table — Process 35 (`CommissionAgreement`, by insurer + line) replaces it, and
+  a policy whose quotation captured no rate cannot be billed today (422) · **no
+  premium-tax-rate table** — `taxAmount` is a raw Finance input (no computed default, no
+  exemption model); a real Jordan insurance-premium-levy figure belongs to a Finance
+  config surface that does not exist · `INVOICE_MAX_DUE_DAYS_AHEAD` (365) is a **drafted**
+  sanity bound · the five figures are **write-once** — no amend / credit-note path ·
+  `PremiumTransaction` (the generic premium-ledger model) is **not** written — #31 fills
+  `Invoice.premiumAmount` directly; the ledger is #32/#35/#36 · only the
+  `new_business_premium` `invoiceType` is modelled (`endorsement_adjustment` /
+  `renewal_premium` invoices are not) · no `Invoice → COLLECTED` / Receipt / Remittance
+  (Process 32); `invoice.create` / `client-accounting.read` are role-level; no
+  PDPL-registry SLA at `INVOICED`.
+- **Verification**: +26 api unit — new `finance.config.spec.ts` (10 —
+  `computeInvoiceFigures` with hand-computed literals `125.000` / `375.075` / `41.667` /
+  `291.668`, `invoiceFiguresMatch` scale-insensitivity, `deriveInvoiceView`,
+  `invoiceAuditSnapshot` shape) + new `invoice.service.spec.ts` (16 — the happy path +
+  audited CREATE, 404 / 422 (no issued premium, no commission rate, tax > premium, fees >
+  premium, due date past, due date > 365d, **rate outside 0..100**), write-once resume /
+  409, **resume after the stored due date has elapsed**, `P2002` → 409, best-effort
+  audit swallow, `list` scope-required 400 + list-by-policyId). New `test/invoice.e2e-spec.ts`
+  (2 — raise (premium carried, commission `14400.000` netted from 12 %, total
+  `115350.000`), non-Finance 403 on POST + GET, past / +400d due date 422, `GET
+  /invoices?policyId=`, `GET /invoices/:id`, exactly one `CREATE Invoice` audit row,
+  unscoped `GET /invoices` 400; write-once resume + changed-figure / changed-date 409,
+  still one invoice on the policy). Full suites green: **api unit 1135** (79 files),
+  **invoice.e2e-spec.ts 2/2** in isolation, **full api e2e 125/125** (a clean run); full
+  turbo `build` + `typecheck` OK, api / web `eslint` OK, Playwright **rfq.spec.ts 26/26**
+  (the 24 prior + 2 new Finance tests — raise from the "Billing" block with commission
+  netted + total computed, a non-Finance user sees no raise control). `prisma validate`
+  OK, `prisma migrate status` clean (**35** — migration `20260902210000`); no seed
+  change. `npm audit` — the same 1 pre-existing moderate transitive `qs` advisory (no
+  `package.json` / lock change here).
 
 ## Deployment
 

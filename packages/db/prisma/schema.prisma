@@ -1643,12 +1643,29 @@ model PremiumTransaction {
 }
 
 /// Process 31 — premium + tax + fees, net of commission, with due dates.
+/// `totalAmount` is ALWAYS `premiumAmount + taxAmount + feesAmount -
+/// commissionDeducted`, computed server-side (never an input) — see
+/// finance.config.ts `computeInvoiceFigures` and
+/// ibms-brain/meta/context/finance-lifecycle.md.
+///
+/// "At most one new-business premium invoice per policy" is a real DB
+/// invariant — the partial UNIQUE index
+/// `Invoice_one_new_business_premium_per_policy ON ("policyId") WHERE
+/// "invoiceType" = 'new_business_premium'` (migration
+/// 20260902210000_add_premium_billing_invoice,
+/// ibms-brain/meta/lex/race-safe-invariants.md) — so a double-submit cannot
+/// bill the client's premium twice. Prisma can't express a partial UNIQUE
+/// with a predicate, so it lives in raw SQL in that migration. Endorsement /
+/// renewal premium invoices carry a different `invoiceType` and are
+/// unconstrained.
 model Invoice {
   id           String   @id @default(uuid())
   policyId     String?
   policy       Policy?  @relation(fields: [policyId], references: [id])
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
+  /// new_business_premium (Process 31) | endorsement_adjustment | renewal_premium
+  invoiceType  String   @default("new_business_premium")
   premiumAmount Decimal @db.Decimal(18, 3)
   taxAmount    Decimal  @db.Decimal(18, 3) @default(0)
   feesAmount   Decimal  @db.Decimal(18, 3) @default(0)
@@ -1664,6 +1681,7 @@ model Invoice {
 
   @@index([customerId])
   @@index([status])
+  @@index([policyId])
 }
 
 /// Process 32 — Invoice -> Collection -> Receipt -> Reconciliation ->

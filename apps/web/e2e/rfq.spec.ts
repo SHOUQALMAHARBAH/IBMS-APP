@@ -180,6 +180,7 @@ async function mockRfqApi(
     onClaimFollowUp?: (body: Record<string, unknown>) => void;
     onClaimSettlement?: (body: Record<string, unknown>) => void;
     onClaimClosure?: (body: Record<string, unknown>) => void;
+    onCreateInvoice?: (body: Record<string, unknown>) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -783,6 +784,52 @@ async function mockRfqApi(
       return route.fulfill({ status: 201, json: policy });
     }
     return route.fulfill({ status: 200, json: policy ? [policy] : [] });
+  });
+
+  // Process 31 — the premium invoice against the policy. Starts empty; a POST
+  // /invoices composes it (premium carried from the policy, commission netted
+  // at 12%, total = premium + tax + fees - commission) and appends the one row.
+  const invoiceRows: Record<string, unknown>[] = [];
+  await page.route("http://localhost:4000/invoices**", (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+    if (method === "POST" && /\/invoices(\?|$)/.test(url.split("?")[0])) {
+      const b = route.request().postDataJSON() as {
+        policyId: string;
+        taxAmount: string;
+        feesAmount?: string;
+        dueDate: string;
+      };
+      opts.onCreateInvoice?.(b);
+      if (invoiceRows.length > 0) {
+        return route.fulfill({
+          status: 409,
+          json: { message: "A premium invoice already exists for this policy." },
+        });
+      }
+      const premium = 120000;
+      const commission = premium * 0.12;
+      const tax = Number(b.taxAmount) || 0;
+      const fees = Number(b.feesAmount) || 0;
+      const row = {
+        id: "inv-1",
+        policyId: b.policyId,
+        customerId: "cust-1",
+        invoiceType: "new_business_premium",
+        premiumAmount: premium.toFixed(3),
+        taxAmount: tax.toFixed(3),
+        feesAmount: fees.toFixed(3),
+        commissionDeducted: commission.toFixed(3),
+        totalAmount: (premium + tax + fees - commission).toFixed(3),
+        currency: "JOD",
+        dueDate: `${b.dueDate}T00:00:00.000Z`,
+        status: "INVOICED",
+        createdAt: "2026-09-16T00:00:00.000Z",
+      };
+      invoiceRows.push(row);
+      return route.fulfill({ status: 201, json: row });
+    }
+    return route.fulfill({ status: 200, json: invoiceRows });
   });
 
   // Process 23-24 — claims against the policy. Starts empty; a POST /claims
@@ -1743,6 +1790,59 @@ test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Advance to insurer" }),
   ).toBeVisible();
+});
+
+test("raises a premium invoice from the Billing block — commission netted, total computed", async ({
+  page,
+}) => {
+  await mockAuth(page, ["FINANCE_COLLECTIONS_OFFICER"]);
+  let created: {
+    policyId: string;
+    taxAmount: string;
+    feesAmount?: string;
+    dueDate: string;
+  } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onCreateInvoice: (b) => {
+      created = b as typeof created;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Billing", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("No premium invoice yet")).toBeVisible();
+
+  await page.getByLabel("Tax amount").fill("9600.000");
+  await page.getByLabel("Fees amount").fill("150.000");
+  await page.getByLabel("Due date").fill("2026-12-01");
+  await page.getByRole("button", { name: "Raise premium invoice" }).click();
+
+  await expect.poll(() => created?.taxAmount).toBe("9600.000");
+  await expect(page.getByText("−JOD 14,400.000")).toBeVisible();
+  await expect(page.getByText("JOD 115,350.000")).toBeVisible();
+  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+});
+
+test("a non-Finance user sees no raise-invoice control on the Billing block", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Billing", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Raise premium invoice" }),
+  ).toHaveCount(0);
 });
 
 test("notifies a claim against an issued policy", async ({ page }) => {

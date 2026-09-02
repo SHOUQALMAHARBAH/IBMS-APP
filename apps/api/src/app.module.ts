@@ -30,6 +30,7 @@ import { PolicyModule } from './modules/policy/policy.module';
 import { EndorsementModule } from './modules/endorsement/endorsement.module';
 import { LossRatioModule } from './modules/loss-ratio/loss-ratio.module';
 import { ClaimModule } from './modules/claim/claim.module';
+import { FinanceModule } from './modules/finance/finance.module';
 
 @Module({
   imports: [
@@ -197,6 +198,16 @@ import { ClaimModule } from './modules/claim/claim.module';
     // by ClaimModule; listed here for the module registry.
     LossRatioModule,
     ClaimModule,
+    // Part C backlog #31 (Premium Billing) — opens Domain D (Finance). Raises
+    // the new-business premium Invoice against an issued policy: premium
+    // carried from Policy.issuedPremium, commission auto-derived from the
+    // placed quotation's rate, tax + fees supplied by Finance, totalAmount =
+    // premium + tax + fees - commissionDeducted computed server-side. One
+    // new-business premium invoice per policy (partial UNIQUE). Invoice IS a
+    // workflow entity but #31 only creates it at @default(INVOICED) — the
+    // INVOICED -> COLLECTED cycle is Process 32. Depends on PolicyModule (the
+    // policy) / RecommendationModule (the placed commission rate).
+    FinanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

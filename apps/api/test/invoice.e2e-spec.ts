@@ -1,0 +1,402 @@
+import { afterAll, describe, expect, it } from 'vitest';
+import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import type { App } from 'supertest/types';
+import { authenticator } from 'otplib';
+import { prisma, type RoleName } from '@ibms/db';
+import { createTestApp } from './utils/test-app';
+
+const PASSWORD = 'Correct-Horse-Battery-Staple-9';
+
+function uniqueEmail(label: string): string {
+  return `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@ibms.test`;
+}
+function bearer(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
+function secretFromOtpAuthUri(uri: string): string {
+  const match = /[?&]secret=([^&]+)/.exec(uri);
+  if (!match) throw new Error('No secret in otpauth URI');
+  return match[1];
+}
+function isoDaysAhead(days: number): string {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+interface IssuedSessionBody {
+  accessToken: string;
+  user: { id: string };
+}
+interface MfaEnrollBody {
+  credentialId: string;
+  otpAuthUri: string;
+}
+interface QuotationChainBody {
+  current: { id: string };
+}
+interface PolicyBody {
+  id: string;
+  status: string;
+}
+interface InvoiceBody {
+  id: string;
+  policyId: string | null;
+  customerId: string;
+  invoiceType: string;
+  premiumAmount: string;
+  taxAmount: string;
+  feesAmount: string;
+  commissionDeducted: string;
+  totalAmount: string;
+  currency: string;
+  dueDate: string;
+  status: string;
+  createdAt: string;
+}
+
+const ISSUED_SCHEDULE = {
+  limits: { buildings: '5000000.000', contents: '1200000.000' },
+  sumsInsured: { total: '6200000.000' },
+  namedPerils: ['fire', 'flood', 'theft'],
+  extensions: ['debris removal'],
+};
+
+const FACTORS = {
+  coverage: 'Matches every requested peril plus the two extensions.',
+  price: 'Lowest premium of the shortlist.',
+  financialStrength: 'A- rated carrier, adequate for this exposure.',
+  claimsService: 'Local adjuster panel, ten-day average settlement.',
+  deductible: 'JOD 1,000, in line with the market for this class.',
+  policyConditions: 'No unusual warranties; standard subrogation clause.',
+};
+
+let sharedApp: INestApplication<App> | undefined;
+async function boot(): Promise<INestApplication<App>> {
+  if (!sharedApp) sharedApp = await createTestApp();
+  return sharedApp;
+}
+
+async function makeUser(
+  app: INestApplication<App>,
+  label: string,
+  ...roles: RoleName[]
+): Promise<{ accessToken: string; userId: string }> {
+  const email = uniqueEmail(label);
+  await request(app.getHttpServer())
+    .post('/auth/signup')
+    .send({ fullName: 'Invoice E2E User', email, password: PASSWORD })
+    .expect(201);
+  const login = await request(app.getHttpServer())
+    .post('/auth/login')
+    .send({ email, password: PASSWORD })
+    .expect(200);
+  const { accessToken, user } = login.body as IssuedSessionBody;
+
+  const enroll = await request(app.getHttpServer())
+    .post('/auth/mfa/totp/enroll')
+    .set(bearer(accessToken))
+    .expect(201);
+  const enrollBody = enroll.body as MfaEnrollBody;
+  await request(app.getHttpServer())
+    .post('/auth/mfa/totp/enroll/verify')
+    .set(bearer(accessToken))
+    .send({
+      credentialId: enrollBody.credentialId,
+      code: authenticator.generate(secretFromOtpAuthUri(enrollBody.otpAuthUri)),
+    })
+    .expect(200);
+
+  for (const roleName of roles) {
+    const role = await prisma.role.upsert({
+      where: { name: roleName },
+      update: {},
+      create: { name: roleName },
+    });
+    await prisma.userRoleAssignment.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      update: { revokedAt: null },
+      create: { userId: user.id, roleId: role.id },
+    });
+  }
+  return { accessToken, userId: user.id };
+}
+
+/** Place + issue + check + deliver + acknowledge — an ACTIVE policy whose
+ * placed quote carries `commissionRatePercent = 12` and whose `issuedPremium`
+ * is `120000.000` (so the #31 invoice nets a `14400.000` commission). */
+async function activePolicy(
+  app: INestApplication<App>,
+  placerToken: string,
+  checkerToken: string,
+  ownerUserId: string,
+  tag: string,
+): Promise<{ policyId: string; customerId: string }> {
+  const rand = Math.random().toString(36).slice(2, 8);
+  const customer = await prisma.customer.create({
+    data: {
+      customerType: 'CORPORATE',
+      legalName: `Invoice E2E ${tag} ${rand}`,
+      ownerUserId,
+    },
+  });
+  const riskProfile = await prisma.riskProfile.create({
+    data: { customerId: customer.id, siteLabel: 'HQ' },
+  });
+  const program = await prisma.insuranceProgram.create({
+    data: { riskProfileId: riskProfile.id, status: 'FINALIZED' },
+  });
+  const opportunity = await prisma.opportunity.create({
+    data: {
+      customerId: customer.id,
+      insuranceProgramId: program.id,
+      status: 'COMPARISON_BUILT',
+    },
+  });
+  const rfq = await prisma.rFQ.create({
+    data: {
+      opportunityId: opportunity.id,
+      insuranceLine: 'Property All Risks',
+    },
+  });
+  const insurer = await prisma.insurer.create({
+    data: { name: `Invoice E2E ${tag} ins ${rand}` },
+  });
+  await prisma.rFQInsurer.create({
+    data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
+  });
+
+  const quote = await request(app.getHttpServer())
+    .post('/quotations')
+    .set(bearer(placerToken))
+    .send({
+      rfqId: rfq.id,
+      insurerId: insurer.id,
+      premium: '120000.000',
+      commissionRatePercent: '12',
+    })
+    .expect(201);
+  const drafted = await request(app.getHttpServer())
+    .post('/recommendations')
+    .set(bearer(placerToken))
+    .send({
+      opportunityId: opportunity.id,
+      recommendedQuotationId: (quote.body as QuotationChainBody).current.id,
+      rationale: 'A long enough written summary to pass the length check.',
+      rationaleFactors: FACTORS,
+    })
+    .expect(201);
+  await request(app.getHttpServer())
+    .post(`/recommendations/${(drafted.body as { id: string }).id}/send`)
+    .set(bearer(placerToken))
+    .expect(201);
+  await request(app.getHttpServer())
+    .post('/client-decisions')
+    .set(bearer(placerToken))
+    .send({
+      opportunityId: opportunity.id,
+      decision: 'ACCEPT',
+      evidenceType: 'e-signature',
+      evidenceRef: `inv-${tag}`,
+    })
+    .expect(201);
+
+  const placed = await request(app.getHttpServer())
+    .post('/policies')
+    .set(bearer(placerToken))
+    .send({
+      opportunityId: opportunity.id,
+      inceptionDate: '2026-10-01',
+      expiryDate: '2027-10-01',
+    })
+    .expect(201);
+  const policyId = (placed.body as PolicyBody).id;
+  await request(app.getHttpServer())
+    .post(`/policies/${policyId}/issuance`)
+    .set(bearer(placerToken))
+    .send({
+      policyNumber: `POL-INV-${Date.now()}-${rand}`,
+      issuedPremium: '120000.000',
+      schedule: ISSUED_SCHEDULE,
+      documents: [],
+    })
+    .expect(201);
+  await request(app.getHttpServer())
+    .post(`/policies/${policyId}/checking`)
+    .set(bearer(checkerToken))
+    .send({ requestedCoverage: ISSUED_SCHEDULE })
+    .expect(201);
+  await request(app.getHttpServer())
+    .post(`/policies/${policyId}/delivery`)
+    .set(bearer(placerToken))
+    .send({ method: 'courier', recipient: 'Acme Risk Dept' })
+    .expect(201);
+  await request(app.getHttpServer())
+    .post(`/policies/${policyId}/delivery/acknowledge-receipt`)
+    .set(bearer(placerToken))
+    .send({})
+    .expect(201);
+  return { policyId, customerId: customer.id };
+}
+
+describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
+  afterAll(async () => {
+    if (sharedApp) await sharedApp.close();
+    sharedApp = undefined;
+  });
+
+  it('raises a premium invoice — premium carried, commission auto-netted, total computed — and reads it back; a non-finance actor is 403', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv-fin', 'FINANCE_COLLECTIONS_OFFICER');
+
+    const { policyId, customerId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'raise',
+    );
+
+    // the placer (SALES + PLACEMENT, no finance perm) cannot raise or read
+    await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(plc.accessToken))
+      .send({ policyId, taxAmount: '9600.000', dueDate: isoDaysAhead(30) })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/invoices?policyId=${policyId}`)
+      .set(bearer(plc.accessToken))
+      .expect(403);
+
+    // a past due date and one more than a year out are both 422 (new-invoice
+    // window check) — no invoice exists yet on this policy
+    await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({ policyId, taxAmount: '9600.000', dueDate: isoDaysAhead(-2) })
+      .expect(422);
+    await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({ policyId, taxAmount: '9600.000', dueDate: isoDaysAhead(400) })
+      .expect(422);
+
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const inv = raised.body as InvoiceBody;
+    expect(inv.invoiceType).toBe('new_business_premium');
+    expect(inv.customerId).toBe(customerId);
+    expect(inv.premiumAmount).toBe('120000.000'); // carried from issuedPremium
+    expect(inv.commissionDeducted).toBe('14400.000'); // 120000 * 12%
+    expect(inv.taxAmount).toBe('9600.000');
+    expect(inv.feesAmount).toBe('150.000');
+    expect(inv.totalAmount).toBe('115350.000'); // 120000 + 9600 + 150 - 14400
+    expect(inv.currency).toBe('JOD');
+    expect(inv.status).toBe('INVOICED');
+
+    const got = await request(app.getHttpServer())
+      .get(`/invoices/${inv.id}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((got.body as InvoiceBody).id).toBe(inv.id);
+
+    const listed = await request(app.getHttpServer())
+      .get(`/invoices?policyId=${policyId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((listed.body as InvoiceBody[]).map((r) => r.id)).toEqual([inv.id]);
+
+    // exactly one CREATE Invoice audit row for this invoice
+    const auditRows = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'Invoice',
+        action: 'CREATE',
+        entityId: inv.id,
+      },
+    });
+    expect(auditRows).toHaveLength(1);
+    expect(JSON.stringify(auditRows[0]?.afterValue)).toContain('115350.000');
+
+    // a book-wide read (no scope) is a 400 — that is Process 33's report
+    await request(app.getHttpServer())
+      .get('/invoices')
+      .set(bearer(fin.accessToken))
+      .expect(400);
+  });
+
+  it('is write-once: a byte-identical re-post resumes the same invoice, and any changed figure (or due date) is a 409', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv2-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv2-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv2-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const { policyId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'wonce',
+    );
+
+    const body = {
+      policyId,
+      taxAmount: '9600.000',
+      feesAmount: '150.000',
+      dueDate: isoDaysAhead(30),
+    };
+    const first = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send(body)
+      .expect(201);
+    const resumed = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send(body)
+      .expect(201);
+    expect((resumed.body as InvoiceBody).id).toBe(
+      (first.body as InvoiceBody).id,
+    );
+
+    await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({ ...body, feesAmount: '999.000' })
+      .expect(409);
+
+    // a changed due date on an already-billed policy is also a 409 (the
+    // figures-and-date match gate runs before the window check)
+    await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({ ...body, dueDate: isoDaysAhead(45) })
+      .expect(409);
+
+    // still exactly one invoice on the policy
+    const listed = await request(app.getHttpServer())
+      .get(`/invoices?policyId=${policyId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect(listed.body as InvoiceBody[]).toHaveLength(1);
+  });
+});
