@@ -1685,10 +1685,19 @@ model Invoice {
 }
 
 /// Process 32 — Invoice -> Collection -> Receipt -> Reconciliation ->
-/// Remittance cycle.
+/// Remittance cycle. `invoiceId` is `@unique`: #32 records exactly ONE
+/// full-payment receipt per invoice, and a read-then-create would let a
+/// concurrent / retried `POST /invoices/:id/receipt` double-book the client's
+/// premium into `ClientFundsLedgerEntry` (Part 7.3 — client funds must always
+/// be reconcilable). The engine transition alone is NOT the gate: a caller
+/// that lost the `INVOICED -> COLLECTED` race still reaches the artefact write
+/// before the winner's `$transaction` commits. `Receipt_invoiceId_key`
+/// (migration 20260902220000) is the real backstop; `P2002` -> resume/409.
+/// Partial-payment support (multiple receipts summing to the total) is a
+/// deferred refinement that would replace this constraint.
 model Receipt {
   id           String   @id @default(uuid())
-  invoiceId    String
+  invoiceId    String   @unique
   invoice      Invoice  @relation(fields: [invoiceId], references: [id])
   amount       Decimal  @db.Decimal(18, 3)
   receivedAt   DateTime @default(now())

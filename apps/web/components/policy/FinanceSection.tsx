@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   createInvoice,
   listInvoicesForPolicy,
+  recordReceipt,
+  recordRemittance,
+  reconcileInvoice,
+  RECEIPT_METHOD_OPTIONS,
   type Invoice,
 } from '../../lib/finance/invoice-api';
 import {
@@ -18,6 +22,8 @@ interface Props {
   opportunityId: string;
   /** Finance — raise the premium invoice. */
   canInvoice: boolean;
+  /** Finance — drive the collection cycle (receipt / reconcile / remittance). */
+  canCollect: boolean;
 }
 
 function money(value: string | null, currency = 'JOD'): string {
@@ -30,7 +36,11 @@ function money(value: string | null, currency = 'JOD'): string {
 
 /** The section only makes sense once a policy exists with an issued premium —
  * #31 bills `Policy.issuedPremium`. */
-export function FinanceSection({ opportunityId, canInvoice }: Props) {
+export function FinanceSection({
+  opportunityId,
+  canInvoice,
+  canCollect,
+}: Props) {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +49,9 @@ export function FinanceSection({ opportunityId, canInvoice }: Props) {
   const [taxAmount, setTaxAmount] = useState('0.000');
   const [feesAmount, setFeesAmount] = useState('0.000');
   const [dueDate, setDueDate] = useState('');
+  const [receiptMethod, setReceiptMethod] = useState<string>(
+    RECEIPT_METHOD_OPTIONS[0],
+  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -68,20 +81,14 @@ export function FinanceSection({ opportunityId, canInvoice }: Props) {
 
   const invoice = invoices[0] ?? null;
 
-  async function raise() {
-    if (!policy) return;
+  async function runStep(step: () => Promise<unknown>, failMsg: string) {
     setBusy(true);
     setError(null);
     try {
-      await createInvoice({
-        policyId: policy.id,
-        taxAmount: taxAmount.trim() || '0',
-        feesAmount: feesAmount.trim() || '0',
-        dueDate,
-      });
+      await step();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to raise the invoice.');
+      setError(err instanceof Error ? err.message : failMsg);
     } finally {
       setBusy(false);
     }
@@ -125,6 +132,26 @@ export function FinanceSection({ opportunityId, canInvoice }: Props) {
             <span>Status</span>
             <strong>{invoice.status}</strong>
           </div>
+          {invoice.receipt ? (
+            <div style={quoteFieldStyle}>
+              <span>Collected</span>
+              <strong>
+                {money(invoice.receipt.amount, invoice.currency)}
+                {invoice.receipt.method ? ` (${invoice.receipt.method})` : ''}
+              </strong>
+            </div>
+          ) : null}
+          {invoice.remittance ? (
+            <div style={quoteFieldStyle}>
+              <span>Remitted to insurer</span>
+              <strong>
+                {money(invoice.remittance.amount, invoice.currency)}
+                {invoice.remittance.remittedAt
+                  ? ` on ${new Date(invoice.remittance.remittedAt).toLocaleDateString()}`
+                  : ''}
+              </strong>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p style={{ color: '#6b7280' }}>
@@ -165,13 +192,92 @@ export function FinanceSection({ opportunityId, canInvoice }: Props) {
           </label>
           <button
             type="button"
-            onClick={() => void raise()}
+            onClick={() =>
+              void runStep(
+                () =>
+                  createInvoice({
+                    policyId: policy.id,
+                    taxAmount: taxAmount.trim() || '0',
+                    feesAmount: feesAmount.trim() || '0',
+                    dueDate,
+                  }),
+                'Failed to raise the invoice.',
+              )
+            }
             disabled={busy || dueDate.trim().length === 0}
             style={buttonStyle}
           >
             Raise premium invoice
           </button>
         </div>
+      ) : null}
+
+      {invoice && canCollect && invoice.status === 'INVOICED' ? (
+        <div style={{ display: 'grid', gap: '0.5rem', maxWidth: '22rem', marginTop: '0.75rem' }}>
+          <label>
+            Received via
+            <select
+              value={receiptMethod}
+              onChange={(e) => setReceiptMethod(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              {RECEIPT_METHOD_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() =>
+              void runStep(
+                () =>
+                  recordReceipt(invoice.id, {
+                    amount: invoice.totalAmount,
+                    method: receiptMethod,
+                  }),
+                'Failed to record the receipt.',
+              )
+            }
+            disabled={busy}
+            style={buttonStyle}
+          >
+            Record receipt of {money(invoice.totalAmount, invoice.currency)}
+          </button>
+        </div>
+      ) : null}
+
+      {invoice && canCollect && invoice.status === 'COLLECTED' ? (
+        <button
+          type="button"
+          onClick={() =>
+            void runStep(
+              () => reconcileInvoice(invoice.id),
+              'Failed to reconcile.',
+            )
+          }
+          disabled={busy}
+          style={{ ...buttonStyle, marginTop: '0.75rem' }}
+        >
+          Reconcile collected funds
+        </button>
+      ) : null}
+
+      {invoice && canCollect && invoice.status === 'RECONCILED' ? (
+        <button
+          type="button"
+          onClick={() =>
+            void runStep(
+              () => recordRemittance(invoice.id),
+              'Failed to record the remittance.',
+            )
+          }
+          disabled={busy}
+          style={{ ...buttonStyle, marginTop: '0.75rem' }}
+        >
+          Remit {money(invoice.netRemittance, invoice.currency)} to insurer
+        </button>
       ) : null}
     </section>
   );

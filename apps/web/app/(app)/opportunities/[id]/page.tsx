@@ -231,6 +231,7 @@ export default function OpportunityDetailPage() {
           <FinanceSection
             opportunityId={opportunity.id}
             canInvoice={isFinance}
+            canCollect={isFinance}
           />
 
           <ClaimSection

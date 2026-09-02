@@ -181,6 +181,7 @@ async function mockRfqApi(
     onClaimSettlement?: (body: Record<string, unknown>) => void;
     onClaimClosure?: (body: Record<string, unknown>) => void;
     onCreateInvoice?: (body: Record<string, unknown>) => void;
+    onCollectionStep?: (body: Record<string, unknown>) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -786,13 +787,55 @@ async function mockRfqApi(
     return route.fulfill({ status: 200, json: policy ? [policy] : [] });
   });
 
-  // Process 31 — the premium invoice against the policy. Starts empty; a POST
-  // /invoices composes it (premium carried from the policy, commission netted
-  // at 12%, total = premium + tax + fees - commission) and appends the one row.
+  // Process 31-32 — the premium invoice + its collection cycle. Starts empty;
+  // a POST /invoices composes it (premium carried, commission netted at 12%,
+  // total = premium + tax + fees - commission); POST /invoices/:id/receipt |
+  // /reconcile | /remittance walk it INVOICED -> COLLECTED -> RECONCILED ->
+  // REMITTED, attaching the receipt / remittance sub-objects.
+  const PREMIUM = 120000;
+  const COMMISSION = PREMIUM * 0.12;
   const invoiceRows: Record<string, unknown>[] = [];
   await page.route("http://localhost:4000/invoices**", (route) => {
     const url = route.request().url();
     const method = route.request().method();
+    const inv = invoiceRows[0] as Record<string, unknown> | undefined;
+
+    if (method === "POST" && /\/invoices\/[^/]+\/receipt(\?|$)/.test(url)) {
+      const b = route.request().postDataJSON() as {
+        amount: string;
+        method?: string;
+      };
+      opts.onCollectionStep?.({ step: "receipt", ...b });
+      if (inv) {
+        inv.status = "COLLECTED";
+        inv.receipt = {
+          id: "rcpt-1",
+          amount: b.amount,
+          method: b.method ?? null,
+          receivedAt: "2026-09-20T00:00:00.000Z",
+        };
+      }
+      return route.fulfill({ status: 201, json: inv });
+    }
+    if (method === "POST" && /\/invoices\/[^/]+\/reconcile(\?|$)/.test(url)) {
+      opts.onCollectionStep?.({ step: "reconcile" });
+      if (inv) inv.status = "RECONCILED";
+      return route.fulfill({ status: 201, json: inv });
+    }
+    if (method === "POST" && /\/invoices\/[^/]+\/remittance(\?|$)/.test(url)) {
+      opts.onCollectionStep?.({ step: "remittance" });
+      if (inv) {
+        inv.status = "REMITTED";
+        inv.remittance = {
+          id: "rem-1",
+          amount: (PREMIUM - COMMISSION).toFixed(3),
+          insurerId: "ins-1",
+          remittedAt: "2026-09-25T00:00:00.000Z",
+        };
+      }
+      return route.fulfill({ status: 201, json: inv });
+    }
+
     if (method === "POST" && /\/invoices(\?|$)/.test(url.split("?")[0])) {
       const b = route.request().postDataJSON() as {
         policyId: string;
@@ -807,8 +850,6 @@ async function mockRfqApi(
           json: { message: "A premium invoice already exists for this policy." },
         });
       }
-      const premium = 120000;
-      const commission = premium * 0.12;
       const tax = Number(b.taxAmount) || 0;
       const fees = Number(b.feesAmount) || 0;
       const row = {
@@ -816,15 +857,18 @@ async function mockRfqApi(
         policyId: b.policyId,
         customerId: "cust-1",
         invoiceType: "new_business_premium",
-        premiumAmount: premium.toFixed(3),
+        premiumAmount: PREMIUM.toFixed(3),
         taxAmount: tax.toFixed(3),
         feesAmount: fees.toFixed(3),
-        commissionDeducted: commission.toFixed(3),
-        totalAmount: (premium + tax + fees - commission).toFixed(3),
+        commissionDeducted: COMMISSION.toFixed(3),
+        totalAmount: (PREMIUM + tax + fees - COMMISSION).toFixed(3),
         currency: "JOD",
         dueDate: `${b.dueDate}T00:00:00.000Z`,
         status: "INVOICED",
         createdAt: "2026-09-16T00:00:00.000Z",
+        netRemittance: (PREMIUM - COMMISSION).toFixed(3),
+        receipt: null,
+        remittance: null,
       };
       invoiceRows.push(row);
       return route.fulfill({ status: 201, json: row });
@@ -1823,7 +1867,11 @@ test("raises a premium invoice from the Billing block — commission netted, tot
 
   await expect.poll(() => created?.taxAmount).toBe("9600.000");
   await expect(page.getByText("−JOD 14,400.000")).toBeVisible();
-  await expect(page.getByText("JOD 115,350.000")).toBeVisible();
+  // the "Total due" figure — exact so it isn't confused with the "Record
+  // receipt of JOD 115,350.000" collection button #32 adds
+  await expect(
+    page.getByText("JOD 115,350.000", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
 });
 
@@ -1843,6 +1891,55 @@ test("a non-Finance user sees no raise-invoice control on the Billing block", as
   await expect(
     page.getByRole("button", { name: "Raise premium invoice" }),
   ).toHaveCount(0);
+});
+
+test("walks the collection cycle from the Billing block: receipt -> reconcile -> remittance", async ({
+  page,
+}) => {
+  await mockAuth(page, ["FINANCE_COLLECTIONS_OFFICER"]);
+  const steps: string[] = [];
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onCollectionStep: (b) => {
+      steps.push(b.step as string);
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Billing", exact: true }),
+  ).toBeVisible();
+
+  // raise the invoice first
+  await page.getByLabel("Tax amount").fill("9600.000");
+  await page.getByLabel("Fees amount").fill("150.000");
+  await page.getByLabel("Due date").fill("2026-12-01");
+  await page.getByRole("button", { name: "Raise premium invoice" }).click();
+  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+
+  // 1. record the receipt for the full total
+  await page
+    .getByRole("button", { name: /Record receipt of JOD 115,350.000/ })
+    .click();
+  await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
+  await expect(page.getByText("JOD 115,350.000 (bank_transfer)")).toBeVisible();
+
+  // 2. reconcile
+  await page
+    .getByRole("button", { name: "Reconcile collected funds" })
+    .click();
+  await expect(page.getByText("RECONCILED", { exact: true })).toBeVisible();
+
+  // 3. remit the net premium (120000 - 14400)
+  await page
+    .getByRole("button", { name: /Remit JOD 105,600.000 to insurer/ })
+    .click();
+  await expect(page.getByText("REMITTED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Remitted to insurer")).toBeVisible();
+  await expect(page.getByText(/JOD 105,600.000 on/)).toBeVisible();
+
+  expect(steps).toEqual(["receipt", "reconcile", "remittance"]);
 });
 
 test("notifies a claim against an issued policy", async ({ page }) => {

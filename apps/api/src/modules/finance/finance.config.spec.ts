@@ -2,6 +2,7 @@ import { Prisma } from '@ibms/db';
 import { describe, expect, it } from 'vitest';
 import {
   computeInvoiceFigures,
+  computeRemittanceAmount,
   deriveInvoiceView,
   invoiceAuditSnapshot,
   invoiceFiguresMatch,
@@ -118,7 +119,7 @@ describe('deriveInvoiceView', () => {
     createdAt: new Date('2026-09-02T10:00:00.000Z'),
   };
 
-  it('renders every money field as a fixed 3dp string and the dates as ISO', () => {
+  it('renders every money field as a fixed 3dp string and the dates as ISO; no receipt / remittance yet', () => {
     const v = deriveInvoiceView(row);
     expect(v).toEqual({
       id: 'inv-1',
@@ -134,7 +135,81 @@ describe('deriveInvoiceView', () => {
       dueDate: '2026-10-01T00:00:00.000Z',
       status: 'INVOICED',
       createdAt: '2026-09-02T10:00:00.000Z',
+      netRemittance: '875.000', // 1000 premium − 125 commission
+      receipt: null,
+      remittance: null,
     });
+  });
+
+  it('surfaces the collection receipt and its remittance once present (Process 32)', () => {
+    const v = deriveInvoiceView({
+      ...row,
+      status: 'REMITTED',
+      receipts: [
+        {
+          id: 'rcpt-1',
+          amount: d('1060'),
+          method: 'bank_transfer',
+          receivedAt: new Date('2026-10-03T09:00:00.000Z'),
+          remittance: {
+            id: 'rem-1',
+            amount: d('875'),
+            insurerId: 'ins-1',
+            remittedAt: new Date('2026-10-05T12:00:00.000Z'),
+          },
+        },
+      ],
+    });
+    expect(v.receipt).toEqual({
+      id: 'rcpt-1',
+      amount: '1060.000',
+      method: 'bank_transfer',
+      receivedAt: '2026-10-03T09:00:00.000Z',
+    });
+    expect(v.remittance).toEqual({
+      id: 'rem-1',
+      amount: '875.000',
+      insurerId: 'ins-1',
+      remittedAt: '2026-10-05T12:00:00.000Z',
+    });
+  });
+
+  it('a receipt with no remittance yet leaves remittance null', () => {
+    const v = deriveInvoiceView({
+      ...row,
+      status: 'COLLECTED',
+      receipts: [
+        {
+          id: 'rcpt-1',
+          amount: d('1060'),
+          method: null,
+          receivedAt: new Date('2026-10-03T09:00:00.000Z'),
+          remittance: null,
+        },
+      ],
+    });
+    expect(v.receipt?.method).toBeNull();
+    expect(v.remittance).toBeNull();
+  });
+});
+
+describe('computeRemittanceAmount (Process 32)', () => {
+  it('is premium minus commission', () => {
+    expect(computeRemittanceAmount('120000.000', '14400.000').toFixed(3)).toBe(
+      '105600.000',
+    );
+  });
+
+  it('quantizes to fils and is scale-insensitive on the inputs', () => {
+    expect(computeRemittanceAmount(d('1000'), d('125.0')).toFixed(3)).toBe(
+      '875.000',
+    );
+  });
+
+  it('is exactly zero when commission equals the premium', () => {
+    expect(computeRemittanceAmount('1000.000', '1000.000').toFixed(3)).toBe(
+      '0.000',
+    );
   });
 });
 

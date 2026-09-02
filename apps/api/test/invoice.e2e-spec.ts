@@ -54,6 +54,13 @@ interface InvoiceBody {
   dueDate: string;
   status: string;
   createdAt: string;
+  receipt: { id: string; amount: string; method: string | null } | null;
+  remittance: {
+    id: string;
+    amount: string;
+    insurerId: string;
+    remittedAt: string | null;
+  } | null;
 }
 
 const ISSUED_SCHEDULE = {
@@ -398,5 +405,135 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .set(bearer(fin.accessToken))
       .expect(200);
     expect(listed.body as InvoiceBody[]).toHaveLength(1);
+  });
+
+  it('runs the full collection cycle: receipt -> reconcile -> remittance, with a client-funds ledger entry at each money movement (Part C #32)', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv3-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv3-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv3-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const { policyId, customerId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'cycle',
+    );
+
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+    // total = 120000 + 9600 + 150 - 14400
+    expect((raised.body as InvoiceBody).totalAmount).toBe('115350.000');
+
+    // the placer (no finance perm) cannot drive any cycle step
+    for (const path of ['receipt', 'reconcile', 'remittance']) {
+      await request(app.getHttpServer())
+        .post(`/invoices/${invoiceId}/${path}`)
+        .set(bearer(plc.accessToken))
+        .send(path === 'reconcile' ? undefined : { amount: '115350.000' })
+        .expect(403);
+    }
+
+    // reconcile / remittance are 422 before there is a receipt
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/reconcile`)
+      .set(bearer(fin.accessToken))
+      .expect(422);
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({})
+      .expect(422);
+
+    // a short payment is a 422 — never a silent write-off
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '100000.000', method: 'bank_transfer' })
+      .expect(422);
+
+    // 1. collection receipt -> COLLECTED
+    const collected = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .expect(201);
+    expect((collected.body as InvoiceBody).status).toBe('COLLECTED');
+    expect((collected.body as InvoiceBody).receipt?.amount).toBe('115350.000');
+
+    // idempotent: a byte-identical re-post resumes the same receipt
+    const collectedAgain = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .expect(201);
+    expect((collectedAgain.body as InvoiceBody).receipt?.id).toBe(
+      (collected.body as InvoiceBody).receipt?.id,
+    );
+
+    // 2. reconcile -> RECONCILED (idempotent)
+    const reconciled = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/reconcile`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+    expect((reconciled.body as InvoiceBody).status).toBe('RECONCILED');
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/reconcile`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+
+    // 3. remittance -> REMITTED, amount = premium - commission
+    const remitted = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({})
+      .expect(201);
+    expect((remitted.body as InvoiceBody).status).toBe('REMITTED');
+    expect((remitted.body as InvoiceBody).remittance?.amount).toBe(
+      '105600.000',
+    ); // 120000 - 14400
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({})
+      .expect(201);
+
+    // exactly three TRANSITION audit rows for this invoice
+    const transitions = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'Invoice',
+        action: 'TRANSITION',
+        entityId: invoiceId,
+      },
+    });
+    expect(transitions).toHaveLength(3);
+
+    // exactly one Receipt on the invoice — the UNIQUE backstop held
+    expect(await prisma.receipt.count({ where: { invoiceId } })).toBe(1);
+
+    // one "in" ledger entry at the collected total, one "out" at the remittance
+    const ledger = await prisma.clientFundsLedgerEntry.findMany({
+      where: { customerId, reference: `invoice:${invoiceId}` },
+      orderBy: { recordedAt: 'asc' },
+    });
+    expect(ledger).toHaveLength(2);
+    expect(ledger[0]?.direction).toBe('in');
+    expect(ledger[0]?.amount.toString()).toBe('115350');
+    expect(ledger[1]?.direction).toBe('out');
+    expect(ledger[1]?.amount.toString()).toBe('105600');
   });
 });

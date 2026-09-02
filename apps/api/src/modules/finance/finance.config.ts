@@ -10,10 +10,11 @@ import {
 } from '../../common/money.util';
 
 /**
- * Process 31 — Premium Billing (backlog Part C #31, Domain D). The pure,
- * deterministic core: composing an `Invoice`'s five figures from the policy's
- * issued premium + the placed commission rate + the Finance-supplied tax and
- * fees, and the audit `afterValue` snapshot.
+ * Process 31–32 — Premium Billing + Collection (backlog Part C #31–32, Domain
+ * D). The pure, deterministic core: composing an `Invoice`'s five figures from
+ * the policy's issued premium + the placed commission rate + the Finance-
+ * supplied tax and fees (#31), the net-premium remittance figure (#32), the
+ * `Invoice` cycle view, and the audit `afterValue` snapshots.
  *
  * `ibms-brain/meta/context/finance-lifecycle.md` § "Premium Billing (Process
  * 31)":
@@ -38,6 +39,29 @@ export const NEW_BUSINESS_PREMIUM_INVOICE_TYPE = 'new_business_premium';
  * term. `ibms-app` product decision; no CBJ / Part-3.6 figure specifies a
  * maximum credit period. */
 export const INVOICE_MAX_DUE_DAYS_AHEAD = 365;
+
+/** How a collection `Receipt` was received (`Receipt.method`). */
+export const RECEIPT_METHODS = [
+  'bank_transfer',
+  'cheque',
+  'card',
+  'cash',
+] as const;
+export type ReceiptMethod = (typeof RECEIPT_METHODS)[number];
+
+/**
+ * Process 32 — the net premium the broker owes the insurer for a fully-
+ * collected invoice: the issued premium less the broker's commission. #31
+ * bounds `commissionDeducted <= premiumAmount`, so this is `>= 0`. Tax and
+ * fees stay with the broker (passed to the tax authority / retained as fee
+ * income — out of scope for #32). All through `money.util.ts`.
+ */
+export function computeRemittanceAmount(
+  premiumAmount: Prisma.Decimal | string,
+  commissionDeducted: Prisma.Decimal | string,
+): Prisma.Decimal {
+  return subtractMoney(premiumAmount, commissionDeducted);
+}
 
 export interface InvoiceFigureInputs {
   /** Carried from `Policy.issuedPremium`. */
@@ -120,6 +144,20 @@ export function invoiceFiguresMatch(
 
 // --- view --------------------------------------------------------------------
 
+export interface InvoiceReceiptView {
+  id: string;
+  amount: string;
+  method: string | null;
+  receivedAt: string;
+}
+
+export interface InvoiceRemittanceView {
+  id: string;
+  amount: string;
+  insurerId: string;
+  remittedAt: string | null;
+}
+
 export interface InvoiceView {
   id: string;
   policyId: string | null;
@@ -134,6 +172,27 @@ export interface InvoiceView {
   dueDate: string;
   status: InvoiceStatus;
   createdAt: string;
+  /** Process 32 — `premiumAmount − commissionDeducted`, the net premium the
+   * broker owes the insurer. Computed here so the UI never does money math. */
+  netRemittance: string;
+  /** Process 32 — the client's collection receipt (or null). #32 records at
+   * most one, for the full invoiced total. */
+  receipt: InvoiceReceiptView | null;
+  /** Process 32 — the net-premium remittance to the insurer (or null). */
+  remittance: InvoiceRemittanceView | null;
+}
+
+export interface InvoiceReceiptRow {
+  id: string;
+  amount: Prisma.Decimal;
+  method: string | null;
+  receivedAt: Date;
+  remittance: {
+    id: string;
+    amount: Prisma.Decimal;
+    insurerId: string;
+    remittedAt: Date | null;
+  } | null;
 }
 
 export interface InvoiceRow {
@@ -150,9 +209,13 @@ export interface InvoiceRow {
   dueDate: Date;
   status: InvoiceStatus;
   createdAt: Date;
+  /** Present on a with-cycle read (#32); absent on a bare `Invoice` fetch. */
+  receipts?: InvoiceReceiptRow[];
 }
 
 export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
+  const receipt =
+    row.receipts && row.receipts.length > 0 ? row.receipts[0] : null;
   return {
     id: row.id,
     policyId: row.policyId,
@@ -167,6 +230,25 @@ export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
     dueDate: row.dueDate.toISOString(),
     status: row.status,
     createdAt: row.createdAt.toISOString(),
+    netRemittance: formatMoney(
+      computeRemittanceAmount(row.premiumAmount, row.commissionDeducted),
+    ),
+    receipt: receipt
+      ? {
+          id: receipt.id,
+          amount: formatMoney(receipt.amount),
+          method: receipt.method,
+          receivedAt: receipt.receivedAt.toISOString(),
+        }
+      : null,
+    remittance: receipt?.remittance
+      ? {
+          id: receipt.remittance.id,
+          amount: formatMoney(receipt.remittance.amount),
+          insurerId: receipt.remittance.insurerId,
+          remittedAt: receipt.remittance.remittedAt?.toISOString() ?? null,
+        }
+      : null,
   };
 }
 
@@ -206,5 +288,69 @@ export function invoiceAuditSnapshot(input: {
     currency: input.currency,
     dueDate: input.dueDate.toISOString(),
     status: input.status,
+  };
+}
+
+/** Process 32 — CREATE audit `afterValue` for a collection `Receipt`. Money
+ * as a fixed 3dp string + ids + method; no free text (a receipt carries
+ * none). */
+export function receiptAuditSnapshot(input: {
+  receiptId: string;
+  invoiceId: string;
+  customerId: string;
+  amount: Prisma.Decimal;
+  method: string | null;
+  receivedAt: Date;
+}): Prisma.InputJsonObject {
+  return {
+    receiptId: input.receiptId,
+    invoiceId: input.invoiceId,
+    customerId: input.customerId,
+    amount: formatMoney(input.amount),
+    method: input.method,
+    receivedAt: input.receivedAt.toISOString(),
+  };
+}
+
+/** Process 32 — CREATE audit `afterValue` for a `Remittance` to an insurer. */
+export function remittanceAuditSnapshot(input: {
+  remittanceId: string;
+  receiptId: string;
+  invoiceId: string;
+  insurerId: string;
+  amount: Prisma.Decimal;
+  remittedAt: Date | null;
+}): Prisma.InputJsonObject {
+  return {
+    remittanceId: input.remittanceId,
+    receiptId: input.receiptId,
+    invoiceId: input.invoiceId,
+    insurerId: input.insurerId,
+    amount: formatMoney(input.amount),
+    remittedAt: input.remittedAt?.toISOString() ?? null,
+  };
+}
+
+/**
+ * Process 32 / Part 7.3 — CREATE audit `afterValue` for a
+ * `ClientFundsLedgerEntry`. Client funds must be identifiable and reconcilable
+ * separately from the broker's own operating funds at all times; every
+ * collection books an `in` entry and every remittance an `out` entry against
+ * this ledger. `reference` is a `receipt:` / `remittance:` id pointer, never
+ * free text.
+ */
+export function clientFundsLedgerAuditSnapshot(input: {
+  entryId: string;
+  customerId: string;
+  amount: Prisma.Decimal;
+  direction: string;
+  reference: string | null;
+}): Prisma.InputJsonObject {
+  return {
+    entryId: input.entryId,
+    customerId: input.customerId,
+    amount: formatMoney(input.amount),
+    direction: input.direction,
+    reference: input.reference,
   };
 }

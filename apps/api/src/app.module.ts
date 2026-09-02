@@ -198,15 +198,18 @@ import { FinanceModule } from './modules/finance/finance.module';
     // by ClaimModule; listed here for the module registry.
     LossRatioModule,
     ClaimModule,
-    // Part C backlog #31 (Premium Billing) — opens Domain D (Finance). Raises
-    // the new-business premium Invoice against an issued policy: premium
-    // carried from Policy.issuedPremium, commission auto-derived from the
-    // placed quotation's rate, tax + fees supplied by Finance, totalAmount =
-    // premium + tax + fees - commissionDeducted computed server-side. One
-    // new-business premium invoice per policy (partial UNIQUE). Invoice IS a
-    // workflow entity but #31 only creates it at @default(INVOICED) — the
-    // INVOICED -> COLLECTED cycle is Process 32. Depends on PolicyModule (the
-    // policy) / RecommendationModule (the placed commission rate).
+    // Part C backlog #31-32 (Premium Billing + Collection) — Domain D
+    // (Finance). #31 raises the new-business premium Invoice against an issued
+    // policy (premium carried from Policy.issuedPremium, commission auto-
+    // derived from the placed quotation's rate, tax + fees supplied by
+    // Finance, totalAmount computed server-side; one per policy via a partial
+    // UNIQUE). #32 drives it through the cycle INVOICED -> COLLECTED ->
+    // RECONCILED -> REMITTED via the workflow engine — recording the client's
+    // receipt, reconciling the collected funds, remitting the net premium
+    // (premium - commission) to the insurer, and booking a
+    // ClientFundsLedgerEntry at each money movement (Part 7.3). Depends on
+    // PolicyModule (the policy + insurer) / RecommendationModule (the placed
+    // commission rate).
     FinanceModule,
   ],
   controllers: [AppController],
