@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  ConflictException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -9,9 +10,11 @@ import type { ClaimRepository } from '../../repositories/claim.repository';
 import type { PolicyRepository } from '../../repositories/policy.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { EncryptionService } from '../security/encryption.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
+import type { RegisterClaimDto } from './dto/register-claim.dto';
 
 const INCEPTION = new Date('2026-01-01T00:00:00.000Z');
 const ENDORSED_AT = new Date('2026-06-01T00:00:00.000Z');
@@ -65,6 +68,15 @@ function makeDeps(opts: Opts = {}) {
   };
 
   const stored: Record<string, unknown>[] = [];
+  // Mutable claim state the engine + registration mocks advance, so a
+  // follow-up `findById` reflects it (matching the real atomic writes).
+  const claimState = {
+    status: 'NOTIFIED' as string,
+    insurerClaimReference: null as string | null,
+    claimNumber: null as string | null,
+    adjuster: null as Record<string, unknown> | null,
+    history: [] as Record<string, unknown>[],
+  };
 
   const claimRepo = {
     createNotification: vi
@@ -76,8 +88,6 @@ function makeDeps(opts: Opts = {}) {
         ) => {
           const row = {
             id: 'claim-1',
-            claimNumber: null,
-            status: 'NOTIFIED',
             classification: 'HIGHLY_CONFIDENTIAL',
             followUpAlertThresholdDays: 9,
             createdAt: new Date(),
@@ -85,8 +95,14 @@ function makeDeps(opts: Opts = {}) {
             ...claim,
           };
           stored.push(row);
+          claimState.history.push({
+            fromStatus: null,
+            toStatus: 'NOTIFIED',
+            changedByUserId: claim.notifiedByUserId,
+            changedAt: new Date(),
+          });
           return Promise.resolve({
-            claim: row,
+            claim: { ...row, status: 'NOTIFIED' },
             thirdParty: tp
               ? {
                   id: tp.id,
@@ -99,11 +115,48 @@ function makeDeps(opts: Opts = {}) {
           });
         },
       ),
+    recordRegistration: vi
+      .fn()
+      .mockImplementation(
+        (input: {
+          claimId: string;
+          changedByUserId: string;
+          adjuster: { name: string; firm: string | null };
+        }) => {
+          const created = claimState.history.every(
+            (h) => h.toStatus !== 'REGISTERED',
+          );
+          if (created) {
+            claimState.history.push({
+              fromStatus: 'NOTIFIED',
+              toStatus: 'REGISTERED',
+              changedByUserId: input.changedByUserId,
+              changedAt: new Date(),
+            });
+          }
+          claimState.adjuster = {
+            id: 'adj-1',
+            claimId: input.claimId,
+            name: input.adjuster.name,
+            firm: input.adjuster.firm,
+            assignedAt: new Date(),
+            surveyCompletedAt: null,
+            investigationCompletedAt: null,
+          };
+          // The claim is REGISTERED once its artefacts exist (in reality the
+          // transition set this; on a resume it was already set).
+          claimState.status = 'REGISTERED';
+          return Promise.resolve(claimState.adjuster);
+        },
+      ),
     findById: vi.fn().mockImplementation(() => {
       const row = stored[stored.length - 1];
       if (!row) return Promise.resolve(null);
       return Promise.resolve({
         ...row,
+        status: claimState.status,
+        claimNumber: claimState.claimNumber,
+        insurerClaimReference: claimState.insurerClaimReference,
         policy: policyRow,
         thirdParty: row.isThirdPartyInvolved
           ? {
@@ -113,14 +166,8 @@ function makeDeps(opts: Opts = {}) {
               subrogationRecoveryFlag: false,
             }
           : null,
-        statusHistory: [
-          {
-            fromStatus: null,
-            toStatus: 'NOTIFIED',
-            changedByUserId: row.notifiedByUserId,
-            changedAt: new Date(),
-          },
-        ],
+        adjuster: claimState.adjuster,
+        statusHistory: claimState.history,
       });
     }),
     findManyByPolicyId: vi.fn().mockResolvedValue([]),
@@ -143,16 +190,44 @@ function makeDeps(opts: Opts = {}) {
     encrypt: vi.fn().mockResolvedValue('enc:xxx'),
     decrypt: vi.fn(),
   };
+  // The workflow engine — moves the claim's in-memory status + persists the
+  // transition `data` scalars so a follow-up `findById` reflects the atomic
+  // write the real engine performs.
+  const workflow = {
+    transition: vi
+      .fn()
+      .mockImplementation(
+        (p: { toStatus: string; data?: Record<string, unknown> }) => {
+          claimState.status = p.toStatus;
+          if (typeof p.data?.insurerClaimReference === 'string') {
+            claimState.insurerClaimReference = p.data.insurerClaimReference;
+          }
+          if (typeof p.data?.claimNumber === 'string') {
+            claimState.claimNumber = p.data.claimNumber;
+          }
+          return Promise.resolve({ id: 'claim-1', status: p.toStatus });
+        },
+      ),
+  };
 
   const service = new ClaimService(
     claimRepo as unknown as ClaimRepository,
     policyRepo as unknown as PolicyRepository,
     customerRepo as unknown as CustomerRepository,
     audit as unknown as AuditService,
+    workflow as unknown as WorkflowTransitionService,
     encryption as unknown as EncryptionService,
   );
 
-  return { service, claimRepo, policyRepo, customerRepo, audit, encryption };
+  return {
+    service,
+    claimRepo,
+    policyRepo,
+    customerRepo,
+    audit,
+    workflow,
+    encryption,
+  };
 }
 
 const BASE_DTO: NotifyClaimDto = {
@@ -473,5 +548,308 @@ describe('ClaimService reads', () => {
     expect(entry.isSensitiveDataAccess).toBe(true);
     expect(entry.afterValue.count).toBe(2);
     expect(entry.afterValue.claimIds).toEqual(['claim-a', 'claim-b']);
+  });
+});
+
+const REGISTER_DTO: RegisterClaimDto = {
+  insurerClaimReference: 'INS-CLM-2026-0042',
+  adjuster: { name: 'Cunningham Lindsey', firm: 'CL Loss Adjusters' },
+};
+
+describe('ClaimService.register', () => {
+  it('drives NOTIFIED -> REGISTERED through the engine, persists the insurer ref, and assigns the adjuster', async () => {
+    const { service, workflow, claimRepo, audit } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+
+    const view = await service.register(
+      'claim-1',
+      { ...REGISTER_DTO, claimNumber: 'BRK-2026-77' },
+      claims(),
+    );
+
+    expect(workflow.transition).toHaveBeenCalledOnce();
+    const tArg = workflow.transition.mock.calls[0][0] as {
+      entityType: string;
+      toStatus: string;
+      data: Record<string, unknown>;
+    };
+    expect(tArg.entityType).toBe('Claim');
+    expect(tArg.toStatus).toBe('REGISTERED');
+    expect(tArg.data).toEqual({
+      insurerClaimReference: 'INS-CLM-2026-0042',
+      claimNumber: 'BRK-2026-77',
+    });
+
+    expect(view.status).toBe('REGISTERED');
+    expect(view.insurerClaimReference).toBe('INS-CLM-2026-0042');
+    expect(view.claimNumber).toBe('BRK-2026-77');
+    expect(view.adjuster).toMatchObject({
+      name: 'Cunningham Lindsey',
+      firm: 'CL Loss Adjusters',
+    });
+    expect(view.statusHistory.map((h) => h.toStatus)).toEqual([
+      'NOTIFIED',
+      'REGISTERED',
+    ]);
+    expect(claimRepo.recordRegistration).toHaveBeenCalledOnce();
+
+    const adjusterAudit = audit.record.mock.calls.find(
+      (c) => (c[0] as { entityType: string }).entityType === 'Adjuster',
+    );
+    expect(adjusterAudit).toBeDefined();
+    const claimUpdate = audit.record.mock.calls.find(
+      (c) =>
+        (c[0] as { entityType: string; action: string }).entityType ===
+          'Claim' && (c[0] as { action: string }).action === 'UPDATE',
+    );
+    expect(
+      (claimUpdate?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+    ).toEqual({
+      claimId: 'claim-1',
+      insurerClaimReference: 'INS-CLM-2026-0042',
+      claimNumber: 'BRK-2026-77',
+    });
+  });
+
+  it('omits the claim number from the transition data when not supplied', async () => {
+    const { service, workflow } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+    const tArg = workflow.transition.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(tArg.data).toEqual({
+      insurerClaimReference: 'INS-CLM-2026-0042',
+    });
+  });
+
+  it('is an idempotent no-op when re-called with the same insurer ref + adjuster', async () => {
+    const { service, workflow, claimRepo } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+
+    workflow.transition.mockClear();
+    claimRepo.recordRegistration.mockClear();
+    const view = await service.register(
+      'claim-1',
+      { ...REGISTER_DTO },
+      claims(),
+    );
+
+    expect(view.status).toBe('REGISTERED');
+    expect(workflow.transition).not.toHaveBeenCalled();
+    expect(claimRepo.recordRegistration).not.toHaveBeenCalled();
+  });
+
+  it('409s a re-register with a different insurer ref / adjuster', async () => {
+    const { service } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+
+    await expect(
+      service.register(
+        'claim-1',
+        {
+          insurerClaimReference: 'INS-DIFFERENT-999',
+          adjuster: { name: 'Someone Else' },
+        },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('409s a re-register that only changes the adjuster firm (registration detail is not silently discarded)', async () => {
+    const { service } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+
+    await expect(
+      service.register(
+        'claim-1',
+        {
+          ...REGISTER_DTO,
+          adjuster: {
+            name: REGISTER_DTO.adjuster.name,
+            firm: 'A Different Firm',
+          },
+        },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('resumes a partially-completed registration (status REGISTERED, no adjuster) without re-transitioning', async () => {
+    const { service, workflow, claimRepo, audit } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    // simulate: the transition committed, the artefact write did not
+    claimRepo.findById.mockResolvedValueOnce({
+      id: 'claim-1',
+      claimNumber: null,
+      insurerClaimReference: 'INS-CLM-2026-0042',
+      status: 'REGISTERED',
+      classification: 'HIGHLY_CONFIDENTIAL',
+      followUpAlertThresholdDays: 9,
+      customerId: 'cus-1',
+      policyId: 'pol-1',
+      lossDate: new Date('2026-03-15T00:00:00.000Z'),
+      lossLocation: null,
+      causeOfLoss: 'x',
+      estimatedLoss: new Prisma.Decimal('20000'),
+      isThirdPartyInvolved: false,
+      isLargeClaim: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      policy: {
+        id: 'pol-1',
+        customerId: 'cus-1',
+        policyNumber: 'POL-1',
+        insuranceLine: 'Property All Risks',
+        expiryDate: EXPIRY,
+        schedules: [
+          { id: 'sched-v1', effectiveFrom: INCEPTION, effectiveTo: null },
+        ],
+      },
+      thirdParty: null,
+      adjuster: null,
+      statusHistory: [
+        {
+          fromStatus: null,
+          toStatus: 'NOTIFIED',
+          changedByUserId: 'clm-1',
+          changedAt: new Date(),
+        },
+      ],
+    });
+
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+
+    expect(workflow.transition).not.toHaveBeenCalled();
+    expect(claimRepo.recordRegistration).toHaveBeenCalledOnce();
+    // no UPDATE Claim audit on a resume (the scalars were written the first time)
+    const claimUpdate = audit.record.mock.calls.find(
+      (c) =>
+        (c[0] as { entityType: string; action: string }).entityType ===
+          'Claim' && (c[0] as { action: string }).action === 'UPDATE',
+    );
+    expect(claimUpdate).toBeUndefined();
+  });
+
+  it('422s registration of a claim that is not NOTIFIED (e.g. already past REGISTERED)', async () => {
+    const { service, claimRepo } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    claimRepo.findById.mockResolvedValueOnce({
+      id: 'claim-1',
+      claimNumber: null,
+      insurerClaimReference: null,
+      status: 'UNDER_ASSESSMENT',
+      classification: 'HIGHLY_CONFIDENTIAL',
+      followUpAlertThresholdDays: 9,
+      customerId: 'cus-1',
+      policyId: 'pol-1',
+      lossDate: new Date('2026-03-15T00:00:00.000Z'),
+      lossLocation: null,
+      causeOfLoss: 'x',
+      estimatedLoss: new Prisma.Decimal('20000'),
+      isThirdPartyInvolved: false,
+      isLargeClaim: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      policy: {
+        id: 'pol-1',
+        customerId: 'cus-1',
+        policyNumber: 'POL-1',
+        insuranceLine: 'Property All Risks',
+        expiryDate: EXPIRY,
+        schedules: [
+          { id: 'sched-v1', effectiveFrom: INCEPTION, effectiveTo: null },
+        ],
+      },
+      thirdParty: null,
+      adjuster: null,
+      statusHistory: [],
+    });
+
+    await expect(
+      service.register('claim-1', { ...REGISTER_DTO }, claims()),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('409s a duplicate broker claim number (P2002 from the engine)', async () => {
+    const { service, workflow } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    workflow.transition.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    await expect(
+      service.register(
+        'claim-1',
+        { ...REGISTER_DTO, claimNumber: 'TAKEN-1' },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('404s registration by a caller who cannot see the claim', async () => {
+    const { service } = makeDeps({ customerOwner: 'someone-else' });
+    await expect(
+      service.register('claim-1', { ...REGISTER_DTO }, sales()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('normalises a lost NOTIFIED -> REGISTERED race (engine "already in status") to the already-registered path', async () => {
+    const { service, claimRepo, workflow } = makeDeps();
+    await service.notify({ ...BASE_DTO }, claims());
+    // a concurrent register won: the engine's pre-read already saw REGISTERED
+    workflow.transition.mockRejectedValueOnce(
+      new UnprocessableEntityException(
+        'Claim claim-1: already in status REGISTERED',
+      ),
+    );
+    // ...and it fully registered the claim with a DIFFERENT adjuster
+    claimRepo.findById.mockResolvedValueOnce({
+      id: 'claim-1',
+      claimNumber: null,
+      insurerClaimReference: 'INS-CONCURRENT-1',
+      status: 'REGISTERED',
+      classification: 'HIGHLY_CONFIDENTIAL',
+      followUpAlertThresholdDays: 9,
+      customerId: 'cus-1',
+      policyId: 'pol-1',
+      lossDate: new Date('2026-03-15T00:00:00.000Z'),
+      lossLocation: null,
+      causeOfLoss: 'x',
+      estimatedLoss: new Prisma.Decimal('20000'),
+      isThirdPartyInvolved: false,
+      isLargeClaim: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      policy: {
+        id: 'pol-1',
+        customerId: 'cus-1',
+        policyNumber: 'POL-1',
+        insuranceLine: 'Property All Risks',
+        expiryDate: EXPIRY,
+        schedules: [
+          { id: 'sched-v1', effectiveFrom: INCEPTION, effectiveTo: null },
+        ],
+      },
+      thirdParty: null,
+      adjuster: {
+        name: 'The Other Adjuster',
+        firm: null,
+        assignedAt: new Date(),
+        surveyCompletedAt: null,
+        investigationCompletedAt: null,
+      },
+      statusHistory: [],
+    });
+
+    await expect(
+      service.register('claim-1', { ...REGISTER_DTO }, claims()),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(claimRepo.recordRegistration).not.toHaveBeenCalled();
   });
 });

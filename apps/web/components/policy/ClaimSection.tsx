@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   listClaimsForPolicy,
   notifyClaim,
+  registerClaim,
   type Claim,
 } from '../../lib/claim/claim-api';
 import {
@@ -22,6 +23,8 @@ interface Props {
   opportunityId: string;
   /** Sales / Claims — record a claim notification. */
   canNotify: boolean;
+  /** Claims — register a NOTIFIED claim with the insurer + assign the adjuster. */
+  canRegister: boolean;
 }
 
 function money(value: string | null): string {
@@ -43,7 +46,107 @@ function coverageLabel(c: Claim): string {
   return `coverage version in force: ${from} → ${to}`;
 }
 
-export function ClaimSection({ opportunityId, canNotify }: Props) {
+/** Process 24 — a Claims Officer registers a NOTIFIED claim with the insurer
+ * and assigns the loss adjuster in one step. */
+function ClaimRegistrationForm({
+  claimId,
+  onDone,
+}: {
+  claimId: string;
+  onDone: () => Promise<void>;
+}) {
+  const [insurerRef, setInsurerRef] = useState('');
+  const [claimNumber, setClaimNumber] = useState('');
+  const [adjusterName, setAdjusterName] = useState('');
+  const [adjusterFirm, setAdjusterFirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await registerClaim(claimId, {
+        insurerClaimReference: insurerRef.trim(),
+        claimNumber: claimNumber.trim() || undefined,
+        adjuster: {
+          name: adjusterName.trim(),
+          firm: adjusterFirm.trim() || undefined,
+        },
+      });
+      await onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Registration could not be completed — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: '0.75rem', maxWidth: '30rem' }}>
+      <strong style={{ fontSize: '0.9rem' }}>Register with the insurer</strong>
+      {error ? (
+        <p role="alert" style={errorStyle}>
+          {error}
+        </p>
+      ) : null}
+      <div style={quoteFieldStyle}>
+        <label htmlFor={`reg-ref-${claimId}`}>Insurer claim reference</label>
+        <input
+          id={`reg-ref-${claimId}`}
+          maxLength={200}
+          value={insurerRef}
+          onChange={(ev) => setInsurerRef(ev.target.value)}
+        />
+      </div>
+      <div style={quoteFieldStyle}>
+        <label htmlFor={`reg-num-${claimId}`}>Broker claim number (optional)</label>
+        <input
+          id={`reg-num-${claimId}`}
+          maxLength={100}
+          value={claimNumber}
+          onChange={(ev) => setClaimNumber(ev.target.value)}
+        />
+      </div>
+      <div style={quoteFieldStyle}>
+        <label htmlFor={`reg-adj-${claimId}`}>Loss adjuster</label>
+        <input
+          id={`reg-adj-${claimId}`}
+          maxLength={200}
+          value={adjusterName}
+          onChange={(ev) => setAdjusterName(ev.target.value)}
+        />
+      </div>
+      <div style={quoteFieldStyle}>
+        <label htmlFor={`reg-firm-${claimId}`}>Adjuster firm (optional)</label>
+        <input
+          id={`reg-firm-${claimId}`}
+          maxLength={200}
+          value={adjusterFirm}
+          onChange={(ev) => setAdjusterFirm(ev.target.value)}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={
+          busy ||
+          insurerRef.trim().length === 0 ||
+          adjusterName.trim().length < 2
+        }
+        style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+        onClick={() => void submit()}
+      >
+        {busy ? 'Registering…' : 'Register & assign adjuster'}
+      </button>
+    </div>
+  );
+}
+
+export function ClaimSection({ opportunityId, canNotify, canRegister }: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -137,7 +240,9 @@ export function ClaimSection({ opportunityId, canNotify }: Props) {
         <strong>NOTIFIED</strong>. Cover is validated against the coverage
         schedule that was in force on the <em>exact loss date</em> — not the
         current one — so a loss under a policy endorsed after the event resolves
-        to the version that actually applied then.
+        to the version that actually applied then. A Claims Officer then
+        registers the claim with the insurer and assigns the loss adjuster,
+        moving it to <strong>REGISTERED</strong>.
       </p>
 
       {loadError ? (
@@ -189,9 +294,24 @@ export function ClaimSection({ opportunityId, canNotify }: Props) {
                   : ''}
               </p>
             ) : null}
+            {c.insurerClaimReference || c.adjuster ? (
+              <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
+                {c.insurerClaimReference
+                  ? `Insurer ref ${c.insurerClaimReference}`
+                  : ''}
+                {c.adjuster
+                  ? `${c.insurerClaimReference ? ' · ' : ''}adjuster ${c.adjuster.name}${
+                      c.adjuster.firm ? ` (${c.adjuster.firm})` : ''
+                    }`
+                  : ''}
+              </p>
+            ) : null}
             <p style={{ opacity: 0.6, fontSize: '0.8rem', margin: '0.4rem 0' }}>
               {coverageLabel(c)}
             </p>
+            {canRegister && c.status === 'NOTIFIED' ? (
+              <ClaimRegistrationForm claimId={c.id} onDone={load} />
+            ) : null}
           </div>
         ))
       )}

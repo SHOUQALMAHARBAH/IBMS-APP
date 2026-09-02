@@ -58,6 +58,15 @@ interface ClaimBody {
     effectiveTo: string | null;
   } | null;
   coverageResolvedAtLossDate: boolean;
+  claimNumber: string | null;
+  insurerClaimReference: string | null;
+  adjuster: {
+    name: string;
+    firm: string | null;
+    assignedAt: string;
+    surveyCompletedAt: string | null;
+    investigationCompletedAt: string | null;
+  } | null;
   statusHistory: {
     fromStatus: string | null;
     toStatus: string;
@@ -235,7 +244,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification (e2e) — backlog Part C #23', () => {
+describe('Claim Notification + Registration (e2e) — backlog Part C #23-24', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -484,5 +493,124 @@ describe('Claim Notification (e2e) — backlog Part C #23', () => {
         estimatedLoss: '1000.000',
       })
       .expect(403);
+  });
+
+  it('#24 — registers a NOTIFIED claim with the insurer and assigns the loss adjuster (NOTIFIED -> REGISTERED via the engine)', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'clm24-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const clm = await makeUser(app, 'clm24-officer', 'CLAIMS_OFFICER');
+    // Sales holds claim.notify but NOT claim.register.
+    const sales = await makeUser(
+      app,
+      'clm24-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'reg',
+      {
+        inceptionDate: '2026-01-01',
+        expiryDate: '2027-01-01',
+      },
+    );
+    // the db-test DB is cumulative — any @unique value must be fresh per run
+    const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const insurerRef = `INS-CLM-${tag}`;
+    const brokerNumber = `BRK-${tag}`;
+
+    const notified = await request(app.getHttpServer())
+      .post('/claims')
+      .set(bearer(clm.accessToken))
+      .send({
+        policyId,
+        lossDate: '2026-04-02',
+        causeOfLoss: 'Water ingress after a burst riser main.',
+        estimatedLoss: '14500.000',
+      })
+      .expect(201);
+    const claimId = (notified.body as ClaimBody).id;
+
+    // Sales cannot register.
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(sales.accessToken))
+      .send({
+        insurerClaimReference: insurerRef,
+        adjuster: { name: 'Cunningham Lindsey' },
+      })
+      .expect(403);
+
+    const registered = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: insurerRef,
+        claimNumber: brokerNumber,
+        adjuster: { name: 'Cunningham Lindsey', firm: 'CL Loss Adjusters' },
+      })
+      .expect(201);
+    const rBody = registered.body as ClaimBody;
+    expect(rBody.status).toBe('REGISTERED');
+    expect(rBody.insurerClaimReference).toBe(insurerRef);
+    expect(rBody.claimNumber).toBe(brokerNumber);
+    expect(rBody.adjuster).toMatchObject({
+      name: 'Cunningham Lindsey',
+      firm: 'CL Loss Adjusters',
+    });
+    expect(rBody.statusHistory.map((h) => h.toStatus)).toEqual([
+      'NOTIFIED',
+      'REGISTERED',
+    ]);
+    expect(rBody.statusHistory[1].changedByUserId).toBe(clm.userId);
+
+    // exactly one engine TRANSITION row for the claim (a direct .status = write
+    // anywhere would drop it)
+    const transitions = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(transitions).toBe(1);
+
+    // a byte-identical re-call (network retry) is an idempotent no-op 201
+    const again = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: insurerRef,
+        claimNumber: brokerNumber,
+        adjuster: { name: 'Cunningham Lindsey', firm: 'CL Loss Adjusters' },
+      })
+      .expect(201);
+    expect((again.body as ClaimBody).status).toBe('REGISTERED');
+
+    // any change to the registration detail — here just the adjuster firm — is
+    // a 409, never a silently-discarded no-op
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: insurerRef,
+        claimNumber: brokerNumber,
+        adjuster: { name: 'Cunningham Lindsey', firm: 'A Different Firm' },
+      })
+      .expect(409);
+
+    // and a different adjuster is likewise a 409
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: insurerRef,
+        adjuster: { name: 'Somebody Else' },
+      })
+      .expect(409);
+
+    // still exactly one TRANSITION row (the re-calls did not re-transition)
+    const transitionsAfter = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(transitionsAfter).toBe(1);
   });
 });

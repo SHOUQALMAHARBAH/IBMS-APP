@@ -1515,6 +1515,14 @@ model ClaimDocument {
 /// Part 3.7 core data entity — explicit status-history trail, named
 /// separately from the generic AuditLogEntry because it feeds Loss Ratio
 /// and Claims Analytics directly.
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most one row per
+/// (claimId, toStatus) — the `WORKFLOW_TRANSITIONS.Claim` map is an acyclic
+/// DAG (no status is ever revisited), so a status is entered exactly once
+/// over a claim's life. `@@unique([claimId, toStatus])` (migration
+/// 20260902180000) makes "one REGISTERED row per claim" (etc.) structural,
+/// so a concurrent double-registration cannot mint a duplicate history row
+/// even if the caller-side pre-check is later weakened.
 model ClaimStatusHistory {
   id         String      @id @default(uuid())
   claimId    String
@@ -1523,6 +1531,8 @@ model ClaimStatusHistory {
   toStatus   ClaimStatus
   changedByUserId String
   changedAt  DateTime    @default(now())
+
+  @@unique([claimId, toStatus])
 }
 
 /// Process 28 — four DISTINCT figures, never collapsed into one number.

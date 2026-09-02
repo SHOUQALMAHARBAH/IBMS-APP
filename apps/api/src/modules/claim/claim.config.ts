@@ -243,3 +243,44 @@ export function thirdPartyClaimantAuditSnapshot(row: {
     subrogationRecoveryFlag: row.subrogationRecoveryFlag,
   };
 }
+
+/**
+ * CREATE audit `afterValue` for the loss `Adjuster` assigned at registration
+ * (Process 24). The adjuster is a professional loss-assessment firm / person —
+ * NOT the insured or the claimant — so the name + firm go in the trail, the
+ * same tier as the delivery `recipient` on a #21 `DeliveryRecord` audit row.
+ */
+export function adjusterAuditSnapshot(row: {
+  id: string;
+  claimId: string;
+  name: string;
+  firm: string | null;
+  assignedAt: Date;
+}): Prisma.InputJsonObject {
+  return {
+    adjusterId: row.id,
+    claimId: row.claimId,
+    name: row.name,
+    firm: row.firm,
+    assignedAt: row.assignedAt.toISOString(),
+  };
+}
+
+/**
+ * UPDATE audit `afterValue` for the registration scalars the workflow engine's
+ * TRANSITION row (before / after `status` only) does not capture — the
+ * insurer's claim reference and, if the broker assigned one now, the internal
+ * claim number. Both are administrative identifiers, not sensitive personal
+ * data.
+ */
+export function claimRegistrationAuditSnapshot(row: {
+  claimId: string;
+  insurerClaimReference: string;
+  claimNumber: string | null;
+}): Prisma.InputJsonObject {
+  return {
+    claimId: row.claimId,
+    insurerClaimReference: row.insurerClaimReference,
+    claimNumber: row.claimNumber,
+  };
+}

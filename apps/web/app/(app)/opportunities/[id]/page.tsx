@@ -228,6 +228,7 @@ export default function OpportunityDetailPage() {
           <ClaimSection
             opportunityId={opportunity.id}
             canNotify={isSales || isClaims}
+            canRegister={isClaims}
           />
         </>
       ) : null}

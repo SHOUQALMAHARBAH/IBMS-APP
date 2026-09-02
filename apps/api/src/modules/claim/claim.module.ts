@@ -8,11 +8,13 @@ import { SecurityModule } from '../security/security.module';
 import { PolicyModule } from '../policy/policy.module';
 import { CustomerModule } from '../customer/customer.module';
 
-/** Process 23 — Claim Notification (backlog Part C #23, Domain C).
+/** Process 23-24 — Claim Notification + Registration (backlog Part C #23-24,
+ * Domain C).
  *
  * `Claim` IS a `WorkflowTransitionService` entity — the engine comes from the
- * @Global() WorkflowModule; #23 only creates the claim at the schema
- * `@default(NOTIFIED)` (no transition), so nothing is imported for it here.
+ * @Global() WorkflowModule (so it is not imported here). #23 creates the
+ * claim at the schema `@default(NOTIFIED)` (no transition); #24 drives the
+ * first real engine transition on it, `NOTIFIED -> REGISTERED`.
  *   - AuditModule    -> AuditService
  *   - AuthModule     -> guards/decorators (RequirePermissions, CurrentUser)
  *   - SecurityModule -> EncryptionService (ThirdPartyClaimant.contactDetailsEnc,

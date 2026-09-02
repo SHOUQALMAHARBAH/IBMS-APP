@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { Prisma } from '@ibms/db';
 import {
   CLAIM_LARGE_THRESHOLD_JOD,
+  adjusterAuditSnapshot,
   claimNotificationAuditSnapshot,
+  claimRegistrationAuditSnapshot,
   coverageGapMessage,
   isLargeClaim,
   resolveCoverageAtLossDate,
@@ -247,6 +249,37 @@ describe('audit snapshots — metadata not body', () => {
       hasFullName: true,
       hasContactDetails: true,
       subrogationRecoveryFlag: true,
+    });
+  });
+
+  it('adjusterAuditSnapshot carries the adjuster name + firm (a professional service provider, not the claimant)', () => {
+    const snap = adjusterAuditSnapshot({
+      id: 'adj-1',
+      claimId: 'claim-1',
+      name: 'Cunningham Lindsey',
+      firm: 'CL Loss Adjusters',
+      assignedAt: d('2026-05-20T00:00:00.000Z'),
+    });
+    expect(snap).toEqual({
+      adjusterId: 'adj-1',
+      claimId: 'claim-1',
+      name: 'Cunningham Lindsey',
+      firm: 'CL Loss Adjusters',
+      assignedAt: '2026-05-20T00:00:00.000Z',
+    });
+  });
+
+  it('claimRegistrationAuditSnapshot carries the administrative identifiers only', () => {
+    expect(
+      claimRegistrationAuditSnapshot({
+        claimId: 'claim-1',
+        insurerClaimReference: 'INS-CLM-2026-0042',
+        claimNumber: null,
+      }),
+    ).toEqual({
+      claimId: 'claim-1',
+      insurerClaimReference: 'INS-CLM-2026-0042',
+      claimNumber: null,
     });
   });
 });

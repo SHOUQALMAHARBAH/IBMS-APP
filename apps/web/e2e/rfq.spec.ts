@@ -168,6 +168,11 @@ async function mockRfqApi(
       estimatedLoss: string;
       isThirdPartyInvolved?: boolean;
     }) => void;
+    onRegisterClaim?: (body: {
+      insurerClaimReference: string;
+      claimNumber?: string;
+      adjuster: { name: string; firm?: string };
+    }) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -773,11 +778,44 @@ async function mockRfqApi(
     return route.fulfill({ status: 200, json: policy ? [policy] : [] });
   });
 
-  // Process 23 — claims against the policy. Starts empty; a POST /claims
-  // appends a NOTIFIED row that resolves to the seeded coverage schedule.
+  // Process 23-24 — claims against the policy. Starts empty; a POST /claims
+  // appends a NOTIFIED row; a POST /claims/:id/registration moves it to
+  // REGISTERED and attaches the insurer ref + adjuster.
   const claimRows: Record<string, unknown>[] = [];
   await page.route("http://localhost:4000/claims**", (route) => {
+    const url = route.request().url();
     const method = route.request().method();
+
+    const regMatch = /\/claims\/([^/?]+)\/registration(\?|$)/.exec(url);
+    if (method === "POST" && regMatch) {
+      const b = route.request().postDataJSON() as {
+        insurerClaimReference: string;
+        claimNumber?: string;
+        adjuster: { name: string; firm?: string };
+      };
+      opts.onRegisterClaim?.(b);
+      const row = claimRows.find((r) => r.id === regMatch[1]);
+      if (row) {
+        row.status = "REGISTERED";
+        row.insurerClaimReference = b.insurerClaimReference;
+        if (b.claimNumber) row.claimNumber = b.claimNumber;
+        row.adjuster = {
+          name: b.adjuster.name,
+          firm: b.adjuster.firm ?? null,
+          assignedAt: "2026-11-05T00:00:00.000Z",
+          surveyCompletedAt: null,
+          investigationCompletedAt: null,
+        };
+        (row.statusHistory as Record<string, unknown>[]).push({
+          fromStatus: "NOTIFIED",
+          toStatus: "REGISTERED",
+          changedByUserId: "user-1",
+          changedAt: "2026-11-05T00:00:00.000Z",
+        });
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
+
     if (method === "POST") {
       const b = route.request().postDataJSON() as {
         policyId: string;
@@ -792,13 +830,14 @@ async function mockRfqApi(
         };
       };
       opts.onNotifyClaim?.(b);
-      const row = {
+      const row: Record<string, unknown> = {
         id: `claim-${claimRows.length + 1}`,
         policyId: b.policyId,
         customerId: "cust-1",
         policyNumber: "POL-SEED-1",
         insuranceLine: "Property All Risks",
         claimNumber: null,
+        insurerClaimReference: null,
         status: "NOTIFIED",
         lossDate: `${b.lossDate}T00:00:00.000Z`,
         lossLocation: b.lossLocation ?? null,
@@ -816,6 +855,7 @@ async function mockRfqApi(
               ),
             }
           : null,
+        adjuster: null,
         coverage: {
           scheduleId: "sch-1",
           effectiveFrom: "2026-10-01T00:00:00.000Z",
@@ -1348,6 +1388,52 @@ test("notifies a claim against an issued policy", async ({ page }) => {
   await expect(page.getByText("large claim", { exact: false })).toBeVisible();
   await expect(
     page.getByText("coverage version in force", { exact: false }),
+  ).toBeVisible();
+});
+
+test("registers a NOTIFIED claim with the insurer and assigns the adjuster", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  let registered: {
+    insurerClaimReference: string;
+    adjuster: { name: string };
+  } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onRegisterClaim: (b) => {
+      registered = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  // notify first
+  await page.getByLabel("Loss date").fill("2026-11-15");
+  await page.getByLabel("Cause of loss").fill("Burst riser main flooded unit 4.");
+  await page.getByLabel("Estimated loss").fill("14000.000");
+  await page.getByRole("button", { name: "Notify claim" }).click();
+  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+
+  // the registration form appears on the NOTIFIED claim
+  await page.getByLabel("Insurer claim reference").fill("INS-CLM-2026-9001");
+  await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
+  await page.getByLabel("Adjuster firm (optional)").fill("CL Loss Adjusters");
+  await page
+    .getByRole("button", { name: "Register & assign adjuster" })
+    .click();
+
+  await expect
+    .poll(() => registered?.insurerClaimReference)
+    .toBe("INS-CLM-2026-9001");
+  await expect.poll(() => registered?.adjuster.name).toBe("Cunningham Lindsey");
+  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("adjuster Cunningham Lindsey", { exact: false }),
   ).toBeVisible();
 });
 

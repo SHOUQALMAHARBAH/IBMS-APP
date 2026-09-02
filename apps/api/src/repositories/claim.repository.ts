@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { Claim, Prisma, ThirdPartyClaimant } from '@ibms/db';
+import type { Adjuster, Claim, Prisma, ThirdPartyClaimant } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CLAIM_INCLUDE = {
   thirdParty: true,
+  // Process 24 — the one loss adjuster assigned at registration (or null).
+  adjuster: true,
   statusHistory: { orderBy: { changedAt: 'asc' } },
   policy: {
     select: {
@@ -64,17 +66,25 @@ export interface CreateThirdPartyClaimantInput {
   subrogationRecoveryFlag: boolean;
 }
 
+export interface AssignAdjusterInput {
+  name: string;
+  firm: string | null;
+}
+
 /**
- * Process 23 — Claim Notification (backlog Part C #23, Domain C). Owns `Claim`
- * plus its notification-time children: the opening `ClaimStatusHistory` row
- * and, for a third-party-involved loss, the one `ThirdPartyClaimant`.
+ * Process 23-24 — Claim Notification + Registration (backlog Part C #23-24,
+ * Domain C). Owns `Claim` plus its children: the `ClaimStatusHistory` trail,
+ * the one `ThirdPartyClaimant` (#23) and the one loss `Adjuster` (#24).
  *
  * `Claim` IS a `WorkflowTransitionService` entity — its `status`
  * (`ClaimStatus`) moves ONLY through the engine
  * (ibms-brain/meta/lex/workflow-state-transitions.md). Nothing here writes
  * `status`: the notification row takes the schema `@default(NOTIFIED)` on
  * `create` (initial creation, same as a `Policy` created at
- * `PLACEMENT_CONFIRMED`); the `NOTIFIED → REGISTERED` move is Process 24.
+ * `PLACEMENT_CONFIRMED`); the `NOTIFIED → REGISTERED` move (#24) goes through
+ * `WorkflowTransitionService.transition` in `ClaimService`, and only the
+ * post-transition artefacts (the `REGISTERED` history row + the `Adjuster`)
+ * are written here.
  */
 @Injectable()
 export class ClaimRepository {
@@ -126,6 +136,56 @@ export class ClaimRepository {
           })
         : null;
       return { claim: created, thirdParty: tp };
+    });
+  }
+
+  /**
+   * Process 24 — the registration artefacts recorded once the
+   * `NOTIFIED → REGISTERED` transition has committed: the `REGISTERED`
+   * `ClaimStatusHistory` row (the engine writes only a generic `TRANSITION`
+   * `AuditLogEntry`, not this domain trail that feeds Loss Ratio / Claims
+   * Analytics) and the one loss `Adjuster` (`claimId @unique`) — in ONE
+   * interactive transaction (the same local-exception rationale as
+   * `createNotification`).
+   *
+   * "One `REGISTERED` history row per claim" is structural — the partial-free
+   * `@@unique([claimId, toStatus])` on `ClaimStatusHistory` (migration
+   * `20260902180000`, correct because `WORKFLOW_TRANSITIONS.Claim` is an
+   * acyclic DAG). The `count()` here is a friendly pre-check that KEEPS the
+   * crash-recovery re-entry working: a resume (transition committed, this
+   * write did not, but a prior attempt DID insert the history row) must skip
+   * the insert rather than roll the whole transaction back on the constraint.
+   * A `P2002` on either insert (a concurrent registration got there first)
+   * rolls the transaction back; the caller maps it to 409.
+   */
+  recordRegistration(input: {
+    claimId: string;
+    changedByUserId: string;
+    adjuster: AssignAdjusterInput;
+  }): Promise<Adjuster> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const hasRegisteredHistory =
+        (await tx.claimStatusHistory.count({
+          where: { claimId: input.claimId, toStatus: 'REGISTERED' },
+        })) > 0;
+      if (!hasRegisteredHistory) {
+        await tx.claimStatusHistory.create({
+          data: {
+            claimId: input.claimId,
+            // REGISTERED's only predecessor in WORKFLOW_TRANSITIONS.Claim.
+            fromStatus: 'NOTIFIED',
+            toStatus: 'REGISTERED',
+            changedByUserId: input.changedByUserId,
+          },
+        });
+      }
+      return tx.adjuster.create({
+        data: {
+          claimId: input.claimId,
+          name: input.adjuster.name,
+          firm: input.adjuster.firm,
+        },
+      });
     });
   }
 
