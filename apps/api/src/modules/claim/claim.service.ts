@@ -63,7 +63,9 @@ import type { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
 import type { RecordAdjusterProgressDto } from './dto/record-adjuster-progress.dto';
 import type { DecideClaimAssessmentDto } from './dto/decide-claim-assessment.dto';
 import type { RecordSettlementDto } from './dto/record-settlement.dto';
+import type { CloseClaimDto } from './dto/close-claim.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
+import { LossRatioService } from '../loss-ratio/loss-ratio.service';
 
 const CROSS_OWNER_ROLES: readonly string[] = CLAIM_CROSS_OWNER_ROLES;
 
@@ -158,6 +160,9 @@ export interface ClaimView {
    * from the approved amount + broker-processed flag — NOT `isLargeClaim`
    * above, which is the notification-time snapshot. */
   settlement: SettlementView | null;
+  /** Process 29 — when the claim was formally closed (the `CLOSED`
+   * `ClaimStatusHistory.changedAt`), or null while it is still open. */
+  closedAt: Date | null;
   statusHistory: ClaimStatusHistoryView[];
   createdAt: Date;
   updatedAt: Date;
@@ -180,8 +185,8 @@ export interface ClaimFollowUpScanResult {
 }
 
 /**
- * Process 23-28 — Claim Notification + Registration + Documentation +
- * Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C).
+ * Process 23-29 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up + Settlement + Closure (backlog Part C #23-29, Domain C).
  *
  *  - `notify` (#23) — record a reported loss against a Policy: loss
  *    date/location/cause, the estimated loss, third-party involvement. The
@@ -225,6 +230,11 @@ export interface ClaimFollowUpScanResult {
  *    SETTLED` through the engine and **structurally refuses** to while a
  *    required second approval is missing (the #22 APPLY-re-checks-approval
  *    lesson).
+ *  - `closeClaim` (#29) — formal closure. `SETTLED → CLOSED` gated on the
+ *    client's payment receipt being confirmed (`Settlement.clientPaymentConfirmedAt`,
+ *    write-once); `DECLINED → CLOSED` directly. `closeCore` drives the engine
+ *    transition, then best-effort triggers `LossRatioService.recomputeForPolicy`
+ *    (Loss Ratio is an input the renewal workflow depends on).
  *  - `list` / `get` — read, scoped to exactly one of `policyId` /
  *    `customerId`.
  *
@@ -251,6 +261,7 @@ export class ClaimService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly encryption: EncryptionService,
+    private readonly lossRatio: LossRatioService,
   ) {}
 
   private canReachAnyClaim(actor: AuthenticatedUser): boolean {
@@ -384,6 +395,9 @@ export class ClaimService {
         status: claim.status,
         settlement: claim.settlement,
       }),
+      closedAt:
+        claim.statusHistory.find((h) => h.toStatus === 'CLOSED')?.changedAt ??
+        null,
       statusHistory: claim.statusHistory.map((h) => ({
         fromStatus: h.fromStatus,
         toStatus: h.toStatus,
@@ -1724,6 +1738,168 @@ export class ClaimService {
       throw err;
     }
     await this.recordHistoryBestEffort(id, fromStatus, 'SETTLED', actor);
+  }
+
+  /**
+   * Process 29 — formal claim closure. A `SETTLED` claim closes only once the
+   * client's receipt of the settlement payment is confirmed
+   * (`Settlement.clientPaymentConfirmedAt` — write-once, past-only, no earlier
+   * than the loss date); a `DECLINED` claim (no payout) closes directly. Drives `Claim (SETTLED | DECLINED) → CLOSED` through the engine
+   * and best-effort triggers a Loss Ratio recompute for the parent policy
+   * (`claims-lifecycle.md` — Loss Ratio is an input the renewal workflow
+   * depends on). Idempotent: an already-`CLOSED` claim is a 200 no-op.
+   * No maker/checker — closure is single-actor Claims work (the mandatory
+   * second approver is at settlement, Process 28).
+   */
+  async closeClaim(
+    id: string,
+    dto: CloseClaimDto,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+    const confirmedRaw = dto.clientPaymentConfirmedAt?.trim();
+
+    if (claim.status === 'CLOSED') {
+      // Already closed — 200 no-op. Do NOT re-fire the Loss Ratio recompute
+      // (a re-close is not a new closure event).
+      return this.toViewAudited(id, actor, 'claim-closure');
+    }
+
+    if (claim.status === 'DECLINED') {
+      if (confirmedRaw) {
+        throw new UnprocessableEntityException(
+          `Claim ${id} is DECLINED — there is no settlement payment to confirm. Close it with no body.`,
+        );
+      }
+      await this.closeCore(id, claim.policyId, 'DECLINED', actor);
+      return this.toViewAudited(id, actor, 'claim-closure');
+    }
+
+    if (claim.status !== 'SETTLED') {
+      throw new UnprocessableEntityException(
+        `Claim ${id} is ${claim.status}; a claim is closed from SETTLED (after the client's payment is confirmed) or DECLINED.`,
+      );
+    }
+
+    // SETTLED — a confirmed client payment receipt is the precondition.
+    const s = claim.settlement;
+    if (!s) {
+      throw new UnprocessableEntityException(
+        `Claim ${id} is SETTLED but has no Settlement row — cannot confirm the client payment.`,
+      );
+    }
+
+    if (s.clientPaymentConfirmedAt == null) {
+      if (!confirmedRaw) {
+        throw new UnprocessableEntityException(
+          `Claim ${id}: confirm the client's receipt of the settlement payment (send clientPaymentConfirmedAt) before closing.`,
+        );
+      }
+      const instant = parseHistoricalInstant(
+        confirmedRaw,
+        'clientPaymentConfirmedAt',
+      );
+      // Lower bound: the loss date (the client cannot have received a
+      // settlement payment before the loss occurred). A tighter "after the
+      // Settlement row was recorded" bound is deliberately not enforced —
+      // data-entry lag between a real payment and its capture is normal (same
+      // latitude as #21's `deliveredAt`).
+      if (instant.getTime() < claim.lossDate.getTime()) {
+        throw new UnprocessableEntityException(
+          `clientPaymentConfirmedAt cannot be earlier than the loss date (${claim.lossDate.toISOString()}).`,
+        );
+      }
+      const { wrote, settlement } = await this.claims.confirmSettlementPayment(
+        s.id,
+        instant,
+      );
+      if (
+        !wrote &&
+        settlement.clientPaymentConfirmedAt != null &&
+        settlement.clientPaymentConfirmedAt.getTime() !== instant.getTime()
+      ) {
+        throw new ConflictException(
+          `Claim ${id}: the client payment receipt was already confirmed at ${settlement.clientPaymentConfirmedAt.toISOString()} (recorded once — a correction is not supported).`,
+        );
+      }
+      if (wrote) {
+        await this.safeAudit({
+          userId: actor.id,
+          action: 'UPDATE',
+          entityType: 'Settlement',
+          entityId: s.id,
+          afterValue: {
+            settlementId: s.id,
+            claimId: id,
+            clientPaymentConfirmedAt: instant.toISOString(),
+          },
+        });
+      }
+    } else if (confirmedRaw) {
+      // Already confirmed — a different value is a 409, an identical one is a
+      // silent no-op (a byte-identical re-close resumes a stuck close).
+      const parsed = parseHistoricalInstant(
+        confirmedRaw,
+        'clientPaymentConfirmedAt',
+      );
+      if (parsed.getTime() !== s.clientPaymentConfirmedAt.getTime()) {
+        throw new ConflictException(
+          `Claim ${id}: the client payment receipt was already confirmed at ${s.clientPaymentConfirmedAt.toISOString()}.`,
+        );
+      }
+    }
+
+    await this.closeCore(id, claim.policyId, 'SETTLED', actor);
+    return this.toViewAudited(id, actor, 'claim-closure');
+  }
+
+  /**
+   * Drive `Claim (SETTLED | DECLINED) → CLOSED` through the engine + write the
+   * domain `ClaimStatusHistory` row (best-effort — the #24-28 seam). A
+   * concurrent close is normalised to an idempotent no-op. Only the call that
+   * actually transitions the claim fires the Loss Ratio recompute (best-effort
+   * — closure has committed; the recompute is a downstream input, not a gate).
+   */
+  private async closeCore(
+    id: string,
+    policyId: string,
+    fromStatus: 'SETTLED' | 'DECLINED',
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    try {
+      await this.workflow.transition({
+        entityType: 'Claim',
+        entityId: id,
+        toStatus: 'CLOSED',
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      const now = await this.loadVisibleClaim(id, actor);
+      if (now.status === 'CLOSED') {
+        await this.backfillStatusHistory(
+          id,
+          fromStatus,
+          'CLOSED',
+          now.statusHistory,
+          actor,
+        );
+        return;
+      }
+      throw err;
+    }
+    await this.recordHistoryBestEffort(id, fromStatus, 'CLOSED', actor);
+
+    try {
+      await this.lossRatio.recomputeForPolicy(
+        policyId,
+        { reason: 'claim-closed', claimId: id },
+        actor.id,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Claim ${id}: closed, but the Loss Ratio recompute for policy ${policyId} did not run (the renewal workflow will recompute it): ${(err as Error).message}`,
+      );
+    }
   }
 
   async list(

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   attachClaimDocuments,
+  closeClaim,
   decideClaimAssessment,
   listClaimsForPolicy,
   notifyClaim,
@@ -50,6 +51,8 @@ interface Props {
   /** Manager / Finance — the mandatory second approval on a large / broker
    * settlement (never the first approver). */
   canSecondApproveSettlement: boolean;
+  /** Claims — formally close a SETTLED (payment confirmed) or DECLINED claim. */
+  canClose: boolean;
 }
 
 function money(value: string | null): string {
@@ -693,6 +696,128 @@ function ClaimSettlement({
   );
 }
 
+const CLOSURE_STATUSES: Claim['status'][] = ['SETTLED', 'DECLINED', 'CLOSED'];
+
+/** Process 29 — formal closure. A SETTLED claim closes once the client's
+ * payment receipt is confirmed; a DECLINED claim closes directly. */
+function ClaimClosure({
+  claim,
+  canClose,
+  onDone,
+}: {
+  claim: Claim;
+  canClose: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [confirmedOn, setConfirmedOn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!CLOSURE_STATUSES.includes(claim.status)) return null;
+
+  const paymentConfirmed = claim.settlement?.clientPaymentConfirmedAt ?? null;
+
+  async function close(input: { clientPaymentConfirmedAt?: string }) {
+    setBusy(true);
+    setError(null);
+    try {
+      await closeClaim(claim.id, input);
+      await onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'The claim could not be closed — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <strong style={{ fontSize: '0.9rem' }}>Closure</strong>
+      {error ? (
+        <p role="alert" style={errorStyle}>
+          {error}
+        </p>
+      ) : null}
+
+      {claim.status === 'CLOSED' ? (
+        <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
+          Closed{' '}
+          {claim.closedAt
+            ? new Date(claim.closedAt).toLocaleDateString()
+            : ''}
+          {paymentConfirmed
+            ? ` · client payment confirmed ${new Date(
+                paymentConfirmed,
+              ).toLocaleDateString()}`
+            : ''}
+        </p>
+      ) : claim.status === 'DECLINED' ? (
+        <>
+          <p style={{ fontSize: '0.85rem', margin: '0.35rem 0', opacity: 0.8 }}>
+            Declined by the insurer — no payment. Close the claim to trigger the
+            Loss Ratio recompute.
+          </p>
+          {canClose ? (
+            <button
+              type="button"
+              disabled={busy}
+              style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+              onClick={() => void close({})}
+            >
+              Close claim
+            </button>
+          ) : null}
+        </>
+      ) : paymentConfirmed ? (
+        <>
+          <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
+            Client payment confirmed{' '}
+            {new Date(paymentConfirmed).toLocaleDateString()}.
+          </p>
+          {canClose ? (
+            <button
+              type="button"
+              disabled={busy}
+              style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+              onClick={() => void close({})}
+            >
+              Close claim
+            </button>
+          ) : null}
+        </>
+      ) : canClose ? (
+        <div style={{ maxWidth: '30rem' }}>
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`close-paid-${claim.id}`}>
+              Client received the settlement payment on
+            </label>
+            <input
+              id={`close-paid-${claim.id}`}
+              type="date"
+              value={confirmedOn}
+              onChange={(ev) => setConfirmedOn(ev.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            disabled={busy || confirmedOn.trim().length === 0}
+            style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+            onClick={() =>
+              void close({ clientPaymentConfirmedAt: confirmedOn.trim() })
+            }
+          >
+            Confirm payment &amp; close claim
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ClaimSection({
   opportunityId,
   canNotify,
@@ -702,6 +827,7 @@ export function ClaimSection({
   canFollowUp,
   canSettle,
   canSecondApproveSettlement,
+  canClose,
 }: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
@@ -809,7 +935,10 @@ export function ClaimSection({
         Finally the settlement is recorded as four distinct figures
         (estimated / approved / deductible / net) — large or broker-processed
         payments need a second approver, never the first
-        (<strong>SETTLED</strong>).
+        (<strong>SETTLED</strong>). The claim is then formally closed once the
+        client&rsquo;s receipt of the payment is confirmed (a declined claim
+        closes directly); closure triggers a Loss Ratio recompute for the
+        policy.
       </p>
 
       {canFollowUp ? (
@@ -928,6 +1057,7 @@ export function ClaimSection({
               canSecondApproveSettlement={canSecondApproveSettlement}
               onDone={load}
             />
+            <ClaimClosure claim={c} canClose={canClose} onDone={load} />
           </div>
         ))
       )}

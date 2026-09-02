@@ -1,14 +1,16 @@
-// Process 23-28 — Claim Notification + Registration + Documentation +
-// Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C). Talks
-// to apps/api's claim module: record a reported loss against a Policy (with
-// coverage-at-loss-date validation), register it with the insurer + assign the
-// adjuster (NOTIFIED -> REGISTERED), file the mandatory documentation (a
-// per-claim-type checklist, first attach -> DOCUMENTATION_IN_PROGRESS), track
-// the adjuster's survey / investigation, submit for insurer assessment (->
-// UNDER_ASSESSMENT, gated on the checklist), record the verdict (-> APPROVED |
-// PARTIALLY_APPROVED | DECLINED), raise / resolve insurer non-response
-// follow-up alerts, and record the settlement's four distinct figures with a
-// mandatory second approver for large / broker-processed payments (-> SETTLED).
+// Process 23-29 — Claim Notification + Registration + Documentation +
+// Assessment + Follow-up + Settlement + Closure (backlog Part C #23-29, Domain
+// C). Talks to apps/api's claim module: record a reported loss against a Policy
+// (with coverage-at-loss-date validation), register it with the insurer +
+// assign the adjuster (NOTIFIED -> REGISTERED), file the mandatory
+// documentation (a per-claim-type checklist, first attach ->
+// DOCUMENTATION_IN_PROGRESS), track the adjuster's survey / investigation,
+// submit for insurer assessment (-> UNDER_ASSESSMENT, gated on the checklist),
+// record the verdict (-> APPROVED | PARTIALLY_APPROVED | DECLINED), raise /
+// resolve insurer non-response follow-up alerts, record the settlement's four
+// distinct figures with a mandatory second approver for large / broker-processed
+// payments (-> SETTLED), and formally close the claim once the client's payment
+// receipt is confirmed (-> CLOSED, triggering a Loss Ratio recompute).
 
 import { apiGet, apiPost } from '../auth/api-client';
 
@@ -137,7 +139,9 @@ export interface Claim {
     secondApproverUserId: string | null;
     secondApproverRequired: boolean;
     settled: boolean;
+    clientPaymentConfirmedAt: string | null;
   } | null;
+  closedAt: string | null;
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
@@ -287,4 +291,20 @@ export function secondApproveClaimSettlement(claimId: string): Promise<Claim> {
     `/claims/${encodeURIComponent(claimId)}/settlement/second-approve`,
     {},
   );
+}
+
+export interface CloseClaimInput {
+  /** required to close a SETTLED claim (the client's receipt of the settlement
+   * payment); omit for a DECLINED claim. */
+  clientPaymentConfirmedAt?: string;
+}
+
+/** Process 29 — formal closure. `SETTLED → CLOSED` once the client's payment
+ * receipt is confirmed; `DECLINED → CLOSED` directly. Triggers a Loss Ratio
+ * recompute for the policy. */
+export function closeClaim(
+  claimId: string,
+  input: CloseClaimInput = {},
+): Promise<Claim> {
+  return apiPost(`/claims/${encodeURIComponent(claimId)}/closure`, input);
 }

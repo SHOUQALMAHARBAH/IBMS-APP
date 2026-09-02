@@ -805,6 +805,7 @@ describe('Process 28 — settlement', () => {
         brokerProcessedPayment: false,
         approvedByUserId: 'u-1',
         secondApproverUserId: null,
+        clientPaymentConfirmedAt: null,
         createdAt: d('2026-06-01T00:00:00.000Z'),
       },
     });
@@ -817,6 +818,7 @@ describe('Process 28 — settlement', () => {
       settled: false,
       approvedByUserId: 'u-1',
       secondApproverUserId: null,
+      clientPaymentConfirmedAt: null,
     });
   });
 
@@ -831,11 +833,13 @@ describe('Process 28 — settlement', () => {
         brokerProcessedPayment: false,
         approvedByUserId: 'u-1',
         secondApproverUserId: null,
+        clientPaymentConfirmedAt: d('2026-06-10T00:00:00.000Z'),
         createdAt: d('2026-06-01T00:00:00.000Z'),
       },
     });
     expect(v?.settled).toBe(true);
     expect(v?.secondApproverRequired).toBe(false);
+    expect(v?.clientPaymentConfirmedAt).toBe('2026-06-10T00:00:00.000Z');
   });
 
   it('settlementAuditSnapshot carries the four figures as fixed strings, no narrative', () => {

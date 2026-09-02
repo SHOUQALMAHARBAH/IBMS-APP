@@ -236,6 +236,7 @@ export default function OpportunityDetailPage() {
             canFollowUp={isClaims}
             canSettle={isClaims || isManager}
             canSecondApproveSettlement={isManager || isFinance}
+            canClose={isClaims}
           />
         </>
       ) : null}

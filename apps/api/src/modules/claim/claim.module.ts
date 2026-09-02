@@ -8,9 +8,10 @@ import { AuthModule } from '../auth/auth.module';
 import { SecurityModule } from '../security/security.module';
 import { PolicyModule } from '../policy/policy.module';
 import { CustomerModule } from '../customer/customer.module';
+import { LossRatioModule } from '../loss-ratio/loss-ratio.module';
 
-/** Process 23-27 — Claim Notification + Registration + Documentation +
- * Assessment + Follow-up (backlog Part C #23-27, Domain C).
+/** Process 23-29 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up + Settlement + Closure (backlog Part C #23-29, Domain C).
  *
  * `Claim` IS a `WorkflowTransitionService` entity — the engine comes from the
  * @Global() WorkflowModule (so it is not imported here). #23 creates the
@@ -25,6 +26,8 @@ import { CustomerModule } from '../customer/customer.module';
  *   - PolicyModule   -> PolicyRepository (the parent Policy — visibility and
  *     every PolicySchedule window, for "coverage in force at the loss date")
  *   - CustomerModule -> CustomerRepository (owner, for visibility)
+ *   - LossRatioModule -> LossRatioService (Process 29 — closing a claim
+ *     best-effort triggers a Loss Ratio recompute for the policy)
  *
  * `ClaimFollowUpScheduler` (@Cron) drives the nightly Process 27 insurer
  * non-response sweep; ScheduleModule.forRoot() is registered in app.module.ts. */
@@ -35,6 +38,7 @@ import { CustomerModule } from '../customer/customer.module';
     SecurityModule,
     PolicyModule,
     CustomerModule,
+    LossRatioModule,
   ],
   controllers: [ClaimController],
   providers: [ClaimService, ClaimRepository, ClaimFollowUpScheduler],

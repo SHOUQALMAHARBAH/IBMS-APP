@@ -7,13 +7,14 @@ import { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
 import { RecordAdjusterProgressDto } from './dto/record-adjuster-progress.dto';
 import { DecideClaimAssessmentDto } from './dto/decide-claim-assessment.dto';
 import { RecordSettlementDto } from './dto/record-settlement.dto';
+import { CloseClaimDto } from './dto/close-claim.dto';
 import { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
-/** Process 23-28 — Claim Notification + Registration + Documentation +
- * Assessment + Follow-up + Settlement (backlog Part C #23-28, Domain C). Record
+/** Process 23-29 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up + Settlement + Closure (backlog Part C #23-29, Domain C). Record
  * a reported loss against a Policy (with coverage-at-loss-date validation),
  * register it with the insurer and assign the loss adjuster (`NOTIFIED →
  * REGISTERED`), file the mandatory documentation — a per-claim-type checklist —
@@ -23,10 +24,12 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * checklist), record the verdict (`UNDER_ASSESSMENT → APPROVED |
  * PARTIALLY_APPROVED | DECLINED`), raise a `ClaimFollowUpAlert` (nightly or on
  * demand) on any pre-verdict claim past its per-line insurer non-response
- * threshold, and record the settlement's four distinct figures with a mandatory
- * second approver for large / broker-processed payments (`→ SETTLED`). See
- * claim.service.ts for the rules. Frontend: the "Claims" block in the "Policy"
- * section on apps/web/app/(app)/opportunities/[id]/. */
+ * threshold, record the settlement's four distinct figures with a mandatory
+ * second approver for large / broker-processed payments (`→ SETTLED`), and
+ * formally close the claim once the client's payment receipt is confirmed
+ * (`→ CLOSED`, triggering a Loss Ratio recompute). See claim.service.ts for the
+ * rules. Frontend: the "Claims" block in the "Policy" section on
+ * apps/web/app/(app)/opportunities/[id]/. */
 @ApiTags('claims')
 @Controller('claims')
 export class ClaimController {
@@ -147,6 +150,20 @@ export class ClaimController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.claims.secondApproveSettlement(id, user);
+  }
+
+  /** Process 29 — formal closure. `SETTLED → CLOSED` once the client's receipt
+   * of the settlement payment is confirmed (`clientPaymentConfirmedAt`,
+   * write-once); `DECLINED → CLOSED` directly (no body). Best-effort triggers a
+   * Loss Ratio recompute for the policy. */
+  @RequirePermissions('claim.close')
+  @Post(':id/closure')
+  closeClaim(
+    @Param('id') id: string,
+    @Body() dto: CloseClaimDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.closeClaim(id, dto, user);
   }
 
   @RequirePermissions('claim.read')

@@ -762,6 +762,10 @@ export interface SettlementView {
   /** The four figures are recorded, the (any) required second approval is in,
    * and the `Claim` has reached `SETTLED`. */
   settled: boolean;
+  /** Process 29 — when the client's receipt of the settlement payment was
+   * confirmed (write-once). A `SETTLED` claim can only be closed once this is
+   * set. */
+  clientPaymentConfirmedAt: string | null;
   createdAt: Date;
 }
 
@@ -777,6 +781,7 @@ export function deriveSettlementView(input: {
     brokerProcessedPayment: boolean;
     approvedByUserId: string | null;
     secondApproverUserId: string | null;
+    clientPaymentConfirmedAt: Date | null;
     createdAt: Date;
   } | null;
 }): SettlementView | null {
@@ -797,6 +802,9 @@ export function deriveSettlementView(input: {
         })
       : false,
     settled: input.status === 'SETTLED' || input.status === 'CLOSED',
+    clientPaymentConfirmedAt: s.clientPaymentConfirmedAt
+      ? s.clientPaymentConfirmedAt.toISOString()
+      : null,
     createdAt: s.createdAt,
   };
 }

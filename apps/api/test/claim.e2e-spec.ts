@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { Prisma, prisma, type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -107,7 +107,9 @@ interface ClaimBody {
     secondApproverUserId: string | null;
     secondApproverRequired: boolean;
     settled: boolean;
+    clientPaymentConfirmedAt: string | null;
   } | null;
+  closedAt: string | null;
   statusHistory: {
     fromStatus: string | null;
     toStatus: string;
@@ -294,7 +296,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification + Registration + Documentation + Assessment + Follow-up + Settlement (e2e) — backlog Part C #23-28', () => {
+describe('Claim Notification + Registration + Documentation + Assessment + Follow-up + Settlement + Closure (e2e) — backlog Part C #23-29', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -1403,5 +1405,217 @@ describe('Claim Notification + Registration + Documentation + Assessment + Follo
     expect(largeSettlement.approvedByUserId).not.toBe(
       largeSettlement.secondApproverUserId,
     );
+  });
+
+  it('#29 — closes a SETTLED claim once the client payment receipt is confirmed (triggering a Loss Ratio recompute), and a DECLINED claim directly', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'clm29-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const clm = await makeUser(app, 'clm29-officer', 'CLAIMS_OFFICER');
+    // Sales holds claim.notify but NOT claim.close.
+    const sales = await makeUser(
+      app,
+      'clm29-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'close',
+      {
+        inceptionDate: '2026-01-01',
+        expiryDate: '2027-01-01',
+      },
+    );
+    // Give the policy an open RenewalCase so the closure's Loss Ratio recompute
+    // actually computes + upserts (exercising loadPolicyForRecompute /
+    // computeLossRatio / upsertLossRatio against a real DB), rather than the
+    // logged no-op the renewal-not-built path takes.
+    await prisma.renewalCase.create({ data: { policyId } });
+    const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const driveToVerdict = async (
+      lossDate: string,
+      estimatedLoss: string,
+      outcome: 'APPROVED' | 'DECLINED',
+    ): Promise<string> => {
+      const n = await request(app.getHttpServer())
+        .post('/claims')
+        .set(bearer(clm.accessToken))
+        .send({
+          policyId,
+          lossDate,
+          causeOfLoss: 'Storm damage to the warehouse.',
+          estimatedLoss,
+        })
+        .expect(201);
+      const cid = (n.body as ClaimBody).id;
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/registration`)
+        .set(bearer(clm.accessToken))
+        .send({
+          insurerClaimReference: `INS-${tag}-${cid.slice(0, 6)}`,
+          adjuster: { name: 'Cunningham Lindsey' },
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/documents`)
+        .set(bearer(clm.accessToken))
+        .send({
+          documents: ['claim_form', 'photo', 'repair_estimate'].map(
+            (docType, i) => ({
+              docType,
+              classification: 'CONFIDENTIAL',
+              fileName: `${docType}-${tag}-${i}.pdf`,
+              storageRef: `s3://claims/${tag}/${cid.slice(0, 6)}/${docType}`,
+            }),
+          ),
+        })
+        .expect(201);
+      const surveyAt = new Date(
+        new Date(`${lossDate}T00:00:00.000Z`).getTime() + 8 * 86400000,
+      ).toISOString();
+      const investigationAt = new Date(
+        new Date(`${lossDate}T00:00:00.000Z`).getTime() + 12 * 86400000,
+      ).toISOString();
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/assessment/adjuster-progress`)
+        .set(bearer(clm.accessToken))
+        .send({
+          surveyCompletedAt: surveyAt,
+          investigationCompletedAt: investigationAt,
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/assessment/submit`)
+        .set(bearer(clm.accessToken))
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/assessment/decision`)
+        .set(bearer(clm.accessToken))
+        .send({ outcome })
+        .expect(201);
+      return cid;
+    };
+
+    // --- SETTLED -> CLOSED (after confirming the client payment receipt) ---
+    const settledClaim = await driveToVerdict(
+      '2026-04-02',
+      '18000.000',
+      'APPROVED',
+    );
+    await request(app.getHttpServer())
+      .post(`/claims/${settledClaim}/settlement`)
+      .set(bearer(clm.accessToken))
+      .send({ approvedAmount: '17500.000', deductible: '2500.000' })
+      .expect(201);
+
+    // Sales cannot close a claim
+    await request(app.getHttpServer())
+      .post(`/claims/${settledClaim}/closure`)
+      .set(bearer(sales.accessToken))
+      .send({})
+      .expect(403);
+
+    // closing a SETTLED claim needs a confirmed client payment receipt
+    await request(app.getHttpServer())
+      .post(`/claims/${settledClaim}/closure`)
+      .set(bearer(clm.accessToken))
+      .send({})
+      .expect(422);
+
+    // ... and it cannot predate the loss
+    await request(app.getHttpServer())
+      .post(`/claims/${settledClaim}/closure`)
+      .set(bearer(clm.accessToken))
+      .send({ clientPaymentConfirmedAt: '2026-01-01T00:00:00.000Z' })
+      .expect(422);
+
+    const closed = await request(app.getHttpServer())
+      .post(`/claims/${settledClaim}/closure`)
+      .set(bearer(clm.accessToken))
+      .send({ clientPaymentConfirmedAt: '2026-05-01T00:00:00.000Z' })
+      .expect(201);
+    const cBody = closed.body as ClaimBody;
+    expect(cBody.status).toBe('CLOSED');
+    expect(cBody.closedAt).not.toBeNull();
+    expect(cBody.settlement?.clientPaymentConfirmedAt).toBe(
+      '2026-05-01T00:00:00.000Z',
+    );
+    expect(cBody.statusHistory.map((h) => h.toStatus)).toContain('CLOSED');
+
+    // every Claim status move went through the engine: REGISTERED,
+    // DOCUMENTATION_IN_PROGRESS, UNDER_ASSESSMENT, APPROVED, SETTLED, CLOSED = 6
+    const transitionRows = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'Claim',
+        entityId: settledClaim,
+        action: 'TRANSITION',
+      },
+    });
+    expect(transitionRows).toHaveLength(6);
+
+    // the closure triggered a real Loss Ratio recompute: one LossRatio row for
+    // THIS policy's RenewalCase (db-test is cumulative — scope every query to
+    // this policy / renewal case, never a global findMany), periodClaims = the
+    // net settlement, periodPremium = the policy premium, ratio = claims /
+    // premium at 4 dp.
+    const policyRow = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+    });
+    const premium = policyRow.issuedPremium ?? policyRow.requestedPremium;
+    const renewalCase = await prisma.renewalCase.findUniqueOrThrow({
+      where: { policyId },
+    });
+    const lossRatioRows = await prisma.lossRatio.findMany({
+      where: { renewalCaseId: renewalCase.id },
+    });
+    expect(lossRatioRows).toHaveLength(1);
+    expect(lossRatioRows[0].periodClaims.toString()).toBe('15000');
+    expect(lossRatioRows[0].periodPremium.toString()).toBe(premium.toString());
+    expect(lossRatioRows[0].ratio.toString()).toBe(
+      new Prisma.Decimal('15000')
+        .div(premium)
+        .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP)
+        .toString(),
+    );
+    // the recompute wrote an UPDATE LossRatio audit row for THIS row — figures
+    // only, no claim narrative
+    const lossRatioAudits = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'LossRatio',
+        action: 'UPDATE',
+        entityId: lossRatioRows[0].id,
+      },
+    });
+    expect(lossRatioAudits).toHaveLength(1);
+    expect(
+      (lossRatioAudits[0].afterValue as Record<string, unknown>).trigger,
+    ).toBe('claim-closed');
+    expect(JSON.stringify(lossRatioAudits[0])).not.toContain('warehouse');
+
+    // a byte-identical re-close is an idempotent 200
+    const reclosed = await request(app.getHttpServer())
+      .post(`/claims/${settledClaim}/closure`)
+      .set(bearer(clm.accessToken))
+      .send({ clientPaymentConfirmedAt: '2026-05-01T00:00:00.000Z' })
+      .expect(201);
+    expect((reclosed.body as ClaimBody).status).toBe('CLOSED');
+
+    // --- DECLINED -> CLOSED directly (no payment to confirm) ---
+    const declined = await driveToVerdict('2026-06-02', '9000.000', 'DECLINED');
+    await request(app.getHttpServer())
+      .post(`/claims/${declined}/closure`)
+      .set(bearer(clm.accessToken))
+      .send({ clientPaymentConfirmedAt: '2026-06-10T00:00:00.000Z' })
+      .expect(422); // a declined claim has no payment
+    const declinedClosed = await request(app.getHttpServer())
+      .post(`/claims/${declined}/closure`)
+      .set(bearer(clm.accessToken))
+      .send({})
+      .expect(201);
+    expect((declinedClosed.body as ClaimBody).status).toBe('CLOSED');
+    expect((declinedClosed.body as ClaimBody).closedAt).not.toBeNull();
   });
 });

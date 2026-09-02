@@ -14,6 +14,7 @@ import type { CustomerRepository } from '../../repositories/customer.repository'
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { EncryptionService } from '../security/encryption.service';
+import type { LossRatioService } from '../loss-ratio/loss-ratio.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
 import type { RegisterClaimDto } from './dto/register-claim.dto';
@@ -283,7 +284,7 @@ function makeDeps(opts: Opts = {}) {
           approvedByUserId: input.approvedByUserId,
           secondApproverUserId: null,
           clientPaymentConfirmedAt: null,
-          createdAt: new Date(),
+          createdAt: new Date('2026-08-01T00:00:00.000Z'),
         };
         return Promise.resolve(claimState.settlement);
       }),
@@ -294,6 +295,19 @@ function makeDeps(opts: Opts = {}) {
         if (!s || s.secondApproverUserId != null) return Promise.resolve(null);
         s.secondApproverUserId = secondApproverUserId;
         return Promise.resolve(s);
+      }),
+    // Process 29 — write-once client-payment-receipt stamp.
+    confirmSettlementPayment: vi
+      .fn()
+      .mockImplementation((_id: string, at: Date) => {
+        const s = claimState.settlement;
+        if (!s) throw new Error('no settlement');
+        let wrote = false;
+        if (s.clientPaymentConfirmedAt == null) {
+          s.clientPaymentConfirmedAt = at;
+          wrote = true;
+        }
+        return Promise.resolve({ wrote, settlement: s });
       }),
     // Process 27 — the follow-up sweep. Default: nothing to do.
     findClaimsAwaitingInsurerResponse: vi.fn().mockResolvedValue([]),
@@ -328,6 +342,14 @@ function makeDeps(opts: Opts = {}) {
     encrypt: vi.fn().mockResolvedValue('enc:xxx'),
     decrypt: vi.fn(),
   };
+  // Process 29 — the Loss Ratio recompute a closure triggers. Default: the
+  // policy has no RenewalCase (the renewal module is not built), so it is a
+  // no-op. A test can override `recomputed`.
+  const lossRatio = {
+    recomputeForPolicy: vi
+      .fn()
+      .mockResolvedValue({ recomputed: false, reason: 'no-renewal-case' }),
+  };
   // The workflow engine — moves the claim's in-memory status + persists the
   // transition `data` scalars so a follow-up `findById` reflects the atomic
   // write the real engine performs.
@@ -355,6 +377,7 @@ function makeDeps(opts: Opts = {}) {
     audit as unknown as AuditService,
     workflow as unknown as WorkflowTransitionService,
     encryption as unknown as EncryptionService,
+    lossRatio as unknown as LossRatioService,
   );
 
   return {
@@ -365,6 +388,7 @@ function makeDeps(opts: Opts = {}) {
     audit,
     workflow,
     encryption,
+    lossRatio,
     claimState,
   };
 }
@@ -2360,5 +2384,179 @@ describe('ClaimService settlement (Process 28)', () => {
     );
     expect(view.status).toBe('APPROVED');
     expect(workflow.transition).not.toHaveBeenCalled();
+  });
+});
+
+describe('ClaimService closure (Process 29)', () => {
+  const CONFIRMED = '2026-08-15T00:00:00.000Z';
+
+  /** notify -> APPROVED -> record a small settlement -> SETTLED. */
+  async function settledClaim() {
+    const deps = makeDeps();
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    deps.claimState.status = 'APPROVED';
+    await deps.service.recordSettlement(
+      'claim-1',
+      { approvedAmount: '17500.000', deductible: '2500.000' },
+      claims(),
+    );
+    deps.workflow.transition.mockClear();
+    deps.audit.record.mockClear();
+    deps.lossRatio.recomputeForPolicy.mockClear();
+    return deps;
+  }
+
+  async function declinedClaim() {
+    const deps = makeDeps();
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    deps.claimState.status = 'DECLINED';
+    deps.workflow.transition.mockClear();
+    deps.audit.record.mockClear();
+    deps.lossRatio.recomputeForPolicy.mockClear();
+    return deps;
+  }
+
+  it('422 when a SETTLED claim is closed without confirming the client payment receipt', async () => {
+    const { service } = await settledClaim();
+    await expect(
+      service.closeClaim('claim-1', {}, claims()),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('closes a SETTLED claim once payment is confirmed: stamps the settlement, drives -> CLOSED, and triggers the Loss Ratio recompute', async () => {
+    const { service, claimRepo, workflow, audit, lossRatio } =
+      await settledClaim();
+
+    const view = await service.closeClaim(
+      'claim-1',
+      { clientPaymentConfirmedAt: CONFIRMED },
+      claims(),
+    );
+
+    expect(view.status).toBe('CLOSED');
+    expect(view.closedAt).not.toBeNull();
+    expect(view.settlement?.clientPaymentConfirmedAt).toBe(CONFIRMED);
+    expect(claimRepo.confirmSettlementPayment).toHaveBeenCalledWith(
+      'settlement-1',
+      new Date(CONFIRMED),
+    );
+    expect(workflow.transition).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: 'Claim', toStatus: 'CLOSED' }),
+    );
+    expect(lossRatio.recomputeForPolicy).toHaveBeenCalledTimes(1);
+    expect(lossRatio.recomputeForPolicy).toHaveBeenCalledWith(
+      'pol-1',
+      { reason: 'claim-closed', claimId: 'claim-1' },
+      'clm-1',
+    );
+    const stamp = audit.record.mock.calls.find(
+      (c) =>
+        (c[0] as { entityType: string; action: string }).entityType ===
+          'Settlement' && (c[0] as { action: string }).action === 'UPDATE',
+    );
+    expect(
+      (stamp?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+    ).toMatchObject({
+      claimId: 'claim-1',
+      clientPaymentConfirmedAt: CONFIRMED,
+    });
+  });
+
+  it('422 when the confirmed instant predates the loss date', async () => {
+    const { service } = await settledClaim();
+    await expect(
+      service.closeClaim(
+        'claim-1',
+        { clientPaymentConfirmedAt: '2026-03-01T00:00:00.000Z' }, // before lossDate 2026-03-15
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('a stuck close (payment already confirmed, still SETTLED): a different confirmed instant is a 409, an identical one resumes the close', async () => {
+    const deps = await settledClaim();
+    // Simulate a crash after the payment stamp but before the transition: the
+    // Settlement carries clientPaymentConfirmedAt, the claim is still SETTLED.
+    deps.claimState.settlement!.clientPaymentConfirmedAt = new Date(CONFIRMED);
+
+    await expect(
+      deps.service.closeClaim(
+        'claim-1',
+        { clientPaymentConfirmedAt: '2026-08-20T00:00:00.000Z' },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    deps.workflow.transition.mockClear();
+    const again = await deps.service.closeClaim(
+      'claim-1',
+      { clientPaymentConfirmedAt: CONFIRMED },
+      claims(),
+    );
+    expect(again.status).toBe('CLOSED');
+    expect(deps.workflow.transition).toHaveBeenCalledWith(
+      expect.objectContaining({ toStatus: 'CLOSED' }),
+    );
+  });
+
+  it('closes a DECLINED claim directly (no payment) and still triggers the recompute', async () => {
+    const { service, workflow, lossRatio } = await declinedClaim();
+    const view = await service.closeClaim('claim-1', {}, claims());
+    expect(view.status).toBe('CLOSED');
+    expect(workflow.transition).toHaveBeenCalledWith(
+      expect.objectContaining({ toStatus: 'CLOSED' }),
+    );
+    expect(lossRatio.recomputeForPolicy).toHaveBeenCalledTimes(1);
+  });
+
+  it('422 when a clientPaymentConfirmedAt is supplied for a DECLINED claim', async () => {
+    const { service } = await declinedClaim();
+    await expect(
+      service.closeClaim(
+        'claim-1',
+        { clientPaymentConfirmedAt: CONFIRMED },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('422 when the claim is not SETTLED / DECLINED / CLOSED', async () => {
+    const deps = makeDeps();
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    deps.claimState.status = 'UNDER_ASSESSMENT';
+    await expect(
+      deps.service.closeClaim('claim-1', {}, claims()),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('an already-CLOSED claim is a 200 no-op and does NOT re-fire the recompute', async () => {
+    const { service, workflow, lossRatio } = await settledClaim();
+    await service.closeClaim(
+      'claim-1',
+      { clientPaymentConfirmedAt: CONFIRMED },
+      claims(),
+    );
+    workflow.transition.mockClear();
+    lossRatio.recomputeForPolicy.mockClear();
+    const again = await service.closeClaim('claim-1', {}, claims());
+    expect(again.status).toBe('CLOSED');
+    expect(workflow.transition).not.toHaveBeenCalled();
+    expect(lossRatio.recomputeForPolicy).not.toHaveBeenCalled();
+  });
+
+  it('404 for a caller who cannot see the claim', async () => {
+    const deps = makeDeps({ customerOwner: 'someone-else' });
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    deps.claimState.status = 'DECLINED';
+    await expect(
+      deps.service.closeClaim('claim-1', {}, sales()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('still closes the claim if the Loss Ratio recompute throws (best-effort)', async () => {
+    const { service, lossRatio } = await declinedClaim();
+    lossRatio.recomputeForPolicy.mockRejectedValueOnce(new Error('boom'));
+    const view = await service.closeClaim('claim-1', {}, claims());
+    expect(view.status).toBe('CLOSED');
   });
 });

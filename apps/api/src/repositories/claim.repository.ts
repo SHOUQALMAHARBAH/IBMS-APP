@@ -518,4 +518,27 @@ export class ClaimRepository {
       where: { id: settlementId },
     });
   }
+
+  // --- Process 29: claim closure -------------------------------------------
+
+  /**
+   * Stamp `Settlement.clientPaymentConfirmedAt` (the client's receipt of the
+   * settlement payment), conditional on it not already being set — write-once.
+   * `0 rows` => it was already confirmed (a concurrent confirm, or a re-call);
+   * the caller reloads and compares, treating an identical value as an
+   * idempotent no-op and a different one as a 409.
+   */
+  async confirmSettlementPayment(
+    settlementId: string,
+    clientPaymentConfirmedAt: Date,
+  ): Promise<{ wrote: boolean; settlement: Settlement }> {
+    const { count } = await this.prisma.client.settlement.updateMany({
+      where: { id: settlementId, clientPaymentConfirmedAt: null },
+      data: { clientPaymentConfirmedAt },
+    });
+    const settlement = await this.prisma.client.settlement.findUniqueOrThrow({
+      where: { id: settlementId },
+    });
+    return { wrote: count === 1, settlement };
+  }
 }

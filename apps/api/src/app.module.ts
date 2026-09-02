@@ -28,6 +28,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { ClientDecisionModule } from './modules/client-decision/client-decision.module';
 import { PolicyModule } from './modules/policy/policy.module';
 import { EndorsementModule } from './modules/endorsement/endorsement.module';
+import { LossRatioModule } from './modules/loss-ratio/loss-ratio.module';
 import { ClaimModule } from './modules/claim/claim.module';
 
 @Module({
@@ -189,6 +190,12 @@ import { ClaimModule } from './modules/claim/claim.module';
     // not the current schedule alone. Depends on PolicyModule (the parent
     // Policy + schedule windows) / CustomerModule (visibility) / SecurityModule
     // (ThirdPartyClaimant.contactDetailsEnc field-level encryption).
+    //
+    // Part C backlog #29 (Claim Closure) — LossRatioModule recomputes
+    // Claims / Premium for a policy's RenewalCase (1:1 with the Policy) when a
+    // claim closes (a logged no-op until the renewal module exists). Imported
+    // by ClaimModule; listed here for the module registry.
+    LossRatioModule,
     ClaimModule,
   ],
   controllers: [AppController],

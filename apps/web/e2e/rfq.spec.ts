@@ -179,6 +179,7 @@ async function mockRfqApi(
     onClaimAssessment?: (body: Record<string, unknown>) => void;
     onClaimFollowUp?: (body: Record<string, unknown>) => void;
     onClaimSettlement?: (body: Record<string, unknown>) => void;
+    onClaimClosure?: (body: Record<string, unknown>) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -934,6 +935,35 @@ async function mockRfqApi(
       return route.fulfill({ status: 201, json: row ?? {} });
     }
 
+    // Process 29 — formal closure (SETTLED / DECLINED -> CLOSED).
+    const closeMatch = /\/claims\/([^/?]+)\/closure(\?|$)/.exec(url);
+    if (method === "POST" && closeMatch) {
+      const row = claimRows.find((r) => r.id === closeMatch[1]);
+      const b = (route.request().postDataJSON() ?? {}) as {
+        clientPaymentConfirmedAt?: string;
+      };
+      opts.onClaimClosure?.({ ...b });
+      if (row && row.status !== "CLOSED") {
+        const from = row.status as string;
+        const s = row.settlement as Record<string, unknown> | null;
+        if (s && b.clientPaymentConfirmedAt) {
+          s.clientPaymentConfirmedAt = `${b.clientPaymentConfirmedAt}T00:00:00.000Z`;
+        }
+        row.status = "CLOSED";
+        row.closedAt = "2026-12-15T00:00:00.000Z";
+        (row.statusHistory as Record<string, unknown>[]).push({
+          fromStatus: from,
+          toStatus: "CLOSED",
+          changedByUserId: "user-1",
+          changedAt: "2026-12-15T00:00:00.000Z",
+        });
+        applySettlement(row);
+        applyAssessment(row);
+        applyFollowUp(row);
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
+
     const sweepMatch = /\/claims\/follow-up-sweep(\?|$)/.exec(url);
     if (method === "POST" && sweepMatch) {
       opts.onClaimFollowUp?.({ step: "sweep" });
@@ -1163,6 +1193,7 @@ async function mockRfqApi(
         },
         coverageResolvedAtLossDate: true,
         settlement: null,
+        closedAt: null,
         statusHistory: [
           {
             fromStatus: null,
@@ -2059,6 +2090,49 @@ test("a large claim settlement blocks on a mandatory distinct second approver", 
   ).toHaveCount(0);
 
   expect(steps).toEqual(["record", "second-approve"]);
+});
+
+test("closes a settled claim once the client payment receipt is confirmed", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  let closure: Record<string, unknown> | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onClaimClosure: (b) => {
+      closure = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  await driveClaimToVerdict(page, {
+    estimatedLoss: "20000.000",
+    verdict: "APPROVED",
+    insurerRef: "INS-CLS-1",
+  });
+  await page.getByLabel("Approved amount").fill("17500.000");
+  await page.getByLabel("Deductible").fill("2500.000");
+  await page.getByRole("button", { name: "Record settlement" }).click();
+  await expect(page.getByText(/· net .+ · settled/)).toBeVisible();
+
+  // the closure block asks for the client payment date, then closes
+  await page
+    .getByLabel("Client received the settlement payment on")
+    .fill("2026-12-01");
+  await page
+    .getByRole("button", { name: "Confirm payment & close claim" })
+    .click();
+
+  await expect(page.getByText(/^Closed /)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm payment & close claim" }),
+  ).toHaveCount(0);
+  await expect.poll(() => closure?.clientPaymentConfirmedAt).toBe("2026-12-01");
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {
