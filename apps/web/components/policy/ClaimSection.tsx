@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   attachClaimDocuments,
+  decideClaimAssessment,
   listClaimsForPolicy,
   notifyClaim,
+  recordAdjusterProgress,
   registerClaim,
+  submitClaimForAssessment,
+  CLAIM_ASSESSMENT_OUTCOMES,
   CLAIM_DOC_CLASSIFICATION_OPTIONS,
   CLAIM_DOC_TYPE_OPTIONS,
   type Claim,
+  type ClaimAssessmentOutcome,
   type ClaimDocClassification,
   type ClaimDocType,
 } from '../../lib/claim/claim-api';
@@ -32,6 +37,8 @@ interface Props {
   canRegister: boolean;
   /** Claims — file claim documentation against the mandatory checklist. */
   canDocument: boolean;
+  /** Claims — track adjuster progress, submit for assessment, record the verdict. */
+  canAssess: boolean;
 }
 
 function money(value: string | null): string {
@@ -294,11 +301,184 @@ function ClaimDocumentation({
   );
 }
 
+const ASSESSMENT_ACTIVE: Claim['status'][] = [
+  'REGISTERED',
+  'DOCUMENTATION_IN_PROGRESS',
+  'UNDER_ASSESSMENT',
+];
+
+/** Process 26 — adjuster survey/investigation tracking, submit-for-assessment
+ * (gated on the checklist), and the insurer's verdict. */
+function ClaimAssessment({
+  claim,
+  canAssess,
+  onDone,
+}: {
+  claim: Claim;
+  canAssess: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [when, setWhen] = useState('');
+  const [outcome, setOutcome] =
+    useState<ClaimAssessmentOutcome>('PARTIALLY_APPROVED');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const a = claim.assessment;
+  const decided = a.outcome !== null;
+  // `assessment.outcome` reverts to null once the claim reaches SETTLED/CLOSED
+  // (it is derived from `status`), so this block hides itself for a settled
+  // claim. TODO(#28): the recorded verdict should stay visible once the
+  // Settlement section exists — it survives in `statusHistory` meanwhile.
+  const show =
+    ASSESSMENT_ACTIVE.includes(claim.status) || decided;
+  if (!show) return null;
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'That assessment step could not be completed — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const stamp = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString() : '—';
+  // an <input type="date"> yields YYYY-MM-DD; the API accepts a bare date.
+  const instant = () => when.trim();
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <strong style={{ fontSize: '0.9rem' }}>Assessment</strong>
+      {error ? (
+        <p role="alert" style={errorStyle}>
+          {error}
+        </p>
+      ) : null}
+      <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
+        Survey {stamp(a.surveyCompletedAt)} · investigation{' '}
+        {stamp(a.investigationCompletedAt)}
+        {decided ? ` · verdict ${a.outcome}` : ''}
+      </p>
+
+      {canAssess && !decided ? (
+        <div style={{ maxWidth: '30rem' }}>
+          {claim.status !== 'UNDER_ASSESSMENT' ? (
+            <>
+              <div style={quoteFieldStyle}>
+                <label htmlFor={`asmt-when-${claim.id}`}>
+                  Completion date (adjuster survey / investigation)
+                </label>
+                <input
+                  id={`asmt-when-${claim.id}`}
+                  type="date"
+                  value={when}
+                  onChange={(ev) => setWhen(ev.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  disabled={busy || instant().length === 0 || !!a.surveyCompletedAt}
+                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                  onClick={() =>
+                    void run(() =>
+                      recordAdjusterProgress(claim.id, {
+                        surveyCompletedAt: instant(),
+                      }),
+                    )
+                  }
+                >
+                  Mark survey complete
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    instant().length === 0 ||
+                    !!a.investigationCompletedAt
+                  }
+                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                  onClick={() =>
+                    void run(() =>
+                      recordAdjusterProgress(claim.id, {
+                        investigationCompletedAt: instant(),
+                      }),
+                    )
+                  }
+                >
+                  Mark investigation complete
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !a.readyForAssessment}
+                  title={
+                    a.readyForAssessment
+                      ? undefined
+                      : 'Complete the mandatory documentation first.'
+                  }
+                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                  onClick={() =>
+                    void run(() => submitClaimForAssessment(claim.id))
+                  }
+                >
+                  Submit for assessment
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <select
+                aria-label="Assessment verdict"
+                value={outcome}
+                onChange={(ev) =>
+                  setOutcome(ev.target.value as ClaimAssessmentOutcome)
+                }
+              >
+                {CLAIM_ASSESSMENT_OUTCOMES.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={busy || !a.adjusterWorkComplete}
+                title={
+                  a.adjusterWorkComplete
+                    ? undefined
+                    : 'Record the adjuster survey + investigation first.'
+                }
+                style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                onClick={() =>
+                  void run(() => decideClaimAssessment(claim.id, outcome))
+                }
+              >
+                Record verdict
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ClaimSection({
   opportunityId,
   canNotify,
   canRegister,
   canDocument,
+  canAssess,
 }: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
@@ -395,8 +575,13 @@ export function ClaimSection({
         current one — so a loss under a policy endorsed after the event resolves
         to the version that actually applied then. A Claims Officer then
         registers the claim with the insurer and assigns the loss adjuster
-        (<strong>REGISTERED</strong>), and files the mandatory documentation
-        against a per-claim-type checklist (<strong>DOCUMENTATION_IN_PROGRESS</strong>).
+        (<strong>REGISTERED</strong>), files the mandatory documentation
+        against a per-claim-type checklist (<strong>DOCUMENTATION_IN_PROGRESS</strong>),
+        tracks the adjuster&rsquo;s survey / investigation, submits the claim to
+        the insurer once the checklist is complete
+        (<strong>UNDER_ASSESSMENT</strong>) and records the verdict
+        (<strong>APPROVED</strong> / <strong>PARTIALLY_APPROVED</strong> /
+        <strong>DECLINED</strong>).
       </p>
 
       {loadError ? (
@@ -470,6 +655,13 @@ export function ClaimSection({
               <ClaimDocumentation
                 claim={c}
                 canDocument={canDocument}
+                onDone={load}
+              />
+            ) : null}
+            {c.status !== 'NOTIFIED' ? (
+              <ClaimAssessment
+                claim={c}
+                canAssess={canAssess}
                 onDone={load}
               />
             ) : null}

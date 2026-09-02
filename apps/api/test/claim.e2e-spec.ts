@@ -79,6 +79,13 @@ interface ClaimBody {
   documentChecklist: { docType: string; required: boolean; present: boolean }[];
   documentationComplete: boolean;
   missingMandatoryDocuments: string[];
+  assessment: {
+    surveyCompletedAt: string | null;
+    investigationCompletedAt: string | null;
+    adjusterWorkComplete: boolean;
+    readyForAssessment: boolean;
+    outcome: string | null;
+  };
   statusHistory: {
     fromStatus: string | null;
     toStatus: string;
@@ -256,7 +263,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification + Registration + Documentation (e2e) — backlog Part C #23-25', () => {
+describe('Claim Notification + Registration + Documentation + Assessment (e2e) — backlog Part C #23-26', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -805,5 +812,193 @@ describe('Claim Notification + Registration + Documentation (e2e) — backlog Pa
       where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
     });
     expect(claimTransitions2).toBe(2);
+  });
+
+  it('#26 — tracks adjuster survey/investigation, gates the submission on the checklist, and records the verdict via the engine', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'clm26-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const clm = await makeUser(app, 'clm26-officer', 'CLAIMS_OFFICER');
+
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'assess',
+      { inceptionDate: '2026-01-01', expiryDate: '2027-01-01' },
+    );
+    const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // helper: notify -> register -> attach the given docTypes
+    const setUpClaim = async (
+      lossDate: string,
+      docTypes: string[],
+    ): Promise<string> => {
+      const n = await request(app.getHttpServer())
+        .post('/claims')
+        .set(bearer(clm.accessToken))
+        .send({
+          policyId,
+          lossDate,
+          causeOfLoss: 'Storm ripped the roof sheeting off.',
+          estimatedLoss: '18000.000',
+        })
+        .expect(201);
+      const cid = (n.body as ClaimBody).id;
+      await request(app.getHttpServer())
+        .post(`/claims/${cid}/registration`)
+        .set(bearer(clm.accessToken))
+        .send({
+          insurerClaimReference: `INS-${tag}-${cid.slice(0, 6)}`,
+          adjuster: { name: 'Cunningham Lindsey' },
+        })
+        .expect(201);
+      if (docTypes.length > 0) {
+        await request(app.getHttpServer())
+          .post(`/claims/${cid}/documents`)
+          .set(bearer(clm.accessToken))
+          .send({
+            documents: docTypes.map((docType, i) => ({
+              docType,
+              classification: 'CONFIDENTIAL',
+              fileName: `${docType}-${tag}-${i}.pdf`,
+              storageRef: `s3://claims/${tag}/${cid.slice(0, 6)}/${docType}`,
+            })),
+          })
+          .expect(201);
+      }
+      return cid;
+    };
+
+    // property line mandatory set: claim_form + photo + repair_estimate
+    const claimId = await setUpClaim('2026-04-02', ['claim_form', 'photo']);
+
+    // submit is BLOCKED while the mandatory checklist is incomplete (safety gate)
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/submit`)
+      .set(bearer(clm.accessToken))
+      .expect(422);
+
+    // a Placement officer holds no claim.assess
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/adjuster-progress`)
+      .set(bearer(plc.accessToken))
+      .send({ surveyCompletedAt: '2026-04-10T00:00:00.000Z' })
+      .expect(403);
+
+    // stamp the adjuster's survey + investigation
+    const prog = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/adjuster-progress`)
+      .set(bearer(clm.accessToken))
+      .send({
+        surveyCompletedAt: '2026-04-10T00:00:00.000Z',
+        investigationCompletedAt: '2026-04-14T00:00:00.000Z',
+      })
+      .expect(201);
+    expect((prog.body as ClaimBody).assessment.adjusterWorkComplete).toBe(true);
+
+    // the survey stamp is write-once — a different value is a 409
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/adjuster-progress`)
+      .set(bearer(clm.accessToken))
+      .send({ surveyCompletedAt: '2026-04-11T00:00:00.000Z' })
+      .expect(409);
+
+    // complete the checklist
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/documents`)
+      .set(bearer(clm.accessToken))
+      .send({
+        documents: [
+          {
+            docType: 'repair_estimate',
+            classification: 'CONFIDENTIAL',
+            fileName: `re-${tag}.pdf`,
+            storageRef: `s3://claims/${tag}/re`,
+          },
+        ],
+      })
+      .expect(201);
+
+    // now the submission is allowed
+    const submitted = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/submit`)
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    const subBody = submitted.body as ClaimBody;
+    expect(subBody.status).toBe('UNDER_ASSESSMENT');
+    expect(subBody.statusHistory.map((h) => h.toStatus)).toEqual([
+      'NOTIFIED',
+      'REGISTERED',
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+    ]);
+
+    // every Claim status move went through the engine
+    let transitions = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(transitions).toBe(3); // REGISTERED, DOCUMENTATION_IN_PROGRESS, UNDER_ASSESSMENT
+
+    // a re-submit is an idempotent no-op — no extra TRANSITION row
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/submit`)
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    transitions = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(transitions).toBe(3);
+
+    // record the insurer's verdict
+    const decided = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/decision`)
+      .set(bearer(clm.accessToken))
+      .send({ outcome: 'PARTIALLY_APPROVED' })
+      .expect(201);
+    const decBody = decided.body as ClaimBody;
+    expect(decBody.status).toBe('PARTIALLY_APPROVED');
+    expect(decBody.assessment.outcome).toBe('PARTIALLY_APPROVED');
+    expect(decBody.statusHistory.map((h) => h.toStatus)).toEqual([
+      'NOTIFIED',
+      'REGISTERED',
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+      'PARTIALLY_APPROVED',
+    ]);
+    transitions = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(transitions).toBe(4);
+
+    // a different verdict once one is recorded is a 409
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/decision`)
+      .set(bearer(clm.accessToken))
+      .send({ outcome: 'DECLINED' })
+      .expect(409);
+
+    // adjuster progress can no longer be recorded once the verdict is in
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/assessment/adjuster-progress`)
+      .set(bearer(clm.accessToken))
+      .send({ investigationCompletedAt: '2026-04-20T00:00:00.000Z' })
+      .expect(422);
+
+    // a second claim, fully documented + submitted but with NO adjuster work,
+    // cannot be decided — the survey/investigation gate
+    const claim2 = await setUpClaim('2026-05-02', [
+      'claim_form',
+      'photo',
+      'repair_estimate',
+    ]);
+    await request(app.getHttpServer())
+      .post(`/claims/${claim2}/assessment/submit`)
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/claims/${claim2}/assessment/decision`)
+      .set(bearer(clm.accessToken))
+      .send({ outcome: 'APPROVED' })
+      .expect(422);
   });
 });

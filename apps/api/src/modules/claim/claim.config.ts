@@ -2,11 +2,11 @@ import { Prisma } from '@ibms/db';
 import { formatMoney, quantizeMoney } from '../../common/money.util';
 
 /**
- * Process 23-25 — Claim Notification / Registration / Documentation (backlog
- * Part C #23-25, Domain C). The pure, deterministic core: resolving the
- * coverage that was in force at the loss date, the drafted large-claim
- * threshold, the mandatory-document checklist per claim type, and the audit
- * `afterValue` snapshots.
+ * Process 23-26 — Claim Notification / Registration / Documentation /
+ * Assessment (backlog Part C #23-26, Domain C). The pure, deterministic core:
+ * resolving the coverage that was in force at the loss date, the drafted
+ * large-claim threshold, the mandatory-document checklist per claim type, the
+ * assessment-readiness derivation, and the audit `afterValue` snapshots.
  *
  * `ibms-brain/meta/context/claims-lifecycle.md` § "The rules that aren't
  * obvious":
@@ -449,5 +449,97 @@ export function claimDocumentAuditSnapshot(row: {
     category: row.category,
     classification: row.classification,
     uploadedByUserId: row.uploadedByUserId,
+  };
+}
+
+// --- Process 26: claim assessment ----------------------------------------
+
+/** The insurer's assessment verdict — the three terminal outcomes of the
+ * `UNDER_ASSESSMENT` phase (`WORKFLOW_TRANSITIONS.Claim`). `DECLINED` goes
+ * straight to `CLOSED` (no payment); `APPROVED` / `PARTIALLY_APPROVED` pass
+ * through `SETTLED` where the four distinct figures are recorded (Process 28).
+ * Stable order — the UI renders it. */
+export const CLAIM_ASSESSMENT_OUTCOMES = [
+  'APPROVED',
+  'PARTIALLY_APPROVED',
+  'DECLINED',
+] as const;
+export type ClaimAssessmentOutcome = (typeof CLAIM_ASSESSMENT_OUTCOMES)[number];
+
+/** True once the assessment phase is over — `status` is one of the three
+ * verdicts, or past them (`SETTLED` / `CLOSED`). Distinct from
+ * `CLAIM_ASSESSMENT_OUTCOMES.includes(status)`, which is true only for the
+ * verdict itself (that narrower test is what `deriveAssessmentView` uses for
+ * the `outcome` field). */
+export function isAssessmentConcluded(status: string): boolean {
+  return (
+    (CLAIM_ASSESSMENT_OUTCOMES as readonly string[]).includes(status) ||
+    status === 'SETTLED' ||
+    status === 'CLOSED'
+  );
+}
+
+export interface AssessmentView {
+  surveyCompletedAt: Date | null;
+  investigationCompletedAt: Date | null;
+  /** Both adjuster timestamps are set — the loss adjuster has finished the
+   * survey AND the investigation. `ibms-app` gates the `UNDER_ASSESSMENT →
+   * verdict` move on this (drafted, unsourced — see the `/brain-gap`). */
+  adjusterWorkComplete: boolean;
+  /** The claim is `DOCUMENTATION_IN_PROGRESS` with every mandatory document on
+   * file — the `→ UNDER_ASSESSMENT` move is unblocked. */
+  readyForAssessment: boolean;
+  /** The recorded verdict, derived from `status` (null until decided). */
+  outcome: ClaimAssessmentOutcome | null;
+}
+
+/** Derive the assessment sub-view from the claim's status, the (live)
+ * documentation-complete flag and the adjuster's two completion stamps. Pure.
+ */
+export function deriveAssessmentView(input: {
+  status: string;
+  documentationComplete: boolean;
+  surveyCompletedAt: Date | null;
+  investigationCompletedAt: Date | null;
+}): AssessmentView {
+  return {
+    surveyCompletedAt: input.surveyCompletedAt,
+    investigationCompletedAt: input.investigationCompletedAt,
+    adjusterWorkComplete:
+      input.surveyCompletedAt !== null &&
+      input.investigationCompletedAt !== null,
+    readyForAssessment:
+      input.status === 'DOCUMENTATION_IN_PROGRESS' &&
+      input.documentationComplete,
+    outcome: (CLAIM_ASSESSMENT_OUTCOMES as readonly string[]).includes(
+      input.status,
+    )
+      ? (input.status as ClaimAssessmentOutcome)
+      : null,
+  };
+}
+
+/**
+ * UPDATE audit `afterValue` for the loss `Adjuster`'s survey / investigation
+ * completion stamps (Process 26). The adjuster is a professional
+ * loss-assessment firm — not the claimant — so ids + the two ISO timestamps
+ * are fine in the trail (same tier as {@link adjusterAuditSnapshot}). No claim
+ * narrative.
+ */
+export function adjusterAssessmentAuditSnapshot(row: {
+  adjusterId: string;
+  claimId: string;
+  surveyCompletedAt: Date | null;
+  investigationCompletedAt: Date | null;
+}): Prisma.InputJsonObject {
+  return {
+    adjusterId: row.adjusterId,
+    claimId: row.claimId,
+    surveyCompletedAt: row.surveyCompletedAt
+      ? row.surveyCompletedAt.toISOString()
+      : null,
+    investigationCompletedAt: row.investigationCompletedAt
+      ? row.investigationCompletedAt.toISOString()
+      : null,
   };
 }

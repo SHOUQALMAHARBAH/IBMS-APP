@@ -1,9 +1,12 @@
-// Process 23-25 — Claim Notification + Registration + Documentation (backlog
-// Part C #23-25, Domain C). Talks to apps/api's claim module: record a reported
-// loss against a Policy (with coverage-at-loss-date validation), register it
-// with the insurer + assign the adjuster (NOTIFIED -> REGISTERED), then file
-// the mandatory documentation (a per-claim-type checklist), with the first
-// attach advancing REGISTERED -> DOCUMENTATION_IN_PROGRESS.
+// Process 23-26 — Claim Notification + Registration + Documentation +
+// Assessment (backlog Part C #23-26, Domain C). Talks to apps/api's claim
+// module: record a reported loss against a Policy (with coverage-at-loss-date
+// validation), register it with the insurer + assign the adjuster (NOTIFIED ->
+// REGISTERED), file the mandatory documentation (a per-claim-type checklist,
+// first attach -> DOCUMENTATION_IN_PROGRESS), then track the adjuster's survey
+// / investigation, submit for insurer assessment (-> UNDER_ASSESSMENT, gated on
+// the checklist) and record the verdict (-> APPROVED | PARTIALLY_APPROVED |
+// DECLINED).
 
 import { apiGet, apiPost } from '../auth/api-client';
 
@@ -38,6 +41,13 @@ export type ClaimStatus =
   | 'DECLINED'
   | 'SETTLED'
   | 'CLOSED';
+
+export const CLAIM_ASSESSMENT_OUTCOMES = [
+  'APPROVED',
+  'PARTIALLY_APPROVED',
+  'DECLINED',
+] as const;
+export type ClaimAssessmentOutcome = (typeof CLAIM_ASSESSMENT_OUTCOMES)[number];
 
 export interface ClaimStatusHistoryEntry {
   fromStatus: ClaimStatus | null;
@@ -97,6 +107,13 @@ export interface Claim {
   }[];
   documentationComplete: boolean;
   missingMandatoryDocuments: ClaimDocType[];
+  assessment: {
+    surveyCompletedAt: string | null;
+    investigationCompletedAt: string | null;
+    adjusterWorkComplete: boolean;
+    readyForAssessment: boolean;
+    outcome: ClaimAssessmentOutcome | null;
+  };
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
@@ -151,4 +168,43 @@ export function attachClaimDocuments(
   return apiPost(`/claims/${encodeURIComponent(claimId)}/documents`, {
     documents,
   });
+}
+
+export interface AdjusterProgressInput {
+  surveyCompletedAt?: string;
+  investigationCompletedAt?: string;
+}
+
+/** Process 26 — stamp the loss adjuster's survey / investigation completion
+ * (write-once per field). */
+export function recordAdjusterProgress(
+  claimId: string,
+  input: AdjusterProgressInput,
+): Promise<Claim> {
+  return apiPost(
+    `/claims/${encodeURIComponent(claimId)}/assessment/adjuster-progress`,
+    input,
+  );
+}
+
+/** Process 26 — submit the claim to the insurer for assessment
+ * (DOCUMENTATION_IN_PROGRESS -> UNDER_ASSESSMENT). Gated server-side on the
+ * mandatory-document checklist being complete. */
+export function submitClaimForAssessment(claimId: string): Promise<Claim> {
+  return apiPost(
+    `/claims/${encodeURIComponent(claimId)}/assessment/submit`,
+    {},
+  );
+}
+
+/** Process 26 — record the insurer's verdict (UNDER_ASSESSMENT -> APPROVED |
+ * PARTIALLY_APPROVED | DECLINED). */
+export function decideClaimAssessment(
+  claimId: string,
+  outcome: ClaimAssessmentOutcome,
+): Promise<Claim> {
+  return apiPost(
+    `/claims/${encodeURIComponent(claimId)}/assessment/decision`,
+    { outcome },
+  );
 }

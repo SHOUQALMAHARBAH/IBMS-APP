@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import { ClaimService } from './claim.service';
+import type { ClaimDocType } from './claim.config';
 import type { ClaimRepository } from '../../repositories/claim.repository';
 import type { PolicyRepository } from '../../repositories/policy.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
@@ -203,6 +204,37 @@ function makeDeps(opts: Opts = {}) {
             });
           }
           return Promise.resolve(undefined);
+        },
+      ),
+    recordAdjusterProgress: vi
+      .fn()
+      .mockImplementation(
+        (
+          _claimId: string,
+          patch: { surveyCompletedAt?: Date; investigationCompletedAt?: Date },
+        ) => {
+          const a = claimState.adjuster;
+          if (!a) throw new Error('no adjuster');
+          const wrote = {
+            surveyCompletedAt: false,
+            investigationCompletedAt: false,
+          };
+          // write-once guard mirrors the repo's `<field> IS NULL` updateMany
+          if (
+            patch.surveyCompletedAt !== undefined &&
+            a.surveyCompletedAt == null
+          ) {
+            a.surveyCompletedAt = patch.surveyCompletedAt;
+            wrote.surveyCompletedAt = true;
+          }
+          if (
+            patch.investigationCompletedAt !== undefined &&
+            a.investigationCompletedAt == null
+          ) {
+            a.investigationCompletedAt = patch.investigationCompletedAt;
+            wrote.investigationCompletedAt = true;
+          }
+          return Promise.resolve({ adjuster: a, wrote });
         },
       ),
     findById: vi.fn().mockImplementation(() => {
@@ -1161,5 +1193,451 @@ describe('ClaimService.attachDocuments', () => {
       documentsFiled: 1,
     });
     expect(JSON.stringify(entry.afterValue)).not.toContain('site-1.jpg');
+  });
+});
+
+describe('ClaimService assessment (Process 26)', () => {
+  const SURVEY_AT = '2026-04-01T00:00:00.000Z'; // after BASE_DTO lossDate, past
+  const INVESTIGATION_AT = '2026-04-05T00:00:00.000Z';
+
+  const DOC = (
+    docType: ClaimDocType,
+    fileName: string,
+  ): {
+    docType: ClaimDocType;
+    classification: 'CONFIDENTIAL';
+    fileName: string;
+    storageRef: string;
+  } => ({
+    docType,
+    classification: 'CONFIDENTIAL',
+    fileName,
+    storageRef: `s3://${fileName}`,
+  });
+
+  /** notify -> register -> attach every mandatory doc (property line:
+   * claim_form + photo + repair_estimate) so `documentationComplete` is true.
+   * `withAdjusterWork` also stamps the survey + investigation. */
+  async function documentedClaim(withAdjusterWork = false) {
+    const deps = makeDeps();
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    await deps.service.register('claim-1', { ...REGISTER_DTO }, claims());
+    await deps.service.attachDocuments(
+      'claim-1',
+      {
+        documents: [
+          DOC('claim_form', 'cf.pdf'),
+          DOC('photo', 'ph.jpg'),
+          DOC('repair_estimate', 're.pdf'),
+        ],
+      },
+      claims(),
+    );
+    if (withAdjusterWork) {
+      await deps.service.recordAdjusterProgress(
+        'claim-1',
+        {
+          surveyCompletedAt: SURVEY_AT,
+          investigationCompletedAt: INVESTIGATION_AT,
+        },
+        claims(),
+      );
+    }
+    deps.workflow.transition.mockClear();
+    deps.audit.record.mockClear();
+    return deps;
+  }
+
+  describe('recordAdjusterProgress', () => {
+    it('stamps survey + investigation and surfaces them on the view', async () => {
+      const { service } = await documentedClaim();
+      const view = await service.recordAdjusterProgress(
+        'claim-1',
+        {
+          surveyCompletedAt: SURVEY_AT,
+          investigationCompletedAt: INVESTIGATION_AT,
+        },
+        claims(),
+      );
+      expect(view.assessment.surveyCompletedAt).toEqual(new Date(SURVEY_AT));
+      expect(view.assessment.investigationCompletedAt).toEqual(
+        new Date(INVESTIGATION_AT),
+      );
+      expect(view.assessment.adjusterWorkComplete).toBe(true);
+      expect(view.adjuster?.surveyCompletedAt).toEqual(new Date(SURVEY_AT));
+    });
+
+    it('is a no-op when re-sent with the identical value, a 409 on a different one', async () => {
+      const { service } = await documentedClaim();
+      await service.recordAdjusterProgress(
+        'claim-1',
+        { surveyCompletedAt: SURVEY_AT },
+        claims(),
+      );
+      // identical -> fine
+      await service.recordAdjusterProgress(
+        'claim-1',
+        { surveyCompletedAt: SURVEY_AT },
+        claims(),
+      );
+      // different -> 409
+      await expect(
+        service.recordAdjusterProgress(
+          'claim-1',
+          { surveyCompletedAt: '2026-04-02T00:00:00.000Z' },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('422 when neither timestamp is provided', async () => {
+      const { service } = await documentedClaim();
+      await expect(
+        service.recordAdjusterProgress('claim-1', {}, claims()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('422 when a completion instant predates the loss date', async () => {
+      const { service } = await documentedClaim();
+      await expect(
+        service.recordAdjusterProgress(
+          'claim-1',
+          { surveyCompletedAt: '2026-01-01T00:00:00.000Z' },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('422 when the claim has no adjuster yet (still NOTIFIED)', async () => {
+      const { service } = makeDeps();
+      await service.notify({ ...BASE_DTO }, claims());
+      await expect(
+        service.recordAdjusterProgress(
+          'claim-1',
+          { surveyCompletedAt: SURVEY_AT },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('records an UPDATE Adjuster audit (ids + timestamps, no narrative) and a sensitive READ', async () => {
+      const { service, audit } = await documentedClaim();
+      await service.recordAdjusterProgress(
+        'claim-1',
+        { surveyCompletedAt: SURVEY_AT },
+        claims(),
+      );
+      const upd = audit.record.mock.calls.find(
+        (c) =>
+          (c[0] as { entityType: string; action: string }).entityType ===
+            'Adjuster' && (c[0] as { action: string }).action === 'UPDATE',
+      );
+      expect(upd).toBeDefined();
+      expect(
+        (upd?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+      ).toMatchObject({ surveyCompletedAt: SURVEY_AT });
+      const read = audit.record.mock.calls.find(
+        (c) => (c[0] as { action: string }).action === 'READ',
+      );
+      expect(
+        (read?.[0] as { isSensitiveDataAccess: boolean }).isSensitiveDataAccess,
+      ).toBe(true);
+    });
+  });
+
+  describe('submitForAssessment', () => {
+    it('422 while the mandatory documentation is incomplete', async () => {
+      const deps = makeDeps();
+      await deps.service.notify({ ...BASE_DTO }, claims());
+      await deps.service.register('claim-1', { ...REGISTER_DTO }, claims());
+      await deps.service.attachDocuments(
+        'claim-1',
+        { documents: [DOC('claim_form', 'cf.pdf')] }, // photo + repair_estimate missing
+        claims(),
+      );
+      await expect(
+        deps.service.submitForAssessment('claim-1', claims()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('drives DOCUMENTATION_IN_PROGRESS -> UNDER_ASSESSMENT through the engine + writes the history row', async () => {
+      const { service, workflow, claimRepo } = await documentedClaim();
+      const view = await service.submitForAssessment('claim-1', claims());
+      expect(view.status).toBe('UNDER_ASSESSMENT');
+      expect(workflow.transition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: 'Claim',
+          toStatus: 'UNDER_ASSESSMENT',
+        }),
+      );
+      expect(claimRepo.recordStatusHistory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fromStatus: 'DOCUMENTATION_IN_PROGRESS',
+          toStatus: 'UNDER_ASSESSMENT',
+        }),
+      );
+      expect(view.statusHistory.map((h) => h.toStatus)).toEqual([
+        'NOTIFIED',
+        'REGISTERED',
+        'DOCUMENTATION_IN_PROGRESS',
+        'UNDER_ASSESSMENT',
+      ]);
+    });
+
+    it('is idempotent once UNDER_ASSESSMENT — no re-transition', async () => {
+      const { service, workflow } = await documentedClaim();
+      await service.submitForAssessment('claim-1', claims());
+      workflow.transition.mockClear();
+      const view = await service.submitForAssessment('claim-1', claims());
+      expect(workflow.transition).not.toHaveBeenCalled();
+      expect(view.status).toBe('UNDER_ASSESSMENT');
+    });
+
+    it('backfills a missing UNDER_ASSESSMENT history row on a re-call without re-transitioning', async () => {
+      const { service, workflow, claimRepo } = await documentedClaim();
+      // first submit: the engine transition commits but the history write throws
+      claimRepo.recordStatusHistory.mockRejectedValueOnce(
+        new Error('history write failed'),
+      );
+      let view = await service.submitForAssessment('claim-1', claims());
+      expect(view.status).toBe('UNDER_ASSESSMENT');
+      expect(view.statusHistory.map((h) => h.toStatus)).not.toContain(
+        'UNDER_ASSESSMENT',
+      );
+      workflow.transition.mockClear();
+      claimRepo.recordStatusHistory.mockClear();
+      view = await service.submitForAssessment('claim-1', claims());
+      expect(workflow.transition).not.toHaveBeenCalled();
+      expect(claimRepo.recordStatusHistory).toHaveBeenCalledWith(
+        expect.objectContaining({ toStatus: 'UNDER_ASSESSMENT' }),
+      );
+      expect(view.statusHistory.map((h) => h.toStatus)).toContain(
+        'UNDER_ASSESSMENT',
+      );
+    });
+
+    it('422 when the claim is not yet DOCUMENTATION_IN_PROGRESS', async () => {
+      const deps = makeDeps();
+      await deps.service.notify({ ...BASE_DTO }, claims());
+      await deps.service.register('claim-1', { ...REGISTER_DTO }, claims());
+      await expect(
+        deps.service.submitForAssessment('claim-1', claims()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+  });
+
+  describe('decideAssessment', () => {
+    async function underAssessment(withAdjusterWork = true) {
+      const deps = await documentedClaim(withAdjusterWork);
+      await deps.service.submitForAssessment('claim-1', claims());
+      deps.workflow.transition.mockClear();
+      return deps;
+    }
+
+    it('422 before the claim has been submitted for assessment', async () => {
+      const { service } = await documentedClaim(true);
+      await expect(
+        service.decideAssessment('claim-1', { outcome: 'APPROVED' }, claims()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it('422 when the loss adjuster has not completed survey + investigation', async () => {
+      const { service } = await underAssessment(false);
+      await expect(
+        service.decideAssessment('claim-1', { outcome: 'APPROVED' }, claims()),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    });
+
+    it.each(['APPROVED', 'PARTIALLY_APPROVED', 'DECLINED'] as const)(
+      'drives UNDER_ASSESSMENT -> %s through the engine + writes the history row',
+      async (outcome) => {
+        const { service, workflow, claimRepo } = await underAssessment();
+        const view = await service.decideAssessment(
+          'claim-1',
+          { outcome },
+          claims(),
+        );
+        expect(view.status).toBe(outcome);
+        expect(view.assessment.outcome).toBe(outcome);
+        expect(workflow.transition).toHaveBeenCalledWith(
+          expect.objectContaining({ entityType: 'Claim', toStatus: outcome }),
+        );
+        expect(claimRepo.recordStatusHistory).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fromStatus: 'UNDER_ASSESSMENT',
+            toStatus: outcome,
+          }),
+        );
+      },
+    );
+
+    it('is idempotent when re-sent with the recorded verdict, a 409 on a different one', async () => {
+      const { service, workflow } = await underAssessment();
+      await service.decideAssessment(
+        'claim-1',
+        { outcome: 'PARTIALLY_APPROVED' },
+        claims(),
+      );
+      workflow.transition.mockClear();
+      // identical -> no-op
+      const again = await service.decideAssessment(
+        'claim-1',
+        { outcome: 'PARTIALLY_APPROVED' },
+        claims(),
+      );
+      expect(again.status).toBe('PARTIALLY_APPROVED');
+      expect(workflow.transition).not.toHaveBeenCalled();
+      // different -> 409
+      await expect(
+        service.decideAssessment('claim-1', { outcome: 'DECLINED' }, claims()),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('backfills a missing UNDER_ASSESSMENT trail row when submit transitioned but its history write threw (review MINOR 1)', async () => {
+      const { service, claimRepo } = await documentedClaim(true);
+      // submit: the engine transition commits, the domain history write fails
+      claimRepo.recordStatusHistory.mockRejectedValueOnce(
+        new Error('history write failed'),
+      );
+      const submitted = await service.submitForAssessment('claim-1', claims());
+      expect(submitted.status).toBe('UNDER_ASSESSMENT');
+      expect(submitted.statusHistory.map((h) => h.toStatus)).not.toContain(
+        'UNDER_ASSESSMENT',
+      );
+      // straight to the verdict without re-calling submit — the intermediate
+      // row is reconciled, not permanently lost
+      const decided = await service.decideAssessment(
+        'claim-1',
+        { outcome: 'APPROVED' },
+        claims(),
+      );
+      expect(decided.statusHistory.map((h) => h.toStatus)).toEqual([
+        'NOTIFIED',
+        'REGISTERED',
+        'DOCUMENTATION_IN_PROGRESS',
+        'UNDER_ASSESSMENT',
+        'APPROVED',
+      ]);
+    });
+
+    it('normalises a lost UNDER_ASSESSMENT -> verdict race to a clean 409, not the engine raw error (review MINOR 1)', async () => {
+      const { service, workflow, claimRepo } = await underAssessment();
+      const rowAt = (status: string) => ({
+        id: 'claim-1',
+        claimNumber: null,
+        status,
+        classification: 'HIGHLY_CONFIDENTIAL',
+        followUpAlertThresholdDays: 9,
+        customerId: 'cus-1',
+        policyId: 'pol-1',
+        lossDate: new Date('2026-03-15T00:00:00.000Z'),
+        lossLocation: null,
+        causeOfLoss: 'x',
+        estimatedLoss: new Prisma.Decimal('20000'),
+        isThirdPartyInvolved: false,
+        isLargeClaim: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        policy: {
+          id: 'pol-1',
+          customerId: 'cus-1',
+          policyNumber: 'POL-1',
+          insuranceLine: 'Property All Risks',
+          expiryDate: EXPIRY,
+          schedules: [
+            { id: 'sched-v1', effectiveFrom: INCEPTION, effectiveTo: null },
+          ],
+        },
+        thirdParty: null,
+        adjuster: {
+          name: 'A',
+          firm: null,
+          assignedAt: new Date(),
+          surveyCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+          investigationCompletedAt: new Date('2026-04-05T00:00:00.000Z'),
+        },
+        documents: [],
+        statusHistory: [{ toStatus: status }],
+      });
+      // call #1 (gate check) still sees UNDER_ASSESSMENT; our engine transition
+      // then loses the race; the catch-block reload (#2) sees a concurrent
+      // caller's DIFFERENT verdict.
+      claimRepo.findById
+        .mockImplementationOnce(() =>
+          Promise.resolve(rowAt('UNDER_ASSESSMENT')),
+        )
+        .mockImplementationOnce(() => Promise.resolve(rowAt('DECLINED')));
+      workflow.transition.mockRejectedValueOnce(
+        new ConflictException('status changed concurrently'),
+      );
+      await expect(
+        service.decideAssessment('claim-1', { outcome: 'APPROVED' }, claims()),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe('recordAdjusterProgress — concurrent write (review MINOR 2)', () => {
+    it('409s a caller whose stamp lost the race to a different concurrent value', async () => {
+      const { service, claimRepo } = await documentedClaim();
+      // the repo reports it wrote NOTHING and the row already holds a
+      // different value — a concurrent caller stamped it first
+      claimRepo.recordAdjusterProgress.mockImplementationOnce(() =>
+        Promise.resolve({
+          adjuster: {
+            id: 'adj-1',
+            surveyCompletedAt: new Date('2026-04-09T00:00:00.000Z'),
+            investigationCompletedAt: null,
+          },
+          wrote: { surveyCompletedAt: false, investigationCompletedAt: false },
+        }),
+      );
+      await expect(
+        service.recordAdjusterProgress(
+          'claim-1',
+          { surveyCompletedAt: '2026-04-01T00:00:00.000Z' },
+          claims(),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('is a no-op (not a 409) when the concurrent value matches ours', async () => {
+      const { service, claimRepo } = await documentedClaim();
+      claimRepo.recordAdjusterProgress.mockImplementationOnce(() =>
+        Promise.resolve({
+          adjuster: {
+            id: 'adj-1',
+            surveyCompletedAt: new Date('2026-04-01T00:00:00.000Z'),
+            investigationCompletedAt: null,
+          },
+          wrote: { surveyCompletedAt: false, investigationCompletedAt: false },
+        }),
+      );
+      await expect(
+        service.recordAdjusterProgress(
+          'claim-1',
+          { surveyCompletedAt: '2026-04-01T00:00:00.000Z' },
+          claims(),
+        ),
+      ).resolves.toBeDefined();
+    });
+  });
+
+  it('404s every assessment endpoint for a caller who cannot see the claim', async () => {
+    const { service } = makeDeps({ customerOwner: 'someone-else' });
+    await service.notify({ ...BASE_DTO }, claims());
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+    await expect(
+      service.recordAdjusterProgress(
+        'claim-1',
+        { surveyCompletedAt: SURVEY_AT },
+        sales(),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.submitForAssessment('claim-1', sales()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.decideAssessment('claim-1', { outcome: 'APPROVED' }, sales()),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

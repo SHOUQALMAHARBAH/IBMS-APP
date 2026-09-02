@@ -25,16 +25,21 @@ import { formatMoney, quantizeMoney } from '../../common/money.util';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import {
   MEDICAL_REPORT_DOC_TYPE,
+  adjusterAssessmentAuditSnapshot,
   adjusterAuditSnapshot,
   buildDocumentChecklist,
   claimDocumentAuditSnapshot,
   claimNotificationAuditSnapshot,
   claimRegistrationAuditSnapshot,
   coverageGapMessage,
+  deriveAssessmentView,
+  isAssessmentConcluded,
   isLargeClaim,
   mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
   thirdPartyClaimantAuditSnapshot,
+  type AssessmentView,
+  type ClaimAssessmentOutcome,
   type ClaimDocChecklistItem,
   type ClaimDocType,
 } from './claim.config';
@@ -42,6 +47,8 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
 import type { RegisterClaimDto } from './dto/register-claim.dto';
 import type { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
+import type { RecordAdjusterProgressDto } from './dto/record-adjuster-progress.dto';
+import type { DecideClaimAssessmentDto } from './dto/decide-claim-assessment.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 
 const CROSS_OWNER_ROLES: readonly string[] = CLAIM_CROSS_OWNER_ROLES;
@@ -125,14 +132,18 @@ export interface ClaimView {
   documentChecklist: ClaimDocChecklistItem[];
   documentationComplete: boolean;
   missingMandatoryDocuments: ClaimDocType[];
+  /** Process 26 — the assessment sub-view: the adjuster's survey /
+   * investigation completion, whether the `→ UNDER_ASSESSMENT` move is
+   * unblocked, and the recorded verdict (null until decided). */
+  assessment: AssessmentView;
   statusHistory: ClaimStatusHistoryView[];
   createdAt: Date;
   updatedAt: Date;
 }
 
 /**
- * Process 23-25 — Claim Notification + Registration + Documentation (backlog
- * Part C #23-25, Domain C).
+ * Process 23-26 — Claim Notification + Registration + Documentation +
+ * Assessment (backlog Part C #23-26, Domain C).
  *
  *  - `notify` (#23) — record a reported loss against a Policy: loss
  *    date/location/cause, the estimated loss, third-party involvement. The
@@ -149,13 +160,27 @@ export interface ClaimView {
  *  - `attachDocuments` (#25) — file `ClaimDocument` / `Document` rows and
  *    surface the mandatory-document checklist per claim type; the first
  *    attach best-effort advances `REGISTERED → DOCUMENTATION_IN_PROGRESS`.
+ *  - `recordAdjusterProgress` (#26) — stamp the loss adjuster's survey /
+ *    investigation completion (write-once per field).
+ *  - `submitForAssessment` (#26) — drive `Claim DOCUMENTATION_IN_PROGRESS →
+ *    UNDER_ASSESSMENT` through the engine, **gated on the live
+ *    mandatory-document checklist** (`claims-lifecycle.md` — "the checklist is
+ *    what gates the move to insurer assessment"; a real safety gate, not
+ *    best-effort — recomputed from the loaded rows, never a snapshot).
+ *  - `decideAssessment` (#26) — drive `Claim UNDER_ASSESSMENT → APPROVED |
+ *    PARTIALLY_APPROVED | DECLINED` through the engine, recording the
+ *    insurer's verdict. The four settlement figures are Process 28.
  *  - `list` / `get` — read, scoped to exactly one of `policyId` /
  *    `customerId`.
  *
  * `Claim` IS a `WorkflowTransitionService` entity — `status` moves ONLY
- * through the engine. Both notification and registration are single-actor
- * Sales / Claims work — no maker/checker at this stage (the mandatory second
- * approver is at settlement, Process 28, `maker-checker-segregation.md`).
+ * through the engine; every move also writes a domain `ClaimStatusHistory`
+ * row (it feeds Loss Ratio / Claims Analytics; the engine's generic
+ * `TRANSITION` audit row does not). Notification, registration, documentation
+ * and assessment are all single-actor Claims work — no maker/checker at any
+ * of these stages (the mandatory second approver is at settlement, Process
+ * 28, `maker-checker-segregation.md` § "what does NOT trigger this rule" —
+ * recording the insurer's verdict is not the broker approving a payment).
  * Visibility mirrors `PolicyService`: a claim inherits its Customer's
  * visibility, and a Claims Officer reaches any claim (cross-book operational
  * role).
@@ -296,7 +321,7 @@ export class ClaimService {
           }
         : null,
       coverageResolvedAtLossDate: resolution.ok,
-      ...this.documentationView(claim),
+      ...this.assessmentAndDocumentationView(claim),
       statusHistory: claim.statusHistory.map((h) => ({
         fromStatus: h.fromStatus,
         toStatus: h.toStatus,
@@ -308,11 +333,13 @@ export class ClaimService {
     };
   }
 
-  /** Process 25 — the attached files + the mandatory checklist derived from
+  /** Process 25-26 — the attached files + the mandatory checklist derived from
    * the claim's line family (`Policy.insuranceLine`) and third-party
-   * involvement. `storageRef` is dropped; `fileName` is kept (in-app claim
-   * data — the read is audited as a sensitive-data access). */
-  private documentationView(
+   * involvement, plus the Process 26 assessment sub-view (adjuster survey /
+   * investigation completion, readiness, recorded verdict). `storageRef` is
+   * dropped; `fileName` is kept (in-app claim data — the read is audited as a
+   * sensitive-data access). */
+  private assessmentAndDocumentationView(
     claim: ClaimWithContext,
   ): Pick<
     ClaimView,
@@ -320,6 +347,7 @@ export class ClaimService {
     | 'documentChecklist'
     | 'documentationComplete'
     | 'missingMandatoryDocuments'
+    | 'assessment'
   > {
     const documents: ClaimDocumentView[] = claim.documents.map((d) => ({
       id: d.id,
@@ -345,6 +373,13 @@ export class ClaimService {
       documentChecklist: checklist,
       documentationComplete,
       missingMandatoryDocuments: missing,
+      assessment: deriveAssessmentView({
+        status: claim.status,
+        documentationComplete,
+        surveyCompletedAt: claim.adjuster?.surveyCompletedAt ?? null,
+        investigationCompletedAt:
+          claim.adjuster?.investigationCompletedAt ?? null,
+      }),
     };
   }
 
@@ -576,7 +611,7 @@ export class ClaimService {
         (claim.adjuster.firm ?? '') === (dto.adjuster.firm ?? '');
       const sameNumber = (claim.claimNumber ?? '') === (dto.claimNumber ?? '');
       if (sameRef && sameName && sameFirm && sameNumber) {
-        return this.toView(claim);
+        return this.toViewAudited(claim.id, actor, 'claim-registration');
       }
       throw new ConflictException(
         `Claim ${claim.id} is already registered (insurer ref "${claim.insurerClaimReference ?? '—'}", adjuster "${claim.adjuster.name}"). Registration details are recorded once — a correction is not yet supported.`,
@@ -631,7 +666,7 @@ export class ClaimService {
       });
     }
 
-    return this.toView(await this.loadVisibleClaim(claim.id, actor));
+    return this.toViewAudited(claim.id, actor, 'claim-registration');
   }
 
   /**
@@ -748,6 +783,382 @@ export class ClaimService {
       documentsFiled: created.length,
     });
     return view;
+  }
+
+  /**
+   * Process 26 — stamp the loss adjuster's survey and / or investigation
+   * completion. Valid while the claim is `REGISTERED` .. `UNDER_ASSESSMENT`
+   * (the adjuster exists from registration; once a verdict is recorded the
+   * assessment phase is closed). Each timestamp is a past-only instant
+   * (`parseHistoricalInstant`) no earlier than the loss date, and is
+   * **write-once** — re-sending the identical value is a no-op, a different
+   * value is a 409 (there is no amend path). No maker/checker — recording
+   * adjuster progress is single-actor Claims work.
+   */
+  async recordAdjusterProgress(
+    id: string,
+    dto: RecordAdjusterProgressDto,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+    if (!claim.adjuster) {
+      throw new UnprocessableEntityException(
+        `Claim ${id} has no loss adjuster yet — register it with the insurer (POST /claims/${id}/registration) first.`,
+      );
+    }
+    if (isAssessmentConcluded(claim.status)) {
+      throw new UnprocessableEntityException(
+        `Claim ${id} is ${claim.status}; the assessment phase is closed — adjuster progress can no longer be recorded.`,
+      );
+    }
+
+    if (
+      dto.surveyCompletedAt === undefined &&
+      dto.investigationCompletedAt === undefined
+    ) {
+      throw new UnprocessableEntityException(
+        'Provide surveyCompletedAt and/or investigationCompletedAt.',
+      );
+    }
+
+    const lossAt = claim.lossDate.getTime();
+    const patch: { surveyCompletedAt?: Date; investigationCompletedAt?: Date } =
+      {};
+
+    for (const field of [
+      'surveyCompletedAt',
+      'investigationCompletedAt',
+    ] as const) {
+      const raw = dto[field];
+      if (raw === undefined) continue;
+      const parsed = parseHistoricalInstant(raw, field);
+      if (parsed.getTime() < lossAt) {
+        throw new UnprocessableEntityException(
+          `${field} (${parsed.toISOString()}) is before the loss date (${claim.lossDate.toISOString()}) — the adjuster cannot have surveyed a loss that had not happened.`,
+        );
+      }
+      const existing = claim.adjuster[field];
+      if (existing) {
+        // Write-once: an identical re-send is fine, a different value is a 409.
+        if (existing.getTime() !== parsed.getTime()) {
+          throw new ConflictException(
+            `${field} is already recorded as ${existing.toISOString()} — it is set once and there is no correction path.`,
+          );
+        }
+        continue;
+      }
+      patch[field] = parsed;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      const { adjuster, wrote } = await this.claims.recordAdjusterProgress(
+        id,
+        patch,
+      );
+      // A field this call meant to set but did NOT write (`wrote.* === false`)
+      // means a concurrent caller stamped it first, between our pre-check
+      // above and the guarded `updateMany`. If their value differs from ours,
+      // the loser gets a 409 (not a feigned success); if it matches, it is an
+      // idempotent no-op.
+      for (const field of Object.keys(patch) as (keyof typeof patch)[]) {
+        if (wrote[field]) continue;
+        const landed = adjuster[field];
+        if (landed && landed.getTime() !== patch[field]!.getTime()) {
+          throw new ConflictException(
+            `${field} was recorded concurrently as ${landed.toISOString()} — it is set once and there is no correction path.`,
+          );
+        }
+      }
+      await this.safeAudit({
+        userId: actor.id,
+        action: 'UPDATE',
+        entityType: 'Adjuster',
+        entityId: adjuster.id,
+        afterValue: adjusterAssessmentAuditSnapshot({
+          adjusterId: adjuster.id,
+          claimId: id,
+          surveyCompletedAt: adjuster.surveyCompletedAt,
+          investigationCompletedAt: adjuster.investigationCompletedAt,
+        }),
+      });
+    }
+
+    const view = this.toView(await this.loadVisibleClaim(id, actor));
+    await this.auditSensitiveRead(actor, 'Claim', id, true, {
+      view: 'claim-adjuster-progress',
+      claimId: id,
+    });
+    return view;
+  }
+
+  /**
+   * Process 26 — submit the claim to the insurer for assessment: drives
+   * `Claim DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT` through the workflow
+   * engine. **Gated on the mandatory-document checklist being complete**
+   * (`claims-lifecycle.md` — "the checklist is what gates the move to insurer
+   * assessment"): this is a real safety gate, so a failed / illegal transition
+   * is surfaced (409 / 422), never swallowed. The gate is **recomputed from
+   * the loaded document rows**, never trusted from a snapshot (the #16
+   * generalisation). The `UNDER_ASSESSMENT` `ClaimStatusHistory` row is
+   * written after the transition (idempotent); a re-call once the claim is
+   * already `UNDER_ASSESSMENT` backfills a missing history row without
+   * re-transitioning. No maker/checker — single-actor Claims work.
+   */
+  async submitForAssessment(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+
+    if (claim.status === 'UNDER_ASSESSMENT') {
+      await this.backfillStatusHistory(
+        id,
+        'DOCUMENTATION_IN_PROGRESS',
+        'UNDER_ASSESSMENT',
+        claim.statusHistory,
+        actor,
+      );
+      return this.toViewAudited(id, actor, 'claim-submit-for-assessment');
+    }
+
+    if (claim.status !== 'DOCUMENTATION_IN_PROGRESS') {
+      throw new UnprocessableEntityException(
+        isAssessmentConcluded(claim.status)
+          ? `Claim ${id} is ${claim.status}; the assessment is already concluded.`
+          : `Claim ${id} is ${claim.status}; it must be DOCUMENTATION_IN_PROGRESS (register it and file the mandatory documents) before it can be submitted for assessment.`,
+      );
+    }
+
+    // Recompute the checklist from the loaded rows — the safety gate.
+    const mandatory = mandatoryDocTypesFor({
+      insuranceLine: claim.policy.insuranceLine,
+      isThirdPartyInvolved: claim.isThirdPartyInvolved,
+    });
+    const { documentationComplete, missing } = buildDocumentChecklist(
+      mandatory,
+      claim.documents.map((d) => d.docType),
+    );
+    if (!documentationComplete) {
+      throw new UnprocessableEntityException(
+        `Claim ${id} cannot be submitted for assessment — the mandatory documentation is incomplete. Missing: ${missing.join(', ')}.`,
+      );
+    }
+
+    try {
+      await this.workflow.transition({
+        entityType: 'Claim',
+        entityId: id,
+        toStatus: 'UNDER_ASSESSMENT',
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      // A concurrent submit won the DOCUMENTATION_IN_PROGRESS -> UNDER_ASSESSMENT
+      // race (engine 0-rows ConflictException, or its pre-read already saw
+      // UNDER_ASSESSMENT). Reload and treat as already-submitted; anything else
+      // rethrows (the gate above already passed, so this is the only expected
+      // failure).
+      const now = await this.loadVisibleClaim(id, actor);
+      if (now.status === 'UNDER_ASSESSMENT') {
+        await this.backfillStatusHistory(
+          id,
+          'DOCUMENTATION_IN_PROGRESS',
+          'UNDER_ASSESSMENT',
+          now.statusHistory,
+          actor,
+        );
+        return this.toViewAudited(id, actor, 'claim-submit-for-assessment');
+      }
+      throw err;
+    }
+
+    await this.recordHistoryBestEffort(
+      id,
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+      actor,
+    );
+    return this.toViewAudited(id, actor, 'claim-submit-for-assessment');
+  }
+
+  /**
+   * Process 26 — record the insurer's assessment verdict: drives
+   * `Claim UNDER_ASSESSMENT → APPROVED | PARTIALLY_APPROVED | DECLINED`
+   * through the workflow engine and writes the `ClaimStatusHistory` row. The
+   * four settlement figures (estimated / approved / deductible / net) are
+   * Process 28 — this endpoint records only the decision.
+   *
+   * Gated on the loss adjuster having completed **both** the survey and the
+   * investigation (`Adjuster.surveyCompletedAt` and `investigationCompletedAt`
+   * set) — an `ibms-app` product rule, drafted / unsourced (filed via
+   * `/brain-gap`; same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23), the #25
+   * checklist matrix, #16's 10 % / 2 pp).
+   *
+   * Idempotent: re-sending the recorded verdict is a no-op; a *different*
+   * verdict once one is recorded is a 409 (write-once — a dispute routes to
+   * Complaint Management, Process 42). A concurrent `decideAssessment` that
+   * lost the engine race is normalised the same way (idempotent for the same
+   * outcome, 409 for a different one) rather than surfacing the engine's raw
+   * conflict. No maker/checker — recording the insurer's decision is
+   * single-actor Claims work, not the broker approving a payment
+   * (`maker-checker-segregation.md` § "what does NOT trigger this rule").
+   */
+  async decideAssessment(
+    id: string,
+    dto: DecideClaimAssessmentDto,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const outcome: ClaimAssessmentOutcome = dto.outcome;
+    const claim = await this.loadVisibleClaim(id, actor);
+
+    if (claim.status === outcome) {
+      return this.concludeIdempotently(id, outcome, claim.statusHistory, actor);
+    }
+
+    if (isAssessmentConcluded(claim.status)) {
+      throw new ConflictException(
+        `Claim ${id} assessment is already recorded as ${claim.status} — the verdict is set once (a client dispute routes to Complaint Management).`,
+      );
+    }
+
+    if (claim.status !== 'UNDER_ASSESSMENT') {
+      throw new UnprocessableEntityException(
+        `Claim ${id} is ${claim.status}; submit it for assessment (POST /claims/${id}/assessment/submit) before recording a verdict.`,
+      );
+    }
+
+    if (
+      !claim.adjuster?.surveyCompletedAt ||
+      !claim.adjuster?.investigationCompletedAt
+    ) {
+      throw new UnprocessableEntityException(
+        `Claim ${id}: the loss adjuster has not completed the survey and investigation — record those (POST /claims/${id}/assessment/adjuster-progress) before the assessment verdict.`,
+      );
+    }
+
+    // Reconcile a possibly-missing UNDER_ASSESSMENT trail row — `submit` may
+    // have transitioned but had its best-effort history write fail, and the
+    // caller came straight here without re-calling `submit`.
+    await this.backfillStatusHistory(
+      id,
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+      claim.statusHistory,
+      actor,
+    );
+
+    try {
+      await this.workflow.transition({
+        entityType: 'Claim',
+        entityId: id,
+        toStatus: outcome,
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      // A concurrent `decideAssessment` won the UNDER_ASSESSMENT -> verdict
+      // race (engine 0-rows ConflictException, or its pre-read already saw a
+      // verdict). Reload: if the winner recorded THIS outcome it is an
+      // idempotent no-op; a DIFFERENT verdict (or a move past it) is the same
+      // 409 the sequential path gives; anything else rethrows.
+      const now = await this.loadVisibleClaim(id, actor);
+      if (now.status === outcome) {
+        return this.concludeIdempotently(id, outcome, now.statusHistory, actor);
+      }
+      if (isAssessmentConcluded(now.status)) {
+        throw new ConflictException(
+          `Claim ${id} assessment was recorded concurrently as ${now.status} — the verdict is set once (a client dispute routes to Complaint Management).`,
+        );
+      }
+      throw err;
+    }
+    await this.recordHistoryBestEffort(id, 'UNDER_ASSESSMENT', outcome, actor);
+    return this.toViewAudited(id, actor, 'claim-assessment-decision');
+  }
+
+  /** The verdict is already recorded (idempotent re-call, or a concurrent
+   * winner). Reconcile BOTH trail rows that may be missing — the intermediate
+   * `UNDER_ASSESSMENT` (if `submit`'s best-effort write failed) and the verdict
+   * itself — then return the view. */
+  private async concludeIdempotently(
+    id: string,
+    outcome: ClaimAssessmentOutcome,
+    history: readonly { toStatus: ClaimStatus }[],
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    await this.backfillStatusHistory(
+      id,
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+      history,
+      actor,
+    );
+    await this.backfillStatusHistory(
+      id,
+      'UNDER_ASSESSMENT',
+      outcome,
+      history,
+      actor,
+    );
+    return this.toViewAudited(id, actor, 'claim-assessment-decision');
+  }
+
+  /** Write the domain `ClaimStatusHistory` row for a status the engine has
+   * JUST moved through — best-effort (logged, never thrown). The engine
+   * transition is the loud safety gate; this is the Analytics-feeding trail
+   * write that follows it, and the #24 / #25 seam applies: a crash between the
+   * two leaves the status ahead of its history row, which the next call's
+   * `backfillStatusHistory` reconciles. */
+  private async recordHistoryBestEffort(
+    claimId: string,
+    fromStatus: ClaimStatus,
+    toStatus: ClaimStatus,
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    try {
+      await this.claims.recordStatusHistory({
+        claimId,
+        fromStatus,
+        toStatus,
+        changedByUserId: actor.id,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Claim ${claimId}: status moved to ${toStatus} but the domain ClaimStatusHistory write did not land (will be backfilled on the next call): ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /** Write the domain `ClaimStatusHistory` row for a status the engine has
+   * already moved through, if it is not already present (a resume path: the
+   * transition committed but its separate history write then threw). Goes
+   * through {@link recordHistoryBestEffort} so a concurrent backfill that trips
+   * the `@@unique([claimId, toStatus])` is swallowed as "already reconciled"
+   * rather than surfacing a raw `P2002` — the row landing is all that
+   * matters. */
+  private async backfillStatusHistory(
+    claimId: string,
+    fromStatus: ClaimStatus,
+    toStatus: ClaimStatus,
+    history: readonly { toStatus: ClaimStatus }[],
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    if (history.some((h) => h.toStatus === toStatus)) return;
+    await this.recordHistoryBestEffort(claimId, fromStatus, toStatus, actor);
+  }
+
+  /** Reload the claim, build the view, and log the sensitive-data READ (the
+   * view echoes `causeOfLoss` / `lossLocation` / `documents[].fileName` / the
+   * third-party name — same rule as `get` / `list`). */
+  private async toViewAudited(
+    id: string,
+    actor: AuthenticatedUser,
+    view: string,
+  ): Promise<ClaimView> {
+    const result = this.toView(await this.loadVisibleClaim(id, actor));
+    await this.auditSensitiveRead(actor, 'Claim', id, true, {
+      view,
+      claimId: id,
+    });
+    return result;
   }
 
   async list(

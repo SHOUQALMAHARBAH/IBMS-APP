@@ -11,17 +11,24 @@ import type {
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Process 25 — the claim-documentation files, newest first, for the
+// mandatory-checklist computation. Secondary sort by id so intra-batch order is
+// stable (one attachDocuments $transaction gives every Document the same
+// createdAt). Declared as a typed array outside CLAIM_INCLUDE — an `as const`
+// on the include object would freeze this to a readonly tuple that
+// Prisma.ClaimInclude rejects.
+const CLAIM_DOCUMENTS_ORDER: Prisma.ClaimDocumentOrderByWithRelationInput[] = [
+  { document: { createdAt: 'desc' } },
+  { id: 'asc' },
+];
+
 const CLAIM_INCLUDE = {
   thirdParty: true,
   // Process 24 — the one loss adjuster assigned at registration (or null).
   adjuster: true,
-  // Process 25 — the claim-documentation files (ClaimDocument join + Document),
-  // newest first, for the mandatory-checklist computation. Secondary sort by id
-  // so intra-batch order is stable (one attachDocuments $transaction gives every
-  // Document the same createdAt).
   documents: {
     include: { document: true },
-    orderBy: [{ document: { createdAt: 'desc' } }, { id: 'asc' }],
+    orderBy: CLAIM_DOCUMENTS_ORDER,
   },
   statusHistory: { orderBy: { changedAt: 'asc' } },
   policy: {
@@ -99,10 +106,11 @@ export interface ClaimDocumentInput {
 export type ClaimDocumentWithFile = ClaimDocument & { document: Document };
 
 /**
- * Process 23-25 — Claim Notification + Registration + Documentation (backlog
- * Part C #23-25, Domain C). Owns `Claim` plus its children: the
- * `ClaimStatusHistory` trail, the one `ThirdPartyClaimant` (#23), the one loss
- * `Adjuster` (#24) and the `ClaimDocument` / `Document` file rows (#25).
+ * Process 23-26 — Claim Notification + Registration + Documentation +
+ * Assessment (backlog Part C #23-26, Domain C). Owns `Claim` plus its
+ * children: the `ClaimStatusHistory` trail, the one `ThirdPartyClaimant`
+ * (#23), the one loss `Adjuster` (#24, its survey / investigation completion
+ * stamps written in #26) and the `ClaimDocument` / `Document` file rows (#25).
  *
  * `Claim` IS a `WorkflowTransitionService` entity — its `status`
  * (`ClaimStatus`) moves ONLY through the engine
@@ -250,6 +258,47 @@ export class ClaimRepository {
       }
       return created;
     });
+  }
+
+  /**
+   * Process 26 — stamp the loss `Adjuster`'s survey / investigation completion
+   * timestamps. Each field is written with a `<field> IS NULL` guard so it is
+   * **write-once** and a concurrent stamp loses the race (0 rows) rather than
+   * being silently overwritten (`race-safe-invariants.md` — "guard right at
+   * the write"). Returns the fresh row **and** which fields this call actually
+   * wrote (`wrote.*`), so the service can 409 a caller whose value lost the
+   * race to a *different* concurrent value rather than feign success. A patch
+   * with no fields is a no-op reload (`wrote` all false).
+   */
+  async recordAdjusterProgress(
+    claimId: string,
+    patch: { surveyCompletedAt?: Date; investigationCompletedAt?: Date },
+  ): Promise<{
+    adjuster: Adjuster;
+    wrote: { surveyCompletedAt: boolean; investigationCompletedAt: boolean };
+  }> {
+    const wrote = {
+      surveyCompletedAt: false,
+      investigationCompletedAt: false,
+    };
+    if (patch.surveyCompletedAt !== undefined) {
+      const { count } = await this.prisma.client.adjuster.updateMany({
+        where: { claimId, surveyCompletedAt: null },
+        data: { surveyCompletedAt: patch.surveyCompletedAt },
+      });
+      wrote.surveyCompletedAt = count > 0;
+    }
+    if (patch.investigationCompletedAt !== undefined) {
+      const { count } = await this.prisma.client.adjuster.updateMany({
+        where: { claimId, investigationCompletedAt: null },
+        data: { investigationCompletedAt: patch.investigationCompletedAt },
+      });
+      wrote.investigationCompletedAt = count > 0;
+    }
+    const adjuster = await this.prisma.client.adjuster.findUniqueOrThrow({
+      where: { claimId },
+    });
+    return { adjuster, wrote };
   }
 
   /**

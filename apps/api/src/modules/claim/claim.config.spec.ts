@@ -3,6 +3,7 @@ import { Prisma } from '@ibms/db';
 import {
   CLAIM_DOC_TYPES,
   CLAIM_LARGE_THRESHOLD_JOD,
+  adjusterAssessmentAuditSnapshot,
   adjusterAuditSnapshot,
   buildDocumentChecklist,
   claimDocumentAuditSnapshot,
@@ -10,6 +11,8 @@ import {
   claimRegistrationAuditSnapshot,
   classifyInsuranceLine,
   coverageGapMessage,
+  deriveAssessmentView,
+  isAssessmentConcluded,
   isLargeClaim,
   mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
@@ -435,6 +438,125 @@ describe('claimDocumentAuditSnapshot — metadata not body', () => {
       category: 'CLAIM',
       classification: 'HIGHLY_CONFIDENTIAL',
       uploadedByUserId: 'u-1',
+    });
+  });
+});
+
+describe('isAssessmentConcluded', () => {
+  it('is true for the three verdicts and beyond, false before', () => {
+    for (const s of [
+      'APPROVED',
+      'PARTIALLY_APPROVED',
+      'DECLINED',
+      'SETTLED',
+      'CLOSED',
+    ]) {
+      expect(isAssessmentConcluded(s)).toBe(true);
+    }
+    for (const s of [
+      'NOTIFIED',
+      'REGISTERED',
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+    ]) {
+      expect(isAssessmentConcluded(s)).toBe(false);
+    }
+  });
+});
+
+describe('deriveAssessmentView', () => {
+  const survey = d('2026-05-10T00:00:00.000Z');
+  const investigation = d('2026-05-12T00:00:00.000Z');
+
+  it('readyForAssessment only when DOCUMENTATION_IN_PROGRESS and docs complete', () => {
+    expect(
+      deriveAssessmentView({
+        status: 'DOCUMENTATION_IN_PROGRESS',
+        documentationComplete: true,
+        surveyCompletedAt: null,
+        investigationCompletedAt: null,
+      }).readyForAssessment,
+    ).toBe(true);
+    expect(
+      deriveAssessmentView({
+        status: 'DOCUMENTATION_IN_PROGRESS',
+        documentationComplete: false,
+        surveyCompletedAt: null,
+        investigationCompletedAt: null,
+      }).readyForAssessment,
+    ).toBe(false);
+    expect(
+      deriveAssessmentView({
+        status: 'UNDER_ASSESSMENT',
+        documentationComplete: true,
+        surveyCompletedAt: null,
+        investigationCompletedAt: null,
+      }).readyForAssessment,
+    ).toBe(false);
+  });
+
+  it('adjusterWorkComplete needs BOTH stamps', () => {
+    expect(
+      deriveAssessmentView({
+        status: 'UNDER_ASSESSMENT',
+        documentationComplete: true,
+        surveyCompletedAt: survey,
+        investigationCompletedAt: null,
+      }).adjusterWorkComplete,
+    ).toBe(false);
+    expect(
+      deriveAssessmentView({
+        status: 'UNDER_ASSESSMENT',
+        documentationComplete: true,
+        surveyCompletedAt: survey,
+        investigationCompletedAt: investigation,
+      }).adjusterWorkComplete,
+    ).toBe(true);
+  });
+
+  it('outcome is the status once it is a verdict, else null', () => {
+    expect(
+      deriveAssessmentView({
+        status: 'UNDER_ASSESSMENT',
+        documentationComplete: true,
+        surveyCompletedAt: survey,
+        investigationCompletedAt: investigation,
+      }).outcome,
+    ).toBeNull();
+    expect(
+      deriveAssessmentView({
+        status: 'PARTIALLY_APPROVED',
+        documentationComplete: true,
+        surveyCompletedAt: survey,
+        investigationCompletedAt: investigation,
+      }).outcome,
+    ).toBe('PARTIALLY_APPROVED');
+    // SETTLED is past the verdict — outcome is not re-derived from it
+    expect(
+      deriveAssessmentView({
+        status: 'SETTLED',
+        documentationComplete: true,
+        surveyCompletedAt: survey,
+        investigationCompletedAt: investigation,
+      }).outcome,
+    ).toBeNull();
+  });
+});
+
+describe('adjusterAssessmentAuditSnapshot — metadata not body', () => {
+  it('carries ids + the two ISO timestamps, no claim narrative', () => {
+    expect(
+      adjusterAssessmentAuditSnapshot({
+        adjusterId: 'adj-1',
+        claimId: 'claim-1',
+        surveyCompletedAt: d('2026-05-10T09:00:00.000Z'),
+        investigationCompletedAt: null,
+      }),
+    ).toEqual({
+      adjusterId: 'adj-1',
+      claimId: 'claim-1',
+      surveyCompletedAt: '2026-05-10T09:00:00.000Z',
+      investigationCompletedAt: null,
     });
   });
 });

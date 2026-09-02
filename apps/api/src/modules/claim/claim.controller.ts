@@ -4,20 +4,24 @@ import { ClaimService } from './claim.service';
 import { NotifyClaimDto } from './dto/notify-claim.dto';
 import { RegisterClaimDto } from './dto/register-claim.dto';
 import { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
+import { RecordAdjusterProgressDto } from './dto/record-adjuster-progress.dto';
+import { DecideClaimAssessmentDto } from './dto/decide-claim-assessment.dto';
 import { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
-/** Process 23-25 — Claim Notification + Registration + Documentation (backlog
- * Part C #23-25, Domain C). Record a reported loss against a Policy (with
- * coverage-at-loss-date validation), register it with the insurer and assign
- * the loss adjuster (`NOTIFIED → REGISTERED`), then file the mandatory
- * documentation — a per-claim-type checklist of claim form / police report /
- * medical report / photos / invoices / repair estimate / expert report — with
- * the first attach advancing `REGISTERED → DOCUMENTATION_IN_PROGRESS`. See
- * claim.service.ts for the rules. Frontend: the "Claims" block in the "Policy"
- * section on apps/web/app/(app)/opportunities/[id]/. */
+/** Process 23-26 — Claim Notification + Registration + Documentation +
+ * Assessment (backlog Part C #23-26, Domain C). Record a reported loss against
+ * a Policy (with coverage-at-loss-date validation), register it with the
+ * insurer and assign the loss adjuster (`NOTIFIED → REGISTERED`), file the
+ * mandatory documentation — a per-claim-type checklist — with the first attach
+ * advancing `REGISTERED → DOCUMENTATION_IN_PROGRESS`, then track the adjuster's
+ * survey / investigation, submit the claim for insurer assessment
+ * (`DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`, gated on the checklist) and
+ * record the verdict (`UNDER_ASSESSMENT → APPROVED | PARTIALLY_APPROVED |
+ * DECLINED`). See claim.service.ts for the rules. Frontend: the "Claims" block
+ * in the "Policy" section on apps/web/app/(app)/opportunities/[id]/. */
 @ApiTags('claims')
 @Controller('claims')
 export class ClaimController {
@@ -55,6 +59,43 @@ export class ClaimController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.claims.attachDocuments(id, dto, user);
+  }
+
+  /** Process 26 — stamp the loss adjuster's survey / investigation completion
+   * (write-once per field). Valid from `REGISTERED` until a verdict is
+   * recorded. */
+  @RequirePermissions('claim.assess')
+  @Post(':id/assessment/adjuster-progress')
+  recordAdjusterProgress(
+    @Param('id') id: string,
+    @Body() dto: RecordAdjusterProgressDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.recordAdjusterProgress(id, dto, user);
+  }
+
+  /** Process 26 — submit the claim to the insurer for assessment
+   * (`DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`). Gated on the mandatory
+   * documentation checklist being complete. */
+  @RequirePermissions('claim.assess')
+  @Post(':id/assessment/submit')
+  submitForAssessment(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.submitForAssessment(id, user);
+  }
+
+  /** Process 26 — record the insurer's assessment verdict
+   * (`UNDER_ASSESSMENT → APPROVED | PARTIALLY_APPROVED | DECLINED`). */
+  @RequirePermissions('claim.assess')
+  @Post(':id/assessment/decision')
+  decideAssessment(
+    @Param('id') id: string,
+    @Body() dto: DecideClaimAssessmentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.decideAssessment(id, dto, user);
   }
 
   @RequirePermissions('claim.read')

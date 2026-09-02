@@ -176,6 +176,7 @@ async function mockRfqApi(
     onAttachClaimDocs?: (body: {
       documents: { docType: string; classification: string }[];
     }) => void;
+    onClaimAssessment?: (body: Record<string, unknown>) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -815,6 +816,26 @@ async function mockRfqApi(
       row.documentationComplete = missing.length === 0;
     };
 
+    // Process 26 — derive the assessment sub-view from status + docs + adjuster.
+    const OUTCOMES = ["APPROVED", "PARTIALLY_APPROVED", "DECLINED"];
+    const applyAssessment = (row: Record<string, unknown>) => {
+      const adj = row.adjuster as Record<string, unknown> | null;
+      const survey = (adj?.surveyCompletedAt as string | null) ?? null;
+      const investigation =
+        (adj?.investigationCompletedAt as string | null) ?? null;
+      row.assessment = {
+        surveyCompletedAt: survey,
+        investigationCompletedAt: investigation,
+        adjusterWorkComplete: survey !== null && investigation !== null,
+        readyForAssessment:
+          row.status === "DOCUMENTATION_IN_PROGRESS" &&
+          row.documentationComplete === true,
+        outcome: OUTCOMES.includes(row.status as string)
+          ? (row.status as string)
+          : null,
+      };
+    };
+
     const docMatch = /\/claims\/([^/?]+)\/documents(\?|$)/.exec(url);
     if (method === "POST" && docMatch) {
       const b = route.request().postDataJSON() as {
@@ -851,6 +872,54 @@ async function mockRfqApi(
           });
         }
         applyChecklist(row);
+        applyAssessment(row);
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
+
+    // Process 26 — adjuster progress / submit for assessment / verdict.
+    const asmtMatch = /\/claims\/([^/?]+)\/assessment\/([a-z-]+)(\?|$)/.exec(
+      url,
+    );
+    if (method === "POST" && asmtMatch) {
+      const row = claimRows.find((r) => r.id === asmtMatch[1]);
+      const step = asmtMatch[2];
+      const b = (route.request().postDataJSON() ?? {}) as Record<
+        string,
+        unknown
+      >;
+      opts.onClaimAssessment?.({ step, ...b });
+      if (row) {
+        const push = (fromStatus: string, toStatus: string) =>
+          (row.statusHistory as Record<string, unknown>[]).push({
+            fromStatus,
+            toStatus,
+            changedByUserId: "user-1",
+            changedAt: "2026-11-07T00:00:00.000Z",
+          });
+        if (step === "adjuster-progress") {
+          const adj = row.adjuster as Record<string, unknown>;
+          if (typeof b.surveyCompletedAt === "string" && !adj.surveyCompletedAt) {
+            adj.surveyCompletedAt = b.surveyCompletedAt;
+          }
+          if (
+            typeof b.investigationCompletedAt === "string" &&
+            !adj.investigationCompletedAt
+          ) {
+            adj.investigationCompletedAt = b.investigationCompletedAt;
+          }
+        } else if (step === "submit") {
+          if (row.status === "DOCUMENTATION_IN_PROGRESS") {
+            row.status = "UNDER_ASSESSMENT";
+            push("DOCUMENTATION_IN_PROGRESS", "UNDER_ASSESSMENT");
+          }
+        } else if (step === "decision") {
+          if (row.status === "UNDER_ASSESSMENT") {
+            row.status = b.outcome as string;
+            push("UNDER_ASSESSMENT", b.outcome as string);
+          }
+        }
+        applyAssessment(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
     }
@@ -881,6 +950,7 @@ async function mockRfqApi(
           changedByUserId: "user-1",
           changedAt: "2026-11-05T00:00:00.000Z",
         });
+        applyAssessment(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
     }
@@ -947,6 +1017,7 @@ async function mockRfqApi(
         updatedAt: "2026-11-01T00:00:00.000Z",
       };
       applyChecklist(row);
+      applyAssessment(row);
       claimRows.push(row);
       return route.fulfill({ status: 201, json: row });
     }
@@ -1556,6 +1627,80 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await expect.poll(() => attached?.documents[0].docType).toBe("claim_form");
   await expect(page.getByText("DOCUMENTATION_IN_PROGRESS", { exact: true })).toBeVisible();
   await expect(page.getByText("missing photo, repair_estimate")).toBeVisible();
+});
+
+test("tracks the adjuster survey, submits for assessment once the checklist is complete, and records the verdict", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  const steps: string[] = [];
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onClaimAssessment: (b) => {
+      steps.push(b.step as string);
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  // notify + register
+  await page.getByLabel("Loss date").fill("2026-11-15");
+  await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
+  await page.getByLabel("Estimated loss").fill("14000.000");
+  await page.getByRole("button", { name: "Notify claim" }).click();
+  await page.getByLabel("Insurer claim reference").fill("INS-ASMT-1");
+  await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
+  await page
+    .getByRole("button", { name: "Register & assign adjuster" })
+    .click();
+  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+
+  // file every mandatory document
+  for (const [docType, fileName] of [
+    ["claim_form", "cf.pdf"],
+    ["photo", "ph.jpg"],
+    ["repair_estimate", "re.pdf"],
+  ] as const) {
+    await page.getByLabel("Document type").selectOption(docType);
+    await page.getByLabel("File name").fill(fileName);
+    await page.getByLabel("Storage reference").fill(`s3://claims/${docType}`);
+    await page.getByRole("button", { name: "File document" }).click();
+  }
+  await expect(page.getByText("Documentation · complete")).toBeVisible();
+
+  // record the adjuster's survey + investigation
+  await page
+    .getByLabel("Completion date (adjuster survey / investigation)")
+    .fill("2026-11-16");
+  await page.getByRole("button", { name: "Mark survey complete" }).click();
+  await page
+    .getByRole("button", { name: "Mark investigation complete" })
+    .click();
+  await expect.poll(() => steps.filter((s) => s === "adjuster-progress").length).toBe(2);
+
+  // submit for assessment, then record the verdict
+  await page.getByRole("button", { name: "Submit for assessment" }).click();
+  await expect(page.getByText("UNDER_ASSESSMENT", { exact: true })).toBeVisible();
+  await page
+    .getByLabel("Assessment verdict")
+    .selectOption("PARTIALLY_APPROVED");
+  await page.getByRole("button", { name: "Record verdict" }).click();
+
+  // the verdict shows and the decision control is gone
+  await expect(page.getByText("verdict PARTIALLY_APPROVED")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record verdict" }),
+  ).toHaveCount(0);
+  expect(steps).toEqual([
+    "adjuster-progress",
+    "adjuster-progress",
+    "submit",
+    "decision",
+  ]);
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {
