@@ -67,6 +67,18 @@ interface ClaimBody {
     surveyCompletedAt: string | null;
     investigationCompletedAt: string | null;
   } | null;
+  documents: {
+    id: string;
+    docType: string;
+    category: string;
+    classification: string;
+    fileName: string;
+    versionNumber: number;
+    uploadedByUserId: string;
+  }[];
+  documentChecklist: { docType: string; required: boolean; present: boolean }[];
+  documentationComplete: boolean;
+  missingMandatoryDocuments: string[];
   statusHistory: {
     fromStatus: string | null;
     toStatus: string;
@@ -244,7 +256,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification + Registration (e2e) — backlog Part C #23-24', () => {
+describe('Claim Notification + Registration + Documentation (e2e) — backlog Part C #23-25', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -612,5 +624,186 @@ describe('Claim Notification + Registration (e2e) — backlog Part C #23-24', ()
       where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
     });
     expect(transitionsAfter).toBe(1);
+  });
+
+  it('#25 — files claim documentation, advances to DOCUMENTATION_IN_PROGRESS, and tracks the mandatory checklist', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'clm25-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const clm = await makeUser(app, 'clm25-officer', 'CLAIMS_OFFICER');
+
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'doc',
+      {
+        inceptionDate: '2026-01-01',
+        expiryDate: '2027-01-01',
+      },
+    );
+    const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const notified = await request(app.getHttpServer())
+      .post('/claims')
+      .set(bearer(clm.accessToken))
+      .send({
+        policyId,
+        lossDate: '2026-04-02',
+        causeOfLoss: 'Storm ripped roofing sheets off the warehouse.',
+        estimatedLoss: '18000.000',
+      })
+      .expect(201);
+    const claimId = (notified.body as ClaimBody).id;
+
+    // must register before documenting
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/documents`)
+      .set(bearer(clm.accessToken))
+      .send({
+        documents: [
+          {
+            docType: 'claim_form',
+            classification: 'CONFIDENTIAL',
+            fileName: 'f',
+            storageRef: 's',
+          },
+        ],
+      })
+      .expect(422);
+
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: `INS-${tag}`,
+        adjuster: { name: 'Cunningham Lindsey' },
+      })
+      .expect(201);
+
+    // a Placement officer holds no claim.document
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/documents`)
+      .set(bearer(plc.accessToken))
+      .send({
+        documents: [
+          {
+            docType: 'photo',
+            classification: 'CONFIDENTIAL',
+            fileName: 'p',
+            storageRef: 's',
+          },
+        ],
+      })
+      .expect(403);
+
+    // a medical_report must be HIGHLY_CONFIDENTIAL
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/documents`)
+      .set(bearer(clm.accessToken))
+      .send({
+        documents: [
+          {
+            docType: 'medical_report',
+            classification: 'CONFIDENTIAL',
+            fileName: 'm.pdf',
+            storageRef: 's3://x/m',
+          },
+        ],
+      })
+      .expect(422);
+
+    // first attach: claim_form + photo (property line still needs repair_estimate).
+    // db-test is cumulative — fileNames/refs must be fresh per run.
+    const photoName = `roof-damage-${tag}.jpg`;
+    const photoRef = `s3://claims/${tag}/photo`;
+    const first = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/documents`)
+      .set(bearer(clm.accessToken))
+      .send({
+        documents: [
+          {
+            docType: 'claim_form',
+            classification: 'CONFIDENTIAL',
+            fileName: `claim-form-${tag}.pdf`,
+            storageRef: `s3://claims/${tag}/cf`,
+          },
+          {
+            docType: 'photo',
+            classification: 'CONFIDENTIAL',
+            fileName: photoName,
+            storageRef: photoRef,
+          },
+        ],
+      })
+      .expect(201);
+    const fBody = first.body as ClaimBody;
+    expect(fBody.status).toBe('DOCUMENTATION_IN_PROGRESS');
+    expect(fBody.documents.map((d) => d.docType).sort()).toEqual([
+      'claim_form',
+      'photo',
+    ]);
+    expect(fBody.documentChecklist).toHaveLength(8);
+    expect(fBody.documentationComplete).toBe(false);
+    expect(fBody.missingMandatoryDocuments).toEqual(['repair_estimate']);
+    expect(fBody.statusHistory.map((h) => h.toStatus)).toEqual([
+      'NOTIFIED',
+      'REGISTERED',
+      'DOCUMENTATION_IN_PROGRESS',
+    ]);
+
+    // exactly one NOTIFIED->... plus REGISTERED plus DOCUMENTATION_IN_PROGRESS
+    // TRANSITION rows — every status move went through the engine
+    const claimTransitions = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(claimTransitions).toBe(2); // REGISTERED, DOCUMENTATION_IN_PROGRESS
+
+    // the Document is CLAIM category, NOT linked to a Policy (the ClaimDocument
+    // join is the canonical link)
+    const linkRows = await prisma.claimDocument.findMany({
+      where: { claimId },
+      include: { document: true },
+    });
+    expect(linkRows).toHaveLength(2);
+    const photoLink = linkRows.find((l) => l.docType === 'photo');
+    expect(photoLink?.document.category).toBe('CLAIM');
+    expect(photoLink?.document.policyId).toBeNull();
+    expect(photoLink?.document.fileName).toBe(photoName);
+
+    // the audit trail for THIS claim's ClaimDocument rows carries no
+    // fileName / storageRef
+    const docAudits = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'ClaimDocument',
+        entityId: { in: linkRows.map((l) => l.id) },
+      },
+    });
+    expect(docAudits).toHaveLength(2);
+    expect(JSON.stringify(docAudits)).not.toContain(photoName);
+    expect(JSON.stringify(docAudits)).not.toContain(photoRef);
+
+    // second attach completes the mandatory checklist
+    const second = await request(app.getHttpServer())
+      .post(`/claims/${claimId}/documents`)
+      .set(bearer(clm.accessToken))
+      .send({
+        documents: [
+          {
+            docType: 'repair_estimate',
+            classification: 'CONFIDENTIAL',
+            fileName: `quote-${tag}.pdf`,
+            storageRef: `s3://claims/${tag}/q`,
+          },
+        ],
+      })
+      .expect(201);
+    const sBody = second.body as ClaimBody;
+    expect(sBody.documentationComplete).toBe(true);
+    expect(sBody.missingMandatoryDocuments).toEqual([]);
+    // a later attach did NOT re-transition
+    const claimTransitions2 = await prisma.auditLogEntry.count({
+      where: { entityType: 'Claim', entityId: claimId, action: 'TRANSITION' },
+    });
+    expect(claimTransitions2).toBe(2);
   });
 });

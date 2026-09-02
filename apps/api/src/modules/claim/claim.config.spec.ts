@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { Prisma } from '@ibms/db';
 import {
+  CLAIM_DOC_TYPES,
   CLAIM_LARGE_THRESHOLD_JOD,
   adjusterAuditSnapshot,
+  buildDocumentChecklist,
+  claimDocumentAuditSnapshot,
   claimNotificationAuditSnapshot,
   claimRegistrationAuditSnapshot,
+  classifyInsuranceLine,
   coverageGapMessage,
   isLargeClaim,
+  mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
   thirdPartyClaimantAuditSnapshot,
 } from './claim.config';
@@ -280,6 +285,156 @@ describe('audit snapshots — metadata not body', () => {
       claimId: 'claim-1',
       insurerClaimReference: 'INS-CLM-2026-0042',
       claimNumber: null,
+    });
+  });
+});
+
+describe('classifyInsuranceLine', () => {
+  it.each([
+    ['Property All Risks', 'property'],
+    ['Property', 'property'],
+    ['Commercial Property', 'property'],
+    ['Householder Property Owners', 'property'],
+    ['Fire & Perils', 'property'],
+    ['Business Interruption', 'property'],
+    ['Motor Fleet', 'motor'],
+    ['Comprehensive Vehicle', 'motor'],
+    ['Group Medical', 'medical'],
+    ['Group Personal Accident', 'medical'],
+    ['Public Liability', 'liability'],
+    ['Professional Indemnity', 'liability'],
+    ['Marine Cargo', 'marine'],
+    ['Goods in Transit', 'marine'],
+    ['Fidelity Guarantee', 'other'],
+    ['Cyber', 'other'],
+  ])('classifies %j as %s', (line, family) => {
+    expect(classifyInsuranceLine(line)).toBe(family);
+  });
+});
+
+describe('mandatoryDocTypesFor', () => {
+  it('always requires a claim_form', () => {
+    expect(
+      mandatoryDocTypesFor({
+        insuranceLine: 'Cyber',
+        isThirdPartyInvolved: false,
+      }),
+    ).toEqual(['claim_form']);
+  });
+
+  it('adds a police_report when a third party is involved', () => {
+    expect(
+      mandatoryDocTypesFor({
+        insuranceLine: 'Cyber',
+        isThirdPartyInvolved: true,
+      }),
+    ).toEqual(['claim_form', 'police_report']);
+  });
+
+  it('property → claim_form + photo + repair_estimate (in CLAIM_DOC_TYPES order)', () => {
+    expect(
+      mandatoryDocTypesFor({
+        insuranceLine: 'Property All Risks',
+        isThirdPartyInvolved: false,
+      }),
+    ).toEqual(['claim_form', 'photo', 'repair_estimate']);
+  });
+
+  it('motor → claim_form + police_report + photo + repair_estimate', () => {
+    expect(
+      mandatoryDocTypesFor({
+        insuranceLine: 'Motor Fleet',
+        isThirdPartyInvolved: false,
+      }),
+    ).toEqual(['claim_form', 'police_report', 'photo', 'repair_estimate']);
+  });
+
+  it('medical → claim_form + medical_report + invoice', () => {
+    expect(
+      mandatoryDocTypesFor({
+        insuranceLine: 'Group Medical',
+        isThirdPartyInvolved: false,
+      }),
+    ).toEqual(['claim_form', 'medical_report', 'invoice']);
+  });
+
+  it('liability → claim_form + expert_report', () => {
+    expect(
+      mandatoryDocTypesFor({
+        insuranceLine: 'Public Liability',
+        isThirdPartyInvolved: false,
+      }),
+    ).toEqual(['claim_form', 'expert_report']);
+  });
+
+  it('never requires correspondence', () => {
+    for (const line of ['Property All Risks', 'Motor Fleet', 'Group Medical']) {
+      expect(
+        mandatoryDocTypesFor({
+          insuranceLine: line,
+          isThirdPartyInvolved: true,
+        }),
+      ).not.toContain('correspondence');
+    }
+  });
+});
+
+describe('buildDocumentChecklist', () => {
+  it('marks every CLAIM_DOC_TYPE, derives complete/missing', () => {
+    const mandatory = mandatoryDocTypesFor({
+      insuranceLine: 'Property All Risks',
+      isThirdPartyInvolved: false,
+    });
+    const r = buildDocumentChecklist(mandatory, ['claim_form', 'photo']);
+    expect(r.checklist).toHaveLength(CLAIM_DOC_TYPES.length);
+    expect(r.checklist.find((c) => c.docType === 'claim_form')).toEqual({
+      docType: 'claim_form',
+      required: true,
+      present: true,
+    });
+    expect(r.checklist.find((c) => c.docType === 'repair_estimate')).toEqual({
+      docType: 'repair_estimate',
+      required: true,
+      present: false,
+    });
+    expect(r.checklist.find((c) => c.docType === 'correspondence')).toEqual({
+      docType: 'correspondence',
+      required: false,
+      present: false,
+    });
+    expect(r.documentationComplete).toBe(false);
+    expect(r.missing).toEqual(['repair_estimate']);
+  });
+
+  it('is complete when every required type is present (extra non-required types are fine)', () => {
+    const r = buildDocumentChecklist(
+      ['claim_form', 'photo'],
+      ['claim_form', 'photo', 'correspondence', 'expert_report'],
+    );
+    expect(r.documentationComplete).toBe(true);
+    expect(r.missing).toEqual([]);
+  });
+});
+
+describe('claimDocumentAuditSnapshot — metadata not body', () => {
+  it('carries ids + type + classification, never fileName / storageRef', () => {
+    const snap = claimDocumentAuditSnapshot({
+      claimDocumentId: 'cd-1',
+      documentId: 'doc-1',
+      claimId: 'claim-1',
+      docType: 'medical_report',
+      category: 'CLAIM',
+      classification: 'HIGHLY_CONFIDENTIAL',
+      uploadedByUserId: 'u-1',
+    });
+    expect(snap).toEqual({
+      claimDocumentId: 'cd-1',
+      documentId: 'doc-1',
+      claimId: 'claim-1',
+      docType: 'medical_report',
+      category: 'CLAIM',
+      classification: 'HIGHLY_CONFIDENTIAL',
+      uploadedByUserId: 'u-1',
     });
   });
 });

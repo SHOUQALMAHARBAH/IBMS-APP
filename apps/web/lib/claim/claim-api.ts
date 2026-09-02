@@ -1,12 +1,32 @@
-// Process 23-24 — Claim Notification + Registration (backlog Part C #23-24,
-// Domain C). Talks to apps/api's claim module (claim.controller.ts): record a
-// reported loss against a Policy (loss date/location/cause, estimated loss,
-// third-party involvement) at ClaimStatus.NOTIFIED — coverage in force at the
-// exact loss date is validated server-side against the policy's PolicySchedule
-// version windows — then register it with the insurer and assign the loss
-// adjuster, moving it NOTIFIED -> REGISTERED through the workflow engine.
+// Process 23-25 — Claim Notification + Registration + Documentation (backlog
+// Part C #23-25, Domain C). Talks to apps/api's claim module: record a reported
+// loss against a Policy (with coverage-at-loss-date validation), register it
+// with the insurer + assign the adjuster (NOTIFIED -> REGISTERED), then file
+// the mandatory documentation (a per-claim-type checklist), with the first
+// attach advancing REGISTERED -> DOCUMENTATION_IN_PROGRESS.
 
 import { apiGet, apiPost } from '../auth/api-client';
+
+export const CLAIM_DOC_TYPE_OPTIONS = [
+  'claim_form',
+  'police_report',
+  'medical_report',
+  'photo',
+  'invoice',
+  'repair_estimate',
+  'expert_report',
+  'correspondence',
+] as const;
+export type ClaimDocType = (typeof CLAIM_DOC_TYPE_OPTIONS)[number];
+
+export const CLAIM_DOC_CLASSIFICATION_OPTIONS = [
+  'PUBLIC',
+  'INTERNAL',
+  'CONFIDENTIAL',
+  'HIGHLY_CONFIDENTIAL',
+] as const;
+export type ClaimDocClassification =
+  (typeof CLAIM_DOC_CLASSIFICATION_OPTIONS)[number];
 
 export type ClaimStatus =
   | 'NOTIFIED'
@@ -60,6 +80,23 @@ export interface Claim {
     effectiveTo: string | null;
   } | null;
   coverageResolvedAtLossDate: boolean;
+  documents: {
+    id: string;
+    docType: ClaimDocType;
+    category: string;
+    classification: string;
+    fileName: string;
+    versionNumber: number;
+    uploadedByUserId: string;
+    createdAt: string;
+  }[];
+  documentChecklist: {
+    docType: ClaimDocType;
+    required: boolean;
+    present: boolean;
+  }[];
+  documentationComplete: boolean;
+  missingMandatoryDocuments: ClaimDocType[];
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
@@ -98,4 +135,20 @@ export function registerClaim(
   input: RegisterClaimInput,
 ): Promise<Claim> {
   return apiPost(`/claims/${encodeURIComponent(claimId)}/registration`, input);
+}
+
+export interface ClaimDocumentInput {
+  docType: ClaimDocType;
+  classification: ClaimDocClassification;
+  fileName: string;
+  storageRef: string;
+}
+
+export function attachClaimDocuments(
+  claimId: string,
+  documents: ClaimDocumentInput[],
+): Promise<Claim> {
+  return apiPost(`/claims/${encodeURIComponent(claimId)}/documents`, {
+    documents,
+  });
 }

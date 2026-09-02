@@ -1,11 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import type { Adjuster, Claim, Prisma, ThirdPartyClaimant } from '@ibms/db';
+import type {
+  Adjuster,
+  Claim,
+  ClaimDocument,
+  ClaimStatus,
+  DataClassification,
+  Document,
+  Prisma,
+  ThirdPartyClaimant,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CLAIM_INCLUDE = {
   thirdParty: true,
   // Process 24 — the one loss adjuster assigned at registration (or null).
   adjuster: true,
+  // Process 25 — the claim-documentation files (ClaimDocument join + Document),
+  // newest first, for the mandatory-checklist computation. Secondary sort by id
+  // so intra-batch order is stable (one attachDocuments $transaction gives every
+  // Document the same createdAt).
+  documents: {
+    include: { document: true },
+    orderBy: [{ document: { createdAt: 'desc' } }, { id: 'asc' }],
+  },
   statusHistory: { orderBy: { changedAt: 'asc' } },
   policy: {
     select: {
@@ -71,10 +88,21 @@ export interface AssignAdjusterInput {
   firm: string | null;
 }
 
+export interface ClaimDocumentInput {
+  docType: string;
+  classification: DataClassification;
+  fileName: string;
+  storageRef: string;
+  uploadedByUserId: string;
+}
+
+export type ClaimDocumentWithFile = ClaimDocument & { document: Document };
+
 /**
- * Process 23-24 — Claim Notification + Registration (backlog Part C #23-24,
- * Domain C). Owns `Claim` plus its children: the `ClaimStatusHistory` trail,
- * the one `ThirdPartyClaimant` (#23) and the one loss `Adjuster` (#24).
+ * Process 23-25 — Claim Notification + Registration + Documentation (backlog
+ * Part C #23-25, Domain C). Owns `Claim` plus its children: the
+ * `ClaimStatusHistory` trail, the one `ThirdPartyClaimant` (#23), the one loss
+ * `Adjuster` (#24) and the `ClaimDocument` / `Document` file rows (#25).
  *
  * `Claim` IS a `WorkflowTransitionService` entity — its `status`
  * (`ClaimStatus`) moves ONLY through the engine
@@ -186,6 +214,70 @@ export class ClaimRepository {
           firm: input.adjuster.firm,
         },
       });
+    });
+  }
+
+  /**
+   * Process 25 — attach one or more documentation files to a claim: each is a
+   * `Document` row (the electronic Insurance File object, Part 4.2 — a
+   * `storageRef` pointer, never the bytes) plus a `ClaimDocument` join carrying
+   * the claim-specific `docType`. ONE interactive transaction (the same
+   * local-exception rationale as `createNotification`) so a crash cannot leave
+   * a `Document` with no `ClaimDocument` (an orphan in the file). The
+   * `Document` is NOT linked to a `Policy` — the canonical link is the
+   * `ClaimDocument` join; a future "full insurance file" view unions the two.
+   */
+  attachDocuments(
+    claimId: string,
+    documents: ClaimDocumentInput[],
+  ): Promise<ClaimDocumentWithFile[]> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const created: ClaimDocumentWithFile[] = [];
+      for (const doc of documents) {
+        const document = await tx.document.create({
+          data: {
+            category: 'CLAIM',
+            classification: doc.classification,
+            fileName: doc.fileName,
+            storageRef: doc.storageRef,
+            uploadedByUserId: doc.uploadedByUserId,
+          },
+        });
+        const link = await tx.claimDocument.create({
+          data: { claimId, documentId: document.id, docType: doc.docType },
+        });
+        created.push({ ...link, document });
+      }
+      return created;
+    });
+  }
+
+  /**
+   * Process 25 — the domain `ClaimStatusHistory` row for a status the engine
+   * has just moved through (the engine writes only a generic `TRANSITION`
+   * `AuditLogEntry`, not this Analytics-feeding trail). Idempotent via the
+   * `count()` pre-check + the structural `@@unique([claimId, toStatus])`
+   * (migration `20260902180000`) — a best-effort caller can re-invoke it after
+   * a partial failure without a duplicate row or a constraint bounce.
+   */
+  async recordStatusHistory(input: {
+    claimId: string;
+    fromStatus: ClaimStatus;
+    toStatus: ClaimStatus;
+    changedByUserId: string;
+  }): Promise<void> {
+    const already =
+      (await this.prisma.client.claimStatusHistory.count({
+        where: { claimId: input.claimId, toStatus: input.toStatus },
+      })) > 0;
+    if (already) return;
+    await this.prisma.client.claimStatusHistory.create({
+      data: {
+        claimId: input.claimId,
+        fromStatus: input.fromStatus,
+        toStatus: input.toStatus,
+        changedByUserId: input.changedByUserId,
+      },
     });
   }
 

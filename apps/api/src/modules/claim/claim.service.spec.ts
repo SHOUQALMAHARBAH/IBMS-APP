@@ -76,6 +76,7 @@ function makeDeps(opts: Opts = {}) {
     claimNumber: null as string | null,
     adjuster: null as Record<string, unknown> | null,
     history: [] as Record<string, unknown>[],
+    documents: [] as Record<string, unknown>[],
   };
 
   const claimRepo = {
@@ -149,6 +150,61 @@ function makeDeps(opts: Opts = {}) {
           return Promise.resolve(claimState.adjuster);
         },
       ),
+    attachDocuments: vi.fn().mockImplementation(
+      (
+        claimId: string,
+        docs: {
+          docType: string;
+          classification: string;
+          fileName: string;
+          storageRef: string;
+          uploadedByUserId: string;
+        }[],
+      ) => {
+        const created = docs.map((doc, i) => {
+          const document = {
+            id: `doc-${claimState.documents.length + i + 1}`,
+            category: 'CLAIM',
+            classification: doc.classification,
+            fileName: doc.fileName,
+            storageRef: doc.storageRef,
+            versionNumber: 1,
+            uploadedByUserId: doc.uploadedByUserId,
+            createdAt: new Date(),
+          };
+          const link = {
+            id: `cd-${claimState.documents.length + i + 1}`,
+            claimId,
+            documentId: document.id,
+            docType: doc.docType,
+            document,
+          };
+          claimState.documents.push(link);
+          return link;
+        });
+        return Promise.resolve(created);
+      },
+    ),
+    recordStatusHistory: vi
+      .fn()
+      .mockImplementation(
+        (input: {
+          claimId: string;
+          fromStatus: string;
+          toStatus: string;
+          changedByUserId: string;
+        }) => {
+          if (claimState.history.every((h) => h.toStatus !== input.toStatus)) {
+            claimState.history.push({
+              fromStatus: input.fromStatus,
+              toStatus: input.toStatus,
+              changedByUserId: input.changedByUserId,
+              changedAt: new Date(),
+            });
+          }
+          return Promise.resolve(undefined);
+        },
+      ),
     findById: vi.fn().mockImplementation(() => {
       const row = stored[stored.length - 1];
       if (!row) return Promise.resolve(null);
@@ -167,6 +223,7 @@ function makeDeps(opts: Opts = {}) {
             }
           : null,
         adjuster: claimState.adjuster,
+        documents: claimState.documents,
         statusHistory: claimState.history,
       });
     }),
@@ -438,6 +495,8 @@ describe('ClaimService reads', () => {
           ],
         },
         thirdParty: null,
+        adjuster: null,
+        documents: [],
         statusHistory: [],
       }),
     );
@@ -519,6 +578,8 @@ describe('ClaimService reads', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       thirdParty: null,
+      adjuster: null,
+      documents: [],
       statusHistory: [],
       policy: {
         id: 'pol-1',
@@ -851,5 +912,254 @@ describe('ClaimService.register', () => {
       service.register('claim-1', { ...REGISTER_DTO }, claims()),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(claimRepo.recordRegistration).not.toHaveBeenCalled();
+  });
+});
+
+describe('ClaimService.attachDocuments', () => {
+  const PHOTO = {
+    docType: 'photo' as const,
+    classification: 'CONFIDENTIAL' as const,
+    fileName: 'site-1.jpg',
+    storageRef: 's3://claims/site-1.jpg',
+  };
+
+  async function registeredClaim() {
+    const deps = makeDeps({ policyMissing: false });
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    await deps.service.register('claim-1', { ...REGISTER_DTO }, claims());
+    deps.workflow.transition.mockClear();
+    return deps;
+  }
+
+  it('files the documents, audits each ClaimDocument (no fileName/storageRef), and best-effort advances REGISTERED -> DOCUMENTATION_IN_PROGRESS', async () => {
+    const { service, claimRepo, workflow, audit } = await registeredClaim();
+
+    const view = await service.attachDocuments(
+      'claim-1',
+      { documents: [{ ...PHOTO }, { ...PHOTO, docType: 'claim_form' }] },
+      claims(),
+    );
+
+    expect(claimRepo.attachDocuments).toHaveBeenCalledOnce();
+    expect(view.documents.map((d) => d.docType)).toEqual([
+      'photo',
+      'claim_form',
+    ]);
+    expect(view.status).toBe('DOCUMENTATION_IN_PROGRESS');
+    expect(workflow.transition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: 'Claim',
+        toStatus: 'DOCUMENTATION_IN_PROGRESS',
+      }),
+    );
+    expect(view.statusHistory.map((h) => h.toStatus)).toContain(
+      'DOCUMENTATION_IN_PROGRESS',
+    );
+
+    const docAudits = audit.record.mock.calls.filter(
+      (c) => (c[0] as { entityType: string }).entityType === 'ClaimDocument',
+    );
+    expect(docAudits).toHaveLength(2);
+    expect(JSON.stringify(docAudits)).not.toContain('site-1.jpg');
+    expect(JSON.stringify(docAudits)).not.toContain('s3://');
+  });
+
+  it('computes the mandatory checklist per claim type (property line here) and documentationComplete', async () => {
+    const { service } = await registeredClaim();
+    // property line (BASE_DTO policy) -> mandatory: claim_form, photo, repair_estimate
+    let view = await service.attachDocuments(
+      'claim-1',
+      {
+        documents: [
+          { ...PHOTO, docType: 'claim_form', fileName: 'form.pdf' },
+          { ...PHOTO },
+        ],
+      },
+      claims(),
+    );
+    expect(view.missingMandatoryDocuments).toEqual(['repair_estimate']);
+    expect(view.documentationComplete).toBe(false);
+
+    view = await service.attachDocuments(
+      'claim-1',
+      {
+        documents: [
+          { ...PHOTO, docType: 'repair_estimate', fileName: 'quote.pdf' },
+        ],
+      },
+      claims(),
+    );
+    expect(view.missingMandatoryDocuments).toEqual([]);
+    expect(view.documentationComplete).toBe(true);
+  });
+
+  it('422s a medical_report that is not HIGHLY_CONFIDENTIAL', async () => {
+    const { service, claimRepo } = await registeredClaim();
+    await expect(
+      service.attachDocuments(
+        'claim-1',
+        {
+          documents: [
+            {
+              ...PHOTO,
+              docType: 'medical_report',
+              classification: 'CONFIDENTIAL',
+            },
+          ],
+        },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(claimRepo.attachDocuments).not.toHaveBeenCalled();
+  });
+
+  it('accepts a HIGHLY_CONFIDENTIAL medical_report', async () => {
+    const { service } = await registeredClaim();
+    const view = await service.attachDocuments(
+      'claim-1',
+      {
+        documents: [
+          {
+            ...PHOTO,
+            docType: 'medical_report',
+            classification: 'HIGHLY_CONFIDENTIAL',
+          },
+        ],
+      },
+      claims(),
+    );
+    expect(view.documents[0].docType).toBe('medical_report');
+    expect(view.documents[0].classification).toBe('HIGHLY_CONFIDENTIAL');
+  });
+
+  it('422s an attach while the claim is still NOTIFIED (register first)', async () => {
+    const deps = makeDeps();
+    await deps.service.notify({ ...BASE_DTO }, claims());
+    await expect(
+      deps.service.attachDocuments(
+        'claim-1',
+        { documents: [{ ...PHOTO }] },
+        claims(),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.claimRepo.attachDocuments).not.toHaveBeenCalled();
+  });
+
+  it('does not re-transition on a later attach (already DOCUMENTATION_IN_PROGRESS)', async () => {
+    const { service, workflow } = await registeredClaim();
+    await service.attachDocuments(
+      'claim-1',
+      { documents: [{ ...PHOTO }] },
+      claims(),
+    );
+    workflow.transition.mockClear();
+    await service.attachDocuments(
+      'claim-1',
+      { documents: [{ ...PHOTO, docType: 'invoice', fileName: 'inv.pdf' }] },
+      claims(),
+    );
+    expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('still files the documents if the best-effort advance throws (logged, not thrown)', async () => {
+    const { service, workflow } = await registeredClaim();
+    workflow.transition.mockRejectedValueOnce(new Error('engine down'));
+    const view = await service.attachDocuments(
+      'claim-1',
+      { documents: [{ ...PHOTO }] },
+      claims(),
+    );
+    expect(view.documents).toHaveLength(1);
+    // status stayed REGISTERED (the advance failed) but the docs are filed
+    expect(view.status).toBe('REGISTERED');
+  });
+
+  it('404s an attach by a caller who cannot see the claim', async () => {
+    // Claims Officer (cross-owner) sets the claim up; a Sales officer who does
+    // NOT own the customer cannot see it.
+    const { service } = makeDeps({ customerOwner: 'someone-else' });
+    await service.notify({ ...BASE_DTO }, claims());
+    await service.register('claim-1', { ...REGISTER_DTO }, claims());
+    await expect(
+      service.attachDocuments(
+        'claim-1',
+        { documents: [{ ...PHOTO }] },
+        sales(),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('backfills the DOCUMENTATION_IN_PROGRESS history row on a later attach when the first attach transitioned but its history write threw', async () => {
+    const { service, claimRepo, workflow } = await registeredClaim();
+
+    // First attach: the engine transition commits (status -> DIP) but the
+    // separate domain history write fails.
+    claimRepo.recordStatusHistory.mockRejectedValueOnce(
+      new Error('history write failed'),
+    );
+    let view = await service.attachDocuments(
+      'claim-1',
+      { documents: [{ ...PHOTO }] },
+      claims(),
+    );
+    expect(view.status).toBe('DOCUMENTATION_IN_PROGRESS');
+    expect(view.documents).toHaveLength(1);
+    // the history row did NOT land
+    expect(view.statusHistory.map((h) => h.toStatus)).not.toContain(
+      'DOCUMENTATION_IN_PROGRESS',
+    );
+
+    workflow.transition.mockClear();
+    claimRepo.recordStatusHistory.mockClear();
+
+    // Second attach: status is already DIP so no re-transition, but the missing
+    // history row is backfilled (needsAdvance keys off the row being absent).
+    view = await service.attachDocuments(
+      'claim-1',
+      {
+        documents: [
+          { ...PHOTO, docType: 'repair_estimate', fileName: 'q.pdf' },
+        ],
+      },
+      claims(),
+    );
+    expect(workflow.transition).not.toHaveBeenCalled();
+    expect(claimRepo.recordStatusHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ toStatus: 'DOCUMENTATION_IN_PROGRESS' }),
+    );
+    expect(view.statusHistory.map((h) => h.toStatus)).toEqual([
+      'NOTIFIED',
+      'REGISTERED',
+      'DOCUMENTATION_IN_PROGRESS',
+    ]);
+  });
+
+  it('records a sensitive-data-access READ audit on the attach (ids only, no fileName / claim content)', async () => {
+    const { service, audit } = await registeredClaim();
+    audit.record.mockClear();
+
+    await service.attachDocuments(
+      'claim-1',
+      { documents: [{ ...PHOTO }] },
+      claims(),
+    );
+
+    const read = audit.record.mock.calls.find(
+      (c) => (c[0] as { action: string }).action === 'READ',
+    );
+    expect(read).toBeDefined();
+    const entry = read?.[0] as {
+      entityType: string;
+      isSensitiveDataAccess: boolean;
+      afterValue: Record<string, unknown>;
+    };
+    expect(entry.entityType).toBe('Claim');
+    expect(entry.isSensitiveDataAccess).toBe(true);
+    expect(entry.afterValue).toEqual({
+      view: 'claim-attach-documents',
+      claimId: 'claim-1',
+      documentsFiled: 1,
+    });
+    expect(JSON.stringify(entry.afterValue)).not.toContain('site-1.jpg');
   });
 });

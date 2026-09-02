@@ -229,6 +229,7 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canNotify={isSales || isClaims}
             canRegister={isClaims}
+            canDocument={isClaims}
           />
         </>
       ) : null}

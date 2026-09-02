@@ -173,6 +173,9 @@ async function mockRfqApi(
       claimNumber?: string;
       adjuster: { name: string; firm?: string };
     }) => void;
+    onAttachClaimDocs?: (body: {
+      documents: { docType: string; classification: string }[];
+    }) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -786,6 +789,72 @@ async function mockRfqApi(
     const url = route.request().url();
     const method = route.request().method();
 
+    // the seeded policy line is "Property All Risks" -> mandatory docs.
+    const MANDATORY = ["claim_form", "photo", "repair_estimate"];
+    const CLAIM_DOC_TYPES = [
+      "claim_form",
+      "police_report",
+      "medical_report",
+      "photo",
+      "invoice",
+      "repair_estimate",
+      "expert_report",
+      "correspondence",
+    ];
+    const applyChecklist = (row: Record<string, unknown>) => {
+      const present = new Set(
+        (row.documents as { docType: string }[]).map((d) => d.docType),
+      );
+      row.documentChecklist = CLAIM_DOC_TYPES.map((docType) => ({
+        docType,
+        required: MANDATORY.includes(docType),
+        present: present.has(docType),
+      }));
+      const missing = MANDATORY.filter((t) => !present.has(t));
+      row.missingMandatoryDocuments = missing;
+      row.documentationComplete = missing.length === 0;
+    };
+
+    const docMatch = /\/claims\/([^/?]+)\/documents(\?|$)/.exec(url);
+    if (method === "POST" && docMatch) {
+      const b = route.request().postDataJSON() as {
+        documents: {
+          docType: string;
+          classification: string;
+          fileName: string;
+          storageRef: string;
+        }[];
+      };
+      opts.onAttachClaimDocs?.(b);
+      const row = claimRows.find((r) => r.id === docMatch[1]);
+      if (row) {
+        const docs = row.documents as Record<string, unknown>[];
+        b.documents.forEach((d, i) => {
+          docs.push({
+            id: `cd-${docs.length + i + 1}`,
+            docType: d.docType,
+            category: "CLAIM",
+            classification: d.classification,
+            fileName: d.fileName,
+            versionNumber: 1,
+            uploadedByUserId: "user-1",
+            createdAt: "2026-11-06T00:00:00.000Z",
+          });
+        });
+        if (row.status === "REGISTERED") {
+          row.status = "DOCUMENTATION_IN_PROGRESS";
+          (row.statusHistory as Record<string, unknown>[]).push({
+            fromStatus: "REGISTERED",
+            toStatus: "DOCUMENTATION_IN_PROGRESS",
+            changedByUserId: "user-1",
+            changedAt: "2026-11-06T00:00:00.000Z",
+          });
+        }
+        applyChecklist(row);
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
+
     const regMatch = /\/claims\/([^/?]+)\/registration(\?|$)/.exec(url);
     if (method === "POST" && regMatch) {
       const b = route.request().postDataJSON() as {
@@ -856,6 +925,10 @@ async function mockRfqApi(
             }
           : null,
         adjuster: null,
+        documents: [],
+        documentChecklist: [],
+        documentationComplete: false,
+        missingMandatoryDocuments: [],
         coverage: {
           scheduleId: "sch-1",
           effectiveFrom: "2026-10-01T00:00:00.000Z",
@@ -873,6 +946,7 @@ async function mockRfqApi(
         createdAt: "2026-11-01T00:00:00.000Z",
         updatedAt: "2026-11-01T00:00:00.000Z",
       };
+      applyChecklist(row);
       claimRows.push(row);
       return route.fulfill({ status: 201, json: row });
     }
@@ -1435,6 +1509,53 @@ test("registers a NOTIFIED claim with the insurer and assigns the adjuster", asy
   await expect(
     page.getByText("adjuster Cunningham Lindsey", { exact: false }),
   ).toBeVisible();
+});
+
+test("files claim documentation and tracks the mandatory checklist", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  let attached: {
+    documents: { docType: string; classification: string }[];
+  } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onAttachClaimDocs: (b) => {
+      attached = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  // notify + register
+  await page.getByLabel("Loss date").fill("2026-11-15");
+  await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
+  await page.getByLabel("Estimated loss").fill("14000.000");
+  await page.getByRole("button", { name: "Notify claim" }).click();
+  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+
+  await page.getByLabel("Insurer claim reference").fill("INS-DOC-1");
+  await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
+  await page
+    .getByRole("button", { name: "Register & assign adjuster" })
+    .click();
+  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+
+  // the documentation checklist shows the missing mandatory docs
+  await expect(page.getByText("missing claim_form, photo, repair_estimate")).toBeVisible();
+
+  await page.getByLabel("Document type").selectOption("claim_form");
+  await page.getByLabel("File name").fill("claim-form.pdf");
+  await page.getByLabel("Storage reference").fill("s3://claims/cf");
+  await page.getByRole("button", { name: "File document" }).click();
+
+  await expect.poll(() => attached?.documents[0].docType).toBe("claim_form");
+  await expect(page.getByText("DOCUMENTATION_IN_PROGRESS", { exact: true })).toBeVisible();
+  await expect(page.getByText("missing photo, repair_estimate")).toBeVisible();
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

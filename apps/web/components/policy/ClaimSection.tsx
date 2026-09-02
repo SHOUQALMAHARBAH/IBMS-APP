@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  attachClaimDocuments,
   listClaimsForPolicy,
   notifyClaim,
   registerClaim,
+  CLAIM_DOC_CLASSIFICATION_OPTIONS,
+  CLAIM_DOC_TYPE_OPTIONS,
   type Claim,
+  type ClaimDocClassification,
+  type ClaimDocType,
 } from '../../lib/claim/claim-api';
 import {
   listPoliciesForOpportunity,
@@ -25,6 +30,8 @@ interface Props {
   canNotify: boolean;
   /** Claims — register a NOTIFIED claim with the insurer + assign the adjuster. */
   canRegister: boolean;
+  /** Claims — file claim documentation against the mandatory checklist. */
+  canDocument: boolean;
 }
 
 function money(value: string | null): string {
@@ -146,7 +153,153 @@ function ClaimRegistrationForm({
   );
 }
 
-export function ClaimSection({ opportunityId, canNotify, canRegister }: Props) {
+/** Process 25 — the mandatory-document checklist + a single-file attach form. */
+function ClaimDocumentation({
+  claim,
+  canDocument,
+  onDone,
+}: {
+  claim: Claim;
+  canDocument: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [docType, setDocType] = useState<ClaimDocType>('claim_form');
+  const [classification, setClassification] =
+    useState<ClaimDocClassification>('CONFIDENTIAL');
+  const [fileName, setFileName] = useState('');
+  const [storageRef, setStorageRef] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await attachClaimDocuments(claim.id, [
+        {
+          docType,
+          classification,
+          fileName: fileName.trim(),
+          storageRef: storageRef.trim(),
+        },
+      ]);
+      setFileName('');
+      setStorageRef('');
+      await onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'That document could not be filed — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <strong style={{ fontSize: '0.9rem' }}>
+        Documentation{' '}
+        {claim.documentationComplete
+          ? '· complete'
+          : `· missing ${claim.missingMandatoryDocuments.join(', ')}`}
+      </strong>
+      <ul style={{ margin: '0.35rem 0', paddingLeft: '1.1rem', fontSize: '0.85rem' }}>
+        {claim.documentChecklist
+          .filter((i) => i.required || i.present)
+          .map((i) => (
+            <li key={i.docType} style={{ opacity: i.present ? 1 : 0.6 }}>
+              {i.present ? '✓' : i.required ? '☐ (required)' : '·'} {i.docType}
+            </li>
+          ))}
+      </ul>
+      {claim.documents.length > 0 ? (
+        <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: '0.25rem 0' }}>
+          {claim.documents.length} file
+          {claim.documents.length === 1 ? '' : 's'} on record.
+        </p>
+      ) : null}
+
+      {canDocument ? (
+        <div style={{ maxWidth: '30rem' }}>
+          {error ? (
+            <p role="alert" style={errorStyle}>
+              {error}
+            </p>
+          ) : null}
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`doc-type-${claim.id}`}>Document type</label>
+            <select
+              id={`doc-type-${claim.id}`}
+              value={docType}
+              onChange={(ev) => setDocType(ev.target.value as ClaimDocType)}
+            >
+              {CLAIM_DOC_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`doc-class-${claim.id}`}>Classification</label>
+            <select
+              id={`doc-class-${claim.id}`}
+              value={classification}
+              onChange={(ev) =>
+                setClassification(ev.target.value as ClaimDocClassification)
+              }
+            >
+              {CLAIM_DOC_CLASSIFICATION_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`doc-name-${claim.id}`}>File name</label>
+            <input
+              id={`doc-name-${claim.id}`}
+              maxLength={300}
+              value={fileName}
+              onChange={(ev) => setFileName(ev.target.value)}
+            />
+          </div>
+          <div style={quoteFieldStyle}>
+            <label htmlFor={`doc-ref-${claim.id}`}>Storage reference</label>
+            <input
+              id={`doc-ref-${claim.id}`}
+              maxLength={500}
+              value={storageRef}
+              onChange={(ev) => setStorageRef(ev.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            disabled={
+              busy ||
+              fileName.trim().length === 0 ||
+              storageRef.trim().length === 0
+            }
+            style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+            onClick={() => void submit()}
+          >
+            {busy ? 'Filing…' : 'File document'}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ClaimSection({
+  opportunityId,
+  canNotify,
+  canRegister,
+  canDocument,
+}: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -241,8 +394,9 @@ export function ClaimSection({ opportunityId, canNotify, canRegister }: Props) {
         schedule that was in force on the <em>exact loss date</em> — not the
         current one — so a loss under a policy endorsed after the event resolves
         to the version that actually applied then. A Claims Officer then
-        registers the claim with the insurer and assigns the loss adjuster,
-        moving it to <strong>REGISTERED</strong>.
+        registers the claim with the insurer and assigns the loss adjuster
+        (<strong>REGISTERED</strong>), and files the mandatory documentation
+        against a per-claim-type checklist (<strong>DOCUMENTATION_IN_PROGRESS</strong>).
       </p>
 
       {loadError ? (
@@ -311,6 +465,13 @@ export function ClaimSection({ opportunityId, canNotify, canRegister }: Props) {
             </p>
             {canRegister && c.status === 'NOTIFIED' ? (
               <ClaimRegistrationForm claimId={c.id} onDone={load} />
+            ) : null}
+            {c.status !== 'NOTIFIED' ? (
+              <ClaimDocumentation
+                claim={c}
+                canDocument={canDocument}
+                onDone={load}
+              />
             ) : null}
           </div>
         ))

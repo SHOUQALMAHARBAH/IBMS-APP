@@ -10,6 +10,7 @@ import { Prisma } from '@ibms/db';
 import type { Adjuster, ClaimStatus } from '@ibms/db';
 import {
   ClaimRepository,
+  type ClaimDocumentInput,
   type ClaimWithContext,
   type CreateThirdPartyClaimantInput,
 } from '../../repositories/claim.repository';
@@ -23,17 +24,24 @@ import { CLAIM_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
 import { formatMoney, quantizeMoney } from '../../common/money.util';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import {
+  MEDICAL_REPORT_DOC_TYPE,
   adjusterAuditSnapshot,
+  buildDocumentChecklist,
+  claimDocumentAuditSnapshot,
   claimNotificationAuditSnapshot,
   claimRegistrationAuditSnapshot,
   coverageGapMessage,
   isLargeClaim,
+  mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
   thirdPartyClaimantAuditSnapshot,
+  type ClaimDocChecklistItem,
+  type ClaimDocType,
 } from './claim.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
 import type { RegisterClaimDto } from './dto/register-claim.dto';
+import type { AttachClaimDocumentsDto } from './dto/attach-claim-documents.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 
 const CROSS_OWNER_ROLES: readonly string[] = CLAIM_CROSS_OWNER_ROLES;
@@ -49,6 +57,21 @@ interface ClaimStatusHistoryView {
   toStatus: ClaimStatus;
   changedByUserId: string;
   changedAt: Date;
+}
+
+/** Process 25 — one attached claim-documentation file. `storageRef` (the
+ * internal object-storage key) is never returned; `fileName` is (in-app claim
+ * data to an authorised `claim.read` holder — the read itself is audited as a
+ * sensitive-data access). */
+interface ClaimDocumentView {
+  id: string;
+  docType: string;
+  category: string;
+  classification: string;
+  fileName: string;
+  versionNumber: number;
+  uploadedByUserId: string;
+  createdAt: Date;
 }
 
 /** A claim as the API returns it. `coverage` is the `PolicySchedule` version
@@ -95,14 +118,21 @@ export interface ClaimView {
    * e.g. the policy was cancelled forward after the claim was notified. The
    * claim row stands; this just flags that the window can't be shown. */
   coverageResolvedAtLossDate: boolean;
+  /** Process 25 — the attached documentation files, and the mandatory
+   * checklist derived from the claim's line family + third-party involvement.
+   * `documentationComplete` = every `required` checklist item is `present`. */
+  documents: ClaimDocumentView[];
+  documentChecklist: ClaimDocChecklistItem[];
+  documentationComplete: boolean;
+  missingMandatoryDocuments: ClaimDocType[];
   statusHistory: ClaimStatusHistoryView[];
   createdAt: Date;
   updatedAt: Date;
 }
 
 /**
- * Process 23-24 — Claim Notification + Registration (backlog Part C #23-24,
- * Domain C).
+ * Process 23-25 — Claim Notification + Registration + Documentation (backlog
+ * Part C #23-25, Domain C).
  *
  *  - `notify` (#23) — record a reported loss against a Policy: loss
  *    date/location/cause, the estimated loss, third-party involvement. The
@@ -116,6 +146,9 @@ export interface ClaimView {
  *  - `register` (#24) — register the claim with the insurer (recording its
  *    `insurerClaimReference`) and assign the loss `Adjuster`, driving `Claim
  *    NOTIFIED → REGISTERED` through the workflow engine.
+ *  - `attachDocuments` (#25) — file `ClaimDocument` / `Document` rows and
+ *    surface the mandatory-document checklist per claim type; the first
+ *    attach best-effort advances `REGISTERED → DOCUMENTATION_IN_PROGRESS`.
  *  - `list` / `get` — read, scoped to exactly one of `policyId` /
  *    `customerId`.
  *
@@ -263,6 +296,7 @@ export class ClaimService {
           }
         : null,
       coverageResolvedAtLossDate: resolution.ok,
+      ...this.documentationView(claim),
       statusHistory: claim.statusHistory.map((h) => ({
         fromStatus: h.fromStatus,
         toStatus: h.toStatus,
@@ -271,6 +305,46 @@ export class ClaimService {
       })),
       createdAt: claim.createdAt,
       updatedAt: claim.updatedAt,
+    };
+  }
+
+  /** Process 25 — the attached files + the mandatory checklist derived from
+   * the claim's line family (`Policy.insuranceLine`) and third-party
+   * involvement. `storageRef` is dropped; `fileName` is kept (in-app claim
+   * data — the read is audited as a sensitive-data access). */
+  private documentationView(
+    claim: ClaimWithContext,
+  ): Pick<
+    ClaimView,
+    | 'documents'
+    | 'documentChecklist'
+    | 'documentationComplete'
+    | 'missingMandatoryDocuments'
+  > {
+    const documents: ClaimDocumentView[] = claim.documents.map((d) => ({
+      id: d.id,
+      docType: d.docType,
+      category: d.document.category,
+      classification: d.document.classification,
+      fileName: d.document.fileName,
+      versionNumber: d.document.versionNumber,
+      uploadedByUserId: d.document.uploadedByUserId,
+      createdAt: d.document.createdAt,
+    }));
+    const mandatory = mandatoryDocTypesFor({
+      insuranceLine: claim.policy.insuranceLine,
+      isThirdPartyInvolved: claim.isThirdPartyInvolved,
+    });
+    const { checklist, documentationComplete, missing } =
+      buildDocumentChecklist(
+        mandatory,
+        documents.map((d) => d.docType),
+      );
+    return {
+      documents,
+      documentChecklist: checklist,
+      documentationComplete,
+      missingMandatoryDocuments: missing,
     };
   }
 
@@ -558,6 +632,122 @@ export class ClaimService {
     }
 
     return this.toView(await this.loadVisibleClaim(claim.id, actor));
+  }
+
+  /**
+   * Process 25 — attach one or more documentation files to a claim's
+   * electronic file (Part 4.2). Valid from `REGISTERED` onward (the claim must
+   * be registered with the insurer first — a `NOTIFIED` claim has no insurer
+   * reference to file against). Each file is a `Document` (`storageRef`
+   * pointer, never the bytes) + a `ClaimDocument` join carrying the
+   * claim-specific `docType`, written in one `$transaction`. A `medical_report`
+   * MUST be `HIGHLY_CONFIDENTIAL` (`claims-lifecycle.md` — health data is
+   * classification-driven from first contact). The FIRST attach best-effort
+   * advances `Claim REGISTERED → DOCUMENTATION_IN_PROGRESS` (logged, never
+   * thrown — the documents are the authoritative artefact, and
+   * `DOCUMENTATION_IN_PROGRESS` is a forward-progress marker, not a safety
+   * gate; a resume re-tries on the next attach). No maker/checker — filing
+   * documents is single-actor Claims work.
+   */
+  async attachDocuments(
+    id: string,
+    dto: AttachClaimDocumentsDto,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+    if (claim.status === 'NOTIFIED') {
+      throw new UnprocessableEntityException(
+        `Claim ${id} is NOTIFIED; register it with the insurer (POST /claims/${id}/registration) before attaching documentation.`,
+      );
+    }
+
+    for (const doc of dto.documents) {
+      if (
+        doc.docType === MEDICAL_REPORT_DOC_TYPE &&
+        doc.classification !== 'HIGHLY_CONFIDENTIAL'
+      ) {
+        throw new UnprocessableEntityException(
+          `A ${MEDICAL_REPORT_DOC_TYPE} is Sensitive Personal Data under PDPL and must be classified HIGHLY_CONFIDENTIAL (got ${doc.classification}).`,
+        );
+      }
+    }
+
+    const inputs: ClaimDocumentInput[] = dto.documents.map((d) => ({
+      docType: d.docType,
+      classification: d.classification,
+      fileName: d.fileName,
+      storageRef: d.storageRef,
+      uploadedByUserId: actor.id,
+    }));
+    const created = await this.claims.attachDocuments(id, inputs);
+
+    for (const link of created) {
+      await this.safeAudit({
+        userId: actor.id,
+        action: 'CREATE',
+        entityType: 'ClaimDocument',
+        entityId: link.id,
+        afterValue: claimDocumentAuditSnapshot({
+          claimDocumentId: link.id,
+          documentId: link.document.id,
+          claimId: id,
+          docType: link.docType,
+          category: link.document.category,
+          classification: link.document.classification,
+          uploadedByUserId: link.document.uploadedByUserId,
+        }),
+      });
+    }
+
+    // Ensure the claim is advanced to DOCUMENTATION_IN_PROGRESS with its domain
+    // history row — best-effort (logged, never thrown: the documents are the
+    // authoritative artefact and DOCUMENTATION_IN_PROGRESS is a forward-progress
+    // marker, not a #20-style safety gate). Keyed off the history row being
+    // ABSENT (not off `status === REGISTERED`) so a transition that committed
+    // but whose separate history write then threw is still backfilled on a
+    // later attach.
+    const advanced = await this.loadVisibleClaim(id, actor);
+    const needsAdvance =
+      (advanced.status === 'REGISTERED' ||
+        advanced.status === 'DOCUMENTATION_IN_PROGRESS') &&
+      !advanced.statusHistory.some(
+        (h) => h.toStatus === 'DOCUMENTATION_IN_PROGRESS',
+      );
+    if (needsAdvance) {
+      try {
+        if (advanced.status === 'REGISTERED') {
+          await this.workflow.transition({
+            entityType: 'Claim',
+            entityId: id,
+            toStatus: 'DOCUMENTATION_IN_PROGRESS',
+            actorUserId: actor.id,
+          });
+        }
+        await this.claims.recordStatusHistory({
+          claimId: id,
+          fromStatus: 'REGISTERED',
+          toStatus: 'DOCUMENTATION_IN_PROGRESS',
+          changedByUserId: actor.id,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `Claim ${id}: the best-effort REGISTERED -> DOCUMENTATION_IN_PROGRESS advance did not complete on this attempt (will retry on the next attach): ${(err as Error).message}`,
+        );
+      }
+    }
+
+    const view = this.toView(await this.loadVisibleClaim(id, actor));
+    // The response echoes the whole ClaimView — `documents[].fileName` for
+    // EVERY file on the claim (incl. ones another officer attached) plus the
+    // `causeOfLoss` / `lossLocation` / third-party name — so log it as a
+    // sensitive-data access, the same as `get` / `list`
+    // (sensitive-data-handling.md; the #23 MAJOR fix).
+    await this.auditSensitiveRead(actor, 'Claim', id, true, {
+      view: 'claim-attach-documents',
+      claimId: id,
+      documentsFiled: created.length,
+    });
+    return view;
   }
 
   async list(
