@@ -1,18 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { Prisma } from '@ibms/db';
+import { AWAITING_INSURER_STATUSES } from '../../repositories/claim.repository';
 import {
+  CLAIM_AWAITING_INSURER_STATUSES,
   CLAIM_DOC_TYPES,
   CLAIM_LARGE_THRESHOLD_JOD,
+  DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS,
   adjusterAssessmentAuditSnapshot,
   adjusterAuditSnapshot,
   buildDocumentChecklist,
   claimDocumentAuditSnapshot,
+  claimFollowUpAlertAuditSnapshot,
   claimNotificationAuditSnapshot,
   claimRegistrationAuditSnapshot,
   classifyInsuranceLine,
   coverageGapMessage,
   deriveAssessmentView,
+  deriveFollowUpView,
+  followUpThresholdDaysFor,
   isAssessmentConcluded,
+  isClaimFollowUpDue,
   isLargeClaim,
   mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
@@ -557,6 +564,182 @@ describe('adjusterAssessmentAuditSnapshot — metadata not body', () => {
       claimId: 'claim-1',
       surveyCompletedAt: '2026-05-10T09:00:00.000Z',
       investigationCompletedAt: null,
+    });
+  });
+});
+
+describe('CLAIM_AWAITING_INSURER_STATUSES', () => {
+  it('stays in sync with the repo copy (AWAITING_INSURER_STATUSES) — the two are hand-duplicated to avoid a repo->module import', () => {
+    expect([...CLAIM_AWAITING_INSURER_STATUSES].sort()).toEqual(
+      [...AWAITING_INSURER_STATUSES].sort(),
+    );
+  });
+
+  it('is exactly the three pre-verdict statuses', () => {
+    expect([...CLAIM_AWAITING_INSURER_STATUSES].sort()).toEqual([
+      'DOCUMENTATION_IN_PROGRESS',
+      'REGISTERED',
+      'UNDER_ASSESSMENT',
+    ]);
+  });
+});
+
+describe('followUpThresholdDaysFor (Process 27 — drafted per-line)', () => {
+  it.each([
+    ['Motor Fleet', 7],
+    ['Comprehensive Vehicle', 7],
+    ['Property All Risks', 10],
+    ['Fire & Perils', 10],
+    ['Group Medical', 7],
+    ['Public Liability', 15],
+    ['Professional Indemnity', 15],
+    ['Marine Cargo', 15],
+    ['Fidelity Guarantee', DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS],
+    ['Cyber', DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS],
+  ])('maps %j -> %i business days', (line, days) => {
+    expect(followUpThresholdDaysFor(line)).toBe(days);
+  });
+
+  it('the neutral default is the Part 3.7 worked-example figure (9)', () => {
+    expect(DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS).toBe(9);
+  });
+});
+
+describe('isClaimFollowUpDue', () => {
+  // Thu 1 Jan 2026 (Jordan weekend = Fri/Sat) + 2 business days -> Mon 5 Jan.
+  const REGISTERED_THURSDAY = d('2026-01-01T09:00:00.000Z');
+
+  it('false before the whole business-day window has elapsed', () => {
+    expect(
+      isClaimFollowUpDue(REGISTERED_THURSDAY, 2, d('2026-01-04T12:00:00Z')),
+    ).toBe(false);
+  });
+
+  it('true once the window has elapsed', () => {
+    expect(
+      isClaimFollowUpDue(REGISTERED_THURSDAY, 2, d('2026-01-05T09:00:00Z')),
+    ).toBe(true);
+  });
+
+  it('a non-positive / malformed threshold never auto-alerts', () => {
+    const now = d('2026-02-01T00:00:00Z');
+    expect(isClaimFollowUpDue(REGISTERED_THURSDAY, 0, now)).toBe(false);
+    expect(isClaimFollowUpDue(REGISTERED_THURSDAY, -1, now)).toBe(false);
+    expect(isClaimFollowUpDue(REGISTERED_THURSDAY, Number.NaN, now)).toBe(
+      false,
+    );
+  });
+});
+
+describe('deriveFollowUpView', () => {
+  const REG = d('2026-05-01T00:00:00.000Z');
+  const A = (id: string, resolvedAt: Date | null) => ({
+    id,
+    triggeredAt: d('2026-05-15T00:00:00.000Z'),
+    resolvedAt,
+  });
+
+  it('followUpAlertOpen is true iff some alert has no resolvedAt', () => {
+    expect(
+      deriveFollowUpView({
+        status: 'UNDER_ASSESSMENT',
+        followUpAlertThresholdDays: 10,
+        registeredAt: REG,
+        alerts: [A('a1', d('2026-05-20T00:00:00.000Z'))],
+      }).followUpAlertOpen,
+    ).toBe(false);
+    expect(
+      deriveFollowUpView({
+        status: 'UNDER_ASSESSMENT',
+        followUpAlertThresholdDays: 10,
+        registeredAt: REG,
+        alerts: [A('a1', d('2026-05-20T00:00:00.000Z')), A('a2', null)],
+      }).followUpAlertOpen,
+    ).toBe(true);
+  });
+
+  it('awaitingInsurerResponse is true only for the pre-verdict statuses', () => {
+    for (const status of [
+      'REGISTERED',
+      'DOCUMENTATION_IN_PROGRESS',
+      'UNDER_ASSESSMENT',
+    ]) {
+      expect(
+        deriveFollowUpView({
+          status,
+          followUpAlertThresholdDays: 10,
+          registeredAt: REG,
+          alerts: [],
+        }).awaitingInsurerResponse,
+      ).toBe(true);
+    }
+    for (const status of [
+      'NOTIFIED',
+      'APPROVED',
+      'DECLINED',
+      'SETTLED',
+      'CLOSED',
+    ]) {
+      expect(
+        deriveFollowUpView({
+          status,
+          followUpAlertThresholdDays: 10,
+          registeredAt: REG,
+          alerts: [],
+        }).awaitingInsurerResponse,
+      ).toBe(false);
+    }
+  });
+
+  it('passes through the threshold + clock start', () => {
+    const v = deriveFollowUpView({
+      status: 'REGISTERED',
+      followUpAlertThresholdDays: 15,
+      registeredAt: REG,
+      alerts: [],
+    });
+    expect(v.followUpAlertThresholdDays).toBe(15);
+    expect(v.awaitingInsurerSince).toBe(REG);
+    expect(v.followUpAlerts).toEqual([]);
+  });
+});
+
+describe('claimFollowUpAlertAuditSnapshot — metadata not body', () => {
+  it('raise: ids + threshold + clock timestamps only', () => {
+    expect(
+      claimFollowUpAlertAuditSnapshot({
+        claimFollowUpAlertId: 'fa-1',
+        claimId: 'claim-1',
+        triggeredAt: d('2026-05-15T00:00:00.000Z'),
+        resolvedAt: null,
+        thresholdDays: 10,
+        registeredAt: d('2026-05-01T00:00:00.000Z'),
+      }),
+    ).toEqual({
+      claimFollowUpAlertId: 'fa-1',
+      claimId: 'claim-1',
+      triggeredAt: '2026-05-15T00:00:00.000Z',
+      resolvedAt: null,
+      thresholdDays: 10,
+      registeredAt: '2026-05-01T00:00:00.000Z',
+    });
+  });
+
+  it('resolve: omits the raise context, records who resolved it', () => {
+    expect(
+      claimFollowUpAlertAuditSnapshot({
+        claimFollowUpAlertId: 'fa-1',
+        claimId: 'claim-1',
+        triggeredAt: d('2026-05-15T00:00:00.000Z'),
+        resolvedAt: d('2026-05-25T00:00:00.000Z'),
+        resolvedBy: 'manual',
+      }),
+    ).toEqual({
+      claimFollowUpAlertId: 'fa-1',
+      claimId: 'claim-1',
+      triggeredAt: '2026-05-15T00:00:00.000Z',
+      resolvedAt: '2026-05-25T00:00:00.000Z',
+      resolvedBy: 'manual',
     });
   });
 });

@@ -7,7 +7,7 @@ import {
 import { Prisma } from '@ibms/db';
 import { ClaimService } from './claim.service';
 import type { ClaimDocType } from './claim.config';
-import type { ClaimRepository } from '../../repositories/claim.repository';
+import { ClaimRepository } from '../../repositories/claim.repository';
 import type { PolicyRepository } from '../../repositories/policy.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { AuditService } from '../audit/audit.service';
@@ -78,6 +78,7 @@ function makeDeps(opts: Opts = {}) {
     adjuster: null as Record<string, unknown> | null,
     history: [] as Record<string, unknown>[],
     documents: [] as Record<string, unknown>[],
+    followUpAlerts: [] as Record<string, unknown>[],
   };
 
   const claimRepo = {
@@ -245,6 +246,8 @@ function makeDeps(opts: Opts = {}) {
         status: claimState.status,
         claimNumber: claimState.claimNumber,
         insurerClaimReference: claimState.insurerClaimReference,
+        followUpAlertThresholdDays:
+          (row.followUpAlertThresholdDays as number | undefined) ?? 9,
         policy: policyRow,
         thirdParty: row.isThirdPartyInvolved
           ? {
@@ -256,11 +259,27 @@ function makeDeps(opts: Opts = {}) {
           : null,
         adjuster: claimState.adjuster,
         documents: claimState.documents,
+        followUpAlerts: claimState.followUpAlerts,
         statusHistory: claimState.history,
       });
     }),
     findManyByPolicyId: vi.fn().mockResolvedValue([]),
     findManyByCustomerId: vi.fn().mockResolvedValue([]),
+    // Process 27 — the follow-up sweep. Default: nothing to do.
+    findClaimsAwaitingInsurerResponse: vi.fn().mockResolvedValue([]),
+    findOpenFollowUpAlertsForRespondedClaims: vi.fn().mockResolvedValue([]),
+    raiseFollowUpAlert: vi.fn().mockImplementation((claimId: string) =>
+      Promise.resolve({
+        created: true,
+        alert: {
+          id: `fa-${claimId}`,
+          claimId,
+          triggeredAt: new Date(),
+          resolvedAt: null,
+        },
+      }),
+    ),
+    resolveFollowUpAlert: vi.fn().mockResolvedValue(1),
   };
 
   const policyRepo = {
@@ -530,6 +549,7 @@ describe('ClaimService reads', () => {
         adjuster: null,
         documents: [],
         statusHistory: [],
+        followUpAlerts: [],
       }),
     );
     const view = await service.get('claim-1', claims());
@@ -613,6 +633,7 @@ describe('ClaimService reads', () => {
       adjuster: null,
       documents: [],
       statusHistory: [],
+      followUpAlerts: [],
       policy: {
         id: 'pol-1',
         customerId: 'cus-1',
@@ -860,6 +881,7 @@ describe('ClaimService.register', () => {
       thirdParty: null,
       adjuster: null,
       statusHistory: [],
+      followUpAlerts: [],
     });
 
     await expect(
@@ -938,6 +960,7 @@ describe('ClaimService.register', () => {
         investigationCompletedAt: null,
       },
       statusHistory: [],
+      followUpAlerts: [],
     });
 
     await expect(
@@ -1558,6 +1581,7 @@ describe('ClaimService assessment (Process 26)', () => {
         },
         documents: [],
         statusHistory: [{ toStatus: status }],
+        followUpAlerts: [],
       });
       // call #1 (gate check) still sees UNDER_ASSESSMENT; our engine transition
       // then loses the race; the catch-block reload (#2) sees a concurrent
@@ -1639,5 +1663,330 @@ describe('ClaimService assessment (Process 26)', () => {
     await expect(
       service.decideAssessment('claim-1', { outcome: 'APPROVED' }, sales()),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('ClaimService follow-up (Process 27)', () => {
+  const REGISTERED_LONG_AGO = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+  const REGISTERED_RECENTLY = new Date(Date.now() - 60 * 1000);
+
+  /** a bare pre-verdict claim row for the sweep's candidate list */
+  const awaitingRow = (over: Partial<Record<string, unknown>> = {}) => ({
+    id: 'claim-1',
+    status: 'UNDER_ASSESSMENT',
+    followUpAlertThresholdDays: 9,
+    createdAt: REGISTERED_LONG_AGO,
+    statusHistory: [
+      { toStatus: 'NOTIFIED', changedAt: REGISTERED_LONG_AGO },
+      { toStatus: 'REGISTERED', changedAt: REGISTERED_LONG_AGO },
+    ],
+    followUpAlerts: [] as { id: string }[],
+    ...over,
+  });
+
+  describe('runFollowUpScan', () => {
+    it('raises an alert for a due claim with none open, and audits it', async () => {
+      const { service, claimRepo, audit } = makeDeps();
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue([
+        awaitingRow(),
+      ]);
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toMatchObject({ awaiting: 1, due: 1, raised: 1 });
+      expect(claimRepo.raiseFollowUpAlert).toHaveBeenCalledWith(
+        'claim-1',
+        expect.any(Date),
+      );
+      const created = audit.record.mock.calls.find(
+        (c) =>
+          (c[0] as { entityType: string }).entityType === 'ClaimFollowUpAlert',
+      );
+      expect(created).toBeDefined();
+      expect(
+        (
+          created?.[0] as {
+            action: string;
+            afterValue: Record<string, unknown>;
+          }
+        ).action,
+      ).toBe('CREATE');
+      expect(
+        (created?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+      ).toMatchObject({ claimId: 'claim-1', thresholdDays: 9 });
+    });
+
+    it('falls back to the claim earliest instant (+ a warn) when the REGISTERED history row is missing (review MINOR)', async () => {
+      const { service, claimRepo } = makeDeps();
+      const warn = vi
+        .spyOn(
+          (service as unknown as { logger: { warn: (m: string) => void } })
+            .logger,
+          'warn',
+        )
+        .mockImplementation(() => undefined);
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue([
+        awaitingRow({
+          statusHistory: [
+            { toStatus: 'NOTIFIED', changedAt: REGISTERED_LONG_AGO },
+          ],
+        }),
+      ]);
+
+      const result = await service.runFollowUpScan('system-1');
+
+      // still chased (the fallback clock is old enough) + ops was warned
+      expect(result).toMatchObject({ due: 1, raised: 1 });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('no REGISTERED ClaimStatusHistory row'),
+      );
+    });
+
+    it('warns when the candidate set hits FOLLOWUP_SWEEP_LIMIT (review MINOR)', async () => {
+      const { service, claimRepo } = makeDeps();
+      const warn = vi
+        .spyOn(
+          (service as unknown as { logger: { warn: (m: string) => void } })
+            .logger,
+          'warn',
+        )
+        .mockImplementation(() => undefined);
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue(
+        Array.from({ length: ClaimRepository.FOLLOWUP_SWEEP_LIMIT }, (_, i) =>
+          awaitingRow({ id: `c-${i}`, followUpAlerts: [{ id: 'x' }] }),
+        ),
+      );
+
+      await service.runFollowUpScan('system-1');
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('row cap'));
+    });
+
+    it('does not raise for a claim still within its threshold', async () => {
+      const { service, claimRepo } = makeDeps();
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue([
+        awaitingRow({
+          statusHistory: [
+            { toStatus: 'REGISTERED', changedAt: REGISTERED_RECENTLY },
+          ],
+        }),
+      ]);
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toMatchObject({ due: 0, raised: 0 });
+      expect(claimRepo.raiseFollowUpAlert).not.toHaveBeenCalled();
+    });
+
+    it('skips a due claim that already has an open alert', async () => {
+      const { service, claimRepo } = makeDeps();
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue([
+        awaitingRow({ followUpAlerts: [{ id: 'fa-existing' }] }),
+      ]);
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toMatchObject({
+        due: 1,
+        raised: 0,
+        skippedAlreadyAlerted: 1,
+      });
+      expect(claimRepo.raiseFollowUpAlert).not.toHaveBeenCalled();
+    });
+
+    it('counts a P2002 loss (concurrent sweep) as skippedAlreadyAlerted, not failed', async () => {
+      const { service, claimRepo } = makeDeps();
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue([
+        awaitingRow(),
+      ]);
+      claimRepo.raiseFollowUpAlert.mockResolvedValue({
+        created: false,
+        alert: null,
+      });
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toMatchObject({
+        raised: 0,
+        skippedAlreadyAlerted: 1,
+        failed: 0,
+      });
+    });
+
+    it('auto-resolves an open alert whose claim has progressed past the pre-verdict stage', async () => {
+      const { service, claimRepo, audit } = makeDeps();
+      claimRepo.findOpenFollowUpAlertsForRespondedClaims.mockResolvedValue([
+        {
+          id: 'fa-1',
+          claimId: 'claim-1',
+          triggeredAt: REGISTERED_LONG_AGO,
+          resolvedAt: null,
+          claim: { id: 'claim-1', status: 'APPROVED' },
+        },
+      ]);
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toMatchObject({ autoResolved: 1 });
+      expect(claimRepo.resolveFollowUpAlert).toHaveBeenCalledWith(
+        'fa-1',
+        expect.any(Date),
+      );
+      const upd = audit.record.mock.calls.find(
+        (c) =>
+          (c[0] as { entityType: string }).entityType === 'ClaimFollowUpAlert',
+      );
+      expect(
+        (upd?.[0] as { action: string; afterValue: Record<string, unknown> })
+          .action,
+      ).toBe('UPDATE');
+      expect(
+        (upd?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+      ).toMatchObject({ resolvedBy: 'sweep' });
+    });
+
+    it('per-row isolation: one row that throws does not abandon the rest', async () => {
+      const { service, claimRepo } = makeDeps();
+      claimRepo.findClaimsAwaitingInsurerResponse.mockResolvedValue([
+        awaitingRow({ id: 'bad' }),
+        awaitingRow({ id: 'good' }),
+      ]);
+      claimRepo.raiseFollowUpAlert.mockImplementation((claimId: string) => {
+        if (claimId === 'bad') return Promise.reject(new Error('db blip'));
+        return Promise.resolve({
+          created: true,
+          alert: {
+            id: 'fa-good',
+            claimId,
+            triggeredAt: new Date(),
+            resolvedAt: null,
+          },
+        });
+      });
+
+      const result = await service.runFollowUpScan('system-1');
+
+      expect(result).toMatchObject({ raised: 1, failed: 1 });
+    });
+  });
+
+  describe('resolveFollowUpAlert', () => {
+    async function claimWithOpenAlert() {
+      const deps = makeDeps();
+      await deps.service.notify({ ...BASE_DTO }, claims());
+      const alert = { id: 'fa-1', triggeredAt: new Date(), resolvedAt: null };
+      deps.claimRepo.findById.mockImplementation(() =>
+        Promise.resolve({
+          id: 'claim-1',
+          claimNumber: null,
+          status: 'UNDER_ASSESSMENT',
+          classification: 'HIGHLY_CONFIDENTIAL',
+          followUpAlertThresholdDays: 9,
+          customerId: 'cus-1',
+          policyId: 'pol-1',
+          lossDate: new Date('2026-03-15T00:00:00.000Z'),
+          lossLocation: null,
+          causeOfLoss: 'x',
+          estimatedLoss: new Prisma.Decimal('20000'),
+          isThirdPartyInvolved: false,
+          isLargeClaim: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          policy: {
+            id: 'pol-1',
+            customerId: 'cus-1',
+            policyNumber: 'POL-1',
+            insuranceLine: 'Property All Risks',
+            expiryDate: EXPIRY,
+            schedules: [
+              { id: 'sched-v1', effectiveFrom: INCEPTION, effectiveTo: null },
+            ],
+          },
+          thirdParty: null,
+          adjuster: null,
+          documents: [],
+          followUpAlerts: [alert],
+          statusHistory: [{ toStatus: 'REGISTERED', changedAt: new Date() }],
+        }),
+      );
+      return deps;
+    }
+
+    it('resolves an open alert and audits it (resolvedBy: manual)', async () => {
+      const { service, claimRepo, audit } = await claimWithOpenAlert();
+      audit.record.mockClear();
+
+      await service.resolveFollowUpAlert('claim-1', 'fa-1', claims());
+
+      expect(claimRepo.resolveFollowUpAlert).toHaveBeenCalledWith(
+        'fa-1',
+        expect.any(Date),
+      );
+      const upd = audit.record.mock.calls.find(
+        (c) =>
+          (c[0] as { entityType: string }).entityType === 'ClaimFollowUpAlert',
+      );
+      expect(
+        (upd?.[0] as { afterValue: Record<string, unknown> }).afterValue,
+      ).toMatchObject({ resolvedBy: 'manual', claimId: 'claim-1' });
+    });
+
+    it('404s an alert id that is not on this claim', async () => {
+      const { service } = await claimWithOpenAlert();
+      await expect(
+        service.resolveFollowUpAlert('claim-1', 'fa-other', claims()),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('is an idempotent no-op when the alert is already resolved', async () => {
+      const { service, claimRepo } = await claimWithOpenAlert();
+      claimRepo.findById.mockImplementation(() =>
+        Promise.resolve({
+          id: 'claim-1',
+          claimNumber: null,
+          status: 'UNDER_ASSESSMENT',
+          classification: 'HIGHLY_CONFIDENTIAL',
+          followUpAlertThresholdDays: 9,
+          customerId: 'cus-1',
+          policyId: 'pol-1',
+          lossDate: new Date('2026-03-15T00:00:00.000Z'),
+          lossLocation: null,
+          causeOfLoss: 'x',
+          estimatedLoss: new Prisma.Decimal('20000'),
+          isThirdPartyInvolved: false,
+          isLargeClaim: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          policy: {
+            id: 'pol-1',
+            customerId: 'cus-1',
+            policyNumber: 'POL-1',
+            insuranceLine: 'Property All Risks',
+            expiryDate: EXPIRY,
+            schedules: [
+              { id: 'sched-v1', effectiveFrom: INCEPTION, effectiveTo: null },
+            ],
+          },
+          thirdParty: null,
+          adjuster: null,
+          documents: [],
+          followUpAlerts: [
+            { id: 'fa-1', triggeredAt: new Date(), resolvedAt: new Date() },
+          ],
+          statusHistory: [{ toStatus: 'REGISTERED', changedAt: new Date() }],
+        }),
+      );
+
+      await service.resolveFollowUpAlert('claim-1', 'fa-1', claims());
+      expect(claimRepo.resolveFollowUpAlert).not.toHaveBeenCalled();
+    });
+
+    it('404s a caller who cannot see the claim', async () => {
+      const { service } = makeDeps({ customerOwner: 'someone-else' });
+      await service.notify({ ...BASE_DTO }, claims());
+      await expect(
+        service.resolveFollowUpAlert('claim-1', 'fa-1', sales()),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 });

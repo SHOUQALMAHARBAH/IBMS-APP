@@ -1,12 +1,15 @@
 import { Prisma } from '@ibms/db';
+import type { ClaimStatus } from '@ibms/db';
 import { formatMoney, quantizeMoney } from '../../common/money.util';
+import { isFollowUpDue } from '../../common/follow-up.util';
 
 /**
- * Process 23-26 — Claim Notification / Registration / Documentation /
- * Assessment (backlog Part C #23-26, Domain C). The pure, deterministic core:
- * resolving the coverage that was in force at the loss date, the drafted
- * large-claim threshold, the mandatory-document checklist per claim type, the
- * assessment-readiness derivation, and the audit `afterValue` snapshots.
+ * Process 23-27 — Claim Notification / Registration / Documentation /
+ * Assessment / Follow-up (backlog Part C #23-27, Domain C). The pure,
+ * deterministic core: resolving the coverage that was in force at the loss
+ * date, the drafted large-claim threshold, the mandatory-document checklist
+ * per claim type, the assessment-readiness derivation, the per-line follow-up
+ * threshold + due predicate, and the audit `afterValue` snapshots.
  *
  * `ibms-brain/meta/context/claims-lifecycle.md` § "The rules that aren't
  * obvious":
@@ -541,5 +544,144 @@ export function adjusterAssessmentAuditSnapshot(row: {
     investigationCompletedAt: row.investigationCompletedAt
       ? row.investigationCompletedAt.toISOString()
       : null,
+  };
+}
+
+// --- Process 27: claim follow-up (insurer non-response) ------------------
+
+/** The pre-verdict statuses in which the claim is "awaiting a response from
+ * the insurer" — the ball is in the insurer's court (they registered it and
+ * must engage / assess / decide). Once a verdict is recorded (`APPROVED` /
+ * `PARTIALLY_APPROVED` / `DECLINED`) or the claim is beyond that, the insurer
+ * has responded and any open follow-up alert is resolvable. */
+export const CLAIM_AWAITING_INSURER_STATUSES: readonly ClaimStatus[] = [
+  'REGISTERED',
+  'DOCUMENTATION_IN_PROGRESS',
+  'UNDER_ASSESSMENT',
+];
+
+/** The neutral default follow-up threshold — the Part 3.7 worked example
+ * ("no response after 9 days from a 1 August submission triggers an alert on
+ * day 10"), also the `Claim.followUpAlertThresholdDays` schema `@default`. */
+export const DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS = 9;
+
+/**
+ * The follow-up threshold (Jordan business days since the claim was
+ * `REGISTERED` with the insurer) per broad line family — "configurable per
+ * line" (backlog #27).
+ *
+ * **`ibms-app` product decision, drafted, unsourced** — Part 3.7 gives ONE
+ * worked example (9 days) and no per-line table; `Policy.insuranceLine` has
+ * no taxonomy, so the family comes from {@link classifyInsuranceLine}. Same
+ * drafted-constant status as `CLAIM_LARGE_THRESHOLD_JOD` (#23), the #25
+ * checklist matrix, #16's 10 % / 2 pp. Filed via `/brain-gap`.
+ */
+export const CLAIM_FOLLOWUP_THRESHOLD_DAYS_BY_FAMILY: Record<
+  ClaimLineFamily,
+  number
+> = {
+  motor: 7,
+  property: 10,
+  medical: 7,
+  liability: 15,
+  marine: 15,
+  other: DEFAULT_CLAIM_FOLLOWUP_THRESHOLD_DAYS,
+};
+
+/** Resolve the follow-up threshold for a claim from its policy's free-text
+ * `insuranceLine`. Snapshotted onto `Claim.followUpAlertThresholdDays` at
+ * notification (Process 23) so a later taxonomy change does not retroactively
+ * shift live claims — the sweep reads the column, not this map. */
+export function followUpThresholdDaysFor(insuranceLine: string): number {
+  return CLAIM_FOLLOWUP_THRESHOLD_DAYS_BY_FAMILY[
+    classifyInsuranceLine(insuranceLine)
+  ];
+}
+
+/** Is a follow-up alert now due for a claim registered at `registeredAt` with
+ * a `thresholdDays` grace window? Thin wrapper over the shared
+ * {@link isFollowUpDue} (Jordan business days, `now` injected). */
+export function isClaimFollowUpDue(
+  registeredAt: Date,
+  thresholdDays: number,
+  now: Date,
+): boolean {
+  return isFollowUpDue(registeredAt, thresholdDays, now);
+}
+
+export interface ClaimFollowUpAlertView {
+  id: string;
+  triggeredAt: Date;
+  resolvedAt: Date | null;
+}
+
+export interface ClaimFollowUpView {
+  followUpAlerts: ClaimFollowUpAlertView[];
+  /** At least one alert has no `resolvedAt`. */
+  followUpAlertOpen: boolean;
+  followUpAlertThresholdDays: number;
+  /** The claim is in a pre-verdict status — the insurer still owes a
+   * response. */
+  awaitingInsurerResponse: boolean;
+  /** When the claim was `REGISTERED` with the insurer — the follow-up clock
+   * start (null before registration, or if the history row is somehow
+   * absent). */
+  awaitingInsurerSince: Date | null;
+}
+
+/** Derive the Process 27 follow-up sub-view. Pure. */
+export function deriveFollowUpView(input: {
+  status: string;
+  followUpAlertThresholdDays: number;
+  registeredAt: Date | null;
+  alerts: readonly { id: string; triggeredAt: Date; resolvedAt: Date | null }[];
+}): ClaimFollowUpView {
+  const followUpAlerts = input.alerts.map((a) => ({
+    id: a.id,
+    triggeredAt: a.triggeredAt,
+    resolvedAt: a.resolvedAt,
+  }));
+  return {
+    followUpAlerts,
+    followUpAlertOpen: followUpAlerts.some((a) => a.resolvedAt === null),
+    followUpAlertThresholdDays: input.followUpAlertThresholdDays,
+    awaitingInsurerResponse: (
+      CLAIM_AWAITING_INSURER_STATUSES as readonly string[]
+    ).includes(input.status),
+    awaitingInsurerSince: input.registeredAt,
+  };
+}
+
+/**
+ * CREATE / UPDATE audit `afterValue` for a `ClaimFollowUpAlert`. It is an
+ * accountability record — ids, the threshold and the clock timestamps only,
+ * never any claim narrative. `thresholdDays` / `registeredAt` are the raise
+ * context (omitted on a plain resolve, where they are not to hand).
+ */
+export function claimFollowUpAlertAuditSnapshot(row: {
+  claimFollowUpAlertId: string;
+  claimId: string;
+  triggeredAt: Date;
+  resolvedAt: Date | null;
+  resolvedBy?: 'sweep' | 'manual';
+  thresholdDays?: number;
+  registeredAt?: Date | null;
+}): Prisma.InputJsonObject {
+  return {
+    claimFollowUpAlertId: row.claimFollowUpAlertId,
+    claimId: row.claimId,
+    triggeredAt: row.triggeredAt.toISOString(),
+    resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+    ...(row.resolvedBy ? { resolvedBy: row.resolvedBy } : {}),
+    ...(row.thresholdDays !== undefined
+      ? { thresholdDays: row.thresholdDays }
+      : {}),
+    ...(row.registeredAt !== undefined
+      ? {
+          registeredAt: row.registeredAt
+            ? row.registeredAt.toISOString()
+            : null,
+        }
+      : {}),
   };
 }

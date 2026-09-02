@@ -1577,13 +1577,24 @@ model Adjuster {
 
 /// Process 27 — system-generated follow-up alert once insurer non-response
 /// exceeds the configurable threshold (example: day 10 after a 1 Aug
-/// submission with a 9-day threshold).
+/// submission with a 9-day threshold). The clock runs from the claim's
+/// REGISTERED ClaimStatusHistory.changedAt; the threshold is snapshotted onto
+/// Claim.followUpAlertThresholdDays at notification (per line family).
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most one UNRESOLVED alert
+/// per claim — a partial `UNIQUE ("claimId") WHERE "resolvedAt" IS NULL`
+/// (migration 20260902190000; Prisma cannot express the WHERE here). A
+/// resolved alert leaves the index, so a claim chased again later gets a fresh
+/// row. The sweep + a manual re-run rely on this: raise is `create` +
+/// P2002 -> "already alerted".
 model ClaimFollowUpAlert {
   id          String   @id @default(uuid())
   claimId     String
   claim       Claim    @relation(fields: [claimId], references: [id])
   triggeredAt DateTime @default(now())
   resolvedAt  DateTime?
+
+  @@index([claimId])
 }
 
 // ============================================================================

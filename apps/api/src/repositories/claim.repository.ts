@@ -1,15 +1,29 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@ibms/db';
 import type {
   Adjuster,
   Claim,
   ClaimDocument,
+  ClaimFollowUpAlert,
   ClaimStatus,
   DataClassification,
   Document,
-  Prisma,
   ThirdPartyClaimant,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+
+/** Process 27 — the pre-verdict statuses in which a claim is awaiting an
+ * insurer response (the follow-up sweep's candidate set). Kept here rather
+ * than imported from `modules/claim/claim.config` to avoid a repository ->
+ * module import; `claim.config.ts` has its own `CLAIM_AWAITING_INSURER_STATUSES`
+ * for the view. Exported so `claim.config.spec.ts` can assert the two copies
+ * stay in sync (a `@code-reviewer` MINOR — a hand-duplicated set with no
+ * equality check). */
+export const AWAITING_INSURER_STATUSES: readonly ClaimStatus[] = [
+  'REGISTERED',
+  'DOCUMENTATION_IN_PROGRESS',
+  'UNDER_ASSESSMENT',
+];
 
 // Process 25 — the claim-documentation files, newest first, for the
 // mandatory-checklist computation. Secondary sort by id so intra-batch order is
@@ -31,6 +45,8 @@ const CLAIM_INCLUDE = {
     orderBy: CLAIM_DOCUMENTS_ORDER,
   },
   statusHistory: { orderBy: { changedAt: 'asc' } },
+  // Process 27 — the insurer non-response follow-up alerts, newest first.
+  followUpAlerts: { orderBy: { triggeredAt: 'desc' } },
   policy: {
     select: {
       id: true,
@@ -72,6 +88,10 @@ export interface CreateClaimInput {
   estimatedLoss: Prisma.Decimal;
   isThirdPartyInvolved: boolean;
   isLargeClaim: boolean;
+  /** Process 27 — the insurer non-response follow-up threshold (Jordan
+   * business days), snapshotted from the policy's line family at notification
+   * so a later taxonomy change does not retroactively shift live claims. */
+  followUpAlertThresholdDays: number;
   /** The officer recording the notification — stamped on the opening
    * `ClaimStatusHistory` row (`fromStatus: null → NOTIFIED`), which is the
    * authoritative provenance trail for a claim (there is no
@@ -106,8 +126,8 @@ export interface ClaimDocumentInput {
 export type ClaimDocumentWithFile = ClaimDocument & { document: Document };
 
 /**
- * Process 23-26 — Claim Notification + Registration + Documentation +
- * Assessment (backlog Part C #23-26, Domain C). Owns `Claim` plus its
+ * Process 23-27 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up (backlog Part C #23-27, Domain C). Owns `Claim` plus its
  * children: the `ClaimStatusHistory` trail, the one `ThirdPartyClaimant`
  * (#23), the one loss `Adjuster` (#24, its survey / investigation completion
  * stamps written in #26) and the `ClaimDocument` / `Document` file rows (#25).
@@ -150,6 +170,7 @@ export class ClaimRepository {
           estimatedLoss: claim.estimatedLoss,
           isThirdPartyInvolved: claim.isThirdPartyInvolved,
           isLargeClaim: claim.isLargeClaim,
+          followUpAlertThresholdDays: claim.followUpAlertThresholdDays,
         },
       });
       await tx.claimStatusHistory.create({
@@ -353,5 +374,94 @@ export class ClaimRepository {
       orderBy: { createdAt: 'desc' },
       take: CLAIM_LIST_LIMIT,
     });
+  }
+
+  // --- Process 27: insurer non-response follow-up ------------------------
+
+  /** Cap on the follow-up sweep's candidate set — well above any realistic
+   * count of open claims; a larger backlog is an ops problem, not something
+   * to silently truncate a sweep over (revisit with pagination if it is ever
+   * hit). */
+  static readonly FOLLOWUP_SWEEP_LIMIT = 1000;
+
+  /** Every claim still awaiting an insurer response (pre-verdict statuses),
+   * with its full status-history trail (for the `REGISTERED` clock start) and
+   * — **filtered to the OPEN ones only** (`resolvedAt: null`) —  its follow-up
+   * alerts, so the sweep's `followUpAlerts.length > 0` reads "already has an
+   * open alert". Oldest first so the sweep chases the longest-waiting claims
+   * first if it ever hits `FOLLOWUP_SWEEP_LIMIT` (the caller warns on that). */
+  findClaimsAwaitingInsurerResponse(): Promise<
+    Prisma.ClaimGetPayload<{
+      include: {
+        statusHistory: true;
+        followUpAlerts: { where: { resolvedAt: null } };
+      };
+    }>[]
+  > {
+    return this.prisma.client.claim.findMany({
+      where: { status: { in: [...AWAITING_INSURER_STATUSES] } },
+      include: {
+        statusHistory: true,
+        followUpAlerts: { where: { resolvedAt: null } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: ClaimRepository.FOLLOWUP_SWEEP_LIMIT,
+    });
+  }
+
+  /** Open follow-up alerts whose claim has since moved past the pre-verdict
+   * stage — the insurer responded, so the alert is resolvable. */
+  findOpenFollowUpAlertsForRespondedClaims(): Promise<
+    Prisma.ClaimFollowUpAlertGetPayload<{
+      include: { claim: { select: { id: true; status: true } } };
+    }>[]
+  > {
+    return this.prisma.client.claimFollowUpAlert.findMany({
+      where: {
+        resolvedAt: null,
+        claim: { status: { notIn: [...AWAITING_INSURER_STATUSES] } },
+      },
+      include: { claim: { select: { id: true, status: true } } },
+      take: ClaimRepository.FOLLOWUP_SWEEP_LIMIT,
+    });
+  }
+
+  /**
+   * Raise a follow-up alert for a claim. The partial `UNIQUE ("claimId") WHERE
+   * "resolvedAt" IS NULL` (migration `20260902190000`) is the race gate: a
+   * concurrent sweep / re-run that already created the open alert makes this a
+   * `P2002`, which the caller maps to "already alerted" (`created: false`).
+   */
+  async raiseFollowUpAlert(
+    claimId: string,
+    triggeredAt: Date,
+  ): Promise<{ created: boolean; alert: ClaimFollowUpAlert | null }> {
+    try {
+      const alert = await this.prisma.client.claimFollowUpAlert.create({
+        data: { claimId, triggeredAt },
+      });
+      return { created: true, alert };
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        return { created: false, alert: null };
+      }
+      throw err;
+    }
+  }
+
+  /** Stamp `resolvedAt` on one alert, conditional on it still being open
+   * (0 rows => a concurrent resolve / sweep already did it — race-safe). */
+  async resolveFollowUpAlert(
+    alertId: string,
+    resolvedAt: Date,
+  ): Promise<number> {
+    const { count } = await this.prisma.client.claimFollowUpAlert.updateMany({
+      where: { id: alertId, resolvedAt: null },
+      data: { resolvedAt },
+    });
+    return count;
   }
 }

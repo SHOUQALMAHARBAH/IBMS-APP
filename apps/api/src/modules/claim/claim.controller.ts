@@ -11,17 +11,19 @@ import { RequirePermissions } from '../rbac/decorators/require-permissions.decor
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
-/** Process 23-26 — Claim Notification + Registration + Documentation +
- * Assessment (backlog Part C #23-26, Domain C). Record a reported loss against
- * a Policy (with coverage-at-loss-date validation), register it with the
- * insurer and assign the loss adjuster (`NOTIFIED → REGISTERED`), file the
- * mandatory documentation — a per-claim-type checklist — with the first attach
- * advancing `REGISTERED → DOCUMENTATION_IN_PROGRESS`, then track the adjuster's
- * survey / investigation, submit the claim for insurer assessment
- * (`DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`, gated on the checklist) and
+/** Process 23-27 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up (backlog Part C #23-27, Domain C). Record a reported
+ * loss against a Policy (with coverage-at-loss-date validation), register it
+ * with the insurer and assign the loss adjuster (`NOTIFIED → REGISTERED`), file
+ * the mandatory documentation — a per-claim-type checklist — with the first
+ * attach advancing `REGISTERED → DOCUMENTATION_IN_PROGRESS`, track the
+ * adjuster's survey / investigation, submit the claim for insurer assessment
+ * (`DOCUMENTATION_IN_PROGRESS → UNDER_ASSESSMENT`, gated on the checklist),
  * record the verdict (`UNDER_ASSESSMENT → APPROVED | PARTIALLY_APPROVED |
- * DECLINED`). See claim.service.ts for the rules. Frontend: the "Claims" block
- * in the "Policy" section on apps/web/app/(app)/opportunities/[id]/. */
+ * DECLINED`), and — nightly or on demand — raise a `ClaimFollowUpAlert` on any
+ * pre-verdict claim past its per-line insurer non-response threshold. See
+ * claim.service.ts for the rules. Frontend: the "Claims" block in the "Policy"
+ * section on apps/web/app/(app)/opportunities/[id]/. */
 @ApiTags('claims')
 @Controller('claims')
 export class ClaimController {
@@ -31,6 +33,15 @@ export class ClaimController {
   @Post()
   notify(@Body() dto: NotifyClaimDto, @CurrentUser() user: AuthenticatedUser) {
     return this.claims.notify(dto, user);
+  }
+
+  /** Process 27 — run the insurer non-response follow-up sweep now (it is
+   * otherwise nightly). Returns counts only, no claim content. Declared before
+   * the `:id` routes so `follow-up-sweep` is never read as a claim id. */
+  @RequirePermissions('claim.followup.manage')
+  @Post('follow-up-sweep')
+  runFollowUpSweep(@CurrentUser() user: AuthenticatedUser) {
+    return this.claims.runFollowUpScan(user.id);
   }
 
   /** Process 24 — register a NOTIFIED claim with the insurer (recording its
@@ -96,6 +107,18 @@ export class ClaimController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.claims.decideAssessment(id, dto, user);
+  }
+
+  /** Process 27 — a Claims Officer manually resolves an open follow-up alert
+   * (they chased the insurer; the claim's status is not touched). */
+  @RequirePermissions('claim.followup.manage')
+  @Post(':id/follow-up-alerts/:alertId/resolve')
+  resolveFollowUpAlert(
+    @Param('id') id: string,
+    @Param('alertId') alertId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.resolveFollowUpAlert(id, alertId, user);
   }
 
   @RequirePermissions('claim.read')

@@ -1,12 +1,13 @@
-// Process 23-26 — Claim Notification + Registration + Documentation +
-// Assessment (backlog Part C #23-26, Domain C). Talks to apps/api's claim
-// module: record a reported loss against a Policy (with coverage-at-loss-date
-// validation), register it with the insurer + assign the adjuster (NOTIFIED ->
-// REGISTERED), file the mandatory documentation (a per-claim-type checklist,
-// first attach -> DOCUMENTATION_IN_PROGRESS), then track the adjuster's survey
-// / investigation, submit for insurer assessment (-> UNDER_ASSESSMENT, gated on
-// the checklist) and record the verdict (-> APPROVED | PARTIALLY_APPROVED |
-// DECLINED).
+// Process 23-27 — Claim Notification + Registration + Documentation +
+// Assessment + Follow-up (backlog Part C #23-27, Domain C). Talks to apps/api's
+// claim module: record a reported loss against a Policy (with
+// coverage-at-loss-date validation), register it with the insurer + assign the
+// adjuster (NOTIFIED -> REGISTERED), file the mandatory documentation (a
+// per-claim-type checklist, first attach -> DOCUMENTATION_IN_PROGRESS), track
+// the adjuster's survey / investigation, submit for insurer assessment (->
+// UNDER_ASSESSMENT, gated on the checklist), record the verdict (-> APPROVED |
+// PARTIALLY_APPROVED | DECLINED), and raise / resolve insurer non-response
+// follow-up alerts.
 
 import { apiGet, apiPost } from '../auth/api-client';
 
@@ -114,9 +115,29 @@ export interface Claim {
     readyForAssessment: boolean;
     outcome: ClaimAssessmentOutcome | null;
   };
+  followUp: {
+    followUpAlerts: {
+      id: string;
+      triggeredAt: string;
+      resolvedAt: string | null;
+    }[];
+    followUpAlertOpen: boolean;
+    followUpAlertThresholdDays: number;
+    awaitingInsurerResponse: boolean;
+    awaitingInsurerSince: string | null;
+  };
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ClaimFollowUpScanResult {
+  awaiting: number;
+  due: number;
+  raised: number;
+  skippedAlreadyAlerted: number;
+  autoResolved: number;
+  failed: number;
 }
 
 export interface NotifyClaimInput {
@@ -206,5 +227,25 @@ export function decideClaimAssessment(
   return apiPost(
     `/claims/${encodeURIComponent(claimId)}/assessment/decision`,
     { outcome },
+  );
+}
+
+/** Process 27 — run the insurer non-response follow-up sweep now (otherwise
+ * nightly). Returns counts only. */
+export function runClaimFollowUpSweep(): Promise<ClaimFollowUpScanResult> {
+  return apiPost('/claims/follow-up-sweep', {});
+}
+
+/** Process 27 — manually resolve an open follow-up alert (the claim's status
+ * is not touched). */
+export function resolveClaimFollowUpAlert(
+  claimId: string,
+  alertId: string,
+): Promise<Claim> {
+  return apiPost(
+    `/claims/${encodeURIComponent(claimId)}/follow-up-alerts/${encodeURIComponent(
+      alertId,
+    )}/resolve`,
+    {},
   );
 }

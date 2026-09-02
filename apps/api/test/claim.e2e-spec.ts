@@ -86,11 +86,31 @@ interface ClaimBody {
     readyForAssessment: boolean;
     outcome: string | null;
   };
+  followUp: {
+    followUpAlerts: {
+      id: string;
+      triggeredAt: string;
+      resolvedAt: string | null;
+    }[];
+    followUpAlertOpen: boolean;
+    followUpAlertThresholdDays: number;
+    awaitingInsurerResponse: boolean;
+    awaitingInsurerSince: string | null;
+  };
   statusHistory: {
     fromStatus: string | null;
     toStatus: string;
     changedByUserId: string;
   }[];
+}
+
+interface FollowUpScanBody {
+  awaiting: number;
+  due: number;
+  raised: number;
+  skippedAlreadyAlerted: number;
+  autoResolved: number;
+  failed: number;
 }
 
 const ISSUED_SCHEDULE = {
@@ -263,7 +283,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification + Registration + Documentation + Assessment (e2e) — backlog Part C #23-26', () => {
+describe('Claim Notification + Registration + Documentation + Assessment + Follow-up (e2e) — backlog Part C #23-27', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -1000,5 +1020,181 @@ describe('Claim Notification + Registration + Documentation + Assessment (e2e) �
       .set(bearer(clm.accessToken))
       .send({ outcome: 'APPROVED' })
       .expect(422);
+  });
+
+  it('#27 — the follow-up sweep raises an alert on an overdue pre-verdict claim, and auto-resolves it once the claim progresses; a manual resolve also works', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'clm27-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const clm = await makeUser(app, 'clm27-officer', 'CLAIMS_OFFICER');
+    // Sales holds claim.notify but NOT claim.followup.manage.
+    const sales = await makeUser(
+      app,
+      'clm27-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'followup',
+      { inceptionDate: '2026-01-01', expiryDate: '2027-01-01' },
+    );
+    const tag = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    // notify + register — the claim is now REGISTERED, awaiting the insurer.
+    const notified = await request(app.getHttpServer())
+      .post('/claims')
+      .set(bearer(clm.accessToken))
+      .send({
+        policyId,
+        lossDate: '2026-04-02',
+        causeOfLoss: 'Roof torn off in a gale.',
+        estimatedLoss: '18000.000',
+      })
+      .expect(201);
+    const claimId = (notified.body as ClaimBody).id;
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: `INS-${tag}`,
+        adjuster: { name: 'Cunningham Lindsey' },
+      })
+      .expect(201);
+
+    // property line -> a 10-business-day threshold (drafted). Backdate the
+    // REGISTERED history row so the whole window has elapsed.
+    const fortyDaysAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+    await prisma.claimStatusHistory.updateMany({
+      where: { claimId, toStatus: 'REGISTERED' },
+      data: { changedAt: fortyDaysAgo },
+    });
+
+    // Sales cannot run the sweep.
+    await request(app.getHttpServer())
+      .post('/claims/follow-up-sweep')
+      .set(bearer(sales.accessToken))
+      .expect(403);
+
+    const sweep1 = await request(app.getHttpServer())
+      .post('/claims/follow-up-sweep')
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    expect((sweep1.body as FollowUpScanBody).raised).toBeGreaterThanOrEqual(1);
+
+    const alerts = await prisma.claimFollowUpAlert.findMany({
+      where: { claimId },
+    });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].resolvedAt).toBeNull();
+    const alertId = alerts[0].id;
+
+    let view = (
+      await request(app.getHttpServer())
+        .get(`/claims/${claimId}`)
+        .set(bearer(clm.accessToken))
+        .expect(200)
+    ).body as ClaimBody;
+    expect(view.followUp.followUpAlertOpen).toBe(true);
+    expect(view.followUp.followUpAlertThresholdDays).toBe(10);
+    expect(view.followUp.awaitingInsurerResponse).toBe(true);
+
+    // a second sweep does NOT raise a duplicate for this claim (partial UNIQUE
+    // + P2002 path). db-test is cumulative, so assert per-claim, not on the
+    // global `raised` count.
+    await request(app.getHttpServer())
+      .post('/claims/follow-up-sweep')
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    expect(await prisma.claimFollowUpAlert.count({ where: { claimId } })).toBe(
+      1,
+    );
+
+    // the audit trail carries no claim narrative
+    const alertAudits = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'ClaimFollowUpAlert', entityId: alertId },
+    });
+    expect(JSON.stringify(alertAudits)).not.toContain('gale');
+
+    // The claim progresses past the pre-verdict stage — the insurer responded.
+    // DELIBERATE test shortcut: a raw status write instead of driving the full
+    // register -> docs -> adjuster-progress -> submit -> decision chain (the
+    // #26 e2e already covers that). The auto-resolve pass only reads
+    // `claim.status`, so this exercises exactly what it needs.
+    await prisma.claim.update({
+      where: { id: claimId },
+      data: { status: 'DECLINED' },
+    });
+    const sweep3 = await request(app.getHttpServer())
+      .post('/claims/follow-up-sweep')
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    expect(
+      (sweep3.body as FollowUpScanBody).autoResolved,
+    ).toBeGreaterThanOrEqual(1);
+    const resolved = await prisma.claimFollowUpAlert.findUniqueOrThrow({
+      where: { id: alertId },
+    });
+    expect(resolved.resolvedAt).not.toBeNull();
+
+    // --- manual resolve on a fresh overdue claim ---
+    const n2 = await request(app.getHttpServer())
+      .post('/claims')
+      .set(bearer(clm.accessToken))
+      .send({
+        policyId,
+        lossDate: '2026-05-02',
+        causeOfLoss: 'Flood in the basement store.',
+        estimatedLoss: '9000.000',
+      })
+      .expect(201);
+    const claim2 = (n2.body as ClaimBody).id;
+    await request(app.getHttpServer())
+      .post(`/claims/${claim2}/registration`)
+      .set(bearer(clm.accessToken))
+      .send({
+        insurerClaimReference: `INS-${tag}-2`,
+        adjuster: { name: 'Crawford & Co' },
+      })
+      .expect(201);
+    await prisma.claimStatusHistory.updateMany({
+      where: { claimId: claim2, toStatus: 'REGISTERED' },
+      data: { changedAt: fortyDaysAgo },
+    });
+    await request(app.getHttpServer())
+      .post('/claims/follow-up-sweep')
+      .set(bearer(clm.accessToken))
+      .expect(201);
+    const a2 = await prisma.claimFollowUpAlert.findFirstOrThrow({
+      where: { claimId: claim2, resolvedAt: null },
+    });
+
+    // Sales cannot resolve.
+    await request(app.getHttpServer())
+      .post(`/claims/${claim2}/follow-up-alerts/${a2.id}/resolve`)
+      .set(bearer(sales.accessToken))
+      .expect(403);
+
+    view = (
+      await request(app.getHttpServer())
+        .post(`/claims/${claim2}/follow-up-alerts/${a2.id}/resolve`)
+        .set(bearer(clm.accessToken))
+        .expect(201)
+    ).body as ClaimBody;
+    expect(view.followUp.followUpAlertOpen).toBe(false);
+    expect(
+      (
+        await prisma.claimFollowUpAlert.findUniqueOrThrow({
+          where: { id: a2.id },
+        })
+      ).resolvedAt,
+    ).not.toBeNull();
+
+    // a wrong alert id on this claim is a 404
+    await request(app.getHttpServer())
+      .post(`/claims/${claim2}/follow-up-alerts/${alertId}/resolve`)
+      .set(bearer(clm.accessToken))
+      .expect(404);
   });
 });

@@ -177,6 +177,7 @@ async function mockRfqApi(
       documents: { docType: string; classification: string }[];
     }) => void;
     onClaimAssessment?: (body: Record<string, unknown>) => void;
+    onClaimFollowUp?: (body: Record<string, unknown>) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -836,6 +837,73 @@ async function mockRfqApi(
       };
     };
 
+    // Process 27 — the follow-up sub-view + a synthetic "overdue" flag the
+    // sweep branch uses (the real due-check is business-day date math).
+    const AWAITING = ["REGISTERED", "DOCUMENTATION_IN_PROGRESS", "UNDER_ASSESSMENT"];
+    const applyFollowUp = (row: Record<string, unknown>) => {
+      const alerts = (row.followUpAlerts as Record<string, unknown>[]) ?? [];
+      row.followUpAlerts = alerts;
+      row.followUp = {
+        followUpAlerts: alerts,
+        followUpAlertOpen: alerts.some((a) => a.resolvedAt === null),
+        followUpAlertThresholdDays: 10,
+        awaitingInsurerResponse: AWAITING.includes(row.status as string),
+        awaitingInsurerSince: "2026-11-05T00:00:00.000Z",
+      };
+    };
+
+    const sweepMatch = /\/claims\/follow-up-sweep(\?|$)/.exec(url);
+    if (method === "POST" && sweepMatch) {
+      opts.onClaimFollowUp?.({ step: "sweep" });
+      let raised = 0;
+      for (const row of claimRows) {
+        // The real sweep does business-day date math; the mock raises for any
+        // pre-verdict claim with no open alert so the UI flow is exercised.
+        if (
+          AWAITING.includes(row.status as string) &&
+          ((row.followUpAlerts as unknown[]) ?? []).length === 0
+        ) {
+          (row.followUpAlerts as Record<string, unknown>[]) = [
+            {
+              id: `fa-${row.id}`,
+              triggeredAt: "2026-11-20T00:00:00.000Z",
+              resolvedAt: null,
+            },
+          ];
+          raised += 1;
+        }
+        applyFollowUp(row);
+      }
+      return route.fulfill({
+        status: 201,
+        json: {
+          awaiting: claimRows.length,
+          due: raised,
+          raised,
+          skippedAlreadyAlerted: 0,
+          autoResolved: 0,
+          failed: 0,
+        },
+      });
+    }
+
+    const resolveMatch =
+      /\/claims\/([^/?]+)\/follow-up-alerts\/([^/?]+)\/resolve(\?|$)/.exec(url);
+    if (method === "POST" && resolveMatch) {
+      opts.onClaimFollowUp?.({ step: "resolve", alertId: resolveMatch[2] });
+      const row = claimRows.find((r) => r.id === resolveMatch[1]);
+      if (row) {
+        for (const a of (row.followUpAlerts as Record<string, unknown>[]) ??
+          []) {
+          if (a.id === resolveMatch[2] && a.resolvedAt === null) {
+            a.resolvedAt = "2026-11-25T00:00:00.000Z";
+          }
+        }
+        applyFollowUp(row);
+      }
+      return route.fulfill({ status: 201, json: row ?? {} });
+    }
+
     const docMatch = /\/claims\/([^/?]+)\/documents(\?|$)/.exec(url);
     if (method === "POST" && docMatch) {
       const b = route.request().postDataJSON() as {
@@ -873,6 +941,7 @@ async function mockRfqApi(
         }
         applyChecklist(row);
         applyAssessment(row);
+        applyFollowUp(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
     }
@@ -920,6 +989,7 @@ async function mockRfqApi(
           }
         }
         applyAssessment(row);
+        applyFollowUp(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
     }
@@ -951,6 +1021,7 @@ async function mockRfqApi(
           changedAt: "2026-11-05T00:00:00.000Z",
         });
         applyAssessment(row);
+        applyFollowUp(row);
       }
       return route.fulfill({ status: 201, json: row ?? {} });
     }
@@ -999,6 +1070,7 @@ async function mockRfqApi(
         documentChecklist: [],
         documentationComplete: false,
         missingMandatoryDocuments: [],
+        followUpAlerts: [],
         coverage: {
           scheduleId: "sch-1",
           effectiveFrom: "2026-10-01T00:00:00.000Z",
@@ -1018,6 +1090,7 @@ async function mockRfqApi(
       };
       applyChecklist(row);
       applyAssessment(row);
+      applyFollowUp(row);
       claimRows.push(row);
       return route.fulfill({ status: 201, json: row });
     }
@@ -1701,6 +1774,50 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
     "submit",
     "decision",
   ]);
+});
+
+test("raises an insurer non-response follow-up alert via the sweep and resolves it", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  const steps: string[] = [];
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onClaimFollowUp: (b) => {
+      steps.push(b.step as string);
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  // notify + register — the claim is now REGISTERED, awaiting the insurer.
+  await page.getByLabel("Loss date").fill("2026-11-15");
+  await page.getByLabel("Cause of loss").fill("Roof torn off in a gale.");
+  await page.getByLabel("Estimated loss").fill("14000.000");
+  await page.getByRole("button", { name: "Notify claim" }).click();
+  await page.getByLabel("Insurer claim reference").fill("INS-FU-1");
+  await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
+  await page
+    .getByRole("button", { name: "Register & assign adjuster" })
+    .click();
+  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+
+  // no alert yet
+  await expect(page.getByText("Insurer follow-up alert")).toHaveCount(0);
+
+  // run the sweep — the pre-verdict claim gets an alert
+  await page.getByRole("button", { name: "Run follow-up sweep" }).click();
+  await expect(page.getByText("Insurer follow-up alert")).toBeVisible();
+
+  // resolve it
+  await page.getByRole("button", { name: "Resolve", exact: true }).click();
+  await expect(page.getByText("Insurer follow-up alert")).toHaveCount(0);
+
+  expect(steps).toEqual(["sweep", "resolve"]);
 });
 
 test("RFQ screens have no serious/critical accessibility violations @a11y", async ({ page }) => {

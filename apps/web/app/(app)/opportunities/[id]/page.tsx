@@ -231,6 +231,7 @@ export default function OpportunityDetailPage() {
             canRegister={isClaims}
             canDocument={isClaims}
             canAssess={isClaims}
+            canFollowUp={isClaims}
           />
         </>
       ) : null}

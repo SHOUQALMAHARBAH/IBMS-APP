@@ -8,6 +8,8 @@ import {
   notifyClaim,
   recordAdjusterProgress,
   registerClaim,
+  resolveClaimFollowUpAlert,
+  runClaimFollowUpSweep,
   submitClaimForAssessment,
   CLAIM_ASSESSMENT_OUTCOMES,
   CLAIM_DOC_CLASSIFICATION_OPTIONS,
@@ -39,6 +41,8 @@ interface Props {
   canDocument: boolean;
   /** Claims — track adjuster progress, submit for assessment, record the verdict. */
   canAssess: boolean;
+  /** Claims — run the insurer non-response follow-up sweep, resolve alerts. */
+  canFollowUp: boolean;
 }
 
 function money(value: string | null): string {
@@ -473,12 +477,77 @@ function ClaimAssessment({
   );
 }
 
+/** Process 27 — the insurer non-response follow-up alerts on one claim, with a
+ * manual "Resolve" for a Claims Officer who has chased the insurer. */
+function ClaimFollowUp({
+  claim,
+  canFollowUp,
+  onDone,
+}: {
+  claim: Claim;
+  canFollowUp: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // At most one open alert per claim (partial UNIQUE, migration 20260902190000).
+  const alert = claim.followUp.followUpAlerts.find((a) => a.resolvedAt === null);
+  if (!alert) return null;
+
+  async function resolve(alertId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await resolveClaimFollowUpAlert(claim.id, alertId);
+      await onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'That alert could not be resolved — try again.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>
+        Insurer follow-up alert
+      </strong>
+      {error ? (
+        <p role="alert" style={errorStyle}>
+          {error}
+        </p>
+      ) : null}
+      <p style={{ fontSize: '0.85rem', margin: '0.25rem 0', opacity: 0.8 }}>
+        No insurer response {claim.followUp.followUpAlertThresholdDays} business
+        days after registration — raised{' '}
+        {new Date(alert.triggeredAt).toLocaleDateString()}.
+      </p>
+      {canFollowUp ? (
+        <button
+          type="button"
+          disabled={busy}
+          style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+          onClick={() => void resolve(alert.id)}
+        >
+          Resolve
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function ClaimSection({
   opportunityId,
   canNotify,
   canRegister,
   canDocument,
   canAssess,
+  canFollowUp,
 }: Props) {
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
@@ -581,8 +650,33 @@ export function ClaimSection({
         the insurer once the checklist is complete
         (<strong>UNDER_ASSESSMENT</strong>) and records the verdict
         (<strong>APPROVED</strong> / <strong>PARTIALLY_APPROVED</strong> /
-        <strong>DECLINED</strong>).
+        <strong>DECLINED</strong>). A nightly job raises a follow-up alert on any
+        pre-verdict claim past its per-line insurer non-response threshold.
       </p>
+
+      {canFollowUp ? (
+        <button
+          type="button"
+          disabled={busy}
+          style={{ ...buttonStyle, width: 'auto', marginTop: '0.5rem' }}
+          onClick={() => {
+            setBusy(true);
+            setFormError(null);
+            void runClaimFollowUpSweep()
+              .then(() => load())
+              .catch((err) =>
+                setFormError(
+                  err instanceof ApiError
+                    ? err.message
+                    : 'The follow-up sweep could not run — try again.',
+                ),
+              )
+              .finally(() => setBusy(false));
+          }}
+        >
+          {busy ? 'Running…' : 'Run follow-up sweep'}
+        </button>
+      ) : null}
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -665,6 +759,11 @@ export function ClaimSection({
                 onDone={load}
               />
             ) : null}
+            <ClaimFollowUp
+              claim={c}
+              canFollowUp={canFollowUp}
+              onDone={load}
+            />
           </div>
         ))
       )}

@@ -29,11 +29,15 @@ import {
   adjusterAuditSnapshot,
   buildDocumentChecklist,
   claimDocumentAuditSnapshot,
+  claimFollowUpAlertAuditSnapshot,
   claimNotificationAuditSnapshot,
   claimRegistrationAuditSnapshot,
   coverageGapMessage,
   deriveAssessmentView,
+  deriveFollowUpView,
+  followUpThresholdDaysFor,
   isAssessmentConcluded,
+  isClaimFollowUpDue,
   isLargeClaim,
   mandatoryDocTypesFor,
   resolveCoverageAtLossDate,
@@ -42,6 +46,7 @@ import {
   type ClaimAssessmentOutcome,
   type ClaimDocChecklistItem,
   type ClaimDocType,
+  type ClaimFollowUpView,
 } from './claim.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
@@ -136,14 +141,33 @@ export interface ClaimView {
    * investigation completion, whether the `→ UNDER_ASSESSMENT` move is
    * unblocked, and the recorded verdict (null until decided). */
   assessment: AssessmentView;
+  /** Process 27 — the insurer non-response follow-up sub-view: the alerts,
+   * whether one is open, the per-line threshold and the clock start. */
+  followUp: ClaimFollowUpView;
   statusHistory: ClaimStatusHistoryView[];
   createdAt: Date;
   updatedAt: Date;
 }
 
+/** Counts returned by the Process 27 follow-up sweep. */
+export interface ClaimFollowUpScanResult {
+  /** claims scanned (pre-verdict statuses) */
+  awaiting: number;
+  /** of those, past their threshold */
+  due: number;
+  /** new `ClaimFollowUpAlert` rows created this run */
+  raised: number;
+  /** due claims that already had an open alert (incl. a concurrent-sweep loss) */
+  skippedAlreadyAlerted: number;
+  /** open alerts closed because the claim has since progressed */
+  autoResolved: number;
+  /** rows that threw and were skipped (retried next run) */
+  failed: number;
+}
+
 /**
- * Process 23-26 — Claim Notification + Registration + Documentation +
- * Assessment (backlog Part C #23-26, Domain C).
+ * Process 23-27 — Claim Notification + Registration + Documentation +
+ * Assessment + Follow-up (backlog Part C #23-27, Domain C).
  *
  *  - `notify` (#23) — record a reported loss against a Policy: loss
  *    date/location/cause, the estimated loss, third-party involvement. The
@@ -170,6 +194,12 @@ export interface ClaimView {
  *  - `decideAssessment` (#26) — drive `Claim UNDER_ASSESSMENT → APPROVED |
  *    PARTIALLY_APPROVED | DECLINED` through the engine, recording the
  *    insurer's verdict. The four settlement figures are Process 28.
+ *  - `runFollowUpScan` (#27) — the insurer non-response sweep: raise a
+ *    `ClaimFollowUpAlert` on every pre-verdict claim past its per-line
+ *    business-day threshold (clock from `REGISTERED`), and auto-resolve alerts
+ *    whose claim has since progressed. `resolveFollowUpAlert` (#27) — a manual
+ *    resolve. NOT a `Claim` status change — an alert is an accountability
+ *    nudge, not a lifecycle state.
  *  - `list` / `get` — read, scoped to exactly one of `policyId` /
  *    `customerId`.
  *
@@ -238,6 +268,7 @@ export class ClaimService {
   ): Promise<{
     id: string;
     customerId: string;
+    insuranceLine: string;
     expiryDate: Date | null;
     schedules: { id: string; effectiveFrom: Date; effectiveTo: Date | null }[];
   }> {
@@ -251,6 +282,7 @@ export class ClaimService {
     return {
       id: policy.id,
       customerId: policy.customerId,
+      insuranceLine: policy.insuranceLine,
       expiryDate: policy.expiryDate,
       schedules: policy.schedules.map((s) => ({
         id: s.id,
@@ -322,6 +354,7 @@ export class ClaimService {
         : null,
       coverageResolvedAtLossDate: resolution.ok,
       ...this.assessmentAndDocumentationView(claim),
+      followUp: this.followUpView(claim),
       statusHistory: claim.statusHistory.map((h) => ({
         fromStatus: h.fromStatus,
         toStatus: h.toStatus,
@@ -381,6 +414,21 @@ export class ClaimService {
           claim.adjuster?.investigationCompletedAt ?? null,
       }),
     };
+  }
+
+  /** Process 27 — the follow-up sub-view. The clock start is the `REGISTERED`
+   * `ClaimStatusHistory.changedAt` (registration = submission to the insurer);
+   * `null` before registration. */
+  private followUpView(claim: ClaimWithContext): ClaimFollowUpView {
+    const registeredAt =
+      claim.statusHistory.find((h) => h.toStatus === 'REGISTERED')?.changedAt ??
+      null;
+    return deriveFollowUpView({
+      status: claim.status,
+      followUpAlertThresholdDays: claim.followUpAlertThresholdDays,
+      registeredAt,
+      alerts: claim.followUpAlerts,
+    });
   }
 
   async notify(
@@ -456,6 +504,12 @@ export class ClaimService {
         estimatedLoss,
         isThirdPartyInvolved: thirdPartyInvolved,
         isLargeClaim: largeClaim,
+        // Process 27 — snapshot the per-line-family insurer non-response
+        // threshold at notification (a later taxonomy change must not shift
+        // live claims; the sweep reads this column).
+        followUpAlertThresholdDays: followUpThresholdDaysFor(
+          policy.insuranceLine,
+        ),
         notifiedByUserId: actor.id,
       },
       thirdPartyInput,
@@ -1159,6 +1213,195 @@ export class ClaimService {
       claimId: id,
     });
     return result;
+  }
+
+  /**
+   * Process 27 — the insurer non-response follow-up sweep (the nightly
+   * `ClaimFollowUpScheduler`, and an on-demand `POST /claims/follow-up-sweep`
+   * for ops). Two passes, per-row isolated so one bad row does not abandon the
+   * run (the `CrossSellDetectionScheduler` shape):
+   *
+   *  1. **Raise** — for every claim still awaiting an insurer response
+   *     (pre-verdict statuses) whose business-day `followUpAlertThresholdDays`
+   *     has elapsed since it was `REGISTERED` (falling back to the claim's
+   *     earliest known instant + a warn if the #24 seam left the `REGISTERED`
+   *     history row missing), and which has no open alert, create one
+   *     `ClaimFollowUpAlert`. The partial `UNIQUE ("claimId") WHERE
+   *     "resolvedAt" IS NULL` is the race gate — a concurrent sweep's `P2002`
+   *     is counted as `skippedAlreadyAlerted`, not `failed`.
+   *  2. **Resolve** — for every open alert whose claim has since moved past
+   *     the pre-verdict stage (the insurer responded), stamp `resolvedAt`.
+   *
+   * Each candidate query is capped at `FOLLOWUP_SWEEP_LIMIT`; a run that hits
+   * the cap logs a warn (no pagination yet). `actorUserId` is the system
+   * service account (resolved by the scheduler) or the ops user who triggered
+   * the on-demand run.
+   */
+  async runFollowUpScan(actorUserId: string): Promise<ClaimFollowUpScanResult> {
+    const now = new Date();
+    const awaiting = await this.claims.findClaimsAwaitingInsurerResponse();
+    if (awaiting.length === ClaimRepository.FOLLOWUP_SWEEP_LIMIT) {
+      // Ordered oldest-first, so the NEWEST pre-verdict claims are the ones
+      // being dropped — they go un-chased run after run until the backlog
+      // clears. Surface it rather than silently truncate a compliance sweep.
+      this.logger.warn(
+        `Claim follow-up sweep: the awaiting-response candidate set hit the ${ClaimRepository.FOLLOWUP_SWEEP_LIMIT}-row cap — the newest pre-verdict claims are not being scanned. Pagination is needed.`,
+      );
+    }
+
+    let due = 0;
+    let raised = 0;
+    let skippedAlreadyAlerted = 0;
+    let autoResolved = 0;
+    let failed = 0;
+
+    for (const claim of awaiting) {
+      try {
+        // The clock start is the REGISTERED history row (registration =
+        // submission to the insurer). A pre-verdict claim should always have
+        // one; if the #24 transition-then-history-row seam left it missing and
+        // nothing has re-entered `register`, fall back to the claim's earliest
+        // known instant (fires EARLIER — the safe direction for a chase nudge)
+        // and warn so ops can see the gap.
+        const registeredAt =
+          claim.statusHistory.find((h) => h.toStatus === 'REGISTERED')
+            ?.changedAt ?? null;
+        let clockStart: Date;
+        if (registeredAt) {
+          clockStart = registeredAt;
+        } else {
+          const earliest = claim.statusHistory
+            .map((h) => h.changedAt)
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+          clockStart = earliest ?? claim.createdAt;
+          this.logger.warn(
+            `Claim follow-up sweep: claim ${claim.id} is ${claim.status} with no REGISTERED ClaimStatusHistory row — chasing from ${clockStart.toISOString()} instead (the #24 seam; a later register call would backfill it).`,
+          );
+        }
+        if (
+          !isClaimFollowUpDue(clockStart, claim.followUpAlertThresholdDays, now)
+        ) {
+          continue;
+        }
+        due += 1;
+        if (claim.followUpAlerts.length > 0) {
+          skippedAlreadyAlerted += 1;
+          continue;
+        }
+        const { created, alert } = await this.claims.raiseFollowUpAlert(
+          claim.id,
+          now,
+        );
+        if (created && alert) {
+          raised += 1;
+          await this.safeAudit({
+            userId: actorUserId,
+            action: 'CREATE',
+            entityType: 'ClaimFollowUpAlert',
+            entityId: alert.id,
+            afterValue: claimFollowUpAlertAuditSnapshot({
+              claimFollowUpAlertId: alert.id,
+              claimId: claim.id,
+              triggeredAt: alert.triggeredAt,
+              resolvedAt: null,
+              thresholdDays: claim.followUpAlertThresholdDays,
+              registeredAt: clockStart,
+            }),
+          });
+        } else {
+          // A concurrent sweep created the open alert between our
+          // findMany and the insert.
+          skippedAlreadyAlerted += 1;
+        }
+      } catch (err) {
+        failed += 1;
+        this.logger.error(
+          `Claim follow-up sweep: claim ${claim.id} failed (${(err as Error).message}) — continuing; next run will retry.`,
+        );
+      }
+    }
+
+    const responded =
+      await this.claims.findOpenFollowUpAlertsForRespondedClaims();
+    if (responded.length === ClaimRepository.FOLLOWUP_SWEEP_LIMIT) {
+      this.logger.warn(
+        `Claim follow-up sweep: the resolvable-alert set hit the ${ClaimRepository.FOLLOWUP_SWEEP_LIMIT}-row cap — the rest resolve on the next run.`,
+      );
+    }
+    for (const alert of responded) {
+      try {
+        const n = await this.claims.resolveFollowUpAlert(alert.id, now);
+        if (n === 1) {
+          autoResolved += 1;
+          await this.safeAudit({
+            userId: actorUserId,
+            action: 'UPDATE',
+            entityType: 'ClaimFollowUpAlert',
+            entityId: alert.id,
+            afterValue: claimFollowUpAlertAuditSnapshot({
+              claimFollowUpAlertId: alert.id,
+              claimId: alert.claim.id,
+              triggeredAt: alert.triggeredAt,
+              resolvedAt: now,
+              resolvedBy: 'sweep',
+            }),
+          });
+        }
+      } catch (err) {
+        failed += 1;
+        this.logger.error(
+          `Claim follow-up sweep: resolving alert ${alert.id} failed (${(err as Error).message}) — continuing; next run will retry.`,
+        );
+      }
+    }
+
+    return {
+      awaiting: awaiting.length,
+      due,
+      raised,
+      skippedAlreadyAlerted,
+      autoResolved,
+      failed,
+    };
+  }
+
+  /**
+   * Process 27 — a Claims Officer manually resolves an open follow-up alert
+   * (they chased the insurer and have a commitment; the claim's own status is
+   * not touched). Idempotent: an already-resolved alert is a no-op; a
+   * concurrent resolve (`updateMany` 0 rows) is treated the same. An alert id
+   * that is not on this claim is a 404 (no cross-claim resolve).
+   */
+  async resolveFollowUpAlert(
+    id: string,
+    alertId: string,
+    actor: AuthenticatedUser,
+  ): Promise<ClaimView> {
+    const claim = await this.loadVisibleClaim(id, actor);
+    const alert = claim.followUpAlerts.find((a) => a.id === alertId);
+    if (!alert) {
+      throw new NotFoundException('Follow-up alert not found');
+    }
+    if (!alert.resolvedAt) {
+      const now = new Date();
+      const n = await this.claims.resolveFollowUpAlert(alertId, now);
+      if (n === 1) {
+        await this.safeAudit({
+          userId: actor.id,
+          action: 'UPDATE',
+          entityType: 'ClaimFollowUpAlert',
+          entityId: alertId,
+          afterValue: claimFollowUpAlertAuditSnapshot({
+            claimFollowUpAlertId: alertId,
+            claimId: id,
+            triggeredAt: alert.triggeredAt,
+            resolvedAt: now,
+            resolvedBy: 'manual',
+          }),
+        });
+      }
+    }
+    return this.toViewAudited(id, actor, 'claim-followup-resolve');
   }
 
   async list(
