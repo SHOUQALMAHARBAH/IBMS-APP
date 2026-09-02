@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { Prisma } from '@ibms/db';
-import { computeLossRatio, lossRatioAuditSnapshot } from './loss-ratio.config';
+import {
+  buildLossRatioBreakdown,
+  computeLossRatio,
+  lossRatioAuditSnapshot,
+  type AnalyticsPolicyLike,
+} from './loss-ratio.config';
 
 const d = (s: string) => new Prisma.Decimal(s);
+
+function pol(over: Partial<AnalyticsPolicyLike>): AnalyticsPolicyLike {
+  return {
+    id: 'pol-1',
+    customerId: 'cus-1',
+    customerLegalName: 'Acme Ltd',
+    insuranceLine: 'Property All Risks',
+    policyRef: 'POL-1',
+    premium: d('10000.000'),
+    claimNetSettlements: [],
+    ...over,
+  };
+}
 
 describe('computeLossRatio (Process 29)', () => {
   it('sums the net settlements and divides by the premium (worked example)', () => {
@@ -95,5 +113,134 @@ describe('lossRatioAuditSnapshot', () => {
       ratio: '0.5000',
       ratioCapped: false,
     });
+  });
+});
+
+describe('buildLossRatioBreakdown (Process 30)', () => {
+  const policies: AnalyticsPolicyLike[] = [
+    // Acme — 2 policies, different lines
+    pol({
+      id: 'p-a1',
+      customerId: 'acme',
+      customerLegalName: 'Acme Ltd',
+      policyRef: 'POL-A1',
+      insuranceLine: 'Property All Risks',
+      premium: d('40000.000'),
+      claimNetSettlements: [d('15000.000'), d('5000.000'), null], // 20000 paid
+    }),
+    pol({
+      id: 'p-a2',
+      customerId: 'acme',
+      customerLegalName: 'Acme Ltd',
+      policyRef: 'POL-A2',
+      insuranceLine: 'Motor Fleet',
+      premium: d('10000.000'),
+      claimNetSettlements: [], // no settled claims
+    }),
+    // Beta — 1 property policy, a big loss
+    pol({
+      id: 'p-b1',
+      customerId: 'beta',
+      customerLegalName: 'Beta Co',
+      policyRef: 'POL-B1',
+      insuranceLine: 'Property All Risks',
+      premium: d('20000.000'),
+      claimNetSettlements: [d('30000.000')], // 30000 paid on 20000 premium -> 1.5
+    }),
+  ];
+
+  it('groups by customer: one row per customer, pooled claims / premium, worst-first', () => {
+    const b = buildLossRatioBreakdown({ groupBy: 'customer', policies });
+    expect(b.groupBy).toBe('customer');
+    expect(b.rows.map((r) => r.key)).toEqual(['beta', 'acme']); // 1.5 before 0.4
+    const acme = b.rows.find((r) => r.key === 'acme')!;
+    expect(acme).toMatchObject({
+      label: 'Acme Ltd',
+      periodClaims: '20000.000',
+      periodPremium: '50000.000', // 40000 + 10000
+      ratio: '0.4000',
+      claimCount: 2,
+      policyCount: 2,
+    });
+    const beta = b.rows.find((r) => r.key === 'beta')!;
+    expect(beta).toMatchObject({
+      periodClaims: '30000.000',
+      periodPremium: '20000.000',
+      ratio: '1.5000',
+      claimCount: 1,
+      policyCount: 1,
+    });
+  });
+
+  it('groups by line: pools across customers', () => {
+    const b = buildLossRatioBreakdown({ groupBy: 'line', policies });
+    const property = b.rows.find((r) => r.key === 'Property All Risks')!;
+    expect(property).toMatchObject({
+      label: 'Property All Risks',
+      periodClaims: '50000.000', // 20000 (Acme) + 30000 (Beta)
+      periodPremium: '60000.000', // 40000 + 20000
+      ratio: '0.8333', // 50000 / 60000
+      claimCount: 3,
+      policyCount: 2,
+    });
+    const motor = b.rows.find((r) => r.key === 'Motor Fleet')!;
+    expect(motor).toMatchObject({
+      ratio: '0.0000',
+      claimCount: 0,
+      policyCount: 1,
+    });
+  });
+
+  it('groups by policy: one row per policy', () => {
+    const b = buildLossRatioBreakdown({ groupBy: 'policy', policies });
+    expect(b.rows).toHaveLength(3);
+    expect(b.rows.find((r) => r.key === 'p-a1')).toMatchObject({
+      label: 'POL-A1',
+      ratio: '0.5000', // 20000 / 40000
+    });
+  });
+
+  it('totals pool every policy regardless of groupBy', () => {
+    const byCustomer = buildLossRatioBreakdown({
+      groupBy: 'customer',
+      policies,
+    });
+    const byLine = buildLossRatioBreakdown({ groupBy: 'line', policies });
+    // 50000 claims / 70000 premium -> 0.7143
+    expect(byCustomer.totals).toMatchObject({
+      periodClaims: '50000.000',
+      periodPremium: '70000.000',
+      ratio: '0.7143',
+      claimCount: 3,
+      policyCount: 3,
+    });
+    expect(byLine.totals).toEqual(byCustomer.totals);
+  });
+
+  it('is an empty breakdown (zero totals) when no policies match', () => {
+    const b = buildLossRatioBreakdown({ groupBy: 'customer', policies: [] });
+    expect(b.rows).toEqual([]);
+    expect(b.totals).toMatchObject({
+      periodClaims: '0.000',
+      periodPremium: '0.000',
+      ratio: '0.0000',
+      claimCount: 0,
+      policyCount: 0,
+    });
+  });
+
+  it('propagates the ratio cap into a group row', () => {
+    const b = buildLossRatioBreakdown({
+      groupBy: 'policy',
+      policies: [
+        pol({
+          id: 'p-huge',
+          premium: d('1000.000'),
+          claimNetSettlements: [d('5000000.000')],
+        }),
+      ],
+    });
+    expect(b.rows[0]).toMatchObject({ ratio: '999.9999', ratioCapped: true });
+    expect(b.totals.ratioCapped).toBe(true);
   });
 });

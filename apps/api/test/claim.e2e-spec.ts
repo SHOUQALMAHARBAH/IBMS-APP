@@ -296,7 +296,7 @@ async function issuedPolicy(
   return { policyId, scheduleId };
 }
 
-describe('Claim Notification + Registration + Documentation + Assessment + Follow-up + Settlement + Closure (e2e) — backlog Part C #23-29', () => {
+describe('Claim Notification + Registration + Documentation + Assessment + Follow-up + Settlement + Closure + Analytics (e2e) — backlog Part C #23-30', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -1407,7 +1407,7 @@ describe('Claim Notification + Registration + Documentation + Assessment + Follo
     );
   });
 
-  it('#29 — closes a SETTLED claim once the client payment receipt is confirmed (triggering a Loss Ratio recompute), and a DECLINED claim directly', async () => {
+  it('#29/#30 — closes a SETTLED claim (Loss Ratio recompute) + a DECLINED claim, and the aggregate loss-ratio breakdown reflects the settled claim', async () => {
     const app = await boot();
     const plc = await makeUser(app, 'clm29-plc', 'PLACEMENT_TECHNICAL_OFFICER');
     const clm = await makeUser(app, 'clm29-officer', 'CLAIMS_OFFICER');
@@ -1617,5 +1617,81 @@ describe('Claim Notification + Registration + Documentation + Assessment + Follo
       .expect(201);
     expect((declinedClosed.body as ClaimBody).status).toBe('CLOSED');
     expect((declinedClosed.body as ClaimBody).closedAt).not.toBeNull();
+
+    // --- #30: the aggregate loss-ratio breakdown reflects the settled claim ---
+    interface BreakdownRow {
+      key: string;
+      label: string;
+      periodClaims: string;
+      periodPremium: string;
+      ratio: string;
+      claimCount: number;
+      policyCount: number;
+    }
+    interface Breakdown {
+      groupBy: string;
+      rows: BreakdownRow[];
+      totals: Omit<BreakdownRow, 'key' | 'label'>;
+    }
+    const ratioOf = (claims: string, premium: Prisma.Decimal) =>
+      new Prisma.Decimal(claims)
+        .div(premium)
+        .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP)
+        .toFixed(4);
+
+    // Sales holds no claims-analytics.view
+    await request(app.getHttpServer())
+      .get('/claims-analytics/loss-ratio?groupBy=policy')
+      .set(bearer(sales.accessToken))
+      .expect(403);
+
+    // by policy, scoped to this policy: one row, 15,000 paid net over the
+    // policy premium (the DECLINED-then-CLOSED claim contributes 0)
+    const byPolicy = (
+      await request(app.getHttpServer())
+        .get(`/claims-analytics/loss-ratio?groupBy=policy&policyId=${policyId}`)
+        .set(bearer(clm.accessToken))
+        .expect(200)
+    ).body as Breakdown;
+    expect(byPolicy.rows).toHaveLength(1);
+    expect(byPolicy.rows[0]).toMatchObject({
+      key: policyId,
+      periodClaims: '15000.000',
+      periodPremium: premium.toFixed(3),
+      ratio: ratioOf('15000', premium),
+      claimCount: 1,
+      policyCount: 1,
+    });
+
+    // by customer, scoped to this customer: same figures, one customer row
+    const byCustomer = (
+      await request(app.getHttpServer())
+        .get(
+          `/claims-analytics/loss-ratio?groupBy=customer&customerId=${policyRow.customerId}`,
+        )
+        .set(bearer(clm.accessToken))
+        .expect(200)
+    ).body as Breakdown;
+    expect(byCustomer.rows).toHaveLength(1);
+    expect(byCustomer.rows[0].periodClaims).toBe('15000.000');
+    expect(byCustomer.totals.claimCount).toBe(1);
+
+    // the read was audited (READ / ClaimsAnalytics, no figures in the payload)
+    const analyticsReads = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'ClaimsAnalytics',
+        action: 'READ',
+        userId: clm.userId,
+      },
+    });
+    expect(analyticsReads.length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(analyticsReads)).not.toContain('15000.000');
+    expect(analyticsReads.some((r) => r.isSensitiveDataAccess)).toBe(true);
+
+    // a bad groupBy is a 400
+    await request(app.getHttpServer())
+      .get('/claims-analytics/loss-ratio?groupBy=nonsense')
+      .set(bearer(clm.accessToken))
+      .expect(400);
   });
 });

@@ -11,6 +11,7 @@ import {
   MONEY_SCALE,
   quantizeMoney,
   subtractMoney,
+  sumMoney,
   toMoney,
 } from './money.util';
 
@@ -90,6 +91,23 @@ describe('addMoney', () => {
 
   it('throws with no arguments rather than silently returning zero', () => {
     expect(() => addMoney()).toThrow(/at least one value/);
+  });
+});
+
+describe('sumMoney', () => {
+  it('sums a list (no spread) and quantizes once', () => {
+    expect(
+      sumMoney(['10.1111', '0.0004', new Prisma.Decimal('1.000')]).toString(),
+    ).toBe('11.112');
+  });
+
+  it('is a clean zero for an empty list (a sum over nothing), never a throw', () => {
+    expect(sumMoney([]).toString()).toBe('0');
+  });
+
+  it('handles a list far longer than a safe spread would allow', () => {
+    const many = Array.from({ length: 200_000 }, () => '0.001');
+    expect(sumMoney(many).toString()).toBe('200');
   });
 });
 

@@ -77,8 +77,18 @@ export function addMoney(...values: MoneyInput[]): Prisma.Decimal {
   if (values.length === 0) {
     throw new Error('addMoney: at least one value is required');
   }
+  return sumMoney(values);
+}
+
+/**
+ * Sums a *list* of monetary amounts, quantized once at the end. Unlike
+ * {@link addMoney} this takes an array (no spread), so it is safe on a list
+ * whose length scales with the data — an aggregate/report reducing thousands
+ * of rows. An empty list is `0` (a sum over nothing), never a throw.
+ */
+export function sumMoney(values: readonly MoneyInput[]): Prisma.Decimal {
   const sum = values.reduce<Prisma.Decimal>(
-    (acc, value) => acc.plus(toMoney(value, 'addMoney')),
+    (acc, value) => acc.plus(toMoney(value, 'sumMoney')),
     new Prisma.Decimal(0),
   );
   return quantizeMoney(sum);
