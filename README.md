@@ -409,11 +409,12 @@ build actually is today:
   deployment-target decision.
 - **Part C — Domain A, Processes 1–10 — built and verified** (unit + e2e +
   Playwright/axe green). Per-process detail below.
-- **Part C — Domain B has begun: RFQ / Market Submission (#11) + Market Placement (#12) +
+- **Part C — Domain B is complete: RFQ / Market Submission (#11) + Market Placement (#12) +
   Quotation Management (#13) + Quote Comparison (#14) + Negotiation (#15) + Broker
   Recommendation (#16) + Client Decision Handling (#17) + Policy Placement & Issuance
   (#18–19) + Policy Checking / Quality Control (#20) + Policy Delivery (#21) + Endorsement
-  Management (#22) — built and verified.** A minimal
+  Management (#22) — built and verified. Domain C (Claims) has begun with Claim
+  Notification (#23).** A minimal
   `Opportunity` parent (created from
   a FINALIZED `InsuranceProgram`) plus `RFQ` / `RFQInsurer` — one RFQ per insurance line, an
   insurer shortlist, per-insurer response tracking, a nightly business-day follow-up sweep
@@ -448,7 +449,13 @@ build actually is today:
   calculated, a negative one auto-creates the commission reversal tied 1:1 to it plus a
   maker/checker-gated `Refund` above a configurable value threshold, and applying it opens
   a new `PolicySchedule` version (the prior one closed, never overwritten) — a cancellation
-  also drives the `Policy` to `CANCELLED`. Detail below.
+  also drives the `Policy` to `CANCELLED`. A reported loss is then recorded against a
+  policy as a `Claim` at `NOTIFIED` (loss date / location / cause, the estimated loss,
+  third-party involvement with the third party's contact details field-level encrypted) —
+  validated against the coverage schedule **in force on the exact loss date** (resolved
+  against every `PolicySchedule` version window, i.e. the endorsement history, not the
+  current schedule), and every read of the Highly Confidential claim is audit-logged.
+  Detail below.
 - **Everything else — not started.** Schema models (`packages/db/prisma/schema.prisma`,
   103 models) exist for all of it; there is no application code, no API, and no UI.
 
@@ -482,14 +489,17 @@ build actually is today:
 | 21 | Policy Delivery | **no migration** — the `DeliveryRecord` model (`policyId @unique`, `deliveredAt`, `method`, `recipient`, `receiptAcknowledgedAt`), the `policy.deliver` perm (`[SALES, PLACEMENT]`), and the `VERIFIED → DELIVERED → ACTIVE` map all already existed · new `PolicyDeliveryService` + `PolicyDeliveryRepository` in the `policy` module · `POST /policies/:id/delivery` (`{ method ∈ email \| portal \| courier \| in_person, recipient, deliveredAt? }`, `policy.deliver`) drives `Policy VERIFIED → DELIVERED` through `WorkflowTransitionService.transition` (its status-conditional `updateMany` is the race gate — a concurrent delivery → `409`; an "already in status DELIVERED" engine rejection is **normalised to the same 409** so the loser's status code is deterministic), then creates the one `DeliveryRecord` (`policyId @unique` → `P2002` → `409`) · a **crash-recovery re-entry branch** (status already `DELIVERED`, no `DeliveryRecord`) creates the missing record without re-transitioning · `POST /policies/:id/delivery/acknowledge-receipt` (`{ acknowledgedAt? }`, `policy.deliver`) stamps `DeliveryRecord.receiptAcknowledgedAt` via a status-conditional `updateMany` (double-ack → `409`) and **best-effort** advances `Policy DELIVERED → ACTIVE` (logged, never thrown — the stamp is the authoritative "client confirmed" record, and `ACTIVE` is *not* a safety gate the way `DISCREPANCY` is, so failing to reach it leaves the policy in the *more* restrictive `DELIVERED` state; a resume branch does just the `ACTIVE` advance when the stamp already committed) · `deliveredAt` / `acknowledgedAt` are parsed with `parseHistoricalInstant` (past-only, an explicit offset required on datetimes); `422` if `acknowledgedAt < deliveredAt` · `DeliveryRecord` is **not** a `WorkflowTransitionService` entity (no `status`) · audit `CREATE` / `UPDATE DeliveryRecord` carries `method` / `recipient` / `deliveredAt` (delivery is an accountability record) · `delivery` (+ `deliveryComplete` = `receiptAcknowledgedAt` set) folded into `PolicyView` · **refactor**: `PolicyService.loadVisible` promoted to **public** so `PolicyCheckingService` + `PolicyDeliveryService` share one visibility path — `PolicyCheckingService` drops its own copy + its `CustomerRepository` dependency · web: the "Policy" section gains a Sales/Placement delivery form + an "Acknowledge receipt" button + a read-only display | `DeliveryRecord` has no `status`; the `DELIVERED → ACTIVE` advance is best-effort (fail-safe — a stuck policy sits in the more restrictive `DELIVERED`, self-heals on the next ack call, and `deliveryComplete` is still true); `ACTIVE` here just means "delivered + client-confirmed" — **premium-collection / inception-date gating of `ACTIVE`** is a Finance concern (#31+) not modelled; delivery is single-actor factual recording (no maker/checker — `maker-checker-segregation.md` § "what does NOT trigger this rule"); `deliveredAt` may be backdated before the policy's own issuance date (bounded only by "not in the future", same latitude as #19/#20's historical instants); `policy.deliver` is role-level (no per-officer queue); no reminder / SLA timer for an unacknowledged delivery (Policy Delivery has no row in `pdpl-sla-timers.md`) |
 | 22 | Endorsement Management | **new module** `apps/api/src/modules/endorsement/` (+ `repositories/endorsement.repository.ts`) — `Endorsement` / `Cancellation` / `Refund` / `CommissionReversal` / `PolicySchedule` models + the `Refund_maker_checker_distinct` CHECK (`20260826091424`, `approvedByUserId <> raisedByUserId`) all already existed · **`Endorsement` IS a `WorkflowTransitionService` entity** — `status` moves ONLY through the engine `REQUESTED → SUBMITTED_TO_INSURER → INSURER_CONFIRMED → FINANCIAL_ADJUSTMENT_CALCULATED → (REFUND_APPROVAL_PENDING →) APPLIED → CLIENT_NOTIFIED`; the child `Cancellation` / `Refund` / `CommissionReversal` have **no `status`** (lifecycle = the parent endorsement's), same shape as `PolicyChecking` / `DeliveryRecord` · `POST /policies/:id/endorsements` (`{ type ∈ POSITIVE \| NEGATIVE, changeType, premiumAmount (unsigned), effectiveFrom, targetCoverage? }`, `endorsement.create`/Placement) — Policy must be `ACTIVE` (422); `signedPremiumAdjustment` (pure) signs the fils-quantized amount by `type` (a NEGATIVE endorsement returns premium → negative `premiumAdjustment`) · `POST /policies/:id/cancellation` (`{ reason, basis ∈ short_period \| pro_rata, effectiveFrom }`, `cancellation.create`/Placement) — a NEGATIVE endorsement `changeType: cancellation`; `cancellationReturnPremium` (pure) — `pro_rata` = `issuedPremium × unexpiredDays / totalDays` (via `money.util.ts` `applyPercentage`), `short_period` = **drafted, unsourced** `SHORT_PERIOD_CLIENT_RETURN_PERCENT = '90'`% of the pro-rata figure; the `Endorsement` + its `Cancellation` child created in **one `$transaction`** (local exception) · `POST /endorsements/:id/advance` (`endorsement.create`) walks the two pre-financial hops · `POST /endorsements/:id/calculate-adjustment` (`{ premiumAmount? }` insurer-confirmed override for a non-cancellation, `endorsement.apply`) — for a NEGATIVE endorsement creates the auto-tied `Refund` (maker side) **+** `CommissionReversal` (`|premiumAdjustment| × recommendedQuotation.commissionRatePercent`, `commissionReversalAmount` pure — **never a separate hand calc**, `policy-lifecycle.md`) in **one `$transaction`** (`P2002` → 409), transitions to FINANCIAL_ADJUSTMENT_CALCULATED, then to REFUND_APPROVAL_PENDING iff the refund is `≥` the **drafted, unsourced** `REFUND_APPROVAL_THRESHOLD_JOD = '5000.000'` · `POST /endorsements/:id/apply` (`endorsement.apply`) — FINANCIAL_ADJUSTMENT_CALCULATED → APPLIED; **`applyCore` refuses outright if an at/above-threshold `Refund` is still unapproved — regardless of status** (the maker/checker gate is structural, not just the `REFUND_APPROVAL_PENDING` status, `@code-reviewer` BLOCKER); `PolicyRepository.versionScheduleForEndorsement` closes the open `PolicySchedule` at `effectiveFrom` and opens a **NEW** version (`sourceEndorsementId @unique`, coverage from `targetCoverage` or carried forward) in **one `$transaction`** — the prior version is never overwritten; a **cancellation apply drives `Policy ACTIVE → CANCELLED` and throws a hard 409 if that cannot be applied** (already-`CANCELLED` = success; the endorsement is already APPLIED so a retry of `apply` is re-entrant); 422 while REFUND_APPROVAL_PENDING · `POST /refunds/:id/approve` (`refund.approve`/**Manager or Finance**, already seeded) — **maker/checker** `assertDifferentActors(raisedByUserId, actor)` (403) + the CHECK; status-conditional `recordRefundApproval` (0 rows → 409); on success runs the apply path (→ APPLIED + schedule version) · `POST /endorsements/:id/notify-client` (`endorsement.apply`) — APPLIED → CLIENT_NOTIFIED (+ stamps `Cancellation.clientNotifiedAt`) · `GET /policies/:id/endorsements` + `GET /endorsements/:id` (**new perm `endorsement.read`**/Sales,Placement,Finance,Manager,Exec) · migration `20260902160000` adds `Endorsement.targetCoverage JSONB`, `effectiveFrom` / `submittedToInsurerAt` / `financialAdjustmentCalculatedAt` timestamps, `Endorsement_policyId_idx`; **migration `20260902170000` adds the partial `UNIQUE` `Endorsement_one_live_cancellation_per_policy` (`WHERE changeType='cancellation' AND status<>'CLIENT_NOTIFIED'`, `@code-reviewer` MAJOR — at most one in-flight cancellation per policy)** — no new `Decimal` columns · audit snapshots **metadata not body** (money as fixed strings, `hasReason` boolean, never the `reason` text; a CREATE row per `Endorsement` / `Cancellation` / `Refund` / `CommissionReversal` / `PolicySchedule`) · web: a new "Endorsements" section (`components/policy/EndorsementSection.tsx`) — Placement request/cancellation forms while the Policy is ACTIVE, per-endorsement one-action buttons, Manager "Approve refund" | `SHORT_PERIOD_CLIENT_RETURN_PERCENT` (90%) and `REFUND_APPROVAL_THRESHOLD_JOD` (5,000) are **drafted, unsourced** module constants — no market short-period scale table, no CBJ / Finance approval-matrix source (a real Finance config surface, narrative Process 37/40, does not exist); **filed via `/brain-gap`** (ibms-brain `7b60bbd`), same pattern as #16's drafted 10% / 2 pp bands · `commissionRatePercent` comes from the accepted `Recommendation.recommendedQuotation` — 422 if the quote captured none · the premium-adjustment override at `calculate-adjustment` only applies before FINANCIAL_ADJUSTMENT_CALCULATED and never to a cancellation (a materially different late override is a 422, not a silent no-op) · a below-threshold `Refund` is auto-cleared (`approvalThresholdMatrixLevel = below_threshold_auto`, `approvedByUserId` stays null — no separate approval row) · the parent-`Opportunity` progression is best-effort (the `Endorsement` + its money are authoritative) · `Refund.paidAt` is surfaced but no endpoint stamps it (payment execution is Finance, #37) · a stuck in-flight cancellation permanently blocks re-raising until it is pushed through (no void/withdraw endpoint) · `endorsement.create` / `.apply` / `refund.approve` are role-level (no per-officer queue); no SLA timer on an unapplied endorsement |
 
+### Part C · Domain C #23 — built, with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 23 | Claim Notification | **new module** `apps/api/src/modules/claim/` (+ `repositories/claim.repository.ts`) — **no migration**: the `Claim` / `ClaimStatusHistory` / `ThirdPartyClaimant` models, the `ClaimStatus` enum, the `WORKFLOW_TRANSITIONS.Claim` map (`NOTIFIED → REGISTERED → …`), every `Decimal` money field (already in `MONEY_DECIMAL_FIELDS`), and `ENCRYPTED_FIELDS.ThirdPartyClaimant = ['contactDetailsEnc']` all already existed · **`Claim` IS a `WorkflowTransitionService` entity**, but #23 only does the INITIAL creation at the schema `@default(NOTIFIED)` — NOT via the engine (same precedent as `Policy` at `PLACEMENT_CONFIRMED`, `Opportunity` at `NEEDS_CONFIRMED`); `NOTIFIED → REGISTERED` is Process 24 · **no maker/checker at notification** (recording a reported loss is single-actor Sales/Claims work — the mandatory second approver is at settlement, Process 28) · `POST /claims` (`{ policyId, lossDate, causeOfLoss, lossLocation?, estimatedLoss, isThirdPartyInvolved?, thirdParty?: { fullName?, contactDetails?, subrogationRecoveryFlag? } }`, `claim.notify`/**Sales or Claims** — already seeded) creates the `Claim`, its opening `ClaimStatusHistory` row (`null → NOTIFIED`, `changedByUserId` = the notifier — there is no `Claim.notifiedByUserId` scalar) and, for a third-party loss, the one `ThirdPartyClaimant` (contact details field-level encrypted via `encryptEntityFields`) — all in **one `$transaction`** (local exception) · **coverage in force AT THE LOSS DATE** (`resolveCoverageAtLossDate`, pure & total) resolves against **every `PolicySchedule` version window `[effectiveFrom, effectiveTo)`** — the materialised endorsement history, NOT the current open schedule — so a loss under a policy endorsed *after* the loss resolves to the (now closed) version that actually applied; `Policy.expiryDate` is an independent upper bound (nothing closes the open row at expiry); an unresolvable loss is a hard **422** on notify, but a non-throwing `coverage: null` + `coverageResolvedAtLossDate: false` on a later read (a #22 forward cancellation can strand a validly-notified mid-term loss) · `estimatedLoss` quantized + must be `> 0`; `isLargeClaim` derived from the **drafted, unsourced** `CLAIM_LARGE_THRESHOLD_JOD = '25000.000'` as an advisory NOTIFICATION-TIME SNAPSHOT (`/brain-gap` filed — ibms-brain `67582ee`; Process 28 must re-derive the second-approver gate from live data) · `GET /claims?policyId=\|customerId=` + `/:id` (**new perm `claim.read`**/Sales,Claims,Manager,Exec) — **every read is audit-logged** (`action: READ`, `isSensitiveDataAccess` when a claim is returned — ids/counts only, never `causeOfLoss` / `lossLocation` / the claimant name; mirrors `CrmService.get360View`), list capped at 200 rows · audit snapshots **metadata not body**: `hasLossLocation` bool + the resolved schedule id/window, never the free text; the third-party snapshot is `hasFullName` / `hasContactDetails` bools + `subrogationRecoveryFlag` only · `CLAIMS_OFFICER` added to `policy.read` (seed, additive — a claims officer needs the underlying policy context) + a new shared `CLAIM_CROSS_OWNER_ROLES` (visibility: Claims/Manager/Exec cross-book, Sales own-customer only) · web: a "Claims" block in the "Policy" section on the Opportunity detail screen (Sales/Claims notify form once the policy is issued, read-only claim list with the resolved coverage window) | `Claim` creation takes the schema `@default(NOTIFIED)` without the engine (initial creation) · `CLAIM_LARGE_THRESHOLD_JOD` is a **drafted, unsourced** constant (no CBJ / Part-3.7 / broker authority-matrix figure) and `isLargeClaim` is a snapshot only — the Process 28 second-approver gate must re-derive from the approved amount · `ThirdPartyClaimant.recoveryAmount` is a settlement-phase figure and is **not** accepted at notification; a bare `isThirdPartyInvolved: true` still creates the (all-null) claimant row as the anchor for the subrogation process · no `claimNumber` / `insurerClaimReference` (assigned at #24 registration with the insurer); no `Adjuster` assignment, no `ClaimFollowUpAlert` sweep (#24 / #27); no `ClaimDocument` upload (#25); Loss Ratio / Claims Analytics (#29+) not fed yet · the resolver assumes contiguous schedule versions — a `coverage_gap` reason exists for a hole between versions but that shouldn't occur (each #22 APPLY closes-and-opens contiguously) · `claim.notify` / `claim.read` are role-level (no per-officer queue); no PDPL-registry SLA attaches at `NOTIFIED` (the insurer-non-response follow-up clock is a #24/#27 concern) |
+
 ### Not started
 
-- **Domains B–H** — Insurance Operations (#11 RFQ / Market Submission, #12 Market
-  Placement, #13 Quotation Management, #14 Quote Comparison, #15 Negotiation, #16 Broker
-  Recommendation, #17 Client Decision Handling, #18–19 Policy Placement & Issuance, #20
-  Policy Checking, #21 Policy Delivery, and #22 Endorsement Management are **built** — see
-  the Domain B table above; that completes Domain B), Claims
-  (#23–30), Finance (billing / collection / commission / reconciliation, #31–40), Customer
+- **Domains C–H** — Claims (#24 Claim Registration, #25 Documentation, #26 Assessment, #27
+  Follow-up, #28 Settlement, #29 Loss Ratio / Analytics, #30 closure — #23 Claim
+  Notification is **built**, see the Domain C table above), Finance (billing / collection / commission / reconciliation, #31–40), Customer
   Service (#41–46), Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
   (#58–65), Supporting Operations (HR, procurement, IT, document management, vendor
@@ -2909,6 +2919,135 @@ narrows a gap.
   api + web + db `typecheck` + `eslint` clean. Both migrations applied to `db` + `db-test`;
   `prisma validate` OK, `prisma migrate status` clean (31 migrations); seed re-run (**145**
   permissions — new `endorsement.read`; `refund.approve` grant widened to Finance).
+
+**Part C #23 — Claim Notification (Domain C, Process 23)**
+
+- **New module** `apps/api/src/modules/claim/` — `claim.service.ts` + `claim.config.ts`
+  (pure) + `claim.controller.ts` + `claim.module.ts` + `apps/api/src/repositories/claim.repository.ts`.
+  Opens Domain C. Backlog: record loss date / location / cause + the estimated loss +
+  third-party involvement; validate coverage in force **at the exact loss date** via
+  `PolicySchedule.effectiveFrom/effectiveTo`, not just the current schedule.
+- **No migration.** The `Claim` / `ClaimStatusHistory` / `ThirdPartyClaimant` / `Settlement`
+  / `Adjuster` / `ClaimFollowUpAlert` models, the `ClaimStatus` enum, the
+  `WORKFLOW_TRANSITIONS.Claim` map (`NOTIFIED → REGISTERED → DOCUMENTATION_IN_PROGRESS →
+  UNDER_ASSESSMENT → APPROVED | PARTIALLY_APPROVED | DECLINED → SETTLED → CLOSED`), all four
+  claim `Decimal` money fields (already in `MONEY_DECIMAL_FIELDS`), and
+  `ENCRYPTED_FIELDS.ThirdPartyClaimant = ['contactDetailsEnc']` all pre-existed. The only
+  seed change is one additive permission (`claim.read`) + one additive grant
+  (`CLAIMS_OFFICER` on `policy.read`).
+- **`Claim` IS a `WorkflowTransitionService` entity**, but #23 only does the **initial
+  creation** at the schema `@default(NOTIFIED)` — NOT through the engine (the same
+  initial-creation pattern as `Policy` at `PLACEMENT_CONFIRMED`, `Opportunity` at
+  `NEEDS_CONFIRMED`, `Endorsement` at `REQUESTED`). `NOTIFIED → REGISTERED` is Process 24
+  (out of scope). Nothing here writes `status`.
+- **No maker/checker at notification** — recording a reported loss is single-actor
+  Sales/Claims work per `maker-checker-segregation.md` § "what does NOT trigger this rule".
+  The mandatory second approver is at settlement (Process 28).
+- **`POST /claims`** (`{ policyId, lossDate, causeOfLoss, lossLocation?, estimatedLoss,
+  isThirdPartyInvolved?, thirdParty?: { fullName?, contactDetails?, subrogationRecoveryFlag? } }`,
+  `claim.notify`/**Sales or Claims** — already seeded). `ClaimRepository.createNotification`
+  writes, in **one Prisma `$transaction`** (a documented local exception, like
+  `QuotationRepository.reviseChain` / `PolicyRepository.createIssuanceArtifacts`): the
+  `Claim`; its opening `ClaimStatusHistory` row (`fromStatus: null → NOTIFIED`,
+  `changedByUserId` = the notifier — there is no `Claim.notifiedByUserId` scalar, the
+  history row + the `CREATE` `AuditLogEntry` are the provenance trail); and, for a
+  third-party loss, the one `ThirdPartyClaimant` (`contactDetails` field-level encrypted
+  into `contactDetailsEnc` via `encryptEntityFields(... 'ThirdPartyClaimant' ...)`, the id
+  pre-generated so the `ENCRYPTION_KEY_USED` key-use audit attributes to the real row).
+  `lossDate` via `parseHistoricalInstant` (past-only, offset required on datetimes);
+  `estimatedLoss` `quantizeMoney`'d and must be `> 0`.
+- **Coverage in force AT THE LOSS DATE** — `resolveCoverageAtLossDate` (pure, **total** —
+  never throws) finds the `PolicySchedule` version whose window `[effectiveFrom,
+  effectiveTo)` contains the loss date. The full set of schedule versions **is** the
+  materialised endorsement history (every #22 APPLY closes the open version and opens a new
+  one), so this is "querying against endorsement history" — a loss under a policy endorsed
+  *after* the loss resolves to the (now closed) version that actually applied, **not** the
+  current open schedule (`claims-lifecycle.md` / `data-model.md`). `Policy.expiryDate` is an
+  **independent upper bound** — nothing closes the open schedule row at expiry, so its
+  `effectiveTo` stays `null` and can't be relied on to reject a post-expiry loss. On
+  `POST /claims` an unresolvable loss (`not_issued` / `before_inception` /
+  `after_cover_ended` / `coverage_gap`) is a hard **422** with a reason-specific message;
+  on a later read it is a non-throwing `coverage: null` + `coverageResolvedAtLossDate:
+  false` — a mid-term loss can be validly notified while cover is open and then a #22
+  forward cancellation strands it, and the read must still return the claim.
+- **`isLargeClaim`** — derived at notification from `CLAIM_LARGE_THRESHOLD_JOD = '25000.000'`,
+  a **drafted, unsourced** constant (no CBJ / Part-3.7 / broker authority-matrix figure;
+  `claims-lifecycle.md`'s worked example uses a JOD 20,000 Estimated Loss as a *routine*
+  claim). It is an **advisory notification-time SNAPSHOT** — the `claims-lifecycle.md`
+  large-claim / second-approver gate at Process 28 must **re-derive from live data** (the
+  approved amount) at the settlement decision point, never trust this flag (the #16 review
+  generalisation). **Filed via `/brain-gap`** to `ibms-brain/meta/context/claims-lifecycle.md`
+  (`ibms-brain` `67582ee`, pushed; submodule pin bumped in this commit).
+- **`GET /claims?policyId=|customerId=`** + **`GET /claims/:id`** (**new seeded perm
+  `claim.read`** — `[SALES, CLAIMS_OFFICER, BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`).
+  Visibility: a new shared `CLAIM_CROSS_OWNER_ROLES` (`[CLAIMS_OFFICER, BRANCH_DEPARTMENT_MANAGER,
+  EXECUTIVE_MANAGEMENT]` reach any claim cross-book; a Sales Officer sees only claims on a
+  Customer they own); every miss collapses to one `404`. **`CLAIMS_OFFICER` added to
+  `policy.read`** (seed, additive — a claims officer needs the underlying policy context;
+  same cross-book rationale as `POLICY_CHECKING_OFFICER` at #20).
+- **Every read is audit-logged** (`@code-reviewer` MAJOR) — `Claim` is
+  `@default(HIGHLY_CONFIDENTIAL)` and a read returns `causeOfLoss` / `lossLocation` free
+  text (which may name an injured person or describe a medical event) plus the third-party
+  name. `get` and `list` each emit an `AuditLogEntry` `action: READ`,
+  `isSensitiveDataAccess` true when a claim was actually returned — ids / counts only,
+  never claim content — so the audit anomaly detector (bulk / repeated sensitive reads)
+  sees it. Mirrors `CrmService.get360View`. The list is capped at `CLAIM_LIST_LIMIT = 200`
+  (newest first).
+- **Audit snapshots — metadata not body.** `claimNotificationAuditSnapshot` records
+  `hasLossLocation` (bool) + the resolved coverage schedule id / window, never the
+  `causeOfLoss` / `lossLocation` text; money as a fixed 3dp string.
+  `thirdPartyClaimantAuditSnapshot` records `hasFullName` / `hasContactDetails` bools +
+  `subrogationRecoveryFlag`, never the name or the (encrypted) contact.
+- **`apps/web/app/(app)/opportunities/[id]/`** — a **"Claims"** block in the "Policy"
+  section (`components/policy/ClaimSection.tsx`, mounted below `EndorsementSection`). It
+  fetches the opportunity's policy and, once it is issued, shows a Sales/Claims notify form
+  (loss date / cause / location / estimated loss / third-party toggle → name / contact /
+  subrogation) and a read-only claim list with status, estimated loss, cause, third-party
+  and the resolved coverage window. `canNotify = isSales || isClaims`. No new nav item.
+- **`@code-reviewer` (mandatory — a workflow entity + a validation gate + Highly
+  Confidential data + a financial figure)** → **CHANGES REQUESTED → resolved.** One
+  **MAJOR**: `list` / `get` served Highly Confidential claim content with no access trace —
+  fixed by the sensitive-data `READ` audit above (+ 2 unit tests, + an e2e assertion).
+  MINORs fixed: (1) `CLAIM_LARGE_THRESHOLD_JOD` `/brain-gap` filed + pushed (not just
+  asserted in a comment); (2) `findManyBy*` bounded at `CLAIM_LIST_LIMIT = 200`; (3) a new
+  `coverage_gap` reason so a hole between schedule versions is not mislabelled "cover
+  ended". NITs: `@IsString()` added before `@Matches` on `estimatedLoss`; unused
+  `status` / `inceptionDate` dropped from the `CLAIM_INCLUDE` policy select. NIT left as
+  the reviewer marked it optional: `notify` re-loads the claim to build the response.
+- **Deferred**: `CLAIM_LARGE_THRESHOLD_JOD` is a drafted constant (filed, above) and
+  `isLargeClaim` is a snapshot only — #28 must re-derive. `ThirdPartyClaimant.recoveryAmount`
+  is a settlement-phase figure and is **not** accepted at notification; a bare
+  `isThirdPartyInvolved: true` with no details still creates the (all-null)
+  `ThirdPartyClaimant` row as the anchor for the subrogation/recovery process. No
+  `claimNumber` / `insurerClaimReference` (assigned at #24 registration with the insurer);
+  no `Adjuster` assignment (#24/#26), no `ClaimFollowUpAlert` sweep (#27), no `ClaimDocument`
+  upload (#25); Loss Ratio / Claims Analytics (#29) is not fed yet. The resolver assumes
+  contiguous schedule versions — `coverage_gap` exists for a hole but that shouldn't occur
+  (each #22 APPLY closes-and-opens contiguously). `claim.notify` / `claim.read` are
+  role-level (no per-officer queue); no PDPL-registry SLA attaches at `NOTIFIED`.
+- **Verification**: +33 api unit — `claim.config.spec.ts` (16 — `resolveCoverageAtLossDate`
+  version-in-force / `[from, to)` boundary / `before_inception` / `after_cover_ended` past
+  expiry / cancelled-forward / `coverage_gap` / `not_issued` / null-`expiryDate`;
+  `coverageGapMessage` per reason; `isLargeClaim` boundary + value-not-string compare; both
+  audit snapshots withhold free text), `claim.service.spec.ts` (17 — a stateful `Claim` +
+  `Policy` mock: create at `NOTIFIED` resolving the older version; resolve to the current
+  version for a later loss; large-claim flag; `422` before inception / on-or-after expiry /
+  not-issued / zero estimate / future loss date; third-party encrypts + audits the child +
+  no plaintext leak; `422` `thirdParty` without the flag; no encrypt with no contact;
+  `404` visibility; read after a forward cancellation returns `coverage: null` not an
+  error; scope validation; **`get` / `list` emit the sensitive `READ` audit, sensitive
+  only when a claim was returned**). `test/claim.e2e-spec.ts` (**new** — 4 tests: a pure
+  Claims Officer notifies two losses resolving to the pre- and post-endorsement schedule
+  versions + the opening `ClaimStatusHistory` row + the sensitive `READ` audit rows;
+  `422` for a loss before inception and on/after expiry; a third party whose contact
+  details are encrypted and never reach the response or any audit row + `ENCRYPTION_KEY_USED`
+  logged; `403` without `claim.notify`). Full suites green: **api unit 932** (72 files),
+  api contract 4/4, api e2e (claim 4/4; crm / rbac / policy / endorsement unaffected by the
+  `policy.read` grant + `rbac-visibility.util.ts` change), `npm audit` 0, `nest build` OK,
+  web `typecheck` / `eslint` / `next build` OK, Playwright **rfq.spec.ts 17/17** (+1: notifies
+  a claim against an issued policy) incl. `@a11y`. No migration; `prisma validate` OK,
+  `prisma migrate status` clean (31); seed re-run (**146** permissions — new `claim.read`;
+  `policy.read` grant widened to `CLAIMS_OFFICER`).
 
 ## Deployment
 

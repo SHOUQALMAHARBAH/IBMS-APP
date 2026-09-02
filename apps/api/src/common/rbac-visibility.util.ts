@@ -66,3 +66,16 @@ export const POLICY_CROSS_OWNER_ROLES: RoleName[] = [
   ...CUSTOMER_FILE_CROSS_OWNER_ROLES,
   'POLICY_CHECKING_OFFICER',
 ];
+
+/** Roles that reach any `Claim` regardless of who owns the Customer — the
+ * Claims Officer works the whole claims book (a cross-book operational role,
+ * like the Policy Checking Officer for QC) and Manager/Executive get the
+ * org-wide view (ibms-brain/meta/context/roles-and-segregation-of-duties.md).
+ * A Sales/Relationship Officer holding `claim.notify` / `claim.read` still
+ * sees only claims on a Customer they own. Shared by the claim module (backlog
+ * Part C #23+). */
+export const CLAIM_CROSS_OWNER_ROLES: RoleName[] = [
+  'CLAIMS_OFFICER',
+  'BRANCH_DEPARTMENT_MANAGER',
+  'EXECUTIVE_MANAGEMENT',
+];

@@ -28,6 +28,7 @@ import { RecommendationModule } from './modules/recommendation/recommendation.mo
 import { ClientDecisionModule } from './modules/client-decision/client-decision.module';
 import { PolicyModule } from './modules/policy/policy.module';
 import { EndorsementModule } from './modules/endorsement/endorsement.module';
+import { ClaimModule } from './modules/claim/claim.module';
 
 @Module({
   imports: [
@@ -180,6 +181,15 @@ import { EndorsementModule } from './modules/endorsement/endorsement.module';
     // WorkflowModule for the Endorsement status walk and the best-effort
     // Policy ACTIVE -> CANCELLED move.
     EndorsementModule,
+    // Part C backlog #23 (Claim Notification) — opens Domain C. Records a
+    // reported loss against a Policy (loss date/location/cause, estimated
+    // loss, third-party involvement) at ClaimStatus.NOTIFIED, validating that
+    // cover was in force at the EXACT loss date against the policy's
+    // PolicySchedule version windows (the materialised endorsement history),
+    // not the current schedule alone. Depends on PolicyModule (the parent
+    // Policy + schedule windows) / CustomerModule (visibility) / SecurityModule
+    // (ThirdPartyClaimant.contactDetailsEnc field-level encryption).
+    ClaimModule,
   ],
   controllers: [AppController],
   providers: [AppService],

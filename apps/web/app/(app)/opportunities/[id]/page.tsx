@@ -20,12 +20,14 @@ import { RecommendationSection } from '../../../../components/recommendation/Rec
 import { ClientDecisionSection } from '../../../../components/client-decision/ClientDecisionSection';
 import { PolicySection } from '../../../../components/policy/PolicySection';
 import { EndorsementSection } from '../../../../components/policy/EndorsementSection';
+import { ClaimSection } from '../../../../components/policy/ClaimSection';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
 const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 const POLICY_CHECK_ROLE = 'POLICY_CHECKING_OFFICER';
+const CLAIMS_ROLE = 'CLAIMS_OFFICER';
 
 function statusBreakdown(rfq: Rfq): string {
   if (rfq.insurerSubmissions.length === 0) return 'no insurers yet';
@@ -88,6 +90,7 @@ export default function OpportunityDetailPage() {
   const isCompliance = user.roles.includes(COMPLIANCE_ROLE);
   const isSales = user.roles.includes(SALES_ROLE);
   const isPolicyChecker = user.roles.includes(POLICY_CHECK_ROLE);
+  const isClaims = user.roles.includes(CLAIMS_ROLE);
 
   return (
     <main style={pageStyle}>
@@ -220,6 +223,11 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canManage={isPlacement}
             canApproveRefund={isManager}
+          />
+
+          <ClaimSection
+            opportunityId={opportunity.id}
+            canNotify={isSales || isClaims}
           />
         </>
       ) : null}

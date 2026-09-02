@@ -115,7 +115,12 @@ const insuranceOperations: PermissionSeed[] = [
   { code: 'client-decision.read', module: 'insurance-operations', description: 'List/read the client decision and its routing outcome', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
   { code: 'policy.create', module: 'insurance-operations', description: 'Create a Policy from an accepted Opportunity', roles: [PLACEMENT] },
   { code: 'policy.issue', module: 'insurance-operations', description: 'Record the insurer-issued policy/schedule/certificates/invoice', roles: [PLACEMENT] },
-  { code: 'policy.read', module: 'insurance-operations', description: 'List/read policies, their coverage schedules, electronic-file documents and the quality-control check result', roles: [SALES, PLACEMENT, POLICY_CHECK, MANAGER, EXEC] },
+  // CLAIMS added at Part C #23 (Claim Notification): a Claims Officer works
+  // the claims book across the whole org and needs the underlying policy
+  // context (coverage schedule in force at the loss date, insurer, period) to
+  // notify and work a claim — additive, same cross-book rationale as
+  // POLICY_CHECK for Process 20.
+  { code: 'policy.read', module: 'insurance-operations', description: 'List/read policies, their coverage schedules, electronic-file documents and the quality-control check result', roles: [SALES, PLACEMENT, POLICY_CHECK, CLAIMS, MANAGER, EXEC] },
   { code: 'policy.check', module: 'insurance-operations', description: 'Independently check an issued policy against requested coverage line-by-line (maker/checker: never the officer who placed it) — a discrepancy blocks Delivery and auto-logs a PI risk event', roles: [POLICY_CHECK] },
   { code: 'policy.deliver', module: 'insurance-operations', description: 'Record policy delivery date/method/recipient/acknowledgement', roles: [SALES, PLACEMENT] },
   { code: 'endorsement.create', module: 'insurance-operations', description: 'Request a positive/negative endorsement', roles: [PLACEMENT] },
@@ -143,6 +148,7 @@ const insuranceOperations: PermissionSeed[] = [
 // ----------------------------------------------------------------------
 const claims: PermissionSeed[] = [
   { code: 'claim.notify', module: 'claims', description: 'Record a claim notification (loss date/location/cause/estimate)', roles: [SALES, CLAIMS] },
+  { code: 'claim.read', module: 'claims', description: 'List/read claims, their status-history trail and the coverage schedule in force at the loss date', roles: [SALES, CLAIMS, MANAGER, EXEC] },
   { code: 'claim.register', module: 'claims', description: 'Register a claim with the insurer and assign the adjuster', roles: [CLAIMS] },
   { code: 'claim.document', module: 'claims', description: 'Attach mandatory claim documentation', roles: [CLAIMS] },
   { code: 'claim.assess', module: 'claims', description: 'Track claim survey/investigation and log status changes', roles: [CLAIMS] },

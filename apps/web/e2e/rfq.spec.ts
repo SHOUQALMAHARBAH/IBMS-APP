@@ -161,6 +161,13 @@ async function mockRfqApi(
       changeType: string;
       premiumAmount: string;
     }) => void;
+    onNotifyClaim?: (body: {
+      policyId: string;
+      lossDate: string;
+      causeOfLoss: string;
+      estimatedLoss: string;
+      isThirdPartyInvolved?: boolean;
+    }) => void;
     /** pre-seed an already-ISSUED policy (a checker opening one they did not place) */
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
@@ -766,6 +773,72 @@ async function mockRfqApi(
     return route.fulfill({ status: 200, json: policy ? [policy] : [] });
   });
 
+  // Process 23 — claims against the policy. Starts empty; a POST /claims
+  // appends a NOTIFIED row that resolves to the seeded coverage schedule.
+  const claimRows: Record<string, unknown>[] = [];
+  await page.route("http://localhost:4000/claims**", (route) => {
+    const method = route.request().method();
+    if (method === "POST") {
+      const b = route.request().postDataJSON() as {
+        policyId: string;
+        lossDate: string;
+        causeOfLoss: string;
+        lossLocation?: string;
+        estimatedLoss: string;
+        isThirdPartyInvolved?: boolean;
+        thirdParty?: {
+          fullName?: string;
+          subrogationRecoveryFlag?: boolean;
+        };
+      };
+      opts.onNotifyClaim?.(b);
+      const row = {
+        id: `claim-${claimRows.length + 1}`,
+        policyId: b.policyId,
+        customerId: "cust-1",
+        policyNumber: "POL-SEED-1",
+        insuranceLine: "Property All Risks",
+        claimNumber: null,
+        status: "NOTIFIED",
+        lossDate: `${b.lossDate}T00:00:00.000Z`,
+        lossLocation: b.lossLocation ?? null,
+        causeOfLoss: b.causeOfLoss,
+        estimatedLoss: b.estimatedLoss,
+        isThirdPartyInvolved: Boolean(b.isThirdPartyInvolved),
+        isLargeClaim: Number(b.estimatedLoss) >= 25000,
+        classification: "HIGHLY_CONFIDENTIAL",
+        followUpAlertThresholdDays: 9,
+        thirdParty: b.isThirdPartyInvolved
+          ? {
+              fullName: b.thirdParty?.fullName ?? null,
+              subrogationRecoveryFlag: Boolean(
+                b.thirdParty?.subrogationRecoveryFlag,
+              ),
+            }
+          : null,
+        coverage: {
+          scheduleId: "sch-1",
+          effectiveFrom: "2026-10-01T00:00:00.000Z",
+          effectiveTo: null,
+        },
+        coverageResolvedAtLossDate: true,
+        statusHistory: [
+          {
+            fromStatus: null,
+            toStatus: "NOTIFIED",
+            changedByUserId: "user-1",
+            changedAt: `${b.lossDate}T00:00:00.000Z`,
+          },
+        ],
+        createdAt: "2026-11-01T00:00:00.000Z",
+        updatedAt: "2026-11-01T00:00:00.000Z",
+      };
+      claimRows.push(row);
+      return route.fulfill({ status: 201, json: row });
+    }
+    return route.fulfill({ status: 200, json: claimRows });
+  });
+
   // One route for the whole /rfqs prefix — the last-registered route wins in
   // Playwright, so a separate /rfqs/selectable-insurers route would be
   // shadowed by this one. Branch internally instead.
@@ -1238,6 +1311,43 @@ test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Advance to insurer" }),
+  ).toBeVisible();
+});
+
+test("notifies a claim against an issued policy", async ({ page }) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  let notified: {
+    lossDate: string;
+    causeOfLoss: string;
+    estimatedLoss: string;
+    isThirdPartyInvolved?: boolean;
+  } | null = null;
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+    onNotifyClaim: (b) => {
+      notified = b;
+    },
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims", exact: true }),
+  ).toBeVisible();
+
+  await page.getByLabel("Loss date").fill("2026-11-15");
+  await page
+    .getByLabel("Cause of loss")
+    .fill("Storm damage to the warehouse roof.");
+  await page.getByLabel("Estimated loss").fill("30000.000");
+  await page.getByRole("button", { name: "Notify claim" }).click();
+
+  await expect.poll(() => notified?.estimatedLoss).toBe("30000.000");
+  await expect.poll(() => notified?.causeOfLoss).toContain("warehouse roof");
+  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("large claim", { exact: false })).toBeVisible();
+  await expect(
+    page.getByText("coverage version in force", { exact: false }),
   ).toBeVisible();
 });
 
