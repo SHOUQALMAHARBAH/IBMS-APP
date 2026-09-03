@@ -4,6 +4,8 @@ import { InvoiceService } from './invoice.service';
 import { CollectionService } from './collection.service';
 import { ClientAccountingController } from './client-accounting.controller';
 import { ClientAccountingService } from './client-accounting.service';
+import { InsurerAccountingController } from './insurer-accounting.controller';
+import { InsurerAccountingService } from './insurer-accounting.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
@@ -33,18 +35,25 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
  * import needed).
  *
  * `ClientAccountingService` (#33) serves the accounts-receivable / ageing
- * report (`GET /client-accounting/ageing`, `client-accounting.read`) —
- * computed on the fly from the `Invoice` / `Receipt` rows, no stored
- * aggregate, not audit-logged (invoice totals are Confidential, the #31
- * decision).
+ * report (`GET /client-accounting/ageing`, `client-accounting.read`);
+ * `InsurerAccountingService` (#34) serves the accounts-payable /
+ * remittance-obligations report (`GET /insurer-accounting/payables`,
+ * `insurer-accounting.read`) — both computed on the fly from the `Invoice` /
+ * `Receipt` / `Remittance` rows, no stored aggregate, not audit-logged
+ * (invoice / remittance amounts are Confidential, the #31 decision).
  */
 @Module({
   imports: [AuditModule, PolicyModule, RecommendationModule],
-  controllers: [InvoiceController, ClientAccountingController],
+  controllers: [
+    InvoiceController,
+    ClientAccountingController,
+    InsurerAccountingController,
+  ],
   providers: [
     InvoiceService,
     CollectionService,
     ClientAccountingService,
+    InsurerAccountingService,
     InvoiceRepository,
   ],
   exports: [InvoiceRepository],

@@ -93,6 +93,29 @@ interface AgeingReport {
   };
 }
 
+interface InsurerPayableRow {
+  insurerId: string;
+  insurerName: string;
+  outstandingAmount: string;
+  outstandingCount: number;
+  oldestCollectedAt: string | null;
+  oldestDaysOutstanding: number;
+  remittedAmount: string;
+  remittedCount: number;
+}
+interface InsurerPayablesReport {
+  asOf: string;
+  currency: string;
+  rows: InsurerPayableRow[];
+  totals: {
+    outstandingAmount: string;
+    outstandingCount: number;
+    remittedAmount: string;
+    remittedCount: number;
+    insurerCount: number;
+  };
+}
+
 const ISSUED_SCHEDULE = {
   limits: { buildings: '5000000.000', contents: '1200000.000' },
   sumsInsured: { total: '6200000.000' },
@@ -688,5 +711,140 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .set(bearer(fin.accessToken))
       .expect(200);
     expect((unknown.body as AgeingReport).rows).toHaveLength(0);
+  });
+
+  it('serves the insurer accounts-payable report — owed once collected & unremitted, moved to remitted once paid (Part C #34)', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv5-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv5-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv5-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const { policyId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'payables',
+    );
+    const policy = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { insurerId: true },
+    });
+    const insurerId = policy.insurerId;
+
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+
+    // a non-finance actor cannot read the report
+    await request(app.getHttpServer())
+      .get('/insurer-accounting/payables')
+      .set(bearer(plc.accessToken))
+      .expect(403);
+    // a future asOf is a 422
+    await request(app.getHttpServer())
+      .get(`/insurer-accounting/payables?asOf=${isoDaysAhead(2)}`)
+      .set(bearer(fin.accessToken))
+      .expect(422);
+
+    // nothing collected yet -> the insurer is not in the report
+    const dry = await request(app.getHttpServer())
+      .get(`/insurer-accounting/payables?insurerId=${insurerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((dry.body as InsurerPayablesReport).rows).toHaveLength(0);
+
+    // collect the client's premium (-> COLLECTED) but do not remit yet
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .expect(201);
+
+    const owed = await request(app.getHttpServer())
+      .get(`/insurer-accounting/payables?insurerId=${insurerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const owedBody = owed.body as InsurerPayablesReport;
+    expect(owedBody.currency).toBe('JOD');
+    expect(owedBody.rows).toHaveLength(1);
+    expect(owedBody.rows[0]).toMatchObject({
+      insurerId,
+      outstandingAmount: '105600.000', // 120000 premium - 14400 commission
+      outstandingCount: 1,
+      remittedAmount: '0.000',
+      remittedCount: 0,
+    });
+    expect(owedBody.rows[0]?.oldestDaysOutstanding).toBeGreaterThanOrEqual(0);
+    expect(owedBody.rows[0]?.oldestDaysOutstanding).toBeLessThanOrEqual(1);
+    expect(owedBody.totals).toMatchObject({
+      outstandingAmount: '105600.000',
+      outstandingCount: 1,
+      remittedAmount: '0.000',
+      remittedCount: 0,
+      insurerCount: 1,
+    });
+
+    // as at a date before the receipt: nothing was collected -> not in the report
+    const past = await request(app.getHttpServer())
+      .get(
+        `/insurer-accounting/payables?insurerId=${insurerId}&asOf=2020-01-01`,
+      )
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((past.body as InsurerPayablesReport).rows).toHaveLength(0);
+
+    // reconcile + remit -> the obligation moves from outstanding to remitted
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/reconcile`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({})
+      .expect(201);
+
+    const remitted = await request(app.getHttpServer())
+      .get(`/insurer-accounting/payables?insurerId=${insurerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const remittedBody = remitted.body as InsurerPayablesReport;
+    expect(remittedBody.rows[0]).toMatchObject({
+      insurerId,
+      outstandingAmount: '0.000',
+      outstandingCount: 0,
+      oldestCollectedAt: null,
+      oldestDaysOutstanding: -1,
+      remittedAmount: '105600.000',
+      remittedCount: 1,
+    });
+    expect(remittedBody.totals).toMatchObject({
+      outstandingAmount: '0.000',
+      remittedAmount: '105600.000',
+      remittedCount: 1,
+      insurerCount: 1,
+    });
+
+    // an unknown insurer scope is simply empty
+    const unknownIns = await request(app.getHttpServer())
+      .get(
+        '/insurer-accounting/payables?insurerId=00000000-0000-4000-8000-000000000000',
+      )
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((unknownIns.body as InsurerPayablesReport).rows).toHaveLength(0);
   });
 });

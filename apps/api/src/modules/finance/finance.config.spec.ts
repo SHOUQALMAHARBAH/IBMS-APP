@@ -2,6 +2,7 @@ import { Prisma } from '@ibms/db';
 import { describe, expect, it } from 'vitest';
 import {
   ageingBucketFor,
+  buildInsurerPayables,
   buildReceivablesAgeing,
   computeInvoiceFigures,
   computeRemittanceAmount,
@@ -10,6 +11,8 @@ import {
   invoiceAuditSnapshot,
   invoiceFiguresMatch,
   NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
+  type InsurerObligationRow,
+  type InsurerRemittanceRow,
   type InvoiceRow,
   type OutstandingInvoiceRow,
 } from './finance.config';
@@ -378,6 +381,182 @@ describe('buildReceivablesAgeing (Process 33)', () => {
     const report = buildReceivablesAgeing({
       asOf: new Date('2026-09-03T14:22:00.000Z'),
       invoices: [],
+    });
+    expect(report.asOf).toBe('2026-09-03T00:00:00.000Z');
+  });
+});
+
+describe('buildInsurerPayables (Process 34)', () => {
+  const asOf = new Date('2026-09-03T00:00:00.000Z');
+  const DAY = 24 * 60 * 60 * 1000;
+  const collected = (offsetDays: number) =>
+    new Date(Date.UTC(2026, 8, 3) + offsetDays * DAY);
+
+  const obl = (
+    over: Partial<InsurerObligationRow> &
+      Pick<
+        InsurerObligationRow,
+        | 'invoiceId'
+        | 'insurerId'
+        | 'premiumAmount'
+        | 'commissionDeducted'
+        | 'collectedAt'
+      >,
+  ): InsurerObligationRow => ({
+    insurerName: `Insurer ${over.insurerId}`,
+    ...over,
+  });
+
+  const rem = (
+    over: Partial<InsurerRemittanceRow> &
+      Pick<
+        InsurerRemittanceRow,
+        'remittanceId' | 'insurerId' | 'amount' | 'remittedAt'
+      >,
+  ): InsurerRemittanceRow => ({
+    insurerName: `Insurer ${over.insurerId}`,
+    ...over,
+  });
+
+  it('groups by insurer, derives the net owed (premium - commission), and pools both sides', () => {
+    const report = buildInsurerPayables({
+      asOf,
+      obligations: [
+        obl({
+          invoiceId: 'a1',
+          insurerId: 'A',
+          premiumAmount: '100000.000',
+          commissionDeducted: '12000.000',
+          collectedAt: collected(-40),
+        }),
+        obl({
+          invoiceId: 'a2',
+          insurerId: 'A',
+          premiumAmount: '50000.000',
+          commissionDeducted: '6000.000',
+          collectedAt: collected(-5),
+        }),
+      ],
+      remittances: [
+        rem({
+          remittanceId: 'ra',
+          insurerId: 'A',
+          amount: '30000.000',
+          remittedAt: collected(-30),
+        }),
+        rem({
+          remittanceId: 'rb',
+          insurerId: 'B',
+          amount: '10000.000',
+          remittedAt: collected(-2),
+        }),
+      ],
+    });
+
+    expect(report.asOf).toBe('2026-09-03T00:00:00.000Z');
+    expect(report.currency).toBe('JOD');
+    // worst-first: A has a 40-day-old obligation, B has none outstanding
+    expect(report.rows.map((r) => r.insurerId)).toEqual(['A', 'B']);
+
+    expect(report.rows[0]).toMatchObject({
+      insurerId: 'A',
+      outstandingAmount: '132000.000', // 88000 + 44000
+      outstandingCount: 2,
+      oldestCollectedAt: collected(-40).toISOString(),
+      oldestDaysOutstanding: 40,
+      remittedAmount: '30000.000',
+      remittedCount: 1,
+    });
+    expect(report.rows[1]).toMatchObject({
+      insurerId: 'B',
+      outstandingAmount: '0.000',
+      outstandingCount: 0,
+      oldestCollectedAt: null,
+      oldestDaysOutstanding: -1,
+      remittedAmount: '10000.000',
+      remittedCount: 1,
+    });
+
+    expect(report.totals).toEqual({
+      outstandingAmount: '132000.000',
+      outstandingCount: 2,
+      remittedAmount: '40000.000',
+      remittedCount: 2,
+      insurerCount: 2,
+    });
+  });
+
+  it('computes the net owed through money.util (quantized), never re-typed', () => {
+    const report = buildInsurerPayables({
+      asOf,
+      obligations: [
+        obl({
+          invoiceId: 'x',
+          insurerId: 'X',
+          premiumAmount: '1000.000',
+          commissionDeducted: '125.5',
+          collectedAt: collected(-1),
+        }),
+      ],
+      remittances: [],
+    });
+    expect(report.rows[0]?.outstandingAmount).toBe('874.500'); // 1000 - 125.5
+  });
+
+  it('breaks an equal-age tie by amount owed, then by insurer name', () => {
+    const report = buildInsurerPayables({
+      asOf,
+      obligations: [
+        // Z: same age + same amount as X -> falls through to the name tie-break
+        obl({
+          invoiceId: 'z',
+          insurerId: 'Z',
+          premiumAmount: '1000.000',
+          commissionDeducted: '0.000',
+          collectedAt: collected(-10),
+        }),
+        obl({
+          invoiceId: 'x',
+          insurerId: 'X',
+          premiumAmount: '1000.000',
+          commissionDeducted: '0.000',
+          collectedAt: collected(-10),
+        }),
+        obl({
+          invoiceId: 'd',
+          insurerId: 'D',
+          premiumAmount: '3000.000',
+          commissionDeducted: '0.000',
+          collectedAt: collected(-10),
+        }),
+      ],
+      remittances: [],
+    });
+    // D first (larger amount), then X before Z (equal age + amount -> name asc)
+    expect(report.rows.map((r) => r.insurerId)).toEqual(['D', 'X', 'Z']);
+  });
+
+  it('is empty (zeroed totals) when nothing is owed or remitted', () => {
+    const report = buildInsurerPayables({
+      asOf,
+      obligations: [],
+      remittances: [],
+    });
+    expect(report.rows).toEqual([]);
+    expect(report.totals).toEqual({
+      outstandingAmount: '0.000',
+      outstandingCount: 0,
+      remittedAmount: '0.000',
+      remittedCount: 0,
+      insurerCount: 0,
+    });
+  });
+
+  it('normalises the asOf output to UTC midnight', () => {
+    const report = buildInsurerPayables({
+      asOf: new Date('2026-09-03T14:22:00.000Z'),
+      obligations: [],
+      remittances: [],
     });
     expect(report.asOf).toBe('2026-09-03T00:00:00.000Z');
   });

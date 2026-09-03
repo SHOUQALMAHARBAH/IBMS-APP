@@ -592,3 +592,199 @@ export function buildReceivablesAgeing(input: {
     },
   };
 }
+
+// --- Process 34: insurer accounts-payable / remittance obligations ---------
+
+/**
+ * Process 34 — Insurer Accounting. The pure core of the accounts-payable /
+ * remittance-obligations report: what the broker owes each insurer.
+ *
+ * The obligation arises the moment the client's premium is collected (#32's
+ * `Receipt`) and is discharged by the `Remittance` (#32's
+ * `RECONCILED → REMITTED` hop). So an **outstanding** obligation is a
+ * collected-but-not-yet-remitted invoice — the broker is holding the client's
+ * money that belongs to the insurer (Part 7.3). The amount owed per invoice is
+ * `premiumAmount − commissionDeducted` — exactly #32's `computeRemittanceAmount`
+ * / the eventual `Remittance.amount` (tax + fees stay with the broker). The
+ * **remitted** side is straight from the `Remittance` rows. All money through
+ * `money.util.ts`.
+ *
+ * `ibms-brain/meta/context/finance-lifecycle.md` § "Insurer Accounting
+ * (Process 34)".
+ */
+
+/** Cap on how many collected-but-unremitted invoices / `Remittance` rows one
+ * payables report materialises + groups in memory. A broker's open remittance
+ * pipeline fits comfortably; `InsurerAccountingService` `logger.warn`s on
+ * truncation (the #30 `ANALYTICS_POLICY_LIMIT` / #33 `AR_AGEING_INVOICE_LIMIT`
+ * precedent). */
+export const INSURER_PAYABLES_ROW_LIMIT = 5000;
+
+/** One collected-but-unremitted invoice — the net premium the broker is
+ * holding for an insurer, and when the client paid (the AP clock start).
+ * Matches `InvoiceRepository.loadInsurerObligations`'s row. */
+export interface InsurerObligationRow {
+  invoiceId: string;
+  insurerId: string;
+  insurerName: string;
+  /** carried from the policy's premium / commission — the net owed is derived
+   * here (`premiumAmount − commissionDeducted`), never re-typed. */
+  premiumAmount: Prisma.Decimal | string;
+  commissionDeducted: Prisma.Decimal | string;
+  /** `Receipt.receivedAt` — when the broker received the client's money and the
+   * obligation to the insurer arose. */
+  collectedAt: Date;
+}
+
+/** One `Remittance` already paid to an insurer (as at the report's `asOf`).
+ * Matches `InvoiceRepository.loadInsurerRemittances`'s row. */
+export interface InsurerRemittanceRow {
+  remittanceId: string;
+  insurerId: string;
+  insurerName: string;
+  amount: Prisma.Decimal | string;
+  remittedAt: Date;
+}
+
+export interface InsurerPayableRow {
+  insurerId: string;
+  insurerName: string;
+  /** Σ (`premiumAmount − commissionDeducted`) over this insurer's
+   * collected-but-unremitted invoices — what the broker currently owes it. */
+  outstandingAmount: string;
+  outstandingCount: number;
+  /** Earliest client-payment date among the unremitted obligations (ISO), or
+   * null when the insurer has none outstanding (remitted-only row). */
+  oldestCollectedAt: string | null;
+  /** Whole days since `oldestCollectedAt` — the worst-first sort key
+   * (`>= 0`; `-1` when nothing is outstanding). */
+  oldestDaysOutstanding: number;
+  /** Σ `Remittance.amount` already paid to this insurer as at `asOf`. */
+  remittedAmount: string;
+  remittedCount: number;
+}
+
+export interface InsurerPayablesTotals {
+  outstandingAmount: string;
+  outstandingCount: number;
+  remittedAmount: string;
+  remittedCount: number;
+  insurerCount: number;
+}
+
+export interface InsurerPayablesReport {
+  /** The reference date, UTC midnight, ISO (default: today). */
+  asOf: string;
+  /** SINGLE-CURRENCY: `'JOD'`. `Remittance` has no currency column and every
+   * `Invoice.currency` is JOD (`money.util.ts` is fils-precision JOD); same
+   * assumption as #33's `buildReceivablesAgeing` and #30's
+   * `buildLossRatioBreakdown`. */
+  currency: string;
+  /** One row per insurer with an outstanding and/or remitted balance,
+   * worst-first (largest days-outstanding, then largest amount owed). */
+  rows: InsurerPayableRow[];
+  totals: InsurerPayablesTotals;
+}
+
+interface InsurerPayableAcc {
+  insurerName: string;
+  outstanding: Prisma.Decimal[];
+  outstandingCount: number;
+  oldestCollectedMs: number | null;
+  oldestDaysOutstanding: number;
+  remitted: Prisma.Decimal[];
+  remittedCount: number;
+}
+
+/**
+ * Process 34 — the accounts-payable / remittance-obligations report, grouped by
+ * insurer. `outstandingAmount` pools each collected-but-unremitted invoice's
+ * `premiumAmount − commissionDeducted` (`computeRemittanceAmount`);
+ * `remittedAmount` pools the `Remittance.amount`s already paid. Both through
+ * `sumMoney` — never an averaged or re-derived figure. Rows worst-first:
+ * largest days-outstanding, then largest amount owed, then insurer name (fixed
+ * `en` locale). Pure.
+ */
+export function buildInsurerPayables(input: {
+  asOf: Date;
+  obligations: InsurerObligationRow[];
+  remittances: InsurerRemittanceRow[];
+}): InsurerPayablesReport {
+  const byInsurer = new Map<string, InsurerPayableAcc>();
+
+  const accFor = (id: string, name: string): InsurerPayableAcc => {
+    let acc = byInsurer.get(id);
+    if (!acc) {
+      acc = {
+        insurerName: name,
+        outstanding: [],
+        outstandingCount: 0,
+        oldestCollectedMs: null,
+        oldestDaysOutstanding: -1,
+        remitted: [],
+        remittedCount: 0,
+      };
+      byInsurer.set(id, acc);
+    }
+    return acc;
+  };
+
+  for (const o of input.obligations) {
+    const acc = accFor(o.insurerId, o.insurerName);
+    acc.outstanding.push(
+      computeRemittanceAmount(o.premiumAmount, o.commissionDeducted),
+    );
+    acc.outstandingCount += 1;
+    const days = daysOverdue(o.collectedAt, input.asOf);
+    acc.oldestCollectedMs =
+      acc.oldestCollectedMs === null
+        ? o.collectedAt.getTime()
+        : Math.min(acc.oldestCollectedMs, o.collectedAt.getTime());
+    acc.oldestDaysOutstanding = Math.max(acc.oldestDaysOutstanding, days);
+  }
+
+  for (const r of input.remittances) {
+    const acc = accFor(r.insurerId, r.insurerName);
+    acc.remitted.push(quantizeMoney(r.amount));
+    acc.remittedCount += 1;
+  }
+
+  const rows: InsurerPayableRow[] = [...byInsurer.entries()]
+    .map(([insurerId, acc]) => ({
+      insurerId,
+      insurerName: acc.insurerName,
+      outstandingAmount: formatMoney(sumMoney(acc.outstanding)),
+      outstandingCount: acc.outstandingCount,
+      oldestCollectedAt:
+        acc.oldestCollectedMs === null
+          ? null
+          : new Date(acc.oldestCollectedMs).toISOString(),
+      oldestDaysOutstanding: acc.oldestDaysOutstanding,
+      remittedAmount: formatMoney(sumMoney(acc.remitted)),
+      remittedCount: acc.remittedCount,
+    }))
+    .sort(
+      (a, b) =>
+        b.oldestDaysOutstanding - a.oldestDaysOutstanding ||
+        compareMoney(b.outstandingAmount, a.outstandingAmount) ||
+        a.insurerName.localeCompare(b.insurerName, 'en'),
+    );
+
+  const allOutstanding = input.obligations.map((o) =>
+    computeRemittanceAmount(o.premiumAmount, o.commissionDeducted),
+  );
+  const allRemitted = input.remittances.map((r) => quantizeMoney(r.amount));
+
+  return {
+    asOf: new Date(utcMidnightMs(input.asOf)).toISOString(),
+    currency: 'JOD',
+    rows,
+    totals: {
+      outstandingAmount: formatMoney(sumMoney(allOutstanding)),
+      outstandingCount: allOutstanding.length,
+      remittedAmount: formatMoney(sumMoney(allRemitted)),
+      remittedCount: allRemitted.length,
+      insurerCount: byInsurer.size,
+    },
+  };
+}

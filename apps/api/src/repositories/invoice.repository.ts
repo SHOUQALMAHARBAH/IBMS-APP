@@ -9,7 +9,10 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AR_AGEING_INVOICE_LIMIT,
+  INSURER_PAYABLES_ROW_LIMIT,
   NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
+  type InsurerObligationRow,
+  type InsurerRemittanceRow,
   type OutstandingInvoiceRow,
 } from '../modules/finance/finance.config';
 
@@ -141,6 +144,105 @@ export class InvoiceRepository {
       totalAmount: r.totalAmount,
       currency: r.currency,
       dueDate: r.dueDate,
+    }));
+  }
+
+  /**
+   * Process 34 — every collected-but-unremitted invoice as at
+   * `asOfExclusiveUpper` (UTC midnight of the day AFTER the report's reference
+   * date): the client's premium was received by then
+   * (`receipts.some.receivedAt <` it) and no `Remittance` had discharged it by
+   * then (`receipts.none.remittance.remittedAt <` it — so an invoice remitted
+   * AFTER the reference date is still an obligation as at that date). The
+   * `Receipt` / `Remittance` cycle is 1:1:1 (`Receipt.invoiceId @unique`,
+   * `Remittance.receiptId @unique`), so `some` / `none` here each concern the
+   * single receipt. Non-policy invoices are skipped (`policyId != null` — no
+   * insurer to owe). Book-wide (`insurer-accounting.read` is a cross-book
+   * reporting permission), optionally narrowed to one insurer. Capped at
+   * {@link INSURER_PAYABLES_ROW_LIMIT}.
+   */
+  async loadInsurerObligations(scope: {
+    insurerId?: string;
+    asOfExclusiveUpper: Date;
+  }): Promise<InsurerObligationRow[]> {
+    const rows = await this.prisma.client.invoice.findMany({
+      where: {
+        policyId: { not: null },
+        receipts: {
+          some: { receivedAt: { lt: scope.asOfExclusiveUpper } },
+          none: {
+            remittance: { remittedAt: { lt: scope.asOfExclusiveUpper } },
+          },
+        },
+        ...(scope.insurerId
+          ? { policy: { is: { insurerId: scope.insurerId } } }
+          : {}),
+      },
+      select: {
+        id: true,
+        premiumAmount: true,
+        commissionDeducted: true,
+        policy: {
+          select: { insurerId: true, insurer: { select: { name: true } } },
+        },
+        receipts: {
+          select: { receivedAt: true },
+          orderBy: { receivedAt: 'asc' },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: INSURER_PAYABLES_ROW_LIMIT,
+    });
+    return rows.flatMap((r) => {
+      // `policyId != null` in the where means `policy` is always present; guard
+      // for the type and skip an impossible orphan rather than throw.
+      if (!r.policy || r.receipts.length === 0) return [];
+      return [
+        {
+          invoiceId: r.id,
+          insurerId: r.policy.insurerId,
+          insurerName: r.policy.insurer.name,
+          premiumAmount: r.premiumAmount,
+          commissionDeducted: r.commissionDeducted,
+          collectedAt: r.receipts[0].receivedAt,
+        },
+      ];
+    });
+  }
+
+  /**
+   * Process 34 — every `Remittance` actually paid to an insurer as at
+   * `asOfExclusiveUpper` (`remittedAt <` it; the `{ lt }` excludes the
+   * still-null ones). Book-wide, optionally narrowed to one insurer. Capped at
+   * {@link INSURER_PAYABLES_ROW_LIMIT}.
+   */
+  async loadInsurerRemittances(scope: {
+    insurerId?: string;
+    asOfExclusiveUpper: Date;
+  }): Promise<InsurerRemittanceRow[]> {
+    const rows = await this.prisma.client.remittance.findMany({
+      where: {
+        remittedAt: { lt: scope.asOfExclusiveUpper },
+        ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
+      },
+      select: {
+        id: true,
+        insurerId: true,
+        amount: true,
+        remittedAt: true,
+        insurer: { select: { name: true } },
+      },
+      orderBy: { remittedAt: 'asc' },
+      take: INSURER_PAYABLES_ROW_LIMIT,
+    });
+    return rows.map((r) => ({
+      remittanceId: r.id,
+      insurerId: r.insurerId,
+      insurerName: r.insurer.name,
+      amount: r.amount,
+      // the `remittedAt: { lt: ... }` filter guarantees non-null
+      remittedAt: r.remittedAt as Date,
     }));
   }
 
