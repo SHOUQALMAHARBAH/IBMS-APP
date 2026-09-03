@@ -41,7 +41,8 @@ export const NEW_BUSINESS_PREMIUM_INVOICE_TYPE = 'new_business_premium';
  * maximum credit period. */
 export const INVOICE_MAX_DUE_DAYS_AHEAD = 365;
 
-/** How a collection `Receipt` was received (`Receipt.method`). */
+/** How a collection `Receipt` was received (`Receipt.method`). Also the
+ * `PaymentChannel.channelType` domain (Process 38). */
 export const RECEIPT_METHODS = [
   'bank_transfer',
   'cheque',
@@ -49,6 +50,101 @@ export const RECEIPT_METHODS = [
   'cash',
 ] as const;
 export type ReceiptMethod = (typeof RECEIPT_METHODS)[number];
+
+// --- Process 38: approved payment channels --------------------------------
+
+/** A `PaymentChannel` belongs to a customer (money IN, on a Receipt) or an
+ * insurer (money OUT, on a Remittance). */
+export const PAYMENT_CHANNEL_OWNER_TYPES = ['customer', 'insurer'] as const;
+export type PaymentChannelOwnerType =
+  (typeof PAYMENT_CHANNEL_OWNER_TYPES)[number];
+
+export const PAYMENT_CHANNEL_STATUSES = ['active', 'disabled'] as const;
+export type PaymentChannelStatus = (typeof PAYMENT_CHANNEL_STATUSES)[number];
+
+/** `accountLast4` — the ONLY bank-account fragment #38 stores (masked form;
+ * `sensitive-data-handling.md` — a full number is Highly Confidential). 2–4
+ * digits. */
+export const ACCOUNT_LAST4 = /^\d{2,4}$/;
+
+export interface PaymentChannelRow {
+  id: string;
+  ownerType: string;
+  customerId: string | null;
+  insurerId: string | null;
+  channelType: string;
+  label: string;
+  bankName: string | null;
+  accountLast4: string | null;
+  currency: string;
+  status: string;
+  disabledAt: Date | null;
+  createdAt: Date;
+}
+
+export interface PaymentChannelView {
+  id: string;
+  ownerType: string;
+  /** The owning customer or insurer id (exactly one of the two is set). */
+  customerId: string | null;
+  insurerId: string | null;
+  channelType: string;
+  label: string;
+  bankName: string | null;
+  /** Masked account fragment — never a full number. */
+  accountLast4: string | null;
+  currency: string;
+  status: string;
+  isActive: boolean;
+  disabledAt: string | null;
+  createdAt: string;
+}
+
+export function derivePaymentChannelView(
+  row: PaymentChannelRow,
+): PaymentChannelView {
+  return {
+    id: row.id,
+    ownerType: row.ownerType,
+    customerId: row.customerId,
+    insurerId: row.insurerId,
+    channelType: row.channelType,
+    label: row.label,
+    bankName: row.bankName,
+    accountLast4: row.accountLast4,
+    currency: row.currency,
+    status: row.status,
+    isActive: row.status === 'active',
+    disabledAt: row.disabledAt ? row.disabledAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** Process 38 — CREATE / UPDATE audit `afterValue` for a `PaymentChannel`.
+ * Carries ids + `ownerType` + `channelType` + `label` + `bankName` + `status`.
+ * **Never `accountLast4`** — even the masked fragment stays out of the audit
+ * trail (it adds nothing and keeps the row free of any bank-account data). */
+export function paymentChannelAuditSnapshot(input: {
+  channelId: string;
+  ownerType: string;
+  customerId: string | null;
+  insurerId: string | null;
+  channelType: string;
+  label: string;
+  bankName: string | null;
+  status: string;
+}): Prisma.InputJsonObject {
+  return {
+    channelId: input.channelId,
+    ownerType: input.ownerType,
+    customerId: input.customerId,
+    insurerId: input.insurerId,
+    channelType: input.channelType,
+    label: input.label,
+    bankName: input.bankName,
+    status: input.status,
+  };
+}
 
 /**
  * Process 32 — the net premium the broker owes the insurer for a fully-
@@ -149,6 +245,8 @@ export interface InvoiceReceiptView {
   id: string;
   amount: string;
   method: string | null;
+  /** Process 38 — the approved customer payment channel used (or null). */
+  paymentChannelId: string | null;
   receivedAt: string;
 }
 
@@ -156,6 +254,8 @@ export interface InvoiceRemittanceView {
   id: string;
   amount: string;
   insurerId: string;
+  /** Process 38 — the approved insurer payment channel used (or null). */
+  paymentChannelId: string | null;
   remittedAt: string | null;
 }
 
@@ -187,11 +287,13 @@ export interface InvoiceReceiptRow {
   id: string;
   amount: Prisma.Decimal;
   method: string | null;
+  paymentChannelId: string | null;
   receivedAt: Date;
   remittance: {
     id: string;
     amount: Prisma.Decimal;
     insurerId: string;
+    paymentChannelId: string | null;
     remittedAt: Date | null;
   } | null;
 }
@@ -239,6 +341,7 @@ export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
           id: receipt.id,
           amount: formatMoney(receipt.amount),
           method: receipt.method,
+          paymentChannelId: receipt.paymentChannelId,
           receivedAt: receipt.receivedAt.toISOString(),
         }
       : null,
@@ -247,6 +350,7 @@ export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
           id: receipt.remittance.id,
           amount: formatMoney(receipt.remittance.amount),
           insurerId: receipt.remittance.insurerId,
+          paymentChannelId: receipt.remittance.paymentChannelId,
           remittedAt: receipt.remittance.remittedAt?.toISOString() ?? null,
         }
       : null,
@@ -301,6 +405,7 @@ export function receiptAuditSnapshot(input: {
   customerId: string;
   amount: Prisma.Decimal;
   method: string | null;
+  paymentChannelId: string | null;
   receivedAt: Date;
 }): Prisma.InputJsonObject {
   return {
@@ -309,6 +414,7 @@ export function receiptAuditSnapshot(input: {
     customerId: input.customerId,
     amount: formatMoney(input.amount),
     method: input.method,
+    paymentChannelId: input.paymentChannelId,
     receivedAt: input.receivedAt.toISOString(),
   };
 }
@@ -320,6 +426,7 @@ export function remittanceAuditSnapshot(input: {
   invoiceId: string;
   insurerId: string;
   amount: Prisma.Decimal;
+  paymentChannelId: string | null;
   remittedAt: Date | null;
 }): Prisma.InputJsonObject {
   return {
@@ -328,6 +435,7 @@ export function remittanceAuditSnapshot(input: {
     invoiceId: input.invoiceId,
     insurerId: input.insurerId,
     amount: formatMoney(input.amount),
+    paymentChannelId: input.paymentChannelId,
     remittedAt: input.remittedAt?.toISOString() ?? null,
   };
 }

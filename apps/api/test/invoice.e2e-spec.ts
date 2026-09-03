@@ -54,13 +54,31 @@ interface InvoiceBody {
   dueDate: string;
   status: string;
   createdAt: string;
-  receipt: { id: string; amount: string; method: string | null } | null;
+  receipt: {
+    id: string;
+    amount: string;
+    method: string | null;
+    paymentChannelId: string | null;
+  } | null;
   remittance: {
     id: string;
     amount: string;
     insurerId: string;
+    paymentChannelId: string | null;
     remittedAt: string | null;
   } | null;
+}
+
+interface PaymentChannelBody {
+  id: string;
+  ownerType: string;
+  customerId: string | null;
+  insurerId: string | null;
+  channelType: string;
+  label: string;
+  accountLast4: string | null;
+  status: string;
+  isActive: boolean;
 }
 
 interface AgeingRow {
@@ -846,5 +864,199 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .set(bearer(fin.accessToken))
       .expect(200);
     expect((unknownIns.body as InsurerPayablesReport).rows).toHaveLength(0);
+  });
+
+  it('Process 38 — records approved payment channels and threads them through the collection cycle', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv38-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv38-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv38-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const { policyId, customerId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'chan',
+    );
+    const policyRow = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { insurerId: true },
+    });
+    const insurerId = policyRow.insurerId;
+
+    // a non-Finance actor cannot maintain the channel list
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(plc.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'x',
+      })
+      .expect(403);
+
+    // Finance adds an approved customer channel + an insurer channel
+    const custChan = await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'Client — Cairo Amman JOD',
+        bankName: 'Cairo Amman Bank',
+        accountLast4: '4321',
+      })
+      .expect(201);
+    const custChanId = (custChan.body as PaymentChannelBody).id;
+    expect((custChan.body as PaymentChannelBody).isActive).toBe(true);
+    expect((custChan.body as PaymentChannelBody).accountLast4).toBe('4321');
+
+    const insChan = await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'insurer',
+        insurerId,
+        channelType: 'cheque',
+        label: 'Insurer settlement',
+      })
+      .expect(201);
+    const insChanId = (insChan.body as PaymentChannelBody).id;
+
+    // a disabled channel is rejected — make one, disable it, try to use it
+    const deadChan = await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'cash',
+        label: 'Old petty-cash route',
+      })
+      .expect(201);
+    const deadChanId = (deadChan.body as PaymentChannelBody).id;
+    const disabled = await request(app.getHttpServer())
+      .post(`/payment-channels/${deadChanId}/disable`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+    expect((disabled.body as PaymentChannelBody).status).toBe('disabled');
+    // disable is idempotent
+    await request(app.getHttpServer())
+      .post(`/payment-channels/${deadChanId}/disable`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+
+    // raise the invoice
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+
+    // a receipt against a disabled channel -> 422
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', paymentChannelId: deadChanId })
+      .expect(422);
+    // a receipt against the INSURER channel (wrong owner) -> 422
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', paymentChannelId: insChanId })
+      .expect(422);
+    // an explicit method conflicting with the channel type -> 422
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({
+        amount: '115350.000',
+        method: 'cheque',
+        paymentChannelId: custChanId,
+      })
+      .expect(422);
+
+    // a clean receipt against the approved customer channel: method derived
+    const collected = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', paymentChannelId: custChanId })
+      .expect(201);
+    expect((collected.body as InvoiceBody).receipt?.paymentChannelId).toBe(
+      custChanId,
+    );
+    expect((collected.body as InvoiceBody).receipt?.method).toBe(
+      'bank_transfer',
+    );
+
+    // a re-post with a DIFFERENT channel -> 409
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000' })
+      .expect(409);
+    // byte-identical re-post -> resume
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', paymentChannelId: custChanId })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/reconcile`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+
+    // a remittance against the CUSTOMER channel (wrong owner) -> 422
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({ paymentChannelId: custChanId })
+      .expect(422);
+
+    // a clean remittance against the approved insurer channel
+    const remitted = await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({ paymentChannelId: insChanId })
+      .expect(201);
+    expect((remitted.body as InvoiceBody).status).toBe('REMITTED');
+    expect((remitted.body as InvoiceBody).remittance?.paymentChannelId).toBe(
+      insChanId,
+    );
+
+    // the channel list read is Finance-scoped, filterable, and never leaks a
+    // full account number (only the last-4 fragment exists)
+    const list = await request(app.getHttpServer())
+      .get(`/payment-channels?customerId=${customerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const rows = list.body as PaymentChannelBody[];
+    expect(rows.map((r) => r.id).sort()).toEqual(
+      [custChanId, deadChanId].sort(),
+    );
+    for (const r of rows) {
+      if (r.accountLast4) expect(r.accountLast4.length).toBeLessThanOrEqual(4);
+    }
+
+    // audit: a CREATE PaymentChannel row exists and carries no account fragment
+    const chanAudit = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'PaymentChannel', entityId: custChanId },
+    });
+    expect(chanAudit.some((r) => r.action === 'CREATE')).toBe(true);
+    expect(JSON.stringify(chanAudit)).not.toContain('4321');
   });
 });

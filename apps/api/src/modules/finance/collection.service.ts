@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
+import type { PaymentChannel } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import {
@@ -13,6 +14,7 @@ import {
   type InvoiceWithCycle,
 } from '../../repositories/invoice.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
+import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
@@ -67,9 +69,98 @@ export class CollectionService {
   constructor(
     private readonly invoices: InvoiceRepository,
     private readonly policies: PolicyRepository,
+    private readonly channels: PaymentChannelRepository,
     private readonly workflow: WorkflowTransitionService,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Process 38 — load an optional payment channel by id. A truly-unknown id is
+   * a 404 whether the caller is creating or replaying an existing receipt /
+   * remittance. Owner / status / currency / method checks are
+   * `assert*ChannelUsable` — run **only on the create path**, AFTER the
+   * write-once resume check, so an idempotent retry after the channel was later
+   * disabled still resumes rather than 422-ing (the #31 "resume check before
+   * the input-bound checks" ordering; same as #28 `recordSettlement`).
+   */
+  private async loadChannel(
+    paymentChannelId: string | undefined,
+  ): Promise<PaymentChannel | null> {
+    if (!paymentChannelId) return null;
+    const channel = await this.channels.findById(paymentChannelId);
+    if (!channel) {
+      throw new NotFoundException(
+        `Payment channel ${paymentChannelId} not found.`,
+      );
+    }
+    return channel;
+  }
+
+  /** The `Receipt.method` a supplied channel implies (its `channelType`), or
+   * the caller's free `method` when no channel was supplied. Pure. */
+  private receiptMethodFor(
+    channel: PaymentChannel | null,
+    callerMethod: string | null,
+  ): string | null {
+    return channel ? channel.channelType : callerMethod;
+  }
+
+  /** Process 38 — a supplied channel must be `active`, owned by the invoice's
+   * customer, in the invoice currency, and not contradict an explicit caller
+   * `method`. Called only when a NEW receipt is about to be written. */
+  private assertReceiptChannelUsable(
+    channel: PaymentChannel,
+    invoice: InvoiceWithCycle,
+    callerMethod: string | null,
+  ): void {
+    if (
+      channel.ownerType !== 'customer' ||
+      channel.customerId !== invoice.customerId
+    ) {
+      throw new UnprocessableEntityException(
+        `Payment channel ${channel.id} does not belong to this invoice's customer.`,
+      );
+    }
+    if (channel.status !== 'active') {
+      throw new UnprocessableEntityException(
+        `Payment channel ${channel.id} is disabled.`,
+      );
+    }
+    if (channel.currency !== invoice.currency) {
+      throw new UnprocessableEntityException(
+        `Payment channel ${channel.id} is a ${channel.currency} channel; this invoice is ${invoice.currency}.`,
+      );
+    }
+    if (callerMethod !== null && callerMethod !== channel.channelType) {
+      throw new UnprocessableEntityException(
+        `method "${callerMethod}" conflicts with payment channel ${channel.id} (${channel.channelType}) — omit method, it is derived from the channel.`,
+      );
+    }
+  }
+
+  /** Process 38 — a supplied remittance channel must be `active`, owned by the
+   * policy's insurer, and in the invoice currency. Create path only. */
+  private assertRemittanceChannelUsable(
+    channel: PaymentChannel,
+    insurerId: string,
+    currency: string,
+  ): void {
+    if (channel.ownerType !== 'insurer' || channel.insurerId !== insurerId) {
+      throw new UnprocessableEntityException(
+        `Payment channel ${channel.id} does not belong to this policy's insurer.`,
+      );
+    }
+    if (channel.status !== 'active') {
+      throw new UnprocessableEntityException(
+        `Payment channel ${channel.id} is disabled.`,
+      );
+    }
+    if (channel.currency !== currency) {
+      throw new UnprocessableEntityException(
+        `Payment channel ${channel.id} is a ${channel.currency} channel; this invoice is ${currency}.`,
+      );
+    }
+  }
 
   // --- 1. Collection / Receipt (INVOICED -> COLLECTED) --------------------
 
@@ -80,7 +171,11 @@ export class CollectionService {
   ): Promise<InvoiceView> {
     let invoice = await this.loadInvoice(invoiceId);
     const amount = quantizeMoney(dto.amount);
-    const method = dto.method ?? null;
+    // Load-only (404 on an unknown id) — the usability checks come after the
+    // write-once resume, so a retry after the channel was disabled still resumes.
+    const channel = await this.loadChannel(dto.paymentChannelId);
+    const paymentChannelId = channel?.id ?? null;
+    const method = this.receiptMethodFor(channel, dto.method ?? null);
     const receivedAt = dto.receivedAt
       ? parseHistoricalInstant(dto.receivedAt, 'receivedAt')
       : new Date();
@@ -89,10 +184,12 @@ export class CollectionService {
     if (existingReceipt) {
       // A receipt exists => the INVOICED -> COLLECTED transition already
       // committed. A byte-identical re-post is an idempotent no-op; any
-      // different amount / method is a 409 (recorded once — no amend path).
+      // different amount / method / channel is a 409 (recorded once — no amend
+      // path).
       const same =
         compareMoney(existingReceipt.amount, amount) === 0 &&
-        (existingReceipt.method ?? null) === method;
+        (existingReceipt.method ?? null) === method &&
+        (existingReceipt.paymentChannelId ?? null) === paymentChannelId;
       if (!same) {
         throw new ConflictException(
           `Invoice ${invoiceId} already has a collection receipt (${formatMoney(
@@ -101,6 +198,11 @@ export class CollectionService {
         );
       }
       return deriveInvoiceView(invoice);
+    }
+
+    // A NEW receipt — the supplied channel must be usable now.
+    if (channel) {
+      this.assertReceiptChannelUsable(channel, invoice, dto.method ?? null);
     }
 
     // No receipt yet. The exact-amount rule is the loud "never a silent
@@ -129,10 +231,24 @@ export class CollectionService {
         // invoice.
         invoice = await this.loadInvoice(invoiceId);
         if (invoice.status === 'INVOICED') throw err;
-        return this.finishReceipt(invoice, amount, method, receivedAt, actor);
+        return this.finishReceipt(
+          invoice,
+          amount,
+          method,
+          paymentChannelId,
+          receivedAt,
+          actor,
+        );
       }
       invoice = await this.loadInvoice(invoiceId);
-      return this.finishReceipt(invoice, amount, method, receivedAt, actor);
+      return this.finishReceipt(
+        invoice,
+        amount,
+        method,
+        paymentChannelId,
+        receivedAt,
+        actor,
+      );
     }
 
     if (invoice.status === 'COLLECTED') {
@@ -141,7 +257,14 @@ export class CollectionService {
       this.logger.warn(
         `Invoice ${invoiceId}: resuming a partially-completed receipt (status COLLECTED, no receipt row).`,
       );
-      return this.finishReceipt(invoice, amount, method, receivedAt, actor);
+      return this.finishReceipt(
+        invoice,
+        amount,
+        method,
+        paymentChannelId,
+        receivedAt,
+        actor,
+      );
     }
 
     throw new UnprocessableEntityException(
@@ -153,6 +276,7 @@ export class CollectionService {
     invoice: InvoiceWithCycle,
     amount: Prisma.Decimal,
     method: string | null,
+    paymentChannelId: string | null,
     receivedAt: Date,
     actor: AuthenticatedUser,
   ): Promise<InvoiceView> {
@@ -162,7 +286,8 @@ export class CollectionService {
       const existing = invoice.receipts[0];
       const same =
         compareMoney(existing.amount, amount) === 0 &&
-        (existing.method ?? null) === method;
+        (existing.method ?? null) === method &&
+        (existing.paymentChannelId ?? null) === paymentChannelId;
       if (!same) {
         throw new ConflictException(
           `Invoice ${invoice.id} already has a collection receipt (created concurrently with different figures).`,
@@ -180,6 +305,7 @@ export class CollectionService {
         customerId: invoice.customerId,
         amount,
         method,
+        paymentChannelId,
         receivedAt,
         ledgerReference: `invoice:${invoice.id}`,
       });
@@ -189,14 +315,15 @@ export class CollectionService {
         // committed between our `receipts[0]` read above and this write (it
         // lost the transition race but still reached here before we did). A
         // byte-identical race is an idempotent resume; a genuinely different
-        // amount / method is a 409. This is the "the write re-asserts the
-        // condition" half of race-safe-invariants.md.
+        // amount / method / channel is a 409. This is the "the write re-asserts
+        // the condition" half of race-safe-invariants.md.
         const now = await this.loadInvoice(invoice.id);
         const landed = now.receipts[0];
         if (
           landed &&
           compareMoney(landed.amount, amount) === 0 &&
-          (landed.method ?? null) === method
+          (landed.method ?? null) === method &&
+          (landed.paymentChannelId ?? null) === paymentChannelId
         ) {
           return deriveInvoiceView(now);
         }
@@ -218,6 +345,7 @@ export class CollectionService {
         customerId: invoice.customerId,
         amount: created.receipt.amount,
         method: created.receipt.method,
+        paymentChannelId: created.receipt.paymentChannelId,
         receivedAt: created.receipt.receivedAt,
       }),
     });
@@ -325,19 +453,31 @@ export class CollectionService {
       );
     }
 
+    // Load-only (404 on an unknown id) — after the "no collection" 422 so an
+    // unknown channel on a not-yet-collected invoice gets the more useful
+    // message; the usability checks come after the write-once resume.
+    const channel = await this.loadChannel(dto.paymentChannelId);
+    const paymentChannelId = channel?.id ?? null;
+
     if (receipt.remittance) {
-      // Deterministic (amount + insurer both derived) — a re-post always
-      // matches, so this is an idempotent no-op. A stored figure that somehow
-      // disagrees is a 409, not a silent resume.
+      // Amount + insurer are derived; the channel is a caller input. A re-post
+      // with the same channel (or none) is an idempotent no-op; a different
+      // stored figure / insurer / channel is a 409, not a silent resume.
       const same =
         compareMoney(receipt.remittance.amount, amount) === 0 &&
-        receipt.remittance.insurerId === insurerId;
+        receipt.remittance.insurerId === insurerId &&
+        (receipt.remittance.paymentChannelId ?? null) === paymentChannelId;
       if (!same) {
         throw new ConflictException(
           `Invoice ${invoiceId} already has a remittance recorded with different figures.`,
         );
       }
       return deriveInvoiceView(invoice);
+    }
+
+    // A NEW remittance — the supplied channel must be usable now.
+    if (channel) {
+      this.assertRemittanceChannelUsable(channel, insurerId, invoice.currency);
     }
 
     if (invoice.status === 'RECONCILED') {
@@ -356,6 +496,7 @@ export class CollectionService {
           receipt.id,
           insurerId,
           amount,
+          paymentChannelId,
           remittedAt,
           actor,
         );
@@ -366,6 +507,7 @@ export class CollectionService {
         receipt.id,
         insurerId,
         amount,
+        paymentChannelId,
         remittedAt,
         actor,
       );
@@ -380,6 +522,7 @@ export class CollectionService {
         receipt.id,
         insurerId,
         amount,
+        paymentChannelId,
         remittedAt,
         actor,
       );
@@ -395,11 +538,27 @@ export class CollectionService {
     receiptId: string,
     insurerId: string,
     amount: Prisma.Decimal,
+    paymentChannelId: string | null,
     remittedAt: Date,
     actor: AuthenticatedUser,
   ): Promise<InvoiceView> {
-    if (invoice.receipts[0]?.remittance) {
-      return deriveInvoiceView(invoice); // concurrent write landed first
+    const landed = invoice.receipts[0]?.remittance;
+    if (landed) {
+      // A concurrent caller wrote the remittance between our transition and
+      // here. Byte-identical (amount + insurer + channel) is an idempotent
+      // resume; anything else is a 409 — mirroring `finishReceipt` (the
+      // channel is a caller input, so this is no longer an unconditional
+      // "deterministic resume").
+      const same =
+        compareMoney(landed.amount, amount) === 0 &&
+        landed.insurerId === insurerId &&
+        (landed.paymentChannelId ?? null) === paymentChannelId;
+      if (!same) {
+        throw new ConflictException(
+          `Invoice ${invoice.id} already has a remittance (created concurrently with different figures).`,
+        );
+      }
+      return deriveInvoiceView(invoice);
     }
 
     let created: Awaited<
@@ -411,16 +570,28 @@ export class CollectionService {
         customerId: invoice.customerId,
         insurerId,
         amount,
+        paymentChannelId,
         remittedAt,
         ledgerReference: `invoice:${invoice.id}`,
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
         // `Remittance.receiptId @unique` fired — a concurrent caller's
-        // remittance committed first. The figures are deterministic (net
-        // premium + the policy's insurer), so this is always a byte-identical
-        // race: resume with the landed remittance.
-        return deriveInvoiceView(await this.loadInvoice(invoice.id));
+        // remittance committed first. Amount + insurer are deterministic; the
+        // channel is a caller input, so resume only when it also matches.
+        const now = await this.loadInvoice(invoice.id);
+        const landed = now.receipts[0]?.remittance;
+        if (
+          landed &&
+          compareMoney(landed.amount, amount) === 0 &&
+          landed.insurerId === insurerId &&
+          (landed.paymentChannelId ?? null) === paymentChannelId
+        ) {
+          return deriveInvoiceView(now);
+        }
+        throw new ConflictException(
+          `Invoice ${invoice.id} already has a remittance with different figures (created concurrently).`,
+        );
       }
       throw err;
     }
@@ -436,6 +607,7 @@ export class CollectionService {
         invoiceId: invoice.id,
         insurerId,
         amount: created.remittance.amount,
+        paymentChannelId: created.remittance.paymentChannelId,
         remittedAt: created.remittance.remittedAt,
       }),
     });

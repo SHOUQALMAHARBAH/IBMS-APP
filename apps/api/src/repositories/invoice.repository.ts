@@ -262,6 +262,7 @@ export class InvoiceRepository {
     customerId: string;
     amount: Prisma.Decimal;
     method: string | null;
+    paymentChannelId: string | null;
     receivedAt: Date;
     ledgerReference: string;
   }): Promise<{ receipt: Receipt; ledgerEntry: ClientFundsLedgerEntry }> {
@@ -271,6 +272,7 @@ export class InvoiceRepository {
           invoiceId: input.invoiceId,
           amount: input.amount,
           method: input.method,
+          paymentChannelId: input.paymentChannelId,
           receivedAt: input.receivedAt,
         },
       });
@@ -299,6 +301,7 @@ export class InvoiceRepository {
     customerId: string;
     insurerId: string;
     amount: Prisma.Decimal;
+    paymentChannelId: string | null;
     remittedAt: Date;
     ledgerReference: string;
   }): Promise<{ remittance: Remittance; ledgerEntry: ClientFundsLedgerEntry }> {
@@ -308,6 +311,7 @@ export class InvoiceRepository {
           receiptId: input.receiptId,
           insurerId: input.insurerId,
           amount: input.amount,
+          paymentChannelId: input.paymentChannelId,
           remittedAt: input.remittedAt,
         },
       });

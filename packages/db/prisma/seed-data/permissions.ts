@@ -174,6 +174,7 @@ const finance: PermissionSeed[] = [
   { code: 'commission-override.raise', module: 'finance', description: 'Raise a manual commission override with a mandatory reason', roles: [FINANCE] },
   { code: 'commission-override.approve', module: 'finance', description: 'Approve a manual commission override (separately logged from the raiser)', roles: [MANAGER] },
   { code: 'commission.reconcile', module: 'finance', description: 'Reconcile a commission ledger entry against the insurer statement and mark it paid', roles: [FINANCE] },
+  { code: 'payment-channel.manage', module: 'finance', description: 'Maintain the approved payment-channel list for customers and insurers (add / disable), and list it when recording a receipt or remittance', roles: [FINANCE] },
   { code: 'reconciliation-exception.investigate', module: 'finance', description: 'Investigate a bank-reconciliation variance exception', roles: [FINANCE] },
   { code: 'reconciliation-exception.resolve', module: 'finance', description: 'Close a reconciliation exception', roles: [FINANCE, MANAGER] },
   { code: 'financial-report.view', module: 'finance', description: 'View financial reporting/dashboards', roles: [FINANCE, MANAGER, EXEC, AUDITOR] },

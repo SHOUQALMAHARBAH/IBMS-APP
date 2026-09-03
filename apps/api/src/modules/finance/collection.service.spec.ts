@@ -11,6 +11,7 @@ import type {
   InvoiceWithCycle,
 } from '../../repositories/invoice.repository';
 import type { PolicyRepository } from '../../repositories/policy.repository';
+import type { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -55,8 +56,28 @@ function receiptFixture(over?: Partial<ReceiptFixture>): ReceiptFixture {
     invoiceId: 'inv-1',
     amount: d('115350.000'),
     method: 'bank_transfer',
+    paymentChannelId: null,
     receivedAt: new Date('2026-09-20T00:00:00.000Z'),
     remittance: null,
+    ...over,
+  };
+}
+
+/** A `PaymentChannel` row as `PaymentChannelRepository.findById` returns it. */
+function channelFixture(over: Record<string, unknown> = {}) {
+  return {
+    id: 'pc-1',
+    ownerType: 'customer',
+    customerId: 'cust-1',
+    insurerId: null,
+    channelType: 'bank_transfer',
+    label: 'Primary JOD',
+    bankName: 'Cairo Amman Bank',
+    accountLast4: '1234',
+    currency: 'JOD',
+    status: 'active',
+    disabledAt: null,
+    createdAt: new Date('2026-09-01T00:00:00.000Z'),
     ...over,
   };
 }
@@ -69,41 +90,41 @@ function makeDeps(sequence: InvoiceWithCycle[]) {
     findById: vi.fn(() =>
       Promise.resolve(sequence[Math.min(i++, sequence.length - 1)]),
     ),
-    recordReceiptWithLedger: vi.fn(() =>
-      Promise.resolve({
-        receipt: receiptFixture(),
-        ledgerEntry: {
-          id: 'led-in-1',
-          customerId: 'cust-1',
-          amount: d('115350.000'),
-          direction: 'in',
-          reference: 'invoice:inv-1',
-          recordedAt: new Date(),
-        },
-      }),
-    ),
-    recordRemittanceWithLedger: vi.fn(() =>
-      Promise.resolve({
-        remittance: {
-          id: 'rem-1',
-          receiptId: 'rcpt-1',
-          insurerId: 'ins-1',
-          amount: d('105600.000'),
-          remittedAt: new Date('2026-09-25T00:00:00.000Z'),
-        },
-        ledgerEntry: {
-          id: 'led-out-1',
-          customerId: 'cust-1',
-          amount: d('105600.000'),
-          direction: 'out',
-          reference: 'invoice:inv-1',
-          recordedAt: new Date(),
-        },
-      }),
-    ),
+    recordReceiptWithLedger: vi.fn().mockResolvedValue({
+      receipt: receiptFixture(),
+      ledgerEntry: {
+        id: 'led-in-1',
+        customerId: 'cust-1',
+        amount: d('115350.000'),
+        direction: 'in',
+        reference: 'invoice:inv-1',
+        recordedAt: new Date(),
+      },
+    }),
+    recordRemittanceWithLedger: vi.fn().mockResolvedValue({
+      remittance: {
+        id: 'rem-1',
+        receiptId: 'rcpt-1',
+        insurerId: 'ins-1',
+        amount: d('105600.000'),
+        paymentChannelId: null,
+        remittedAt: new Date('2026-09-25T00:00:00.000Z'),
+      },
+      ledgerEntry: {
+        id: 'led-out-1',
+        customerId: 'cust-1',
+        amount: d('105600.000'),
+        direction: 'out',
+        reference: 'invoice:inv-1',
+        recordedAt: new Date(),
+      },
+    }),
   };
   const policies = {
     findById: vi.fn(() => Promise.resolve({ id: 'pol-1', insurerId: 'ins-1' })),
+  };
+  const channels = {
+    findById: vi.fn(() => Promise.resolve(null as unknown)),
   };
   const workflow = {
     transition: vi.fn(() => Promise.resolve({ id: 'inv-1', status: 'x' })),
@@ -112,10 +133,11 @@ function makeDeps(sequence: InvoiceWithCycle[]) {
   const service = new CollectionService(
     invoices as unknown as InvoiceRepository,
     policies as unknown as PolicyRepository,
+    channels as unknown as PaymentChannelRepository,
     workflow as unknown as WorkflowTransitionService,
     audit as unknown as AuditService,
   );
-  return { service, invoices, policies, workflow, audit };
+  return { service, invoices, policies, channels, workflow, audit };
 }
 
 describe('CollectionService.recordReceipt (Process 32)', () => {
@@ -314,6 +336,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
+              paymentChannelId: null,
               remittedAt: new Date('2026-09-25T00:00:00.000Z'),
             },
           }),
@@ -366,6 +389,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
+              paymentChannelId: null,
               remittedAt: new Date('2026-09-25T00:00:00.000Z'),
             },
           }),
@@ -389,6 +413,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('999.000'),
+              paymentChannelId: null,
               remittedAt: new Date('2026-09-25T00:00:00.000Z'),
             },
           }),
@@ -412,6 +437,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
+              paymentChannelId: null,
               remittedAt: new Date('2026-09-25T00:00:00.000Z'),
             },
           }),
@@ -434,6 +460,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
             receiptId: 'rcpt-1',
             insurerId: 'ins-1',
             amount: d('105600.000'),
+            paymentChannelId: null,
             remittedAt: new Date('2026-09-25T00:00:00.000Z'),
           },
         }),
@@ -453,5 +480,243 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
     const view = await deps.service.recordRemittance('inv-1', {}, actor);
     expect(view.status).toBe('REMITTED');
     expect(view.remittance?.amount).toBe('105600.000');
+  });
+});
+
+describe('CollectionService — Process 38 payment channels', () => {
+  it('records a receipt against an approved customer channel and DERIVES method from it', async () => {
+    const deps = makeDeps([
+      invoiceFixture({ status: 'INVOICED' }),
+      invoiceFixture({ status: 'COLLECTED' }),
+      invoiceFixture({
+        status: 'COLLECTED',
+        receipts: [receiptFixture({ paymentChannelId: 'pc-1' })],
+      }),
+    ]);
+    deps.channels.findById.mockResolvedValue(channelFixture());
+    deps.invoices.recordReceiptWithLedger.mockResolvedValueOnce({
+      receipt: receiptFixture({ paymentChannelId: 'pc-1' }),
+      ledgerEntry: {
+        id: 'led-in-1',
+        customerId: 'cust-1',
+        amount: d('115350.000'),
+        direction: 'in',
+        reference: 'invoice:inv-1',
+        recordedAt: new Date(),
+      },
+    });
+    await deps.service.recordReceipt(
+      'inv-1',
+      { amount: '115350.000', paymentChannelId: 'pc-1' },
+      actor,
+    );
+    const arg = deps.invoices.recordReceiptWithLedger.mock.calls[0]?.[0] as {
+      paymentChannelId: string | null;
+      method: string | null;
+    };
+    expect(arg.paymentChannelId).toBe('pc-1');
+    expect(arg.method).toBe('bank_transfer'); // derived from the channel
+  });
+
+  it('422s a receipt whose channel is disabled', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({ status: 'disabled' }),
+    );
+    await expect(
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', paymentChannelId: 'pc-1' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('resumes an idempotent retry even after the channel was later disabled (ordering)', async () => {
+    const deps = makeDeps([
+      invoiceFixture({
+        status: 'COLLECTED',
+        receipts: [
+          receiptFixture({ paymentChannelId: 'pc-1', method: 'bank_transfer' }),
+        ],
+      }),
+    ]);
+    // the channel that recorded the receipt has since been disabled
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({ status: 'disabled' }),
+    );
+    const v = await deps.service.recordReceipt(
+      'inv-1',
+      { amount: '115350.000', paymentChannelId: 'pc-1' },
+      actor,
+    );
+    expect(v.status).toBe('COLLECTED'); // resumed, not 422
+    expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('422s a receipt whose channel currency differs from the invoice currency', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({ currency: 'USD' }), // invoice is JOD
+    );
+    await expect(
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', paymentChannelId: 'pc-1' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('422s a receipt whose channel belongs to another customer', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({ customerId: 'someone-else' }),
+    );
+    await expect(
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', paymentChannelId: 'pc-1' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('422s a receipt whose explicit method conflicts with the channel type', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
+    deps.channels.findById.mockResolvedValue(channelFixture()); // bank_transfer
+    await expect(
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', method: 'cheque', paymentChannelId: 'pc-1' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('404s a receipt referencing an unknown channel', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
+    deps.channels.findById.mockResolvedValue(null);
+    await expect(
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', paymentChannelId: 'pc-x' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('records a remittance against an approved insurer channel', async () => {
+    const deps = makeDeps([
+      invoiceFixture({ status: 'RECONCILED', receipts: [receiptFixture()] }),
+      invoiceFixture({ status: 'REMITTED', receipts: [receiptFixture()] }),
+      invoiceFixture({
+        status: 'REMITTED',
+        receipts: [
+          receiptFixture({
+            remittance: {
+              id: 'rem-1',
+              receiptId: 'rcpt-1',
+              insurerId: 'ins-1',
+              amount: d('105600.000'),
+              paymentChannelId: 'pc-ins',
+              remittedAt: new Date('2026-09-25T00:00:00.000Z'),
+            },
+          }),
+        ],
+      }),
+    ]);
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({
+        id: 'pc-ins',
+        ownerType: 'insurer',
+        customerId: null,
+        insurerId: 'ins-1',
+      }),
+    );
+    deps.invoices.recordRemittanceWithLedger.mockResolvedValueOnce({
+      remittance: {
+        id: 'rem-1',
+        receiptId: 'rcpt-1',
+        insurerId: 'ins-1',
+        amount: d('105600.000'),
+        paymentChannelId: 'pc-ins',
+        remittedAt: new Date('2026-09-25T00:00:00.000Z'),
+      },
+      ledgerEntry: {
+        id: 'led-out-1',
+        customerId: 'cust-1',
+        amount: d('105600.000'),
+        direction: 'out',
+        reference: 'invoice:inv-1',
+        recordedAt: new Date(),
+      },
+    });
+    await deps.service.recordRemittance(
+      'inv-1',
+      { paymentChannelId: 'pc-ins' },
+      actor,
+    );
+    const arg = deps.invoices.recordRemittanceWithLedger.mock.calls[0]?.[0] as {
+      paymentChannelId: string | null;
+    };
+    expect(arg.paymentChannelId).toBe('pc-ins');
+  });
+
+  it('422s a remittance whose channel belongs to another insurer', async () => {
+    const deps = makeDeps([
+      invoiceFixture({ status: 'RECONCILED', receipts: [receiptFixture()] }),
+    ]);
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({
+        ownerType: 'insurer',
+        customerId: null,
+        insurerId: 'other-insurer',
+      }),
+    );
+    await expect(
+      deps.service.recordRemittance(
+        'inv-1',
+        { paymentChannelId: 'pc-x' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('409s when a remittance landed concurrently with a different channel (finishRemittance)', async () => {
+    // transition succeeds, but on reload a remittance with a DIFFERENT channel
+    // is already present (a concurrent caller won the race).
+    const landed = receiptFixture({
+      remittance: {
+        id: 'rem-1',
+        receiptId: 'rcpt-1',
+        insurerId: 'ins-1',
+        amount: d('105600.000'),
+        paymentChannelId: 'pc-other',
+        remittedAt: new Date('2026-09-25T00:00:00.000Z'),
+      },
+    });
+    const deps = makeDeps([
+      invoiceFixture({ status: 'RECONCILED', receipts: [receiptFixture()] }),
+      invoiceFixture({ status: 'REMITTED', receipts: [landed] }),
+    ]);
+    deps.channels.findById.mockResolvedValue(
+      channelFixture({
+        id: 'pc-ins',
+        ownerType: 'insurer',
+        customerId: null,
+        insurerId: 'ins-1',
+      }),
+    );
+    await expect(
+      deps.service.recordRemittance(
+        'inv-1',
+        { paymentChannelId: 'pc-ins' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(deps.invoices.recordRemittanceWithLedger).not.toHaveBeenCalled();
   });
 });

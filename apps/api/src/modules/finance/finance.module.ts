@@ -6,7 +6,10 @@ import { ClientAccountingController } from './client-accounting.controller';
 import { ClientAccountingService } from './client-accounting.service';
 import { InsurerAccountingController } from './insurer-accounting.controller';
 import { InsurerAccountingService } from './insurer-accounting.service';
+import { PaymentChannelController } from './payment-channel.controller';
+import { PaymentChannelService } from './payment-channel.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
+import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
@@ -41,6 +44,11 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
  * `insurer-accounting.read`) — both computed on the fly from the `Invoice` /
  * `Receipt` / `Remittance` rows, no stored aggregate, not audit-logged
  * (invoice / remittance amounts are Confidential, the #31 decision).
+ *
+ * `PaymentChannelService` (#38) maintains the approved `PaymentChannel` list
+ * (`payment-channel.manage` / Finance) — a governed reference list; #32's
+ * `CollectionService` validates a supplied `paymentChannelId` against it and
+ * records it on the `Receipt` / `Remittance`.
  */
 @Module({
   imports: [AuditModule, PolicyModule, RecommendationModule],
@@ -48,13 +56,16 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     InvoiceController,
     ClientAccountingController,
     InsurerAccountingController,
+    PaymentChannelController,
   ],
   providers: [
     InvoiceService,
     CollectionService,
     ClientAccountingService,
     InsurerAccountingService,
+    PaymentChannelService,
     InvoiceRepository,
+    PaymentChannelRepository,
   ],
   exports: [InvoiceRepository],
 })

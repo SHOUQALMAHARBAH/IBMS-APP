@@ -509,6 +509,7 @@ model Customer {
   documents         Document[]           @relation("CustomerDocuments")
   invoices          Invoice[]
   clientFundsLedgerEntries ClientFundsLedgerEntry[]
+  paymentChannels   PaymentChannel[]
   serviceRequests   ServiceRequest[]
   feedback          CustomerFeedback[]
   retentionCases    RetentionCase[]
@@ -1702,6 +1703,10 @@ model Receipt {
   amount       Decimal  @db.Decimal(18, 3)
   receivedAt   DateTime @default(now())
   method       String?  // bank_transfer | cheque | card | cash
+  /// Process 38 — the approved customer PaymentChannel the money came in on
+  /// (optional). When set, `method` is derived from the channel's `channelType`.
+  paymentChannelId String?
+  paymentChannel   PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
 
   remittance   Remittance?
 }
@@ -1716,6 +1721,45 @@ model Remittance {
   insurer     Insurer  @relation(fields: [insurerId], references: [id])
   amount      Decimal  @db.Decimal(18, 3)
   remittedAt  DateTime?
+  /// Process 38 — the approved insurer PaymentChannel the funds went out on
+  /// (optional).
+  paymentChannelId String?
+  paymentChannel   PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
+}
+
+/// Process 38 — a governed, approved payment channel for a customer (money IN,
+/// referenced on a collection Receipt) or an insurer (money OUT, referenced on
+/// a Remittance). Finance maintains the list; #32's Receipt / Remittance record
+/// WHICH approved channel a movement used. Masked-only: NO full bank account /
+/// card number is stored (ibms-brain/meta/lex/sensitive-data-handling.md —
+/// bank/card data is Highly Confidential); `accountLast4` is the permitted
+/// masked form, so the model itself stays CONFIDENTIAL.
+///
+/// `PaymentChannel_owner_exactly_one` CHECK (migration 20260903140000): exactly
+/// one of (customerId, insurerId) is set and it matches `ownerType`.
+model PaymentChannel {
+  id            String    @id @default(uuid())
+  ownerType     String    // customer | insurer
+  customerId    String?
+  // onDelete: Restrict — SET NULL (Prisma's default for an optional relation)
+  // would break `PaymentChannel_owner_exactly_one` on a hard delete of the owner.
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  insurerId     String?
+  insurer       Insurer?  @relation(fields: [insurerId], references: [id], onDelete: Restrict)
+  channelType   String    // bank_transfer | cheque | card | cash
+  label         String
+  bankName      String?
+  accountLast4  String?   // masked — at most 4 digits; NEVER the full number
+  currency      String    @default("JOD")
+  status        String    @default("active") // active | disabled
+  disabledAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  receipts      Receipt[]
+  remittances   Remittance[]
+
+  @@index([ownerType, customerId])
+  @@index([ownerType, insurerId])
 }
 
 /// Process 35 — insurer- and product-specific commission rate table
@@ -2555,6 +2599,7 @@ model Insurer {
   policies          Policy[]
   commissionAgreements CommissionAgreement[]
   remittances       Remittance[]
+  paymentChannels   PaymentChannel[]
   performanceScores InsurerPerformanceScore[]
 }
 

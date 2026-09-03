@@ -111,6 +111,8 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     // Finance DOES reconcile the commission ledger against insurer statements
     // (Process 36) — applying/settling the governed figure, not altering it.
     expect(granted).toContain('commission.reconcile');
+    // Finance maintains the approved payment-channel list (Process 38).
+    expect(granted).toContain('payment-channel.manage');
   });
 
   it('Compliance Officer cannot originate sales transactions or close a DSR (DPO-only)', () => {

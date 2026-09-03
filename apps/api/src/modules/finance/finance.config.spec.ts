@@ -7,14 +7,17 @@ import {
   computeInvoiceFigures,
   computeRemittanceAmount,
   daysOverdue,
+  derivePaymentChannelView,
   deriveInvoiceView,
   invoiceAuditSnapshot,
   invoiceFiguresMatch,
   NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
+  paymentChannelAuditSnapshot,
   type InsurerObligationRow,
   type InsurerRemittanceRow,
   type InvoiceRow,
   type OutstandingInvoiceRow,
+  type PaymentChannelRow,
 } from './finance.config';
 
 const d = (v: string) => new Prisma.Decimal(v);
@@ -157,11 +160,13 @@ describe('deriveInvoiceView', () => {
           id: 'rcpt-1',
           amount: d('1060'),
           method: 'bank_transfer',
+          paymentChannelId: 'pc-cust-1',
           receivedAt: new Date('2026-10-03T09:00:00.000Z'),
           remittance: {
             id: 'rem-1',
             amount: d('875'),
             insurerId: 'ins-1',
+            paymentChannelId: 'pc-ins-1',
             remittedAt: new Date('2026-10-05T12:00:00.000Z'),
           },
         },
@@ -171,12 +176,14 @@ describe('deriveInvoiceView', () => {
       id: 'rcpt-1',
       amount: '1060.000',
       method: 'bank_transfer',
+      paymentChannelId: 'pc-cust-1',
       receivedAt: '2026-10-03T09:00:00.000Z',
     });
     expect(v.remittance).toEqual({
       id: 'rem-1',
       amount: '875.000',
       insurerId: 'ins-1',
+      paymentChannelId: 'pc-ins-1',
       remittedAt: '2026-10-05T12:00:00.000Z',
     });
   });
@@ -190,12 +197,14 @@ describe('deriveInvoiceView', () => {
           id: 'rcpt-1',
           amount: d('1060'),
           method: null,
+          paymentChannelId: null,
           receivedAt: new Date('2026-10-03T09:00:00.000Z'),
           remittance: null,
         },
       ],
     });
     expect(v.receipt?.method).toBeNull();
+    expect(v.receipt?.paymentChannelId).toBeNull();
     expect(v.remittance).toBeNull();
   });
 });
@@ -589,5 +598,75 @@ describe('invoiceAuditSnapshot', () => {
       dueDate: '2026-10-01T00:00:00.000Z',
       status: 'INVOICED',
     });
+  });
+});
+
+describe('PaymentChannel view + audit (Process 38)', () => {
+  const base: PaymentChannelRow = {
+    id: 'pc-1',
+    ownerType: 'customer',
+    customerId: 'cust-1',
+    insurerId: null,
+    channelType: 'bank_transfer',
+    label: 'Primary JOD',
+    bankName: 'Cairo Amman Bank',
+    accountLast4: '1234',
+    currency: 'JOD',
+    status: 'active',
+    disabledAt: null,
+    createdAt: new Date('2026-09-01T00:00:00.000Z'),
+  };
+
+  it('derivePaymentChannelView renders isActive + ISO dates + the masked fragment', () => {
+    expect(derivePaymentChannelView(base)).toEqual({
+      id: 'pc-1',
+      ownerType: 'customer',
+      customerId: 'cust-1',
+      insurerId: null,
+      channelType: 'bank_transfer',
+      label: 'Primary JOD',
+      bankName: 'Cairo Amman Bank',
+      accountLast4: '1234',
+      currency: 'JOD',
+      status: 'active',
+      isActive: true,
+      disabledAt: null,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    });
+  });
+
+  it('a disabled channel is not active', () => {
+    const v = derivePaymentChannelView({
+      ...base,
+      status: 'disabled',
+      disabledAt: new Date('2026-10-01T00:00:00.000Z'),
+    });
+    expect(v.isActive).toBe(false);
+    expect(v.disabledAt).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  it('paymentChannelAuditSnapshot carries metadata but NEVER accountLast4', () => {
+    const snap = paymentChannelAuditSnapshot({
+      channelId: 'pc-1',
+      ownerType: 'insurer',
+      customerId: null,
+      insurerId: 'ins-1',
+      channelType: 'cheque',
+      label: 'Insurer settlement account',
+      bankName: 'Arab Bank',
+      status: 'active',
+    });
+    expect(snap).toEqual({
+      channelId: 'pc-1',
+      ownerType: 'insurer',
+      customerId: null,
+      insurerId: 'ins-1',
+      channelType: 'cheque',
+      label: 'Insurer settlement account',
+      bankName: 'Arab Bank',
+      status: 'active',
+    });
+    expect(JSON.stringify(snap)).not.toContain('1234');
+    expect(Object.keys(snap)).not.toContain('accountLast4');
   });
 });
