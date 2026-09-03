@@ -4226,11 +4226,20 @@ narrows a gap.
   web `eslint` OK; new Playwright `client-accounting.spec.ts` (3 — worst-first table +
   totals, the permission-missing message, `@a11y`). `prisma migrate status` unchanged
   (**36**); no seed change. `npm audit` — the same 1 pre-existing `qs` advisory.
-- **Pre-existing, unrelated**: `packages/db` `prisma/seed-data/permissions.spec.ts` has
-  one failing assertion on this branch **before** this change —
-  `FINANCE_COLLECTIONS_OFFICER` is granted `refund.approve`, which the Part 5.1 "Cannot"
-  constraint test forbids. Confirmed pre-existing (fails identically with all #33
-  changes stashed); not touched here.
+- **Follow-up fix (same branch, next commit)**: `packages/db`
+  `prisma/seed-data/permissions.spec.ts` had one failing assertion since Part C #22
+  (commit `4aa7c3b` added `FINANCE` to `refund.approve` — brain-correct — but left the
+  stale role-level test). **Corrected the test, not the seed**:
+  `roles-and-segregation-of-duties.md` says Finance "Cannot approve **own**
+  refunds/write-offs" (instance-level — the "own"), and `maker-checker-segregation.md`
+  maps the refund *checker* to a "Finance approver above the value threshold", so
+  `FINANCE` legitimately holds `refund.approve`; raiser ≠ approver on a given `Refund`
+  is enforced by `assertDifferentActors` + the `Refund_maker_checker_distinct` CHECK in
+  `endorsement.service.ts` `approveRefund`, not by withholding the code — the same shape
+  as the Claims Officer first-approver assertion in the same spec, and exactly what the
+  spec's own header comment ("instance-level self-check … is A.5's `assertDifferentActors`,
+  not this grid's job") already carves out. `@ibms/db` tests 15/15; full `npm run test`
+  green.
 
 ## Deployment
 
