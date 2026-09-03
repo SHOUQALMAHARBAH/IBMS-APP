@@ -40,6 +40,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/bank-reconciliation', label: 'Bank reconciliation' },
   { href: '/financial-report', label: 'Financial report' },
   { href: '/service-requests', label: 'Customer requests' },
+  { href: '/complaints', label: 'Complaints' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

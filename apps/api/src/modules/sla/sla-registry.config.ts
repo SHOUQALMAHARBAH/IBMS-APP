@@ -306,6 +306,33 @@ export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
     citation:
       'DRAFT, UNSOURCED — no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers customer-service-request turnaround; Part 3.8 names no figure. See ibms-brain/meta/context/customer-service-lifecycle.md',
   },
+  // Backlog Part C #42 (Complaints Management, Domain E). Like the KYC and
+  // service-request rows above, this has NO source in pdpl-sla-timers.md's
+  // registry: a customer-complaint resolution turnaround is a CBJ insurance
+  // conduct-of-business matter (the CBJ Insurance Dispute Resolution
+  // Committee, which `EscalationRecord` routes to, is a real CBJ mechanism),
+  // NOT a PDPL statutory SLA — and Part 3.8 of the context document names no
+  // figure. 10 business days below is a DRAFTED analog (this table's DSR
+  // correction/objection figure, a reasonable "substantive response"
+  // window). The backlog line explicitly names `SlaTimer`, so it is tracked
+  // here (with the nightly escalation sweep to the internal supervisor);
+  // replace with a sourced figure when a CBJ complaint-handling instruction
+  // or a broker SOP supplies one. Filed as a brain gap in
+  // ibms-brain/meta/context/customer-service-lifecycle.md.
+  {
+    workflowName: 'complaint_resolution',
+    label: 'Customer complaint resolution',
+    entityType: 'Complaint',
+    duration: { value: 10, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'BRANCH_DEPARTMENT_MANAGER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers customer-complaint resolution turnaround; Part 3.8 names no figure (CBJ conduct-of-business, not PDPL). See ibms-brain/meta/context/customer-service-lifecycle.md',
+  },
 ];
 
 const SLA_REGISTRY_BY_NAME = new Map(

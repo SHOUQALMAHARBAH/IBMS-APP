@@ -31,6 +31,7 @@ const EXPECTED_NON_PDPL_WORKFLOW_NAMES = [
   'kyc_standard_review',
   'kyc_edd_review',
   'service_request_fulfilment',
+  'complaint_resolution',
 ].sort();
 
 describe('SLA_REGISTRY', () => {

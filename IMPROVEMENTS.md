@@ -8,9 +8,10 @@ completed backlog item)" and are not repeated here except where they compound
 into a system-wide problem.
 
 **Status:** first compiled at parent `17e52b4` / `ibms-brain` `ed9ad56` (Domain
-D complete); topped up through Part C #41 (Domain E opened). Nothing below has
-been actioned — this file is the plan for the "solve every gap / threat / bug"
-pass the user asked for **after** the backlog build is finished.
+D complete); topped up through Part C #42 (Domain E — #41 Customer Requests +
+#42 Complaints Management built). Nothing below has been actioned — this file is
+the plan for the "solve every gap / threat / bug" pass the user asked for
+**after** the backlog build is finished.
 
 **Priority key:** `P0` blocks correctness, security, or a real "definition of
 done" · `P1` must be fixed before the system goes near production · `P2` tech
@@ -296,6 +297,7 @@ system is used for anything.
 | Claim-decision preconditions (adjuster survey + investigation both done) | #26 | drafted |
 | KYC compliance-review turnaround + re-KYC cadence | `kyc-aml-sla-timers.md` | draft/unsourced |
 | `service_request_fulfilment` SLA | #41 `sla-registry.config.ts` | 5 business days, escalate to Branch/Dept Manager — DRAFT/UNSOURCED (courtesy target, not a PDPL SLA) |
+| `complaint_resolution` SLA | #42 `sla-registry.config.ts` | 10 business days, escalate to Branch/Dept Manager — DRAFT/UNSOURCED (CBJ conduct-of-business, not a PDPL SLA; a CBJ complaint-handling instruction should supply the real figure) |
 | Jordan business-day calendar (SLA timers) | A.8 | brain gap filed; not implemented |
 
 ---
@@ -469,11 +471,16 @@ system is used for anything.
 Tracked in `README.md` § "Scope status" — listed here only so this file is a
 complete picture. **Not** improvements to existing code; net-new build.
 
-- **Domain E — Customer Service (#42–46):** #41 (`ServiceRequest`) is built.
-  Remaining: `Complaint` + supervisor sign-off + Insurance Dispute Resolution
-  Committee escalation, SLA monitoring dashboard, `CommunicationLog`
-  consent-gated sends, `CustomerFeedback`, `RetentionCase` auto-open on lapse
-  risk.
+- **Domain E — Customer Service (#43–46):** #41 (`ServiceRequest`) and #42
+  (`Complaint` + supervisor sign-off + Insurance Dispute Resolution Committee
+  escalation) are built. Remaining: the cross-module SLA monitoring dashboard
+  (#43), `CommunicationLog` consent-gated sends (#44), `CustomerFeedback` (#45),
+  `RetentionCase` auto-open on lapse risk (#46). #42 gaps: one 10-day
+  complaint-resolution SLA for all categories (drafted / unsourced); no
+  automatic escalation sweep to the dispute-resolution committee (the nightly
+  sweep only escalates the timer to the internal manager); no complaint →
+  acknowledgement / final-response `Document` link; escalation does not restart
+  the SLA on a return-to-handling; no re-open of a closed complaint.
 - **Domain F — Compliance & Risk (#47–57):** AML/CFT (5.3), sanctions batch,
   regulatory calendar, incident management, internal audit, data-protection
   compliance (= Part D, 5.1).

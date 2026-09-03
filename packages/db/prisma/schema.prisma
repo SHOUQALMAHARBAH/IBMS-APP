@@ -1957,8 +1957,18 @@ enum ComplaintStatus {
   ESCALATED
 }
 
-/// Process 42 / Part 3.8 — date, customer, issue, responsible employee,
-/// SLA, action, resolution, closure date.
+/// Process 42 / Part 3.8 (backlog Part C #42, Domain E) — a customer
+/// complaint: date, customer, issue, responsible employee, SLA, actions,
+/// resolution, closure date. `status` IS driven by `WorkflowTransitionService`
+/// (`WORKFLOW_TRANSITIONS.Complaint` —
+/// `LOGGED -> ASSIGNED -> IN_PROGRESS -> {RESOLVED | ESCALATED}`,
+/// `ESCALATED -> {IN_PROGRESS | RESOLVED}`, `RESOLVED -> CLOSED`), never a
+/// bare `.status =`. Closure carries a **mandatory supervisor sign-off**:
+/// `closureApprovedByUserId` must differ from `resolvedByUserId` (the maker) —
+/// `assertDifferentActors` + the `Complaint_closure_maker_checker_distinct`
+/// CHECK (migration `20260903170000`). `slaTimerId` links the ONE generic
+/// `SlaTimer` row (`complaint_resolution` — a DRAFTED 10-business-day default);
+/// best-effort, resolved when the complaint is resolved / escalated.
 model Complaint {
   id                 String   @id @default(uuid())
   customerId         String
@@ -1974,7 +1984,11 @@ model Complaint {
   slaTimerId         String?  @unique
   slaTimer           SlaTimer? @relation(fields: [slaTimerId], references: [id])
   resolution         String?
-  // closure requires supervisor approval before case is closed
+  // who moved the complaint to RESOLVED (the maker for the closure sign-off)
+  resolvedByUserId   String?
+  resolvedAt         DateTime?
+  // closure requires supervisor approval (MANAGER) before case is closed —
+  // MUST differ from resolvedByUserId (maker/checker segregation, Part 5.2)
   closureApprovedByUserId String?
   closedAt           DateTime?
   createdAt          DateTime @default(now())
@@ -1983,7 +1997,10 @@ model Complaint {
   escalations        EscalationRecord[]
 
   @@index([customerId])
-  @@index([status])
+  // the "open queue" read (status filter + newest-first order)
+  @@index([status, createdAt])
+  @@index([claimId])
+  @@index([responsibleEmployeeUserId])
 }
 
 model ComplaintAction {
@@ -1993,17 +2010,24 @@ model ComplaintAction {
   actionText  String
   takenByUserId String
   takenAt     DateTime  @default(now())
+
+  @@index([complaintId])
 }
 
-/// Process 42 — escalation to regulator / insurance dispute resolution
-/// mechanism, captured as a case status.
+/// Process 42 — escalation to management / the regulator / the Insurance
+/// Dispute Resolution Committee when a complaint cannot be resolved
+/// internally (a `complaint.escalate` action; the complaint moves to
+/// `ESCALATED`).
 model EscalationRecord {
   id            String    @id @default(uuid())
   complaintId   String
   complaint     Complaint @relation(fields: [complaintId], references: [id])
   escalatedTo   String    // management | regulator | dispute_resolution_committee
+  escalatedByUserId String?
   escalatedAt   DateTime  @default(now())
   reason        String?
+
+  @@index([complaintId])
 }
 
 enum CommunicationDirection {

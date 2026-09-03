@@ -26,3 +26,18 @@ export function trimIfString({ value }: TransformFnParams): unknown {
  * consolidation here — `risk-profile.config.ts` and `create-prospect.dto.ts`
  * still carry their own copies. */
 export const MONEY_STRING = /^\d{1,15}(\.\d{1,3})?$/;
+
+/**
+ * Guard for a free-text business note that sits next to a masked-data path
+ * (`ibms-brain/meta/lex/sensitive-data-handling.md` — a note / detail /
+ * reason field must not become the *de facto* capture point for a full bank
+ * account / card number, which is Highly Confidential and belongs on an
+ * approved `PaymentChannel`, Process 38, `accountLast4` only). Rejects a run
+ * of 9+ consecutive digits. `[\s\S]*` (not `.*`) so a multi-line note still
+ * matches. Pair with `@Matches(NO_FULL_ACCOUNT_NUMBER, { message: \`<field>
+ * ${NO_FULL_ACCOUNT_NUMBER_MESSAGE}\` })`. Used by Process 41 (`ServiceRequest`
+ * `detail` / `outcomeNote`) and Process 42 (`Complaint` `issue` / `resolution`,
+ * `ComplaintAction.actionText`, `EscalationRecord.reason`). */
+export const NO_FULL_ACCOUNT_NUMBER = /^(?!.*\d{9,})[\s\S]*$/;
+export const NO_FULL_ACCOUNT_NUMBER_MESSAGE =
+  'must not contain a run of 9+ digits — record a payment-method / account change through an approved payment channel (Process 38), not free text';

@@ -33,6 +33,7 @@ import { ForbiddenException } from '@nestjs/common';
  * | CommissionLedgerEntry     | overrideRequestedByUserId      | overrideApprovedByUserId     |
  * | Recommendation            | draftedByUserId                | approvedByUserId             |
  * | AccessRecertificationItem | subjectUserId                  | reviewerUserId               |
+ * | Complaint                 | resolvedByUserId               | closureApprovedByUserId      |
  *
  * @param makerId the user id who performed the maker action (requested,
  *   captured, placed, nominated, raised, drafted, assessed, ...)

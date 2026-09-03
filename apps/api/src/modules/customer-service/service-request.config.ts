@@ -63,15 +63,14 @@ export const SERVICE_REQUEST_SLA_WORKFLOW = 'service_request_fulfilment';
 /**
  * `detail` / `outcomeNote` are free-text business notes returned unmasked in
  * every list row and stored verbatim in the audit `afterValue` — Confidential
- * tier, not Highly Confidential. This guard keeps a full bank account / card
- * number (Highly Confidential — `sensitive-data-handling.md`) out of them: a
- * run of 9+ consecutive digits is rejected. A payment-method change is
- * recorded through an approved `PaymentChannel` (Process 38, masked
- * `accountLast4` only), not typed into `detail`. `[\s\S]*` (not `.*`) so a
- * multi-line note still matches. */
-export const NO_FULL_ACCOUNT_NUMBER = /^(?!.*\d{9,})[\s\S]*$/;
-export const NO_FULL_ACCOUNT_NUMBER_MESSAGE =
-  'must not contain a run of 9+ digits — record a payment-method / account change through an approved payment channel (Process 38), not free text';
+ * tier, not Highly Confidential. The `NO_FULL_ACCOUNT_NUMBER` guard (now in
+ * `common/dto.util.ts`, shared with Process 42's `Complaint` notes) keeps a
+ * full bank account / card number out of them. Re-exported here so the
+ * Process 41 DTOs keep their single-import surface. */
+export {
+  NO_FULL_ACCOUNT_NUMBER,
+  NO_FULL_ACCOUNT_NUMBER_MESSAGE,
+} from '../../common/dto.util';
 
 /** Cap on a book-wide `ServiceRequest` list. */
 export const SERVICE_REQUEST_READ_LIMIT = 5000;
