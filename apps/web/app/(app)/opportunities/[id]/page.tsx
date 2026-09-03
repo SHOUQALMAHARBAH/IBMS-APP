@@ -22,6 +22,7 @@ import { PolicySection } from '../../../../components/policy/PolicySection';
 import { EndorsementSection } from '../../../../components/policy/EndorsementSection';
 import { ClaimSection } from '../../../../components/policy/ClaimSection';
 import { FinanceSection } from '../../../../components/policy/FinanceSection';
+import { CommissionSection } from '../../../../components/policy/CommissionSection';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
@@ -232,6 +233,12 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canInvoice={isFinance}
             canCollect={isFinance}
+          />
+
+          <CommissionSection
+            opportunityId={opportunity.id}
+            canCalculate={isFinance}
+            canApproveOverride={isManager}
           />
 
           <ClaimSection

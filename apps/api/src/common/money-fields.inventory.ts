@@ -52,6 +52,7 @@ export const MONEY_DECIMAL_FIELDS: readonly string[] = [
   'Remittance.amount',
   'CommissionLedgerEntry.amount',
   'CommissionLedgerEntry.vatAmount',
+  'CommissionLedgerEntry.overrideAmount',
   'ReconciliationException.insurerStatementAmount',
   'ReconciliationException.brokerRecordAmount',
   'ReconciliationException.varianceAmount',

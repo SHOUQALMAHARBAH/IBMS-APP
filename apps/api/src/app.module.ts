@@ -31,6 +31,7 @@ import { EndorsementModule } from './modules/endorsement/endorsement.module';
 import { LossRatioModule } from './modules/loss-ratio/loss-ratio.module';
 import { ClaimModule } from './modules/claim/claim.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { CommissionModule } from './modules/commission/commission.module';
 
 @Module({
   imports: [
@@ -211,6 +212,14 @@ import { FinanceModule } from './modules/finance/finance.module';
     // PolicyModule (the policy + insurer) / RecommendationModule (the placed
     // commission rate).
     FinanceModule,
+    // Part C backlog #35 (Commission Calculation) — the governed
+    // CommissionAgreement rate table (by insurer + line, time-windowed;
+    // commission-rate.manage / Compliance + Manager) and the
+    // CommissionLedgerEntry ledger: calculate at the governed rate
+    // (commission.calculate / Finance, write-once per policy) plus the
+    // manual-override maker/checker pair (commission-override.raise / Finance
+    // -> commission-override.approve / Manager). Depends on PolicyModule.
+    CommissionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

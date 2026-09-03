@@ -35,6 +35,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/claims-analytics', label: 'Claims analytics' },
   { href: '/client-accounting', label: 'Client accounting' },
   { href: '/insurer-accounting', label: 'Insurer accounting' },
+  { href: '/commission', label: 'Commission rates' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

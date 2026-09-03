@@ -1720,6 +1720,12 @@ model Remittance {
 
 /// Process 35 — insurer- and product-specific commission rate table
 /// (illustrative rates: Motor 12%, Medical 10%, Property 15%, Life 20%).
+/// AT MOST ONE currently-open agreement per (insurerId, insuranceLine) — a
+/// partial `UNIQUE ("insurerId", "insuranceLine") WHERE "effectiveTo" IS NULL`
+/// (migration 20260903120000, raw SQL — Prisma can't express a predicate
+/// UNIQUE). A rate change closes the prior window (`effectiveTo`) and opens a
+/// new one in one $transaction; the index is the race backstop
+/// (ibms-brain/meta/lex/race-safe-invariants.md).
 model CommissionAgreement {
   id            String   @id @default(uuid())
   insurerId     String
@@ -1734,8 +1740,16 @@ model CommissionAgreement {
   @@index([insurerId, insuranceLine])
 }
 
-/// Process 36 — commission rate, amount, VAT/tax implications, paid,
-/// outstanding, reversed.
+/// Process 35–36 — the governed commission earned on a policy. #35 records the
+/// ONE new-business entry per policy (`@@unique([policyId])`, write-once —
+/// the #31 Invoice pattern) at the governed rate; #36 tracks its lifecycle
+/// (rate/amount/VAT/paid/outstanding/reversed). `amount` is the governed
+/// figure; `overrideAmount` is a PROPOSED manual override held separately
+/// until APPROVED, at which point the approve step copies it into `amount`.
+/// Maker/checker on the override pair (overrideRequestedByUserId <>
+/// overrideApprovedByUserId) is DB-enforced by
+/// CommissionLedgerEntry_maker_checker_distinct (migration 20260826091424) +
+/// assertDifferentActors in the service.
 model CommissionLedgerEntry {
   id                     String   @id @default(uuid())
   policyId               String
@@ -1744,6 +1758,9 @@ model CommissionLedgerEntry {
   commissionAgreement    CommissionAgreement? @relation(fields: [commissionAgreementId], references: [id])
   amount                 Decimal  @db.Decimal(18, 3)
   vatAmount              Decimal  @db.Decimal(18, 3) @default(0)
+  /// Process 35 — the proposed manual-override amount; null unless an override
+  /// has been raised. Copied into `amount` only when the override is approved.
+  overrideAmount         Decimal? @db.Decimal(18, 3)
   status                 String   @default("outstanding") // outstanding | paid | reversed
   isManualOverride       Boolean  @default(false)
   overrideReason         String?  // manual override requires an approval reason, logged
@@ -1753,6 +1770,8 @@ model CommissionLedgerEntry {
   overrideRequestedByUserId String?
   overrideApprovedByUserId String?
   createdAt              DateTime @default(now())
+
+  @@unique([policyId])
 }
 
 /// Process 39 — every reconciliation mismatch raised as an EXPLICIT
