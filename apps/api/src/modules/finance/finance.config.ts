@@ -1056,3 +1056,332 @@ export function buildInsurerPayables(input: {
     },
   };
 }
+
+// --- Process 40: financial reporting (consolidated dashboard summary) -------
+//
+// Part 3.6 / backlog #40 says only "Financial Reporting — dashboard D in Part
+// E" (the Part E "Financial Dashboard": receivables & ageing, payables to
+// insurers, commission income & outstanding commission, profitability by
+// client segment / line). The receivables + payables sections are #33 / #34
+// verbatim (`buildReceivablesAgeing` / `buildInsurerPayables` totals); the two
+// pure builders below are the new #40 pieces. All money through
+// `money.util.ts`. `ibms-brain/meta/context/finance-lifecycle.md` §
+// "Financial Reporting (Process 40)".
+
+/** Cap on how many `CommissionLedgerEntry` / written-`Policy` rows one summary
+ * materialises + groups in memory. A broker's commission book / written book
+ * fits comfortably; the service `logger.warn`s on truncation (the #30
+ * `ANALYTICS_POLICY_LIMIT` / #33 `AR_AGEING_INVOICE_LIMIT` precedent). */
+export const FINANCIAL_REPORT_ROW_LIMIT = 5000;
+
+/** One `CommissionLedgerEntry` joined to its policy's insurer — the input to
+ * `buildCommissionRollup`. `amount` is the EFFECTIVE commission at every stage
+ * (a pending override never touches it; an approved one is copied in — the
+ * `deriveLedgerEntryView` `effectiveAmount` rule). */
+export interface CommissionRollupEntryRow {
+  entryId: string;
+  insurerId: string;
+  insurerName: string;
+  /** governed / effective commission earned on this policy. */
+  amount: Prisma.Decimal | string;
+  vatAmount: Prisma.Decimal | string;
+  /** `paidAmount` once reconciled (#36 `settle`), else null. */
+  paidAmount: Prisma.Decimal | string | null;
+  /** accumulated clawback (#36, driven by a Process 22 `CommissionReversal`),
+   * else null. */
+  reversedAmount: Prisma.Decimal | string | null;
+  status: string;
+}
+
+export interface CommissionRollupFigures {
+  /** Σ `amount` — gross commission booked on the group's policies. */
+  earned: string;
+  /** Σ `vatAmount` (on the gross `earned` — a reversal's VAT treatment is a
+   * #36 / tax concern, not netted here). */
+  vat: string;
+  /** `earned + vat`. */
+  gross: string;
+  /** `earned − reversed` — commission income recognised after clawbacks. */
+  netEarned: string;
+  /** Σ `paidAmount` (reconciled against the insurer's statement, #36). */
+  paid: string;
+  /** Σ `reversedAmount` (clawed back, #36 / #22). */
+  reversed: string;
+  /** Σ per-entry `max(0, amount − paidAmount − reversedAmount)` — commission
+   * still collectible from the insurer. **Never negative**: a `paid` entry
+   * later clawed back (`paidAmount == amount` AND `reversedAmount > 0`) would
+   * make the raw residual negative, so it is floored at 0 per entry (nothing
+   * left to collect — the clawback is money owed *back*, tracked in
+   * `reversed`). The strict identity `earned == paid + outstanding + reversed`
+   * therefore holds only for entries with no paid+reversed overlap (the normal
+   * case); use `netEarned` for "recognised income". */
+  outstanding: string;
+  entryCount: number;
+}
+
+export interface CommissionRollupInsurerRow extends CommissionRollupFigures {
+  insurerId: string;
+  insurerName: string;
+}
+
+export interface CommissionRollup extends CommissionRollupFigures {
+  /** one row per insurer with a commission ledger entry, worst-first (largest
+   * outstanding, then largest earned, then insurer name). */
+  byInsurer: CommissionRollupInsurerRow[];
+}
+
+interface CommissionRollupAcc {
+  insurerName: string;
+  earned: Prisma.Decimal[];
+  vat: Prisma.Decimal[];
+  paid: Prisma.Decimal[];
+  reversed: Prisma.Decimal[];
+  /** per-entry `max(0, amount − (paidAmount ?? 0) − (reversedAmount ?? 0))`. */
+  outstanding: Prisma.Decimal[];
+  entryCount: number;
+}
+
+function rollupFigures(acc: CommissionRollupAcc): CommissionRollupFigures {
+  const earned = sumMoney(acc.earned);
+  const vat = sumMoney(acc.vat);
+  const reversed = sumMoney(acc.reversed);
+  return {
+    earned: formatMoney(earned),
+    vat: formatMoney(vat),
+    gross: formatMoney(addMoney(earned, vat)),
+    netEarned: formatMoney(subtractMoney(earned, reversed)),
+    paid: formatMoney(sumMoney(acc.paid)),
+    reversed: formatMoney(reversed),
+    outstanding: formatMoney(sumMoney(acc.outstanding)),
+    entryCount: acc.entryCount,
+  };
+}
+
+/**
+ * Process 40 — the commission income / outstanding roll-up (the "AP-style
+ * outstanding-vs-paid-vs-reversed roll-up by insurer" #36 deferred to here).
+ * Per entry: `earned = amount` (the *effective* commission — `amount` holds the
+ * governed figure on a fresh / pending-override entry and the approved override
+ * once copied in, the `deriveLedgerEntryView` rule), `paid = paidAmount ?? 0`,
+ * `reversed = reversedAmount ?? 0`, `outstanding = max(0, amount − paid −
+ * reversed)` — floored at 0 so a reconciled-then-clawed-back entry
+ * (`paidAmount == amount` **and** `reversedAmount > 0`, a legal #36 / #22 state)
+ * never reports a negative "still collectible". `netEarned = earned − reversed`
+ * is the recognised income. Every figure through `money.util.ts`; the book
+ * totals pool the same per-entry values the `byInsurer` rows do. Rows
+ * worst-first (largest `outstanding`, then `earned`, then insurer name). Pure.
+ */
+export function buildCommissionRollup(
+  entries: CommissionRollupEntryRow[],
+): CommissionRollup {
+  const zero = new Prisma.Decimal(0);
+  const byInsurer = new Map<string, CommissionRollupAcc>();
+  const book: CommissionRollupAcc = {
+    insurerName: '',
+    earned: [],
+    vat: [],
+    paid: [],
+    reversed: [],
+    outstanding: [],
+    entryCount: 0,
+  };
+
+  for (const e of entries) {
+    let acc = byInsurer.get(e.insurerId);
+    if (!acc) {
+      acc = {
+        insurerName: e.insurerName,
+        earned: [],
+        vat: [],
+        paid: [],
+        reversed: [],
+        outstanding: [],
+        entryCount: 0,
+      };
+      byInsurer.set(e.insurerId, acc);
+    }
+    const amount = quantizeMoney(e.amount);
+    const vat = quantizeMoney(e.vatAmount);
+    const paid = e.paidAmount == null ? zero : quantizeMoney(e.paidAmount);
+    const reversed =
+      e.reversedAmount == null ? zero : quantizeMoney(e.reversedAmount);
+    const residual = subtractMoney(subtractMoney(amount, paid), reversed);
+    const outstanding = compareMoney(residual, zero) < 0 ? zero : residual;
+
+    for (const target of [acc, book]) {
+      target.earned.push(amount);
+      target.vat.push(vat);
+      target.paid.push(paid);
+      target.reversed.push(reversed);
+      target.outstanding.push(outstanding);
+      target.entryCount += 1;
+    }
+  }
+
+  const byInsurerRows: CommissionRollupInsurerRow[] = [...byInsurer.entries()]
+    .map(([insurerId, acc]) => ({
+      insurerId,
+      insurerName: acc.insurerName,
+      ...rollupFigures(acc),
+    }))
+    .sort(
+      (a, b) =>
+        compareMoney(b.outstanding, a.outstanding) ||
+        compareMoney(b.earned, a.earned) ||
+        a.insurerName.localeCompare(b.insurerName, 'en'),
+    );
+
+  return { ...rollupFigures(book), byInsurer: byInsurerRows };
+}
+
+/** How the profitability section groups the written book. */
+export const PROFITABILITY_GROUP_BY = ['line', 'segment'] as const;
+export type ProfitabilityGroupBy = (typeof PROFITABILITY_GROUP_BY)[number];
+
+/** One written policy's contribution to the profitability section. Matches
+ * `FinancialReportRepository.loadProfitabilityPolicies`'s row. */
+export interface ProfitabilityPolicyRow {
+  policyId: string;
+  insuranceLine: string;
+  /** `CustomerType` — `'CORPORATE'` | `'INDIVIDUAL'`. */
+  customerType: string;
+  /** `issuedPremium ?? requestedPremium` — written premium (a cancelled /
+   * expired policy still contributes its full written premium; earned-premium
+   * proration is a renewal-module refinement, the #30 assumption). */
+  premium: Prisma.Decimal | string;
+  /** net settlement of each SETTLED / CLOSED claim on the policy (null when
+   * unsettled). HIGHLY_CONFIDENTIAL source — the service records a READ. */
+  claimNetSettlements: (Prisma.Decimal | string | null)[];
+  /** the policy's `CommissionLedgerEntry` effective `amount`, or null. */
+  commissionAmount: Prisma.Decimal | string | null;
+  /** accumulated clawback on that entry, or null. */
+  commissionReversedAmount: Prisma.Decimal | string | null;
+}
+
+export interface ProfitabilityRow {
+  /** the group key — the line string, or `'CORPORATE'` / `'INDIVIDUAL'`. */
+  key: string;
+  label: string;
+  /** Σ written premium. */
+  premiumWritten: string;
+  /** Σ net settlement of SETTLED / CLOSED claims on the group's policies. */
+  claimsPaid: string;
+  /** Σ (`commissionAmount − commissionReversedAmount`) — net commission
+   * earned by the broker on the group. */
+  commissionEarned: string;
+  /** `premiumWritten − claimsPaid − commissionEarned` — the book's
+   * underwriting result for the group (drafted interpretation of the Part E
+   * "profitability by client segment / line" line — for a broker the P&L
+   * driver is `commissionEarned`, but the backlog line reads
+   * "premium − claims − commission", so that is what this returns). Can be
+   * negative. */
+  netPosition: string;
+  policyCount: number;
+  claimCount: number;
+}
+
+export interface ProfitabilitySection {
+  /** worst-first (smallest / most-negative `netPosition`), then label A→Z. */
+  byLine: ProfitabilityRow[];
+  bySegment: ProfitabilityRow[];
+  totals: Omit<ProfitabilityRow, 'key' | 'label'>;
+}
+
+function profitabilityRowFor(
+  policies: ProfitabilityPolicyRow[],
+): Omit<ProfitabilityRow, 'key' | 'label'> {
+  const zero = new Prisma.Decimal(0);
+  const premiumWritten = sumMoney(policies.map((p) => p.premium));
+  const nets = policies.flatMap((p) => p.claimNetSettlements);
+  const claimsPaid = sumMoney(
+    nets.filter((n): n is Prisma.Decimal | string => n != null),
+  );
+  const commissionEarned = sumMoney(
+    policies.map((p) =>
+      subtractMoney(
+        p.commissionAmount == null ? zero : quantizeMoney(p.commissionAmount),
+        p.commissionReversedAmount == null
+          ? zero
+          : quantizeMoney(p.commissionReversedAmount),
+      ),
+    ),
+  );
+  return {
+    premiumWritten: formatMoney(premiumWritten),
+    claimsPaid: formatMoney(claimsPaid),
+    commissionEarned: formatMoney(commissionEarned),
+    netPosition: formatMoney(
+      subtractMoney(
+        subtractMoney(premiumWritten, claimsPaid),
+        commissionEarned,
+      ),
+    ),
+    policyCount: policies.length,
+    claimCount: nets.filter((n) => n != null).length,
+  };
+}
+
+function groupProfitability(
+  policies: ProfitabilityPolicyRow[],
+  keyOf: (p: ProfitabilityPolicyRow) => string,
+): ProfitabilityRow[] {
+  const groups = new Map<string, ProfitabilityPolicyRow[]>();
+  for (const p of policies) {
+    const key = keyOf(p);
+    const g = groups.get(key) ?? [];
+    g.push(p);
+    groups.set(key, g);
+  }
+  return [...groups.entries()]
+    .map(([key, g]) => ({ key, label: key, ...profitabilityRowFor(g) }))
+    .sort(
+      (a, b) =>
+        compareMoney(a.netPosition, b.netPosition) ||
+        a.label.localeCompare(b.label, 'en'),
+    );
+}
+
+/**
+ * Process 40 — the "profitability by client segment / line" section. Groups
+ * every written policy by `insuranceLine` and by `customerType`, and for each
+ * group returns `premiumWritten` / `claimsPaid` / `commissionEarned` and
+ * `netPosition = premiumWritten − claimsPaid − commissionEarned` (the backlog
+ * line's literal "premium − claims − commission"). Every figure through
+ * `sumMoney`; rows worst-first (most-negative `netPosition`). Pure.
+ */
+export function buildProfitability(
+  policies: ProfitabilityPolicyRow[],
+): ProfitabilitySection {
+  return {
+    byLine: groupProfitability(policies, (p) => p.insuranceLine),
+    bySegment: groupProfitability(policies, (p) => p.customerType),
+    totals: profitabilityRowFor(policies),
+  };
+}
+
+export interface FinancialReportReceivables extends ArAgeingBucketAmounts {
+  outstandingTotal: string;
+  invoiceCount: number;
+  customerCount: number;
+}
+
+export interface FinancialReportPayables {
+  outstandingAmount: string;
+  outstandingCount: number;
+  remittedAmount: string;
+  remittedCount: number;
+  insurerCount: number;
+}
+
+export interface FinancialReportSummary {
+  /** the point-in-time reference date for the receivables + payables sections,
+   * UTC midnight, ISO (default today). Commission + profitability are
+   * current-state (the commission ledger / `Policy.issuedPremium` are not
+   * time-versioned). */
+  asOf: string;
+  currency: string;
+  receivables: FinancialReportReceivables;
+  payables: FinancialReportPayables;
+  commission: CommissionRollup;
+  profitability: ProfitabilitySection;
+}

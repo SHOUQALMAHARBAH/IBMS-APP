@@ -10,9 +10,12 @@ import { PaymentChannelController } from './payment-channel.controller';
 import { PaymentChannelService } from './payment-channel.service';
 import { ReconciliationController } from './reconciliation.controller';
 import { ReconciliationService } from './reconciliation.service';
+import { FinancialReportController } from './financial-report.controller';
+import { FinancialReportService } from './financial-report.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import { ReconciliationRepository } from '../../repositories/reconciliation.repository';
+import { FinancialReportRepository } from '../../repositories/financial-report.repository';
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
@@ -61,6 +64,14 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
  * `COLLECTED|RECONCILED → EXCEPTION_RAISED` through the engine; the
  * investigate / resolve path closes it and resumes the cycle at the
  * caller-picked `RECONCILED` / `REMITTED`.
+ *
+ * `FinancialReportService` (#40) serves the consolidated "Financial Dashboard"
+ * summary (`GET /financial-report/summary`, `financial-report.view`) —
+ * composing #33's AR / ageing totals + #34's insurer AP totals with a new
+ * commission income roll-up (by insurer) and a profitability section (written
+ * policies grouped by line / customer segment). Computed on the fly; a
+ * best-effort `READ` audit row (the profitability section touches
+ * HIGHLY_CONFIDENTIAL `Claim` rows — the #30 precedent).
  */
 @Module({
   imports: [AuditModule, PolicyModule, RecommendationModule],
@@ -70,6 +81,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     InsurerAccountingController,
     PaymentChannelController,
     ReconciliationController,
+    FinancialReportController,
   ],
   providers: [
     InvoiceService,
@@ -78,9 +90,11 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     InsurerAccountingService,
     PaymentChannelService,
     ReconciliationService,
+    FinancialReportService,
     InvoiceRepository,
     PaymentChannelRepository,
     ReconciliationRepository,
+    FinancialReportRepository,
   ],
   exports: [InvoiceRepository],
 })

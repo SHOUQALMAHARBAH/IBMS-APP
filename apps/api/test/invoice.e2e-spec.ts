@@ -1235,4 +1235,136 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     expect(actions).toContain('UPDATE');
     expect(JSON.stringify(reconAudit)).toContain(NOTE);
   });
+
+  it('Process 40 — the consolidated financial-report summary composes AR / payables + a commission roll-up + a profitability section', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv40-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv40-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv40-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const comp = await makeUser(app, 'inv40-comp', 'COMPLIANCE_OFFICER');
+    const { policyId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'finrep',
+    );
+    const policy = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { insurerId: true, insuranceLine: true },
+    });
+
+    // raise + collect the premium invoice (→ COLLECTED: not in AR, owed to insurer)
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000' })
+      .expect(201);
+
+    // a governed commission rate for the pair, then Finance calculates + settles
+    await request(app.getHttpServer())
+      .post('/commission/agreements')
+      .set(bearer(comp.accessToken))
+      .send({
+        insurerId: policy.insurerId,
+        insuranceLine: policy.insuranceLine,
+        ratePercent: '12',
+        effectiveFrom: '2026-01-01',
+      })
+      .expect(201);
+    const calc = await request(app.getHttpServer())
+      .post('/commission/entries')
+      .set(bearer(fin.accessToken))
+      .send({ policyId })
+      .expect(201);
+    const entryId = (calc.body as { id: string; amount: string }).id;
+    expect((calc.body as { amount: string }).amount).toBe('14400.000'); // 120000 × 12%
+    await request(app.getHttpServer())
+      .post(`/commission/entries/${entryId}/settle`)
+      .set(bearer(fin.accessToken))
+      .send({ statementAmount: '14400.000', paymentReference: 'STMT-FR-1' })
+      .expect(201);
+
+    // a non-Finance actor cannot read the summary
+    await request(app.getHttpServer())
+      .get('/financial-report/summary')
+      .set(bearer(plc.accessToken))
+      .expect(403);
+
+    // a future asOf is a 422
+    await request(app.getHttpServer())
+      .get(`/financial-report/summary?asOf=${isoDaysAhead(2)}`)
+      .set(bearer(fin.accessToken))
+      .expect(422);
+
+    const summary = await request(app.getHttpServer())
+      .get('/financial-report/summary')
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const body = summary.body as {
+      asOf: string;
+      currency: string;
+      receivables: { outstandingTotal: string; invoiceCount: number };
+      payables: { outstandingAmount: string; remittedAmount: string };
+      commission: {
+        earned: string;
+        paid: string;
+        outstanding: string;
+        byInsurer: { insurerId: string; earned: string; paid: string }[];
+      };
+      profitability: {
+        byLine: {
+          key: string;
+          commissionEarned: string;
+          netPosition: string;
+        }[];
+        bySegment: { key: string }[];
+        totals: { premiumWritten: string; policyCount: number };
+      };
+    };
+
+    expect(body.currency).toBe('JOD');
+    // this invoice was collected → it is NOT in AR; it IS owed to the insurer
+    // (premium − commission = 105600), nothing remitted yet
+    const insurerRow = body.payables;
+    expect(Number(insurerRow.outstandingAmount) >= 105600).toBe(true);
+    // the commission roll-up sees this settled entry
+    const cRow = body.commission.byInsurer.find(
+      (r) => r.insurerId === policy.insurerId,
+    );
+    expect(cRow).toBeDefined();
+    expect(Number(cRow?.paid)).toBeGreaterThanOrEqual(14400);
+    // the profitability section groups the written policy by its line + segment
+    const line = body.profitability.byLine.find(
+      (r) => r.key === policy.insuranceLine,
+    );
+    expect(line).toBeDefined();
+    expect(Number(line?.commissionEarned)).toBeGreaterThanOrEqual(14400);
+    expect(
+      body.profitability.bySegment.some((r) => r.key === 'CORPORATE'),
+    ).toBe(true);
+    expect(body.profitability.totals.policyCount).toBeGreaterThanOrEqual(1);
+
+    // a best-effort READ audit row exists for the summary
+    const frAudit = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'FinancialReport', action: 'READ' },
+    });
+    expect(frAudit.length).toBeGreaterThanOrEqual(1);
+  });
 });

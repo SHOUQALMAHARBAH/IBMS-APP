@@ -2,7 +2,9 @@ import { Prisma } from '@ibms/db';
 import { describe, expect, it } from 'vitest';
 import {
   ageingBucketFor,
+  buildCommissionRollup,
   buildInsurerPayables,
+  buildProfitability,
   buildReceivablesAgeing,
   computeInvoiceFigures,
   computeRemittanceAmount,
@@ -18,11 +20,13 @@ import {
   paymentChannelAuditSnapshot,
   reconExceptionAuditSnapshot,
   reconExceptionUpdateAuditSnapshot,
+  type CommissionRollupEntryRow,
   type InsurerObligationRow,
   type InsurerRemittanceRow,
   type InvoiceRow,
   type OutstandingInvoiceRow,
   type PaymentChannelRow,
+  type ProfitabilityPolicyRow,
   type ReconExceptionRow,
 } from './finance.config';
 
@@ -801,6 +805,227 @@ describe('ReconciliationException view + audit (Process 39)', () => {
       status: 'resolved',
       resolutionNote: 'Statement double-counted a prior remittance.',
       resumeInvoiceAs: 'REMITTED',
+    });
+  });
+});
+
+describe('buildCommissionRollup (Process 40)', () => {
+  const entry = (
+    over: Partial<CommissionRollupEntryRow> = {},
+  ): CommissionRollupEntryRow => ({
+    entryId: 'cle-1',
+    insurerId: 'ins-1',
+    insurerName: 'Alpha Insurance',
+    amount: d('1000.000'),
+    vatAmount: d('160.000'),
+    paidAmount: null,
+    reversedAmount: null,
+    status: 'outstanding',
+    ...over,
+  });
+
+  it('an outstanding entry contributes its full amount to earned + outstanding', () => {
+    const r = buildCommissionRollup([entry()]);
+    expect(r.earned).toBe('1000.000');
+    expect(r.paid).toBe('0.000');
+    expect(r.reversed).toBe('0.000');
+    expect(r.outstanding).toBe('1000.000');
+    expect(r.vat).toBe('160.000');
+    expect(r.gross).toBe('1160.000');
+    expect(r.entryCount).toBe(1);
+  });
+
+  it('earned == paid + outstanding + reversed across a book with no paid+reversed overlap', () => {
+    const r = buildCommissionRollup([
+      entry({ entryId: 'a', status: 'outstanding' }), // 1000 outstanding
+      entry({
+        entryId: 'b',
+        status: 'paid',
+        amount: d('2000.000'),
+        paidAmount: d('2000.000'),
+      }), // 2000 paid
+      entry({
+        entryId: 'c',
+        status: 'reversed',
+        amount: d('500.000'),
+        reversedAmount: d('500.000'),
+      }), // 500 reversed (was outstanding)
+      entry({
+        entryId: 'd',
+        status: 'outstanding',
+        amount: d('900.000'),
+        reversedAmount: d('300.000'),
+      }), // 600 still collectible
+    ]);
+    expect(r.earned).toBe('4400.000'); // 1000 + 2000 + 500 + 900
+    expect(r.paid).toBe('2000.000');
+    expect(r.reversed).toBe('800.000'); // 500 + 300
+    expect(r.outstanding).toBe('1600.000'); // 1000 + 0 + 0 + 600
+    expect(r.netEarned).toBe('3600.000'); // 4400 − 800
+    // the invariant holds when no entry is both paid and reversed
+    expect(
+      new Prisma.Decimal(r.paid)
+        .plus(r.outstanding)
+        .plus(r.reversed)
+        .toFixed(3),
+    ).toBe(r.earned);
+  });
+
+  it('a reconciled-then-clawed-back entry never drives outstanding negative', () => {
+    const r = buildCommissionRollup([
+      // #36 settle stamps paidAmount == amount; a later Process 22 cancellation
+      // claws back part of it while status is still `paid`
+      entry({
+        entryId: 'paid-partial-clawback',
+        status: 'paid',
+        amount: d('1000.000'),
+        paidAmount: d('1000.000'),
+        reversedAmount: d('300.000'),
+      }),
+      // fully clawed back after payment → status `reversed`, paidAmount kept
+      entry({
+        entryId: 'paid-full-clawback',
+        insurerId: 'ins-2',
+        insurerName: 'Beta',
+        status: 'reversed',
+        amount: d('2000.000'),
+        paidAmount: d('2000.000'),
+        reversedAmount: d('2000.000'),
+      }),
+      entry({ entryId: 'plain', amount: d('500.000') }), // 500 genuinely outstanding
+    ]);
+    // outstanding floored at 0 per entry — the 500 is NOT eaten by the two
+    // paid+reversed entries' would-be negatives
+    expect(r.outstanding).toBe('500.000');
+    expect(Number(r.outstanding)).toBeGreaterThanOrEqual(0);
+    for (const row of r.byInsurer) {
+      expect(Number(row.outstanding)).toBeGreaterThanOrEqual(0);
+    }
+    // the genuinely-outstanding insurer sorts ahead of the two zeroed rows
+    expect(r.byInsurer[0]?.outstanding).toBe('500.000');
+    expect(r.paid).toBe('3000.000'); // 1000 + 2000
+    expect(r.reversed).toBe('2300.000'); // 300 + 2000
+    expect(r.netEarned).toBe('1200.000'); // 3500 earned − 2300 reversed
+  });
+
+  it('groups by insurer and orders rows worst-first (largest outstanding, then earned, then name)', () => {
+    const r = buildCommissionRollup([
+      entry({
+        entryId: 'a',
+        insurerId: 'ins-a',
+        insurerName: 'Zeta',
+        amount: d('100.000'),
+      }),
+      entry({
+        entryId: 'b',
+        insurerId: 'ins-b',
+        insurerName: 'Beta',
+        amount: d('900.000'),
+      }),
+      entry({
+        entryId: 'c',
+        insurerId: 'ins-b',
+        insurerName: 'Beta',
+        amount: d('100.000'),
+      }),
+    ]);
+    expect(r.byInsurer.map((x) => x.insurerId)).toEqual(['ins-b', 'ins-a']);
+    expect(r.byInsurer[0]?.outstanding).toBe('1000.000');
+    expect(r.byInsurer[0]?.entryCount).toBe(2);
+  });
+
+  it('is a clean zero for an empty book', () => {
+    const r = buildCommissionRollup([]);
+    expect(r).toMatchObject({
+      earned: '0.000',
+      vat: '0.000',
+      gross: '0.000',
+      paid: '0.000',
+      reversed: '0.000',
+      outstanding: '0.000',
+      entryCount: 0,
+      byInsurer: [],
+    });
+  });
+});
+
+describe('buildProfitability (Process 40)', () => {
+  const pol = (
+    over: Partial<ProfitabilityPolicyRow> = {},
+  ): ProfitabilityPolicyRow => ({
+    policyId: 'pol-1',
+    insuranceLine: 'Property All Risks',
+    customerType: 'CORPORATE',
+    premium: d('120000.000'),
+    claimNetSettlements: [],
+    commissionAmount: d('14400.000'),
+    commissionReversedAmount: null,
+    ...over,
+  });
+
+  it('netPosition = premiumWritten - claimsPaid - commissionEarned per group', () => {
+    const s = buildProfitability([
+      pol({
+        claimNetSettlements: [d('30000.000'), d('5000.000')],
+        commissionAmount: d('14400.000'),
+        commissionReversedAmount: d('400.000'), // net commission 14000
+      }),
+    ]);
+    // 120000 - 35000 - 14000 = 71000
+    expect(s.totals.premiumWritten).toBe('120000.000');
+    expect(s.totals.claimsPaid).toBe('35000.000');
+    expect(s.totals.commissionEarned).toBe('14000.000');
+    expect(s.totals.netPosition).toBe('71000.000');
+    expect(s.totals.policyCount).toBe(1);
+    expect(s.totals.claimCount).toBe(2);
+  });
+
+  it('groups byLine and bySegment and sorts worst-first (most-negative netPosition)', () => {
+    const s = buildProfitability([
+      pol({
+        policyId: 'a',
+        insuranceLine: 'Motor Fleet',
+        customerType: 'INDIVIDUAL',
+        premium: d('10000.000'),
+        claimNetSettlements: [d('90000.000')], // net -84400
+        commissionAmount: d('1200.000'),
+      }),
+      pol({
+        policyId: 'b',
+        insuranceLine: 'Property All Risks',
+        customerType: 'CORPORATE',
+        premium: d('120000.000'),
+        claimNetSettlements: [],
+        commissionAmount: d('14400.000'), // net 105600
+      }),
+    ]);
+    expect(s.byLine.map((r) => r.key)).toEqual([
+      'Motor Fleet',
+      'Property All Risks',
+    ]);
+    expect(s.byLine[0]?.netPosition).toBe('-81200.000'); // 10000 - 90000 - 1200
+    expect(s.bySegment.map((r) => r.key)).toEqual(['INDIVIDUAL', 'CORPORATE']);
+  });
+
+  it('a null commission entry contributes zero commission', () => {
+    const s = buildProfitability([
+      pol({ commissionAmount: null, commissionReversedAmount: null }),
+    ]);
+    expect(s.totals.commissionEarned).toBe('0.000');
+    expect(s.totals.netPosition).toBe('120000.000');
+  });
+
+  it('is a clean zero for an empty book', () => {
+    const s = buildProfitability([]);
+    expect(s.byLine).toEqual([]);
+    expect(s.bySegment).toEqual([]);
+    expect(s.totals).toMatchObject({
+      premiumWritten: '0.000',
+      claimsPaid: '0.000',
+      commissionEarned: '0.000',
+      netPosition: '0.000',
+      policyCount: 0,
+      claimCount: 0,
     });
   });
 });
