@@ -37,6 +37,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/insurer-accounting', label: 'Insurer accounting' },
   { href: '/commission', label: 'Commission rates' },
   { href: '/payment-channels', label: 'Payment channels' },
+  { href: '/bank-reconciliation', label: 'Bank reconciliation' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

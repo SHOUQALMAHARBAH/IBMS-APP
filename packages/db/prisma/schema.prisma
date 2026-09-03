@@ -1848,8 +1848,27 @@ model CommissionLedgerEntry {
   @@unique([policyId])
 }
 
-/// Process 39 — every reconciliation mismatch raised as an EXPLICIT
-/// exception with the exact variance amount, NEVER silently written off.
+/// Process 39 — every reconciliation mismatch (insurer statement vs. broker
+/// record) raised as an EXPLICIT exception with the exact variance amount,
+/// NEVER silently written off (money-decimal-jod.md). `varianceAmount =
+/// insurerStatementAmount − brokerRecordAmount`, exact to the fils.
+///
+/// Lifecycle (`status`, a plain string — NOT a WorkflowTransition entity; the
+/// legal moves live in finance.config.ts's RECON_EXCEPTION_TRANSITIONS and
+/// every move is a status-conditional updateMany, race-safe-invariants.md):
+///   open --investigate--> investigating --resolve--> resolved
+///   open --resolve--> resolved   (an investigation step is optional)
+/// The parent `Invoice` (when tied) IS a WorkflowTransition entity: detect
+/// drives COLLECTED|RECONCILED -> EXCEPTION_RAISED; resolve drives
+/// EXCEPTION_RAISED -> EXCEPTION_RESOLVED -> RECONCILED (`resumeInvoiceAs`;
+/// only RECONCILED — a straight -> REMITTED would skip the Remittance +
+/// client-funds ledger entry). Resolving NEVER adjusts a figure — the
+/// variance stays recorded here.
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most ONE non-resolved
+/// exception per invoice — the partial UNIQUE index
+/// `ReconciliationException_one_open_per_invoice` (migration 20260903150000,
+/// raw SQL: `WHERE "status" <> 'resolved' AND "invoiceId" IS NOT NULL`).
 model ReconciliationException {
   id                String   @id @default(uuid())
   invoiceId         String?
@@ -1858,9 +1877,17 @@ model ReconciliationException {
   brokerRecordAmount Decimal @db.Decimal(18, 3)
   varianceAmount    Decimal  @db.Decimal(18, 3)
   status            String   @default("open") // open | investigating | resolved
+  raisedByUserId    String?
   investigatedByUserId String?
+  resolvedByUserId  String?
+  /// Why the variance was closed — logged verbatim (a business justification,
+  /// not personal data). Mandatory on resolve.
+  resolutionNote    String?
   resolvedAt        DateTime?
   createdAt         DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([status])
 }
 
 /// Process 32/7.3 — client funds must be identifiable and reconcilable

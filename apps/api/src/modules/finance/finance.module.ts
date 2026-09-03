@@ -8,8 +8,11 @@ import { InsurerAccountingController } from './insurer-accounting.controller';
 import { InsurerAccountingService } from './insurer-accounting.service';
 import { PaymentChannelController } from './payment-channel.controller';
 import { PaymentChannelService } from './payment-channel.service';
+import { ReconciliationController } from './reconciliation.controller';
+import { ReconciliationService } from './reconciliation.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
+import { ReconciliationRepository } from '../../repositories/reconciliation.repository';
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
@@ -49,6 +52,15 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
  * (`payment-channel.manage` / Finance) — a governed reference list; #32's
  * `CollectionService` validates a supplied `paymentChannelId` against it and
  * records it on the `Receipt` / `Remittance`.
+ *
+ * `ReconciliationService` (#39) runs the insurer-statement-vs-broker-record
+ * variance check (`POST /reconciliation-exceptions/detect`,
+ * `reconciliation-exception.investigate` / Finance) — a non-zero variance
+ * ALWAYS raises a `ReconciliationException` (never a silent write-off,
+ * `money-decimal-jod.md`) and drives the parent `Invoice`
+ * `COLLECTED|RECONCILED → EXCEPTION_RAISED` through the engine; the
+ * investigate / resolve path closes it and resumes the cycle at the
+ * caller-picked `RECONCILED` / `REMITTED`.
  */
 @Module({
   imports: [AuditModule, PolicyModule, RecommendationModule],
@@ -57,6 +69,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     ClientAccountingController,
     InsurerAccountingController,
     PaymentChannelController,
+    ReconciliationController,
   ],
   providers: [
     InvoiceService,
@@ -64,8 +77,10 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     ClientAccountingService,
     InsurerAccountingService,
     PaymentChannelService,
+    ReconciliationService,
     InvoiceRepository,
     PaymentChannelRepository,
+    ReconciliationRepository,
   ],
   exports: [InvoiceRepository],
 })

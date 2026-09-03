@@ -51,6 +51,166 @@ export const RECEIPT_METHODS = [
 ] as const;
 export type ReceiptMethod = (typeof RECEIPT_METHODS)[number];
 
+// --- Process 39: bank reconciliation ------------------------------------
+
+/** The variance on one statement line: `insurerStatementAmount −
+ * brokerRecordAmount`, exact to the fils (`money.util.ts`) — can be positive
+ * (insurer says more than the broker recorded) or negative. NEVER rounded
+ * away: a non-zero result ALWAYS raises a `ReconciliationException`
+ * (`money-decimal-jod.md`). Pure. */
+export function computeVariance(
+  insurerStatementAmount: Prisma.Decimal | string,
+  brokerRecordAmount: Prisma.Decimal | string,
+): Prisma.Decimal {
+  return subtractMoney(insurerStatementAmount, brokerRecordAmount);
+}
+
+/** `ReconciliationException.status` values. NOT a `WorkflowTransitionService`
+ * entity — the parent `Invoice` is; this lives in a plain string like
+ * `CommissionLedgerEntry.status`. */
+export const RECON_EXCEPTION_STATUSES = [
+  'open',
+  'investigating',
+  'resolved',
+] as const;
+export type ReconExceptionStatus = (typeof RECON_EXCEPTION_STATUSES)[number];
+
+/** Legal `ReconciliationException.status` moves. `open` may skip straight to
+ * `resolved` (an investigation step is optional); `resolved` is terminal.
+ * Every move validates against this, writes an audit row, and persists via a
+ * status-conditional `updateMany` (never a bare `.status =`). */
+export const RECON_EXCEPTION_TRANSITIONS: Record<
+  ReconExceptionStatus,
+  readonly ReconExceptionStatus[]
+> = {
+  open: ['investigating', 'resolved'],
+  investigating: ['resolved'],
+  resolved: [],
+};
+
+export function isReconExceptionTransition(
+  from: string,
+  to: ReconExceptionStatus,
+): boolean {
+  const allowed = RECON_EXCEPTION_TRANSITIONS[from as ReconExceptionStatus];
+  return allowed !== undefined && allowed.includes(to);
+}
+
+/** Where a resolved exception's parent `Invoice` resumes the collection cycle.
+ * A subset of `WORKFLOW_TRANSITIONS.Invoice['EXCEPTION_RESOLVED']` (which also
+ * allows `REMITTED`): resuming straight to `REMITTED` here would land a
+ * terminal-state invoice with NO `Remittance` row and NO `out`
+ * `ClientFundsLedgerEntry` — those are minted only inside
+ * `POST /invoices/:id/remittance`'s `$transaction` (Part 7.3 client-money
+ * trace). So `resolve` returns the invoice to `RECONCILED` and Finance
+ * completes the cycle with a normal remittance call. */
+export const RECON_INVOICE_RESUME_STATUSES = ['RECONCILED'] as const;
+export type ReconInvoiceResumeStatus =
+  (typeof RECON_INVOICE_RESUME_STATUSES)[number];
+
+/** Sanity cap on one `POST /reconciliation-exceptions/detect` batch — a
+ * statement with more lines than this is almost certainly a mistaken paste.
+ * Drafted `ibms-app` product decision, same status as the other Domain D
+ * caps. */
+export const RECON_DETECT_MAX_LINES = 500;
+
+export interface ReconExceptionRow {
+  id: string;
+  invoiceId: string | null;
+  insurerStatementAmount: Prisma.Decimal;
+  brokerRecordAmount: Prisma.Decimal;
+  varianceAmount: Prisma.Decimal;
+  status: string;
+  raisedByUserId: string | null;
+  investigatedByUserId: string | null;
+  resolvedByUserId: string | null;
+  resolutionNote: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ReconExceptionView {
+  id: string;
+  invoiceId: string | null;
+  insurerStatementAmount: string;
+  brokerRecordAmount: string;
+  varianceAmount: string;
+  status: string;
+  isResolved: boolean;
+  raisedByUserId: string | null;
+  investigatedByUserId: string | null;
+  resolvedByUserId: string | null;
+  resolutionNote: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export function deriveReconExceptionView(
+  row: ReconExceptionRow,
+): ReconExceptionView {
+  return {
+    id: row.id,
+    invoiceId: row.invoiceId,
+    insurerStatementAmount: formatMoney(row.insurerStatementAmount),
+    brokerRecordAmount: formatMoney(row.brokerRecordAmount),
+    varianceAmount: formatMoney(row.varianceAmount),
+    status: row.status,
+    isResolved: row.status === 'resolved',
+    raisedByUserId: row.raisedByUserId,
+    investigatedByUserId: row.investigatedByUserId,
+    resolvedByUserId: row.resolvedByUserId,
+    resolutionNote: row.resolutionNote,
+    resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** CREATE audit `afterValue` for a raised `ReconciliationException` — the
+ * three figures as fixed 3dp strings + ids + status, no free text. */
+export function reconExceptionAuditSnapshot(input: {
+  exceptionId: string;
+  invoiceId: string | null;
+  insurerStatementAmount: Prisma.Decimal;
+  brokerRecordAmount: Prisma.Decimal;
+  varianceAmount: Prisma.Decimal;
+  status: string;
+}): Prisma.InputJsonObject {
+  return {
+    exceptionId: input.exceptionId,
+    invoiceId: input.invoiceId,
+    insurerStatementAmount: formatMoney(input.insurerStatementAmount),
+    brokerRecordAmount: formatMoney(input.brokerRecordAmount),
+    varianceAmount: formatMoney(input.varianceAmount),
+    status: input.status,
+  };
+}
+
+/** UPDATE audit `afterValue` for an investigate / resolve. `resolutionNote` is
+ * carried **verbatim** on the resolve (the reason IS the point of the
+ * "investigation and closure path" — a business justification, not personal
+ * data, same rule as #35's `overrideReason`). */
+export function reconExceptionUpdateAuditSnapshot(input: {
+  exceptionId: string;
+  invoiceId: string | null;
+  varianceAmount: Prisma.Decimal;
+  status: string;
+  investigatedByUserId: string | null;
+  resolvedByUserId: string | null;
+  resolutionNote: string | null;
+  resumeInvoiceAs: string | null;
+}): Prisma.InputJsonObject {
+  return {
+    exceptionId: input.exceptionId,
+    invoiceId: input.invoiceId,
+    varianceAmount: formatMoney(input.varianceAmount),
+    status: input.status,
+    investigatedByUserId: input.investigatedByUserId,
+    resolvedByUserId: input.resolvedByUserId,
+    resolutionNote: input.resolutionNote,
+    resumeInvoiceAs: input.resumeInvoiceAs,
+  };
+}
+
 // --- Process 38: approved payment channels --------------------------------
 
 /** A `PaymentChannel` belongs to a customer (money IN, on a Receipt) or an

@@ -1059,4 +1059,180 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     expect(chanAudit.some((r) => r.action === 'CREATE')).toBe(true);
     expect(JSON.stringify(chanAudit)).not.toContain('4321');
   });
+
+  it('Process 39 — bank reconciliation: a variance ALWAYS raises an exception, then the investigate/resolve path returns the invoice to the cycle', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv39-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv39-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv39-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const mgr = await makeUser(app, 'inv39-mgr', 'BRANCH_DEPARTMENT_MANAGER');
+    const { policyId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'recon',
+    );
+
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+    // broker record for reconciliation = premium − commission = 120000 − 14400
+    const BROKER_RECORD = '105600.000';
+
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/reconcile`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+
+    // a non-Finance actor cannot run detection
+    await request(app.getHttpServer())
+      .post('/reconciliation-exceptions/detect')
+      .set(bearer(plc.accessToken))
+      .send({ lines: [{ invoiceId, insurerStatementAmount: BROKER_RECORD }] })
+      .expect(403);
+
+    // a matching statement line reconciles silently — no exception
+    const matched = await request(app.getHttpServer())
+      .post('/reconciliation-exceptions/detect')
+      .set(bearer(fin.accessToken))
+      .send({ lines: [{ invoiceId, insurerStatementAmount: BROKER_RECORD }] })
+      .expect(201);
+    expect((matched.body as { reconciled: number }).reconciled).toBe(1);
+    expect(
+      (matched.body as { exceptionsRaised: number }).exceptionsRaised,
+    ).toBe(0);
+
+    // a variance ALWAYS raises an exception with the EXACT amount, and drives
+    // the invoice to EXCEPTION_RAISED
+    const detected = await request(app.getHttpServer())
+      .post('/reconciliation-exceptions/detect')
+      .set(bearer(fin.accessToken))
+      .send({
+        lines: [{ invoiceId, insurerStatementAmount: '110600.000' }], // +5000
+      })
+      .expect(201);
+    const dBody = detected.body as {
+      exceptionsRaised: number;
+      results: {
+        outcome: string;
+        exceptionId?: string;
+        varianceAmount?: string;
+      }[];
+    };
+    expect(dBody.exceptionsRaised).toBe(1);
+    expect(dBody.results[0]?.outcome).toBe('exception_raised');
+    expect(dBody.results[0]?.varianceAmount).toBe('5000.000');
+    const exceptionId = dBody.results[0]?.exceptionId as string;
+
+    const invAfterDetect = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((invAfterDetect.body as InvoiceBody).status).toBe(
+      'EXCEPTION_RAISED',
+    );
+
+    // re-detect → the same open exception (idempotent), no second row
+    const reDetect = await request(app.getHttpServer())
+      .post('/reconciliation-exceptions/detect')
+      .set(bearer(fin.accessToken))
+      .send({ lines: [{ invoiceId, insurerStatementAmount: '110600.000' }] })
+      .expect(201);
+    expect(
+      (reDetect.body as { results: { outcome: string }[] }).results[0]?.outcome,
+    ).toBe('exception_exists');
+
+    const listed = await request(app.getHttpServer())
+      .get(`/reconciliation-exceptions?invoiceId=${invoiceId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((listed.body as { id: string }[]).map((e) => e.id)).toEqual([
+      exceptionId,
+    ]);
+
+    // investigate → investigating
+    const investigated = await request(app.getHttpServer())
+      .post(`/reconciliation-exceptions/${exceptionId}/investigate`)
+      .set(bearer(fin.accessToken))
+      .expect(201);
+    expect((investigated.body as { status: string }).status).toBe(
+      'investigating',
+    );
+
+    // resolve without resumeInvoiceAs is a 422 while the invoice is EXCEPTION_RAISED
+    await request(app.getHttpServer())
+      .post(`/reconciliation-exceptions/${exceptionId}/resolve`)
+      .set(bearer(mgr.accessToken))
+      .send({
+        resolutionNote: 'Insurer statement applied an unbilled endorsement.',
+      })
+      .expect(422);
+
+    // resolve (Manager holds reconciliation-exception.resolve) → resolved, and
+    // the invoice returns to RECONCILED (NO figure adjusted — the variance
+    // stays recorded on the exception)
+    const NOTE =
+      'Insurer statement double-counted a prior part-remittance; broker record stands.';
+    const resolved = await request(app.getHttpServer())
+      .post(`/reconciliation-exceptions/${exceptionId}/resolve`)
+      .set(bearer(mgr.accessToken))
+      .send({ resolutionNote: NOTE, resumeInvoiceAs: 'RECONCILED' })
+      .expect(201);
+    const rBody = resolved.body as {
+      status: string;
+      varianceAmount: string;
+      resolutionNote: string;
+    };
+    expect(rBody.status).toBe('resolved');
+    expect(rBody.varianceAmount).toBe('5000.000'); // unchanged
+    expect(rBody.resolutionNote).toBe(NOTE);
+
+    const invAfterResolve = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((invAfterResolve.body as InvoiceBody).status).toBe('RECONCILED');
+
+    // the cycle is usable again: the remittance now goes through
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/remittance`)
+      .set(bearer(fin.accessToken))
+      .send({})
+      .expect(201);
+
+    // idempotent re-resolve
+    await request(app.getHttpServer())
+      .post(`/reconciliation-exceptions/${exceptionId}/resolve`)
+      .set(bearer(mgr.accessToken))
+      .send({ resolutionNote: NOTE })
+      .expect(201);
+
+    // audit: a CREATE ReconciliationException + a resolve UPDATE carrying the note
+    const reconAudit = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'ReconciliationException', entityId: exceptionId },
+    });
+    const actions = reconAudit.map((r) => r.action).sort();
+    expect(actions).toContain('CREATE');
+    expect(actions).toContain('UPDATE');
+    expect(JSON.stringify(reconAudit)).toContain(NOTE);
+  });
 });

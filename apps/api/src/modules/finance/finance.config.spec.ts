@@ -6,18 +6,24 @@ import {
   buildReceivablesAgeing,
   computeInvoiceFigures,
   computeRemittanceAmount,
+  computeVariance,
   daysOverdue,
   derivePaymentChannelView,
   deriveInvoiceView,
+  deriveReconExceptionView,
   invoiceAuditSnapshot,
   invoiceFiguresMatch,
+  isReconExceptionTransition,
   NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
   paymentChannelAuditSnapshot,
+  reconExceptionAuditSnapshot,
+  reconExceptionUpdateAuditSnapshot,
   type InsurerObligationRow,
   type InsurerRemittanceRow,
   type InvoiceRow,
   type OutstandingInvoiceRow,
   type PaymentChannelRow,
+  type ReconExceptionRow,
 } from './finance.config';
 
 const d = (v: string) => new Prisma.Decimal(v);
@@ -668,5 +674,133 @@ describe('PaymentChannel view + audit (Process 38)', () => {
     });
     expect(JSON.stringify(snap)).not.toContain('1234');
     expect(Object.keys(snap)).not.toContain('accountLast4');
+  });
+});
+
+describe('computeVariance (Process 39)', () => {
+  it('is insurerStatementAmount − brokerRecordAmount, exact to the fils', () => {
+    // the money-decimal-jod.md example: statement 100000, broker 95000
+    expect(computeVariance('100000.000', '95000.000').toFixed(3)).toBe(
+      '5000.000',
+    );
+  });
+  it('is negative when the insurer says less than the broker recorded', () => {
+    expect(computeVariance('95000.000', '100000.000').toFixed(3)).toBe(
+      '-5000.000',
+    );
+  });
+  it('is exactly zero (not rounded away) when the figures agree', () => {
+    expect(computeVariance('105600.000', '105600.000').toFixed(3)).toBe(
+      '0.000',
+    );
+  });
+  it('keeps a sub-fils-looking variance at full precision', () => {
+    expect(computeVariance('105600.001', '105600.000').toFixed(3)).toBe(
+      '0.001',
+    );
+  });
+});
+
+describe('isReconExceptionTransition (Process 39)', () => {
+  it('allows open -> investigating | resolved and investigating -> resolved', () => {
+    expect(isReconExceptionTransition('open', 'investigating')).toBe(true);
+    expect(isReconExceptionTransition('open', 'resolved')).toBe(true);
+    expect(isReconExceptionTransition('investigating', 'resolved')).toBe(true);
+  });
+  it('rejects resolved -> anything, investigating -> open, and an unknown from', () => {
+    expect(isReconExceptionTransition('resolved', 'investigating')).toBe(false);
+    expect(isReconExceptionTransition('resolved', 'resolved')).toBe(false);
+    expect(isReconExceptionTransition('investigating', 'investigating')).toBe(
+      false,
+    );
+    expect(isReconExceptionTransition('nonsense', 'resolved')).toBe(false);
+  });
+});
+
+describe('ReconciliationException view + audit (Process 39)', () => {
+  const base: ReconExceptionRow = {
+    id: 're-1',
+    invoiceId: 'inv-1',
+    insurerStatementAmount: d('100000'),
+    brokerRecordAmount: d('95000'),
+    varianceAmount: d('5000'),
+    status: 'open',
+    raisedByUserId: 'fin-1',
+    investigatedByUserId: null,
+    resolvedByUserId: null,
+    resolutionNote: null,
+    resolvedAt: null,
+    createdAt: new Date('2026-09-03T10:00:00.000Z'),
+  };
+
+  it('deriveReconExceptionView renders the three figures + isResolved + ISO dates', () => {
+    expect(deriveReconExceptionView(base)).toEqual({
+      id: 're-1',
+      invoiceId: 'inv-1',
+      insurerStatementAmount: '100000.000',
+      brokerRecordAmount: '95000.000',
+      varianceAmount: '5000.000',
+      status: 'open',
+      isResolved: false,
+      raisedByUserId: 'fin-1',
+      investigatedByUserId: null,
+      resolvedByUserId: null,
+      resolutionNote: null,
+      resolvedAt: null,
+      createdAt: '2026-09-03T10:00:00.000Z',
+    });
+  });
+
+  it('a resolved exception surfaces isResolved + the note + resolvedAt', () => {
+    const v = deriveReconExceptionView({
+      ...base,
+      status: 'resolved',
+      resolvedByUserId: 'mgr-1',
+      resolutionNote:
+        'Insurer applied an FX rate we had not; broker figure stands.',
+      resolvedAt: new Date('2026-09-10T00:00:00.000Z'),
+    });
+    expect(v.isResolved).toBe(true);
+    expect(v.resolutionNote).toContain('FX rate');
+    expect(v.resolvedAt).toBe('2026-09-10T00:00:00.000Z');
+  });
+
+  it('reconExceptionAuditSnapshot carries the three figures as fixed strings, no free text', () => {
+    expect(
+      reconExceptionAuditSnapshot({
+        exceptionId: 're-1',
+        invoiceId: 'inv-1',
+        insurerStatementAmount: d('100000'),
+        brokerRecordAmount: d('95000'),
+        varianceAmount: d('5000'),
+        status: 'open',
+      }),
+    ).toEqual({
+      exceptionId: 're-1',
+      invoiceId: 'inv-1',
+      insurerStatementAmount: '100000.000',
+      brokerRecordAmount: '95000.000',
+      varianceAmount: '5000.000',
+      status: 'open',
+    });
+  });
+
+  it('reconExceptionUpdateAuditSnapshot carries the resolutionNote verbatim', () => {
+    const snap = reconExceptionUpdateAuditSnapshot({
+      exceptionId: 're-1',
+      invoiceId: 'inv-1',
+      varianceAmount: d('5000'),
+      status: 'resolved',
+      investigatedByUserId: 'fin-1',
+      resolvedByUserId: 'mgr-1',
+      resolutionNote: 'Statement double-counted a prior remittance.',
+      resumeInvoiceAs: 'REMITTED',
+    });
+    expect(snap).toMatchObject({
+      varianceAmount: '5000.000',
+      status: 'resolved',
+      resolutionNote: 'Statement double-counted a prior remittance.',
+      resumeInvoiceAs: 'REMITTED',
+    });
   });
 });
