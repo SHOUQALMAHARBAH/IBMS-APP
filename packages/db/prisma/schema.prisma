@@ -1280,6 +1280,7 @@ model Policy {
   commissionLedgerEntries CommissionLedgerEntry[]
   insuredPersons InsuredPerson[]
   complaints     Complaint[]
+  serviceRequests ServiceRequest[]
   renewalCase    RenewalCase?
   documents      Document[]           @relation("PolicyDocuments")
 
@@ -1906,17 +1907,45 @@ model ClientFundsLedgerEntry {
 // PROCESSES 41-46 — CUSTOMER SERVICE
 // ============================================================================
 
-/// Process 41 — certificates, copies, changes, with SLA tracking.
+/// Process 41 (backlog Part C #41) — certificates, copies, changes, with SLA
+/// tracking. `status` is a PLAIN STRING (not a WorkflowTransition entity — the
+/// `CommissionLedgerEntry` / `ReconciliationException` pattern): the legal
+/// moves live in `service-request.config.ts`'s SERVICE_REQUEST_TRANSITIONS
+/// (`open --start--> in_progress`, `{open|in_progress} --fulfil--> fulfilled`,
+/// `{open|in_progress} --cancel--> cancelled`) and every move is a
+/// status-conditional `updateMany` (race-safe-invariants.md). One `SlaTimer`
+/// (`slaTimerId @unique`, `service_request_fulfilment` workflow — a DRAFTED
+/// 5-business-day default, see sla-registry.config.ts) is started best-effort
+/// at create and resolved on fulfil / cancel. `outcomeNote` (mandatory on
+/// fulfil / cancel) is logged verbatim (what was done / why cancelled — a
+/// business note, not personal data). No maker/checker.
 model ServiceRequest {
   id           String   @id @default(uuid())
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
+  policyId     String?
+  policy       Policy?  @relation(fields: [policyId], references: [id])
   requestType  String   // certificate | copy | change | other
-  status       String   @default("open")
+  /// Free text — what specifically is requested (which policy / for whom /
+  /// what change). Optional; not personal data by policy.
+  detail       String?
+  status       String   @default("open") // open | in_progress | fulfilled | cancelled
   slaTimerId   String?  @unique
   slaTimer     SlaTimer? @relation(fields: [slaTimerId], references: [id])
+  raisedByUserId    String?
+  assignedToUserId  String?
+  fulfilledByUserId String?
+  /// What was done (fulfil) / why it was cancelled — mandatory at closure,
+  /// logged verbatim.
+  outcomeNote  String?
   createdAt    DateTime @default(now())
   closedAt     DateTime?
+
+  @@index([customerId])
+  // serves the "open queue" read (status filter + newest-first order) and the
+  // "my queue" read (assignedToUserId filter).
+  @@index([status, createdAt])
+  @@index([assignedToUserId])
 }
 
 enum ComplaintStatus {

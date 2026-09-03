@@ -30,6 +30,7 @@ const EXPECTED_PDPL_WORKFLOW_NAMES = [
 const EXPECTED_NON_PDPL_WORKFLOW_NAMES = [
   'kyc_standard_review',
   'kyc_edd_review',
+  'service_request_fulfilment',
 ].sort();
 
 describe('SLA_REGISTRY', () => {
@@ -81,8 +82,8 @@ describe('SLA_REGISTRY', () => {
     expect(edd.duration.value).toBeGreaterThan(standard.duration.value);
   });
 
-  it('marks both KYC review entries as drafted/unsourced, unlike the 14 PDPL rows', () => {
-    for (const workflowName of ['kyc_standard_review', 'kyc_edd_review']) {
+  it('marks every non-PDPL entry as drafted/unsourced, unlike the 14 PDPL rows', () => {
+    for (const workflowName of EXPECTED_NON_PDPL_WORKFLOW_NAMES) {
       expect(getSlaRegistryEntry(workflowName).citation).toMatch(
         /DRAFT, UNSOURCED/,
       );

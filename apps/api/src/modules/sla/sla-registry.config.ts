@@ -281,6 +281,31 @@ export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
     citation:
       'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers KYC/AML EDD review turnaround)',
   },
+  // Backlog Part C #41 (Customer Requests, Domain E). Like the two KYC rows
+  // above — but UNLIKE the 14 PDPL rows — this has NO source in
+  // pdpl-sla-timers.md's registry: a customer-service-request turnaround is a
+  // published service-standard / contractual courtesy target, not a PDPL
+  // statutory SLA, and Part 3.8 of the context document names no figure. The
+  // 5-business-day default below is a DRAFTED analog (the same figure this
+  // table already uses for DPIA review / KYC standard as a reasonable
+  // "internal review turnaround"). The backlog line explicitly names
+  // `SlaTimer`, so it is tracked here (not merely as a KPI); replace with a
+  // sourced figure when a broker service charter / SOP supplies one. Filed as
+  // a brain gap in ibms-brain/meta/context/customer-service-lifecycle.md.
+  {
+    workflowName: 'service_request_fulfilment',
+    label: 'Customer service request fulfilment',
+    entityType: 'ServiceRequest',
+    duration: { value: 5, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'BRANCH_DEPARTMENT_MANAGER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers customer-service-request turnaround; Part 3.8 names no figure. See ibms-brain/meta/context/customer-service-lifecycle.md',
+  },
 ];
 
 const SLA_REGISTRY_BY_NAME = new Map(

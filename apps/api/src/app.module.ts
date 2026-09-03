@@ -29,6 +29,7 @@ import { ClientDecisionModule } from './modules/client-decision/client-decision.
 import { PolicyModule } from './modules/policy/policy.module';
 import { EndorsementModule } from './modules/endorsement/endorsement.module';
 import { LossRatioModule } from './modules/loss-ratio/loss-ratio.module';
+import { CustomerServiceModule } from './modules/customer-service/customer-service.module';
 import { ClaimModule } from './modules/claim/claim.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { CommissionModule } from './modules/commission/commission.module';
@@ -220,6 +221,12 @@ import { CommissionModule } from './modules/commission/commission.module';
     // manual-override maker/checker pair (commission-override.raise / Finance
     // -> commission-override.approve / Manager). Depends on PolicyModule.
     CommissionModule,
+    // Part C backlog #41 (Customer Requests) — opens Domain E. ServiceRequest
+    // (certificate / copy / change / other), a plain-string status machine
+    // (open -> in_progress -> {fulfilled | cancelled}), with its fulfilment
+    // tracked by the generic SlaTimerService (service_request_fulfilment — a
+    // DRAFTED 5-business-day default). service-request.manage / Sales, Manager.
+    CustomerServiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

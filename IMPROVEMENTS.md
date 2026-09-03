@@ -7,10 +7,10 @@ the per-backlog-item deferred edges live in `README.md` § "Known gaps (per
 completed backlog item)" and are not repeated here except where they compound
 into a system-wide problem.
 
-**Status:** compiled at parent commit `17e52b4` / `ibms-brain` `ed9ad56`
-(Domain D complete). Nothing below has been actioned — this file is the plan
-for the "solve every gap / threat / bug" pass the user asked for **after** the
-backlog build is finished.
+**Status:** first compiled at parent `17e52b4` / `ibms-brain` `ed9ad56` (Domain
+D complete); topped up through Part C #41 (Domain E opened). Nothing below has
+been actioned — this file is the plan for the "solve every gap / threat / bug"
+pass the user asked for **after** the backlog build is finished.
 
 **Priority key:** `P0` blocks correctness, security, or a real "definition of
 done" · `P1` must be fixed before the system goes near production · `P2` tech
@@ -254,6 +254,22 @@ by blast radius.
 - **Fix:** subtract `creditTermsDays` when computing `oldestDaysOutstanding` /
   an `overdue` flag.
 
+### 3.13 `P2` — #41 service requests have no `Document` link and no `change`-request execution path
+
+- A `fulfilled` `certificate` / `copy` request should attach the generated PDF
+  (a #25-style `Document` pointer) — not built; the outcome is a free-text note
+  only.
+- A `change` request (e.g. "update my bank details", "change the mailing
+  address") records intent but executes **nothing** — no endorsement is raised,
+  no `PaymentChannel` is created. The `NO_FULL_ACCOUNT_NUMBER` guard on
+  `detail` / `outcomeNote` (added at the #41 review) keeps a full account number
+  out of the free text, but there is still no governed path *from* a service
+  request *to* the masked `PaymentChannel` (#38) or an `Endorsement` (#22).
+- One 5-business-day SLA covers all four `requestType`s; no per-type target.
+- **Fix:** a `ServiceRequest` → `Document` attach on fulfil; a "convert to
+  endorsement / payment-channel" action for `change` requests; per-`requestType`
+  SLA figures once a service charter supplies them.
+
 ---
 
 ## 4. Drafted / unsourced values (need a real regulatory citation)
@@ -279,6 +295,7 @@ system is used for anything.
 | Mandatory-document checklist matrix | #25/#26 | drafted per claim type/line |
 | Claim-decision preconditions (adjuster survey + investigation both done) | #26 | drafted |
 | KYC compliance-review turnaround + re-KYC cadence | `kyc-aml-sla-timers.md` | draft/unsourced |
+| `service_request_fulfilment` SLA | #41 `sla-registry.config.ts` | 5 business days, escalate to Branch/Dept Manager — DRAFT/UNSOURCED (courtesy target, not a PDPL SLA) |
 | Jordan business-day calendar (SLA timers) | A.8 | brain gap filed; not implemented |
 
 ---
@@ -452,10 +469,11 @@ system is used for anything.
 Tracked in `README.md` § "Scope status" — listed here only so this file is a
 complete picture. **Not** improvements to existing code; net-new build.
 
-- **Domain E — Customer Service (#41–46):** `ServiceRequest`, `Complaint` +
-  supervisor sign-off + Insurance Dispute Resolution Committee escalation, SLA
-  monitoring dashboard, `CommunicationLog` consent-gated sends,
-  `CustomerFeedback`, `RetentionCase` auto-open on lapse risk.
+- **Domain E — Customer Service (#42–46):** #41 (`ServiceRequest`) is built.
+  Remaining: `Complaint` + supervisor sign-off + Insurance Dispute Resolution
+  Committee escalation, SLA monitoring dashboard, `CommunicationLog`
+  consent-gated sends, `CustomerFeedback`, `RetentionCase` auto-open on lapse
+  risk.
 - **Domain F — Compliance & Risk (#47–57):** AML/CFT (5.3), sanctions batch,
   regulatory calendar, incident management, internal audit, data-protection
   compliance (= Part D, 5.1).
