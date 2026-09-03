@@ -63,6 +63,36 @@ interface InvoiceBody {
   } | null;
 }
 
+interface AgeingRow {
+  customerId: string;
+  customerLegalName: string;
+  currency: string;
+  current: string;
+  d1_30: string;
+  d31_60: string;
+  d61_90: string;
+  d90_plus: string;
+  outstandingTotal: string;
+  invoiceCount: number;
+  oldestDueDate: string | null;
+  oldestDaysOverdue: number;
+}
+interface AgeingReport {
+  asOf: string;
+  currency: string;
+  rows: AgeingRow[];
+  totals: {
+    current: string;
+    d1_30: string;
+    d31_60: string;
+    d61_90: string;
+    d90_plus: string;
+    outstandingTotal: string;
+    invoiceCount: number;
+    customerCount: number;
+  };
+}
+
 const ISSUED_SCHEDULE = {
   limits: { buildings: '5000000.000', contents: '1200000.000' },
   sumsInsured: { total: '6200000.000' },
@@ -535,5 +565,128 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     expect(ledger[0]?.amount.toString()).toBe('115350');
     expect(ledger[1]?.direction).toBe('out');
     expect(ledger[1]?.amount.toString()).toBe('105600');
+  });
+
+  it('serves the client accounts-receivable / ageing report — outstanding while unpaid, bucketed by dueDate vs asOf, gone once collected (Part C #33)', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv4-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv4-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv4-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const { policyId, customerId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'ageing',
+    );
+
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+
+    // a non-finance actor cannot read the report
+    await request(app.getHttpServer())
+      .get('/client-accounting/ageing')
+      .set(bearer(plc.accessToken))
+      .expect(403);
+
+    // a future asOf is a 422
+    await request(app.getHttpServer())
+      .get(`/client-accounting/ageing?asOf=${isoDaysAhead(2)}`)
+      .set(bearer(fin.accessToken))
+      .expect(422);
+
+    // scoped to this customer: one outstanding invoice, due in 30 days -> current
+    const current = await request(app.getHttpServer())
+      .get(`/client-accounting/ageing?customerId=${customerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const curBody = current.body as AgeingReport;
+    expect(curBody.currency).toBe('JOD');
+    expect(curBody.rows).toHaveLength(1);
+    expect(curBody.rows[0]).toMatchObject({
+      customerId,
+      current: '115350.000',
+      d1_30: '0.000',
+      d31_60: '0.000',
+      d61_90: '0.000',
+      d90_plus: '0.000',
+      outstandingTotal: '115350.000',
+      invoiceCount: 1,
+    });
+    expect(curBody.rows[0]?.oldestDaysOverdue).toBeLessThanOrEqual(0);
+    expect(curBody.totals).toMatchObject({
+      outstandingTotal: '115350.000',
+      invoiceCount: 1,
+      customerCount: 1,
+    });
+
+    // an asOf before the invoice was raised -> it did not exist yet -> absent
+    const beforeItExisted = await request(app.getHttpServer())
+      .get(`/client-accounting/ageing?customerId=${customerId}&asOf=2020-01-01`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((beforeItExisted.body as AgeingReport).rows).toHaveLength(0);
+
+    // backdate the due date 45 days -> the same balance now ages into d31_60
+    await prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { dueDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000) },
+    });
+    const aged = await request(app.getHttpServer())
+      .get(`/client-accounting/ageing?customerId=${customerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const agedRow = (aged.body as AgeingReport).rows[0];
+    expect(agedRow).toMatchObject({
+      current: '0.000',
+      d1_30: '0.000',
+      d31_60: '115350.000',
+      d61_90: '0.000',
+      d90_plus: '0.000',
+      outstandingTotal: '115350.000',
+    });
+    expect(agedRow?.oldestDaysOverdue).toBeGreaterThanOrEqual(44);
+    expect(agedRow?.oldestDaysOverdue).toBeLessThanOrEqual(46);
+
+    // collect it in full -> no longer outstanding
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .expect(201);
+    const settled = await request(app.getHttpServer())
+      .get(`/client-accounting/ageing?customerId=${customerId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const settledBody = settled.body as AgeingReport;
+    expect(settledBody.rows).toHaveLength(0);
+    expect(settledBody.totals).toMatchObject({
+      outstandingTotal: '0.000',
+      invoiceCount: 0,
+      customerCount: 0,
+    });
+
+    // an unknown customer scope is simply empty
+    const unknown = await request(app.getHttpServer())
+      .get(
+        '/client-accounting/ageing?customerId=00000000-0000-4000-8000-000000000000',
+      )
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((unknown.body as AgeingReport).rows).toHaveLength(0);
   });
 });

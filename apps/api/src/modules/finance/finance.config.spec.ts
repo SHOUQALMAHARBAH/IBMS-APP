@@ -1,13 +1,17 @@
 import { Prisma } from '@ibms/db';
 import { describe, expect, it } from 'vitest';
 import {
+  ageingBucketFor,
+  buildReceivablesAgeing,
   computeInvoiceFigures,
   computeRemittanceAmount,
+  daysOverdue,
   deriveInvoiceView,
   invoiceAuditSnapshot,
   invoiceFiguresMatch,
   NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
   type InvoiceRow,
+  type OutstandingInvoiceRow,
 } from './finance.config';
 
 const d = (v: string) => new Prisma.Decimal(v);
@@ -210,6 +214,172 @@ describe('computeRemittanceAmount (Process 32)', () => {
     expect(computeRemittanceAmount('1000.000', '1000.000').toFixed(3)).toBe(
       '0.000',
     );
+  });
+});
+
+describe('daysOverdue / ageingBucketFor (Process 33)', () => {
+  const asOf = new Date('2026-09-03T00:00:00.000Z');
+  const DAY = 24 * 60 * 60 * 1000;
+  const due = (offsetDays: number) =>
+    new Date(Date.UTC(2026, 8, 3) + offsetDays * DAY);
+
+  it('counts whole calendar days past the reference date, negative when not yet due', () => {
+    expect(daysOverdue(due(0), asOf)).toBe(0); // due exactly today
+    expect(daysOverdue(due(-1), asOf)).toBe(1);
+    expect(daysOverdue(due(-45), asOf)).toBe(45);
+    expect(daysOverdue(due(10), asOf)).toBe(-10); // due in 10 days
+  });
+
+  it('ignores the wall-clock time the reference instant carries', () => {
+    const asOfLate = new Date('2026-09-03T23:30:00.000Z');
+    expect(daysOverdue(due(-1), asOfLate)).toBe(1);
+  });
+
+  it('maps a days-overdue count to the 30 / 60 / 90 bucket', () => {
+    expect(ageingBucketFor(-10)).toBe('current');
+    expect(ageingBucketFor(0)).toBe('current');
+    expect(ageingBucketFor(1)).toBe('d1_30');
+    expect(ageingBucketFor(30)).toBe('d1_30');
+    expect(ageingBucketFor(31)).toBe('d31_60');
+    expect(ageingBucketFor(60)).toBe('d31_60');
+    expect(ageingBucketFor(61)).toBe('d61_90');
+    expect(ageingBucketFor(90)).toBe('d61_90');
+    expect(ageingBucketFor(91)).toBe('d90_plus');
+  });
+});
+
+describe('buildReceivablesAgeing (Process 33)', () => {
+  const asOf = new Date('2026-09-03T00:00:00.000Z');
+  const DAY = 24 * 60 * 60 * 1000;
+  const due = (offsetDays: number) =>
+    new Date(Date.UTC(2026, 8, 3) + offsetDays * DAY);
+
+  const inv = (
+    over: Partial<OutstandingInvoiceRow> &
+      Pick<
+        OutstandingInvoiceRow,
+        'id' | 'customerId' | 'totalAmount' | 'dueDate'
+      >,
+  ): OutstandingInvoiceRow => ({
+    customerLegalName: `Cust ${over.customerId}`,
+    currency: 'JOD',
+    ...over,
+  });
+
+  it('groups by customer, buckets each invoice, and pools the totals', () => {
+    const report = buildReceivablesAgeing({
+      asOf,
+      invoices: [
+        inv({
+          id: 'a1',
+          customerId: 'A',
+          totalAmount: '1000.000',
+          dueDate: due(-91),
+        }),
+        inv({
+          id: 'a2',
+          customerId: 'A',
+          totalAmount: '500.000',
+          dueDate: due(5),
+        }),
+        inv({
+          id: 'b1',
+          customerId: 'B',
+          totalAmount: '2000.000',
+          dueDate: due(-5),
+        }),
+      ],
+    });
+
+    expect(report.asOf).toBe('2026-09-03T00:00:00.000Z');
+    expect(report.currency).toBe('JOD');
+
+    // worst-first: A (91 days overdue) before B (5 days)
+    expect(report.rows.map((r) => r.customerId)).toEqual(['A', 'B']);
+
+    const a = report.rows[0];
+    expect(a).toMatchObject({
+      customerId: 'A',
+      current: '500.000',
+      d1_30: '0.000',
+      d31_60: '0.000',
+      d61_90: '0.000',
+      d90_plus: '1000.000',
+      outstandingTotal: '1500.000',
+      invoiceCount: 2,
+      oldestDaysOverdue: 91,
+      oldestDueDate: due(-91).toISOString(),
+    });
+
+    expect(report.rows[1]).toMatchObject({
+      customerId: 'B',
+      d1_30: '2000.000',
+      outstandingTotal: '2000.000',
+      invoiceCount: 1,
+      oldestDaysOverdue: 5,
+    });
+
+    expect(report.totals).toEqual({
+      current: '500.000',
+      d1_30: '2000.000',
+      d31_60: '0.000',
+      d61_90: '0.000',
+      d90_plus: '1000.000',
+      outstandingTotal: '3500.000',
+      invoiceCount: 3,
+      customerCount: 2,
+    });
+  });
+
+  it('breaks an equal-age tie by outstanding balance, then by name', () => {
+    const report = buildReceivablesAgeing({
+      asOf,
+      invoices: [
+        inv({
+          id: 'c',
+          customerId: 'C',
+          totalAmount: '1000.000',
+          dueDate: due(-10),
+        }),
+        inv({
+          id: 'd',
+          customerId: 'D',
+          totalAmount: '3000.000',
+          dueDate: due(-10),
+        }),
+        inv({
+          id: 'e',
+          customerId: 'E',
+          totalAmount: '3000.000',
+          dueDate: due(-10),
+        }),
+      ],
+    });
+    // same age → larger balance first (D, E), then name asc among equal balances
+    expect(report.rows.map((r) => r.customerId)).toEqual(['D', 'E', 'C']);
+  });
+
+  it('is empty (zeroed totals) when nothing is outstanding', () => {
+    const report = buildReceivablesAgeing({ asOf, invoices: [] });
+    expect(report.rows).toEqual([]);
+    expect(report.totals).toEqual({
+      current: '0.000',
+      d1_30: '0.000',
+      d31_60: '0.000',
+      d61_90: '0.000',
+      d90_plus: '0.000',
+      outstandingTotal: '0.000',
+      invoiceCount: 0,
+      customerCount: 0,
+    });
+  });
+
+  it('normalises the asOf output to UTC midnight', () => {
+    const report = buildReceivablesAgeing({
+      asOf: new Date('2026-09-03T14:22:00.000Z'),
+      invoices: [],
+    });
+    expect(report.asOf).toBe('2026-09-03T00:00:00.000Z');
   });
 });
 

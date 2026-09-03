@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { InvoiceController } from './invoice.controller';
 import { InvoiceService } from './invoice.service';
 import { CollectionService } from './collection.service';
+import { ClientAccountingController } from './client-accounting.controller';
+import { ClientAccountingService } from './client-accounting.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
@@ -29,11 +31,22 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
  * hop. The global `PermissionsGuard` + `@CurrentUser` come from RbacModule /
  * the global auth guard (same as CrmModule / LossRatioModule — no AuthModule
  * import needed).
+ *
+ * `ClientAccountingService` (#33) serves the accounts-receivable / ageing
+ * report (`GET /client-accounting/ageing`, `client-accounting.read`) —
+ * computed on the fly from the `Invoice` / `Receipt` rows, no stored
+ * aggregate, not audit-logged (invoice totals are Confidential, the #31
+ * decision).
  */
 @Module({
   imports: [AuditModule, PolicyModule, RecommendationModule],
-  controllers: [InvoiceController],
-  providers: [InvoiceService, CollectionService, InvoiceRepository],
+  controllers: [InvoiceController, ClientAccountingController],
+  providers: [
+    InvoiceService,
+    CollectionService,
+    ClientAccountingService,
+    InvoiceRepository,
+  ],
   exports: [InvoiceRepository],
 })
 export class FinanceModule {}

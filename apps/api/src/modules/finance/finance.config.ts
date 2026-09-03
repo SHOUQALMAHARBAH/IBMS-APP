@@ -7,6 +7,7 @@ import {
   formatMoney,
   quantizeMoney,
   subtractMoney,
+  sumMoney,
 } from '../../common/money.util';
 
 /**
@@ -352,5 +353,242 @@ export function clientFundsLedgerAuditSnapshot(input: {
     amount: formatMoney(input.amount),
     direction: input.direction,
     reference: input.reference,
+  };
+}
+
+// --- Process 33: accounts-receivable ageing ---------------------------------
+
+/**
+ * Process 33 — Client Accounting. The pure core of the accounts-receivable /
+ * ageing report: from a set of outstanding `Invoice` rows (an invoice with no
+ * collection `Receipt` — #32 records exactly one, for the full total, so a
+ * receipt means paid in full), group by customer and split each customer's
+ * outstanding balance into 30 / 60 / 90-day ageing buckets keyed off
+ * `Invoice.dueDate` vs the report's `asOf` reference date. Ordered worst-first
+ * (oldest debt, then largest balance). All money through `money.util.ts`.
+ *
+ * `ibms-brain/meta/context/finance-lifecycle.md` § "Client Accounting (Process
+ * 33)".
+ */
+
+/** Standard 30 / 60 / 90-day accounts-receivable ageing buckets. **Drafted /
+ * unsourced** `ibms-app` product decision — Part 3.6 says only "an
+ * accounts-receivable / ageing report per customer" and names no boundaries;
+ * these are the textbook AR ageing bands. Same drafted status as
+ * `INVOICE_MAX_DUE_DAYS_AHEAD` (#31), `CLAIM_LARGE_THRESHOLD_JOD` (#23), the
+ * #27 follow-up thresholds and the #29 loss-ratio "period". */
+export const AR_AGEING_BUCKET_KEYS = [
+  'current',
+  'd1_30',
+  'd31_60',
+  'd61_90',
+  'd90_plus',
+] as const;
+export type ArAgeingBucketKey = (typeof AR_AGEING_BUCKET_KEYS)[number];
+
+/**
+ * Cap on the number of outstanding invoices one ageing report materialises +
+ * groups in memory. A broker's open-AR book fits comfortably; if a query ever
+ * hits this the report is silently truncated, so `ClientAccountingService`
+ * `logger.warn`s (the #30 `ANALYTICS_POLICY_LIMIT` precedent) — the signal to
+ * push the aggregation into the DB.
+ */
+export const AR_AGEING_INVOICE_LIMIT = 5000;
+
+const AGEING_DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcMidnightMs(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/**
+ * Whole calendar days a due date is past the ageing reference date — negative
+ * when the invoice is not yet due. Both instants are normalised to their own
+ * UTC midnight first (`Invoice.dueDate` is already UTC midnight — #31
+ * `parseDueDateInstant`), so the result is a clean day count regardless of the
+ * wall-clock time `asOf` carries.
+ */
+export function daysOverdue(dueDate: Date, asOf: Date): number {
+  return Math.floor(
+    (utcMidnightMs(asOf) - utcMidnightMs(dueDate)) / AGEING_DAY_MS,
+  );
+}
+
+/** Which ageing bucket a days-overdue count falls in: `<= 0` (not yet due, or
+ * due exactly on the reference date) is `current`; then 1–30 / 31–60 / 61–90 /
+ * over 90. */
+export function ageingBucketFor(days: number): ArAgeingBucketKey {
+  if (days <= 0) return 'current';
+  if (days <= 30) return 'd1_30';
+  if (days <= 60) return 'd31_60';
+  if (days <= 90) return 'd61_90';
+  return 'd90_plus';
+}
+
+/** The minimal per-invoice shape `buildReceivablesAgeing` needs — matches
+ * `InvoiceRepository.loadOutstandingReceivables`'s row. */
+export interface OutstandingInvoiceRow {
+  id: string;
+  customerId: string;
+  customerLegalName: string;
+  totalAmount: Prisma.Decimal | string;
+  currency: string;
+  dueDate: Date;
+}
+
+export type ArAgeingBucketAmounts = Record<ArAgeingBucketKey, string>;
+
+export interface CustomerReceivablesRow extends ArAgeingBucketAmounts {
+  customerId: string;
+  customerLegalName: string;
+  currency: string;
+  /** Sum of the five buckets — this customer's total outstanding balance. */
+  outstandingTotal: string;
+  invoiceCount: number;
+  /** Earliest `dueDate` among this customer's outstanding invoices (ISO), or
+   * null if it somehow has none. */
+  oldestDueDate: string | null;
+  /** Largest days-overdue among this customer's outstanding invoices — the
+   * worst-first sort key. Negative when every invoice is still `current`. */
+  oldestDaysOverdue: number;
+}
+
+export interface ReceivablesAgeingTotals extends ArAgeingBucketAmounts {
+  outstandingTotal: string;
+  invoiceCount: number;
+  customerCount: number;
+}
+
+export interface ReceivablesAgeingReport {
+  /** The ageing reference date, UTC midnight, ISO — the `asOf` the buckets are
+   * measured against (default: today). */
+  asOf: string;
+  currency: string;
+  /** One row per customer with an outstanding balance, worst-first. */
+  rows: CustomerReceivablesRow[];
+  /** Every outstanding invoice pooled, regardless of customer. */
+  totals: ReceivablesAgeingTotals;
+}
+
+function zeroBuckets(): Record<ArAgeingBucketKey, Prisma.Decimal> {
+  return {
+    current: new Prisma.Decimal(0),
+    d1_30: new Prisma.Decimal(0),
+    d31_60: new Prisma.Decimal(0),
+    d61_90: new Prisma.Decimal(0),
+    d90_plus: new Prisma.Decimal(0),
+  };
+}
+
+function bucketsToStrings(
+  b: Record<ArAgeingBucketKey, Prisma.Decimal>,
+): ArAgeingBucketAmounts {
+  return {
+    current: formatMoney(b.current),
+    d1_30: formatMoney(b.d1_30),
+    d31_60: formatMoney(b.d31_60),
+    d61_90: formatMoney(b.d61_90),
+    d90_plus: formatMoney(b.d90_plus),
+  };
+}
+
+interface CustomerAgeingAcc {
+  customerLegalName: string;
+  currency: string;
+  buckets: Record<ArAgeingBucketKey, Prisma.Decimal>;
+  amounts: Prisma.Decimal[];
+  invoiceCount: number;
+  oldestDueMs: number | null;
+  oldestDaysOverdue: number;
+}
+
+/**
+ * Process 33 — the accounts-receivable / ageing report, grouped by customer.
+ * Each outstanding invoice's `totalAmount` lands in one ageing bucket
+ * (`daysOverdue(dueDate, asOf)` → `ageingBucketFor`); the per-customer
+ * `outstandingTotal` and the book-wide `totals` are pooled through
+ * `sumMoney` (never an averaged or re-derived figure). Rows are ordered
+ * worst-first: largest days-overdue, then largest outstanding balance, then
+ * customer name (fixed `en` locale, deterministic across environments). Pure.
+ *
+ * SINGLE-CURRENCY: bucket + `outstandingTotal` figures are pooled per customer
+ * with no currency split, and `report.currency` is `'JOD'`. Every `Invoice`
+ * carries a `currency` (kept on the row for display), but it is always `'JOD'`
+ * today — `money.util.ts` is fils-precision JOD, and no non-JOD policy /
+ * invoice path exists. If a foreign-currency invoice ever lands, a customer
+ * with mixed-currency invoices would get a silently-wrong pooled total; the
+ * fix then is to group by `(customerId, currency)`. Same assumption as #30's
+ * `buildLossRatioBreakdown` (`money-decimal-jod.md` — JOD).
+ */
+export function buildReceivablesAgeing(input: {
+  asOf: Date;
+  invoices: OutstandingInvoiceRow[];
+}): ReceivablesAgeingReport {
+  const byCustomer = new Map<string, CustomerAgeingAcc>();
+  const grandBuckets = zeroBuckets();
+  const grandAmounts: Prisma.Decimal[] = [];
+
+  for (const inv of input.invoices) {
+    const days = daysOverdue(inv.dueDate, input.asOf);
+    const key = ageingBucketFor(days);
+    const amount = quantizeMoney(inv.totalAmount);
+
+    let acc = byCustomer.get(inv.customerId);
+    if (!acc) {
+      acc = {
+        customerLegalName: inv.customerLegalName,
+        currency: inv.currency,
+        buckets: zeroBuckets(),
+        amounts: [],
+        invoiceCount: 0,
+        oldestDueMs: null,
+        oldestDaysOverdue: days,
+      };
+      byCustomer.set(inv.customerId, acc);
+    }
+    acc.buckets[key] = acc.buckets[key].plus(amount);
+    acc.amounts.push(amount);
+    acc.invoiceCount += 1;
+    acc.oldestDueMs =
+      acc.oldestDueMs === null
+        ? inv.dueDate.getTime()
+        : Math.min(acc.oldestDueMs, inv.dueDate.getTime());
+    acc.oldestDaysOverdue = Math.max(acc.oldestDaysOverdue, days);
+
+    grandBuckets[key] = grandBuckets[key].plus(amount);
+    grandAmounts.push(amount);
+  }
+
+  const rows: CustomerReceivablesRow[] = [...byCustomer.entries()]
+    .map(([customerId, acc]) => ({
+      customerId,
+      customerLegalName: acc.customerLegalName,
+      currency: acc.currency,
+      ...bucketsToStrings(acc.buckets),
+      outstandingTotal: formatMoney(sumMoney(acc.amounts)),
+      invoiceCount: acc.invoiceCount,
+      oldestDueDate:
+        acc.oldestDueMs === null
+          ? null
+          : new Date(acc.oldestDueMs).toISOString(),
+      oldestDaysOverdue: acc.oldestDaysOverdue,
+    }))
+    .sort(
+      (a, b) =>
+        b.oldestDaysOverdue - a.oldestDaysOverdue ||
+        compareMoney(b.outstandingTotal, a.outstandingTotal) ||
+        a.customerLegalName.localeCompare(b.customerLegalName, 'en'),
+    );
+
+  return {
+    asOf: new Date(utcMidnightMs(input.asOf)).toISOString(),
+    currency: 'JOD',
+    rows,
+    totals: {
+      ...bucketsToStrings(grandBuckets),
+      outstandingTotal: formatMoney(sumMoney(grandAmounts)),
+      invoiceCount: grandAmounts.length,
+      customerCount: byCustomer.size,
+    },
   };
 }

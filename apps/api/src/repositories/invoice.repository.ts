@@ -7,7 +7,11 @@ import type {
   Remittance,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
-import { NEW_BUSINESS_PREMIUM_INVOICE_TYPE } from '../modules/finance/finance.config';
+import {
+  AR_AGEING_INVOICE_LIMIT,
+  NEW_BUSINESS_PREMIUM_INVOICE_TYPE,
+  type OutstandingInvoiceRow,
+} from '../modules/finance/finance.config';
 
 export interface CreateInvoiceRow {
   policyId: string;
@@ -94,6 +98,50 @@ export class InvoiceRepository {
       include: INVOICE_CYCLE_INCLUDE,
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  /**
+   * Process 33 — every outstanding receivable as at `asOfExclusiveUpper` (the
+   * UTC midnight of the day AFTER the report's reference date): an `Invoice`
+   * that existed by then (`createdAt <` it) and had no collection `Receipt`
+   * recorded by then (`receipts` matching `receivedAt <` it is `none`). The
+   * receipt-time filter is what makes the outstanding *set* point-in-time
+   * correct — an invoice paid AFTER the reference date is still outstanding as
+   * at that date; `Invoice.dueDate` is write-once at #31, so nothing else
+   * needs reconstructing. Book-wide (`client-accounting.read` is a cross-book
+   * reporting permission), optionally narrowed to one customer. Capped at
+   * {@link AR_AGEING_INVOICE_LIMIT} (`orderBy createdAt asc` — oldest first);
+   * `ClientAccountingService` warns on truncation.
+   */
+  async loadOutstandingReceivables(scope: {
+    customerId?: string;
+    asOfExclusiveUpper: Date;
+  }): Promise<OutstandingInvoiceRow[]> {
+    const rows = await this.prisma.client.invoice.findMany({
+      where: {
+        createdAt: { lt: scope.asOfExclusiveUpper },
+        receipts: { none: { receivedAt: { lt: scope.asOfExclusiveUpper } } },
+        ...(scope.customerId ? { customerId: scope.customerId } : {}),
+      },
+      select: {
+        id: true,
+        customerId: true,
+        totalAmount: true,
+        currency: true,
+        dueDate: true,
+        customer: { select: { legalName: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: AR_AGEING_INVOICE_LIMIT,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      customerId: r.customerId,
+      customerLegalName: r.customer.legalName,
+      totalAmount: r.totalAmount,
+      currency: r.currency,
+      dueDate: r.dueDate,
+    }));
   }
 
   /**
