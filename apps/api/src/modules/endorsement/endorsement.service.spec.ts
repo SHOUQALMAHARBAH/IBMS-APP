@@ -291,6 +291,11 @@ function makeDeps(opts: DepsOpts = {}) {
     });
   const workflow = { transition } as unknown as WorkflowTransitionService;
 
+  const reconcileReversalForPolicy = vi.fn().mockResolvedValue(undefined);
+  const commissionLedger = {
+    reconcileReversalForPolicy,
+  } as unknown as import('../commission/commission-ledger.service').CommissionLedgerService;
+
   return {
     service: new EndorsementService(
       endorsements,
@@ -299,6 +304,7 @@ function makeDeps(opts: DepsOpts = {}) {
       customers,
       audit,
       workflow,
+      commissionLedger,
     ),
     endo,
     policyState,
@@ -318,6 +324,7 @@ function makeDeps(opts: DepsOpts = {}) {
       findCustomerById,
       record,
       transition,
+      reconcileReversalForPolicy,
     },
   };
 }
@@ -621,6 +628,33 @@ describe('EndorsementService', () => {
           entityType: 'CommissionReversal',
         }),
       );
+      // Process 36 — the reversal is reflected onto the policy's commission
+      // ledger entry (best-effort, non-fatal).
+      expect(mocks.reconcileReversalForPolicy).toHaveBeenCalledWith(
+        'pol-1',
+        expect.any(String),
+      );
+    });
+
+    it('a failure reflecting the commission reversal onto the ledger entry does not fail the endorsement (Process 36, best-effort)', async () => {
+      const { service, mocks } = makeDeps({ commissionRate: '12.5' });
+      mocks.reconcileReversalForPolicy.mockRejectedValueOnce(
+        new Error('commission module down'),
+      );
+      await service.requestEndorsement(
+        'pol-1',
+        {
+          type: 'NEGATIVE',
+          changeType: 'remove_employee',
+          premiumAmount: '1000',
+          effectiveFrom: '2026-06-30',
+        } as never,
+        placement(),
+      );
+      await toInsurerConfirmed(service);
+      const view = await service.calculateAdjustment('end-1', {}, placement());
+      expect(view.status).toBe('FINANCIAL_ADJUSTMENT_CALCULATED');
+      expect(view.commissionReversal?.amount).toBe('125.000');
     });
 
     it('NEGATIVE at/above threshold: creates a requires_manager_approval refund and moves to REFUND_APPROVAL_PENDING', async () => {

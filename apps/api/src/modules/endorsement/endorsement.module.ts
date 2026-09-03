@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { CustomerModule } from '../customer/customer.module';
+import { CommissionModule } from '../commission/commission.module';
 
 /** Process 22 — Endorsement Management (backlog Part C #22, Domain B).
  *
@@ -20,7 +21,10 @@ import { CustomerModule } from '../customer/customer.module';
  *     coverage-schedule versioning at APPLY)
  *   - RecommendationModule -> RecommendationRepository (the placed quotation's
  *     commission rate — for the auto-tied commission reversal)
- *   - CustomerModule       -> CustomerRepository (owner, for visibility) */
+ *   - CustomerModule       -> CustomerRepository (owner, for visibility)
+ *   - CommissionModule     -> CommissionLedgerService (Process 36 — reflect a
+ *     cancellation / negative-endorsement CommissionReversal onto the policy's
+ *     CommissionLedgerEntry: best-effort `-> reversed`) */
 @Module({
   imports: [
     AuditModule,
@@ -28,6 +32,7 @@ import { CustomerModule } from '../customer/customer.module';
     PolicyModule,
     RecommendationModule,
     CustomerModule,
+    CommissionModule,
   ],
   controllers: [EndorsementController],
   providers: [EndorsementService, EndorsementRepository],

@@ -30,6 +30,7 @@ const AGREEMENTS = [
     insurerName: "Acme Insurance",
     insuranceLine: "Property All Risks",
     ratePercent: "10.00",
+    vatRatePercent: "16.00",
     effectiveFrom: "2026-06-01T00:00:00.000Z",
     effectiveTo: null,
     isOpen: true,
@@ -40,6 +41,7 @@ const AGREEMENTS = [
     insurerName: "Acme Insurance",
     insuranceLine: "Property All Risks",
     ratePercent: "15.00",
+    vatRatePercent: "0.00",
     effectiveFrom: "2026-01-01T00:00:00.000Z",
     effectiveTo: "2026-06-01T00:00:00.000Z",
     isOpen: false,
@@ -77,6 +79,8 @@ test("shows the governed rate table with the open + closed windows", async ({
 
   await expect(page.getByRole("cell", { name: "10.00%" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "15.00%" })).toBeVisible();
+  // Process 36 — the governed VAT rate column
+  await expect(page.getByRole("cell", { name: "16.00%" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Open", exact: true })).toBeVisible();
   await expect(
     page.getByRole("cell", { name: "Closed", exact: true }),
@@ -84,7 +88,8 @@ test("shows the governed rate table with the open + closed windows", async ({
 
   // Compliance sees the add form
   await expect(page.getByLabel("Insurer")).toBeVisible();
-  await expect(page.getByLabel("Rate percent")).toBeVisible();
+  await expect(page.getByLabel("Rate percent", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("VAT rate percent")).toBeVisible();
 });
 
 test("a user without the permission sees a friendly message", async ({ page }) => {

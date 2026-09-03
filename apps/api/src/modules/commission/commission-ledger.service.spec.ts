@@ -19,6 +19,7 @@ const POLICY = {
 const OPEN_AGREEMENT = {
   id: 'ag-1',
   ratePercent: d('15'),
+  vatRatePercent: d('16'),
   effectiveFrom: new Date('2026-07-01T00:00:00.000Z'),
   effectiveTo: null,
 };
@@ -28,13 +29,20 @@ const governedEntry = (over: Record<string, unknown> = {}) => ({
   policyId: 'pol-1',
   commissionAgreementId: 'ag-1',
   amount: d('18000.000'), // 120000 x 15%
-  vatAmount: d('0'),
+  vatRatePercent: d('16'),
+  vatAmount: d('2880.000'), // 18000 x 16%
   overrideAmount: null,
   status: 'outstanding',
   isManualOverride: false,
   overrideReason: null,
   overrideRequestedByUserId: null,
   overrideApprovedByUserId: null,
+  paidAmount: null,
+  paidAt: null,
+  paymentReference: null,
+  reversedAmount: null,
+  reversedAt: null,
+  reversalReason: null,
   createdAt: new Date('2026-09-03T10:00:00.000Z'),
   ...over,
 });
@@ -58,6 +66,9 @@ function makeService(
     findLedgerEntries: vi.fn().mockResolvedValue([]),
     recordOverrideRaise: vi.fn().mockResolvedValue({ count: 1 }),
     recordOverrideApproval: vi.fn().mockResolvedValue({ count: 1 }),
+    recordEntrySettlement: vi.fn().mockResolvedValue({ count: 1 }),
+    recordEntryReversal: vi.fn().mockResolvedValue({ count: 1 }),
+    findCommissionReversalAmountsForPolicy: vi.fn().mockResolvedValue([]),
     ...over.commission,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
@@ -89,8 +100,13 @@ describe('CommissionLedgerService.calculate (Process 35)', () => {
     );
     const created = commission.createLedgerEntry.mock.calls[0]?.[0] as {
       amount: Prisma.Decimal;
+      vatRatePercent: Prisma.Decimal;
+      vatAmount: Prisma.Decimal;
     };
     expect(created.amount.toFixed(3)).toBe('18000.000');
+    // Process 36 — VAT snapshotted from the governing agreement (16%)
+    expect(created.vatRatePercent.toFixed(2)).toBe('16.00');
+    expect(created.vatAmount.toFixed(3)).toBe('2880.000'); // 18000 x 16%
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'CREATE',
@@ -327,8 +343,11 @@ describe('CommissionLedgerService override (Process 35 — maker/checker)', () =
     );
     const approveArg = commission.recordOverrideApproval.mock.calls[0]?.[2] as {
       overrideAmount: Prisma.Decimal;
+      vatAmount: Prisma.Decimal;
     };
     expect(approveArg.overrideAmount.toFixed(3)).toBe('12000.000');
+    // Process 36 — VAT recomputed against the frozen 16% rate: 12000 x 16%
+    expect(approveArg.vatAmount.toFixed(3)).toBe('1920.000');
     expect(v).toMatchObject({
       amount: '12000.000',
       effectiveAmount: '12000.000',
@@ -395,5 +414,245 @@ describe('CommissionLedgerService override (Process 35 — maker/checker)', () =
     await expect(service.approveOverride('cle-1', 'mgr-1')).rejects.toThrow(
       /concurrently/i,
     );
+  });
+});
+
+describe('CommissionLedgerService.settle (Process 36 — reconcile)', () => {
+  it('outstanding -> paid on an exact statement match + a UPDATE audit row', async () => {
+    const { service, commission, audit } = makeService({
+      commission: {
+        findLedgerEntryById: vi
+          .fn()
+          .mockResolvedValueOnce(governedEntry())
+          .mockResolvedValue(
+            governedEntry({
+              status: 'paid',
+              paidAmount: d('18000.000'),
+              paidAt: new Date('2026-10-01T00:00:00.000Z'),
+              paymentReference: 'STMT-1',
+            }),
+          ),
+      },
+    });
+    const v = await service.settle(
+      'cle-1',
+      { statementAmount: '18000.000', paymentReference: 'STMT-1' },
+      'fin-1',
+    );
+    expect(commission.recordEntrySettlement).toHaveBeenCalledWith(
+      'cle-1',
+      expect.objectContaining({ paymentReference: 'STMT-1' }),
+    );
+    const arg = commission.recordEntrySettlement.mock.calls[0]?.[1] as {
+      expectedAmount: Prisma.Decimal;
+      paidAmount: Prisma.Decimal;
+    };
+    expect(arg.expectedAmount.toFixed(3)).toBe('18000.000');
+    expect(arg.paidAmount.toFixed(3)).toBe('18000.000');
+    expect(v).toMatchObject({ status: 'paid', paidAmount: '18000.000' });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'UPDATE',
+        entityType: 'CommissionLedgerEntry',
+      }),
+    );
+  });
+
+  it('422s a statement figure that does not match the recorded commission (points at Process 39)', async () => {
+    const { service } = makeService({
+      commission: {
+        findLedgerEntryById: vi.fn().mockResolvedValue(governedEntry()),
+      },
+    });
+    await expect(
+      service.settle(
+        'cle-1',
+        { statementAmount: '17500.000', paymentReference: 'STMT-1' },
+        'fin-1',
+      ),
+    ).rejects.toThrow(/reconciliation exception \(Process 39\)/i);
+  });
+
+  it('422s while a manual override is pending', async () => {
+    const { service } = makeService({
+      commission: {
+        findLedgerEntryById: vi.fn().mockResolvedValue(
+          governedEntry({
+            isManualOverride: true,
+            overrideAmount: d('12000.000'),
+            overrideRequestedByUserId: 'fin-1',
+          }),
+        ),
+      },
+    });
+    await expect(
+      service.settle(
+        'cle-1',
+        { statementAmount: '18000.000', paymentReference: 'STMT-1' },
+        'fin-1',
+      ),
+    ).rejects.toThrow(/pending manual override/i);
+  });
+
+  it('422s a reversed entry', async () => {
+    const { service } = makeService({
+      commission: {
+        findLedgerEntryById: vi
+          .fn()
+          .mockResolvedValue(governedEntry({ status: 'reversed' })),
+      },
+    });
+    await expect(
+      service.settle(
+        'cle-1',
+        { statementAmount: '18000.000', paymentReference: 'STMT-1' },
+        'fin-1',
+      ),
+    ).rejects.toThrow(/reversed/i);
+  });
+
+  it('422s when a live Process 22 CommissionReversal exists but the flip has not landed', async () => {
+    const { service } = makeService({
+      commission: {
+        findLedgerEntryById: vi.fn().mockResolvedValue(governedEntry()),
+        findCommissionReversalAmountsForPolicy: vi
+          .fn()
+          .mockResolvedValue([d('4000.000')]),
+      },
+    });
+    await expect(
+      service.settle(
+        'cle-1',
+        { statementAmount: '18000.000', paymentReference: 'STMT-1' },
+        'fin-1',
+      ),
+    ).rejects.toThrow(/commission reversal/i);
+  });
+
+  it('is idempotent: a re-settle with the same figure + reference resumes', async () => {
+    const paid = governedEntry({
+      status: 'paid',
+      paidAmount: d('18000.000'),
+      paymentReference: 'STMT-1',
+    });
+    const { service, commission } = makeService({
+      commission: {
+        findLedgerEntryById: vi.fn().mockResolvedValue(paid),
+      },
+    });
+    const v = await service.settle(
+      'cle-1',
+      { statementAmount: '18000.000', paymentReference: 'STMT-1' },
+      'fin-2',
+    );
+    expect(v.status).toBe('paid');
+    expect(commission.recordEntrySettlement).not.toHaveBeenCalled();
+  });
+
+  it('409s a re-settle with a different reference', async () => {
+    const paid = governedEntry({
+      status: 'paid',
+      paidAmount: d('18000.000'),
+      paymentReference: 'STMT-1',
+    });
+    const { service } = makeService({
+      commission: { findLedgerEntryById: vi.fn().mockResolvedValue(paid) },
+    });
+    await expect(
+      service.settle(
+        'cle-1',
+        { statementAmount: '18000.000', paymentReference: 'STMT-OTHER' },
+        'fin-2',
+      ),
+    ).rejects.toThrow(/already reconciled/i);
+  });
+
+  it('a status-conditional 0-row settle surfaces as a 409 (concurrent)', async () => {
+    const { service } = makeService({
+      commission: {
+        findLedgerEntryById: vi
+          .fn()
+          .mockResolvedValueOnce(governedEntry())
+          .mockResolvedValue(governedEntry()), // still outstanding on reload -> not us
+        recordEntrySettlement: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    });
+    await expect(
+      service.settle(
+        'cle-1',
+        { statementAmount: '18000.000', paymentReference: 'STMT-1' },
+        'fin-1',
+      ),
+    ).rejects.toThrow(/changed before it could be reconciled/i);
+  });
+});
+
+describe('CommissionLedgerService.reconcileReversalForPolicy (Process 36)', () => {
+  it('accumulates reversedAmount without flipping status below full clawback', async () => {
+    const { service, commission } = makeService({
+      commission: {
+        findLedgerEntryByPolicyId: vi.fn().mockResolvedValue(governedEntry()),
+        findCommissionReversalAmountsForPolicy: vi
+          .fn()
+          .mockResolvedValue([d('6000.000')]),
+        findLedgerEntryById: vi
+          .fn()
+          .mockResolvedValue(governedEntry({ reversedAmount: d('6000.000') })),
+      },
+    });
+    await service.reconcileReversalForPolicy('pol-1', 'fin-1');
+    const arg = commission.recordEntryReversal.mock.calls[0]?.[1] as {
+      reversedAmount: Prisma.Decimal;
+      toReversed: boolean;
+    };
+    expect(arg.reversedAmount.toFixed(3)).toBe('6000.000');
+    expect(arg.toReversed).toBe(false);
+  });
+
+  it('flips status -> reversed once the pooled reversals meet the earned commission', async () => {
+    const { service, commission } = makeService({
+      commission: {
+        findLedgerEntryByPolicyId: vi.fn().mockResolvedValue(governedEntry()),
+        findCommissionReversalAmountsForPolicy: vi
+          .fn()
+          .mockResolvedValue([d('18000.000')]),
+        findLedgerEntryById: vi.fn().mockResolvedValue(
+          governedEntry({
+            status: 'reversed',
+            reversedAmount: d('18000.000'),
+          }),
+        ),
+      },
+    });
+    await service.reconcileReversalForPolicy('pol-1', 'fin-1');
+    const arg = commission.recordEntryReversal.mock.calls[0]?.[1] as {
+      toReversed: boolean;
+    };
+    expect(arg.toReversed).toBe(true);
+  });
+
+  it('is a no-op when no ledger entry exists for the policy', async () => {
+    const { service, commission } = makeService({
+      commission: {
+        findLedgerEntryByPolicyId: vi.fn().mockResolvedValue(null),
+      },
+    });
+    await service.reconcileReversalForPolicy('pol-x', 'fin-1');
+    expect(commission.recordEntryReversal).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when the reversal is already reflected', async () => {
+    const { service, commission } = makeService({
+      commission: {
+        findLedgerEntryByPolicyId: vi
+          .fn()
+          .mockResolvedValue(governedEntry({ reversedAmount: d('6000.000') })),
+        findCommissionReversalAmountsForPolicy: vi
+          .fn()
+          .mockResolvedValue([d('6000.000')]),
+      },
+    });
+    await service.reconcileReversalForPolicy('pol-1', 'fin-1');
+    expect(commission.recordEntryReversal).not.toHaveBeenCalled();
   });
 });

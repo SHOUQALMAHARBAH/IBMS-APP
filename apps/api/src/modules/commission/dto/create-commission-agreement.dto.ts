@@ -32,6 +32,17 @@ export class CreateCommissionAgreementDto {
   })
   ratePercent!: string;
 
+  /** Process 36 — the governed VAT rate on the broker's commission income for
+   * this pair, `0..100`, at most 2 decimal places. Optional; defaults to `0`
+   * (no VAT applied until a rate manager sets a figure). */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @Matches(/^\d{1,3}(\.\d{1,2})?$/, {
+    message:
+      'vatRatePercent must be a percentage with at most 2 decimal places, e.g. "16.00"',
+  })
+  vatRatePercent?: string;
+
   /** When the rate takes effect — a plain `YYYY-MM-DD`. Optional; defaults to
    * now. May be future-dated (a scheduled rate change); must not predate the
    * window it supersedes. */

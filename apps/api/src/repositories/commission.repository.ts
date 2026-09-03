@@ -20,6 +20,7 @@ export interface CreateAgreementRow {
   insurerId: string;
   insuranceLine: string;
   ratePercent: Prisma.Decimal;
+  vatRatePercent: Prisma.Decimal;
   effectiveFrom: Date;
 }
 
@@ -147,12 +148,16 @@ export class CommissionRepository {
     policyId: string;
     commissionAgreementId: string;
     amount: Prisma.Decimal;
+    vatRatePercent: Prisma.Decimal;
+    vatAmount: Prisma.Decimal;
   }): Promise<CommissionLedgerEntry> {
     return this.prisma.client.commissionLedgerEntry.create({
       data: {
         policyId: input.policyId,
         commissionAgreementId: input.commissionAgreementId,
         amount: input.amount,
+        vatRatePercent: input.vatRatePercent,
+        vatAmount: input.vatAmount,
         status: 'outstanding',
         isManualOverride: false,
       },
@@ -232,6 +237,11 @@ export class CommissionRepository {
     expected: {
       requestedByUserId: string;
       overrideAmount: Prisma.Decimal;
+      /** `overrideAmount × the entry's snapshotted vatRatePercent` — recomputed
+       * so the `vatAmount == amount × vatRatePercent%` invariant survives the
+       * override. Derived purely from fields the `where` pins, so no extra
+       * race surface. */
+      vatAmount: Prisma.Decimal;
     },
   ): Promise<Prisma.BatchPayload> {
     return this.prisma.client.commissionLedgerEntry.updateMany({
@@ -246,7 +256,95 @@ export class CommissionRepository {
       data: {
         overrideApprovedByUserId: approverUserId,
         amount: expected.overrideAmount,
+        vatAmount: expected.vatAmount,
       },
     });
+  }
+
+  // --- Process 36 — reconciliation lifecycle --------------------------
+
+  /**
+   * Reconcile an entry against an insurer statement: `outstanding -> paid`.
+   * Status-conditional `updateMany` — the `where` re-asserts EVERY condition
+   * the service validated between its read and this write
+   * (`race-safe-invariants.md`): `status`; the exact `amount` the statement was
+   * reconciled against (a concurrent override-approve that changed `amount`
+   * lands 0 rows -> 409, never a stale settle); "no PENDING override"
+   * (`OR: isManualOverride false | already approved`); and "no Process 22
+   * `CommissionReversal` on the policy" as a relation filter, so a
+   * `CommissionReversal` minted concurrently (between the service's live
+   * `findCommissionReversalAmountsForPolicy` read and here) also lands 0 rows
+   * -> 409 rather than settling commission on cancelled cover.
+   */
+  recordEntrySettlement(
+    id: string,
+    input: {
+      expectedAmount: Prisma.Decimal;
+      paidAmount: Prisma.Decimal;
+      paymentReference: string;
+    },
+  ): Promise<Prisma.BatchPayload> {
+    return this.prisma.client.commissionLedgerEntry.updateMany({
+      where: {
+        id,
+        status: 'outstanding',
+        amount: input.expectedAmount,
+        OR: [
+          { isManualOverride: false },
+          { overrideApprovedByUserId: { not: null } },
+        ],
+        policy: {
+          is: {
+            endorsements: { none: { commissionReversal: { isNot: null } } },
+          },
+        },
+      },
+      data: {
+        status: 'paid',
+        paidAmount: input.paidAmount,
+        paidAt: new Date(),
+        paymentReference: input.paymentReference,
+      },
+    });
+  }
+
+  /**
+   * Reflect a Process 22 CommissionReversal on the policy's ledger entry:
+   * accumulate `reversedAmount` and, once the full earned commission is clawed
+   * back, flip `status -> reversed`. Status-conditional — 0 rows when the entry
+   * is already `reversed`. `toReversed` decides whether this call is the one
+   * that makes the status terminal.
+   */
+  recordEntryReversal(
+    id: string,
+    input: {
+      reversedAmount: Prisma.Decimal;
+      reversedAt: Date;
+      reversalReason: string;
+      toReversed: boolean;
+    },
+  ): Promise<Prisma.BatchPayload> {
+    return this.prisma.client.commissionLedgerEntry.updateMany({
+      where: { id, status: { in: ['outstanding', 'paid'] } },
+      data: {
+        reversedAmount: input.reversedAmount,
+        reversedAt: input.reversedAt,
+        reversalReason: input.reversalReason,
+        ...(input.toReversed ? { status: 'reversed' as const } : {}),
+      },
+    });
+  }
+
+  /** The amounts of every CommissionReversal tied to the policy's endorsements
+   * (Process 22) — the input to `computeReversalState`. */
+  findCommissionReversalAmountsForPolicy(
+    policyId: string,
+  ): Promise<Prisma.Decimal[]> {
+    return this.prisma.client.commissionReversal
+      .findMany({
+        where: { endorsement: { policyId } },
+        select: { amount: true },
+      })
+      .then((rows) => rows.map((r) => r.amount));
   }
 }

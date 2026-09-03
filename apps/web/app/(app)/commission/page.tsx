@@ -48,6 +48,7 @@ export default function CommissionRatesPage() {
   const [insurerId, setInsurerId] = useState('');
   const [insuranceLine, setInsuranceLine] = useState('');
   const [ratePercent, setRatePercent] = useState('');
+  const [vatRatePercent, setVatRatePercent] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -93,10 +94,12 @@ export default function CommissionRatesPage() {
         insurerId: insurerId.trim(),
         insuranceLine: insuranceLine.trim(),
         ratePercent: ratePercent.trim(),
+        ...(vatRatePercent.trim() ? { vatRatePercent: vatRatePercent.trim() } : {}),
         ...(effectiveFrom ? { effectiveFrom } : {}),
       });
       setInsuranceLine('');
       setRatePercent('');
+      setVatRatePercent('');
       setEffectiveFrom('');
       await load();
     } catch (err) {
@@ -171,6 +174,16 @@ export default function CommissionRatesPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            VAT %
+            <input
+              aria-label="VAT rate percent"
+              value={vatRatePercent}
+              onChange={(e) => setVatRatePercent(e.target.value)}
+              placeholder="16"
+              inputMode="decimal"
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             Effective from
             <input
               type="date"
@@ -207,6 +220,7 @@ export default function CommissionRatesPage() {
                   <th style={headCellStyle}>Insurer</th>
                   <th style={headCellStyle}>Insurance line</th>
                   <th style={{ ...headCellStyle, textAlign: 'right' }}>Rate</th>
+                  <th style={{ ...headCellStyle, textAlign: 'right' }}>VAT</th>
                   <th style={headCellStyle}>Effective from</th>
                   <th style={headCellStyle}>Effective to</th>
                   <th style={headCellStyle}>Status</th>
@@ -219,6 +233,9 @@ export default function CommissionRatesPage() {
                     <td style={cellStyle}>{r.insuranceLine}</td>
                     <td style={{ ...cellStyle, textAlign: 'right' }}>
                       {pct(r.ratePercent)}
+                    </td>
+                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                      {pct(r.vatRatePercent)}
                     </td>
                     <td style={cellStyle}>{r.effectiveFrom.slice(0, 10)}</td>
                     <td style={cellStyle}>

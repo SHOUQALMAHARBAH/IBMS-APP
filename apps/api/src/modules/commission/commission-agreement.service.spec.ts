@@ -29,6 +29,7 @@ const agreementRow = (over: Record<string, unknown> = {}) => ({
   insurerId: 'ins-1',
   insuranceLine: 'Property All Risks',
   ratePercent: d('15'),
+  vatRatePercent: d('0'),
   effectiveFrom: new Date('2026-09-03T00:00:00.000Z'),
   effectiveTo: null,
   insurer: { name: 'Acme Insurance' },
@@ -111,6 +112,43 @@ describe('CommissionAgreementService.create (Process 35)', () => {
     ).rejects.toThrow(/0\.\.100/);
   });
 
+  it('422s a vatRatePercent outside 0..100 (Process 36)', async () => {
+    const { service } = makeService();
+    await expect(
+      service.create(
+        {
+          insurerId: 'ins-1',
+          insuranceLine: 'Motor',
+          ratePercent: '12',
+          vatRatePercent: '150',
+        },
+        'mgr-1',
+      ),
+    ).rejects.toThrow(/vatRatePercent .* 0\.\.100/);
+  });
+
+  it('carries vatRatePercent onto the created window (Process 36)', async () => {
+    const { service, commission } = makeService({
+      supersedeAndCreateAgreement: vi
+        .fn()
+        .mockResolvedValue(agreementRow({ vatRatePercent: d('16') })),
+    });
+    const v = await service.create(
+      {
+        insurerId: 'ins-1',
+        insuranceLine: 'Property All Risks',
+        ratePercent: '15',
+        vatRatePercent: '16',
+      },
+      'mgr-1',
+    );
+    expect(v.vatRatePercent).toBe('16.00');
+    const arg = commission.supersedeAndCreateAgreement.mock.calls[0]?.[0] as {
+      create: { vatRatePercent: Prisma.Decimal };
+    };
+    expect(arg.create.vatRatePercent.toFixed(2)).toBe('16.00');
+  });
+
   it('422s an effectiveFrom earlier than the window it would supersede', async () => {
     const { service } = makeService({
       findOpenAgreement: vi.fn().mockResolvedValue({
@@ -187,6 +225,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
       id: 'ag-open',
       effectiveFrom: new Date('2026-09-03T00:00:00.000Z'),
       ratePercent: d('15'),
+      vatRatePercent: d('0'),
     };
     const { service, commission } = makeService({
       findOpenAgreement: vi.fn().mockResolvedValue(open),

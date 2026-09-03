@@ -16,6 +16,7 @@ import { RecommendationRepository } from '../../repositories/recommendation.repo
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
+import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
 import {
@@ -117,6 +118,7 @@ export class EndorsementService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    private readonly commissionLedger: CommissionLedgerService,
   ) {}
 
   private canReachAnyPolicy(actor: AuthenticatedUser): boolean {
@@ -583,6 +585,23 @@ export class EndorsementService {
         entityId: after.commissionReversal.id,
         afterValue: commissionReversalAuditSnapshot(after.commissionReversal),
       });
+      // Process 36 — reflect the reversal onto the policy's CommissionLedgerEntry
+      // (accumulate `reversedAmount`; flip `-> reversed` once fully clawed
+      // back). Best-effort, like the #29 lossRatio.recomputeForPolicy call: it
+      // must never fail the endorsement flow, the ledger entry may not exist
+      // (Finance may not have run `commission.calculate` yet), and it recomputes
+      // from live rows so a missed call self-heals on the next endorsement and
+      // `settle` re-checks the same gate.
+      try {
+        await this.commissionLedger.reconcileReversalForPolicy(
+          e.policy.id,
+          actor.id,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Endorsement ${id}: reflecting the commission reversal onto the ledger entry failed (non-fatal): ${(err as Error).message}`,
+        );
+      }
     }
     if (
       after &&

@@ -6,6 +6,7 @@ import {
   calculateCommission,
   listCommissionEntriesForPolicy,
   raiseCommissionOverride,
+  settleCommission,
   type CommissionEntry,
 } from '../../lib/commission/commission-api';
 import {
@@ -45,6 +46,8 @@ export function CommissionSection({
 
   const [overrideAmount, setOverrideAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [statementAmount, setStatementAmount] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -107,6 +110,14 @@ export function CommissionSection({
             <span>{money(entry.amount)}</span>
           </div>
           <div style={quoteFieldStyle}>
+            <span>VAT ({entry.vatRatePercent}%)</span>
+            <span>{money(entry.vatAmount)}</span>
+          </div>
+          <div style={quoteFieldStyle}>
+            <span>Gross (incl. VAT)</span>
+            <span>{money(entry.grossAmount)}</span>
+          </div>
+          <div style={quoteFieldStyle}>
             <span>Effective amount</span>
             <strong>{money(entry.effectiveAmount)}</strong>
           </div>
@@ -114,6 +125,24 @@ export function CommissionSection({
             <span>Status</span>
             <span>{entry.status}</span>
           </div>
+          {entry.status === 'paid' ? (
+            <div style={quoteFieldStyle}>
+              <span>Reconciled</span>
+              <span>
+                {money(entry.paidAmount)}
+                {entry.paymentReference ? ` · ${entry.paymentReference}` : ''}
+              </span>
+            </div>
+          ) : null}
+          {entry.reversedAmount && Number(entry.reversedAmount) > 0 ? (
+            <div style={quoteFieldStyle}>
+              <span>Reversed</span>
+              <span>
+                {money(entry.reversedAmount)}
+                {entry.reversalReason ? ` · ${entry.reversalReason}` : ''}
+              </span>
+            </div>
+          ) : null}
           {entry.isManualOverride ? (
             <>
               <div style={quoteFieldStyle}>
@@ -189,6 +218,51 @@ export function CommissionSection({
                 {entry.isManualOverride
                   ? 'Revise pending override'
                   : 'Raise manual override'}
+              </button>
+            </form>
+          ) : null}
+
+          {canCalculate &&
+          entry.status === 'outstanding' &&
+          !entry.overridePending ? (
+            <form
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                marginTop: '0.75rem',
+              }}
+              onSubmit={(ev) => {
+                ev.preventDefault();
+                void run(() =>
+                  settleCommission(entry.id, {
+                    statementAmount: statementAmount.trim(),
+                    paymentReference: paymentReference.trim(),
+                  }),
+                );
+              }}
+            >
+              <label>
+                Insurer statement amount (must equal {money(entry.amount)})
+                <input
+                  aria-label="Statement amount"
+                  value={statementAmount}
+                  onChange={(e) => setStatementAmount(e.target.value)}
+                  inputMode="decimal"
+                  required
+                />
+              </label>
+              <label>
+                Statement / payment reference
+                <input
+                  aria-label="Payment reference"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  required
+                />
+              </label>
+              <button type="submit" style={buttonStyle} disabled={busy}>
+                Reconcile &amp; mark paid
               </button>
             </form>
           ) : null}

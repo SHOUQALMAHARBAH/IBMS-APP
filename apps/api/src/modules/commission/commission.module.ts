@@ -36,6 +36,9 @@ import { PolicyModule } from '../policy/policy.module';
     CommissionLedgerService,
     CommissionRepository,
   ],
-  exports: [CommissionRepository],
+  // CommissionLedgerService is exported so EndorsementModule (Process 22) can
+  // best-effort `reconcileReversalForPolicy` after minting a CommissionReversal
+  // (Process 36 — the `-> reversed` lifecycle move).
+  exports: [CommissionRepository, CommissionLedgerService],
 })
 export class CommissionModule {}

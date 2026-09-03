@@ -36,6 +36,7 @@ interface AgreementBody {
   insurerId: string;
   insuranceLine: string;
   ratePercent: string;
+  vatRatePercent: string;
   effectiveFrom: string;
   effectiveTo: string | null;
   isOpen: boolean;
@@ -45,7 +46,9 @@ interface EntryBody {
   policyId: string;
   commissionAgreementId: string | null;
   amount: string;
+  vatRatePercent: string;
   vatAmount: string;
+  grossAmount: string;
   overrideAmount: string | null;
   effectiveAmount: string;
   status: string;
@@ -54,6 +57,12 @@ interface EntryBody {
   overrideRequestedByUserId: string | null;
   overrideApprovedByUserId: string | null;
   overridePending: boolean;
+  paidAmount: string | null;
+  paidAt: string | null;
+  paymentReference: string | null;
+  reversedAmount: string | null;
+  reversedAt: string | null;
+  reversalReason: string | null;
 }
 
 const ISSUED_SCHEDULE = {
@@ -290,10 +299,12 @@ describe('Commission Calculation (e2e) — backlog Part C #35', () => {
         insurerId,
         insuranceLine: 'Property All Risks',
         ratePercent: '15',
+        vatRatePercent: '16',
         effectiveFrom: '2026-01-01',
       })
       .expect(201);
     expect((ag.body as AgreementBody).ratePercent).toBe('15.00');
+    expect((ag.body as AgreementBody).vatRatePercent).toBe('16.00');
     expect((ag.body as AgreementBody).isOpen).toBe(true);
 
     // a non-Finance actor cannot calculate
@@ -315,6 +326,12 @@ describe('Commission Calculation (e2e) — backlog Part C #35', () => {
     expect(entry.commissionAgreementId).toBe((ag.body as AgreementBody).id);
     expect(entry.isManualOverride).toBe(false);
     expect(entry.status).toBe('outstanding');
+    // Process 36 — VAT snapshotted from the agreement (16%): 18000 x 16% = 2880
+    expect(entry.vatRatePercent).toBe('16.00');
+    expect(entry.vatAmount).toBe('2880.000');
+    expect(entry.grossAmount).toBe('20880.000');
+    expect(entry.paidAmount).toBeNull();
+    expect(entry.reversedAmount).toBeNull();
 
     // write-once: a re-calc returns the same entry
     const recalc = await request(app.getHttpServer())
@@ -360,6 +377,9 @@ describe('Commission Calculation (e2e) — backlog Part C #35', () => {
     expect(done.amount).toBe('12000.000');
     expect(done.effectiveAmount).toBe('12000.000');
     expect(done.overridePending).toBe(false);
+    // Process 36 — VAT recomputed against the frozen 16% rate: 12000 x 16%
+    expect(done.vatAmount).toBe('1920.000');
+    expect(done.grossAmount).toBe('13920.000');
 
     // idempotent: the same approver again is a no-op 201
     await request(app.getHttpServer())
@@ -379,15 +399,65 @@ describe('Commission Calculation (e2e) — backlog Part C #35', () => {
       .expect(200);
     expect((got.body as EntryBody).effectiveAmount).toBe('12000.000');
 
-    // audit: one CREATE CommissionLedgerEntry + one APPROVE row for this entry
+    // --- Process 36: reconcile the entry against an insurer statement -----
+
+    // a non-Finance actor cannot reconcile
+    await request(app.getHttpServer())
+      .post(`/commission/entries/${entry.id}/settle`)
+      .set(bearer(plc.accessToken))
+      .send({ statementAmount: '12000.000', paymentReference: 'STMT-COM-1' })
+      .expect(403);
+
+    // a statement figure that does not match the recorded commission -> 422
+    await request(app.getHttpServer())
+      .post(`/commission/entries/${entry.id}/settle`)
+      .set(bearer(fin.accessToken))
+      .send({ statementAmount: '11000.000', paymentReference: 'STMT-COM-1' })
+      .expect(422);
+
+    // Finance reconciles at the exact (override) amount -> paid
+    const settled = await request(app.getHttpServer())
+      .post(`/commission/entries/${entry.id}/settle`)
+      .set(bearer(fin.accessToken))
+      .send({ statementAmount: '12000.000', paymentReference: 'STMT-COM-1' })
+      .expect(201);
+    const paid = settled.body as EntryBody;
+    expect(paid.status).toBe('paid');
+    expect(paid.paidAmount).toBe('12000.000');
+    expect(paid.paymentReference).toBe('STMT-COM-1');
+    expect(paid.paidAt).not.toBeNull();
+
+    // idempotent: the same statement figure + reference resumes
+    const reSettled = await request(app.getHttpServer())
+      .post(`/commission/entries/${entry.id}/settle`)
+      .set(bearer(fin.accessToken))
+      .send({ statementAmount: '12000.000', paymentReference: 'STMT-COM-1' })
+      .expect(201);
+    expect((reSettled.body as EntryBody).status).toBe('paid');
+
+    // a raised-override on a paid entry is refused
+    await request(app.getHttpServer())
+      .post(`/commission/entries/${entry.id}/override`)
+      .set(bearer(fin.accessToken))
+      .send({ overrideAmount: '9000.000', reason: 'too late to change this' })
+      .expect(422);
+
+    // audit: CREATE + APPROVE + the settle UPDATE row for this entry
     const auditRows = await prisma.auditLogEntry.findMany({
       where: { entityType: 'CommissionLedgerEntry', entityId: entry.id },
     });
     const actions = auditRows.map((r) => r.action).sort();
     expect(actions).toContain('CREATE');
     expect(actions).toContain('APPROVE');
+    expect(actions).toContain('UPDATE');
     const approveRow = auditRows.find((r) => r.action === 'APPROVE');
     expect(JSON.stringify(approveRow?.afterValue)).toContain(reason);
+    const settleRow = auditRows.find(
+      (r) =>
+        r.action === 'UPDATE' &&
+        JSON.stringify(r.afterValue).includes('STMT-COM-1'),
+    );
+    expect(settleRow).toBeTruthy();
 
     // supersede: a new window closes the '15' one
     await request(app.getHttpServer())

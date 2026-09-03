@@ -13,6 +13,7 @@ export interface CommissionAgreement {
   insurerName: string;
   insuranceLine: string;
   ratePercent: string;
+  vatRatePercent: string;
   effectiveFrom: string;
   effectiveTo: string | null;
   isOpen: boolean;
@@ -23,7 +24,9 @@ export interface CommissionEntry {
   policyId: string;
   commissionAgreementId: string | null;
   amount: string;
+  vatRatePercent: string;
   vatAmount: string;
+  grossAmount: string;
   overrideAmount: string | null;
   effectiveAmount: string;
   status: string;
@@ -32,6 +35,12 @@ export interface CommissionEntry {
   overrideRequestedByUserId: string | null;
   overrideApprovedByUserId: string | null;
   overridePending: boolean;
+  paidAmount: string | null;
+  paidAt: string | null;
+  paymentReference: string | null;
+  reversedAmount: string | null;
+  reversedAt: string | null;
+  reversalReason: string | null;
   createdAt: string;
 }
 
@@ -58,6 +67,7 @@ export function createCommissionAgreement(body: {
   insurerId: string;
   insuranceLine: string;
   ratePercent: string;
+  vatRatePercent?: string;
   effectiveFrom?: string;
 }): Promise<CommissionAgreement> {
   return apiPost('/commission/agreements', body);
@@ -84,4 +94,13 @@ export function approveCommissionOverride(
   entryId: string,
 ): Promise<CommissionEntry> {
   return apiPost(`/commission/entries/${entryId}/override/approve`, {});
+}
+
+/** Process 36 — reconcile the entry against an insurer statement and mark it
+ * paid (`commission.reconcile` / Finance). */
+export function settleCommission(
+  entryId: string,
+  body: { statementAmount: string; paymentReference: string },
+): Promise<CommissionEntry> {
+  return apiPost(`/commission/entries/${entryId}/settle`, body);
 }

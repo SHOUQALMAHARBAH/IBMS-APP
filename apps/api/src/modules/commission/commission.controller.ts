@@ -7,6 +7,7 @@ import { ListCommissionAgreementsQueryDto } from './dto/list-commission-agreemen
 import { CalculateCommissionDto } from './dto/calculate-commission.dto';
 import { ListCommissionEntriesQueryDto } from './dto/list-commission-entries-query.dto';
 import { RaiseCommissionOverrideDto } from './dto/raise-commission-override.dto';
+import { SettleCommissionDto } from './dto/settle-commission.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -99,5 +100,19 @@ export class CommissionController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.ledger.approveOverride(id, user.id);
+  }
+
+  /** Process 36 — reconcile the entry against an insurer statement and mark it
+   * `paid` (`commission.reconcile` / Finance). The `-> reversed` move is not an
+   * endpoint: it is driven by a Process 22 cancellation / negative endorsement
+   * minting a `CommissionReversal` for the policy. */
+  @RequirePermissions('commission.reconcile')
+  @Post('entries/:id/settle')
+  settle(
+    @Param('id') id: string,
+    @Body() dto: SettleCommissionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.ledger.settle(id, dto, user.id);
   }
 }

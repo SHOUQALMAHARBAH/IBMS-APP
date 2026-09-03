@@ -15,6 +15,7 @@ import {
 import {
   agreementAuditSnapshot,
   COMMISSION_MAX_RATE_PERCENT,
+  COMMISSION_MAX_VAT_RATE_PERCENT,
   deriveAgreementView,
   type CommissionAgreementView,
 } from './commission.config';
@@ -61,6 +62,16 @@ export class CommissionAgreementService {
       );
     }
 
+    const vatRate = new Prisma.Decimal(dto.vatRatePercent ?? '0');
+    if (
+      vatRate.lessThan(0) ||
+      vatRate.greaterThan(COMMISSION_MAX_VAT_RATE_PERCENT)
+    ) {
+      throw new UnprocessableEntityException(
+        `vatRatePercent (${vatRate.toFixed(2)}%) is outside 0..${COMMISSION_MAX_VAT_RATE_PERCENT}.`,
+      );
+    }
+
     const effectiveFrom = this.parseEffectiveFrom(dto.effectiveFrom);
     const insuranceLine = dto.insuranceLine.trim();
 
@@ -81,10 +92,11 @@ export class CommissionAgreementService {
     if (
       open &&
       open.effectiveFrom.getTime() === effectiveFrom.getTime() &&
-      open.ratePercent.equals(rate)
+      open.ratePercent.equals(rate) &&
+      open.vatRatePercent.equals(vatRate)
     ) {
-      // Idempotent re-post of the same open rate — return it, don't churn the
-      // window.
+      // Idempotent re-post of the same open rate (commission AND VAT) — return
+      // it, don't churn the window.
       const rows = await this.commission.findAgreements({
         insurerId: dto.insurerId,
         insuranceLine,
@@ -104,6 +116,7 @@ export class CommissionAgreementService {
           insurerId: dto.insurerId,
           insuranceLine,
           ratePercent: rate,
+          vatRatePercent: vatRate,
           effectiveFrom,
         },
         supersedeId: open?.id ?? null,
@@ -127,6 +140,7 @@ export class CommissionAgreementService {
         insurerId: created.insurerId,
         insuranceLine: created.insuranceLine,
         ratePercent: created.ratePercent,
+        vatRatePercent: created.vatRatePercent,
         effectiveFrom: created.effectiveFrom,
         effectiveTo: created.effectiveTo,
         supersededAgreementId: open?.id ?? null,

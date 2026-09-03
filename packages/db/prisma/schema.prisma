@@ -1726,12 +1726,19 @@ model Remittance {
 /// UNIQUE). A rate change closes the prior window (`effectiveTo`) and opens a
 /// new one in one $transaction; the index is the race backstop
 /// (ibms-brain/meta/lex/race-safe-invariants.md).
+///
+/// Process 36 — `vatRatePercent` is the GOVERNED VAT rate (Jordan GST on the
+/// broker's commission income) for the pair: Compliance / Manager set it on
+/// the window alongside `ratePercent`, Finance only applies it. Snapshotted
+/// onto each CommissionLedgerEntry at calculate time. DRAFTED default 0 — no
+/// governed tax-rate source is encoded in the system yet.
 model CommissionAgreement {
   id            String   @id @default(uuid())
   insurerId     String
   insurer       Insurer  @relation(fields: [insurerId], references: [id])
   insuranceLine String
   ratePercent   Decimal  @db.Decimal(5, 2)
+  vatRatePercent Decimal @default(0) @db.Decimal(5, 2)
   effectiveFrom DateTime @default(now())
   effectiveTo   DateTime?
 
@@ -1750,6 +1757,19 @@ model CommissionAgreement {
 /// overrideApprovedByUserId) is DB-enforced by
 /// CommissionLedgerEntry_maker_checker_distinct (migration 20260826091424) +
 /// assertDifferentActors in the service.
+///
+/// Process 36 lifecycle (`status`, a plain string — NOT a WorkflowTransition
+/// entity; the legal moves live in commission.config.ts's
+/// COMMISSION_ENTRY_TRANSITIONS and every move is a status-conditional
+/// updateMany, race-safe-invariants.md):
+///   outstanding --settle (insurer statement reconciled)--> paid
+///   {outstanding|paid} --a Process 22 CommissionReversal for the policy--> reversed
+/// `vatRatePercent` is snapshotted from the governing CommissionAgreement at
+/// calculate; `vatAmount == amount x vatRatePercent%` always (approve
+/// recomputes it). `paid*` = the reconciliation outcome (paidAmount MUST equal
+/// `amount` — a variance is a Process 39 exception). `reversed*` = the clawback
+/// outcome; `reversedAmount` accumulates and `status` flips to 'reversed' once
+/// the full earned commission is clawed back.
 model CommissionLedgerEntry {
   id                     String   @id @default(uuid())
   policyId               String
@@ -1757,6 +1777,7 @@ model CommissionLedgerEntry {
   commissionAgreementId  String?
   commissionAgreement    CommissionAgreement? @relation(fields: [commissionAgreementId], references: [id])
   amount                 Decimal  @db.Decimal(18, 3)
+  vatRatePercent         Decimal  @default(0) @db.Decimal(5, 2)
   vatAmount              Decimal  @db.Decimal(18, 3) @default(0)
   /// Process 35 — the proposed manual-override amount; null unless an override
   /// has been raised. Copied into `amount` only when the override is approved.
@@ -1769,6 +1790,15 @@ model CommissionLedgerEntry {
   // (app- and DB-enforced).
   overrideRequestedByUserId String?
   overrideApprovedByUserId String?
+  // Process 36 — reconciliation outcome (outstanding -> paid).
+  paidAmount             Decimal? @db.Decimal(18, 3)
+  paidAt                 DateTime?
+  paymentReference       String?  // the insurer statement / payment reference — a pointer, not free text
+  // Process 36 — clawback outcome ({outstanding|paid} -> reversed), driven by
+  // a Process 22 CommissionReversal on the policy.
+  reversedAmount         Decimal? @db.Decimal(18, 3)
+  reversedAt             DateTime?
+  reversalReason         String?  // why the commission was reversed — logged (a business justification)
   createdAt              DateTime @default(now())
 
   @@unique([policyId])

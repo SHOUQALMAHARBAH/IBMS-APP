@@ -15,21 +15,29 @@ import { assertDifferentActors } from '../../common/maker-checker.util';
 import {
   compareMoney,
   formatMoney,
+  isZeroMoney,
   quantizeMoney,
 } from '../../common/money.util';
 import {
   COMMISSION_MAX_RATE_PERCENT,
   commissionEntryAuditSnapshot,
   computeCommissionAmount,
+  computeCommissionVat,
+  computeReversalState,
   deriveLedgerEntryView,
+  isCommissionEntryTransition,
   overrideAuditSnapshot,
   overrideProposalMatches,
+  reversalAuditSnapshot,
   resolveGovernedRate,
+  settlementAuditSnapshot,
+  type CommissionEntryStatus,
   type CommissionLedgerEntryView,
 } from './commission.config';
 import type { CalculateCommissionDto } from './dto/calculate-commission.dto';
 import type { ListCommissionEntriesQueryDto } from './dto/list-commission-entries-query.dto';
 import type { RaiseCommissionOverrideDto } from './dto/raise-commission-override.dto';
+import type { SettleCommissionDto } from './dto/settle-commission.dto';
 
 /** Cap on a book-wide commission-ledger read (the #30 / #33 precedent). */
 export const COMMISSION_LEDGER_READ_LIMIT = 5000;
@@ -125,6 +133,12 @@ export class CommissionLedgerService {
         )}) — check the rate.`,
       );
     }
+    // Process 36 — snapshot the governed VAT rate onto the entry and stamp the
+    // VAT it implies, so `vatAmount == amount × vatRatePercent%` holds from the
+    // first write (a later manual override recomputes it against this frozen
+    // rate).
+    const vatRatePercent = governed.vatRatePercent;
+    const vatAmount = computeCommissionVat(amount, vatRatePercent);
 
     if (existing) {
       // Compare the FIGURE only — the brain contract is "a matching governed
@@ -148,6 +162,8 @@ export class CommissionLedgerService {
         policyId: dto.policyId,
         commissionAgreementId: governed.id,
         amount,
+        vatRatePercent,
+        vatAmount,
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -178,7 +194,9 @@ export class CommissionLedgerService {
         policyId: created.policyId,
         commissionAgreementId: created.commissionAgreementId,
         ratePercentApplied: rate.toFixed(2),
+        vatRatePercentApplied: vatRatePercent.toFixed(2),
         amount: created.amount,
+        vatAmount: created.vatAmount,
         status: created.status,
       }),
     });
@@ -307,10 +325,17 @@ export class CommissionLedgerService {
     // The `where` re-asserts the exact requester `assertDifferentActors` was
     // checked against and the exact amount being copied in, so a concurrent
     // `raiseOverride` (which could change either) turns this into a clean
-    // 0-row → 409 rather than a DB-CHECK 500 or a stale-amount write.
+    // 0-row → 409 rather than a DB-CHECK 500 or a stale-amount write. `vatAmount`
+    // is recomputed from `overrideAmount × the entry's frozen vatRatePercent`
+    // so the `vatAmount == amount × vatRatePercent%` invariant survives the
+    // override (Process 36).
     const res = await this.commission.recordOverrideApproval(entryId, actorId, {
       requestedByUserId: entry.overrideRequestedByUserId,
       overrideAmount: entry.overrideAmount,
+      vatAmount: computeCommissionVat(
+        entry.overrideAmount,
+        entry.vatRatePercent,
+      ),
     });
     if (res.count === 0) {
       const now = await this.loadEntry(entryId);
@@ -342,6 +367,198 @@ export class CommissionLedgerService {
     return deriveLedgerEntryView(after);
   }
 
+  // --- 4. settle (Process 36 — reconcile against an insurer statement) ---
+
+  /**
+   * `outstanding -> paid`: reconcile the entry against an insurer commission
+   * statement and mark it settled. Single-actor Finance (`commission.reconcile`)
+   * — moving the governed figure to `paid` is mechanical, not an approval (the
+   * maker/checker in commission is the manual override).
+   *
+   * `statementAmount` MUST equal the governed `amount` exactly
+   * (`money-decimal-jod.md`: "a reconciliation mismatch is raised as an
+   * exception, never silently written off" — a variance is a Process 39
+   * `ReconciliationException`, not a short settle here). A still-pending
+   * override blocks settlement (the amount is not final). A `reversed` entry
+   * cannot be settled. Deterministic → a re-`POST` with the same statement
+   * figure + reference resumes (200); a different one is a 409.
+   */
+  async settle(
+    entryId: string,
+    dto: SettleCommissionDto,
+    actorId: string,
+  ): Promise<CommissionLedgerEntryView> {
+    const entry = await this.loadEntry(entryId);
+    const statementAmount = quantizeMoney(dto.statementAmount);
+    const paymentReference = dto.paymentReference.trim();
+
+    if (entry.status === 'paid') {
+      // Write-once resume vs. 409 — the figure AND the reference must match.
+      if (
+        entry.paidAmount !== null &&
+        compareMoney(entry.paidAmount, statementAmount) === 0 &&
+        entry.paymentReference === paymentReference
+      ) {
+        return deriveLedgerEntryView(entry);
+      }
+      throw new ConflictException(
+        `Commission entry ${entryId} is already reconciled (${formatMoney(
+          entry.paidAmount ?? entry.amount,
+        )}, ref "${entry.paymentReference ?? ''}").`,
+      );
+    }
+    if (entry.status === 'reversed') {
+      throw new UnprocessableEntityException(
+        `Commission entry ${entryId} was reversed; a reversed entry cannot be reconciled.`,
+      );
+    }
+    if (entry.isManualOverride && entry.overrideApprovedByUserId === null) {
+      throw new UnprocessableEntityException(
+        `Commission entry ${entryId} has a pending manual override — approve or resolve it before reconciling.`,
+      );
+    }
+    // The status move is `outstanding -> paid`; assert it against the lifecycle
+    // map (the one place the caller-side legal-move check lives — the `where`
+    // below and the guards above are the enforcement, this is the contract).
+    this.assertEntryTransition(entry.status, 'paid');
+    // Re-check the reversal gate from LIVE Process 22 rows (the #16 rule): a
+    // CommissionReversal on the policy whose best-effort flip has not landed
+    // must still block a settle rather than pay commission on cancelled cover.
+    const reversalAmounts =
+      await this.commission.findCommissionReversalAmountsForPolicy(
+        entry.policyId,
+      );
+    const { reversedAmount } = computeReversalState({
+      entryAmount: entry.amount,
+      reversalAmounts,
+    });
+    if (!isZeroMoney(reversedAmount)) {
+      throw new UnprocessableEntityException(
+        `Commission entry ${entryId} has a commission reversal from a Process 22 endorsement (${formatMoney(
+          reversedAmount,
+        )}); it cannot be reconciled — resolve the reversal first.`,
+      );
+    }
+
+    if (compareMoney(statementAmount, entry.amount) !== 0) {
+      const variance = statementAmount.minus(entry.amount);
+      throw new UnprocessableEntityException(
+        `Statement amount ${formatMoney(statementAmount)} does not match the recorded commission ${formatMoney(
+          entry.amount,
+        )} (variance ${formatMoney(variance)}); raise a reconciliation exception (Process 39) — a mismatch is never written off here.`,
+      );
+    }
+
+    const res = await this.commission.recordEntrySettlement(entryId, {
+      expectedAmount: entry.amount,
+      // == entry.amount (asserted equal above); use the validated statement
+      // figure so `paidAmount` reads as "what the insurer's statement paid".
+      paidAmount: statementAmount,
+      paymentReference,
+    });
+    if (res.count === 0) {
+      const now = await this.loadEntry(entryId);
+      if (
+        now.status === 'paid' &&
+        now.paidAmount !== null &&
+        compareMoney(now.paidAmount, statementAmount) === 0 &&
+        now.paymentReference === paymentReference
+      ) {
+        return deriveLedgerEntryView(now);
+      }
+      throw new ConflictException(
+        `Commission entry ${entryId} changed before it could be reconciled — reload and retry.`,
+      );
+    }
+
+    const after = await this.loadEntry(entryId);
+    await this.safeAudit({
+      userId: actorId,
+      action: 'UPDATE',
+      entityType: 'CommissionLedgerEntry',
+      entityId: entryId,
+      afterValue: settlementAuditSnapshot({
+        entryId,
+        policyId: after.policyId,
+        paidAmount: after.paidAmount ?? after.amount,
+        paymentReference,
+        status: after.status,
+      }),
+    });
+
+    return deriveLedgerEntryView(after);
+  }
+
+  // --- 5. reconcile a Process 22 reversal onto the ledger entry --------
+
+  /**
+   * Reflect any Process 22 `CommissionReversal` on the policy onto its
+   * `CommissionLedgerEntry`: accumulate `reversedAmount` and flip
+   * `status -> reversed` once the full earned commission is clawed back.
+   * Called **best-effort** by the endorsement service after it mints a
+   * `CommissionReversal` (the #29 `lossRatio.recomputeForPolicy` precedent —
+   * only the actual transitioner, never blocking the endorsement flow); it
+   * recomputes from live rows so a missed call self-heals on the next
+   * invocation, and `settle` re-checks the same gate independently.
+   */
+  async reconcileReversalForPolicy(
+    policyId: string,
+    actorId: string,
+  ): Promise<void> {
+    const entry = await this.commission.findLedgerEntryByPolicyId(policyId);
+    if (!entry || entry.status === 'reversed') return;
+
+    const reversalAmounts =
+      await this.commission.findCommissionReversalAmountsForPolicy(policyId);
+    const { reversedAmount, fullyReversed } = computeReversalState({
+      entryAmount: entry.amount,
+      reversalAmounts,
+    });
+    if (isZeroMoney(reversedAmount)) return; // no reversal recorded yet
+    if (
+      entry.reversedAmount !== null &&
+      compareMoney(entry.reversedAmount, reversedAmount) === 0 &&
+      !fullyReversed
+    ) {
+      return; // already reflected, nothing changed
+    }
+
+    // `entry.status` is `outstanding` | `paid` here (we returned on `reversed`);
+    // both are legal predecessors of `reversed`. Assert it when this call makes
+    // the status terminal, so the lifecycle map governs the flip.
+    if (fullyReversed) {
+      this.assertEntryTransition(entry.status, 'reversed');
+    }
+
+    const reversalReason =
+      entry.reversalReason ??
+      `Commission reversed by a Process 22 negative / cancellation endorsement on the policy.`;
+    const res = await this.commission.recordEntryReversal(entry.id, {
+      reversedAmount,
+      // Stamped once, at the FIRST reflection — "when the clawback started",
+      // not a last-updated timestamp; later accumulations keep it.
+      reversedAt: entry.reversedAt ?? new Date(),
+      reversalReason,
+      toReversed: fullyReversed,
+    });
+    if (res.count === 0) return;
+
+    const after = await this.loadEntry(entry.id);
+    await this.safeAudit({
+      userId: actorId,
+      action: 'UPDATE',
+      entityType: 'CommissionLedgerEntry',
+      entityId: entry.id,
+      afterValue: reversalAuditSnapshot({
+        entryId: entry.id,
+        policyId,
+        reversedAmount: after.reversedAmount ?? reversedAmount,
+        reversalReason: after.reversalReason ?? reversalReason,
+        status: after.status,
+      }),
+    });
+  }
+
   // --- reads ----------------------------------------------------------
 
   async get(id: string): Promise<CommissionLedgerEntryView> {
@@ -369,6 +586,18 @@ export class CommissionLedgerService {
       throw new NotFoundException(`Commission entry ${id} not found.`);
     }
     return entry;
+  }
+
+  /** Assert `from -> to` is a legal `CommissionLedgerEntry.status` move
+   * (`COMMISSION_ENTRY_TRANSITIONS`). `CommissionLedgerEntry` is not a
+   * `WorkflowTransitionService` entity, so this — plus the status-conditional
+   * `updateMany` `where` in the repository — is how every move is validated. */
+  private assertEntryTransition(from: string, to: CommissionEntryStatus): void {
+    if (!isCommissionEntryTransition(from, to)) {
+      throw new ConflictException(
+        `Commission entry cannot move ${from} -> ${to}.`,
+      );
+    }
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

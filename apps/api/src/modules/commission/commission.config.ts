@@ -1,8 +1,11 @@
 import { Prisma } from '@ibms/db';
 import {
+  addMoney,
   applyPercentage,
   compareMoney,
   formatMoney,
+  quantizeMoney,
+  sumMoney,
 } from '../../common/money.util';
 
 /**
@@ -23,8 +26,17 @@ import {
  * (imported there for the #31 billing backstop). */
 export const COMMISSION_MAX_RATE_PERCENT = 100;
 
-/** The `CommissionLedgerEntry.status` values (Process 36 owns the lifecycle;
- * #35 only ever creates at `outstanding`). */
+/** Upper sanity bound on a governed VAT rate on commission. A VAT rate above
+ * 100 % is a data-entry error; the real Jordan GST rate on the broker's
+ * commission income is DRAFTED / unsourced (no governed tax-rate table exists —
+ * same status as `INVOICE_MAX_DUE_DAYS_AHEAD`, `CLAIM_LARGE_THRESHOLD_JOD`, the
+ * AR ageing bands). `CommissionAgreement.vatRatePercent` defaults to `0`. */
+export const COMMISSION_MAX_VAT_RATE_PERCENT = 100;
+
+/** The `CommissionLedgerEntry.status` values. #35 only ever creates at
+ * `outstanding`; #36 owns the `-> paid` (an insurer statement reconciled) and
+ * `-> reversed` (a Process 22 CommissionReversal clawed the commission back)
+ * moves. */
 export const COMMISSION_ENTRY_STATUSES = [
   'outstanding',
   'paid',
@@ -32,12 +44,43 @@ export const COMMISSION_ENTRY_STATUSES = [
 ] as const;
 export type CommissionEntryStatus = (typeof COMMISSION_ENTRY_STATUSES)[number];
 
+/**
+ * Legal `CommissionLedgerEntry.status` moves (Process 36). `CommissionLedger
+ * Entry` is NOT a `WorkflowTransitionService` entity (its `status` is a plain
+ * string, like `ReconciliationException.status`), but every move still
+ * validates against this map, writes an audit row, and persists via a
+ * status-conditional `updateMany` (never a bare `.status =` —
+ * `ibms-brain/meta/lex/race-safe-invariants.md` /
+ * `workflow-state-transitions.md`). `reversed` is terminal; a `paid` entry can
+ * still be reversed (a clawback after payment).
+ */
+export const COMMISSION_ENTRY_TRANSITIONS: Record<
+  CommissionEntryStatus,
+  readonly CommissionEntryStatus[]
+> = {
+  outstanding: ['paid', 'reversed'],
+  paid: ['reversed'],
+  reversed: [],
+};
+
+/** Whether `from -> to` is a legal `CommissionLedgerEntry.status` move. Pure. */
+export function isCommissionEntryTransition(
+  from: string,
+  to: CommissionEntryStatus,
+): boolean {
+  const allowed = COMMISSION_ENTRY_TRANSITIONS[from as CommissionEntryStatus];
+  return allowed !== undefined && allowed.includes(to);
+}
+
 // --- governed rate resolution ---------------------------------------------
 
 /** The minimal `CommissionAgreement` shape `resolveGovernedRate` needs. */
 export interface CommissionAgreementLike {
   id: string;
   ratePercent: Prisma.Decimal;
+  /** Process 36 — the governed VAT rate on commission for this window,
+   * snapshotted onto the ledger entry at calculate time. */
+  vatRatePercent: Prisma.Decimal;
   effectiveFrom: Date;
   effectiveTo: Date | null;
 }
@@ -83,6 +126,43 @@ export function computeCommissionAmount(
   return applyPercentage(premium, ratePercent);
 }
 
+/**
+ * Process 36 — the VAT charged on a commission amount: `amount ×
+ * vatRatePercent%`, quantized to fils. `vatRatePercent` is the rate
+ * snapshotted from the governing `CommissionAgreement` when the commission was
+ * calculated, so `vatAmount == computeCommissionVat(amount, vatRatePercent)`
+ * is a self-consistent on-row invariant that a later manual override
+ * recomputes (`overrideAmount × the same frozen rate`) and a later edit to the
+ * governed agreement does not disturb. Pure.
+ */
+export function computeCommissionVat(
+  amount: Prisma.Decimal | string,
+  vatRatePercent: Prisma.Decimal | string,
+): Prisma.Decimal {
+  return applyPercentage(amount, vatRatePercent);
+}
+
+/**
+ * Process 36 — the reversal state of a ledger entry given the amounts of every
+ * Process 22 CommissionReversal on its policy. `reversedAmount` is the pooled
+ * total **capped at the earned commission** (`amount`) — you cannot reverse
+ * more commission than was booked; `fullyReversed` is true once the pooled
+ * reversals meet or exceed `amount`, which is when `status` flips to
+ * `reversed`. Pure.
+ */
+export function computeReversalState(input: {
+  entryAmount: Prisma.Decimal | string;
+  reversalAmounts: readonly (Prisma.Decimal | string)[];
+}): { reversedAmount: Prisma.Decimal; fullyReversed: boolean } {
+  const earned = quantizeMoney(input.entryAmount);
+  const pooled = sumMoney(input.reversalAmounts);
+  const fullyReversed = compareMoney(pooled, earned) >= 0;
+  return {
+    reversedAmount: fullyReversed ? earned : pooled,
+    fullyReversed,
+  };
+}
+
 // --- views --------------------------------------------------------------------
 
 export interface CommissionAgreementRow {
@@ -91,6 +171,7 @@ export interface CommissionAgreementRow {
   insurerName: string;
   insuranceLine: string;
   ratePercent: Prisma.Decimal;
+  vatRatePercent: Prisma.Decimal;
   effectiveFrom: Date;
   effectiveTo: Date | null;
 }
@@ -101,6 +182,8 @@ export interface CommissionAgreementView {
   insurerName: string;
   insuranceLine: string;
   ratePercent: string;
+  /** Process 36 — the governed VAT rate on commission for this pair. */
+  vatRatePercent: string;
   effectiveFrom: string;
   effectiveTo: string | null;
   /** `effectiveTo IS NULL` — the current governed rate for the pair. */
@@ -116,6 +199,7 @@ export function deriveAgreementView(
     insurerName: row.insurerName,
     insuranceLine: row.insuranceLine,
     ratePercent: row.ratePercent.toFixed(2),
+    vatRatePercent: row.vatRatePercent.toFixed(2),
     effectiveFrom: row.effectiveFrom.toISOString(),
     effectiveTo: row.effectiveTo ? row.effectiveTo.toISOString() : null,
     isOpen: row.effectiveTo === null,
@@ -127,6 +211,7 @@ export interface CommissionLedgerEntryRow {
   policyId: string;
   commissionAgreementId: string | null;
   amount: Prisma.Decimal;
+  vatRatePercent: Prisma.Decimal;
   vatAmount: Prisma.Decimal;
   overrideAmount: Prisma.Decimal | null;
   status: string;
@@ -134,6 +219,12 @@ export interface CommissionLedgerEntryRow {
   overrideReason: string | null;
   overrideRequestedByUserId: string | null;
   overrideApprovedByUserId: string | null;
+  paidAmount: Prisma.Decimal | null;
+  paidAt: Date | null;
+  paymentReference: string | null;
+  reversedAmount: Prisma.Decimal | null;
+  reversedAt: Date | null;
+  reversalReason: string | null;
   createdAt: Date;
 }
 
@@ -143,12 +234,17 @@ export interface CommissionLedgerEntryView {
   commissionAgreementId: string | null;
   /** The governed figure (`premium × governed rate%`). */
   amount: string;
+  /** The governed VAT rate applied to `amount`, snapshotted at calculate. */
+  vatRatePercent: string;
   vatAmount: string;
+  /** `amount + vatAmount` — the commission inclusive of VAT. */
+  grossAmount: string;
   /** The proposed manual-override amount, or null. */
   overrideAmount: string | null;
   /** The amount that actually counts: `overrideAmount` once the override is
    * approved, else `amount`. */
   effectiveAmount: string;
+  /** `outstanding` | `paid` | `reversed` (Process 36 lifecycle). */
   status: string;
   isManualOverride: boolean;
   overrideReason: string | null;
@@ -156,6 +252,14 @@ export interface CommissionLedgerEntryView {
   overrideApprovedByUserId: string | null;
   /** An override has been raised but not yet approved — `amount` still governs. */
   overridePending: boolean;
+  /** Process 36 — reconciliation outcome. */
+  paidAmount: string | null;
+  paidAt: string | null;
+  paymentReference: string | null;
+  /** Process 36 — clawback outcome (driven by a Process 22 CommissionReversal). */
+  reversedAmount: string | null;
+  reversedAt: string | null;
+  reversalReason: string | null;
   createdAt: string;
 }
 
@@ -169,7 +273,9 @@ export function deriveLedgerEntryView(
     policyId: row.policyId,
     commissionAgreementId: row.commissionAgreementId,
     amount: formatMoney(row.amount),
+    vatRatePercent: row.vatRatePercent.toFixed(2),
     vatAmount: formatMoney(row.vatAmount),
+    grossAmount: formatMoney(addMoney(row.amount, row.vatAmount)),
     overrideAmount:
       row.overrideAmount !== null ? formatMoney(row.overrideAmount) : null,
     // `amount` IS the effective figure at every stage: the governed rate on a
@@ -184,6 +290,13 @@ export function deriveLedgerEntryView(
     overrideRequestedByUserId: row.overrideRequestedByUserId,
     overrideApprovedByUserId: row.overrideApprovedByUserId,
     overridePending,
+    paidAmount: row.paidAmount !== null ? formatMoney(row.paidAmount) : null,
+    paidAt: row.paidAt ? row.paidAt.toISOString() : null,
+    paymentReference: row.paymentReference,
+    reversedAmount:
+      row.reversedAmount !== null ? formatMoney(row.reversedAmount) : null,
+    reversedAt: row.reversedAt ? row.reversedAt.toISOString() : null,
+    reversalReason: row.reversalReason,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -208,6 +321,7 @@ export function agreementAuditSnapshot(input: {
   insurerId: string;
   insuranceLine: string;
   ratePercent: Prisma.Decimal;
+  vatRatePercent: Prisma.Decimal;
   effectiveFrom: Date;
   effectiveTo: Date | null;
   supersededAgreementId: string | null;
@@ -217,6 +331,7 @@ export function agreementAuditSnapshot(input: {
     insurerId: input.insurerId,
     insuranceLine: input.insuranceLine,
     ratePercent: input.ratePercent.toFixed(2),
+    vatRatePercent: input.vatRatePercent.toFixed(2),
     effectiveFrom: input.effectiveFrom.toISOString(),
     effectiveTo: input.effectiveTo ? input.effectiveTo.toISOString() : null,
     supersededAgreementId: input.supersededAgreementId,
@@ -228,7 +343,9 @@ export function commissionEntryAuditSnapshot(input: {
   policyId: string;
   commissionAgreementId: string | null;
   ratePercentApplied: string;
+  vatRatePercentApplied: string;
   amount: Prisma.Decimal;
+  vatAmount: Prisma.Decimal;
   status: string;
 }): Prisma.InputJsonObject {
   return {
@@ -236,7 +353,53 @@ export function commissionEntryAuditSnapshot(input: {
     policyId: input.policyId,
     commissionAgreementId: input.commissionAgreementId,
     ratePercentApplied: input.ratePercentApplied,
+    vatRatePercentApplied: input.vatRatePercentApplied,
     amount: formatMoney(input.amount),
+    vatAmount: formatMoney(input.vatAmount),
+    status: input.status,
+  };
+}
+
+/**
+ * Audit `afterValue` for a Process 36 reconciliation (`outstanding -> paid`).
+ * `paymentReference` is the insurer statement / payment id — a pointer, not
+ * personal data. Figures as fixed 3dp strings.
+ */
+export function settlementAuditSnapshot(input: {
+  entryId: string;
+  policyId: string;
+  paidAmount: Prisma.Decimal;
+  paymentReference: string;
+  status: string;
+}): Prisma.InputJsonObject {
+  return {
+    entryId: input.entryId,
+    policyId: input.policyId,
+    paidAmount: formatMoney(input.paidAmount),
+    paymentReference: input.paymentReference,
+    status: input.status,
+  };
+}
+
+/**
+ * Audit `afterValue` for a Process 36 reversal ({`outstanding`|`paid`} ->
+ * `reversed`, driven by a Process 22 CommissionReversal). `reversalReason` is
+ * carried verbatim — a business justification (which endorsement clawed the
+ * commission back), not personal data, same rule as `overrideReason` and #22's
+ * `commissionReversalAuditSnapshot`.
+ */
+export function reversalAuditSnapshot(input: {
+  entryId: string;
+  policyId: string;
+  reversedAmount: Prisma.Decimal;
+  reversalReason: string;
+  status: string;
+}): Prisma.InputJsonObject {
+  return {
+    entryId: input.entryId,
+    policyId: input.policyId,
+    reversedAmount: formatMoney(input.reversedAmount),
+    reversalReason: input.reversalReason,
     status: input.status,
   };
 }

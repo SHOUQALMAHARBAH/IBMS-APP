@@ -108,6 +108,9 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     // "alter commission rate tables without approval" IS a role-level
     // exclusion — commission-rate.manage goes to Compliance / Manager only.
     expect(granted).not.toContain('commission-rate.manage');
+    // Finance DOES reconcile the commission ledger against insurer statements
+    // (Process 36) — applying/settling the governed figure, not altering it.
+    expect(granted).toContain('commission.reconcile');
   });
 
   it('Compliance Officer cannot originate sales transactions or close a DSR (DPO-only)', () => {

@@ -466,6 +466,12 @@ describe('Endorsement Management (e2e) — backlog Part C #22', () => {
       'SALES_RELATIONSHIP_OFFICER',
     );
     const chk = await makeUser(app, 'end-canc-chk', 'POLICY_CHECKING_OFFICER');
+    const comp = await makeUser(app, 'end-canc-comp', 'COMPLIANCE_OFFICER');
+    const fin = await makeUser(
+      app,
+      'end-canc-fin',
+      'FINANCE_COLLECTIONS_OFFICER',
+    );
 
     const { policyId } = await activePolicy(
       app,
@@ -475,6 +481,31 @@ describe('Endorsement Management (e2e) — backlog Part C #22', () => {
       'canc',
       { inceptionDate: '2026-10-01', expiryDate: '2027-10-01' },
     );
+
+    // Process 36 — a governed commission entry exists for this policy before
+    // the cancellation, so the auto-flip has something to act on.
+    const pol = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { insurerId: true, insuranceLine: true },
+    });
+    await request(app.getHttpServer())
+      .post('/commission/agreements')
+      .set(bearer(comp.accessToken))
+      .send({
+        insurerId: pol.insurerId,
+        insuranceLine: pol.insuranceLine,
+        ratePercent: '12',
+        effectiveFrom: '2026-01-01',
+      })
+      .expect(201);
+    const calcEntry = await request(app.getHttpServer())
+      .post('/commission/entries')
+      .set(bearer(fin.accessToken))
+      .send({ policyId })
+      .expect(201);
+    const entryId = (calcEntry.body as { id: string; amount: string }).id;
+    expect((calcEntry.body as { amount: string }).amount).toBe('14400.000'); // 120000 x 12%
+    expect((calcEntry.body as { status: string }).status).toBe('outstanding');
 
     // cancel ~6 days before expiry -> 120000 × 6/365 ≈ 1972 (< 5000 threshold)
     const requested = await request(app.getHttpServer())
@@ -505,6 +536,27 @@ describe('Endorsement Management (e2e) — backlog Part C #22', () => {
     expect(cBody.status).toBe('FINANCIAL_ADJUSTMENT_CALCULATED');
     expect(cBody.refund?.needsApproval).toBe(false);
     expect(cBody.commissionReversal).not.toBeNull();
+
+    // Process 36 — the commission reversal is reflected onto the ledger entry.
+    // The pro-rata reversal (~6 days of a 12% book) is far below the 14400
+    // earned commission, so this is a PARTIAL reversal: reversedAmount is
+    // stamped but status stays 'outstanding'.
+    const entryAfter = await request(app.getHttpServer())
+      .get(`/commission/entries/${entryId}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const ea = entryAfter.body as {
+      status: string;
+      reversedAmount: string | null;
+      reversedAt: string | null;
+      reversalReason: string | null;
+    };
+    expect(ea.status).toBe('outstanding');
+    expect(ea.reversedAmount).not.toBeNull();
+    expect(Number(ea.reversedAmount)).toBeGreaterThan(0);
+    expect(Number(ea.reversedAmount)).toBeLessThan(14400);
+    expect(ea.reversedAt).not.toBeNull();
+    expect(ea.reversalReason).toBeTruthy();
 
     const applied = await request(app.getHttpServer())
       .post(`/endorsements/${endo.id}/apply`)
