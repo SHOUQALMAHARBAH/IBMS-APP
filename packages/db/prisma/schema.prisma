@@ -489,6 +489,10 @@ model Customer {
   contactPhoneEnc   String?        // -- ENCRYPT (Confidential)
   contactEmailEnc   String?        // -- ENCRYPT (Confidential)
   languagePreference LanguagePreference @default(AR)
+  // Process 44 — the customer's recorded outbound-communication channel
+  // preference. Null = no recorded preference (the caller must then name a
+  // channel explicitly). Language already lives in `languagePreference`.
+  preferredContactChannel InteractionChannel?
   status            CustomerStatus @default(PENDING_KYC)
   classification    DataClassification @default(CONFIDENTIAL)
   ownerUserId       String
@@ -2039,18 +2043,28 @@ enum CommunicationDirection {
 /// logging — AND (backlog Part C #12, Domain B) broker<->insurer
 /// correspondence during an RFQ's market phase ("answer insurer queries and
 /// supply additional information"). The Process 44 columns (`templateId`,
-/// `languageUsed`, `respectedConsent`) are untouched by placement rows;
-/// `direction` defaults to OUTBOUND so Process 44 (always outbound) needs no
-/// change when it is built. A placement row carries `rfqId` (+ optional
-/// `rfqInsurerId` to pin it to one insurer submission; null = the whole
-/// panel), a free-text `body`, and `loggedByUserId`; its `customerId` is
-/// backfilled from the RFQ's Opportunity's Customer.
+/// `languageUsed`, `respectedConsent`, `isMarketing`, `consentRecordId`) are
+/// untouched by placement rows; `direction` defaults to OUTBOUND so Process 44
+/// (always outbound) needs no change. A placement row carries `rfqId` (+
+/// optional `rfqInsurerId` to pin it to one insurer submission; null = the
+/// whole panel), a free-text `body`, and `loggedByUserId`; its `customerId`
+/// is backfilled from the RFQ's Opportunity's Customer.
 ///
 /// DISCRIMINATOR: `rfqId IS NULL` == a Process-44 customer-communication row;
 /// `rfqId IS NOT NULL` == a Part C #12 RFQ-correspondence row. A placement
 /// row *also* has `customerId` set (backfilled), so a Process-44 "all
 /// communications for customer X" query MUST filter `rfqId IS NULL` or it
 /// will pick up RFQ correspondence too.
+///
+/// Process 44 (backlog Part C #44): `CommunicationService` records a send at
+/// `direction = OUTBOUND`, `languageUsed` / `channel` derived from the
+/// `Customer` record (a disagreeing explicit value is a 422 — "respect the
+/// customer's recorded channel and language"), and — for a marketing send
+/// (`isMarketing = true`) — only after the customer's latest MARKETING
+/// `ConsentRecord` is `granted` and not withdrawn (PDPL / `PRIV-SOP-04`; M03).
+/// `consentRecordId` pins the consent record relied on. Not a
+/// WorkflowTransitionService entity, no maker/checker (a factual log, like
+/// `Interaction` #10).
 model CommunicationLog {
   id          String   @id @default(uuid())
   customerId  String?
@@ -2068,10 +2082,19 @@ model CommunicationLog {
   sentAt      DateTime @default(now())
   createdAt   DateTime @default(now())
   respectedConsent Boolean @default(true) // must respect customer's consent preference
+  // Process 44 — a marketing send (the ConsentRecord gate applies). false = a
+  // service / transactional message (contractual necessity, no consent gate).
+  isMarketing Boolean @default(false)
+  // Process 44 — the marketing ConsentRecord relied on at send time. Null for
+  // a non-marketing send. ON DELETE SET NULL — the log row outlives the
+  // consent record it referenced.
+  consentRecordId String?
+  consentRecord   ConsentRecord? @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)
 
-  @@index([customerId])
+  @@index([customerId, sentAt])
   @@index([rfqId])
   @@index([rfqInsurerId])
+  @@index([consentRecordId])
 }
 
 /// Process 45 — satisfaction feedback post-issuance, post-claim,
@@ -2338,6 +2361,8 @@ model ConsentRecord {
   grantedAt       DateTime?
   withdrawnAt     DateTime? // must reflect in register within 2 business days (SLA)
   createdAt       DateTime  @default(now())
+
+  communicationLogs CommunicationLog[] // Process 44 — marketing sends that relied on this consent
 
   @@index([customerId])
 }

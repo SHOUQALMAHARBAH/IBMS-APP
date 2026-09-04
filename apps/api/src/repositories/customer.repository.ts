@@ -6,6 +6,7 @@ import type {
   DataClassification,
   Document,
   DocumentCategory,
+  InteractionChannel,
   LanguagePreference,
   Prisma,
   UltimateBeneficialOwner,
@@ -30,6 +31,7 @@ export interface CreateCustomerInput {
   contactPhoneEnc?: string;
   contactEmailEnc?: string;
   languagePreference: LanguagePreference;
+  preferredContactChannel?: InteractionChannel;
   ownerUserId: string;
 }
 

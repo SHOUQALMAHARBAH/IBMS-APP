@@ -11,7 +11,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { CustomerType, LanguagePreference } from '@ibms/db';
+import { CustomerType, InteractionChannel, LanguagePreference } from '@ibms/db';
 import { emptyStringToUndefined } from '../../../common/dto.util';
 
 /**
@@ -101,6 +101,14 @@ export class CreateCustomerDto {
 
   @IsIn(Object.values(LanguagePreference))
   languagePreference!: LanguagePreference;
+
+  /** Process 44 — the customer's recorded outbound-communication channel
+   * preference. Optional; omitted, an outbound communication must name a
+   * channel explicitly. */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsIn(Object.values(InteractionChannel))
+  preferredContactChannel?: InteractionChannel;
 
   /** Optional link back to the qualifying Prospect (0..1, same shape as
    * Lead->Prospect) — a Customer may also be onboarded directly with no

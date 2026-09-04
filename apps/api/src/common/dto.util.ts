@@ -18,6 +18,18 @@ export function trimIfString({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+/** Coerces a query-string flag (`?isMarketing=true`) to a real boolean.
+ * `"true"`/`"1"` -> true, `"false"`/`"0"` -> false, `""`/absent -> undefined,
+ * anything else passes through untouched so `@IsBoolean()` can 400 it. Pair
+ * with `@Transform(queryBoolean)` above `@IsOptional()` `@IsBoolean()` on an
+ * optional boolean query filter. */
+export function queryBoolean({ value }: TransformFnParams): unknown {
+  if (value === '' || value === undefined || value === null) return undefined;
+  if (value === 'true' || value === '1' || value === true) return true;
+  if (value === 'false' || value === '0' || value === false) return false;
+  return value;
+}
+
 /** Fils-precision decimal string — at most 3 decimal places (Part 3.6 /
  * ibms-brain/meta/lex/money-decimal-jod.md), the shape money.util.ts's
  * `toMoney` / `quantizeMoney` expect. No sign, no currency symbol, no

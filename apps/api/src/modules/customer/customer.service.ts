@@ -97,6 +97,7 @@ export class CustomerService {
       registeredAddress: customer.registeredAddress,
       natureOfBusiness: customer.natureOfBusiness,
       languagePreference: customer.languagePreference,
+      preferredContactChannel: customer.preferredContactChannel,
       status: customer.status,
       classification: customer.classification,
       ownerUserId: customer.ownerUserId,
@@ -161,6 +162,7 @@ export class CustomerService {
       contactPhoneEnc: encrypted.contactPhoneEnc,
       contactEmailEnc: encrypted.contactEmailEnc,
       languagePreference: dto.languagePreference,
+      preferredContactChannel: dto.preferredContactChannel,
       ownerUserId: actorUserId,
     });
 
@@ -227,6 +229,7 @@ export class CustomerService {
       registeredAddress: customer.registeredAddress,
       natureOfBusiness: customer.natureOfBusiness,
       languagePreference: customer.languagePreference,
+      preferredContactChannel: customer.preferredContactChannel,
       status: customer.status,
       classification: customer.classification,
       ownerUserId: customer.ownerUserId,
