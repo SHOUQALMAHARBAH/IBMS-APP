@@ -21,6 +21,11 @@ export interface RetentionSweepResult {
   scanned: number;
   openedRenewalInactivity: number;
   openedLapseRisk: number;
+  /** Classified as due, but this run did not win the escalation — already
+   * escalated by a concurrent / prior run, or the renewal concluded
+   * (RENEWED / CANCELLED) between the load and the write. Distinct from
+   * `failed` (an actual error) and from a plain skip (not due at all). */
+  skippedConcurrent: number;
   failed: number;
 }
 
@@ -83,10 +88,16 @@ export class RetentionCaseService {
    * Shared by the nightly `RetentionSweepScheduler` and the on-demand
    * `POST /retention-cases/sweep`. For each `RenewalCase` not yet escalated
    * whose renewal cycle has not concluded: classify it (pure,
-   * `classifyRenewalCaseForRetention`); if it is due, race-safe stamp
-   * `RenewalCase.retentionEscalatedAt` (conditional on it still being null —
-   * `ibms-brain/meta/lex/race-safe-invariants.md`) and, only if this run won
-   * that stamp, create the `RetentionCase`. Per-row isolation — one bad row
+   * `classifyRenewalCaseForRetention`); if it is due,
+   * `repo.escalateAndCreateRetentionCase` stamps `RenewalCase.retentionEscalatedAt`
+   * and creates the `RetentionCase` in ONE transaction
+   * (`ibms-brain/meta/lex/race-safe-invariants.md`) — a failed create rolls
+   * the stamp back too, so a partial failure never permanently strands a
+   * `RenewalCase` as "escalated" with nothing to show for it; the stamp's
+   * `where` also re-asserts the renewal has not concluded, so a `RenewalCase`
+   * that transitions to `RENEWED` / `CANCELLED` between the load above and
+   * this write yields `null` (no spurious case for a customer who just
+   * renewed) rather than a stale-data race. Per-row isolation — one bad row
    * must not abandon the rest of the sweep (the #9 / #12 / #27 shape).
    */
   async runSweep(actorUserId: string): Promise<RetentionSweepResult> {
@@ -95,6 +106,7 @@ export class RetentionCaseService {
 
     let openedRenewalInactivity = 0;
     let openedLapseRisk = 0;
+    let skippedConcurrent = 0;
     let failed = 0;
 
     for (const renewalCase of candidates) {
@@ -105,16 +117,24 @@ export class RetentionCaseService {
       if (reason === null) continue;
 
       try {
-        const stamped = await this.repo.stampRetentionEscalation(
-          renewalCase.id,
-          now,
-        );
-        if (stamped.count === 0) continue; // a concurrent / prior run already escalated this case
-
-        const row = await this.repo.create({
+        // Stamp + create in ONE transaction (repository.ts) — a failed
+        // create rolls the stamp back too, so a partial failure never
+        // permanently strands this RenewalCase as "escalated" with no
+        // RetentionCase to show for it.
+        const row = await this.repo.escalateAndCreateRetentionCase({
+          renewalCaseId: renewalCase.id,
+          escalatedAt: now,
           customerId: renewalCase.policy.customerId,
           reason,
         });
+        if (row === null) {
+          // Already escalated by a concurrent / prior run, or the renewal
+          // concluded (RENEWED / CANCELLED) between the load above and this
+          // write — either way, not this run's case to open.
+          skippedConcurrent += 1;
+          continue;
+        }
+
         if (reason === 'renewal_inactivity') openedRenewalInactivity += 1;
         else openedLapseRisk += 1;
 
@@ -133,7 +153,7 @@ export class RetentionCaseService {
       } catch (err) {
         failed += 1;
         this.logger.error(
-          `Retention sweep: RenewalCase ${renewalCase.id} failed (${(err as Error).message}) — continuing; next run will retry.`,
+          `Retention sweep: RenewalCase ${renewalCase.id} failed (${(err as Error).message}) — continuing; next run will retry (the transaction rolled back, so this row stays eligible).`,
         );
       }
     }
@@ -142,6 +162,7 @@ export class RetentionCaseService {
       scanned: candidates.length,
       openedRenewalInactivity,
       openedLapseRisk,
+      skippedConcurrent,
       failed,
     };
   }
