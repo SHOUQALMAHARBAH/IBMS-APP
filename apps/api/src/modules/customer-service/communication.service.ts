@@ -86,6 +86,13 @@ export class CommunicationService {
     let consentRecordId: string | null = null;
 
     if (isMarketing) {
+      // The gate is a read-then-write with no DB constraint tying the two: a
+      // withdrawal landing between here and the `create()` below would leave a
+      // marketing row citing consent that was withdrawn moments earlier. Tolerable
+      // while this is a *log*, not a sender (delivery is deferred) — the
+      // `consentRecordId` is the forensic trail and the M03 register-reflection
+      // SLA is 2 business days. A real email/SMS dispatch MUST re-check consent
+      // at send time, inside the same guard.
       const records = await this.repo.marketingConsentRecords(dto.customerId);
       const decision = evaluateMarketingConsent(records);
       if (!decision.allowed) {

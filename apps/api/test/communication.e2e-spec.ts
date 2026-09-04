@@ -230,6 +230,12 @@ describe('Customer Communication (e2e) — backlog Part C #44', () => {
       })
       .expect(422);
 
+    // a malformed customerId on consent-status -> 400 (not a downstream 404)
+    await request(app.getHttpServer())
+      .get('/communications/consent-status?customerId=not-a-uuid')
+      .set(bearer(sales.accessToken))
+      .expect(400);
+
     const beforeStatus = await request(app.getHttpServer())
       .get(`/communications/consent-status?customerId=${customer.id}`)
       .set(bearer(sales.accessToken))

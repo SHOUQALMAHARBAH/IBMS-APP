@@ -124,6 +124,38 @@ describe('evaluateMarketingConsent (Process 44)', () => {
       consentRecordId: 'b',
     });
   });
+
+  it('FAIL-SAFE: a withdrawal on an OLDER record, more recent than a newer active grant, still blocks', () => {
+    const decision = evaluateMarketingConsent([
+      consent({
+        id: 'old',
+        granted: true,
+        grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+        withdrawnAt: new Date('2026-03-01T00:00:00.000Z'),
+      }),
+      consent({
+        id: 'newer-grant',
+        granted: true,
+        grantedAt: new Date('2026-02-01T00:00:00.000Z'),
+        withdrawnAt: null,
+      }),
+    ]);
+    expect(decision).toEqual({
+      allowed: false,
+      reason: 'withdrawn',
+      consentRecordId: 'old',
+    });
+  });
+
+  it('a withdrawal at the SAME instant as the newest active grant blocks (>= , not >)', () => {
+    const t = new Date('2026-04-01T00:00:00.000Z');
+    const decision = evaluateMarketingConsent([
+      consent({ id: 'w', granted: true, grantedAt: t, withdrawnAt: t }),
+      consent({ id: 'g', granted: true, grantedAt: t, withdrawnAt: null }),
+    ]);
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe('withdrawn');
+  });
 });
 
 describe('resolveChannel (Process 44) — respect the recorded channel', () => {
@@ -137,7 +169,7 @@ describe('resolveChannel (Process 44) — respect the recorded channel', () => {
   it('omitted with no recorded preference -> error', () => {
     const r = resolveChannel(undefined, null);
     expect(r.value).toBeNull();
-    expect(r.error).toMatch(/no recorded preferred channel/);
+    expect(r.error).toMatch(/recorded preferred channel/);
   });
 
   it('explicit value equal to the recorded preference -> that value', () => {
@@ -156,6 +188,19 @@ describe('resolveChannel (Process 44) — respect the recorded channel', () => {
   it('explicit value with no recorded preference -> that value', () => {
     expect(resolveChannel('WHATSAPP', null)).toEqual({
       value: 'WHATSAPP',
+      error: null,
+    });
+  });
+
+  it('a recorded value outside the outbound subset (e.g. MEETING) is treated as no preference — omit -> error', () => {
+    const r = resolveChannel(undefined, 'MEETING');
+    expect(r.value).toBeNull();
+    expect(r.error).toMatch(/pass channel explicitly/);
+  });
+
+  it('a recorded value outside the outbound subset does NOT 422 an explicit valid channel', () => {
+    expect(resolveChannel('EMAIL', 'VISIT')).toEqual({
+      value: 'EMAIL',
       error: null,
     });
   });

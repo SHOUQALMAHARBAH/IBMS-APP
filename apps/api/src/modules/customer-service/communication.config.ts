@@ -65,14 +65,23 @@ export interface MarketingConsentDecision {
 /**
  * Whether a marketing communication may be sent, given the customer's
  * MARKETING consent records (the repository has already filtered to
- * `purpose = MARKETING OR isMarketing = true`). The most recent record wins
- * (`grantedAt ?? createdAt`, then `createdAt` as a stable tiebreak): consent
- * is a point-in-time state, and a fresh grant after an earlier withdrawal is
- * a valid re-opt-in. `granted && withdrawnAt == null` ⇒ allowed. Pure — no
- * DB, no `now()`.
+ * `purpose = MARKETING OR isMarketing = true`). Pure — no DB, no `now()`.
  *
- * PDPL / `PRIV-SOP-04`: marketing consent is a distinct, opt-in control;
- * its absence is a "no", never a "maybe".
+ * **Rule (fail-safe):** a send is allowed only if there is an *active grant*
+ * (`granted === true && withdrawnAt === null`) and **no withdrawal event is at
+ * least as recent as the newest active grant**. So a re-opt-in after an
+ * earlier withdrawal is honoured (the new grant is more recent), but a
+ * withdrawal recorded after — or at the same instant as — the newest active
+ * grant blocks, even when it sits on a different (older) record. "Effective
+ * time" is `grantedAt ?? createdAt` for a grant and `withdrawnAt` for a
+ * withdrawal.
+ *
+ * PDPL / `PRIV-SOP-04` (M03): marketing consent is a distinct, opt-in
+ * control; its absence — and any ambiguity about whether it still stands — is
+ * a "no", never a "maybe", so the multi-record tiebreak leans blocked. The
+ * exact precedence is drafted pending a pinned `PRIV-SOP-04` section (like the
+ * drafted SLA figures elsewhere); single grant / withdraw on one record — the
+ * common case — is unambiguous.
  */
 export function evaluateMarketingConsent(
   records: readonly MarketingConsentRow[],
@@ -80,23 +89,59 @@ export function evaluateMarketingConsent(
   if (records.length === 0) {
     return { allowed: false, reason: 'no_record', consentRecordId: null };
   }
-  const latest = [...records].sort((a, b) => {
-    const at = (a.grantedAt ?? a.createdAt).getTime();
-    const bt = (b.grantedAt ?? b.createdAt).getTime();
-    if (at !== bt) return bt - at;
-    return b.createdAt.getTime() - a.createdAt.getTime();
-  })[0];
-  if (latest.withdrawnAt !== null) {
-    return { allowed: false, reason: 'withdrawn', consentRecordId: latest.id };
-  }
-  if (!latest.granted) {
+
+  const grantTime = (r: MarketingConsentRow): number =>
+    (r.grantedAt ?? r.createdAt).getTime();
+
+  const activeGrants = records
+    .filter((r) => r.granted && r.withdrawnAt === null)
+    .sort((a, b) => grantTime(b) - grantTime(a) || compareRaw(b.id, a.id));
+  const latestActiveGrant = activeGrants[0] ?? null;
+
+  const withdrawals = records
+    .filter(
+      (r): r is MarketingConsentRow & { withdrawnAt: Date } =>
+        r.withdrawnAt !== null,
+    )
+    .sort(
+      (a, b) =>
+        b.withdrawnAt.getTime() - a.withdrawnAt.getTime() ||
+        compareRaw(b.id, a.id),
+    );
+  const latestWithdrawal = withdrawals[0] ?? null;
+
+  if (
+    latestActiveGrant !== null &&
+    (latestWithdrawal === null ||
+      latestWithdrawal.withdrawnAt.getTime() < grantTime(latestActiveGrant))
+  ) {
     return {
-      allowed: false,
-      reason: 'not_granted',
-      consentRecordId: latest.id,
+      allowed: true,
+      reason: 'granted',
+      consentRecordId: latestActiveGrant.id,
     };
   }
-  return { allowed: true, reason: 'granted', consentRecordId: latest.id };
+
+  if (latestWithdrawal !== null) {
+    return {
+      allowed: false,
+      reason: 'withdrawn',
+      consentRecordId: latestWithdrawal.id,
+    };
+  }
+
+  // No active grant and nothing withdrawn ⇒ every record is `granted: false`.
+  const newest = [...records].sort(
+    (a, b) => grantTime(b) - grantTime(a) || compareRaw(b.id, a.id),
+  )[0];
+  return { allowed: false, reason: 'not_granted', consentRecordId: newest.id };
+}
+
+/** Byte-stable string compare for a deterministic tiebreak (no locale — the
+ * #43 `compareRaw` precedent; a UUID tiebreak must not shift under a non-`en`
+ * ICU collation). */
+function compareRaw(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 // --- channel / language resolution ---------------------------------------
@@ -109,25 +154,35 @@ export interface ResolveResult<T> {
 }
 
 /** "Respect the customer's recorded channel": omit it → use the recorded
- * preference; supply one that disagrees → error; neither present → error. */
+ * preference; supply one that disagrees → error; neither present → error.
+ *
+ * A recorded value outside `COMMUNICATION_CHANNELS` (e.g. a `MEETING` /
+ * `VISIT` preference — `Customer.preferredContactChannel` is the full
+ * `InteractionChannel` enum) is treated as **no usable preference**: the
+ * caller must then name an outbound channel explicitly. This keeps a
+ * non-outbound preference from either being logged verbatim as a nonsensical
+ * send channel or permanently 422-ing every explicit channel. */
 export function resolveChannel(
   requested: string | undefined,
   recorded: InteractionChannel | null,
 ): ResolveResult<InteractionChannel> {
+  const usableRecorded =
+    recorded !== null && isCommunicationChannel(recorded) ? recorded : null;
+
   if (requested !== undefined) {
-    if (recorded !== null && requested !== recorded) {
+    if (usableRecorded !== null && requested !== usableRecorded) {
       return {
         value: null,
-        error: `channel ${requested} disagrees with the customer's recorded channel ${recorded} — omit channel to use it, or update the customer's preference first`,
+        error: `channel ${requested} disagrees with the customer's recorded channel ${usableRecorded} — omit channel to use it, or update the customer's preference first`,
       };
     }
     return { value: requested as InteractionChannel, error: null };
   }
-  if (recorded !== null) return { value: recorded, error: null };
+  if (usableRecorded !== null) return { value: usableRecorded, error: null };
   return {
     value: null,
     error:
-      'no channel given and the customer has no recorded preferred channel — pass channel explicitly',
+      'no channel given and the customer has no usable recorded preferred channel — pass channel explicitly',
   };
 }
 

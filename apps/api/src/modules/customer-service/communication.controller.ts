@@ -1,16 +1,9 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CommunicationService } from './communication.service';
 import { CreateCommunicationDto } from './dto/create-communication.dto';
 import { ListCommunicationsQueryDto } from './dto/list-communications-query.dto';
+import { ConsentStatusQueryDto } from './dto/consent-status-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -48,11 +41,8 @@ export class CommunicationController {
    * the UI can disable "marketing" before a send is attempted. */
   @RequirePermissions('communication.send')
   @Get('consent-status')
-  consentStatus(@Query('customerId') customerId?: string) {
-    if (!customerId) {
-      throw new BadRequestException('customerId query parameter is required.');
-    }
-    return this.communications.marketingConsentStatus(customerId);
+  consentStatus(@Query() query: ConsentStatusQueryDto) {
+    return this.communications.marketingConsentStatus(query.customerId);
   }
 
   @RequirePermissions('communication.send')
