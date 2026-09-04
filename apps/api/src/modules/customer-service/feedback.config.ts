@@ -15,6 +15,19 @@ import type { Prisma } from '@ibms/db';
  * Feedback (Process 45)".
  */
 
+/** `comments` is customer-typed free text solicited immediately after a claim
+ * settlement, a policy issuance, or a renewal — precisely the moment a
+ * dissatisfied customer is most likely to write something like "you still
+ * haven't refunded my JOD to account 0123456789" (`sensitive-data-handling.md`
+ * § "What triggers this rule" names "a claim note" as exactly this scenario).
+ * Unlike CRM's `Interaction.summary` (a staff-authored note on an arbitrary
+ * touchpoint), this field is book-wide readable and Confidential-tier, so it
+ * carries the shared guard — same as #41 / #42 / #44's free-text fields. */
+export {
+  NO_FULL_ACCOUNT_NUMBER,
+  NO_FULL_ACCOUNT_NUMBER_MESSAGE,
+} from '../../common/dto.util';
+
 /** The three touchpoints the model's own doc comment names — post-issuance,
  * post-claim, post-renewal satisfaction surveys. */
 export const FEEDBACK_CONTEXTS = [
@@ -73,7 +86,9 @@ export function deriveFeedbackView(row: FeedbackRow): FeedbackView {
  * (`crm.service.ts` `logInteraction`), not #41 / #42's business-action notes:
  * feedback `comments` is the customer's own subjective reflection, closer in
  * kind to an Interaction summary than to a "what was done / why" operational
- * note, so it is treated the same conservative way. */
+ * note, so it is treated the same conservative way. (This is the *only*
+ * divergence from #41 / #42 / #44's precedent — the `NO_FULL_ACCOUNT_NUMBER`
+ * input guard above still applies, unlike the audit-row exclusion.) */
 export function feedbackAuditSnapshot(input: {
   feedbackId: string;
   customerId: string;

@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -15,6 +16,8 @@ import {
   FEEDBACK_CONTEXTS,
   FEEDBACK_SCORE_MAX,
   FEEDBACK_SCORE_MIN,
+  NO_FULL_ACCOUNT_NUMBER,
+  NO_FULL_ACCOUNT_NUMBER_MESSAGE,
 } from '../feedback.config';
 
 /**
@@ -41,12 +44,18 @@ export class CreateFeedbackDto {
   score?: number;
 
   /** The customer's own free-text remarks — Confidential tier, returned
-   * unmasked, never in an audit row (see `feedbackAuditSnapshot`). */
+   * unmasked, never in an audit row (see `feedbackAuditSnapshot`). Solicited
+   * right after a claim settlement / policy issuance / renewal, so a full
+   * bank / card number is a plausible thing to land here; `@Matches` keeps it
+   * out (the #41 / #42 / #44 guard). */
   @IsOptional()
   @Transform(trimIfString)
   @Transform(emptyStringToUndefined)
   @IsString()
   @MaxLength(2000)
+  @Matches(NO_FULL_ACCOUNT_NUMBER, {
+    message: `comments ${NO_FULL_ACCOUNT_NUMBER_MESSAGE}`,
+  })
   comments?: string;
 
   @IsOptional()

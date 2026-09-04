@@ -114,11 +114,19 @@ describe('Customer Feedback (e2e) — backlog Part C #45', () => {
       },
     });
 
-    // a non-Sales actor cannot log or read feedback
+    // a non-Sales actor cannot log OR read feedback
     await request(app.getHttpServer())
       .post('/feedback')
       .set(bearer(claims.accessToken))
       .send({ customerId: customer.id, context: 'post_claim' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/feedback')
+      .set(bearer(claims.accessToken))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/feedback?customerId=${customer.id}`)
+      .set(bearer(claims.accessToken))
       .expect(403);
 
     // unknown customer -> 404; an unknown context -> 400
@@ -136,11 +144,39 @@ describe('Customer Feedback (e2e) — backlog Part C #45', () => {
       .send({ customerId: customer.id, context: 'post_complaint' })
       .expect(400);
 
-    // a score outside 1-5 -> 400
+    // a score outside 1-5 -> 400; the 1 and 5 boundaries themselves succeed
+    await request(app.getHttpServer())
+      .post('/feedback')
+      .set(bearer(sales.accessToken))
+      .send({ customerId: customer.id, context: 'post_claim', score: 0 })
+      .expect(400);
     await request(app.getHttpServer())
       .post('/feedback')
       .set(bearer(sales.accessToken))
       .send({ customerId: customer.id, context: 'post_claim', score: 6 })
+      .expect(400);
+    const minScore = await request(app.getHttpServer())
+      .post('/feedback')
+      .set(bearer(sales.accessToken))
+      .send({ customerId: customer.id, context: 'post_claim', score: 1 })
+      .expect(201);
+    expect((minScore.body as FeedbackBody).score).toBe(1);
+    const maxScore = await request(app.getHttpServer())
+      .post('/feedback')
+      .set(bearer(sales.accessToken))
+      .send({ customerId: customer.id, context: 'post_claim', score: 5 })
+      .expect(201);
+    expect((maxScore.body as FeedbackBody).score).toBe(5);
+
+    // a full account number in comments -> 400 (the shared DTO guard)
+    await request(app.getHttpServer())
+      .post('/feedback')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerId: customer.id,
+        context: 'post_claim',
+        comments: 'Please refund my JOD to account 0123456789.',
+      })
       .expect(400);
 
     // log post-claim feedback with a score + comments
@@ -162,11 +198,12 @@ describe('Customer Feedback (e2e) — backlog Part C #45', () => {
     expect(fb.comments).toBe(COMMENTS);
     expect(fb.submittedAt).toBeTruthy();
 
-    // log post-issuance feedback with no score/comments (both optional)
+    // log post-issuance feedback with no score/comments (both optional); an
+    // empty-string comments is treated the same as omitted
     const bare = await request(app.getHttpServer())
       .post('/feedback')
       .set(bearer(sales.accessToken))
-      .send({ customerId: customer.id, context: 'post_issuance' })
+      .send({ customerId: customer.id, context: 'post_issuance', comments: '' })
       .expect(201);
     expect((bare.body as FeedbackBody).score).toBeNull();
     expect((bare.body as FeedbackBody).comments).toBeNull();
@@ -178,21 +215,25 @@ describe('Customer Feedback (e2e) — backlog Part C #45', () => {
       .send({ customerId: otherCustomer.id, context: 'post_renewal', score: 2 })
       .expect(201);
 
-    // reads
+    // reads — this customer now has 4 rows: minScore, maxScore, fb (all
+    // post_claim) + bare (post_issuance)
     const list = await request(app.getHttpServer())
       .get(`/feedback?customerId=${customer.id}`)
       .set(bearer(sales.accessToken))
       .expect(200);
     const ids = (list.body as FeedbackBody[]).map((r) => r.id);
     expect(ids).toContain(fb.id);
-    expect(ids).toHaveLength(2);
+    expect(ids).toHaveLength(4);
 
+    // context filter + newest-first order (submittedAt desc)
     const claimOnly = await request(app.getHttpServer())
       .get(`/feedback?customerId=${customer.id}&context=post_claim`)
       .set(bearer(sales.accessToken))
       .expect(200);
     expect((claimOnly.body as FeedbackBody[]).map((r) => r.id)).toEqual([
       fb.id,
+      (maxScore.body as FeedbackBody).id,
+      (minScore.body as FeedbackBody).id,
     ]);
 
     await request(app.getHttpServer())
