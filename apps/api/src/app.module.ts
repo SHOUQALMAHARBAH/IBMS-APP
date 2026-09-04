@@ -34,6 +34,7 @@ import { ClaimModule } from './modules/claim/claim.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { CommissionModule } from './modules/commission/commission.module';
 import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module';
+import { PdplModule } from './modules/pdpl/pdpl.module';
 
 @Module({
   imports: [
@@ -234,6 +235,14 @@ import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module
     // Manager, Exec, Auditor). No migration, no seed change; a best-effort READ
     // audit row per read. Separate from SlaModule (the engine + sweep).
     SlaDashboardModule,
+    // Part D (PDPL foundations, `IMPROVEMENTS.md` §5.1 / backlog Process #52)
+    // — M03 Consent Management: capture a consent decision at a defined
+    // touchpoint, withdraw it through a two-step request/confirm flow that
+    // gives the generic SlaTimerService (consent_withdrawal, 2 business
+    // days) a real window, and feed #44's marketing-send gate (which already
+    // reads ConsentRecord) a real write path. consent.manage / Sales,
+    // Placement, Claims, DPO. The first of the nine Part D / PCMS systems.
+    PdplModule,
   ],
   controllers: [AppController],
   providers: [AppService],

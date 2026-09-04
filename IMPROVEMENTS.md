@@ -11,9 +11,11 @@ into a system-wide problem.
 D complete); topped up through Part C #46 (**Domain E — Customer Service is
 now complete**: #41 Customer Requests, #42 Complaints Management, #43 SLA
 Management, #44 Customer Communication, #45 Customer Feedback, #46 Customer
-Retention). Nothing below has been actioned — this file is the plan for the
-"solve every gap / threat / bug" pass the user asked for **after** the
-backlog build is finished.
+Retention). This file is the plan for the "solve every gap / threat / bug"
+pass the user asked for **after** the backlog build finished; the pass has
+now **begun**, starting with **§5.1 (PDPL foundations)** — M03 Consent
+Management landed 2026-09-04, the first of the pass's items to be actioned
+(partially — §5.1 covers nine Part D systems, one is built).
 
 **Priority key:** `P0` blocks correctness, security, or a real "definition of
 done" · `P1` must be fixed before the system goes near production · `P2` tech
@@ -336,22 +338,36 @@ system is used for anything.
 
 ## 5. Security & compliance threats / gaps
 
-### 5.1 `P0` — Part D (PDPL / M-series) is entirely unbuilt
+### 5.1 `P0` — Part D (PDPL / M-series) is mostly unbuilt — M03 landed 2026-09-04
 
-- No `ConsentRecord` capture/withdrawal at the 7 touchpoints; no
-  `DataSubjectRequest` handling; no retention & disposal
-  (`RetentionScheduleItem` / `LegalHold` / `DisposalBatch` /
-  `CertificateOfDestruction`); no cross-border transfer gating; no
-  `DataSharingApproval`; no DPIA screening; no version-controlled bilingual
-  privacy notices; no RoPA register; no DPO workspace.
-- The **A.8 SLA registry already carries the PDPL timer definitions** (consent
-  withdrawal, DSR, breach containment, disposal) but **nothing consumes them** —
-  `pdpl-sla-timers.md` says every statutory SLA must be a tracked deadline with
-  escalation, not documentation.
+- **`ConsentRecord` capture/withdrawal is now built** (M03 — `apps/api/src/
+  modules/pdpl/`, `ibms-brain/meta/context/consent-management.md`): a grant
+  or explicit decline at `POST /consent-records`, plus a two-step
+  request-withdrawal/confirm-withdrawal flow that gives the `consent_withdrawal`
+  `SlaTimer` (2 business days) a real window and feeds #44's marketing-send
+  gate live. **Not built as part of M03**: the capture form is a generic
+  screen, not wired into the 7 named touchpoints (lead capture, onboarding/
+  KYC, needs & risk assessment, RFQ/market placement, claims, Group
+  Medical/Life & Motor Fleet, renewal & cross/up-sell) individually — that
+  UI-integration work is still open.
+- Still nothing else: no `DataSubjectRequest` handling (M04); no retention &
+  disposal *execution* (M06 — `RetentionScheduleItem` / `LegalHold` /
+  `DisposalBatch` / `CertificateOfDestruction` have existed in the schema
+  since the initial migration, nothing drives them); no cross-border
+  transfer gating or `DataSharingApproval` (M08); no DPIA screening (M10);
+  no version-controlled bilingual privacy notices; no RoPA register; no DPO
+  workspace.
+- The **A.8 SLA registry already carries every PDPL timer definition**
+  (consent withdrawal, DSR, breach containment, disposal) — `consent_withdrawal`
+  is the **first one with a real caller** (M03); DSR / breach containment /
+  disposal are still undocumented deadlines, exactly the gap
+  `pdpl-sla-timers.md` warns about.
 - **Impact:** the system stores national IDs (encrypted), UBO data, medical
-  reports (claims), and financial data with **no lawful-basis tracking, no
-  erasure path, no retention enforcement**. This is the single biggest
-  compliance exposure.
+  reports (claims), and financial data with a lawful-basis *trail* now
+  starting to exist for MARKETING consent specifically (and any other
+  `ConsentPurpose`, if a call site captures it) but still **no DSR/erasure
+  path and no retention enforcement**. This remains the single biggest
+  compliance exposure — one of nine Part D systems is built.
 
 ### 5.2 `P0` — Screening is simulated
 
@@ -525,7 +541,10 @@ complete picture. **Not** improvements to existing code; net-new build.
   insurer/employee performance scoring.
 - **Domain H — Supporting Operations (#66–74):** HR, procurement, IT asset,
   document management, vendor management, BCP/DR, knowledge base.
-- **Part D — PDPL / M-series** (5.1).
+- **Part D — PDPL / M-series** (5.1) — **begun**: M03 Consent Management
+  landed 2026-09-04 (see §5.1 above); the other eight systems (DSR,
+  retention & disposal execution, vendor risk, data sharing, incident &
+  breach, DPIA, notices, RoPA) and the DPO Workspace are still net-new.
 - **Part E — Dashboards** (7.2).
 - **Part F — Bilingual UI** (7.1).
 - **Part G — Final verification checklist** — the sign-off gate for "done".

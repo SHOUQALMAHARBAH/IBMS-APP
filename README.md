@@ -576,12 +576,22 @@ build actually is today:
   regulatory calendar, incident management, internal audit, #47–57), Management reporting
   (#58–65), Supporting Operations (HR, procurement, IT, document management, vendor
   management, BCP/DR, knowledge base, #66–74).
-- **Part D — PDPL / M-series** — `ConsentRecord` capture/withdrawal at the 7 touchpoints,
-  `DataSubjectRequest` handling, retention & disposal (`RetentionScheduleItem` /
-  `LegalHold` / `DisposalBatch` / `CertificateOfDestruction`), cross-border transfer
-  gating, one-off `DataSharingApproval`, DPIA screening, version-controlled bilingual
-  privacy notices, the RoPA register, and the DPO workspace screen. The A.8 SLA registry
-  already carries the PDPL timer definitions; nothing consumes them yet.
+- **Part D — PDPL / M-series — begun.** **M03 Consent Management is built**: capture a
+  consent decision (grant or explicit decline) for a `Customer` or `InsuredPerson`, and
+  withdraw it through a two-step request/confirm flow that finally gives the
+  previously-unused `consent_withdrawal` `SlaTimer` (2 business days) a real window —
+  see § Known gaps, Part D §5.1, for the full detail. Not built as part of M03: the
+  capture form is a generic screen, not wired into the 7 named touchpoints (lead
+  capture, onboarding/KYC, needs & risk assessment, RFQ/market placement, claims, Group
+  Medical/Life & Motor Fleet, renewal & cross/up-sell) individually. **Still not
+  built**: `DataSubjectRequest` handling (M04), retention & disposal *execution*
+  (M06 — the `RetentionScheduleItem` / `LegalHold` / `DisposalBatch` /
+  `CertificateOfDestruction` models exist since the initial migration, nothing drives
+  them), vendor risk tiering (M07), cross-border transfer gating and one-off
+  `DataSharingApproval` (M08), DPIA screening (M10), version-controlled bilingual
+  privacy notices, the RoPA register, and the DPO workspace dashboard. The A.8 SLA
+  registry carries all the PDPL timer definitions; `consent_withdrawal` is the first one
+  a real caller uses.
 - **Part E — dashboards** — none of the six management dashboards (Sales, Policy, Claims,
   Financial, Compliance, Insurer & Employee Performance) exist.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
@@ -5353,6 +5363,78 @@ narrows a gap.
   none; no link from a `RetentionCase` back to the `RenewalCase` / `Policy`
   that triggered it; no auto-close when the underlying `RenewalCase`
   eventually reaches `RENEWED`.
+
+**Part D §5.1 — Consent Management (M03)** — **opens Part D / PCMS**; new
+  module `apps/api/src/modules/pdpl/`. The backlog bundles all nine Part D
+  systems under Process **#52 Data Protection Compliance**; M03 is the
+  first of the nine, and the first PCMS module (M01–M12) with any code.
+  **Genuinely no migration, no seed change** — `ConsentRecord` (Part 4.1
+  core schema) already had every field needed; `consent.manage`
+  `[SALES_RELATIONSHIP_OFFICER, PLACEMENT_TECHNICAL_OFFICER,
+  CLAIMS_OFFICER, DATA_PROTECTION_OFFICER]` was seeded in `a440c1b` (149
+  perms) — one permission covers capture, withdrawal, and reads alike (the
+  #41/#44/#45 shape). **Not a `WorkflowTransitionService` entity** — no
+  `status` field at all, just `grantedAt` / `withdrawnAt` on an otherwise
+  immutable row; a subject's multiple `ConsentRecord` rows across time ARE
+  the audit trail (Process 44's pre-existing `evaluateMarketingConsent`
+  already reads it that way). **Endpoints** (all `consent.manage`): `POST
+  /consent-records` (`{ customerId? | insuredPersonId?, purpose, granted,
+  consentTextVersion }` — a grant OR an explicit decline, always recorded,
+  never silently dropped; `isMarketing` is DERIVED from `purpose`, never an
+  input — the "computed, not an input, when derivable" rule, #28/#31/#38/
+  #44 — enforcing `PRIV-SOP-04`'s "consent and contractual necessity are
+  always two separate, independently-actionable controls" structurally);
+  `POST .../:id/request-withdrawal` + `POST .../:id/confirm-withdrawal` — a
+  **two-step withdrawal**, not one call; `GET /consent-records?customerId=
+  &insuredPersonId=&purpose=&granted=` + `/:id`. Exactly one of
+  `customerId` / `insuredPersonId` is a service-level 422, **not a DB
+  CHECK** (unlike `PaymentChannel`'s `owner_exactly_one`, #38) — reasoned:
+  a `ConsentRecord` is written by exactly one call site, once, never
+  edited afterward, so there is no concurrent-write race to guard against.
+  **The two-step withdrawal gives the pre-existing, previously-unused
+  `consent_withdrawal` `SLA_REGISTRY` entry (2 business days, `PRIV-STD-01`
+  §6.3) a real window**: `requestWithdrawal` starts the SLA clock
+  (best-effort `SlaTimerService.startTimer`) without touching
+  `ConsentRecord`; `confirmWithdrawal` stamps `withdrawnAt` and resolves
+  the timer (best-effort). The model's own field comment — `withdrawnAt`
+  "must reflect in register within 2 business days" — only makes sense if
+  intake and reflection are genuinely separate events; a single atomic
+  call would make the SLA vacuous by construction. `confirmWithdrawal`
+  also works standalone with no prior request (`SlaTimerService.resolve`
+  is a documented no-op when nothing is open). **Feeds Process 44's
+  marketing-send gate for free**: `evaluateMarketingConsent` already reads
+  the live `withdrawnAt` on every send, so "affected communications
+  suppressed immediately" is satisfied the instant `confirmWithdrawal`
+  runs, by code that shipped before this module did — M03 touches no
+  `CommunicationLog` code at all. Audit: `CREATE` (ids + purpose + the
+  decision — no free text, the model has none), `UPDATE` on the withdrawal
+  (the event only) + the `SlaTimer` engine's own rows. New
+  `apps/api/src/modules/pdpl/consent.{config,service,controller}.ts` + 2
+  DTOs + `repositories/consent-record.repository.ts`, registered after
+  `SlaDashboardModule`. `apps/web/` gains a **"Consent"** screen (a
+  capture form + a table with per-row Request withdrawal / Confirm
+  withdrawal). **Verification**: +29 api unit
+  (`consent.config.spec.ts` 10, `consent.service.spec.ts` 19) → api unit
+  **1518** (105 files, from 1489); new `test/consent-record.e2e-spec.ts`
+  1/1 isolated (403 outside the four roles, 422 both/neither owner, 404
+  unknown customer, grant + decline + InsuredPerson-owner capture,
+  request-withdrawal 422 on a never-granted record, the `SlaTimer` row +
+  its `consent_withdrawal` workflow name, confirm-withdrawal resolving it,
+  idempotent re-confirm, a standalone confirm with no prior request,
+  Process 44's `/communications/consent-status` reading the withdrawal
+  live, list filters, `CREATE`+`UPDATE` audit rows); new Playwright
+  `consent.spec.ts` (3). turbo `typecheck` / `lint` / `build` (8 tasks)
+  OK; `ibms-brain` `brain-doctor.sh` 0 errors; `prisma migrate status`
+  clean (**43**, unchanged). **Deferred:** the capture screen is generic,
+  not wired into the backlog's 7 named touchpoints individually; no
+  per-subject "current status" read for a non-MARKETING purpose (a caller
+  must apply `evaluateMarketingConsent`-style logic itself); no bulk/
+  import capture path; a genuine double-call race on `request-withdrawal`
+  can create more than one open `SlaTimer` for the same record — cosmetic
+  only, `resolve` closes every matching row together, not hardened
+  further. The other eight Part D systems (DSR, retention & disposal
+  *execution*, vendor risk, data sharing, incident & breach, DPIA,
+  notices, RoPA) and the DPO Workspace dashboard remain unbuilt.
 
 ## Deployment
 
