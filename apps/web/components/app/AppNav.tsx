@@ -41,6 +41,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/financial-report', label: 'Financial report' },
   { href: '/service-requests', label: 'Customer requests' },
   { href: '/complaints', label: 'Complaints' },
+  { href: '/sla-dashboard', label: 'SLA dashboard' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

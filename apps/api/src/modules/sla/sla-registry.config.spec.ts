@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getSlaRegistryEntry, SLA_REGISTRY } from './sla-registry.config';
+import {
+  findSlaRegistryEntry,
+  getSlaRegistryEntry,
+  SLA_REGISTRY,
+} from './sla-registry.config';
 
 // The 14 SLA types named in ibms-brain/meta/lex/pdpl-sla-timers.md's
 // registry table — a completeness check so a future accidental removal (or
@@ -120,6 +124,18 @@ describe('getSlaRegistryEntry', () => {
   it('returns the matching entry for a known workflow name', () => {
     expect(getSlaRegistryEntry('consent_withdrawal').entityType).toBe(
       'ConsentRecord',
+    );
+  });
+});
+
+describe('findSlaRegistryEntry', () => {
+  it('returns undefined for an unknown workflow name instead of throwing', () => {
+    expect(findSlaRegistryEntry('not_a_real_workflow')).toBeUndefined();
+  });
+
+  it('returns the matching entry for a known workflow name', () => {
+    expect(findSlaRegistryEntry('complaint_resolution')?.entityType).toBe(
+      'Complaint',
     );
   });
 });

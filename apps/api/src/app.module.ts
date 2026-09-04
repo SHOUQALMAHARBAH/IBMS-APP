@@ -33,6 +33,7 @@ import { CustomerServiceModule } from './modules/customer-service/customer-servi
 import { ClaimModule } from './modules/claim/claim.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { CommissionModule } from './modules/commission/commission.module';
+import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module';
 
 @Module({
   imports: [
@@ -227,6 +228,12 @@ import { CommissionModule } from './modules/commission/commission.module';
     // tracked by the generic SlaTimerService (service_request_fulfilment — a
     // DRAFTED 5-business-day default). service-request.manage / Sales, Manager.
     CustomerServiceModule,
+    // Part C backlog #43 (SLA Management, Domain E) — a read-only cross-module
+    // monitoring dashboard over the generic SlaTimer engine (GET
+    // /sla-dashboard/summary + /timers, sla-dashboard.view / Compliance,
+    // Manager, Exec, Auditor). No migration, no seed change; a best-effort READ
+    // audit row per read. Separate from SlaModule (the engine + sweep).
+    SlaDashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

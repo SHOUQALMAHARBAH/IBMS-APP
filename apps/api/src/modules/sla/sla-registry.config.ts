@@ -348,3 +348,17 @@ export function getSlaRegistryEntry(workflowName: string): SlaRegistryEntry {
   }
   return entry;
 }
+
+/**
+ * Non-throwing sibling of {@link getSlaRegistryEntry} — returns `undefined`
+ * for an unknown `workflowName` instead of throwing. Used by the Process 43
+ * SLA dashboard, which reads persisted `SlaTimer.workflowName` values that
+ * could name a workflow since renamed or removed from the registry: a
+ * monitoring view must degrade gracefully (fall back to the raw name), not
+ * crash on a legacy row.
+ */
+export function findSlaRegistryEntry(
+  workflowName: string,
+): SlaRegistryEntry | undefined {
+  return SLA_REGISTRY_BY_NAME.get(workflowName);
+}
