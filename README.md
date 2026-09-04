@@ -540,12 +540,13 @@ build actually is today:
 | 45 | Customer Feedback | **extends the `customer-service` module** · **no migration, no seed change** — `CustomerFeedback` (Part 4 core schema) already had every field a satisfaction-survey log needs (`customerId`, `context`, `score`, `comments`, `submittedAt`); `feedback.log` (`[SALES_RELATIONSHIP_OFFICER]`) was seeded in `a440c1b` (149 perms), and there is **no separate read permission** — `feedback.log` covers create *and* read (the #41 / #44 shape) · **not a `WorkflowTransitionService` entity, no maker/checker, no `SlaTimer`** — a factual log, create + read only, the `Interaction` #10 shape (the simplest Domain E item so far: no status, no derived fields, no cross-entity validation beyond the customer existing) · new `apps/api/src/modules/customer-service/feedback.{config,service,controller}.ts` + `dto/create-feedback.dto.ts` + `dto/list-feedback-query.dto.ts` + `repositories/feedback.repository.ts`, wired as the **4th `CustomerServiceModule` controller** · `context` restricted to the model's own three documented values (`post_issuance` / `post_claim` / `post_renewal`, `FEEDBACK_CONTEXTS` / `isFeedbackContext`); `score` optional, bounded `1`–`5` (`FEEDBACK_SCORE_MIN` / `FEEDBACK_SCORE_MAX`) — **DRAFTED / UNSOURCED** (Part 3.8 names no scale), same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) · **endpoints** (all `feedback.log`): `POST /feedback` (`{ customerId, context, score?, comments?, submittedAt? }`; **404** unknown customer), `GET /feedback?customerId=&context=` (book-wide, newest-first by `submittedAt`, capped `FEEDBACK_READ_LIMIT = 5000` + `logger.warn`), `GET /feedback/:id`; `submittedAt` backdatable via `parseHistoricalInstant` (an offset-less datetime or a future instant → **422**; default now()) · **`comments` carries the shared `NO_FULL_ACCOUNT_NUMBER` guard, same as #41 / #42 / #44's free-text fields** · **`comments` is deliberately excluded from the `CREATE` audit `afterValue`** (ids + `context` + `score` + `submittedAt` only) — the CRM `Interaction.summary` precedent (`crm.service.ts` `logInteraction` logs channel/`occurredAt`, never `summary`), not #41 (`detail`) / #42 (`issue`/`resolution`)'s verbatim-note precedent: feedback `comments` is the customer's own subjective reflection, closer in kind to a private relationship-log note than to an operational business-action record — the audit trail leans conservative, the input guard does not follow that distinction · no ownership-based read gating — `feedback.log` is single-role and the sole gate on both write and read, book-wide · audit: best-effort `CREATE CustomerFeedback` only; reads not audited (Confidential tier — the #33 / #34 / #41 / #44 precedent) · **`@code-reviewer` (mandatory — code touching Confidential-tier customer commentary + a new `CREATE` audit-row shape) → CHANGES REQUESTED → resolved** — **1 MAJOR fixed**: a first pass reasoned `comments` was the CRM `Interaction.summary` shape and omitted the account-number guard entirely; the reviewer corrected this — feedback `comments` is customer-typed text solicited *immediately after* a claim settlement / issuance / renewal (precisely when a dissatisfied customer is most likely to paste a full account/card number) and is book-wide readable, so the guard now applies, leaving only the audit-row exclusion as the genuine divergence; **2 MINORs addressed**: the e2e now also proves a non-Sales `GET` is 403'd (was POST-only), plus `score` `1`/`5` boundary + full-account-number-in-`comments` assertions; **2 NITs deferred** (no index on `CustomerFeedback`; the truncation-`logger.warn` path untested — both noted, neither new to this module) · **`/brain-gap` filed + pushed** (ibms-brain `0c5bc63` + `7974db7` — `customer-service-lifecycle.md` gains a "Customer Feedback (Process 45)" section; intro → "#41–45 are built") · web: a new **"Feedback"** screen (`app/(app)/feedback/page.tsx` + `lib/customer-service/feedback-api.ts` + an `AppNav` entry after "Communications") — a log form (customer id · context `<select>` · a 1–5 score `<input>` · comments) and a table (customer · context · score · comments · submitted) | the 1–5 score scale is **drafted / unsourced** — same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) and the #41 5-day SLA · **no link from a feedback row to the triggering `Policy`/`Claim`/`RenewalCase`** — `context` is a label, not a foreign key · no automatic survey trigger — logging is always a manual `POST`, no #23-style "on claim closure, prompt for feedback" flow · no duplicate-response detection — a customer can submit feedback for the same context repeatedly · no aggregation / CSAT-dashboard reporting (the #40 / #43 "backend for a Part E dashboard" shape is not repeated here — reads are a plain filtered list) · **no index on `CustomerFeedback`** — not even `@@index([customerId])`, unlike every sibling Domain E model (a follow-up migration once volume exists) |
 | 46 | Customer Retention | **extends the `customer-service` module — Domain E (#41–46) is now complete** · **genuinely no migration, no seed change** — `RetentionCase` (Part 4 core schema) already had every field needed; `RenewalCase` (Part 3.9 core schema) already carried `retentionEscalatedAt DateTime?`, a nullable timestamp clearly provisioned for exactly this mechanism, unused until now; `retention-case.manage` `[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER]` was seeded in `a440c1b` (149 perms) · **built ahead of its data source** (the #8 / #10 / #29 shape) — the renewal module (Part 3.9) that would create a `RenewalCase` per policy nearing expiry is **not built**, so in normal running the sweep is a logged no-op, exactly #29 Loss Ratio's precedent · **not a `WorkflowTransitionService` entity, no maker/checker, no `SlaTimer`** — a factual log; `status` is a plain string `open → closed` (the model's own vocabulary — no outcome/resolution field, the bare schema has none) · new `apps/api/src/modules/customer-service/retention-case.{config,service,controller}.ts` + `retention-sweep.scheduler.ts` + 2 DTOs + `repositories/retention-case.repository.ts`, wired as the **5th `CustomerServiceModule` controller** (`AuthModule` newly imported there, for the scheduler's system-account lookup) · **the classifier** (`classifyRenewalCaseForRetention`, pure): `lapse_risk` ⇐ `status === 'LAPSED'` — checked first, always wins over inactivity; `renewal_inactivity` ⇐ the cycle has **not concluded** (`RENEWED` / `CANCELLED` excluded; `LAPSED` is deliberately NOT "concluded" — it's the other trigger) **and** `RENEWAL_INACTIVITY_THRESHOLD_BUSINESS_DAYS = 30` business days have elapsed since `triggeredAt`, reusing **`isFollowUpDue`** (`common/follow-up.util.ts` — the same test the RFQ #12 / Claim #27 follow-up sweeps use) — **DRAFTED / UNSOURCED** (Part 3.9 names a 90-*calendar*-day `leadTimeDays` default but no inactivity-escalation figure), same status as the #41 / #42 SLA figures; the two reasons are mutually exclusive by construction · **the race-safe invariant is `RenewalCase.retentionEscalatedAt`, not a new `RetentionCase` constraint** — `escalateAndCreateRetentionCase` stamps + creates the `RetentionCase` in **ONE `$transaction`** (a deliberate local exception to the no-`$transaction` convention, the `claim.repository.ts createNotification` shape), a **status-conditional `updateMany`** (`WHERE retentionEscalatedAt IS NULL AND status NOT IN (RENEWED, CANCELLED)`, the `RfqInsurer.followUpAlertSentAt` / `stampFollowUpAlert` shape (#12) plus a `status` re-assertion that precedent didn't need); `runSweep` calls it once — a `null` return counts as `skippedConcurrent` (distinct from `failed`); **`RenewalCase.status` is NEVER written by this sweep** — only checked; per-row isolation (the #9 / #12 / #27 shape) · **`@code-reviewer` (mandatory — this change IS the `race-safe-invariants.md` implementation + a new scheduler) → CHANGES REQUESTED → resolved**: **1 BLOCKER** (stamp + create were two separate writes — a `create` failure after a successful stamp permanently stranded the `RenewalCase` as "escalated" with no `RetentionCase`, and no future sweep would ever reconsider it since `findRenewalCasesForSweep` filters on `retentionEscalatedAt: null`; fixed by the `$transaction` above) **+ 1 MAJOR** (the stamp's `where` originally re-asserted only `retentionEscalatedAt: null`, not `status` — a `RenewalCase` concluding between the sweep's load and the stamp could open a spurious case for a customer who just renewed; fixed by the `status NOT IN (...)` re-assertion) — both dormant today, both would be live races the day the renewal module lands; **2 MINORs addressed** (a distinct `skippedConcurrent` counter; a new unit test for a create failure after a successful stamp) · **no "one open `RetentionCase` per customer" invariant** — deliberately not built (would need a migration; the schema has no FK to dedupe against) — two at-risk policies for one customer legitimately open two cases · **endpoints** (all `retention-case.manage`): `POST /retention-cases` (manual open, `{ customerId, reason }`; **404** unknown customer), `POST /retention-cases/sweep` (on-demand, declared before the `:id` routes, counts only — the #27 `follow-up-sweep` shape), `GET /retention-cases?customerId=&status=&reason=` (book-wide, capped `RETENTION_CASE_READ_LIMIT = 5000`) + `/:id`, `POST /retention-cases/:id/close` (`open → closed`, no body — the model has no note field; idempotent, **404** unknown) · **`RetentionSweepScheduler`** nightly at **08:00 UTC** (after the 07:00 claim follow-up sweep), the `system@ibms.internal` account precedent, delegating to the same `runSweep` the on-demand endpoint calls · audit: best-effort `CREATE RetentionCase` per opened case (sweep or manual), `UPDATE` on close; reads not audited (Confidential tier — the #33 / #34 / #41 / #44 / #45 precedent) · **`/brain-gap` filed + pushed** (ibms-brain `4c1f2c9` — `customer-service-lifecycle.md` gains a "Customer Retention (Process 46)" section; intro → "Domain E is complete — #41–46 are all built") · web: a new **"Retention"** screen (`app/(app)/retention-cases/page.tsx` + `lib/customer-service/retention-case-api.ts` + an `AppNav` entry after "Feedback") — an open form + a "Run detection sweep now" button + a table with a per-row Close | the renewal module (Part 3.9) itself is not built, so the sweep has no real `RenewalCase` traffic in normal running — only e2e tests create one directly · the 30-business-day inactivity threshold is **drafted / unsourced** · **no per-customer dedup of open cases** — the schema has no `renewalCaseId` / `policyId` FK on `RetentionCase` to dedupe against · **no outcome / resolution field on close** — "was the customer retained or lost" is not recorded, the bare schema has none · no link from a `RetentionCase` back to the `RenewalCase` / `Policy` that triggered it (only `RenewalCase.retentionEscalatedAt` records that *an* escalation happened) · no auto-close when the underlying `RenewalCase` eventually reaches `RENEWED` · `retention-case.manage` is role-level (no per-officer queue) |
 
-### Part C · Domain F #47–48 — Compliance & Risk (begun), with these deferrals
+### Part C · Domain F #47–49 — Compliance & Risk (begun), with these deferrals
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
 | 47 | KYC | **fully covered by Part C #3-4** (`KycService` / `ScreeningService`) — the backlog's own line reads "#47 KYC — fully covered under #3–4", no checkboxes of its own. Verified 2026-09-04: every #3-4 checkbox (two-form Customer creation, KYC + document capture, UBO + PEP capture, sanctions/PEP/AML screening at intake/on material change/recurring batch, the automatic EDD path with a separate longer SLA, the maker/checker approval gate, the risk-based periodic re-KYC schedule, the step-by-step onboarding wizard) maps to real, built, permission-gated code — see the #3-4 row above | nothing #47-specific — see the #3-4 row's own deferred edges (simulated screening provider, drafted SLA/re-KYC figures) |
 | 48 | AML/CFT | **new module** `apps/api/src/modules/compliance-risk/` (+ `repositories/transaction-monitoring-alert.repository.ts`) — opens Domain F beyond KYC · **migration `20260904130000` (44th)** only **widens** the pre-existing `TransactionMonitoringAlert` model (Part 7.2 core schema, no application code had ever written to it): adds `sourceEntityType` / `sourceEntityId` (nullable — the triggering `Receipt` for an event-scoped alert; both null for the two aggregate patterns), `@@index([customerId])` / `@@index([status])` / `@@index([patternType])`, and two race-safe uniqueness guards — **no seed change** (`aml.monitor` / `aml.escalate`, both `[COMPLIANCE_OFFICER]`, were seeded ahead of time in `a440c1b`, module `compliance-risk`, 149 perms) · **not a `WorkflowTransitionService` entity, no maker/checker** (`aml.monitor` / `aml.escalate` are both single-role COMPLIANCE grants, kept as two permissions since the pre-existing seed clearly means to separate "monitor" from "escalate" — the #42 `complaint.escalate` shape, not the #23-28 claim-settlement dual-approver shape) · **detection** (`TransactionMonitoringSweepScheduler`, nightly at 09:00 UTC after the 08:00 retention sweep, + on-demand `POST /transaction-monitoring-alerts/detect`) checks four patterns over existing Finance/Endorsement data, pure classifiers in `transaction-monitoring.config.ts`: **`large_premium_payment`** / **`third_party_payment_source`** — both scanned off every `Receipt` (an actual client payment collected, #32 — a raised-but-unpaid `Invoice` is not yet a "payment"), the first comparing the underlying `Invoice.premiumAmount` against a drafted `AML_LARGE_PREMIUM_THRESHOLD_JOD = '15000.000'`, the second checking whether the `Receipt`'s `PaymentChannel` (#38) is owned by a customer other than the one invoiced — **DORMANT in production, a `@code-reviewer` BLOCKER**: `CollectionService.assertReceiptChannelUsable` (#38) already rejects any real `Receipt` whose channel mismatches the invoiced customer before one can exist, so this classifier can never fire outside a test that bypasses `CollectionService` directly; kept coded/tested/wired as a forward-compatible detector, documented rather than architecturally changed; **`frequent_cancellations`** / **`frequent_refunds`** — a rolling 90-calendar-day count of `Cancellation` / `Refund` rows per customer (via `Endorsement.policy.customerId`, neither child table carries its own `customerId`) against a drafted threshold of 3 · **race-safety** (`race-safe-invariants.md`): a plain `@@unique([patternType, sourceEntityId])` stops the sweep from re-alerting the same `Receipt` forever (Postgres treats every NULL `sourceEntityId` as distinct, so the two aggregate patterns are untouched by it); a hand-authored partial `UNIQUE ("customerId", "patternType") WHERE status = 'open' AND "patternType" IN ('frequent_cancellations', 'frequent_refunds')` (the `UpSellRecommendation` / `ClaimFollowUpAlert` shape — Prisma can't express the predicate) caps the aggregate patterns at one open alert per customer/pattern at a time — **scoped directly to `patternType`, NOT to `sourceEntityId IS NULL`, a `@code-reviewer` BLOCKER on the first pass** (that predicate would also collide two unrelated manual `other`-pattern alerts for the same customer, throwing an uncaught 500 with no pre-check/catch; `create()` now catches `P2002` → a 409); the service also pre-checks both before writing, then catches the `P2002` from a concurrent run as `skippedExisting`, never `failed` · per-candidate isolation — one bad row does not abandon the rest of the sweep (the #9/#12/#27/#46 shape) · **manual log**: `POST /transaction-monitoring-alerts` (`aml.monitor`) — any of the five `patternType`s (`large_premium_payment` / `frequent_cancellations` / `frequent_refunds` / `third_party_payment_source` / `other`), for a pattern Compliance notices that machine detection doesn't cover; `detailText` carries the shared `NO_FULL_ACCOUNT_NUMBER` guard (`common/dto.util.ts`, the #41/#42/#44/#45 precedent) — the model's own default `classification` is `HIGHLY_CONFIDENTIAL` ("names payment sources/counterparties, AML-sensitive") · **the suspicious-activity escalation path is two separate steps**, the M03 consent-withdrawal request/confirm shape: `POST /:id/escalate` (`aml.escalate`) — the internal decision, `open` only, idempotent; `POST /:id/report-to-authority` (`aml.escalate`) — the external filing, **requires `escalate` to have run first** (422 otherwise), idempotent; **`POST /:id/close`** (`aml.monitor`) — `open → closed`, no body (the model has no note/`closedAt` field — the `UPDATE` `AuditLogEntry.occurredAt` is the closure timestamp of record) · **record-keeping**: no delete endpoint exists anywhere on this model — the row + its `CREATE`/`UPDATE` audit trail is the regulator-mandated record; the actual retention *period* is undocumented/unsourced (no CBJ AML source figure identified yet — flagged in `ibms-brain/meta/context/transaction-monitoring.md`, not built as a tracked deadline the way `kyc-aml-sla-timers.md`'s two figures are) · `GET /transaction-monitoring-alerts?customerId=&patternType=&status=&escalatedToSuspiciousActivity=` + `/:id` (book-wide, capped `TRANSACTION_MONITORING_READ_LIMIT = 5000`) · audit: best-effort `CREATE` per alert (sweep or manual — ids + `patternType` + `status` + source provenance, **never `detailText`** — the #44 `subject`/`body` / #45 `comments` precedent), `UPDATE` on escalate / report / close, all `isSensitiveDataAccess: true` (Highly Confidential AML data); **`get()`/`list()` also write a best-effort `READ` row** — a `@code-reviewer` MAJOR fix (the first pass had followed the Confidential-tier #33/#34/#41/#44/#45 no-audit precedent; `TransactionMonitoringAlert` is `HIGHLY_CONFIDENTIAL`, the `Claim` same-tier precedent says every read is logged) · `apps/web/`: a new **"AML monitoring"** screen (`app/(app)/transaction-monitoring/page.tsx` + `lib/compliance-risk/transaction-monitoring-api.ts` + an `AppNav` entry after "Consent") — a log form (customer id · pattern `<select>` · detail) + a "Run detection sweep now" button + a table (customer · pattern · status · escalated · reported · detected · per-row Escalate/Report/Close) · **`@code-reviewer` → CHANGES REQUESTED → resolved: 2 BLOCKERs** (the partial-index scoping — fixed; `third_party_payment_source`'s dormancy — documented, not architecturally changed) **+ 1 MAJOR** (the missing `READ` audit — fixed) **+ 2 MINORs** (`escalate()`'s idempotency ordering — a closed-but-escalated alert now stays idempotent on retry; the sweep's `scanned` count now sums rows examined, not distinct customers) · **Verification**: +57 api unit (`transaction-monitoring.config.spec.ts` 23 — every classifier + boundary + the audit-snapshot's `detailText` exclusion; `transaction-monitoring.service.spec.ts` 31 — manual log incl. no-customerId + the P2002→409 fix, all four sweep patterns incl. both-on-one-receipt + pre-check skip + `P2002` → `skippedExisting` + a genuine failure doesn't abort the rest, escalate/report/close incl. every guard + idempotency + the closed-but-escalated fix, `get()`/`list()` `READ`-audit tests; `transaction-monitoring-sweep.scheduler.spec.ts` 3). api unit **1575** (106 files, from 1518). New `test/transaction-monitoring.e2e-spec.ts` **1/1 isolated** (extended post-review) — seeds a large-premium Receipt, a third-party-channel Receipt, an ordinary Receipt, 3 Cancellations (one Endorsement per Policy — `Endorsement_one_live_cancellation_per_policy`, migration 20260902170000, allows only one live cancellation Endorsement per policy) and 3 Refunds under one customer; a non-Compliance actor → 403 on detect/list/escalate; the on-demand sweep flags all four patterns + is idempotent on re-run; manual log incl. the account-number-guard 400 + unknown-`patternType` 400 + unknown-customer 404; a second independent manual `other` alert succeeds while a manual log of an already-open aggregate pattern 409s; report-before-escalate → 422; escalate → report → close, each idempotent; re-escalating the closed-but-escalated alert stays idempotent; a `CREATE` audit row per alert (6 total — 4 swept + 2 manual, none carrying `detailText`) + `UPDATE` rows for escalate/report/close + `READ` rows for `get()`/`list()`. New Playwright `transaction-monitoring.spec.ts` (3 — form + table render, 403 friendly copy, `@a11y` no serious/critical). turbo `typecheck`/`lint`/`build` OK; `ibms-brain` `brain-doctor.sh` 0 errors; `prisma migrate status` clean (44) | the four thresholds (15000 JOD large-premium, 90-day/3-count frequent cancellation & refund) are **drafted / unsourced** — same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) and the #41/#42/#46 SLA figures · **`third_party_payment_source` is dormant in production** (see above — documented, not fixed by relaxing #38's enforcement) and separately cannot classify a `Receipt` with no recorded `PaymentChannel` either way (`Receipt.paymentChannelId` is optional) · no dedup across the four patterns firing on the same underlying activity (a customer could get both a `large_premium_payment` alert and a `frequent_cancellations` alert for related behaviour, with nothing linking them) · the escalation path has **no `SlaTimer`** — the backlog names no filing deadline the way M03's "2 business days" was explicit, so unlike `consent_withdrawal` this is not (yet) a tracked deadline · no case-management workflow beyond `open`/`closed` — no assignment, no investigator notes beyond the original `detailText`, no link to a filed SAR document · no bulk/CSV export; in-memory aggregation for the two frequent-* patterns, capped implicitly by whatever `findCancellationsSince`/`findRefundsSince` return (unpaginated, the #12/#27 follow-up-sweep precedent) · `aml.monitor`/`aml.escalate` are role-level (no per-officer queue) |
+| 49 | Sanctions & PEP Screening | **the one checkbox**: "Screen at onboarding + on any material change + a recurring batch against **updated lists**" — the first two legs were already built under #3-4 (`KycService`/`ScreeningService`); this finishes the third leg with real list data and a sourced cadence · **migration `20260904140000` (45th)** adds `WatchlistSource` / `WatchlistEntry` / `WatchlistSyncRun` — `WatchlistEntry` is the local sync cache (`sourceRecordId` = OFAC `ent_num` / UN `DATAID`, the upsert/prune key, `classification DataClassification @default(HIGHLY_CONFIDENTIAL)` — a `@code-reviewer` BLOCKER, see below); `WatchlistSyncRun` is the sync job's own operational log, not an `AuditLogEntry`, and carries a hand-authored partial `UNIQUE (source) WHERE status='running'` (a second BLOCKER, see below) · **no seed change** — `sanctions-pep.screen` (`[COMPLIANCE_OFFICER]`, module `compliance-risk`) was pre-seeded, gating THREE endpoints: `POST /watchlist-sync/run`, `GET /watchlist-sync/status`, `POST /screening/recurring-batch` · **new module** `apps/api/src/modules/compliance-risk/watchlist-sync.{config,service,controller,scheduler}.ts` + `watchlist-fetchers.ts` (the network boundary — two tiny injectable classes, `OfacSdnFetcher`/`UnConsolidatedFetcher`, so `WatchlistSyncService` never calls `fetch()` directly) + `repositories/watchlist-entry.repository.ts` · **two real, free, no-API-key sanctions lists** — `https://www.treasury.gov/ofac/downloads/sdn.csv` (OFAC SDN, ~19,000 records, redirects to `sanctionslistservice.ofac.treas.gov`) and `https://scsanctions.un.org/resources/xml/en/consolidated.xml` (UN Consolidated, ~1,000 records) — both verified reachable live 2026-09-05; hand-rolled parsers (a general quoted-CSV parser for OFAC's mixed quoted/unquoted 12 columns, a scoped regex block/tag extractor for the UN XML, safe because every tag read is a flat single-occurrence leaf verified against the real document), no new npm dependency, both unit-tested against real captured sample data · **`WatchlistSyncScheduler`** every 12 hours (the lists' own real-world refresh cadence) or on demand, delegating to `WatchlistSyncService.runSync()`: fetch → parse → `upsertMany` (stamps every record with the current `WatchlistSyncRun.id`, chunked at 100 with bounded `Promise.all` concurrency — not a raw-SQL bulk upsert, OFAC alone is ~19,000 rows) → `pruneStale` (deletes every row of that source NOT stamped with this run's id — i.e. dropped from the source list) — two passes, not a `$transaction` (a non-transactional external cache refresh, not a financial/workflow write); per-source isolation (one source's fetch/parse failure does not block the other) · **`ScreeningService.run()` now checks TWO sources**: `sample-watchlist.ts` (unchanged, dev/test-only fixture) and the real synced `WatchlistEntry` cache (every environment, including production) — an exact match on `normalizeWatchlistName`'s canonical form (uppercase, strip everything but letters/digits/whitespace, sort the tokens) applied identically at ingestion and match time; **order-independent** (handles OFAC's "LASTNAME, First" vs. a customer record's "First Last") but **NOT fuzzy/phonetic** — a documented limitation, the same honesty `sample-watchlist.ts`'s own header already had · **`ScreeningBatchScheduler`'s cadence changed from a drafted monthly guess to every 4 hours** — the lists resync every 12h, so checking twice within that window bounds the "list changed but not yet re-checked" gap to at most one sync interval plus one screening interval; its customer-selection + per-customer loop **MOVED into `ScreeningService.runRecurringBatch()`** so the scheduler (4h) and the new on-demand `POST /screening/recurring-batch` (`sanctions-pep.screen`) share identical logic — the #46/#48 "service owns the sweep, scheduler + endpoint both delegate" shape; batch-level failures (e.g. `findActive()` throwing) propagate to the caller rather than being swallowed, matching `RetentionCaseService.runSweep`/`TransactionMonitoringService.runSweep` · **`WatchlistEntryRepository` is provided in BOTH `ComplianceRiskModule` (owns the sync) and `CustomerModule` (`ScreeningService` reads it) deliberately** — a stateless `PrismaService` wrapper, safe to instantiate twice, avoiding a cross-module dependency for one narrow read · **neither the unit nor the e2e suite calls the real endpoints** — `test/watchlist-sync.e2e-spec.ts` stubs `globalThis.fetch` with fixture CSV/XML content and drives the real `POST /watchlist-sync/run` endpoint through the full Nest app, proving the whole fetch→parse→upsert→prune pipeline without depending on an external government server's uptime in CI · `apps/web/`: a new **"Watchlist sync"** screen (`app/(app)/watchlist-sync/page.tsx` + `lib/compliance-risk/watchlist-sync-api.ts` + an `AppNav` entry after "AML monitoring") — a sync-runs table (source · status · records · started · completed) + "Sync watchlists now" / "Run recurring screening batch now" buttons · **`@code-reviewer` → CHANGES REQUESTED → resolved: 4 BLOCKERs** (a concurrency race between an overlapping manual sync and the scheduler — fixed with the partial `UNIQUE (source) WHERE status='running'` above, `createSyncRun`'s P2002 mapped to `'skipped'`; a 200-with-wrong-content parse committing near-zero records and pruning the entire prior cache — fixed with a plausibility floor, `WATCHLIST_MIN_ACCEPTABLE_RATIO = 0.5` / `WATCHLIST_MIN_ABSOLUTE_RECORDS = 10`, both drafted; an ASCII-only `[A-Z0-9]` normalizer reducing any all-Arabic-script name to `""` — a universal false-positive wildcard for this Jordan-based broker — fixed with Unicode-aware `\p{L}`/`\p{N}` plus a defense-in-depth empty-string refusal at ingestion, match time, AND the repository; the `classification` field missing entirely, reasoned in a code comment rather than a `PRIV-STD-02` citation — fixed per `2026-08-pcms-source-of-truth.md`, see above) **+ 3 MINORs** (`parseCsvLine` silently merged fields across an unterminated quote instead of rejecting the line — now returns `null`; `runRecurringBatch`'s error log gained a comment justifying why logging the message is safe; the ADF-style single-token collision risk is now an explicit documented gap, not an implicit one) · **Verification**: +59 api unit total — `watchlist-sync.config.spec.ts` 23 (from 17, +6 review-fix: Arabic-name + pure-punctuation normalization, the two plausibility constants, an unterminated quote in `parseCsvLine`/`parseOfacSdnLine`), `watchlist-sync.service.spec.ts` 10 (from 4, +6: P2002→skipped, non-P2002 still throws, the plausibility floor with/without a prior sync + its exact boundary, an empty-normalized record filtered before upsert), `watchlist-sync.scheduler.spec.ts` 3, `screening.service.spec.ts` +19 original +1 review-fix (an empty-normalized subject name never reaches the query), `screening-batch.scheduler.spec.ts` unchanged → api unit **1617** (109 files, from 1604, from 1575 pre-#49). Isolated `test/watchlist-sync.e2e-spec.ts` **1/1** (all original assertions — a run-unique synthetic OFAC entity + UN individual; a non-Compliance actor → 403 on sync/status/batch; `POST /watchlist-sync/run` succeeds for both sources with `recordCount >= 1`; a real `WatchlistEntry` row matches the parsed shape; a second sync is idempotent; a customer whose legal name is a token-reordering of the synced sanctioned name gets flagged `HIT`/`isEdd: true`, `listSource` = `"OFAC_SDN (SDGT)"`; the on-demand recurring batch runs without error — **plus** a new assertion that the synced row's `classification` is `HIGHLY_CONFIDENTIAL`). Full api e2e suite green, no regression. Playwright `watchlist-sync.spec.ts` 3/3 unaffected (no web changes in the review-fix pass). `npm run typecheck`/`lint` (api) OK; `ibms-brain` `brain-doctor.sh` 0 errors; `prisma migrate status` clean (**45**, same pre-commit migration widened, not a second one) | matching is exact-on-canonical-form, **not fuzzy/phonetic** — spelling variants, transliteration differences, honorifics ("Dr.", "Sheikh"), and a missing/extra middle name all defeat it; aliases are not matched (primary name only, the `sample-watchlist.ts` scope limit carried forward) · the 12h/4h cadence is a **real, sourced ratio** (an observed list-refresh rate) but still **DRAFTED** — no OFAC/UN SLA document commits to exactly 12h · only `Customer`/`UltimateBeneficialOwner` names are screened — `InsuredPerson`/`Employee`/`ThirdPartyClaimant` aren't (no module writes those tables yet either) · no paid/premium sanctions data provider — scope is specifically the free lists · `WatchlistEntry.remarks` (OFAC "Remarks" / UN "COMMENTS1") is stored verbatim, classified `HIGHLY_CONFIDENTIAL` by default (a `@code-reviewer` BLOCKER fix, pending a real PCMS/`PRIV-STD-02` determination) — it names real sanctioned individuals' alleged conduct and DOB, not masked · the single-short-token ("ADF") collision risk is accepted, not fixed · `sanctions-pep.screen` is role-level (no per-officer queue) |
 
 ### Not started
 
@@ -587,12 +588,17 @@ build actually is today:
   payment, a third-party payment source, and frequent cancellations/refunds — as a
   `TransactionMonitoringAlert`, plus a manual log for anything Compliance notices by
   hand, and a two-step `escalate` → `report-to-authority` suspicious-activity path (the
-  M03 consent-withdrawal request/confirm shape). **Not built**: sanctions/PEP batch
-  screening beyond #3-4's monthly re-screen (#49), the regulatory license record
-  (#50), the compliance calendar (#51), the broker's own risk register (#53),
-  incident/breach management (#55), internal audit (#56), the remaining #52/#54/#57
-  items. Management reporting (#58–65), Supporting Operations (HR, procurement, IT,
-  document management, vendor management, BCP/DR, knowledge base, #66–74).
+  M03 consent-withdrawal request/confirm shape). #49 Sanctions & PEP Screening is
+  built: two free public sanctions lists (OFAC SDN, UN Consolidated) sync locally every
+  12 hours into `WatchlistEntry`, `ScreeningService` matches every customer/UBO name
+  against them (exact match on a canonical, order-independent form — not fuzzy) in
+  every environment including production, and the recurring re-screen batch moved from
+  a drafted monthly cadence to every 4 hours to match. **Not built**: the regulatory
+  license record (#50), the compliance calendar (#51), the broker's own risk register
+  (#53), incident/breach management (#55), internal audit (#56), the remaining
+  #52/#54/#57 items. Management reporting (#58–65), Supporting Operations (HR,
+  procurement, IT, document management, vendor management, BCP/DR, knowledge base,
+  #66–74).
 - **Part D — PDPL / M-series — begun.** **M03 Consent Management is built**: capture a
   consent decision (grant or explicit decline) for a `Customer` or `InsuredPerson`, and
   withdraw it through a two-step request/confirm flow that finally gives the
@@ -1196,15 +1202,23 @@ narrows a gap.
   `KycService.decide()` is the only caller of the `Customer` `PENDING_KYC -> ACTIVE`
   move, gated on `assertDifferentActors(kyc.createdByUserId, actorUserId, ...)` (A.5) so
   the Sales Officer who captured a KYC file can never also be its approver.
-- **Sanctions/PEP/AML screening is simulated, not real** — no such data provider exists
-  or is obtainable in this environment (same category of gap as A.1's "no SSO identity
-  provider"). `ScreeningService` checks the Customer's `legalName` and any UBO
-  `fullName`s against a small fictional fixture list
-  (`apps/api/src/modules/customer/sample-watchlist.ts`), hard-gated on `NODE_ENV !==
-  'production'` (same convention as `SAMPLE_INSURERS`/`SAMPLE_USERS`) — in production,
-  every screening result is CLEAR until a real provider is integrated, never a HIT the
-  system can't substantiate. All three `ScreeningType`s check the same fixture list; a
-  real integration would call three distinct providers/lists.
+- **Sanctions/PEP/AML screening now checks a real, free, publicly published data source
+  in every environment including production (Part C #49) — this row is no longer
+  accurate as originally written.** `ScreeningService` checks the Customer's `legalName`
+  and any UBO `fullName`s against TWO sources: `sample-watchlist.ts` (a fictional
+  fixture, still hard-gated on `NODE_ENV !== 'production'`, kept for deterministic
+  offline testing) **and** the synced `WatchlistEntry` cache — OFAC SDN + the UN
+  Security Council Consolidated List, both free, government-published, no API key,
+  refreshed every 12 hours by `WatchlistSyncService`/`WatchlistSyncScheduler`. Production
+  is no longer CLEAR-only: a real HIT against either list now escalates a `KYCRecord` to
+  `isEdd: true` / `RiskLevel.HIGH`. What's still a real, remaining gap: matching is exact
+  on a canonicalised name (`normalizeWatchlistName` — uppercase, Unicode-letter/digit-
+  only, token-sorted), **not fuzzy or phonetic**, so spelling variants, transliteration
+  differences, and honorifics still defeat it; aliases aren't matched (primary name
+  only); and there is still no PAID/premium sanctions provider — only the two free
+  lists. All three `ScreeningType`s check the same combined result; a real integration
+  would call three distinct providers/lists. See Part C #49's own entry above for the
+  full detail.
 - **The KYC/EDD review SLA durations and the re-KYC review cadence are drafted, unsourced
   defaults, not PRIV-SOP/PRIV-STD-cited figures** — unlike every other row in
   `ibms-brain/meta/lex/pdpl-sla-timers.md`'s registry (all 14 are PDPL-sourced), there is
@@ -5622,6 +5636,212 @@ narrows a gap.
   resulting alerts); no case-management workflow beyond `open`/`closed` (no assignment,
   no investigator notes beyond `detailText`, no link to a filed SAR document); no
   bulk/CSV export; `aml.monitor`/`aml.escalate` are role-level (no per-officer queue).
+
+**Part C #49 — Sanctions & PEP Screening (Domain F, Process 49)** — the backlog's one
+  checkbox: "Screen at onboarding + on any material change + a recurring batch against
+  **updated lists**." The first two legs were already built under #3-4
+  (`KycService`/`ScreeningService`, verified 2026-09-04 as fully covered); this item
+  finishes the third leg by giving the recurring batch real list data — two free,
+  publicly published sanctions lists, not a fictional fixture — and a cadence tied to
+  how often those lists actually change, instead of an unsourced monthly guess.
+
+  **Migration `20260904140000` (45th) adds `WatchlistSource` / `WatchlistEntry` /
+  `WatchlistSyncRun`** — genuinely new tables, not a widening of an existing model.
+  `WatchlistEntry` is the local sync cache: `sourceRecordId` (OFAC `ent_num` / UN
+  `DATAID`) is the upsert/prune key, `normalizedName` is the canonical match key (see
+  below). `WatchlistSyncRun` is the sync job's own operational health log — one row per
+  attempt, `status`/`recordCount`/`errorMessage` — not an `AuditLogEntry` (the
+  `SlaTimer`/`AccessRecertificationCycle` "own tracking table" shape). **No seed
+  change** — `sanctions-pep.screen` (`[COMPLIANCE_OFFICER]`, module `compliance-risk`)
+  was pre-seeded, gating three endpoints: `POST /watchlist-sync/run`, `GET
+  /watchlist-sync/status`, `POST /screening/recurring-batch`.
+
+  **Two real, free, no-API-key sanctions lists, verified reachable live on 2026-09-05**:
+  OFAC SDN (`https://www.treasury.gov/ofac/downloads/sdn.csv`, 302-redirects to
+  `sanctionslistservice.ofac.treas.gov`, ~19,000 records, a no-header 12-column CSV with
+  mixed quoted/unquoted fields) and the UN Security Council Consolidated List
+  (`https://scsanctions.un.org/resources/xml/en/consolidated.xml`, ~1,000 records,
+  `<CONSOLIDATED_LIST><INDIVIDUALS>`/`<ENTITIES>` XML). Both parsers are **hand-rolled,
+  no new npm dependency** — a general quoted-CSV-field parser (handles OFAC's doubled-
+  quote escaping and mixed quoting) and a scoped regex block/tag extractor for the UN
+  XML, safe specifically because every tag this module reads (`DATAID`, `FIRST_NAME`,
+  `SECOND_NAME`, `THIRD_NAME`, `FOURTH_NAME`, `UN_LIST_TYPE`, `REFERENCE_NUMBER`,
+  `COMMENTS1`) is a flat, single-occurrence leaf directly inside
+  `<INDIVIDUAL>`/`<ENTITY>` — verified against the real, live document, not assumed from
+  documentation alone. Both are unit-tested against real captured sample lines/blocks.
+  Aliases are not matched — primary name only, the same scope limit `sample-watchlist.ts`
+  already had.
+
+  **The network boundary is two tiny injectable classes** (`OfacSdnFetcher`,
+  `UnConsolidatedFetcher`, `watchlist-fetchers.ts`) so `WatchlistSyncService` never calls
+  `fetch()` directly. `WatchlistSyncScheduler` runs every 12 hours (the lists' own
+  real-world refresh cadence) or on demand: fetch → parse → `WatchlistEntryRepository.
+  upsertMany` (stamps every parsed record with the current `WatchlistSyncRun.id`,
+  chunked at 100 records with bounded `Promise.all` concurrency — not a raw-SQL bulk
+  upsert, since OFAC alone is ~19,000 rows and a fully sequential await-per-row loop
+  would take unnecessarily long for a background job nobody is waiting on) → `pruneStale`
+  (deletes every row of that source NOT stamped with this run's id — i.e. dropped from
+  the source list since the last sync). Two passes, not a `$transaction`: a cache
+  refresh from a non-transactional external source is not a financial/workflow write —
+  a sync that dies partway just leaves a mix of old/new rows, which the next sync
+  supersedes (`race-safe-invariants.md` guards against a *stranded* invariant, e.g. a
+  `Refund` with no matching stamp; this isn't that shape). Per-source isolation — one
+  source's fetch/parse failure does not block the other.
+
+  **`ScreeningService.run()` now checks TWO sources**: `sample-watchlist.ts` (unchanged
+  — a fictional, dev/test-only fixture, disabled in production) and the real synced
+  `WatchlistEntry` cache (every environment, including production). Matching is an
+  exact comparison on `normalizeWatchlistName`'s canonical form — uppercase, strip
+  everything but letters/digits/whitespace, sort the whitespace-split tokens — applied
+  identically at ingestion time and match time. **Order-independent** (OFAC formats
+  "LASTNAME, Firstname"; a customer record might store "Firstname Lastname" — both
+  reduce to the same sorted token string) but **explicitly NOT fuzzy or phonetic** — a
+  documented limitation carried forward from `sample-watchlist.ts`'s own header ("a
+  simple case-insensitive substring check, not a fuzzy/fingerprint match a real
+  sanctions screening product would use"): spelling variants, transliteration
+  differences, honorifics, and a missing/extra middle name all defeat it.
+
+  **`ScreeningBatchScheduler`'s cadence changed from a drafted monthly guess to every 4
+  hours** — the two source lists resync every 12 hours, so re-screening customers twice
+  within that window bounds the "the list changed but we haven't re-checked" gap to at
+  most one sync interval plus one screening interval; this is now a **real, sourced
+  ratio** (an observed publication cadence), not an arbitrary pair, though still
+  **DRAFTED** in the sense that no OFAC/UN SLA document commits to exactly 12h. The
+  scheduler's customer-selection + per-customer loop **moved into
+  `ScreeningService.runRecurringBatch()`**, so the 4-hourly scheduler and the new
+  on-demand `POST /screening/recurring-batch` (`sanctions-pep.screen`) share identical
+  logic — the #46/#48 "service owns the sweep, scheduler + endpoint both delegate"
+  shape; a batch-level failure (e.g. `findActive()` itself throwing) propagates to the
+  caller rather than being swallowed, matching `RetentionCaseService.runSweep` /
+  `TransactionMonitoringService.runSweep`.
+
+  **`WatchlistEntryRepository` is provided in BOTH `ComplianceRiskModule` (owns the
+  sync) and `CustomerModule` (`ScreeningService` reads it) deliberately** — a stateless
+  `PrismaService` wrapper, safe to instantiate twice since both operate on the same
+  underlying rows, avoiding a `ComplianceRiskModule` <-> `CustomerModule` dependency in
+  either direction for one narrow read.
+
+  **Neither the unit nor the e2e suite calls the real endpoints** — a scheduled
+  background sync must never make automated tests flaky, slow, or dependent on an
+  external government server's uptime. `test/watchlist-sync.e2e-spec.ts` stubs
+  `globalThis.fetch` with fixture CSV/XML content (matching the real formats) and drives
+  the real `POST /watchlist-sync/run` endpoint through the full Nest app, proving the
+  whole fetch→parse→upsert→prune pipeline end to end without touching the live network.
+
+  `apps/web/` gains a new **"Watchlist sync"** screen
+  (`app/(app)/watchlist-sync/page.tsx` + `lib/compliance-risk/watchlist-sync-api.ts` +
+  an `AppNav` entry after "AML monitoring") — a sync-runs table (source · status ·
+  records · started · completed) plus "Sync watchlists now" / "Run recurring screening
+  batch now" buttons.
+
+  **`@code-reviewer` (mandatory — a new external-network sync job, Highly-Confidential-
+  adjacent data, and a concurrency invariant `race-safe-invariants.md` governs) →
+  CHANGES REQUESTED → resolved: 4 BLOCKERs + 3 MINORs.**
+
+  - **BLOCKER 1 (concurrency)**: nothing stopped a manual `POST /watchlist-sync/run`
+    from firing while the 12-hourly scheduler was mid-run for the same source (or two
+    manual triggers overlapping) — one run's `pruneStale` could delete rows the other had
+    just (re-)written under a different `syncRunId`, silently dropping currently-
+    sanctioned entries until the next sync. Fixed with a hand-authored partial
+    `UNIQUE (source) WHERE status='running'` on `WatchlistSyncRun` (the
+    `race-safe-invariants.md` shape — Prisma cannot express the `WHERE` predicate in
+    `@@unique`); `createSyncRun`'s resulting P2002 is now caught and mapped to a benign
+    `'skipped'` outcome rather than an unhandled rejection.
+  - **BLOCKER 2 (plausibility)**: a 200 response carrying the wrong content — a WAF or
+    interstitial page, a changed redirect target — parses to zero or near-zero records
+    without ever throwing, and nothing distinguished that from a genuine, drastic list
+    shrink (which OFAC/UN don't do in practice); `pruneStale` would then wipe out the
+    entire prior cache for that source on the strength of a bad fetch. Fixed with a
+    plausibility floor before committing anything: the new parse must be at least
+    `WATCHLIST_MIN_ACCEPTABLE_RATIO = 0.5` (drafted) of the last successful sync's
+    record count, or `WATCHLIST_MIN_ABSOLUTE_RECORDS = 10` (drafted) if there is no
+    prior successful sync — a suspicious drop now fails the sync (existing cache
+    untouched) instead of pruning against a false signal.
+  - **BLOCKER 3 (false-positive wildcard)**: `normalizeWatchlistName`'s original
+    `[^A-Z0-9\s]` character class reduced ANY name written entirely in a non-Latin
+    script — Arabic, for this Jordan-based broker, whose `Customer.languagePreference`
+    defaults to `AR` — to `""`. An empty `normalizedName` is not "no match": every
+    empty-string customer/UBO name and every empty-string watchlist entry would collide
+    with every other empty-string name, a universal false-positive wildcard. Fixed by
+    switching to Unicode-aware `\p{L}`/`\p{N}` (the `u` flag) so non-Latin letters stay
+    real, distinguishing characters, **plus** a defense-in-depth empty-string refusal at
+    three points: ingestion (`WatchlistSyncService` filters an empty-normalized record
+    out before upsert, logged, not silently dropped without a trace), match time
+    (`ScreeningService.findRealWatchlistHit` skips a subject name that normalizes to
+    `""` before ever querying), and the repository itself
+    (`WatchlistEntryRepository.findByNormalizedName` refuses an empty string outright,
+    belt-and-suspenders since it has no other caller to rely on that). A residual,
+    accepted MINOR: a real UN entity is listed under the single token "ADF" — any
+    customer/UBO whose legal name normalizes to exactly one short token collides on an
+    exact match the same way, with no lower-confidence tier (`ScreeningOutcome.
+    PENDING_INVESTIGATION` exists on the model but this module doesn't use it) —
+    documented, not fixed.
+  - **BLOCKER 4 (classification)**: `WatchlistEntry` shipped with no
+    `DataClassification` field at all, reasoned in a code comment ("public government
+    text, not IBMS customer data") instead of a `PRIV-STD-02` citation —
+    `2026-08-pcms-source-of-truth.md` forbids exactly this pattern (IBMS code must never
+    re-derive a privacy classification). Fixed by adding
+    `classification DataClassification @default(HIGHLY_CONFIDENTIAL)` to the model — a
+    conservative default pending an actual PCMS determination; `remarks` (OFAC
+    "Remarks" / UN "COMMENTS1") can carry a real, named individual's DOB and
+    alleged-conduct text, so "public" was never the same question as "unclassified."
+  - **3 MINORs fixed**: `parseCsvLine` silently merged fields across an unterminated
+    quote instead of rejecting the line — a stray `"` in a name/remarks field (this is
+    hand-typed government text, not machine-generated data) would previously corrupt
+    that row's fields rather than being caught; it now returns `null` for such a line,
+    treated as unparseable exactly like a blank one. `ScreeningService.
+    runRecurringBatch`'s catch block gained a comment pinning down why logging
+    `(err as Error).message` here is safe (every failure this loop can actually reach is
+    keyed on `customer.id`, never built from a matched name or list content). The
+    ADF-style single-short-token collision risk (above) is now explicit in the code
+    comment rather than an implicit gap a future reader would have to rediscover.
+
+  **Verification**: +59 api unit total. `watchlist-sync.config.spec.ts` grew to **23**
+  (from 17) — `normalizeWatchlistName` order-independence, `parseCsvLine`'s quoted-field/
+  escaping rules, `parseOfacSdnLine`/`parseOfacSdnCsv` against real captured SDN lines,
+  `parseUnConsolidatedXml` against a real captured INDIVIDUAL+ENTITY block incl.
+  multi-part names + XML-unescaping + a no-`DATAID` skip, **plus** the review-fix cases:
+  an Arabic name normalizes to a non-empty, order-independent token set; a
+  pure-punctuation name still normalizes to `""` (the documented residual risk); the two
+  plausibility constants; an unterminated quote in both `parseCsvLine` and
+  `parseOfacSdnLine` returns `null`/`null`, not a garbled record.
+  `watchlist-sync.service.spec.ts` grew to **10** (from 4) — both sources sync + stamp
+  `normalizedName`, per-source isolation on a fetch failure, **plus**: a P2002 on
+  `createSyncRun` is skipped, not thrown; a non-P2002 failure still throws; a parse
+  implausibly smaller than the last successful sync fails without pruning; a near-empty
+  parse with no prior sync fails against the absolute floor; a parse exactly at the
+  ratio-floor boundary still succeeds; a record whose `fullName` normalizes to `""` is
+  filtered out before upsert. `watchlist-sync.scheduler.spec.ts` 3, unchanged.
+  `screening.service.spec.ts` grew by 19 in the original build (a real-list HIT drives
+  HIGH/isEdd, the bare-source-name fallback when `listProgram` is null, every subject
+  name checked, `runRecurringBatch`'s per-customer isolation / status filter /
+  batch-level-failure propagation) **plus 1 more** in the review-fix pass — an
+  empty-normalized subject name never reaches the real-watchlist query at all.
+  `screening-batch.scheduler.spec.ts` rewritten for the thin-delegator shape, unchanged
+  since. → api unit **1617** (109 files, from 1604 pre-review-fix, from 1575 pre-#49).
+  Isolated `test/watchlist-sync.e2e-spec.ts` **1/1** — the original assertions (a
+  run-unique synthetic OFAC entity + UN individual; a non-Compliance actor → 403 on
+  sync/status/batch; `POST /watchlist-sync/run` succeeds for both sources with
+  `recordCount >= 1`; a real `WatchlistEntry` row matches the parsed shape; a second
+  sync is idempotent; a customer whose legal name is a token-reordering of the synced
+  sanctioned name gets flagged `HIT`/`isEdd: true`, `listSource` =
+  `"OFAC_SDN (SDGT)"`; the on-demand recurring batch runs without error) **plus** a new
+  assertion that the synced row's `classification` is `HIGHLY_CONFIDENTIAL` (BLOCKER 4,
+  proven end to end, not just in the schema). Full api e2e suite green, no regression.
+  Playwright `watchlist-sync.spec.ts` 3/3 unaffected (the review-fix pass touched no web
+  code). `npm run typecheck`/`lint` (api) OK; `ibms-brain` `brain-doctor.sh` 0 errors;
+  `prisma migrate status` clean (**45** — the same pre-commit migration widened with the
+  `classification` column and the concurrency index, not a second migration).
+
+  **Deferred**: matching is exact-on-canonical-form, **not fuzzy/phonetic** — the
+  documented limitation above; aliases are not matched; the 12h/4h cadence, while now a
+  real observed ratio, is still drafted (no pinned OFAC/UN SLA document); only
+  `Customer`/`UltimateBeneficialOwner` names are screened (`InsuredPerson`/`Employee`/
+  `ThirdPartyClaimant` aren't — no module writes those tables yet either); no paid/
+  premium sanctions data provider — #49's scope is specifically the free lists; no UI
+  filtering/search on the sync-runs table; `sanctions-pep.screen` is role-level (no
+  per-officer queue); the single-short-token collision risk (BLOCKER 3's residual MINOR,
+  above) is accepted, not fixed.
 
 ## Deployment
 

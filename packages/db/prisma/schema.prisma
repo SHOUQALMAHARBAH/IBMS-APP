@@ -2254,6 +2254,77 @@ model TransactionMonitoringAlert {
   @@index([patternType])
 }
 
+enum WatchlistSource {
+  OFAC_SDN
+  UN_CONSOLIDATED
+}
+
+/// Process 49 — a locally-cached copy of a free, publicly published
+/// sanctions/PEP list (the source of truth stays with the publisher; this
+/// table is a sync target, refreshed by `WatchlistSyncScheduler`, never
+/// hand-edited). `sourceRecordId` is the source's own stable identifier
+/// (OFAC `ent_num`, UN `DATAID`) — the upsert/prune key on every sync.
+/// `normalizedName` is the SAME canonicalisation
+/// (`normalizeWatchlistName` — uppercase, punctuation stripped, tokens
+/// sorted) `ScreeningService` applies to a customer/UBO name at match time,
+/// so a stored equality check is the whole match — not fuzzy/phonetic, a
+/// documented limitation (see `watchlist-sync.config.ts`). A record whose
+/// name normalizes to an empty string (an all-non-letter/digit `fullName`)
+/// is never stored — see `WatchlistSyncService`.
+///
+/// `classification` — a `@code-reviewer` BLOCKER on the first pass had NO
+/// classification field at all, reasoning in a code comment that this is
+/// "public government text, not IBMS customer data" — an engineering-derived
+/// privacy determination that `ibms-brain/meta/designs/2026-08-pcms-source-
+/// of-truth.md` says belongs to PCMS (PRIV-STD-02), not to this codebase.
+/// Defaulted to the conservative `HIGHLY_CONFIDENTIAL` tier pending that
+/// citation — `remarks` can carry a real, named individual's DOB and
+/// alleged-conduct text — DRAFTED, same status as `kyc-aml-sla-timers.md`'s
+/// figures until PRIV-STD-02 is consulted.
+model WatchlistEntry {
+  id             String          @id @default(uuid())
+  source         WatchlistSource
+  sourceRecordId String
+  fullName       String
+  normalizedName String
+  listProgram    String?         // OFAC "Program", or UN "UN_LIST_TYPE"/"REFERENCE_NUMBER"
+  remarks        String?         // OFAC "Remarks", or UN "COMMENTS1"
+  classification DataClassification @default(HIGHLY_CONFIDENTIAL) // DRAFTED pending PRIV-STD-02 — see model comment
+  syncRunId      String          // the WatchlistSyncRun that last confirmed this row is still on the source list
+  syncedAt       DateTime        @default(now())
+
+  @@unique([source, sourceRecordId])
+  @@index([normalizedName])
+  @@index([source])
+}
+
+/// Process 49 — one row per sync attempt (scheduled every 12h, matching the
+/// source lists' own refresh cadence, or on-demand). The operational health
+/// record for the sync job — not an AuditLogEntry, the same "own tracking
+/// table, not the compliance audit trail" shape as `SlaTimer` /
+/// `AccessRecertificationCycle`.
+///
+/// `@@unique` below (raw SQL, migration `20260904140000` — Prisma can't
+/// express the predicate): at most one `status = 'running'` row per
+/// `source` — a `@code-reviewer` BLOCKER on the first pass: with no guard,
+/// a manual `POST /watchlist-sync/run` firing while the 12-hourly
+/// `WatchlistSyncScheduler` is mid-run (or two concurrent manual triggers)
+/// let two syncs of the SAME source interleave — one run's `pruneStale`
+/// (`watchlist-entry.repository.ts`) deletes rows the OTHER run had just
+/// correctly (re-)written under a different `syncRunId`, silently dropping
+/// real, currently-sanctioned entries from the cache until the next sync.
+/// `WatchlistSyncService.createSyncRun`'s `P2002` on this index is caught
+/// and mapped to a `skipped` outcome, not a `failed` one.
+model WatchlistSyncRun {
+  id           String          @id @default(uuid())
+  source       WatchlistSource
+  startedAt    DateTime        @default(now())
+  completedAt  DateTime?
+  status       String          @default("running") // running | succeeded | failed
+  recordCount  Int?
+  errorMessage String?
+}
+
 /// Process 51 — configurable compliance calendar for CBJ regulatory
 /// filings/reporting obligations.
 model ComplianceCalendarItem {

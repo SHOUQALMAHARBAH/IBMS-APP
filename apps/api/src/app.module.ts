@@ -251,6 +251,13 @@ import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.
     // frequent cancellations/refunds, and third-party payment sources as a
     // TransactionMonitoringAlert, plus a two-step escalate ->
     // report-to-authority path. aml.monitor / aml.escalate / Compliance.
+    // Also #49 (Sanctions & PEP Screening): syncs two free public sanctions
+    // lists (OFAC SDN, UN Consolidated) into WatchlistEntry every 12 hours,
+    // which CustomerModule's ScreeningService matches customer/UBO names
+    // against on every screening run (real, every environment — unlike the
+    // dev/test-only sample-watchlist.ts fixture); ScreeningBatchScheduler's
+    // recurring re-screen moved to a 4-hourly cadence to match.
+    // sanctions-pep.screen / Compliance.
     ComplianceRiskModule,
   ],
   controllers: [AppController],

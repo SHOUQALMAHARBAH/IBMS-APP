@@ -3,11 +3,13 @@ import { CustomerController } from './customer.controller';
 import { CustomerService } from './customer.service';
 import { KycController } from './kyc.controller';
 import { KycService } from './kyc.service';
+import { ScreeningController } from './screening.controller';
 import { ScreeningService } from './screening.service';
 import { ScreeningBatchScheduler } from './screening-batch.scheduler';
 import { KycPeriodicReviewScheduler } from './kyc-periodic-review.scheduler';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { SecurityModule } from '../security/security.module';
@@ -32,7 +34,7 @@ import { ProspectModule } from '../prospect/prospect.module';
     // ProspectModule's own leadId validation against LeadModule).
     ProspectModule,
   ],
-  controllers: [CustomerController, KycController],
+  controllers: [CustomerController, KycController, ScreeningController],
   providers: [
     CustomerService,
     KycService,
@@ -41,6 +43,11 @@ import { ProspectModule } from '../prospect/prospect.module';
     KycPeriodicReviewScheduler,
     CustomerRepository,
     KycRecordRepository,
+    // Process 49 — ScreeningService's real (non-fixture) sanctions/PEP
+    // check. A stateless PrismaService wrapper, also provided directly by
+    // ComplianceRiskModule (which owns the sync writing these rows) —
+    // instantiating it twice is safe and avoids a cross-module import.
+    WatchlistEntryRepository,
   ],
   // RiskProfileModule (Part C #5) reads a Customer's owner to resolve
   // visibility on Risk Profiles / Needs Assessments hung off it — reuses
