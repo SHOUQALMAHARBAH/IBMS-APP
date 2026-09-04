@@ -8,14 +8,32 @@ completed backlog item)" and are not repeated here except where they compound
 into a system-wide problem.
 
 **Status:** first compiled at parent `17e52b4` / `ibms-brain` `ed9ad56` (Domain
-D complete); topped up through Part C #42 (Domain E — #41 Customer Requests +
-#42 Complaints Management built). Nothing below has been actioned — this file is
-the plan for the "solve every gap / threat / bug" pass the user asked for
-**after** the backlog build is finished.
+D complete); topped up through Part C #46 (**Domain E — Customer Service is
+now complete**: #41 Customer Requests, #42 Complaints Management, #43 SLA
+Management, #44 Customer Communication, #45 Customer Feedback, #46 Customer
+Retention). Nothing below has been actioned — this file is the plan for the
+"solve every gap / threat / bug" pass the user asked for **after** the
+backlog build is finished.
 
 **Priority key:** `P0` blocks correctness, security, or a real "definition of
 done" · `P1` must be fixed before the system goes near production · `P2` tech
 debt / quality-of-life.
+
+**Resolved since this file was first compiled** (kept here so the gap isn't
+rediscovered — see § 2 for the same convention applied to in-session bugs):
+
+- ~~§5.4 "No consent check before marketing sends (#44)"~~ — **built at #44**
+  (`ibms-app` `0ec7fad`/`142df0a`). `POST /communications` derives channel +
+  language from the `Customer` record (a disagreeing explicit value is a 422)
+  and blocks a marketing send (422, no row, a `REJECT` audit row) unless the
+  customer's latest MARKETING `ConsentRecord` is granted and not withdrawn.
+  Two new gaps this introduces, not previously tracked, now recorded in
+  §5.4's slot in place of the old (now-resolved) entry: no real delivery
+  integration (`CommunicationLog` is a *log*, nothing actually sends an
+  email/SMS), and the consent-gate is a read-then-write with no DB constraint
+  tying the two — a withdrawal landing between the check and the write would
+  leave a row citing consent that no longer holds, tolerable only because
+  there is no real dispatch yet to make that window matter.
 
 ---
 
@@ -195,15 +213,26 @@ by blast radius.
 - **Fix:** `GET /client-funds/:customerId/statement` (running balance) and a
   book-wide "held vs. owed to insurers" reconciliation view.
 
-### 3.6 `P1` — `LossRatio` recompute is a logged no-op
+### 3.6 `P1` — The renewal module (Part 3.9) not existing now blocks THREE things
 
 - `LossRatioModule` upserts a `LossRatio` per `RenewalCase`, but every call is a
   **logged no-op** because the renewal module (`RenewalCase` producer) is not
   built. #30 Claims Analytics computes loss ratio on the fly instead.
 - Also: the loss-ratio "period" is **all-time / paid-only** — no earned-premium
   proration, no incurred (open-claim reserve) ratio.
-- **Fix:** build the renewal module, then wire the recompute; add an incurred
-  ratio option once claim reserves exist.
+- **New as of #46**: `RetentionCaseService.runSweep` (Customer Retention,
+  Domain E) reads `RenewalCase.status` / `.triggeredAt` to auto-open a
+  retention case on lapse risk or renewal inactivity — also a logged no-op in
+  normal running today, same root cause. Unlike Loss Ratio, #46 has **no
+  fallback on-the-fly computation** (there's nothing else it could compute
+  from) — it is entirely inert until the renewal module lands.
+- This item's blast radius has grown from one dependent (Loss Ratio, at Domain
+  D) to three (+ #30 Claims Analytics' framing of "current" loss ratio, +
+  #46 Customer Retention) — worth moving up the priority queue if the renewal
+  module (Part 3.9) is scheduled soon, since it now unblocks real behaviour in
+  two already-shipped Domain E/C features, not just one.
+- **Fix:** build the renewal module, then wire both recomputes; add an
+  incurred ratio option once claim reserves exist.
 
 ### 3.7 `P1` — #8 Cross-Selling was built as a no-op "until the Policy module lands"
 
@@ -299,6 +328,9 @@ system is used for anything.
 | `service_request_fulfilment` SLA | #41 `sla-registry.config.ts` | 5 business days, escalate to Branch/Dept Manager — DRAFT/UNSOURCED (courtesy target, not a PDPL SLA) |
 | `complaint_resolution` SLA | #42 `sla-registry.config.ts` | 10 business days, escalate to Branch/Dept Manager — DRAFT/UNSOURCED (CBJ conduct-of-business, not a PDPL SLA; a CBJ complaint-handling instruction should supply the real figure) |
 | Jordan business-day calendar (SLA timers) | A.8 | brain gap filed; not implemented |
+| `SLA_DASHBOARD_DUE_SOON_WINDOW` | #43 `sla-dashboard.config.ts` | 3 calendar days — a dashboard lookahead heuristic, not a registry SLA value, so lower stakes than the others in this table (doesn't move a deadline) but still an untraced number |
+| `FEEDBACK_SCORE_MIN`/`MAX` (satisfaction scale) | #45 `feedback.config.ts` | 1–5, common CSAT convention — no CX/Compliance SOP source |
+| `RENEWAL_INACTIVITY_THRESHOLD_BUSINESS_DAYS` | #46 `retention-case.config.ts` | 30 business days since `RenewalCase.triggeredAt` — no source; blocked on the same renewal-module gap as 3.6 anyway |
 
 ---
 
@@ -339,12 +371,22 @@ system is used for anything.
   `Endorsement` / `PaymentChannel.ownerType`) — it's a rules engine + an alert
   workflow that's missing.
 
-### 5.4 `P1` — No consent check before marketing sends (#44)
+### 5.4 `P2` — `CommunicationLog` is a log, not a sender (#44)
 
-- #44 requires respecting the customer's recorded channel + language and
-  checking `ConsentRecord` **before any marketing send**. `CommunicationLog`
-  records sends; nothing gates them on consent (and `ConsentRecord` doesn't
-  exist yet — see 5.1).
+- The consent gate itself is built (§ "Resolved since this file was first
+  compiled" above) — `POST /communications` correctly blocks a marketing send
+  without a granted, non-withdrawn `ConsentRecord`. What's still missing: no
+  real email/SMS/WhatsApp gateway integration (a "sent" `CommunicationLog` row
+  does not cause anything to actually leave the building), and the
+  consent-check-then-write has no DB constraint tying the two together — a
+  withdrawal landing in that window would let a row through citing consent
+  that no longer holds. Both are explicitly tolerable **only** because there
+  is no real dispatch yet (`ibms-brain/meta/context/customer-service-lifecycle.md`
+  § "Customer Communication (Process 44)" already says a real integration
+  must re-check consent at send time, inside the transaction that actually
+  dispatches).
+- **Fix:** when a delivery gateway is wired, re-run the consent check
+  atomically with the dispatch (not just at `CommunicationLog` creation time).
 
 ### 5.5 `P1` — Encryption at rest not enabled on the deployment target
 
@@ -471,16 +513,11 @@ system is used for anything.
 Tracked in `README.md` § "Scope status" — listed here only so this file is a
 complete picture. **Not** improvements to existing code; net-new build.
 
-- **Domain E — Customer Service (#43–46):** #41 (`ServiceRequest`) and #42
-  (`Complaint` + supervisor sign-off + Insurance Dispute Resolution Committee
-  escalation) are built. Remaining: the cross-module SLA monitoring dashboard
-  (#43), `CommunicationLog` consent-gated sends (#44), `CustomerFeedback` (#45),
-  `RetentionCase` auto-open on lapse risk (#46). #42 gaps: one 10-day
-  complaint-resolution SLA for all categories (drafted / unsourced); no
-  automatic escalation sweep to the dispute-resolution committee (the nightly
-  sweep only escalates the timer to the internal manager); no complaint →
-  acknowledgement / final-response `Document` link; escalation does not restart
-  the SLA on a return-to-handling; no re-open of a closed complaint.
+- ~~**Domain E — Customer Service (#41–46)**~~ — **complete**, moved out of
+  this section. Its remaining deferred edges (the drafted SLA figures, the
+  no-committee-auto-escalation gap, the renewal-module dependency, etc.) are
+  tracked above (§3.6, §3.13, §4, §5.4) and in `README.md` § Known gaps, not
+  here — this section is net-new build only.
 - **Domain F — Compliance & Risk (#47–57):** AML/CFT (5.3), sanctions batch,
   regulatory calendar, incident management, internal audit, data-protection
   compliance (= Part D, 5.1).
