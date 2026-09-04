@@ -8,6 +8,9 @@ import { ComplaintRepository } from '../../repositories/complaint.repository';
 import { CommunicationController } from './communication.controller';
 import { CommunicationService } from './communication.service';
 import { CommunicationRepository } from '../../repositories/communication.repository';
+import { FeedbackController } from './feedback.controller';
+import { FeedbackService } from './feedback.service';
+import { FeedbackRepository } from '../../repositories/feedback.repository';
 import { AuditModule } from '../audit/audit.module';
 import { SlaModule } from '../sla/sla.module';
 
@@ -29,6 +32,11 @@ import { SlaModule } from '../sla/sla.module';
  *     `CommunicationLog`, deriving channel / language from the customer record
  *     and gating a marketing send on the customer's MARKETING `ConsentRecord`
  *     (a factual log — no state machine, no maker/checker).
+ *   - Process 45, Customer Feedback (`FeedbackService`) — logs a post-issuance
+ *     / post-claim / post-renewal satisfaction survey response on
+ *     `CustomerFeedback` (a factual log — no state machine, no maker/checker,
+ *     no SLA; `comments` is excluded from the audit row, the CRM
+ *     `Interaction.summary` precedent).
  *
  *   - AuditModule -> AuditService (CREATE / UPDATE / REJECT rows)
  *   - SlaModule   -> SlaTimerService (the generic escalation engine —
@@ -37,7 +45,7 @@ import { SlaModule } from '../sla/sla.module';
  *
  * `WorkflowTransitionService` (for `Complaint.status`) comes from the
  * `@Global()` `WorkflowModule`, so it is not imported here. The global
- * `PermissionsGuard` / `@CurrentUser` cover all three controllers.
+ * `PermissionsGuard` / `@CurrentUser` cover all four controllers.
  */
 @Module({
   imports: [AuditModule, SlaModule],
@@ -45,6 +53,7 @@ import { SlaModule } from '../sla/sla.module';
     ServiceRequestController,
     ComplaintController,
     CommunicationController,
+    FeedbackController,
   ],
   providers: [
     ServiceRequestService,
@@ -53,6 +62,8 @@ import { SlaModule } from '../sla/sla.module';
     ComplaintRepository,
     CommunicationService,
     CommunicationRepository,
+    FeedbackService,
+    FeedbackRepository,
   ],
 })
 export class CustomerServiceModule {}
