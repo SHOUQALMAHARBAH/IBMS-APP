@@ -540,6 +540,13 @@ build actually is today:
 | 45 | Customer Feedback | **extends the `customer-service` module** · **no migration, no seed change** — `CustomerFeedback` (Part 4 core schema) already had every field a satisfaction-survey log needs (`customerId`, `context`, `score`, `comments`, `submittedAt`); `feedback.log` (`[SALES_RELATIONSHIP_OFFICER]`) was seeded in `a440c1b` (149 perms), and there is **no separate read permission** — `feedback.log` covers create *and* read (the #41 / #44 shape) · **not a `WorkflowTransitionService` entity, no maker/checker, no `SlaTimer`** — a factual log, create + read only, the `Interaction` #10 shape (the simplest Domain E item so far: no status, no derived fields, no cross-entity validation beyond the customer existing) · new `apps/api/src/modules/customer-service/feedback.{config,service,controller}.ts` + `dto/create-feedback.dto.ts` + `dto/list-feedback-query.dto.ts` + `repositories/feedback.repository.ts`, wired as the **4th `CustomerServiceModule` controller** · `context` restricted to the model's own three documented values (`post_issuance` / `post_claim` / `post_renewal`, `FEEDBACK_CONTEXTS` / `isFeedbackContext`); `score` optional, bounded `1`–`5` (`FEEDBACK_SCORE_MIN` / `FEEDBACK_SCORE_MAX`) — **DRAFTED / UNSOURCED** (Part 3.8 names no scale), same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) · **endpoints** (all `feedback.log`): `POST /feedback` (`{ customerId, context, score?, comments?, submittedAt? }`; **404** unknown customer), `GET /feedback?customerId=&context=` (book-wide, newest-first by `submittedAt`, capped `FEEDBACK_READ_LIMIT = 5000` + `logger.warn`), `GET /feedback/:id`; `submittedAt` backdatable via `parseHistoricalInstant` (an offset-less datetime or a future instant → **422**; default now()) · **`comments` carries the shared `NO_FULL_ACCOUNT_NUMBER` guard, same as #41 / #42 / #44's free-text fields** · **`comments` is deliberately excluded from the `CREATE` audit `afterValue`** (ids + `context` + `score` + `submittedAt` only) — the CRM `Interaction.summary` precedent (`crm.service.ts` `logInteraction` logs channel/`occurredAt`, never `summary`), not #41 (`detail`) / #42 (`issue`/`resolution`)'s verbatim-note precedent: feedback `comments` is the customer's own subjective reflection, closer in kind to a private relationship-log note than to an operational business-action record — the audit trail leans conservative, the input guard does not follow that distinction · no ownership-based read gating — `feedback.log` is single-role and the sole gate on both write and read, book-wide · audit: best-effort `CREATE CustomerFeedback` only; reads not audited (Confidential tier — the #33 / #34 / #41 / #44 precedent) · **`@code-reviewer` (mandatory — code touching Confidential-tier customer commentary + a new `CREATE` audit-row shape) → CHANGES REQUESTED → resolved** — **1 MAJOR fixed**: a first pass reasoned `comments` was the CRM `Interaction.summary` shape and omitted the account-number guard entirely; the reviewer corrected this — feedback `comments` is customer-typed text solicited *immediately after* a claim settlement / issuance / renewal (precisely when a dissatisfied customer is most likely to paste a full account/card number) and is book-wide readable, so the guard now applies, leaving only the audit-row exclusion as the genuine divergence; **2 MINORs addressed**: the e2e now also proves a non-Sales `GET` is 403'd (was POST-only), plus `score` `1`/`5` boundary + full-account-number-in-`comments` assertions; **2 NITs deferred** (no index on `CustomerFeedback`; the truncation-`logger.warn` path untested — both noted, neither new to this module) · **`/brain-gap` filed + pushed** (ibms-brain `0c5bc63` + `7974db7` — `customer-service-lifecycle.md` gains a "Customer Feedback (Process 45)" section; intro → "#41–45 are built") · web: a new **"Feedback"** screen (`app/(app)/feedback/page.tsx` + `lib/customer-service/feedback-api.ts` + an `AppNav` entry after "Communications") — a log form (customer id · context `<select>` · a 1–5 score `<input>` · comments) and a table (customer · context · score · comments · submitted) | the 1–5 score scale is **drafted / unsourced** — same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) and the #41 5-day SLA · **no link from a feedback row to the triggering `Policy`/`Claim`/`RenewalCase`** — `context` is a label, not a foreign key · no automatic survey trigger — logging is always a manual `POST`, no #23-style "on claim closure, prompt for feedback" flow · no duplicate-response detection — a customer can submit feedback for the same context repeatedly · no aggregation / CSAT-dashboard reporting (the #40 / #43 "backend for a Part E dashboard" shape is not repeated here — reads are a plain filtered list) · **no index on `CustomerFeedback`** — not even `@@index([customerId])`, unlike every sibling Domain E model (a follow-up migration once volume exists) |
 | 46 | Customer Retention | **extends the `customer-service` module — Domain E (#41–46) is now complete** · **genuinely no migration, no seed change** — `RetentionCase` (Part 4 core schema) already had every field needed; `RenewalCase` (Part 3.9 core schema) already carried `retentionEscalatedAt DateTime?`, a nullable timestamp clearly provisioned for exactly this mechanism, unused until now; `retention-case.manage` `[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER]` was seeded in `a440c1b` (149 perms) · **built ahead of its data source** (the #8 / #10 / #29 shape) — the renewal module (Part 3.9) that would create a `RenewalCase` per policy nearing expiry is **not built**, so in normal running the sweep is a logged no-op, exactly #29 Loss Ratio's precedent · **not a `WorkflowTransitionService` entity, no maker/checker, no `SlaTimer`** — a factual log; `status` is a plain string `open → closed` (the model's own vocabulary — no outcome/resolution field, the bare schema has none) · new `apps/api/src/modules/customer-service/retention-case.{config,service,controller}.ts` + `retention-sweep.scheduler.ts` + 2 DTOs + `repositories/retention-case.repository.ts`, wired as the **5th `CustomerServiceModule` controller** (`AuthModule` newly imported there, for the scheduler's system-account lookup) · **the classifier** (`classifyRenewalCaseForRetention`, pure): `lapse_risk` ⇐ `status === 'LAPSED'` — checked first, always wins over inactivity; `renewal_inactivity` ⇐ the cycle has **not concluded** (`RENEWED` / `CANCELLED` excluded; `LAPSED` is deliberately NOT "concluded" — it's the other trigger) **and** `RENEWAL_INACTIVITY_THRESHOLD_BUSINESS_DAYS = 30` business days have elapsed since `triggeredAt`, reusing **`isFollowUpDue`** (`common/follow-up.util.ts` — the same test the RFQ #12 / Claim #27 follow-up sweeps use) — **DRAFTED / UNSOURCED** (Part 3.9 names a 90-*calendar*-day `leadTimeDays` default but no inactivity-escalation figure), same status as the #41 / #42 SLA figures; the two reasons are mutually exclusive by construction · **the race-safe invariant is `RenewalCase.retentionEscalatedAt`, not a new `RetentionCase` constraint** — `escalateAndCreateRetentionCase` stamps + creates the `RetentionCase` in **ONE `$transaction`** (a deliberate local exception to the no-`$transaction` convention, the `claim.repository.ts createNotification` shape), a **status-conditional `updateMany`** (`WHERE retentionEscalatedAt IS NULL AND status NOT IN (RENEWED, CANCELLED)`, the `RfqInsurer.followUpAlertSentAt` / `stampFollowUpAlert` shape (#12) plus a `status` re-assertion that precedent didn't need); `runSweep` calls it once — a `null` return counts as `skippedConcurrent` (distinct from `failed`); **`RenewalCase.status` is NEVER written by this sweep** — only checked; per-row isolation (the #9 / #12 / #27 shape) · **`@code-reviewer` (mandatory — this change IS the `race-safe-invariants.md` implementation + a new scheduler) → CHANGES REQUESTED → resolved**: **1 BLOCKER** (stamp + create were two separate writes — a `create` failure after a successful stamp permanently stranded the `RenewalCase` as "escalated" with no `RetentionCase`, and no future sweep would ever reconsider it since `findRenewalCasesForSweep` filters on `retentionEscalatedAt: null`; fixed by the `$transaction` above) **+ 1 MAJOR** (the stamp's `where` originally re-asserted only `retentionEscalatedAt: null`, not `status` — a `RenewalCase` concluding between the sweep's load and the stamp could open a spurious case for a customer who just renewed; fixed by the `status NOT IN (...)` re-assertion) — both dormant today, both would be live races the day the renewal module lands; **2 MINORs addressed** (a distinct `skippedConcurrent` counter; a new unit test for a create failure after a successful stamp) · **no "one open `RetentionCase` per customer" invariant** — deliberately not built (would need a migration; the schema has no FK to dedupe against) — two at-risk policies for one customer legitimately open two cases · **endpoints** (all `retention-case.manage`): `POST /retention-cases` (manual open, `{ customerId, reason }`; **404** unknown customer), `POST /retention-cases/sweep` (on-demand, declared before the `:id` routes, counts only — the #27 `follow-up-sweep` shape), `GET /retention-cases?customerId=&status=&reason=` (book-wide, capped `RETENTION_CASE_READ_LIMIT = 5000`) + `/:id`, `POST /retention-cases/:id/close` (`open → closed`, no body — the model has no note field; idempotent, **404** unknown) · **`RetentionSweepScheduler`** nightly at **08:00 UTC** (after the 07:00 claim follow-up sweep), the `system@ibms.internal` account precedent, delegating to the same `runSweep` the on-demand endpoint calls · audit: best-effort `CREATE RetentionCase` per opened case (sweep or manual), `UPDATE` on close; reads not audited (Confidential tier — the #33 / #34 / #41 / #44 / #45 precedent) · **`/brain-gap` filed + pushed** (ibms-brain `4c1f2c9` — `customer-service-lifecycle.md` gains a "Customer Retention (Process 46)" section; intro → "Domain E is complete — #41–46 are all built") · web: a new **"Retention"** screen (`app/(app)/retention-cases/page.tsx` + `lib/customer-service/retention-case-api.ts` + an `AppNav` entry after "Feedback") — an open form + a "Run detection sweep now" button + a table with a per-row Close | the renewal module (Part 3.9) itself is not built, so the sweep has no real `RenewalCase` traffic in normal running — only e2e tests create one directly · the 30-business-day inactivity threshold is **drafted / unsourced** · **no per-customer dedup of open cases** — the schema has no `renewalCaseId` / `policyId` FK on `RetentionCase` to dedupe against · **no outcome / resolution field on close** — "was the customer retained or lost" is not recorded, the bare schema has none · no link from a `RetentionCase` back to the `RenewalCase` / `Policy` that triggered it (only `RenewalCase.retentionEscalatedAt` records that *an* escalation happened) · no auto-close when the underlying `RenewalCase` eventually reaches `RENEWED` · `retention-case.manage` is role-level (no per-officer queue) |
 
+### Part C · Domain F #47–48 — Compliance & Risk (begun), with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 47 | KYC | **fully covered by Part C #3-4** (`KycService` / `ScreeningService`) — the backlog's own line reads "#47 KYC — fully covered under #3–4", no checkboxes of its own. Verified 2026-09-04: every #3-4 checkbox (two-form Customer creation, KYC + document capture, UBO + PEP capture, sanctions/PEP/AML screening at intake/on material change/recurring batch, the automatic EDD path with a separate longer SLA, the maker/checker approval gate, the risk-based periodic re-KYC schedule, the step-by-step onboarding wizard) maps to real, built, permission-gated code — see the #3-4 row above | nothing #47-specific — see the #3-4 row's own deferred edges (simulated screening provider, drafted SLA/re-KYC figures) |
+| 48 | AML/CFT | **new module** `apps/api/src/modules/compliance-risk/` (+ `repositories/transaction-monitoring-alert.repository.ts`) — opens Domain F beyond KYC · **migration `20260904130000` (44th)** only **widens** the pre-existing `TransactionMonitoringAlert` model (Part 7.2 core schema, no application code had ever written to it): adds `sourceEntityType` / `sourceEntityId` (nullable — the triggering `Receipt` for an event-scoped alert; both null for the two aggregate patterns), `@@index([customerId])` / `@@index([status])` / `@@index([patternType])`, and two race-safe uniqueness guards — **no seed change** (`aml.monitor` / `aml.escalate`, both `[COMPLIANCE_OFFICER]`, were seeded ahead of time in `a440c1b`, module `compliance-risk`, 149 perms) · **not a `WorkflowTransitionService` entity, no maker/checker** (`aml.monitor` / `aml.escalate` are both single-role COMPLIANCE grants, kept as two permissions since the pre-existing seed clearly means to separate "monitor" from "escalate" — the #42 `complaint.escalate` shape, not the #23-28 claim-settlement dual-approver shape) · **detection** (`TransactionMonitoringSweepScheduler`, nightly at 09:00 UTC after the 08:00 retention sweep, + on-demand `POST /transaction-monitoring-alerts/detect`) checks four patterns over existing Finance/Endorsement data, pure classifiers in `transaction-monitoring.config.ts`: **`large_premium_payment`** / **`third_party_payment_source`** — both scanned off every `Receipt` (an actual client payment collected, #32 — a raised-but-unpaid `Invoice` is not yet a "payment"), the first comparing the underlying `Invoice.premiumAmount` against a drafted `AML_LARGE_PREMIUM_THRESHOLD_JOD = '15000.000'`, the second checking whether the `Receipt`'s `PaymentChannel` (#38) is owned by a customer other than the one invoiced — **DORMANT in production, a `@code-reviewer` BLOCKER**: `CollectionService.assertReceiptChannelUsable` (#38) already rejects any real `Receipt` whose channel mismatches the invoiced customer before one can exist, so this classifier can never fire outside a test that bypasses `CollectionService` directly; kept coded/tested/wired as a forward-compatible detector, documented rather than architecturally changed; **`frequent_cancellations`** / **`frequent_refunds`** — a rolling 90-calendar-day count of `Cancellation` / `Refund` rows per customer (via `Endorsement.policy.customerId`, neither child table carries its own `customerId`) against a drafted threshold of 3 · **race-safety** (`race-safe-invariants.md`): a plain `@@unique([patternType, sourceEntityId])` stops the sweep from re-alerting the same `Receipt` forever (Postgres treats every NULL `sourceEntityId` as distinct, so the two aggregate patterns are untouched by it); a hand-authored partial `UNIQUE ("customerId", "patternType") WHERE status = 'open' AND "patternType" IN ('frequent_cancellations', 'frequent_refunds')` (the `UpSellRecommendation` / `ClaimFollowUpAlert` shape — Prisma can't express the predicate) caps the aggregate patterns at one open alert per customer/pattern at a time — **scoped directly to `patternType`, NOT to `sourceEntityId IS NULL`, a `@code-reviewer` BLOCKER on the first pass** (that predicate would also collide two unrelated manual `other`-pattern alerts for the same customer, throwing an uncaught 500 with no pre-check/catch; `create()` now catches `P2002` → a 409); the service also pre-checks both before writing, then catches the `P2002` from a concurrent run as `skippedExisting`, never `failed` · per-candidate isolation — one bad row does not abandon the rest of the sweep (the #9/#12/#27/#46 shape) · **manual log**: `POST /transaction-monitoring-alerts` (`aml.monitor`) — any of the five `patternType`s (`large_premium_payment` / `frequent_cancellations` / `frequent_refunds` / `third_party_payment_source` / `other`), for a pattern Compliance notices that machine detection doesn't cover; `detailText` carries the shared `NO_FULL_ACCOUNT_NUMBER` guard (`common/dto.util.ts`, the #41/#42/#44/#45 precedent) — the model's own default `classification` is `HIGHLY_CONFIDENTIAL` ("names payment sources/counterparties, AML-sensitive") · **the suspicious-activity escalation path is two separate steps**, the M03 consent-withdrawal request/confirm shape: `POST /:id/escalate` (`aml.escalate`) — the internal decision, `open` only, idempotent; `POST /:id/report-to-authority` (`aml.escalate`) — the external filing, **requires `escalate` to have run first** (422 otherwise), idempotent; **`POST /:id/close`** (`aml.monitor`) — `open → closed`, no body (the model has no note/`closedAt` field — the `UPDATE` `AuditLogEntry.occurredAt` is the closure timestamp of record) · **record-keeping**: no delete endpoint exists anywhere on this model — the row + its `CREATE`/`UPDATE` audit trail is the regulator-mandated record; the actual retention *period* is undocumented/unsourced (no CBJ AML source figure identified yet — flagged in `ibms-brain/meta/context/transaction-monitoring.md`, not built as a tracked deadline the way `kyc-aml-sla-timers.md`'s two figures are) · `GET /transaction-monitoring-alerts?customerId=&patternType=&status=&escalatedToSuspiciousActivity=` + `/:id` (book-wide, capped `TRANSACTION_MONITORING_READ_LIMIT = 5000`) · audit: best-effort `CREATE` per alert (sweep or manual — ids + `patternType` + `status` + source provenance, **never `detailText`** — the #44 `subject`/`body` / #45 `comments` precedent), `UPDATE` on escalate / report / close, all `isSensitiveDataAccess: true` (Highly Confidential AML data); **`get()`/`list()` also write a best-effort `READ` row** — a `@code-reviewer` MAJOR fix (the first pass had followed the Confidential-tier #33/#34/#41/#44/#45 no-audit precedent; `TransactionMonitoringAlert` is `HIGHLY_CONFIDENTIAL`, the `Claim` same-tier precedent says every read is logged) · `apps/web/`: a new **"AML monitoring"** screen (`app/(app)/transaction-monitoring/page.tsx` + `lib/compliance-risk/transaction-monitoring-api.ts` + an `AppNav` entry after "Consent") — a log form (customer id · pattern `<select>` · detail) + a "Run detection sweep now" button + a table (customer · pattern · status · escalated · reported · detected · per-row Escalate/Report/Close) · **`@code-reviewer` → CHANGES REQUESTED → resolved: 2 BLOCKERs** (the partial-index scoping — fixed; `third_party_payment_source`'s dormancy — documented, not architecturally changed) **+ 1 MAJOR** (the missing `READ` audit — fixed) **+ 2 MINORs** (`escalate()`'s idempotency ordering — a closed-but-escalated alert now stays idempotent on retry; the sweep's `scanned` count now sums rows examined, not distinct customers) · **Verification**: +57 api unit (`transaction-monitoring.config.spec.ts` 23 — every classifier + boundary + the audit-snapshot's `detailText` exclusion; `transaction-monitoring.service.spec.ts` 31 — manual log incl. no-customerId + the P2002→409 fix, all four sweep patterns incl. both-on-one-receipt + pre-check skip + `P2002` → `skippedExisting` + a genuine failure doesn't abort the rest, escalate/report/close incl. every guard + idempotency + the closed-but-escalated fix, `get()`/`list()` `READ`-audit tests; `transaction-monitoring-sweep.scheduler.spec.ts` 3). api unit **1575** (106 files, from 1518). New `test/transaction-monitoring.e2e-spec.ts` **1/1 isolated** (extended post-review) — seeds a large-premium Receipt, a third-party-channel Receipt, an ordinary Receipt, 3 Cancellations (one Endorsement per Policy — `Endorsement_one_live_cancellation_per_policy`, migration 20260902170000, allows only one live cancellation Endorsement per policy) and 3 Refunds under one customer; a non-Compliance actor → 403 on detect/list/escalate; the on-demand sweep flags all four patterns + is idempotent on re-run; manual log incl. the account-number-guard 400 + unknown-`patternType` 400 + unknown-customer 404; a second independent manual `other` alert succeeds while a manual log of an already-open aggregate pattern 409s; report-before-escalate → 422; escalate → report → close, each idempotent; re-escalating the closed-but-escalated alert stays idempotent; a `CREATE` audit row per alert (6 total — 4 swept + 2 manual, none carrying `detailText`) + `UPDATE` rows for escalate/report/close + `READ` rows for `get()`/`list()`. New Playwright `transaction-monitoring.spec.ts` (3 — form + table render, 403 friendly copy, `@a11y` no serious/critical). turbo `typecheck`/`lint`/`build` OK; `ibms-brain` `brain-doctor.sh` 0 errors; `prisma migrate status` clean (44) | the four thresholds (15000 JOD large-premium, 90-day/3-count frequent cancellation & refund) are **drafted / unsourced** — same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23) and the #41/#42/#46 SLA figures · **`third_party_payment_source` is dormant in production** (see above — documented, not fixed by relaxing #38's enforcement) and separately cannot classify a `Receipt` with no recorded `PaymentChannel` either way (`Receipt.paymentChannelId` is optional) · no dedup across the four patterns firing on the same underlying activity (a customer could get both a `large_premium_payment` alert and a `frequent_cancellations` alert for related behaviour, with nothing linking them) · the escalation path has **no `SlaTimer`** — the backlog names no filing deadline the way M03's "2 business days" was explicit, so unlike `consent_withdrawal` this is not (yet) a tracked deadline · no case-management workflow beyond `open`/`closed` — no assignment, no investigator notes beyond the original `detailText`, no link to a filed SAR document · no bulk/CSV export; in-memory aggregation for the two frequent-* patterns, capped implicitly by whatever `findCancellationsSince`/`findRefundsSince` return (unpaginated, the #12/#27 follow-up-sweep precedent) · `aml.monitor`/`aml.escalate` are role-level (no per-officer queue) |
+
 ### Not started
 
 - **Domains C–H** — Claims **#23–30 are built** (Notification, Registration, Documentation,
@@ -571,11 +578,21 @@ build actually is today:
   `CustomerFeedback` satisfaction logging, and `RetentionCase` opened
   automatically on renewal inactivity / lapse risk (#46 — built ahead of its
   data source, the Part 3.9 renewal module itself is not built, so the sweep
-  is a logged no-op until it lands, same shape as #29's Loss Ratio). **Not
-  built**: Compliance & Risk beyond KYC (AML/CFT monitoring, sanctions batch,
-  regulatory calendar, incident management, internal audit, #47–57), Management reporting
-  (#58–65), Supporting Operations (HR, procurement, IT, document management, vendor
-  management, BCP/DR, knowledge base, #66–74).
+  is a logged no-op until it lands, same shape as #29's Loss Ratio). **Domain F —
+  Compliance & Risk (#47–57) has begun.** #47 KYC needed no separate build — it is
+  fully covered by Part C #3-4's `KycService`/`ScreeningService` (sanctions/PEP/AML
+  screening, EDD, maker/checker approval, periodic re-KYC — see the #3-4 row above).
+  #48 AML/CFT Transaction Monitoring is built: a nightly + on-demand sweep over
+  `Receipt`/`Cancellation`/`Refund` flags four patterns — an unusually large premium
+  payment, a third-party payment source, and frequent cancellations/refunds — as a
+  `TransactionMonitoringAlert`, plus a manual log for anything Compliance notices by
+  hand, and a two-step `escalate` → `report-to-authority` suspicious-activity path (the
+  M03 consent-withdrawal request/confirm shape). **Not built**: sanctions/PEP batch
+  screening beyond #3-4's monthly re-screen (#49), the regulatory license record
+  (#50), the compliance calendar (#51), the broker's own risk register (#53),
+  incident/breach management (#55), internal audit (#56), the remaining #52/#54/#57
+  items. Management reporting (#58–65), Supporting Operations (HR, procurement, IT,
+  document management, vendor management, BCP/DR, knowledge base, #66–74).
 - **Part D — PDPL / M-series — begun.** **M03 Consent Management is built**: capture a
   consent decision (grant or explicit decline) for a `Customer` or `InsuredPerson`, and
   withdraw it through a two-step request/confirm flow that finally gives the
@@ -5435,6 +5452,176 @@ narrows a gap.
   further. The other eight Part D systems (DSR, retention & disposal
   *execution*, vendor risk, data sharing, incident & breach, DPIA,
   notices, RoPA) and the DPO Workspace dashboard remain unbuilt.
+
+**Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
+  reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
+  2026-09-04 (user request, before starting #48): every #3-4 checkbox — the two-form
+  Customer creation, KYC + document capture (`APPLICATION_PROPOSAL`), UBO + ownership% +
+  PEP capture, sanctions/PEP/AML screening at intake / on material change / recurring
+  batch, the automatic EDD path with a separate longer SLA, the maker/checker approval
+  gate (app-level `assertDifferentActors` **plus** a DB `CHECK`) with `Customer.status`
+  never reaching `ACTIVE` before approval, the risk-based periodic re-KYC schedule
+  (`nextReviewDueAt`), and the step-by-step onboarding wizard — maps to real, tested,
+  permission-gated code in `apps/api/src/modules/customer/` (`KycService`,
+  `ScreeningService`, the two schedulers) and `CustomerOnboardingWizard.tsx`. The only
+  gaps are ones the README already documented as deliberate before this check (a fixture
+  watchlist, not a real sanctions/PEP/AML provider; drafted/unsourced SLA and re-KYC
+  figures) — none are missing backlog checkboxes.
+
+**Part C #48 — AML/CFT Transaction Monitoring (Domain F, Process 48)** — **opens
+  Compliance & Risk beyond KYC**; new module `apps/api/src/modules/compliance-risk/`.
+  **Migration `20260904130000` (44th) only widens** the pre-existing
+  `TransactionMonitoringAlert` model (Part 7.2 core schema — no application code had
+  ever written to it): `sourceEntityType` / `sourceEntityId` (nullable), three indexes,
+  and two race-safe uniqueness guards. **No seed change** — `aml.monitor` /
+  `aml.escalate` (both `[COMPLIANCE_OFFICER]`, module `compliance-risk`) were seeded
+  ahead of time in `a440c1b` (149 perms, unchanged), the same "permission pre-seeded,
+  code lands later" shape as every Domain E item. **Not a `WorkflowTransitionService`
+  entity, no maker/checker** — `aml.monitor` (log/detect/read/close) and `aml.escalate`
+  (the two-step suspicious-activity path) are two distinct permissions the seed clearly
+  means to separate, even though both currently grant to the same single role — the #42
+  `complaint.escalate` shape, not a dual-approver claim-settlement gate.
+
+  **Detection** (`TransactionMonitoringSweepScheduler`, nightly 09:00 UTC — after the
+  08:00 retention sweep — + on-demand `POST /transaction-monitoring-alerts/detect`,
+  both `aml.monitor`) runs four pure classifiers (`transaction-monitoring.config.ts`)
+  over existing Finance/Endorsement data — no new business process, just reading what
+  #31-32/#22 already write: **`large_premium_payment`** and **`third_party_payment_source`**
+  are both scanned off every `Receipt` (an actual collected payment, #32 — a
+  raised-but-unpaid `Invoice` is not yet a "payment"), the first comparing the
+  underlying `Invoice.premiumAmount` against a **drafted, unsourced**
+  `AML_LARGE_PREMIUM_THRESHOLD_JOD = '15000.000'` (the `CLAIM_LARGE_THRESHOLD_JOD` #23
+  shape), the second checking whether the `Receipt`'s `PaymentChannel` (#38) belongs to
+  a customer other than the one invoiced. **`third_party_payment_source` is DORMANT
+  in production, not merely gapped — a `@code-reviewer` BLOCKER**:
+  `CollectionService.assertReceiptChannelUsable` (#38,
+  `apps/api/src/modules/finance/collection.service.ts`) already rejects any real
+  `Receipt` whose channel mismatches the invoiced customer before one can exist, so
+  this classifier can never fire against a `Receipt` created through the real `POST
+  /invoices/:id/receipt` path — the e2e test exercises it only by inserting a `Receipt`
+  directly via Prisma, deliberately bypassing `CollectionService`. Kept coded,
+  unit-tested, and wired into the sweep as a forward-compatible detector (activates
+  with no further code change if a legitimate cross-customer payment path is ever
+  added); documented prominently rather than architecturally changed, since relaxing
+  `assertReceiptChannelUsable` is a business decision, not a code fix. A `Receipt` with
+  no recorded channel at all (`paymentChannelId` is optional) is a separate, narrower
+  gap: it cannot be classified either way and is silently skipped.
+  **`frequent_cancellations`** / **`frequent_refunds`** are a rolling 90-calendar-day
+  count of `Cancellation` / `Refund` rows per customer (reached only via
+  `Endorsement.policy.customerId` — neither child table carries its own `customerId`)
+  against a **drafted** threshold of 3.
+
+  **Race-safety** (`ibms-brain/meta/lex/race-safe-invariants.md`): a plain
+  `@@unique([patternType, sourceEntityId])` stops the sweep from re-alerting the same
+  `Receipt` forever — Postgres treats every `NULL` `sourceEntityId` as distinct from
+  every other, so the two customer-level aggregate patterns (which never set it) **and
+  a manual log (which never sets it either)** are entirely unaffected; a hand-authored
+  partial `UNIQUE ("customerId", "patternType") WHERE status = 'open' AND "patternType"
+  IN ('frequent_cancellations', 'frequent_refunds')` (the `UpSellRecommendation` /
+  `ClaimFollowUpAlert` shape — Prisma cannot express the predicate) caps the two
+  aggregate patterns at one open alert per customer/pattern. **This predicate is
+  scoped directly to `patternType`, NOT to `sourceEntityId IS NULL`** — a
+  `@code-reviewer` BLOCKER on the first pass: a `sourceEntityId IS NULL` predicate
+  would also have collided two unrelated manual `other`-pattern alerts for the same
+  customer (the manual endpoint's own reason for existing — a repeated, ongoing note),
+  and `create()` had no pre-check or `P2002` catch, so it surfaced as an uncaught 500;
+  `create()` now catches `P2002` → a 409 `ConflictException`. The service pre-checks
+  both indexes before writing (avoids the obvious duplicate on the common path) and
+  separately maps a concurrent `P2002` on either to `skippedExisting`, distinct from
+  `failed` — the `UpSellRecommendation` precedent. Per-candidate isolation: one bad row
+  does not abandon the rest of the sweep (the #9/#12/#27/#46 shape).
+
+  **Manual log**: `POST /transaction-monitoring-alerts` (`aml.monitor`) — any of the
+  model's five documented `patternType`s (the four automated ones plus `other`), for a
+  pattern Compliance notices that machine detection doesn't cover. `detailText` carries
+  the shared `NO_FULL_ACCOUNT_NUMBER` guard (`common/dto.util.ts`, the #41/#42/#44/#45
+  precedent) — the model's own default `classification` is `HIGHLY_CONFIDENTIAL`
+  ("names payment sources/counterparties, AML-sensitive").
+
+  **The suspicious-activity escalation path is two separate steps** — the M03
+  consent-withdrawal request/confirm shape, chosen for the same reason: `POST
+  /:id/escalate` (`aml.escalate`) records the internal decision (from `open` only,
+  idempotent — checked in that order deliberately: the escalation flag is tested
+  *before* the `status` guard, a MINOR fix, so an alert escalated and later closed
+  still reports itself idempotently on a retried `escalate` rather than 422ing just
+  because it is no longer open); `POST /:id/report-to-authority` (`aml.escalate`) records that the report
+  was actually filed with the competent authority, and **requires `escalate` to have run
+  first** (422 otherwise — a report with no internal decision behind it is not this
+  flow's shape), idempotent. `POST /:id/close` (`aml.monitor`) is `open → closed`, no
+  body — the model has neither a note field nor a `closedAt` column, so (unlike
+  `RetentionCase`) the `UPDATE` `AuditLogEntry.occurredAt` is the closure timestamp of
+  record. **Record-keeping**: no delete endpoint exists anywhere on this model — the row
+  plus its `CREATE`/`UPDATE` audit trail *is* the regulator-mandated record; the actual
+  retention **period** is undocumented/unsourced (no CBJ AML source figure identified),
+  flagged in `ibms-brain/meta/context/transaction-monitoring.md` rather than built as a
+  tracked deadline the way `kyc-aml-sla-timers.md`'s two figures are — the backlog names
+  no filing deadline the way M03's "2 business days" was explicit, so this module adds
+  no `SlaTimer`.
+
+  `GET /transaction-monitoring-alerts?customerId=&patternType=&status=&
+  escalatedToSuspiciousActivity=` + `/:id` (book-wide, capped
+  `TRANSACTION_MONITORING_READ_LIMIT = 5000`). Audit: best-effort `CREATE` per alert
+  (sweep or manual — ids + `patternType` + `status` + source provenance, **never
+  `detailText`** — the #44 `subject`/`body` / #45 `comments` precedent), `UPDATE` on
+  escalate / report / close, every row `isSensitiveDataAccess: true` (Highly Confidential
+  AML data). **`get()`/`list()` also write a best-effort `READ` audit row** — a
+  `@code-reviewer` MAJOR on the first pass, which had followed the Confidential-tier
+  #33/#34/#41/#44/#45 "reads are not audited" precedent; `TransactionMonitoringAlert`
+  is `HIGHLY_CONFIDENTIAL`, the same tier as `Claim`, whose `get()`/`get360View()`
+  precedent (`sensitive-data-handling.md` / Part 10.3) says the opposite — every read
+  of Highly Confidential data is logged (ids/counts only, never `detailText`).
+  `apps/web/` gains an **"AML monitoring"** screen
+  (`app/(app)/transaction-monitoring/page.tsx` +
+  `lib/compliance-risk/transaction-monitoring-api.ts` + an `AppNav` entry after
+  "Consent") — a log form + a "Run detection sweep now" button + a table with per-row
+  Escalate / Report to authority / Close.
+
+  **`@code-reviewer` (mandatory — Highly Confidential AML data + financial reads +
+  a new race-safe-invariant pattern) → CHANGES REQUESTED → resolved: 2 BLOCKERs**
+  (the partial-index scoping above — fixed by re-scoping to `patternType IN (...)`
+  and adding the `P2002` catch in `create()`; `third_party_payment_source`'s
+  production dormancy above — documented prominently rather than fixed, since
+  relaxing `CollectionService.assertReceiptChannelUsable` needs its own product
+  decision, not a unilateral code change) **+ 1 MAJOR** (the missing `READ` audit on
+  `get()`/`list()` — fixed) **+ 2 MINORs** (`escalate()`'s idempotency-check ordering
+  — fixed; the sweep's `scanned` count mixed row-counts with distinct-customer-counts
+  — fixed to sum actual `Cancellation`/`Refund` rows examined).
+
+  **Verification**: +57 api unit (`transaction-monitoring.config.spec.ts` 23 — every
+  classifier + boundary + the audit-snapshot's `detailText` exclusion;
+  `transaction-monitoring.service.spec.ts` 31 — manual log incl. no-customerId + the
+  P2002→409 fix, all four sweep patterns incl. both patterns firing on one receipt +
+  the pre-check skip + a `P2002` mapping to `skippedExisting` + a genuine failure not
+  aborting the rest of the sweep, escalate/report/close incl. every guard +
+  idempotency + the closed-but-escalated idempotency fix, the new `get()`/`list()`
+  `READ`-audit tests;
+  `transaction-monitoring-sweep.scheduler.spec.ts` 3) → api unit **1575** (106 files,
+  from 1518). New `test/transaction-monitoring.e2e-spec.ts` **1/1 isolated** (extended
+  post-review) — seeds a
+  large-premium `Receipt`, a third-party-channel `Receipt`, an ordinary `Receipt`, 3
+  `Cancellation`s (one `Endorsement`/`Policy` each —
+  `Endorsement_one_live_cancellation_per_policy`, migration 20260902170000, permits only
+  one live cancellation `Endorsement` per policy at a time, discovered by the first e2e
+  run) and 3 `Refund`s under one customer; a non-Compliance actor → 403 on
+  detect/list/escalate; the on-demand sweep flags all four patterns and is idempotent on
+  re-run; manual log incl. the account-number-guard 400 + unknown-`patternType` 400 +
+  unknown-customer 404; **a second independent manual `other` alert for the same
+  customer succeeds** (the BLOCKER regression test) while **a manual log of an
+  already-open aggregate pattern 409s** (the partial index's actual, intended
+  invariant); report-before-escalate → 422; escalate → report → close, each
+  idempotent; **re-escalating the closed-but-escalated alert stays idempotent** (the
+  MINOR fix); a `CREATE` audit row per alert (6 total — 4 swept + 2 manual, none
+  carrying `detailText`) + `UPDATE` rows for escalate/report/close + `READ` rows for
+  `get()`/`list()` (the MAJOR fix). New Playwright `transaction-monitoring.spec.ts`
+  (3 — form + table render, 403 friendly copy, `@a11y` no serious/critical). `npm run
+  typecheck`/`lint`/`build` (api + web) OK; `prisma migrate status` clean (**44**).
+  **Deferred**: the four thresholds are drafted/unsourced; `third_party_payment_source`
+  is dormant in production (documented, see above) and separately cannot classify a
+  `Receipt` with no recorded `PaymentChannel` either way; no cross-pattern dedup (the
+  same underlying activity can trip more than one pattern with nothing linking the
+  resulting alerts); no case-management workflow beyond `open`/`closed` (no assignment,
+  no investigator notes beyond `detailText`, no link to a filed SAR document); no
+  bulk/CSV export; `aml.monitor`/`aml.escalate` are role-level (no per-officer queue).
 
 ## Deployment
 

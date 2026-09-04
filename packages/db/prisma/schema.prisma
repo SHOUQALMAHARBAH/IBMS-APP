@@ -2215,18 +2215,43 @@ model ProfessionalIndemnityRiskEvent {
 /// Part 7.2 — transaction monitoring for unusual patterns (unusually large
 /// premium payments, frequent cancellations/refunds, third-party premium
 /// payment sources), escalating to Suspicious Activity where warranted.
+///
+/// Process 48 (backlog Part C #48) — `sourceEntityType`/`sourceEntityId`
+/// identify the exact Receipt that triggered an event-scoped alert
+/// (`large_premium_payment` / `third_party_payment_source`); both stay null
+/// for the two customer-level aggregate patterns (`frequent_cancellations` /
+/// `frequent_refunds`), which have no single triggering row.
+/// `@@unique([patternType, sourceEntityId])` stops the nightly sweep from
+/// re-alerting the same Receipt forever — Postgres treats every NULL
+/// `sourceEntityId` as distinct, so this is a no-op for the two aggregate
+/// patterns (and for a manual log, which never sets `sourceEntityId`
+/// either). Their own "one OPEN alert per customer" guard is a
+/// hand-authored partial UNIQUE index, scoped directly to
+/// `patternType IN ('frequent_cancellations','frequent_refunds')` — NOT to
+/// `sourceEntityId IS NULL` (migration 20260904130000_add_transaction_
+/// monitoring, the UpSellRecommendation / ClaimFollowUpAlert shape —
+/// ibms-brain/meta/lex/race-safe-invariants.md; a `sourceEntityId IS NULL`
+/// predicate would also collide two unrelated manual `other`-pattern alerts
+/// for the same customer, a real `@code-reviewer` BLOCKER on the first pass).
 model TransactionMonitoringAlert {
   id                 String   @id @default(uuid())
   customerId         String?
   customer           Customer? @relation(fields: [customerId], references: [id])
   patternType        String   // large_premium_payment | frequent_cancellations | frequent_refunds | third_party_payment_source | other
   detailText         String?
+  sourceEntityType   String?
+  sourceEntityId     String?
   detectedAt         DateTime @default(now())
   escalatedToSuspiciousActivity Boolean @default(false)
   escalatedAt        DateTime?
   reportedToAuthorityAt DateTime? // record-keeping for regulator-mandated retention (Part 7.2)
   status             String   @default("open")
   classification     DataClassification @default(HIGHLY_CONFIDENTIAL) // names payment sources/counterparties, AML-sensitive
+
+  @@unique([patternType, sourceEntityId])
+  @@index([customerId])
+  @@index([status])
+  @@index([patternType])
 }
 
 /// Process 51 — configurable compliance calendar for CBJ regulatory

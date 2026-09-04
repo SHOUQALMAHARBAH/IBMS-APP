@@ -35,6 +35,7 @@ import { FinanceModule } from './modules/finance/finance.module';
 import { CommissionModule } from './modules/commission/commission.module';
 import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module';
 import { PdplModule } from './modules/pdpl/pdpl.module';
+import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
 
 @Module({
   imports: [
@@ -243,6 +244,14 @@ import { PdplModule } from './modules/pdpl/pdpl.module';
     // reads ConsentRecord) a real write path. consent.manage / Sales,
     // Placement, Claims, DPO. The first of the nine Part D / PCMS systems.
     PdplModule,
+    // Part C backlog #48 (AML/CFT Transaction Monitoring, Domain F — opens
+    // Compliance & Risk beyond KYC; #47 KYC needed no separate build, fully
+    // covered by CustomerModule's #3-4). A nightly + on-demand sweep over
+    // Receipt/Cancellation/Refund flags unusually large premium payments,
+    // frequent cancellations/refunds, and third-party payment sources as a
+    // TransactionMonitoringAlert, plus a two-step escalate ->
+    // report-to-authority path. aml.monitor / aml.escalate / Compliance.
+    ComplianceRiskModule,
   ],
   controllers: [AppController],
   providers: [AppService],

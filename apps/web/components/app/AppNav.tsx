@@ -46,6 +46,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/retention-cases', label: 'Retention' },
   { href: '/sla-dashboard', label: 'SLA dashboard' },
   { href: '/consent', label: 'Consent' },
+  { href: '/transaction-monitoring', label: 'AML monitoring' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];
