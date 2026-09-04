@@ -593,9 +593,14 @@ build actually is today:
   12 hours into `WatchlistEntry`, `ScreeningService` matches every customer/UBO name
   against them (exact match on a canonical, order-independent form — not fuzzy) in
   every environment including production, and the recurring re-screen batch moved from
-  a drafted monthly cadence to every 4 hours to match. **Not built**: the regulatory
-  license record (#50), the compliance calendar (#51), the broker's own risk register
-  (#53), incident/breach management (#55), internal audit (#56), the remaining
+  a drafted monthly cadence to every 4 hours to match. **#50 Conflict of Interest needed
+  no separate build** — the backlog's own line marks it "(covered under #16)"; verified
+  2026-09-05 against the real, built `ConflictOfInterestDisclosure` model and
+  `RecommendationService` code (`detectConflictOfInterest`, a mandatory disclosure gate
+  before `send`, `assertDifferentActors` so the conflicted drafter can't self-clear it —
+  see #16's own entry above). **Not built**: the regulatory license record + compliance
+  calendar (#51, `BrokerLicense`/`ComplianceCalendarItem`), the broker's own risk
+  register (#53), incident/breach management (#55), internal audit (#56), the remaining
   #52/#54/#57 items. Management reporting (#58–65), Supporting Operations (HR,
   procurement, IT, document management, vendor management, BCP/DR, knowledge base,
   #66–74).
