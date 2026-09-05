@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { getSlaRegistryEntry, SLA_REGISTRY } from './sla-registry.config';
+import {
+  findSlaRegistryEntry,
+  getSlaRegistryEntry,
+  SLA_REGISTRY,
+} from './sla-registry.config';
 
 // The 14 SLA types named in ibms-brain/meta/lex/pdpl-sla-timers.md's
 // registry table — a completeness check so a future accidental removal (or
 // typo'd rename) of a row is caught here rather than silently shrinking the
 // registry below what backlog A.8 requires ("wired to every SLA type").
-const EXPECTED_WORKFLOW_NAMES = [
+const EXPECTED_PDPL_WORKFLOW_NAMES = [
   'consent_withdrawal',
   'dsr_access_deletion',
   'dsr_correction_objection',
@@ -22,10 +26,25 @@ const EXPECTED_WORKFLOW_NAMES = [
   'claim_followup_insurer_response',
 ].sort();
 
+// Backlog Part C #3-4's two KYC/EDD review workflows — deliberately NOT part
+// of the PDPL-sourced 14 above (see the DRAFT/UNSOURCED citation on each in
+// sla-registry.config.ts); kept as a separate list so the PDPL-completeness
+// check above stays a precise match to pdpl-sla-timers.md, not a moving
+// target every time a non-PDPL SLA is added to this same generic engine.
+const EXPECTED_NON_PDPL_WORKFLOW_NAMES = [
+  'kyc_standard_review',
+  'kyc_edd_review',
+  'service_request_fulfilment',
+  'complaint_resolution',
+].sort();
+
 describe('SLA_REGISTRY', () => {
-  it('has exactly the 14 workflow types named in pdpl-sla-timers.md', () => {
+  it('has exactly the 14 PDPL-sourced workflow types named in pdpl-sla-timers.md, plus the drafted non-PDPL ones', () => {
     expect([...SLA_REGISTRY.map((e) => e.workflowName)].sort()).toEqual(
-      EXPECTED_WORKFLOW_NAMES,
+      [
+        ...EXPECTED_PDPL_WORKFLOW_NAMES,
+        ...EXPECTED_NON_PDPL_WORKFLOW_NAMES,
+      ].sort(),
     );
   });
 
@@ -60,6 +79,27 @@ describe('SLA_REGISTRY', () => {
     }
   });
 
+  it('EDD review carries a longer duration than the standard KYC review (backlog Part C #3-4 "a separate, longer SLA")', () => {
+    const standard = getSlaRegistryEntry('kyc_standard_review');
+    const edd = getSlaRegistryEntry('kyc_edd_review');
+    expect(standard.duration.unit).toBe('businessDays');
+    expect(edd.duration.unit).toBe('businessDays');
+    expect(edd.duration.value).toBeGreaterThan(standard.duration.value);
+  });
+
+  it('marks every non-PDPL entry as drafted/unsourced, unlike the 14 PDPL rows', () => {
+    for (const workflowName of EXPECTED_NON_PDPL_WORKFLOW_NAMES) {
+      expect(getSlaRegistryEntry(workflowName).citation).toMatch(
+        /DRAFT, UNSOURCED/,
+      );
+    }
+    for (const workflowName of EXPECTED_PDPL_WORKFLOW_NAMES) {
+      expect(getSlaRegistryEntry(workflowName).citation).not.toMatch(
+        /DRAFT, UNSOURCED/,
+      );
+    }
+  });
+
   it('only data_sharing_decision defines a regulatory-channel override duration', () => {
     for (const entry of SLA_REGISTRY) {
       if (entry.workflowName === 'data_sharing_decision') {
@@ -84,6 +124,18 @@ describe('getSlaRegistryEntry', () => {
   it('returns the matching entry for a known workflow name', () => {
     expect(getSlaRegistryEntry('consent_withdrawal').entityType).toBe(
       'ConsentRecord',
+    );
+  });
+});
+
+describe('findSlaRegistryEntry', () => {
+  it('returns undefined for an unknown workflow name instead of throwing', () => {
+    expect(findSlaRegistryEntry('not_a_real_workflow')).toBeUndefined();
+  });
+
+  it('returns the matching entry for a known workflow name', () => {
+    expect(findSlaRegistryEntry('complaint_resolution')?.entityType).toBe(
+      'Complaint',
     );
   });
 });

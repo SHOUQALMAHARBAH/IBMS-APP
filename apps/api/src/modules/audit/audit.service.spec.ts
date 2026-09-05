@@ -9,6 +9,7 @@ function makeDeps(overrides?: {
 }): {
   service: AuditService;
   create: ReturnType<typeof vi.fn>;
+  createManyAndReturn: ReturnType<typeof vi.fn>;
   findFirst: ReturnType<typeof vi.fn>;
   evaluate: ReturnType<typeof vi.fn>;
 } {
@@ -22,6 +23,17 @@ function makeDeps(overrides?: {
     occurredAt: new Date(),
   };
   const create = vi.fn().mockResolvedValue(createdEntry);
+  const createManyAndReturn = vi
+    .fn()
+    .mockImplementation((args: { data: Record<string, unknown>[] }) =>
+      Promise.resolve(
+        args.data.map((row, i) => ({
+          ...createdEntry,
+          ...row,
+          id: `entry-${i + 1}`,
+        })),
+      ),
+    );
   const findFirst = vi
     .fn()
     .mockResolvedValue(
@@ -32,7 +44,7 @@ function makeDeps(overrides?: {
 
   const prisma = {
     client: {
-      auditLogEntry: { create },
+      auditLogEntry: { create, createManyAndReturn },
       retentionScheduleItem: { findFirst },
     },
   } as unknown as PrismaService;
@@ -45,6 +57,7 @@ function makeDeps(overrides?: {
   return {
     service: new AuditService(prisma, anomalyDetection),
     create,
+    createManyAndReturn,
     findFirst,
     evaluate,
   };
@@ -65,6 +78,36 @@ describe('AuditService', () => {
       expect(evaluate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'entry-1' }),
       );
+    });
+  });
+
+  describe('recordMany', () => {
+    it('writes all entries in one createManyAndReturn and runs anomaly detection per row', async () => {
+      const { service, create, createManyAndReturn, evaluate } = makeDeps();
+      await service.recordMany([
+        {
+          userId: 'u',
+          action: 'CREATE',
+          entityType: 'AccessRecertificationItem',
+          entityId: 'i-1',
+        },
+        {
+          userId: 'u',
+          action: 'CREATE',
+          entityType: 'AccessRecertificationItem',
+          entityId: 'i-2',
+        },
+      ]);
+      expect(create).not.toHaveBeenCalled();
+      expect(createManyAndReturn).toHaveBeenCalledTimes(1);
+      expect(evaluate).toHaveBeenCalledTimes(2);
+    });
+
+    it('is a no-op for an empty list — no DB call', async () => {
+      const { service, createManyAndReturn, evaluate } = makeDeps();
+      await service.recordMany([]);
+      expect(createManyAndReturn).not.toHaveBeenCalled();
+      expect(evaluate).not.toHaveBeenCalled();
     });
   });
 

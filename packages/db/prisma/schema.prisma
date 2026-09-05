@@ -431,6 +431,10 @@ model Lead {
   updatedAt     DateTime   @updatedAt
 
   prospect      Prospect?
+
+  @@index([ownerUserId])
+  @@index([source])
+  @@index([status])
 }
 
 /// Process 2 — Prospect Management (qualification of a Lead).
@@ -453,6 +457,8 @@ model Prospect {
   updatedAt         DateTime @updatedAt
 
   customer          Customer?
+
+  @@index([salesOwnerUserId])
 }
 
 enum CustomerType {
@@ -483,6 +489,10 @@ model Customer {
   contactPhoneEnc   String?        // -- ENCRYPT (Confidential)
   contactEmailEnc   String?        // -- ENCRYPT (Confidential)
   languagePreference LanguagePreference @default(AR)
+  // Process 44 — the customer's recorded outbound-communication channel
+  // preference. Null = no recorded preference (the caller must then name a
+  // channel explicitly). Language already lives in `languagePreference`.
+  preferredContactChannel InteractionChannel?
   status            CustomerStatus @default(PENDING_KYC)
   classification    DataClassification @default(CONFIDENTIAL)
   ownerUserId       String
@@ -500,8 +510,10 @@ model Customer {
   insuredPersons    InsuredPerson[]
   consentRecords    ConsentRecord[]
   dataSubjectRequests DataSubjectRequest[] @relation("DsrCustomer")
+  documents         Document[]           @relation("CustomerDocuments")
   invoices          Invoice[]
   clientFundsLedgerEntries ClientFundsLedgerEntry[]
+  paymentChannels   PaymentChannel[]
   serviceRequests   ServiceRequest[]
   feedback          CustomerFeedback[]
   retentionCases    RetentionCase[]
@@ -546,12 +558,29 @@ model InsuredPerson {
   dataSubjectRequests DataSubjectRequest[] @relation("DsrInsuredPerson")
 }
 
+/// Process 3-4 (Customer Acquisition/Onboarding) KYC lifecycle — mirrors the
+/// model's original comment 1:1 so WorkflowTransitionService (A.6) has a
+/// real enum to govern, the same way LeadStatus does. PERIODIC_REVIEW_DUE is
+/// terminal for THIS row (same pattern as Lead's CONVERTED_TO_PROSPECT): the
+/// actual re-KYC cycle is a new KYCRecord for the same Customer, not a loop
+/// back on this one.
+enum KycStatus {
+  DRAFT
+  SUBMITTED
+  SCREENING
+  EDD
+  COMPLIANCE_REVIEW
+  APPROVED
+  REJECTED
+  PERIODIC_REVIEW_DUE
+}
+
 /// Process 3.1 KYC file (per the Part 3.1 "Core Data Entities" row).
 model KYCRecord {
   id           String    @id @default(uuid())
   customerId   String
   customer     Customer  @relation(fields: [customerId], references: [id])
-  status       String    @default("draft") // Draft->Submitted->Screening->EDD(optional)->Compliance Review->Approved/Rejected->Periodic Review Due
+  status       KycStatus @default(DRAFT)
   isEdd        Boolean   @default(false) // enhanced due diligence
   submittedAt  DateTime?
   // Maker/checker (Part 3.1 Approval row) — capturer != approver
@@ -566,6 +595,19 @@ model KYCRecord {
   riskRating   RiskRating?
 
   @@index([customerId])
+  @@index([status])
+}
+
+enum ScreeningType {
+  SANCTIONS
+  PEP
+  AML
+}
+
+enum ScreeningOutcome {
+  CLEAR
+  HIT
+  PENDING_INVESTIGATION
 }
 
 /// Process 47/49 — sanctions/PEP/AML screening result, at onboarding, on
@@ -574,11 +616,18 @@ model ScreeningResult {
   id           String   @id @default(uuid())
   kycRecordId  String
   kycRecord    KYCRecord @relation(fields: [kycRecordId], references: [id])
-  screeningType String  // sanctions | pep | aml
-  result       String   // clear | hit | pending_investigation
+  screeningType ScreeningType
+  result       ScreeningOutcome
   screenedAt   DateTime @default(now())
   listSource   String?
   escalatedToComplianceAt DateTime?
+
+  @@index([kycRecordId])
+}
+
+enum RiskLevel {
+  STANDARD
+  HIGH
 }
 
 /// Process 3.1/47 — customer risk classification driving screening
@@ -587,7 +636,7 @@ model RiskRating {
   id           String   @id @default(uuid())
   kycRecordId  String   @unique
   kycRecord    KYCRecord @relation(fields: [kycRecordId], references: [id])
-  level        String   // standard | high
+  level        RiskLevel
   reason       String?
   ratedAt      DateTime @default(now())
 }
@@ -622,25 +671,109 @@ model Interaction {
   @@index([customerId])
 }
 
-/// Process 8 — Cross-Selling: system-detected coverage gap vs benchmark.
+/// Process 8 (Cross-Selling) status. OPEN once the detection sweep flags a
+/// gap between a customer's in-force policy lines and the benchmark line
+/// list; CONVERTED when a Sales Officer takes it forward into an
+/// Opportunity/RFQ (Process 11+, not built); DISMISSED (with a reason) when
+/// it is not pursued. Both non-OPEN states are terminal — and the
+/// `@@unique([customerId, gapLine])` on CrossSellOpportunity means a
+/// resolved gap is never re-flagged, so re-opening would be a manual action
+/// with no endpoint yet (same "modeled ahead of a real trigger" shape as
+/// InsuranceProgramStatus.SUPERSEDED). Converted from a free-text String,
+/// the same enum conversion #1/#3-4/#5/#7 did for their status columns.
+enum CrossSellStatus {
+  OPEN
+  CONVERTED
+  DISMISSED
+}
+
+/// Process 8 — Cross-Selling (backlog Part C #8). A system-detected gap
+/// between a customer's in-force policy lines and a benchmark line list —
+/// flagged by the nightly CrossSellDetectionScheduler (or an on-demand
+/// scan via POST /cross-sell-opportunities/detect), then converted or
+/// dismissed. See apps/api/src/modules/cross-sell/.
+///
+/// `status` moves ONLY through WorkflowTransitionService (A.6) — see
+/// ibms-brain/meta/lex/workflow-state-transitions.md.
+///
+/// `@@unique([customerId, gapLine])` is the race-safe backstop
+/// (ibms-brain/meta/lex/race-safe-invariants.md): at most one opportunity
+/// per (customer, benchmark line), ever — the detection sweep inserts with
+/// `skipDuplicates`, so a re-run or a concurrent run adds nothing.
 model CrossSellOpportunity {
   id           String   @id @default(uuid())
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
-  gapLine      String   // e.g. "Liability" when customer only has Motor
+  gapLine      String   // a benchmark insuranceLine the customer holds no in-force policy for, e.g. "Public Liability"
+  status       CrossSellStatus @default(OPEN)
   detectedAt   DateTime @default(now())
-  status       String   @default("open") // open | converted | dismissed
+  /// The actor behind the detection run — the system service account for
+  /// the nightly sweep, the Sales Officer for an on-demand scan. Bare
+  /// scalar, no relation; the AuditLogEntry is the authoritative trail.
+  detectedByUserId String?
+  resolvedByUserId String?
+  resolvedAt   DateTime?
+  dismissReason String?
+
+  @@unique([customerId, gapLine])
+  @@index([status])
 }
 
-/// Process 9 — Up-Selling: under-insurance vs updated asset values.
+/// Process 9 (Up-Selling) status. OPEN once the detection sweep flags
+/// under-insurance (updated asset value materially above the currently
+/// designed Sum Insured); CONVERTED when a Sales Officer takes the proposed
+/// increase forward (an endorsement / re-quote — Process 22 / 11+, not
+/// built); DISMISSED (with a reason) when it is not pursued. Both non-OPEN
+/// states are terminal. Converted from a free-text String, the same enum
+/// conversion #1/#3-4/#5/#7/#8 did for their status columns.
+enum UpSellStatus {
+  OPEN
+  CONVERTED
+  DISMISSED
+}
+
+/// Process 9 — Up-Selling (backlog Part C #9). A system-detected gap between
+/// a customer's currently designed property Sum Insured (the "Property All
+/// Risks" line of their live `InsuranceProgram`, Process 7) and the current
+/// value of their surveyed assets (`deriveSumInsured` over the `RiskProfile`
+/// asset survey, Process 6) — flagged by the nightly
+/// UpSellDetectionScheduler (or an on-demand scan via
+/// POST /up-sell-recommendations/detect), then converted or dismissed. See
+/// apps/api/src/modules/up-sell/. Both figures are fils-precision JOD
+/// (`money.util.ts`, ibms-brain/meta/lex/money-decimal-jod.md).
+///
+/// `status` moves ONLY through WorkflowTransitionService (A.6).
+///
+/// A **partial** UNIQUE index (`customerId WHERE status = 'OPEN'`) is the
+/// race-safe backstop (ibms-brain/meta/lex/race-safe-invariants.md): at most
+/// one OPEN recommendation per customer at a time. Unlike #8's
+/// CrossSellOpportunity (a full UNIQUE — a line gap is binary and one-shot),
+/// an up-sell gap is a continuous, growing quantity, so a customer who
+/// resolves one recommendation can get a fresh one later once their assets
+/// have grown further. Raw SQL — Prisma can't express the predicate; see
+/// migration 20260827220000.
 model UpSellRecommendation {
   id              String   @id @default(uuid())
   customerId      String
   customer        Customer @relation(fields: [customerId], references: [id])
+  /// Σ of the "Property All Risks" line's `sumInsuredBasis` over the
+  /// customer's non-SUPERSEDED Insurance Programs, snapshotted at detection.
   currentSumInsured Decimal @db.Decimal(18, 3)
+  /// `deriveSumInsured(...).propertySumInsured` over the customer's whole
+  /// asset survey, snapshotted at detection.
   currentAssetValue Decimal @db.Decimal(18, 3)
+  status          UpSellStatus @default(OPEN)
   detectedAt      DateTime @default(now())
-  status          String   @default("open")
+  /// The actor behind the detection run — the system service account for
+  /// the nightly sweep, the Sales Officer for an on-demand scan. Bare
+  /// scalar, no relation; the AuditLogEntry is the authoritative trail.
+  detectedByUserId String?
+  resolvedByUserId String?
+  resolvedAt      DateTime?
+  dismissReason   String?
+
+  @@index([customerId])
+  @@index([status])
 }
 
 // ============================================================================
@@ -660,6 +793,8 @@ model RiskProfile {
   assets       Asset[]
   needsAssessments NeedsAssessment[]
   insurancePrograms InsuranceProgram[]
+
+  @@index([customerId])
 }
 
 /// Part 3.2 — asset data (building value, equipment, stock, fleet size...).
@@ -674,32 +809,81 @@ model Asset {
   indemnityPeriodMonths Int?
   fleetVehicleCount Int?
   createdAt     DateTime @default(now())
+
+  @@index([riskProfileId])
 }
 
-/// Process 5 — structured questionnaire ("what risks do you face").
+enum NeedsAssessmentStatus {
+  DRAFT
+  PENDING_REVIEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+/// Process 5 — structured questionnaire ("what risks do you face") that
+/// derives a recommended coverage list, then goes through review + approval
+/// before it can feed an Opportunity/RFQ. Maker/checker: `createdByUserId`
+/// is the Sales/Relationship Officer who captured it; `reviewedByUserId`/
+/// `approvedByUserId` are the Branch/Department Manager who signs it off —
+/// assertDifferentActors (A.5) plus a DB CHECK enforce the split. `status`
+/// moves ONLY through WorkflowTransitionService (A.6) — see
+/// ibms-brain/meta/lex/workflow-state-transitions.md. APPROVED is terminal
+/// here: linking an approved assessment to an Opportunity/RFQ is Process
+/// 11+, not built yet.
 model NeedsAssessment {
   id            String   @id @default(uuid())
   riskProfileId String
   riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
   questionnaireAnswers Json
   recommendedCoverageLines String[] // Fire, Machinery Breakdown, BI, Workers Comp, Product Liability, Burglary, Public Liability, Motor, Cyber, Group Life...
-  status        String   @default("draft") // Data Collection -> Draft Assessment -> Reviewed -> Approved -> Linked to Opportunity/RFQ
+  status        NeedsAssessmentStatus @default(DRAFT)
+  createdByUserId String
   reviewedByUserId String?
   approvedByUserId String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([riskProfileId])
+  @@index([status])
+  @@index([createdByUserId])
 }
 
-/// Process 6-7 — proposed multi-line Insurance Program.
+/// Process 7 — Product Recommendation / Program Design (backlog Part C #7).
+/// DRAFT once assembled from an APPROVED NeedsAssessment's coverage list +
+/// the parent RiskProfile's asset survey; FINALIZED when the Placement/
+/// Technical Officer locks it to feed an Opportunity/RFQ (Process 11+, not
+/// built). `status` moves ONLY through WorkflowTransitionService (A.6) — see
+/// apps/api/src/modules/insurance-program/. SUPERSEDED is modeled for a
+/// re-assembled replacement (e.g. a mid-cycle risk change per
+/// policy-lifecycle.md) but no endpoint triggers it in Part C #7 yet — same
+/// "modeled ahead of a real trigger" shape as CustomerStatus.SUSPENDED.
+enum InsuranceProgramStatus {
+  DRAFT
+  FINALIZED
+  SUPERSEDED
+}
+
 model InsuranceProgram {
   id            String   @id @default(uuid())
   riskProfileId String
   riskProfile   RiskProfile @relation(fields: [riskProfileId], references: [id])
-  status        String   @default("draft")
+  status        InsuranceProgramStatus @default(DRAFT)
+  /// The APPROVED NeedsAssessment whose recommendedCoverageLines this
+  /// program was assembled from (Part C #7). Nullable: bare scalar, no
+  /// relation — provenance for display/re-assembly, the AuditLogEntry is the
+  /// authoritative trail.
+  needsAssessmentId String?
+  assembledByUserId String?
   createdAt     DateTime @default(now())
 
   lines         InsuranceProgramLine[]
   opportunities Opportunity[]
+
+  // "One live program per RiskProfile" is enforced by a partial UNIQUE index
+  // (riskProfileId WHERE status <> 'SUPERSEDED') that Prisma can't express
+  // here — see migration 20260827180000.
+  @@index([riskProfileId])
 }
 
 model InsuranceProgramLine {
@@ -708,6 +892,8 @@ model InsuranceProgramLine {
   insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
   insuranceLine      String   // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
   sumInsuredBasis    Decimal? @db.Decimal(18, 3)
+
+  @@index([insuranceProgramId])
 }
 
 // ============================================================================
@@ -740,6 +926,10 @@ model Opportunity {
   renewalCase        RenewalCase? @relation(fields: [renewalCaseId], references: [id])
   status             OpportunityStatus @default(NEEDS_CONFIRMED)
   targetPremiumThreshold Decimal? @db.Decimal(18, 3) // triggers senior-officer approval above this
+  // Process 11 (backlog Part C #11) provenance — the Placement Officer who
+  // took the finalized Insurance Program to market. Bare scalar, no relation;
+  // the AuditLogEntry CREATE row is the authoritative trail.
+  createdByUserId    String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -748,8 +938,13 @@ model Opportunity {
   clientDecision     ClientDecision?
   policy             Policy?
 
+  // "At most one live Opportunity per InsuranceProgram" is enforced by a
+  // partial UNIQUE index (insuranceProgramId WHERE status <> 'CLOSED_LOST')
+  // that Prisma can't express here — see migration
+  // 20260828120000_add_rfq_market_submission.
   @@index([customerId])
   @@index([status])
+  @@index([insuranceProgramId])
 }
 
 /// Process 11 — RFQ / Market Submission per product/line to a shortlist of
@@ -761,10 +956,19 @@ model RFQ {
   insuranceLine String
   issuedAt      DateTime @default(now())
   followUpThresholdDays Int @default(9) // Part 3.7-style configurable follow-up
+  // Process 11 (backlog Part C #11) provenance — the Placement Officer who
+  // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
+  issuedByUserId String?
 
   insurerSubmissions RFQInsurer[]
   quotations    Quotation[]
   comparisonMatrix ComparisonMatrix?
+  communications CommunicationLog[]
+
+  // One RFQ per insurance line per Opportunity (backlog Part C #11 — "Create
+  // an RFQ per insurance line"). Re-marketing a line is a deliberate future
+  // relaxation (Negotiation #15 / Client Decision #17).
+  @@unique([opportunityId, insuranceLine])
 }
 
 enum RfqInsurerStatus {
@@ -788,11 +992,42 @@ model RFQInsurer {
   respondedAt DateTime?
   followUpAlertSentAt DateTime?
 
+  communications CommunicationLog[]
+
   @@unique([rfqId, insurerId])
+  @@index([insurerId])
+  // The nightly follow-up sweep (backlog Part C #11) filters on status.
+  @@index([status])
 }
 
-/// Process 13 — insurer quotation. Versioned, NEVER overwritten (Part 4.1,
-/// Part 3.3 Controls: "full version history retained for every quotation").
+/// Process 13 — insurer quotation (backlog Part C #13). Versioned, NEVER
+/// overwritten (Part 4.1, Part 3.3 Controls: "full version history retained
+/// for every quotation"): a renegotiation `create()`s a new row linked to
+/// its predecessor via `previousVersionId` and flips `isCurrentVersion`.
+/// A "version chain" is every row sharing one `(rfqId, insurerId)` — one
+/// insurer's successive quotes on one RFQ line.
+///
+/// Process 15 — Negotiation (backlog Part C #15) is the same mechanism: every
+/// negotiation round is a NEW version, "never deleted or replaced". That is
+/// enforced at the DB layer, not just by convention — migration
+/// 20260901180000 adds a trigger (same pattern as
+/// prevent_audit_log_entry_mutation) that rejects any DELETE of a Quotation
+/// row, any UPDATE of an already-superseded version, and any UPDATE of a live
+/// version other than the supersede flip itself.
+///
+/// `isCurrentVersion` is NOT a workflow `status` (it is a boolean, and the
+/// chain has no state machine), so Quotation is not a
+/// WorkflowTransitionService entity — same as Interaction (#10) /
+/// CommunicationLog (#12). It has no maker/checker (capturing what an
+/// insurer sent is a factual, single-actor Placement record).
+///
+/// "At most one current version per chain" is a real DB invariant, not a
+/// read-then-write in QuotationService
+/// (ibms-brain/meta/lex/race-safe-invariants.md): a PARTIAL UNIQUE index
+/// `("rfqId", "insurerId") WHERE "isCurrentVersion" = true` that Prisma
+/// can't express here — see migration 20260901120000. `previousVersionId`'s
+/// own `@unique` additionally serializes two concurrent revisions of the
+/// same node (only one successor can exist).
 model Quotation {
   id             String   @id @default(uuid())
   rfqId          String
@@ -814,21 +1049,47 @@ model Quotation {
   conditions     String?
   commissionRatePercent Decimal? @db.Decimal(5, 2)
   receivedAt     DateTime @default(now())
+  /// Backlog Part C #13 provenance — the Placement Officer who captured this
+  /// version. Bare scalar, no relation; the AuditLogEntry CREATE row is the
+  /// authoritative trail (same shape as RFQ.issuedByUserId, migration
+  /// 20260828120000).
+  capturedByUserId String?
+  /// Backlog Part C #15 — the broker's documented rationale for THIS
+  /// negotiation round (what was requested / conceded). NULL on a version-1
+  /// capture: an insurer's opening quote is not a negotiation round. Treated
+  /// as Confidential commercial correspondence — the AuditLogEntry snapshot
+  /// carries only a `hasNegotiationNotes` boolean, never this text (Part 6.1,
+  /// same "metadata not body" shape as exclusions / conditions).
+  negotiationNotes String?
 
   comparisonRows ComparisonMatrixRow[]
   recommendation Recommendation? @relation("RecommendedQuotation")
 
   @@index([rfqId])
+  @@index([insurerId])
 }
 
-/// Process 14 — structured comparison across price + coverage + exclusions
-/// + deductibles + limits + insurer quality + service. Never price alone.
+/// Process 14 — Quote Comparison (backlog Part C #14). Structured comparison
+/// across price + coverage + exclusions + deductibles + limits + insurer
+/// quality + service — **never price alone**
+/// (ibms-brain/meta/context/policy-lifecycle.md § "The rules that aren't
+/// obvious"). One matrix per RFQ (`rfqId @unique`); `ComparisonService.build`
+/// (re)assembles it deterministically from every **current-version**
+/// `Quotation` on the RFQ (one `ComparisonMatrixRow` each — the objective
+/// columns live on the linked `Quotation`), and records the shortlisted
+/// insurers with no current quote in `missingInsurers` (insurer ids). A
+/// build best-effort advances the parent `Opportunity`
+/// QUOTES_RECEIVED -> COMPARISON_BUILT through the workflow engine.
 model ComparisonMatrix {
   id        String   @id @default(uuid())
   rfqId     String   @unique
   rfq       RFQ      @relation(fields: [rfqId], references: [id])
   builtAt   DateTime @default(now())
-  missingInsurers String[] // insurers that did not respond, flagged in output
+  missingInsurers String[] // insurer ids: on the RFQ shortlist, no current Quotation, not DECLINED — flagged in the output
+  /// Backlog Part C #14 provenance — the Placement Officer who built this
+  /// matrix. Bare scalar, no relation; the AuditLogEntry row is the
+  /// authoritative trail (same shape as Quotation.capturedByUserId).
+  builtByUserId String?
 
   rows      ComparisonMatrixRow[]
 }
@@ -839,32 +1100,83 @@ model ComparisonMatrixRow {
   comparisonMatrix   ComparisonMatrix @relation(fields: [comparisonMatrixId], references: [id])
   quotationId        String
   quotation          Quotation @relation(fields: [quotationId], references: [id])
+  /// Optional subjective scores (0-100, 2dp) supplied by Placement on the
+  /// build request — there is no Insurer-scoring module yet (narrative
+  /// Process 61). Null when not supplied.
   insurerQualityScore Decimal? @db.Decimal(5, 2)
   serviceScore        Decimal? @db.Decimal(5, 2)
+
+  // One row per (matrix, quotation) — a rebuild replaces rows wholesale, and
+  // this keeps two interleaved rebuilds from doubling a row
+  // (ibms-brain/meta/lex/race-safe-invariants.md; Prisma-expressible, no raw
+  // SQL — same as CrossSellOpportunity's @@unique).
+  @@unique([comparisonMatrixId, quotationId])
+  @@index([comparisonMatrixId])
+  @@index([quotationId])
 }
 
 /// Process 16 — the broker's documented, reasoned advice — retained as
 /// professional-indemnity evidence. Never "cheapest wins" without reasoning.
+///
+/// Backlog Part C #16: NOT a WorkflowTransitionService entity (it has no
+/// `status` column) — its lifecycle is DRAFTED (row exists) -> APPROVED
+/// (`approvedAt`, only when `approvalRequired`) -> SENT (`sentToClientAt`),
+/// carried by nullable timestamps; the parent `Opportunity` reflects the
+/// same progression through the engine (COMPARISON_BUILT ->
+/// RECOMMENDATION_DRAFTED -> SENT_TO_CLIENT). Maker/checker (Part 5.2): the
+/// `recommendation.approve` holder (senior officer) must differ from
+/// `draftedByUserId` — `assertDifferentActors` is the app guard, the
+/// `Recommendation_maker_checker_distinct` CHECK (migration 20260826091424)
+/// the DB backstop.
+///
+/// `rationaleFactors` is the structured, per-dimension rationale the backlog
+/// enumerates — a JSON object with a non-empty note for each of
+/// `coverage` / `price` / `financialStrength` / `claimsService` /
+/// `deductible` / `policyConditions` (a recommendation must address every
+/// dimension, not just price — the "never price alone" controls rule from
+/// #14 carried forward). `rationale` stays the free-text overall summary.
+///
+/// `approvalRequired` / `conflictOfInterestFlagged` are snapshots taken at
+/// draft time: `approvalRequired` = the recommended quote's premium exceeds
+/// the Opportunity's `targetPremiumThreshold` (when one is set);
+/// `conflictOfInterestFlagged` = a comparable competing quote (premium within
+/// a configured band) carried a materially lower commission rate.
+/// `coiCompetingQuotationId` / `coiCommissionDiffPercent` explain the flag.
 model Recommendation {
   id                 String   @id @default(uuid())
   opportunityId      String   @unique
   opportunity        Opportunity @relation(fields: [opportunityId], references: [id])
   recommendedQuotationId String @unique
   recommendedQuotation Quotation @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
-  rationale          String   // coverage/price/insurer financial strength/claims service/deductible/policy conditions
+  rationale          String   // free-text overall summary
+  rationaleFactors   Json     // { coverage, price, financialStrength, claimsService, deductible, policyConditions } — a non-empty note each
   draftedByUserId    String
+  // Snapshot at draft: recommendedQuotation.premium > Opportunity.targetPremiumThreshold
+  approvalRequired   Boolean  @default(false)
+  // Snapshot at draft: COI heuristic (comparable competing quote, materially lower commission)
+  conflictOfInterestFlagged Boolean @default(false)
+  coiCompetingQuotationId String?
+  coiCommissionDiffPercent Decimal? @db.Decimal(5, 2)
   // Maker/checker: senior-officer approval required above a configurable premium threshold
   approvedByUserId   String?
   approvedAt         DateTime?
   sentToClientAt     DateTime?
+  sentByUserId       String?
   createdAt          DateTime @default(now())
 
   conflictOfInterestDisclosure ConflictOfInterestDisclosure?
+
+  @@index([draftedByUserId])
 }
 
 /// Process 50 / Part 3.3, 7.3 — mandatory disclosure whenever a
 /// recommendation favors a materially higher-commission insurer over a
-/// comparable/better-value competing offer. System gate, not optional.
+/// comparable/better-value competing offer. System gate, not optional
+/// (backlog Part C #16): `RecommendationService.send` refuses to stamp
+/// `sentToClientAt` while `Recommendation.conflictOfInterestFlagged` is true
+/// and no disclosure row exists. `acknowledgedByUserId` must differ from the
+/// recommendation's `draftedByUserId` (the conflicted officer cannot clear
+/// their own conflict — `assertDifferentActors`, Part 5.2).
 model ConflictOfInterestDisclosure {
   id               String   @id @default(uuid())
   recommendationId String   @unique
@@ -874,6 +1186,8 @@ model ConflictOfInterestDisclosure {
   disclosureText   String
   acknowledgedByUserId String
   acknowledgedAt   DateTime @default(now())
+
+  @@index([competingQuotationId])
 }
 
 enum ClientDecisionType {
@@ -885,8 +1199,17 @@ enum ClientDecisionType {
   REQUEST_COVERAGE_INCREASE
 }
 
-/// Process 17 — six distinct client-decision branches, each routing
-/// differently (Placement / RFQ closed / renewed Negotiation).
+/// Process 17 — Client Decision Handling (backlog Part C #17). The client's
+/// single decision on a sent Recommendation, one per Opportunity
+/// (`opportunityId @unique`). The six `ClientDecisionType` values collapse
+/// to three routes (`client-decision.config.ts` `routeFor`): ACCEPT ->
+/// placement (`Opportunity -> PLACEMENT`), REJECT -> close the request
+/// (`-> CLOSED_LOST`), and the four REQUEST_* values -> renewed negotiation
+/// (`-> RENEGOTIATE`). The routing is the parent Opportunity's engine
+/// transition (`SENT_TO_CLIENT -> CLIENT_DECISION -> <route>`); `ClientDecision`
+/// itself is NOT a WorkflowTransitionService entity (`decision` is a one-shot
+/// enum, not a state machine) and has no maker/checker (recording the
+/// client's stated decision is a factual, single-actor Sales/Placement act).
 model ClientDecision {
   id            String   @id @default(uuid())
   opportunityId String   @unique
@@ -894,6 +1217,14 @@ model ClientDecision {
   decision      ClientDecisionType
   evidenceType  String?  // signature | e-signature | email_confirmation
   evidenceRef   String?
+  /// Free-text context the officer recorded with the decision (e.g. which
+  /// terms the client wants changed on a REQUEST_* route). Not evidence.
+  notes         String?
+  /// Backlog Part C #17 provenance — the Sales/Placement officer who recorded
+  /// the client's decision. Bare scalar, no relation; the AuditLogEntry
+  /// CREATE row is the authoritative trail (same shape as
+  /// Recommendation.sentByUserId / RFQ.issuedByUserId).
+  capturedByUserId String?
   decidedAt     DateTime @default(now())
 }
 
@@ -931,6 +1262,14 @@ model Policy {
   requestedPremium Decimal @db.Decimal(18, 3)
   issuedPremium  Decimal? @db.Decimal(18, 3)
   currency       String   @default("JOD")
+  // Process 18-19 (backlog Part C #18-19) provenance — bare scalars, no
+  // relation. placedByUserId is the Placement Officer who bound the cover;
+  // issuedByUserId is stamped on the PLACEMENT_CONFIRMED -> ISSUED
+  // transition. The AuditLogEntry CREATE / TRANSITION rows are the
+  // authoritative trail (same pattern as Opportunity.createdByUserId /
+  // RFQ.issuedByUserId).
+  placedByUserId String?
+  issuedByUserId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -945,6 +1284,7 @@ model Policy {
   commissionLedgerEntries CommissionLedgerEntry[]
   insuredPersons InsuredPerson[]
   complaints     Complaint[]
+  serviceRequests ServiceRequest[]
   renewalCase    RenewalCase?
   documents      Document[]           @relation("PolicyDocuments")
 
@@ -956,6 +1296,11 @@ model Policy {
 /// Requested/issued coverage snapshot — limits, sums insured, named perils,
 /// extensions (Part 3.4). Kept as a distinct versioned row so a Claim can
 /// resolve to "coverage in force at the loss date" (Part 3.7, data-model rule).
+/// "At most one OPEN schedule (effectiveTo IS NULL) per Policy" is a real DB
+/// invariant — the partial UNIQUE index `PolicySchedule_one_open_per_policy`
+/// (migration 20260902140000_add_policy_placement_issuance,
+/// ibms-brain/meta/lex/race-safe-invariants.md). Prisma can't express a
+/// partial UNIQUE here, so it lives in raw SQL in that migration.
 model PolicySchedule {
   id            String   @id @default(uuid())
   policyId      String
@@ -1030,24 +1375,46 @@ enum EndorsementStatus {
 
 /// Process 22 / Part 3.5 — mid-term amendment. Positive (adds premium) or
 /// negative (returns premium) — never overwrites prior history.
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most one in-flight
+/// cancellation per policy — enforced by the partial UNIQUE index
+/// `Endorsement_one_live_cancellation_per_policy` (raw SQL, migration
+/// 20260902170000: `WHERE "changeType" = 'cancellation' AND "status" <>
+/// 'CLIENT_NOTIFIED'`; Prisma cannot express a two-column partial UNIQUE with
+/// a predicate on the mutable `status`). Without it a second cancellation
+/// Endorsement could be raised while the first is still in flight (the Policy
+/// stays ACTIVE until APPLY) and mint a duplicate Refund + CommissionReversal.
 model Endorsement {
   id              String   @id @default(uuid())
   policyId        String
   policy          Policy   @relation(fields: [policyId], references: [id])
   type            EndorsementType
-  changeType      String   // add_vehicle | remove_vehicle | add_employee | remove_employee | address_change | sum_insured_increase | add_location | change_beneficiary | coverage_amendment
+  changeType      String   // add_vehicle | remove_vehicle | add_employee | remove_employee | address_change | sum_insured_increase | add_location | change_beneficiary | coverage_amendment | cancellation
   status          EndorsementStatus @default(REQUESTED)
   premiumAdjustment Decimal @db.Decimal(18, 3) // positive or negative amount
+  // Process 22 — when the amendment takes effect; the boundary date of the
+  // new PolicySchedule version created at APPLY.
+  effectiveFrom   DateTime?
   requestedByUserId String
+  submittedToInsurerAt DateTime?
   insurerConfirmedAt DateTime?
+  financialAdjustmentCalculatedAt DateTime?
   appliedAt       DateTime?
   clientNotifiedAt DateTime?
+  // Process 22 (backlog Part C #22) — the post-amendment coverage snapshot,
+  // captured at request time and materialised into a NEW PolicySchedule
+  // version when the endorsement is APPLIED (never overwrites the prior
+  // version). `{ limits, sumsInsured, namedPerils, extensions }`; null means
+  // "carry the current coverage forward, just mark the new version boundary".
+  targetCoverage  Json?
   createdAt       DateTime @default(now())
 
   schedule        PolicySchedule?
   refund          Refund?
   commissionReversal CommissionReversal?
   cancellation    Cancellation?
+
+  @@index([policyId])
 }
 
 /// Process 22/37 — cancellation request, always paired with a commission
@@ -1154,6 +1521,14 @@ model ClaimDocument {
 /// Part 3.7 core data entity — explicit status-history trail, named
 /// separately from the generic AuditLogEntry because it feeds Loss Ratio
 /// and Claims Analytics directly.
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most one row per
+/// (claimId, toStatus) — the `WORKFLOW_TRANSITIONS.Claim` map is an acyclic
+/// DAG (no status is ever revisited), so a status is entered exactly once
+/// over a claim's life. `@@unique([claimId, toStatus])` (migration
+/// 20260902180000) makes "one REGISTERED row per claim" (etc.) structural,
+/// so a concurrent double-registration cannot mint a duplicate history row
+/// even if the caller-side pre-check is later weakened.
 model ClaimStatusHistory {
   id         String      @id @default(uuid())
   claimId    String
@@ -1162,9 +1537,21 @@ model ClaimStatusHistory {
   toStatus   ClaimStatus
   changedByUserId String
   changedAt  DateTime    @default(now())
+
+  @@unique([claimId, toStatus])
 }
 
-/// Process 28 — four DISTINCT figures, never collapsed into one number.
+/// Process 28 — four DISTINCT figures, never collapsed into one number
+/// (estimatedLoss carried from the Claim; netSettlement is always
+/// approvedAmount - deductible, never hand-entered).
+///
+/// maker/checker: approvedByUserId (the officer who recorded the four figures
+/// = first approver) vs secondApproverUserId. The `Settlement_maker_checker_
+/// distinct` CHECK (migration 20260826091424) is the DB backstop for
+/// assertDifferentActors. A second approver is MANDATORY when the settlement
+/// is large (Settlement.approvedAmount re-derived against the live threshold,
+/// NOT Claim.isLargeClaim) OR brokerProcessedPayment is true; `settleCore`
+/// refuses `Claim -> SETTLED` structurally while that is unmet.
 model Settlement {
   id               String   @id @default(uuid())
   claimId          String   @unique
@@ -1173,6 +1560,9 @@ model Settlement {
   approvedAmount   Decimal? @db.Decimal(18, 3)
   deductible       Decimal? @db.Decimal(18, 3)
   netSettlement    Decimal? @db.Decimal(18, 3)
+  // true when the broker (not the insurer direct) processes the payout —
+  // forces a second approver regardless of amount (Process 28).
+  brokerProcessedPayment Boolean @default(false)
   // large claims / broker-processed payments require a second approver
   approvedByUserId String?
   secondApproverUserId String?
@@ -1206,13 +1596,24 @@ model Adjuster {
 
 /// Process 27 — system-generated follow-up alert once insurer non-response
 /// exceeds the configurable threshold (example: day 10 after a 1 Aug
-/// submission with a 9-day threshold).
+/// submission with a 9-day threshold). The clock runs from the claim's
+/// REGISTERED ClaimStatusHistory.changedAt; the threshold is snapshotted onto
+/// Claim.followUpAlertThresholdDays at notification (per line family).
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most one UNRESOLVED alert
+/// per claim — a partial `UNIQUE ("claimId") WHERE "resolvedAt" IS NULL`
+/// (migration 20260902190000; Prisma cannot express the WHERE here). A
+/// resolved alert leaves the index, so a claim chased again later gets a fresh
+/// row. The sweep + a manual re-run rely on this: raise is `create` +
+/// P2002 -> "already alerted".
 model ClaimFollowUpAlert {
   id          String   @id @default(uuid())
   claimId     String
   claim       Claim    @relation(fields: [claimId], references: [id])
   triggeredAt DateTime @default(now())
   resolvedAt  DateTime?
+
+  @@index([claimId])
 }
 
 // ============================================================================
@@ -1248,12 +1649,29 @@ model PremiumTransaction {
 }
 
 /// Process 31 — premium + tax + fees, net of commission, with due dates.
+/// `totalAmount` is ALWAYS `premiumAmount + taxAmount + feesAmount -
+/// commissionDeducted`, computed server-side (never an input) — see
+/// finance.config.ts `computeInvoiceFigures` and
+/// ibms-brain/meta/context/finance-lifecycle.md.
+///
+/// "At most one new-business premium invoice per policy" is a real DB
+/// invariant — the partial UNIQUE index
+/// `Invoice_one_new_business_premium_per_policy ON ("policyId") WHERE
+/// "invoiceType" = 'new_business_premium'` (migration
+/// 20260902210000_add_premium_billing_invoice,
+/// ibms-brain/meta/lex/race-safe-invariants.md) — so a double-submit cannot
+/// bill the client's premium twice. Prisma can't express a partial UNIQUE
+/// with a predicate, so it lives in raw SQL in that migration. Endorsement /
+/// renewal premium invoices carry a different `invoiceType` and are
+/// unconstrained.
 model Invoice {
   id           String   @id @default(uuid())
   policyId     String?
   policy       Policy?  @relation(fields: [policyId], references: [id])
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
+  /// new_business_premium (Process 31) | endorsement_adjustment | renewal_premium
+  invoiceType  String   @default("new_business_premium")
   premiumAmount Decimal @db.Decimal(18, 3)
   taxAmount    Decimal  @db.Decimal(18, 3) @default(0)
   feesAmount   Decimal  @db.Decimal(18, 3) @default(0)
@@ -1269,17 +1687,31 @@ model Invoice {
 
   @@index([customerId])
   @@index([status])
+  @@index([policyId])
 }
 
 /// Process 32 — Invoice -> Collection -> Receipt -> Reconciliation ->
-/// Remittance cycle.
+/// Remittance cycle. `invoiceId` is `@unique`: #32 records exactly ONE
+/// full-payment receipt per invoice, and a read-then-create would let a
+/// concurrent / retried `POST /invoices/:id/receipt` double-book the client's
+/// premium into `ClientFundsLedgerEntry` (Part 7.3 — client funds must always
+/// be reconcilable). The engine transition alone is NOT the gate: a caller
+/// that lost the `INVOICED -> COLLECTED` race still reaches the artefact write
+/// before the winner's `$transaction` commits. `Receipt_invoiceId_key`
+/// (migration 20260902220000) is the real backstop; `P2002` -> resume/409.
+/// Partial-payment support (multiple receipts summing to the total) is a
+/// deferred refinement that would replace this constraint.
 model Receipt {
   id           String   @id @default(uuid())
-  invoiceId    String
+  invoiceId    String   @unique
   invoice      Invoice  @relation(fields: [invoiceId], references: [id])
   amount       Decimal  @db.Decimal(18, 3)
   receivedAt   DateTime @default(now())
   method       String?  // bank_transfer | cheque | card | cash
+  /// Process 38 — the approved customer PaymentChannel the money came in on
+  /// (optional). When set, `method` is derived from the channel's `channelType`.
+  paymentChannelId String?
+  paymentChannel   PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
 
   remittance   Remittance?
 }
@@ -1294,16 +1726,68 @@ model Remittance {
   insurer     Insurer  @relation(fields: [insurerId], references: [id])
   amount      Decimal  @db.Decimal(18, 3)
   remittedAt  DateTime?
+  /// Process 38 — the approved insurer PaymentChannel the funds went out on
+  /// (optional).
+  paymentChannelId String?
+  paymentChannel   PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
+}
+
+/// Process 38 — a governed, approved payment channel for a customer (money IN,
+/// referenced on a collection Receipt) or an insurer (money OUT, referenced on
+/// a Remittance). Finance maintains the list; #32's Receipt / Remittance record
+/// WHICH approved channel a movement used. Masked-only: NO full bank account /
+/// card number is stored (ibms-brain/meta/lex/sensitive-data-handling.md —
+/// bank/card data is Highly Confidential); `accountLast4` is the permitted
+/// masked form, so the model itself stays CONFIDENTIAL.
+///
+/// `PaymentChannel_owner_exactly_one` CHECK (migration 20260903140000): exactly
+/// one of (customerId, insurerId) is set and it matches `ownerType`.
+model PaymentChannel {
+  id            String    @id @default(uuid())
+  ownerType     String    // customer | insurer
+  customerId    String?
+  // onDelete: Restrict — SET NULL (Prisma's default for an optional relation)
+  // would break `PaymentChannel_owner_exactly_one` on a hard delete of the owner.
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  insurerId     String?
+  insurer       Insurer?  @relation(fields: [insurerId], references: [id], onDelete: Restrict)
+  channelType   String    // bank_transfer | cheque | card | cash
+  label         String
+  bankName      String?
+  accountLast4  String?   // masked — at most 4 digits; NEVER the full number
+  currency      String    @default("JOD")
+  status        String    @default("active") // active | disabled
+  disabledAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  receipts      Receipt[]
+  remittances   Remittance[]
+
+  @@index([ownerType, customerId])
+  @@index([ownerType, insurerId])
 }
 
 /// Process 35 — insurer- and product-specific commission rate table
 /// (illustrative rates: Motor 12%, Medical 10%, Property 15%, Life 20%).
+/// AT MOST ONE currently-open agreement per (insurerId, insuranceLine) — a
+/// partial `UNIQUE ("insurerId", "insuranceLine") WHERE "effectiveTo" IS NULL`
+/// (migration 20260903120000, raw SQL — Prisma can't express a predicate
+/// UNIQUE). A rate change closes the prior window (`effectiveTo`) and opens a
+/// new one in one $transaction; the index is the race backstop
+/// (ibms-brain/meta/lex/race-safe-invariants.md).
+///
+/// Process 36 — `vatRatePercent` is the GOVERNED VAT rate (Jordan GST on the
+/// broker's commission income) for the pair: Compliance / Manager set it on
+/// the window alongside `ratePercent`, Finance only applies it. Snapshotted
+/// onto each CommissionLedgerEntry at calculate time. DRAFTED default 0 — no
+/// governed tax-rate source is encoded in the system yet.
 model CommissionAgreement {
   id            String   @id @default(uuid())
   insurerId     String
   insurer       Insurer  @relation(fields: [insurerId], references: [id])
   insuranceLine String
   ratePercent   Decimal  @db.Decimal(5, 2)
+  vatRatePercent Decimal @default(0) @db.Decimal(5, 2)
   effectiveFrom DateTime @default(now())
   effectiveTo   DateTime?
 
@@ -1312,8 +1796,29 @@ model CommissionAgreement {
   @@index([insurerId, insuranceLine])
 }
 
-/// Process 36 — commission rate, amount, VAT/tax implications, paid,
-/// outstanding, reversed.
+/// Process 35–36 — the governed commission earned on a policy. #35 records the
+/// ONE new-business entry per policy (`@@unique([policyId])`, write-once —
+/// the #31 Invoice pattern) at the governed rate; #36 tracks its lifecycle
+/// (rate/amount/VAT/paid/outstanding/reversed). `amount` is the governed
+/// figure; `overrideAmount` is a PROPOSED manual override held separately
+/// until APPROVED, at which point the approve step copies it into `amount`.
+/// Maker/checker on the override pair (overrideRequestedByUserId <>
+/// overrideApprovedByUserId) is DB-enforced by
+/// CommissionLedgerEntry_maker_checker_distinct (migration 20260826091424) +
+/// assertDifferentActors in the service.
+///
+/// Process 36 lifecycle (`status`, a plain string — NOT a WorkflowTransition
+/// entity; the legal moves live in commission.config.ts's
+/// COMMISSION_ENTRY_TRANSITIONS and every move is a status-conditional
+/// updateMany, race-safe-invariants.md):
+///   outstanding --settle (insurer statement reconciled)--> paid
+///   {outstanding|paid} --a Process 22 CommissionReversal for the policy--> reversed
+/// `vatRatePercent` is snapshotted from the governing CommissionAgreement at
+/// calculate; `vatAmount == amount x vatRatePercent%` always (approve
+/// recomputes it). `paid*` = the reconciliation outcome (paidAmount MUST equal
+/// `amount` — a variance is a Process 39 exception). `reversed*` = the clawback
+/// outcome; `reversedAmount` accumulates and `status` flips to 'reversed' once
+/// the full earned commission is clawed back.
 model CommissionLedgerEntry {
   id                     String   @id @default(uuid())
   policyId               String
@@ -1321,7 +1826,11 @@ model CommissionLedgerEntry {
   commissionAgreementId  String?
   commissionAgreement    CommissionAgreement? @relation(fields: [commissionAgreementId], references: [id])
   amount                 Decimal  @db.Decimal(18, 3)
+  vatRatePercent         Decimal  @default(0) @db.Decimal(5, 2)
   vatAmount              Decimal  @db.Decimal(18, 3) @default(0)
+  /// Process 35 — the proposed manual-override amount; null unless an override
+  /// has been raised. Copied into `amount` only when the override is approved.
+  overrideAmount         Decimal? @db.Decimal(18, 3)
   status                 String   @default("outstanding") // outstanding | paid | reversed
   isManualOverride       Boolean  @default(false)
   overrideReason         String?  // manual override requires an approval reason, logged
@@ -1330,11 +1839,41 @@ model CommissionLedgerEntry {
   // (app- and DB-enforced).
   overrideRequestedByUserId String?
   overrideApprovedByUserId String?
+  // Process 36 — reconciliation outcome (outstanding -> paid).
+  paidAmount             Decimal? @db.Decimal(18, 3)
+  paidAt                 DateTime?
+  paymentReference       String?  // the insurer statement / payment reference — a pointer, not free text
+  // Process 36 — clawback outcome ({outstanding|paid} -> reversed), driven by
+  // a Process 22 CommissionReversal on the policy.
+  reversedAmount         Decimal? @db.Decimal(18, 3)
+  reversedAt             DateTime?
+  reversalReason         String?  // why the commission was reversed — logged (a business justification)
   createdAt              DateTime @default(now())
+
+  @@unique([policyId])
 }
 
-/// Process 39 — every reconciliation mismatch raised as an EXPLICIT
-/// exception with the exact variance amount, NEVER silently written off.
+/// Process 39 — every reconciliation mismatch (insurer statement vs. broker
+/// record) raised as an EXPLICIT exception with the exact variance amount,
+/// NEVER silently written off (money-decimal-jod.md). `varianceAmount =
+/// insurerStatementAmount − brokerRecordAmount`, exact to the fils.
+///
+/// Lifecycle (`status`, a plain string — NOT a WorkflowTransition entity; the
+/// legal moves live in finance.config.ts's RECON_EXCEPTION_TRANSITIONS and
+/// every move is a status-conditional updateMany, race-safe-invariants.md):
+///   open --investigate--> investigating --resolve--> resolved
+///   open --resolve--> resolved   (an investigation step is optional)
+/// The parent `Invoice` (when tied) IS a WorkflowTransition entity: detect
+/// drives COLLECTED|RECONCILED -> EXCEPTION_RAISED; resolve drives
+/// EXCEPTION_RAISED -> EXCEPTION_RESOLVED -> RECONCILED (`resumeInvoiceAs`;
+/// only RECONCILED — a straight -> REMITTED would skip the Remittance +
+/// client-funds ledger entry). Resolving NEVER adjusts a figure — the
+/// variance stays recorded here.
+///
+/// RACE-SAFE INVARIANT (race-safe-invariants.md): at most ONE non-resolved
+/// exception per invoice — the partial UNIQUE index
+/// `ReconciliationException_one_open_per_invoice` (migration 20260903150000,
+/// raw SQL: `WHERE "status" <> 'resolved' AND "invoiceId" IS NOT NULL`).
 model ReconciliationException {
   id                String   @id @default(uuid())
   invoiceId         String?
@@ -1343,9 +1882,17 @@ model ReconciliationException {
   brokerRecordAmount Decimal @db.Decimal(18, 3)
   varianceAmount    Decimal  @db.Decimal(18, 3)
   status            String   @default("open") // open | investigating | resolved
+  raisedByUserId    String?
   investigatedByUserId String?
+  resolvedByUserId  String?
+  /// Why the variance was closed — logged verbatim (a business justification,
+  /// not personal data). Mandatory on resolve.
+  resolutionNote    String?
   resolvedAt        DateTime?
   createdAt         DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([status])
 }
 
 /// Process 32/7.3 — client funds must be identifiable and reconcilable
@@ -1364,17 +1911,45 @@ model ClientFundsLedgerEntry {
 // PROCESSES 41-46 — CUSTOMER SERVICE
 // ============================================================================
 
-/// Process 41 — certificates, copies, changes, with SLA tracking.
+/// Process 41 (backlog Part C #41) — certificates, copies, changes, with SLA
+/// tracking. `status` is a PLAIN STRING (not a WorkflowTransition entity — the
+/// `CommissionLedgerEntry` / `ReconciliationException` pattern): the legal
+/// moves live in `service-request.config.ts`'s SERVICE_REQUEST_TRANSITIONS
+/// (`open --start--> in_progress`, `{open|in_progress} --fulfil--> fulfilled`,
+/// `{open|in_progress} --cancel--> cancelled`) and every move is a
+/// status-conditional `updateMany` (race-safe-invariants.md). One `SlaTimer`
+/// (`slaTimerId @unique`, `service_request_fulfilment` workflow — a DRAFTED
+/// 5-business-day default, see sla-registry.config.ts) is started best-effort
+/// at create and resolved on fulfil / cancel. `outcomeNote` (mandatory on
+/// fulfil / cancel) is logged verbatim (what was done / why cancelled — a
+/// business note, not personal data). No maker/checker.
 model ServiceRequest {
   id           String   @id @default(uuid())
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
+  policyId     String?
+  policy       Policy?  @relation(fields: [policyId], references: [id])
   requestType  String   // certificate | copy | change | other
-  status       String   @default("open")
+  /// Free text — what specifically is requested (which policy / for whom /
+  /// what change). Optional; not personal data by policy.
+  detail       String?
+  status       String   @default("open") // open | in_progress | fulfilled | cancelled
   slaTimerId   String?  @unique
   slaTimer     SlaTimer? @relation(fields: [slaTimerId], references: [id])
+  raisedByUserId    String?
+  assignedToUserId  String?
+  fulfilledByUserId String?
+  /// What was done (fulfil) / why it was cancelled — mandatory at closure,
+  /// logged verbatim.
+  outcomeNote  String?
   createdAt    DateTime @default(now())
   closedAt     DateTime?
+
+  @@index([customerId])
+  // serves the "open queue" read (status filter + newest-first order) and the
+  // "my queue" read (assignedToUserId filter).
+  @@index([status, createdAt])
+  @@index([assignedToUserId])
 }
 
 enum ComplaintStatus {
@@ -1386,8 +1961,18 @@ enum ComplaintStatus {
   ESCALATED
 }
 
-/// Process 42 / Part 3.8 — date, customer, issue, responsible employee,
-/// SLA, action, resolution, closure date.
+/// Process 42 / Part 3.8 (backlog Part C #42, Domain E) — a customer
+/// complaint: date, customer, issue, responsible employee, SLA, actions,
+/// resolution, closure date. `status` IS driven by `WorkflowTransitionService`
+/// (`WORKFLOW_TRANSITIONS.Complaint` —
+/// `LOGGED -> ASSIGNED -> IN_PROGRESS -> {RESOLVED | ESCALATED}`,
+/// `ESCALATED -> {IN_PROGRESS | RESOLVED}`, `RESOLVED -> CLOSED`), never a
+/// bare `.status =`. Closure carries a **mandatory supervisor sign-off**:
+/// `closureApprovedByUserId` must differ from `resolvedByUserId` (the maker) —
+/// `assertDifferentActors` + the `Complaint_closure_maker_checker_distinct`
+/// CHECK (migration `20260903170000`). `slaTimerId` links the ONE generic
+/// `SlaTimer` row (`complaint_resolution` — a DRAFTED 10-business-day default);
+/// best-effort, resolved when the complaint is resolved / escalated.
 model Complaint {
   id                 String   @id @default(uuid())
   customerId         String
@@ -1403,7 +1988,11 @@ model Complaint {
   slaTimerId         String?  @unique
   slaTimer           SlaTimer? @relation(fields: [slaTimerId], references: [id])
   resolution         String?
-  // closure requires supervisor approval before case is closed
+  // who moved the complaint to RESOLVED (the maker for the closure sign-off)
+  resolvedByUserId   String?
+  resolvedAt         DateTime?
+  // closure requires supervisor approval (MANAGER) before case is closed —
+  // MUST differ from resolvedByUserId (maker/checker segregation, Part 5.2)
   closureApprovedByUserId String?
   closedAt           DateTime?
   createdAt          DateTime @default(now())
@@ -1412,7 +2001,10 @@ model Complaint {
   escalations        EscalationRecord[]
 
   @@index([customerId])
-  @@index([status])
+  // the "open queue" read (status filter + newest-first order)
+  @@index([status, createdAt])
+  @@index([claimId])
+  @@index([responsibleEmployeeUserId])
 }
 
 model ComplaintAction {
@@ -1422,28 +2014,87 @@ model ComplaintAction {
   actionText  String
   takenByUserId String
   takenAt     DateTime  @default(now())
+
+  @@index([complaintId])
 }
 
-/// Process 42 — escalation to regulator / insurance dispute resolution
-/// mechanism, captured as a case status.
+/// Process 42 — escalation to management / the regulator / the Insurance
+/// Dispute Resolution Committee when a complaint cannot be resolved
+/// internally (a `complaint.escalate` action; the complaint moves to
+/// `ESCALATED`).
 model EscalationRecord {
   id            String    @id @default(uuid())
   complaintId   String
   complaint     Complaint @relation(fields: [complaintId], references: [id])
   escalatedTo   String    // management | regulator | dispute_resolution_committee
+  escalatedByUserId String?
   escalatedAt   DateTime  @default(now())
   reason        String?
+
+  @@index([complaintId])
 }
 
-/// Process 44 — outbound communication across channels, full logging.
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+/// Process 44 — outbound customer communication across channels, full
+/// logging — AND (backlog Part C #12, Domain B) broker<->insurer
+/// correspondence during an RFQ's market phase ("answer insurer queries and
+/// supply additional information"). The Process 44 columns (`templateId`,
+/// `languageUsed`, `respectedConsent`, `isMarketing`, `consentRecordId`) are
+/// untouched by placement rows; `direction` defaults to OUTBOUND so Process 44
+/// (always outbound) needs no change. A placement row carries `rfqId` (+
+/// optional `rfqInsurerId` to pin it to one insurer submission; null = the
+/// whole panel), a free-text `body`, and `loggedByUserId`; its `customerId`
+/// is backfilled from the RFQ's Opportunity's Customer.
+///
+/// DISCRIMINATOR: `rfqId IS NULL` == a Process-44 customer-communication row;
+/// `rfqId IS NOT NULL` == a Part C #12 RFQ-correspondence row. A placement
+/// row *also* has `customerId` set (backfilled), so a Process-44 "all
+/// communications for customer X" query MUST filter `rfqId IS NULL` or it
+/// will pick up RFQ correspondence too.
+///
+/// Process 44 (backlog Part C #44): `CommunicationService` records a send at
+/// `direction = OUTBOUND`, `languageUsed` / `channel` derived from the
+/// `Customer` record (a disagreeing explicit value is a 422 — "respect the
+/// customer's recorded channel and language"), and — for a marketing send
+/// (`isMarketing = true`) — only after the customer's latest MARKETING
+/// `ConsentRecord` is `granted` and not withdrawn (PDPL / `PRIV-SOP-04`; M03).
+/// `consentRecordId` pins the consent record relied on. Not a
+/// WorkflowTransitionService entity, no maker/checker (a factual log, like
+/// `Interaction` #10).
 model CommunicationLog {
   id          String   @id @default(uuid())
-  customerId  String
+  customerId  String?
   channel     InteractionChannel
   templateId  String?
-  languageUsed LanguagePreference
+  languageUsed LanguagePreference?
+  direction   CommunicationDirection @default(OUTBOUND)
+  rfqId       String?
+  rfq         RFQ? @relation(fields: [rfqId], references: [id])
+  rfqInsurerId String?
+  rfqInsurer  RFQInsurer? @relation(fields: [rfqInsurerId], references: [id])
+  subject     String?
+  body        String?
+  loggedByUserId String?
   sentAt      DateTime @default(now())
+  createdAt   DateTime @default(now())
   respectedConsent Boolean @default(true) // must respect customer's consent preference
+  // Process 44 — a marketing send (the ConsentRecord gate applies). false = a
+  // service / transactional message (contractual necessity, no consent gate).
+  isMarketing Boolean @default(false)
+  // Process 44 — the marketing ConsentRecord relied on at send time. Null for
+  // a non-marketing send. ON DELETE SET NULL — the log row outlives the
+  // consent record it referenced.
+  consentRecordId String?
+  consentRecord   ConsentRecord? @relation(fields: [consentRecordId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, sentAt])
+  @@index([rfqId])
+  @@index([rfqInsurerId])
+  @@index([consentRecordId])
 }
 
 /// Process 45 — satisfaction feedback post-issuance, post-claim,
@@ -1564,18 +2215,114 @@ model ProfessionalIndemnityRiskEvent {
 /// Part 7.2 — transaction monitoring for unusual patterns (unusually large
 /// premium payments, frequent cancellations/refunds, third-party premium
 /// payment sources), escalating to Suspicious Activity where warranted.
+///
+/// Process 48 (backlog Part C #48) — `sourceEntityType`/`sourceEntityId`
+/// identify the exact Receipt that triggered an event-scoped alert
+/// (`large_premium_payment` / `third_party_payment_source`); both stay null
+/// for the two customer-level aggregate patterns (`frequent_cancellations` /
+/// `frequent_refunds`), which have no single triggering row.
+/// `@@unique([patternType, sourceEntityId])` stops the nightly sweep from
+/// re-alerting the same Receipt forever — Postgres treats every NULL
+/// `sourceEntityId` as distinct, so this is a no-op for the two aggregate
+/// patterns (and for a manual log, which never sets `sourceEntityId`
+/// either). Their own "one OPEN alert per customer" guard is a
+/// hand-authored partial UNIQUE index, scoped directly to
+/// `patternType IN ('frequent_cancellations','frequent_refunds')` — NOT to
+/// `sourceEntityId IS NULL` (migration 20260904130000_add_transaction_
+/// monitoring, the UpSellRecommendation / ClaimFollowUpAlert shape —
+/// ibms-brain/meta/lex/race-safe-invariants.md; a `sourceEntityId IS NULL`
+/// predicate would also collide two unrelated manual `other`-pattern alerts
+/// for the same customer, a real `@code-reviewer` BLOCKER on the first pass).
 model TransactionMonitoringAlert {
   id                 String   @id @default(uuid())
   customerId         String?
   customer           Customer? @relation(fields: [customerId], references: [id])
   patternType        String   // large_premium_payment | frequent_cancellations | frequent_refunds | third_party_payment_source | other
   detailText         String?
+  sourceEntityType   String?
+  sourceEntityId     String?
   detectedAt         DateTime @default(now())
   escalatedToSuspiciousActivity Boolean @default(false)
   escalatedAt        DateTime?
   reportedToAuthorityAt DateTime? // record-keeping for regulator-mandated retention (Part 7.2)
   status             String   @default("open")
   classification     DataClassification @default(HIGHLY_CONFIDENTIAL) // names payment sources/counterparties, AML-sensitive
+
+  @@unique([patternType, sourceEntityId])
+  @@index([customerId])
+  @@index([status])
+  @@index([patternType])
+}
+
+enum WatchlistSource {
+  OFAC_SDN
+  UN_CONSOLIDATED
+}
+
+/// Process 49 — a locally-cached copy of a free, publicly published
+/// sanctions/PEP list (the source of truth stays with the publisher; this
+/// table is a sync target, refreshed by `WatchlistSyncScheduler`, never
+/// hand-edited). `sourceRecordId` is the source's own stable identifier
+/// (OFAC `ent_num`, UN `DATAID`) — the upsert/prune key on every sync.
+/// `normalizedName` is the SAME canonicalisation
+/// (`normalizeWatchlistName` — uppercase, punctuation stripped, tokens
+/// sorted) `ScreeningService` applies to a customer/UBO name at match time,
+/// so a stored equality check is the whole match — not fuzzy/phonetic, a
+/// documented limitation (see `watchlist-sync.config.ts`). A record whose
+/// name normalizes to an empty string (an all-non-letter/digit `fullName`)
+/// is never stored — see `WatchlistSyncService`.
+///
+/// `classification` — a `@code-reviewer` BLOCKER on the first pass had NO
+/// classification field at all, reasoning in a code comment that this is
+/// "public government text, not IBMS customer data" — an engineering-derived
+/// privacy determination that `ibms-brain/meta/designs/2026-08-pcms-source-
+/// of-truth.md` says belongs to PCMS (PRIV-STD-02), not to this codebase.
+/// Defaulted to the conservative `HIGHLY_CONFIDENTIAL` tier pending that
+/// citation — `remarks` can carry a real, named individual's DOB and
+/// alleged-conduct text — DRAFTED, same status as `kyc-aml-sla-timers.md`'s
+/// figures until PRIV-STD-02 is consulted.
+model WatchlistEntry {
+  id             String          @id @default(uuid())
+  source         WatchlistSource
+  sourceRecordId String
+  fullName       String
+  normalizedName String
+  listProgram    String?         // OFAC "Program", or UN "UN_LIST_TYPE"/"REFERENCE_NUMBER"
+  remarks        String?         // OFAC "Remarks", or UN "COMMENTS1"
+  classification DataClassification @default(HIGHLY_CONFIDENTIAL) // DRAFTED pending PRIV-STD-02 — see model comment
+  syncRunId      String          // the WatchlistSyncRun that last confirmed this row is still on the source list
+  syncedAt       DateTime        @default(now())
+
+  @@unique([source, sourceRecordId])
+  @@index([normalizedName])
+  @@index([source])
+}
+
+/// Process 49 — one row per sync attempt (scheduled every 12h, matching the
+/// source lists' own refresh cadence, or on-demand). The operational health
+/// record for the sync job — not an AuditLogEntry, the same "own tracking
+/// table, not the compliance audit trail" shape as `SlaTimer` /
+/// `AccessRecertificationCycle`.
+///
+/// `@@unique` below (raw SQL, migration `20260904140000` — Prisma can't
+/// express the predicate): at most one `status = 'running'` row per
+/// `source` — a `@code-reviewer` BLOCKER on the first pass: with no guard,
+/// a manual `POST /watchlist-sync/run` firing while the 12-hourly
+/// `WatchlistSyncScheduler` is mid-run (or two concurrent manual triggers)
+/// let two syncs of the SAME source interleave — one run's `pruneStale`
+/// (`watchlist-entry.repository.ts`) deletes rows the OTHER run had just
+/// correctly (re-)written under a different `syncRunId`, silently dropping
+/// real, currently-sanctioned entries from the cache until the next sync.
+/// `WatchlistSyncService.createSyncRun`'s `P2002` on this index is caught
+/// and mapped to a `skipped` outcome, not a `failed` one.
+model WatchlistSyncRun {
+  id           String          @id @default(uuid())
+  source       WatchlistSource
+  startedAt    DateTime        @default(now())
+  completedAt  DateTime?
+  status       String          @default("running") // running | succeeded | failed
+  recordCount  Int?
+  errorMessage String?
 }
 
 /// Process 51 — configurable compliance calendar for CBJ regulatory
@@ -1668,7 +2415,11 @@ model IncidentReport {
   impactAssessedAt      DateTime?
   classification        IncidentClassification @default(NOT_YET_CLASSIFIED)
   classifiedByDpoUserId String?
-  seniorManagementCoSignUserId String? // Material classification irreversible without this
+  // Material classification irreversible without this — `assertDifferentActors`
+  // (app-level) + `IncidentReport_classification_maker_checker_distinct` CHECK
+  // (migration 20260906120000, Process 55) both enforce that this is a
+  // DIFFERENT officer than classifiedByDpoUserId.
+  seniorManagementCoSignUserId String?
   seniorManagementNotifiedAt DateTime? // within 1 hour of Material classification
   notifiedRegulators    String[] // CBJ | NCSC | Personal_Data_Protection_Council
   notifiedAt            DateTime?
@@ -1710,6 +2461,8 @@ model ConsentRecord {
   grantedAt       DateTime?
   withdrawnAt     DateTime? // must reflect in register within 2 business days (SLA)
   createdAt       DateTime  @default(now())
+
+  communicationLogs CommunicationLog[] // Process 44 — marketing sends that relied on this consent
 
   @@index([customerId])
 }
@@ -1754,9 +2507,32 @@ model DataSubjectRequest {
   closedAt              DateTime?
   dpoHandlerUserId      String?
   createdAt             DateTime  @default(now())
+  // Process 52/M04 (backlog Part D) widening — maker/checker segregation for
+  // closure (Part 5.2 / maker-checker-segregation.md): processedByUserId is
+  // stamped by whichever of verify->fulfil/partially-fulfil/reject actually
+  // drove the terminal outcome (the MAKER); closedByUserId (the CHECKER) must
+  // differ — enforced app-side (assertDifferentActors) AND by the
+  // DataSubjectRequest_closure_maker_checker_distinct CHECK below. Both are
+  // DPO-only permissions (dsr.handle / dsr.close) — segregation here is
+  // between two distinct DPO officers, not between roles.
+  processedByUserId     String?
+  closedByUserId        String?
+  rejectionReason       String?
+  // DELETION-only staff attestation persisted at fulfil() time (a
+  // @code-reviewer MAJOR on the first pass: confirmNoOpenRetentionHold was
+  // validated in-memory from the request DTO and then discarded — nothing
+  // survived to prove which DPO officer attested "no retention hold applies"
+  // before this Deletion was marked fully fulfilled). Retention & Disposal
+  // (M06) is not built yet, so this stays a staff attestation, not an
+  // automated check against RetentionScheduleItem/LegalHold — see
+  // dsr.config.ts's header comment.
+  noOpenRetentionHoldConfirmedAt DateTime?
 
   @@index([status])
   @@index([slaDueAt])
+  @@index([customerId])
+  @@index([insuredPersonId])
+  @@index([dpoHandlerUserId])
 }
 
 /// Part 6.2 (M06) — retention periods per record category against a
@@ -1951,8 +2727,38 @@ model RopaEntry {
 }
 
 // ============================================================================
-// PART 13 — MANAGEMENT: INSURER & EMPLOYEE PERFORMANCE
+// PART 13 — MANAGEMENT: SALES, INSURER & EMPLOYEE PERFORMANCE
 // ============================================================================
+
+/// Process 59 — a sales quota set for one Sales/Relationship Officer OR one
+/// Branch (never both — SalesTarget_owner_xor_branch, a hand-authored CHECK,
+/// migration 20260910120000) for a period. `ownerUserId`/`branchId` are bare
+/// scalars (the Opportunity.createdByUserId / Policy.placedByUserId shape),
+/// not relations — this table is a live-query scope selector, not a
+/// provenance trail. `SalesPerformanceService` resolves the "actual" side
+/// (new Prospects qualified in the same window, by that owner or by anyone
+/// in that branch) live against Lead/Prospect at read time — this model
+/// never stores an actual figure itself, only the target. Two hand-authored
+/// PARTIAL unique indexes (not a single composite `@@unique`, since Postgres
+/// treats every NULL as distinct in a plain composite unique — the #48
+/// AML gotcha) enforce "at most one target per owner per period label" and
+/// "at most one target per branch per period label" independently.
+model SalesTarget {
+  id                 String   @id @default(uuid())
+  ownerUserId        String?
+  branchId           String?
+  periodLabel        String
+  periodStart        DateTime
+  periodEnd          DateTime
+  targetNewProspects Int
+  createdByUserId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@index([branchId])
+  @@index([periodStart, periodEnd])
+}
 
 /// Process 60 — score insurers on Quote Response, Claims Service, Price,
 /// Service quality.
@@ -2051,6 +2857,7 @@ model Insurer {
   policies          Policy[]
   commissionAgreements CommissionAgreement[]
   remittances       Remittance[]
+  paymentChannels   PaymentChannel[]
   performanceScores InsurerPerformanceScore[]
 }
 
@@ -2106,6 +2913,10 @@ model Document {
   id               String   @id @default(uuid())
   policyId         String?
   policy           Policy?  @relation("PolicyDocuments", fields: [policyId], references: [id])
+  // Process 3-4 (Customer Acquisition/Onboarding) — APPLICATION_PROPOSAL
+  // onboarding documents attach to a Customer before any Policy exists.
+  customerId       String?
+  customer         Customer? @relation("CustomerDocuments", fields: [customerId], references: [id])
   category         DocumentCategory
   classification   DataClassification
   fileName         String
@@ -2122,6 +2933,7 @@ model Document {
   claimDocuments   ClaimDocument[]
 
   @@index([policyId])
+  @@index([customerId])
   @@index([classification])
 }
 

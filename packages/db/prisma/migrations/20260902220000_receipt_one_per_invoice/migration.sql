@@ -1,0 +1,17 @@
+-- Process 32 — Collection (backlog Part C #32, Domain D).
+--
+-- "One collection receipt per invoice" is a real DB invariant, not a
+-- read-then-create (ibms-brain/meta/lex/race-safe-invariants.md). #32 records
+-- exactly one full-payment Receipt per Invoice; without this UNIQUE, a
+-- concurrent or retried POST /invoices/:id/receipt could write two Receipt
+-- rows AND two `in` ClientFundsLedgerEntry rows for the same invoice (the
+-- client's premium booked into client funds twice — unreconcilable, Part 7.3).
+-- The INVOICED -> COLLECTED engine transition is NOT the gate: a caller that
+-- lost that race still reaches the artefact $transaction before the winner's
+-- has committed. This matches Remittance.receiptId @unique on the next hop and
+-- the Invoice new-business partial UNIQUE (migration 20260902210000).
+--
+-- Partial-payment support (multiple receipts summing to the total) is a
+-- deferred refinement; it would drop this and replace it with a discriminated
+-- constraint.
+CREATE UNIQUE INDEX IF NOT EXISTS "Receipt_invoiceId_key" ON "Receipt" ("invoiceId");

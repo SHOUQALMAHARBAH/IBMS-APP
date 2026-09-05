@@ -1,22 +1,49 @@
 import type {
   ClaimStatus,
   ComplaintStatus,
+  CrossSellStatus,
+  CustomerStatus,
   DisposalBatchStatus,
   DsrStatus,
   EndorsementStatus,
   IncidentStatus,
+  InsuranceProgramStatus,
   InvoiceStatus,
+  KycStatus,
+  LeadStatus,
+  NeedsAssessmentStatus,
   OpportunityStatus,
   PolicyStatus,
   Prisma,
   RenewalStatus,
   RfqInsurerStatus,
+  UpSellStatus,
 } from '@ibms/db';
 import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * The eleven workflow-state entities named in
- * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6.
+ * ibms-brain/meta/lex/workflow-state-transitions.md and backlog item A.6,
+ * plus `Lead`, `KYCRecord`, `Customer`, `NeedsAssessment`,
+ * `InsuranceProgram`, `CrossSellOpportunity`, and `UpSellRecommendation` —
+ * the lex file's rule is not scoped to that named list ("Every entity that
+ * carries a workflow state ... moves through a transition()"), and each of
+ * these backlog items (Part C #1 Lead Management, #3-4 Customer
+ * Acquisition/Onboarding, #5 Needs Assessment, #7 Product Recommendation /
+ * Program Design, #8 Cross-Selling, #9 Up-Selling) explicitly asks for a
+ * governed status move, so they reuse this engine rather than growing
+ * one-off transition functions. `KycStatus` and
+ * `CustomerStatus` were added together: backlog #3-4 explicitly says "do not
+ * activate Customer.status = ACTIVE before [KYC] approval" — see
+ * kyc.service.ts, the sole caller of the Customer transition.
+ * `NeedsAssessmentStatus` carries the review/approval gate the #5 backlog
+ * item asks for — see needs-assessment.service.ts. `InsuranceProgramStatus`
+ * carries the DRAFT -> FINALIZED lock the #7 backlog item's program-assembly
+ * implies — see insurance-program.service.ts. `CrossSellStatus` carries the
+ * "convert/dismiss the opportunity" move the #8 backlog item asks for — see
+ * cross-sell.service.ts. `UpSellStatus` is the same OPEN -> CONVERTED |
+ * DISMISSED shape for #9's system-flagged under-insurance recommendations —
+ * see up-sell.service.ts.
  * The string values match the `entityType` already used for these models'
  * AuditLogEntry rows elsewhere (AuditService is polymorphic on this same
  * string), so a TRANSITION audit row and any other action on the same
@@ -33,7 +60,14 @@ export type WorkflowEntityType =
   | 'Invoice'
   | 'DataSubjectRequest'
   | 'IncidentReport'
-  | 'DisposalBatch';
+  | 'DisposalBatch'
+  | 'Lead'
+  | 'KYCRecord'
+  | 'Customer'
+  | 'NeedsAssessment'
+  | 'InsuranceProgram'
+  | 'CrossSellOpportunity'
+  | 'UpSellRecommendation';
 
 /** Maps each entity to the Prisma-generated enum type its `status` column holds. */
 export interface WorkflowStatusMap {
@@ -48,6 +82,13 @@ export interface WorkflowStatusMap {
   DataSubjectRequest: DsrStatus;
   IncidentReport: IncidentStatus;
   DisposalBatch: DisposalBatchStatus;
+  Lead: LeadStatus;
+  KYCRecord: KycStatus;
+  Customer: CustomerStatus;
+  NeedsAssessment: NeedsAssessmentStatus;
+  InsuranceProgram: InsuranceProgramStatus;
+  CrossSellOpportunity: CrossSellStatus;
+  UpSellRecommendation: UpSellStatus;
 }
 
 /**
@@ -96,10 +137,20 @@ export const WORKFLOW_TRANSITIONS: {
     CLOSED_LOST: [],
   },
 
-  // Inferred (no dedicated lifecycle doc yet — see file header). SENT ->
-  // insurer views and/or responds; a follow-up alert (Process 12) marks a
-  // silent insurer NO_RESPONSE, but a late responder can still submit a
-  // quote or decline afterward.
+  // The move map itself is inferred from field semantics (no Part-3.3
+  // paragraph draws these arrows); the NO_RESPONSE mechanics are documented
+  // in ibms-brain/meta/context/policy-lifecycle.md § "The rules that aren't
+  // obvious" (filed via `/brain-gap` at backlog Part C #12, extended at #13).
+  // SENT -> insurer views and/or responds. NO_RESPONSE is reached two ways:
+  // a Placement Officer records it manually (Process 12, `rfq.insurer.update`),
+  // OR the nightly follow-up sweep (backlog Part C #12) auto-advances a
+  // SENT/VIEWED submission once its RFQ's business-day `followUpThresholdDays`
+  // has lapsed (see rfq-followup.scheduler.ts / RfqService.runFollowUpScan —
+  // it also stamps `followUpAlertSentAt` + audits). The sweep first drops any
+  // submission whose insurer has a current `Quotation` (backlog Part C #13) —
+  // that insurer responded even if this status column never caught up. A late
+  // responder can still submit a quote or decline afterward, hence
+  // NO_RESPONSE -> QUOTED/DECLINED.
   RFQInsurer: {
     SENT: ['VIEWED', 'QUOTED', 'DECLINED', 'NO_RESPONSE'],
     VIEWED: ['QUOTED', 'DECLINED', 'NO_RESPONSE'],
@@ -264,6 +315,145 @@ export const WORKFLOW_TRANSITIONS: {
     EXECUTED: ['CLOSED'],
     CLOSED: [],
   },
+
+  // Backlog Part C #1 (Lead Management), verbatim: "NEW -> CONTACTED ->
+  // QUALIFIED -> CONVERTED_TO_PROSPECT/DISQUALIFIED". Read literally that
+  // puts DISQUALIFIED reachable only after QUALIFIED, but every sibling
+  // entity in this file that has a "the client went quiet/declined" exit
+  // (Opportunity's CLOSED_LOST, RenewalCase's LAPSED) models that exit as
+  // reachable from every non-terminal stage, not just the last one — a lead
+  // can go cold or turn out disqualified (wrong number, no budget, wrong
+  // segment) right after first contact, not only once fully qualified.
+  // Modeled the same way here; worth a `/brain-gap` to confirm against a
+  // real CRM-process source rather than this inference.
+  //
+  // QUALIFIED -> CONVERTED_TO_PROSPECT is correctly listed as reachable
+  // here — WorkflowTransitionService.transition() itself doesn't restrict
+  // it, and ProspectService.convert() (backlog Part C #2) calls it
+  // directly. But the GENERIC `POST /leads/:id/transition` endpoint
+  // additionally refuses that one target at the LeadService.transition()
+  // application layer (a Prospect must be created in the same operation,
+  // which the generic engine has no way to do) — see lead.service.ts. This
+  // map stays the source of truth for what's a legal STATE move; it is not
+  // a complete list of which endpoints may request which move.
+  Lead: {
+    NEW: ['CONTACTED', 'DISQUALIFIED'],
+    CONTACTED: ['QUALIFIED', 'DISQUALIFIED'],
+    QUALIFIED: ['CONVERTED_TO_PROSPECT', 'DISQUALIFIED'],
+    CONVERTED_TO_PROSPECT: [],
+    DISQUALIFIED: [],
+  },
+
+  // Backlog Part C #3-4 (Customer Acquisition/Onboarding), transcribed
+  // verbatim from the KYCRecord model comment in schema.prisma: "Draft ->
+  // Submitted -> Screening -> EDD(optional) -> Compliance Review ->
+  // Approved/Rejected -> Periodic Review Due". EDD is reachable only from
+  // SCREENING (ScreeningService decides the branch once results are in, or
+  // a Compliance Officer forces it via kyc.edd.trigger — see
+  // kyc.service.ts); COMPLIANCE_REVIEW is reachable from either SCREENING
+  // (no hit) or EDD (enhanced review complete). PERIODIC_REVIEW_DUE is
+  // terminal for THIS row, same shape as Lead's CONVERTED_TO_PROSPECT: the
+  // actual re-KYC cycle is a new KYCRecord for the same Customer (see
+  // KycPeriodicReviewScheduler), not a loop back onto this one.
+  KYCRecord: {
+    DRAFT: ['SUBMITTED'],
+    SUBMITTED: ['SCREENING'],
+    SCREENING: ['EDD', 'COMPLIANCE_REVIEW'],
+    EDD: ['COMPLIANCE_REVIEW'],
+    COMPLIANCE_REVIEW: ['APPROVED', 'REJECTED'],
+    APPROVED: ['PERIODIC_REVIEW_DUE'],
+    REJECTED: [],
+    PERIODIC_REVIEW_DUE: [],
+  },
+
+  // Backlog Part C #3-4: "do not activate Customer.status = ACTIVE before
+  // [KYC] approval" — ACTIVE is reachable only from PENDING_KYC, and the
+  // sole caller of that move is KycService.approve() (maker/checker-gated;
+  // see maker-checker.util.ts). SUSPENDED/CLOSED have no dedicated lifecycle
+  // doc in this backlog item — modeled the same way every other sibling
+  // entity in this file models its "something went wrong later" exits:
+  // reachable from ACTIVE, with SUSPENDED able to return to ACTIVE (a
+  // resolved suspension) or move on to CLOSED. Worth a `/brain-gap` to
+  // confirm against a real post-onboarding account-management process once
+  // one exists (Domain A Processes 5-10 aren't built yet).
+  Customer: {
+    PENDING_KYC: ['ACTIVE'],
+    ACTIVE: ['SUSPENDED', 'CLOSED'],
+    SUSPENDED: ['ACTIVE', 'CLOSED'],
+    CLOSED: [],
+  },
+
+  // Backlog Part C #5 (Needs Assessment), from the model's own status
+  // comment ("Data Collection -> Draft Assessment -> Reviewed -> Approved ->
+  // Linked to Opportunity/RFQ") narrowed to what is buildable now. The
+  // Sales Officer captures/edits in DRAFT and submits for review; the
+  // Branch/Department Manager (needs-assessment.approve) records a review,
+  // then an approval — two stamped columns (reviewedByUserId then
+  // approvedByUserId), each maker/checker-gated against createdByUserId (see
+  // needs-assessment.service.ts). A manager can bounce it back to DRAFT
+  // (returned for changes) from either PENDING_REVIEW or REVIEWED, or
+  // REJECTED it outright. APPROVED is terminal here: linking an approved
+  // assessment to an Opportunity/RFQ is Process 11+, not built — same
+  // "modeled up to the edge of the next unbuilt process" shape as Lead's
+  // CONVERTED_TO_PROSPECT was before Part C #2.
+  NeedsAssessment: {
+    DRAFT: ['PENDING_REVIEW'],
+    PENDING_REVIEW: ['REVIEWED', 'DRAFT', 'REJECTED'],
+    REVIEWED: ['APPROVED', 'DRAFT', 'REJECTED'],
+    APPROVED: [],
+    REJECTED: [],
+  },
+
+  // Backlog Part C #7 (Product Recommendation / Program Design). The #7 task
+  // list is a single "assemble" bullet with no explicit lifecycle, but a
+  // program that feeds an Opportunity/RFQ (Process 11+) must be lockable
+  // first — so: DRAFT once assembled from the APPROVED NeedsAssessment's
+  // coverage list + the RiskProfile survey, FINALIZED when the
+  // Placement/Technical Officer locks it. FINALIZED -> DRAFT (reopen) keeps
+  // a finalized program with an error from being a dead end. SUPERSEDED is
+  // the terminal state a re-assembled replacement would leave the old
+  // program in (e.g. a mid-cycle risk change per
+  // ibms-brain/meta/context/policy-lifecycle.md) — modeled and reachable,
+  // but no endpoint triggers it in this backlog item yet (same "modeled
+  // ahead of a real trigger" shape as Customer's SUSPENDED/CLOSED). See
+  // insurance-program.service.ts.
+  InsuranceProgram: {
+    DRAFT: ['FINALIZED', 'SUPERSEDED'],
+    FINALIZED: ['DRAFT', 'SUPERSEDED'],
+    SUPERSEDED: [],
+  },
+
+  // Backlog Part C #8 (Cross-Selling), verbatim: "Convert/dismiss the
+  // opportunity". A CrossSellOpportunity is created OPEN by the detection
+  // sweep (nothing else creates one — there is no user-facing "raise a
+  // cross-sell opportunity" path); a Sales Officer then either CONVERTED it
+  // (takes the gap forward into an Opportunity/RFQ — Process 11+, not built,
+  // so CONVERTED is terminal here, same "modeled up to the edge of the next
+  // unbuilt process" shape as Lead's CONVERTED_TO_PROSPECT was before Part C
+  // #2) or DISMISSED it (with a reason). Both non-OPEN states are terminal:
+  // the `@@unique([customerId, gapLine])` on CrossSellOpportunity means a
+  // resolved gap is never re-flagged as a new row either (see
+  // cross-sell.service.ts).
+  CrossSellOpportunity: {
+    OPEN: ['CONVERTED', 'DISMISSED'],
+    CONVERTED: [],
+    DISMISSED: [],
+  },
+
+  // Backlog Part C #9 (Up-Selling). Same shape as CrossSellOpportunity: a
+  // system-detected under-insurance recommendation is created OPEN by the
+  // detection sweep (nothing else creates one), then a Sales Officer either
+  // CONVERTED it (takes the proposed increase forward into an endorsement /
+  // re-quote — Process 22 / 11+, not built, so CONVERTED is terminal here)
+  // or DISMISSED it (with a reason). Both non-OPEN states are terminal; the
+  // partial UNIQUE index (customerId WHERE status = 'OPEN') keeps at most one
+  // OPEN per customer, and a resolved recommendation frees that slot for a
+  // fresh one once assets grow further (see up-sell.service.ts).
+  UpSellRecommendation: {
+    OPEN: ['CONVERTED', 'DISMISSED'],
+    CONVERTED: [],
+    DISMISSED: [],
+  },
 };
 
 /** True if `to` is a legal next status from `from` for the given entity. */
@@ -297,8 +487,8 @@ export function allowedNextStatuses<E extends WorkflowEntityType>(
  * The minimal shape `WorkflowTransitionService` needs from a Prisma model
  * delegate — every workflow entity's `status` column is a plain string enum
  * (see the cross-cutting rule #3 at the top of schema.prisma), so this one
- * narrow interface covers all eleven without depending on their individual
- * generated types.
+ * narrow interface covers every entity in `WORKFLOW_TRANSITIONS` without
+ * depending on their individual generated types.
  */
 export interface WorkflowDelegate {
   findUnique(args: {
@@ -327,6 +517,13 @@ export function getWorkflowDelegate(
     DataSubjectRequest: client.dataSubjectRequest,
     IncidentReport: client.incidentReport,
     DisposalBatch: client.disposalBatch,
+    Lead: client.lead,
+    KYCRecord: client.kYCRecord,
+    Customer: client.customer,
+    NeedsAssessment: client.needsAssessment,
+    InsuranceProgram: client.insuranceProgram,
+    CrossSellOpportunity: client.crossSellOpportunity,
+    UpSellRecommendation: client.upSellRecommendation,
   };
   return delegates[entityType] as WorkflowDelegate;
 }

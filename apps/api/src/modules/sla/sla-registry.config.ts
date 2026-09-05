@@ -243,6 +243,96 @@ export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
     citation:
       'pdpl-sla-timers.md row "Claim follow-up (insurer non-response)"; IBMS_Full_Scope_Context_Document.docx Part 3.5 (Claims); see also ClaimFollowUpAlert in schema.prisma',
   },
+  // Backlog Part C #3-4 (Customer Acquisition/Onboarding) asks for "a
+  // separate, longer SLA" on the EDD path, but — unlike every entry above —
+  // NEITHER of these two rows has a source in pdpl-sla-timers.md's registry
+  // (that table is PDPL-driven; KYC/EDD turnaround is a CBJ AML
+  // customer-due-diligence timing question, a different regulatory domain
+  // entirely). The durations below are a drafted default, not a sourced
+  // fact: 5 business days standard reuses this same table's DPIA-review
+  // figure as a reasonable "compliance review turnaround" analog; 15
+  // business days EDD reuses the DSR figure as the established "long"
+  // analog for a deeper review. Tracked as a brain gap in
+  // ibms-brain/meta/lex/kyc-aml-sla-timers.md (filed via `/brain-gap`) —
+  // do not cite this pair as PRIV-SOP/PRIV-STD-sourced in a PR the way the
+  // other 14 rows are.
+  {
+    workflowName: 'kyc_standard_review',
+    label: 'KYC compliance review (standard)',
+    entityType: 'KYCRecord',
+    duration: { value: 5, unit: 'businessDays' },
+    escalationStages: [
+      { offset: { value: 0, unit: 'businessDays' }, escalateTo: null },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers KYC/AML review turnaround)',
+  },
+  {
+    workflowName: 'kyc_edd_review',
+    label: 'KYC compliance review (enhanced due diligence)',
+    entityType: 'KYCRecord',
+    duration: { value: 15, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'COMPLIANCE_OFFICER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers KYC/AML EDD review turnaround)',
+  },
+  // Backlog Part C #41 (Customer Requests, Domain E). Like the two KYC rows
+  // above — but UNLIKE the 14 PDPL rows — this has NO source in
+  // pdpl-sla-timers.md's registry: a customer-service-request turnaround is a
+  // published service-standard / contractual courtesy target, not a PDPL
+  // statutory SLA, and Part 3.8 of the context document names no figure. The
+  // 5-business-day default below is a DRAFTED analog (the same figure this
+  // table already uses for DPIA review / KYC standard as a reasonable
+  // "internal review turnaround"). The backlog line explicitly names
+  // `SlaTimer`, so it is tracked here (not merely as a KPI); replace with a
+  // sourced figure when a broker service charter / SOP supplies one. Filed as
+  // a brain gap in ibms-brain/meta/context/customer-service-lifecycle.md.
+  {
+    workflowName: 'service_request_fulfilment',
+    label: 'Customer service request fulfilment',
+    entityType: 'ServiceRequest',
+    duration: { value: 5, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'BRANCH_DEPARTMENT_MANAGER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers customer-service-request turnaround; Part 3.8 names no figure. See ibms-brain/meta/context/customer-service-lifecycle.md',
+  },
+  // Backlog Part C #42 (Complaints Management, Domain E). Like the KYC and
+  // service-request rows above, this has NO source in pdpl-sla-timers.md's
+  // registry: a customer-complaint resolution turnaround is a CBJ insurance
+  // conduct-of-business matter (the CBJ Insurance Dispute Resolution
+  // Committee, which `EscalationRecord` routes to, is a real CBJ mechanism),
+  // NOT a PDPL statutory SLA — and Part 3.8 of the context document names no
+  // figure. 10 business days below is a DRAFTED analog (this table's DSR
+  // correction/objection figure, a reasonable "substantive response"
+  // window). The backlog line explicitly names `SlaTimer`, so it is tracked
+  // here (with the nightly escalation sweep to the internal supervisor);
+  // replace with a sourced figure when a CBJ complaint-handling instruction
+  // or a broker SOP supplies one. Filed as a brain gap in
+  // ibms-brain/meta/context/customer-service-lifecycle.md.
+  {
+    workflowName: 'complaint_resolution',
+    label: 'Customer complaint resolution',
+    entityType: 'Complaint',
+    duration: { value: 10, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'BRANCH_DEPARTMENT_MANAGER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers customer-complaint resolution turnaround; Part 3.8 names no figure (CBJ conduct-of-business, not PDPL). See ibms-brain/meta/context/customer-service-lifecycle.md',
+  },
 ];
 
 const SLA_REGISTRY_BY_NAME = new Map(
@@ -257,4 +347,18 @@ export function getSlaRegistryEntry(workflowName: string): SlaRegistryEntry {
     );
   }
   return entry;
+}
+
+/**
+ * Non-throwing sibling of {@link getSlaRegistryEntry} — returns `undefined`
+ * for an unknown `workflowName` instead of throwing. Used by the Process 43
+ * SLA dashboard, which reads persisted `SlaTimer.workflowName` values that
+ * could name a workflow since renamed or removed from the registry: a
+ * monitoring view must degrade gracefully (fall back to the raw name), not
+ * crash on a legacy row.
+ */
+export function findSlaRegistryEntry(
+  workflowName: string,
+): SlaRegistryEntry | undefined {
+  return SLA_REGISTRY_BY_NAME.get(workflowName);
 }
