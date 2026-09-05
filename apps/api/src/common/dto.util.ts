@@ -53,3 +53,20 @@ export const MONEY_STRING = /^\d{1,15}(\.\d{1,3})?$/;
 export const NO_FULL_ACCOUNT_NUMBER = /^(?!.*\d{9,})[\s\S]*$/;
 export const NO_FULL_ACCOUNT_NUMBER_MESSAGE =
   'must not contain a run of 9+ digits — record a payment-method / account change through an approved payment channel (Process 38), not free text';
+
+/** Exactly one of two independently-nullable "who is the data subject" FKs
+ * (`customerId` / `insuredPersonId`) must be set — true for both `M03`
+ * (`ConsentRecord`) and `M04` (`DataSubjectRequest`). No DB CHECK pairs them
+ * (unlike `PaymentChannel`'s `owner_exactly_one`, #38): that guard exists to
+ * stop a *concurrent write* racing into an invalid combination, which does
+ * not apply here — each of these rows is written by exactly one call site,
+ * once, at creation, never edited afterward. App-level validation at that
+ * single call site is proportionate; add a DB CHECK the day a second
+ * creation path appears. Originally local to `consent.config.ts` — promoted
+ * here once `dsr.config.ts` (Process 52/M04) needed the identical check. */
+export function hasExactlyOneOwner(input: {
+  customerId?: string | null;
+  insuredPersonId?: string | null;
+}): boolean {
+  return Boolean(input.customerId) !== Boolean(input.insuredPersonId);
+}

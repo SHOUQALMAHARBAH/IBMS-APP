@@ -1,4 +1,7 @@
 import { Prisma } from '@ibms/db';
+import { hasExactlyOneOwner } from '../../common/dto.util';
+
+export { hasExactlyOneOwner };
 
 /**
  * M03 — Consent Management (backlog Part D §5.1 / `IMPROVEMENTS.md` §5.1;
@@ -75,21 +78,6 @@ export function deriveConsentView(row: ConsentRecordRow): ConsentRecordView {
     isActive: row.granted && row.withdrawnAt === null,
     createdAt: row.createdAt.toISOString(),
   };
-}
-
-/** Exactly one of `customerId` / `insuredPersonId` must identify the data
- * subject (both are independently-nullable FKs on the model — there is no
- * DB CHECK pairing them, unlike `PaymentChannel`'s `owner_exactly_one`
- * (#38): that one guards against *concurrent* writes racing into an invalid
- * combination, which does not apply here — a `ConsentRecord` is written by
- * exactly one call site, once, at creation, never edited afterward. App-level
- * validation at that single call site is proportionate; a DB CHECK would be
- * the right call if a second creation path ever appears). */
-export function hasExactlyOneOwner(input: {
-  customerId?: string;
-  insuredPersonId?: string;
-}): boolean {
-  return Boolean(input.customerId) !== Boolean(input.insuredPersonId);
 }
 
 /** CREATE audit `afterValue` — ids + purpose + the decision. No free text:

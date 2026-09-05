@@ -2503,9 +2503,32 @@ model DataSubjectRequest {
   closedAt              DateTime?
   dpoHandlerUserId      String?
   createdAt             DateTime  @default(now())
+  // Process 52/M04 (backlog Part D) widening — maker/checker segregation for
+  // closure (Part 5.2 / maker-checker-segregation.md): processedByUserId is
+  // stamped by whichever of verify->fulfil/partially-fulfil/reject actually
+  // drove the terminal outcome (the MAKER); closedByUserId (the CHECKER) must
+  // differ — enforced app-side (assertDifferentActors) AND by the
+  // DataSubjectRequest_closure_maker_checker_distinct CHECK below. Both are
+  // DPO-only permissions (dsr.handle / dsr.close) — segregation here is
+  // between two distinct DPO officers, not between roles.
+  processedByUserId     String?
+  closedByUserId        String?
+  rejectionReason       String?
+  // DELETION-only staff attestation persisted at fulfil() time (a
+  // @code-reviewer MAJOR on the first pass: confirmNoOpenRetentionHold was
+  // validated in-memory from the request DTO and then discarded — nothing
+  // survived to prove which DPO officer attested "no retention hold applies"
+  // before this Deletion was marked fully fulfilled). Retention & Disposal
+  // (M06) is not built yet, so this stays a staff attestation, not an
+  // automated check against RetentionScheduleItem/LegalHold — see
+  // dsr.config.ts's header comment.
+  noOpenRetentionHoldConfirmedAt DateTime?
 
   @@index([status])
   @@index([slaDueAt])
+  @@index([customerId])
+  @@index([insuredPersonId])
+  @@index([dpoHandlerUserId])
 }
 
 /// Part 6.2 (M06) — retention periods per record category against a

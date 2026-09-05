@@ -608,22 +608,30 @@ build actually is today:
   Supporting Operations (HR, procurement, IT, document management, vendor management,
   BCP/DR, knowledge base,
   #66–74).
-- **Part D — PDPL / M-series — begun.** **M03 Consent Management is built**: capture a
-  consent decision (grant or explicit decline) for a `Customer` or `InsuredPerson`, and
-  withdraw it through a two-step request/confirm flow that finally gives the
-  previously-unused `consent_withdrawal` `SlaTimer` (2 business days) a real window —
-  see § Known gaps, Part D §5.1, for the full detail. Not built as part of M03: the
-  capture form is a generic screen, not wired into the 7 named touchpoints (lead
-  capture, onboarding/KYC, needs & risk assessment, RFQ/market placement, claims, Group
-  Medical/Life & Motor Fleet, renewal & cross/up-sell) individually. **Still not
-  built**: `DataSubjectRequest` handling (M04), retention & disposal *execution*
-  (M06 — the `RetentionScheduleItem` / `LegalHold` / `DisposalBatch` /
-  `CertificateOfDestruction` models exist since the initial migration, nothing drives
+- **Part D — PDPL / M-series — begun, two of nine systems built.** **M03 Consent
+  Management is built**: capture a consent decision (grant or explicit decline) for a
+  `Customer` or `InsuredPerson`, and withdraw it through a two-step request/confirm flow
+  that finally gives the previously-unused `consent_withdrawal` `SlaTimer` (2 business
+  days) a real window — see § Known gaps, Part D §5.1, for the full detail. Not built as
+  part of M03: the capture form is a generic screen, not wired into the 7 named
+  touchpoints (lead capture, onboarding/KYC, needs & risk assessment, RFQ/market
+  placement, claims, Group Medical/Life & Motor Fleet, renewal & cross/up-sell)
+  individually. **M04 Data Subject Request Management is built**: the full
+  Access/Correction/Deletion/Objection workflow (`RECEIVED -> IDENTITY_VERIFIED ->
+  IN_PROGRESS -> {FULFILLED, PARTIALLY_FULFILLED, REJECTED} -> CLOSED`) against
+  `dsr_access_deletion` (15 business days) / `dsr_correction_objection` (10 business
+  days), the one ACCESS-only +15-day extension, a DELETION request's staff-attested
+  no-open-retention-hold gate before it can be marked fully fulfilled, and mandatory
+  closure sign-off from a second, distinct DPO officer — see § Known gaps, Part D M04,
+  for the full detail. **Still not built**: retention & disposal *execution* (M06 — the
+  `RetentionScheduleItem` / `LegalHold` / `DisposalBatch` / `CertificateOfDestruction`
+  models exist since the initial migration, nothing drives them — M04's DELETION gate
+  above is a staff attestation for exactly this reason, not an automated check against
   them), vendor risk tiering (M07), cross-border transfer gating and one-off
   `DataSharingApproval` (M08), DPIA screening (M10), version-controlled bilingual
   privacy notices, the RoPA register, and the DPO workspace dashboard. The A.8 SLA
-  registry carries all the PDPL timer definitions; `consent_withdrawal` is the first one
-  a real caller uses.
+  registry carries all the PDPL timer definitions; `consent_withdrawal` and the two DSR
+  workflows are the only ones a real caller uses so far.
 - **Part E — dashboards** — none of the six management dashboards (Sales, Policy, Claims,
   Financial, Compliance, Insurer & Employee Performance) exist.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
@@ -5472,9 +5480,104 @@ narrows a gap.
   import capture path; a genuine double-call race on `request-withdrawal`
   can create more than one open `SlaTimer` for the same record — cosmetic
   only, `resolve` closes every matching row together, not hardened
-  further. The other eight Part D systems (DSR, retention & disposal
-  *execution*, vendor risk, data sharing, incident & breach, DPIA,
-  notices, RoPA) and the DPO Workspace dashboard remain unbuilt.
+  further. M04 (DSR) is now built too — see the next entry. The other
+  seven Part D systems (retention & disposal *execution*, vendor risk,
+  data sharing, incident & breach, DPIA, notices, RoPA) and the DPO
+  Workspace dashboard remain unbuilt.
+
+**Part D — Data Subject Request Management (M04)** — extends
+  `apps/api/src/modules/pdpl/` alongside M03; second of Part D's nine
+  systems, bundled under backlog Process #52. **`DataSubjectRequest` (Part
+  4.1 core schema) pre-existed** with every field the workflow needs except
+  the maker/checker closure pair; `WORKFLOW_TRANSITIONS.DataSubjectRequest`
+  (`RECEIVED -> IDENTITY_VERIFIED -> IN_PROGRESS -> {FULFILLED,
+  PARTIALLY_FULFILLED, REJECTED} -> CLOSED`, `REJECTED` also reachable
+  straight from `RECEIVED`/`IDENTITY_VERIFIED`) and `SLA_REGISTRY`'s two DSR
+  entries (`dsr_access_deletion` 15 business days for ACCESS/DELETION,
+  `dsr_correction_objection` 10 for CORRECTION/OBJECTION, both with a
+  pre-existing DPO-then-General-Manager two-stage escalation) also
+  pre-existed — this module is their first real consumer. Migration
+  `20260905120000` (46th) adds `processedByUserId` / `closedByUserId` /
+  `rejectionReason` / `noOpenRetentionHoldConfirmedAt` + the
+  `DataSubjectRequest_closure_maker_checker_distinct` CHECK + three
+  list-filter indexes — **no seed change** (`dsr.log` / `dsr.handle` /
+  `dsr.close`, all pre-seeded; `dsr.handle`/`dsr.close` both
+  `[DATA_PROTECTION_OFFICER]`-only, so closure segregates between two
+  distinct DPO officers, not roles). **Endpoints** (`dsr.log`: create/read;
+  `dsr.handle`: verify-identity/start/assign/apply-extension/fulfil/
+  partially-fulfil/reject; `dsr.close`: the mandatory-sign-off closure):
+  `POST /dsr`, `GET /dsr?customerId=&insuredPersonId=&status=&type=
+  &dpoHandlerUserId=` + `/:id`, `POST /dsr/:id/verify-identity`, `POST
+  /dsr/:id/start`, `POST /dsr/:id/assign`, `POST /dsr/:id/apply-extension`,
+  `POST /dsr/:id/fulfil`, `POST /dsr/:id/partially-fulfil`, `POST
+  /dsr/:id/reject`, `POST /dsr/:id/close`. **Closure needs sign-off from a
+  DIFFERENT DPO officer than whoever processed the request**
+  (`processedByUserId`, stamped by whichever of `fulfil`/`partiallyFulfil`/
+  `reject` drove the terminal outcome, vs. `closedByUserId`) —
+  `assertDifferentActors` + the DB CHECK, the `Complaint` shape;
+  `ibms-brain/meta/lex/maker-checker-segregation.md`'s own "Covered
+  actions" table was silent on this despite the brain `CLAUDE.md`'s
+  summary already naming "DSR closure" as covered — fixed alongside this
+  build (a documentation gap the build itself surfaced, not a new rule). A
+  DELETION request cannot be marked fully FULFILLED without an explicit,
+  now-**persisted** staff attestation (`confirmNoOpenRetentionHold` →
+  `noOpenRetentionHoldConfirmedAt`) — Retention & Disposal (M06) isn't
+  built yet, so this is deliberately a staff attestation, not an automated
+  check against real retention data (the #48 `third_party_payment_source`-
+  dormancy lesson applied up front). The one ACCESS-only +15-business-day
+  extension re-bases `slaDueAt` additive to the *existing* due date
+  (write-once, `accessExtensionAppliedAt IS NULL` **and** `status IN
+  (RECEIVED, IDENTITY_VERIFIED, IN_PROGRESS)` re-asserted together in the
+  repository guard), and re-bases its `SlaTimer` pair via
+  `SlaTimerService.startTimer` THEN `resolve` (a new `createdBefore`
+  parameter on `resolve()` excludes the row `startTimer()` just created,
+  since old and new share the same `workflowName`) — never the reverse
+  order, which could leave zero open timers on a partial failure. DSR reads
+  are audited (`isSensitiveDataAccess: true` on both `get()` and `list()`)
+  — a deliberate departure from the Confidential-tier no-read-audit
+  precedent (#33/#34/#41/#44/#45/#46/#51), reasoned as closer in kind to
+  `Claim`/`TransactionMonitoringAlert`. `receivedAt` is never
+  caller-suppliable (always `new Date()` at create time) — this stops
+  staff from *backdating* a late log, though it does not by itself
+  guarantee the backlog's "logged the same business day" intent, since
+  nothing stops a late `POST /dsr` call in the first place. **`@code-
+  reviewer` (mandatory — a new `WorkflowTransitionService` entity + a new
+  maker/checker pair + Highly-Confidential-adjacent PDPL rights data) →
+  CHANGES REQUESTED → resolved: 1 BLOCKER + 2 MAJORs + 2 MINORs** — see
+  `ibms-brain/meta/context/data-subject-requests.md` § "`@code-reviewer`
+  findings (resolved)" for the full detail; in short, the extension's
+  write-once guard needed the `status` re-assertion above, the SLA
+  re-basing needed the start-then-resolve reordering above, the retention
+  attestation needed to be persisted (it was originally checked in memory
+  and discarded), and the race-safe idempotent-retry-on-`ConflictException`
+  pattern (present only on `start()` at review time) was applied uniformly
+  across all six status-changing methods. New
+  `apps/api/src/modules/pdpl/dsr.{config,service,controller}.ts` + 6 DTOs +
+  `repositories/dsr.repository.ts`. `apps/web/` gains a **"Data Subject
+  Requests"** screen (a log form + a table with per-row Verify identity /
+  Start / Assign / Apply extension / Fulfil / Partially fulfil / Reject /
+  Close). **Verification**: +~40 api unit (incl. the review-fix regression
+  tests: extension start/resolve ordering both ways, the persisted
+  attestation, a concurrent-race idempotency test per status-changing
+  method) → api unit **1705** (117 files, from ~1665 pre-review-fix); new
+  `test/dsr.e2e-spec.ts` **3/3** (a full ACCESS lifecycle incl. the
+  extension — asserting exactly 2 open + 2 resolved `SlaTimer` rows
+  afterward, never 0 or 4 — plus assign, close-by-same-DPO 403,
+  close-by-different-DPO 201, idempotent re-close; a DELETION lifecycle
+  incl. the persisted attestation and a partial-fulfilment path; reject
+  straight from RECEIVED + book-wide `customerId`/`type` list filters).
+  Full api e2e suite green — all 33 files / 147 tests, no regression this
+  run. New Playwright `dsr.spec.ts` 3/3; full Playwright suite **168/168**
+  (from 165). `npm run typecheck`/`lint`/`build` (api + web) OK;
+  `ibms-brain` `brain-doctor.sh` 0 errors; `prisma migrate status` clean
+  (**46**). **Deferred:** no per-subject "current status" read; no
+  bulk/import intake path; `partially-fulfil` accepts the retention-flag
+  fields for any DSR type, not just DELETION (the pre-existing workflow map
+  already permitted this — not something this build introduced, flagged
+  but not sourced against `PRIV-SOP-05` as a MUST-differ requirement). The
+  other seven Part D systems (retention & disposal *execution*, vendor
+  risk, data sharing, incident & breach, DPIA, notices, RoPA) and the DPO
+  Workspace dashboard remain unbuilt.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

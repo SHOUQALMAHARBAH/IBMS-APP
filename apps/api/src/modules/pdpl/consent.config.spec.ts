@@ -3,9 +3,13 @@ import {
   consentAuditSnapshot,
   consentWithdrawalAuditSnapshot,
   deriveConsentView,
-  hasExactlyOneOwner,
   type ConsentRecordRow,
 } from './consent.config';
+
+// hasExactlyOneOwner moved to common/dto.util.ts (also needed by
+// dsr.config.ts, Process 52/M04) — its tests moved with it to
+// common/dto.util.spec.ts; consent.config.ts re-exports the function so
+// existing `from './consent.config'` imports keep working.
 
 const row = (over: Partial<ConsentRecordRow> = {}): ConsentRecordRow => ({
   id: 'consent-1',
@@ -45,26 +49,6 @@ describe('deriveConsentView', () => {
     const v = deriveConsentView(row({ granted: false, grantedAt: null }));
     expect(v.grantedAt).toBeNull();
     expect(v.withdrawnAt).toBeNull();
-  });
-});
-
-describe('hasExactlyOneOwner', () => {
-  it('is true with only customerId', () => {
-    expect(hasExactlyOneOwner({ customerId: 'cust-1' })).toBe(true);
-  });
-
-  it('is true with only insuredPersonId', () => {
-    expect(hasExactlyOneOwner({ insuredPersonId: 'ip-1' })).toBe(true);
-  });
-
-  it('is false with neither', () => {
-    expect(hasExactlyOneOwner({})).toBe(false);
-  });
-
-  it('is false with both', () => {
-    expect(
-      hasExactlyOneOwner({ customerId: 'cust-1', insuredPersonId: 'ip-1' }),
-    ).toBe(false);
   });
 });
 

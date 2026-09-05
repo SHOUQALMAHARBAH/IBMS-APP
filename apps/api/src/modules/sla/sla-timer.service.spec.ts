@@ -214,6 +214,32 @@ describe('SlaTimerService.resolve', () => {
     expect(result).toEqual({ count: 0 });
     expect(record).not.toHaveBeenCalled();
   });
+
+  it('with createdBefore, only matches rows created before that instant — for a caller that starts the new timer(s) first and must not resolve them too', async () => {
+    const { service, updateMany } = makeDeps({ updateManyCount: 2 });
+    const cutoff = new Date('2026-09-20T00:00:00.000Z');
+
+    await service.resolve({
+      entityType: 'DataSubjectRequest',
+      entityId: 'dsr-1',
+      workflowName: 'dsr_access_deletion',
+      actorUserId: 'dpo-1',
+      createdBefore: cutoff,
+    });
+
+    const call = updateMany.mock.calls[0]?.[0] as {
+      where: Record<string, unknown>;
+      data: { resolvedAt: unknown };
+    };
+    expect(call.where).toEqual({
+      entityType: 'DataSubjectRequest',
+      entityId: 'dsr-1',
+      workflowName: { startsWith: 'dsr_access_deletion' },
+      resolvedAt: null,
+      createdAt: { lt: cutoff },
+    });
+    expect(call.data.resolvedAt).toBeInstanceOf(Date);
+  });
 });
 
 describe('SlaTimerService.runEscalationSweep', () => {
