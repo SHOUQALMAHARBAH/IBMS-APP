@@ -38,6 +38,7 @@ import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
+import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
 
 @Module({
   imports: [
@@ -273,6 +274,10 @@ import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
     // read / workflow-history.read — all three pre-seeded, first real
     // consumers here.
     AuditTrailModule,
+    // Process 58 — opens Domain G (Management). A read-only aggregation
+    // over every domain built so far; owns none of the tables it reads.
+    // kpi-dashboard.view / Branch-Department Manager, Executive Management.
+    KpiDashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

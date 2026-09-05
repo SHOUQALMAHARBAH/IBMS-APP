@@ -221,6 +221,7 @@ const complianceRisk: PermissionSeed[] = [
 // Domain G — Management (Processes 58-65)
 // ----------------------------------------------------------------------
 const management: PermissionSeed[] = [
+  { code: 'kpi-dashboard.view', module: 'management-reporting', description: 'View the general KPI dashboard across every module', roles: [MANAGER, EXEC] },
   { code: 'dashboard.sales.view', module: 'management-reporting', description: 'View the Sales KPI dashboard', roles: [SALES, MANAGER, EXEC] },
   { code: 'dashboard.policy.view', module: 'management-reporting', description: 'View the Policy dashboard', roles: [PLACEMENT, POLICY_CHECK, MANAGER, EXEC] },
   { code: 'dashboard.claims.view', module: 'management-reporting', description: 'View the Claims dashboard', roles: [CLAIMS, MANAGER, EXEC] },

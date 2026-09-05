@@ -554,6 +554,12 @@ build actually is today:
 | 56 | Internal Controls (Maker/Checker) | a one-liner backlog item, not a checkbox list: "fully covered in Part A.5, plus a periodic audit report scanning for any possible self-approval cases" · Part A.5's `assertDifferentActors` (`common/maker-checker.util.ts`) + a DB `CHECK` constraint per pair were verified intact — the only new work is the report · **new module** `apps/api/src/modules/internal-controls/` (`internal-controls.{config,service,controller}.ts` + `internal-controls-audit.scheduler.ts`) — the `SlaDashboardModule` shape (aggregates other modules' data, owns none of it) · **`MAKER_CHECKER_REGISTRY`** is a hand-built inventory of all 15 same-table maker/checker pairs this codebase has a DB `CHECK` constraint for, traced across five migrations (`20260826091424` through `20260906120000`) — `KYCRecord`, `PolicyChecking` (placedByUserId), `Refund`, `DisposalBatch`/`DataSharingApproval`/`DataProcessingAgreement` (all three flagged `dormant: true` — M06/M07/M08 aren't built, no writer exists yet, the #48 dormant-classifier precedent: scanned anyway, forward-compatible), `Settlement`, `CommissionLedgerEntry`, `Recommendation`, `AccessRecertificationItem`, `NeedsAssessment` (two constraints, one maker against two checker fields), `Complaint`, `DataSubjectRequest`, `IncidentReport` · **a 16th pair is handled separately, not in the registry**: `PolicyChecking.checkedByUserId` vs the PARENT `Policy.issuedByUserId` — this build resolved an open question `ibms-brain/meta/context/policy-lifecycle.md` had flagged since #20 (should the DB `CHECK` extend to `issuedByUserId` too?) with a firm answer: it structurally CANNOT — a Postgres `CHECK` constraint compares columns on one row of one table, and these two columns live on different tables; this periodic scan is that one pair's ONLY defense-in-depth backstop beyond the app-level `assertDifferentActors` guard, by design, not an oversight · each pair fetches every row with **no `where` filter** (checker-field nullability differs per model — `AccessRecertificationItem.reviewerUserId` is the one exception, NOT NULL — so filtering happens in the pure classify function instead of trusting 15 different Prisma-generated filter types behind one `unknown` cast), capped at `INTERNAL_CONTROLS_SCAN_LIMIT = 20000` with a `truncated` flag · a best-effort `READ` audit row is always written (counts only); a violation (should never occur — see below) is logged at ERROR and persisted as a `CREATE` `InternalControlsViolation` audit row per finding, no new model · `GET /internal-controls/self-approval-audit` (new permission `internal-controls.audit` — `[COMPLIANCE_OFFICER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR]`, 148 → 149 perms, genuinely new rather than pre-seeded ahead of time) + `InternalControlsAuditScheduler` (daily, 10:00 UTC, after the 09:00 transaction-monitoring sweep) both call the identical scan · **a genuine perf fix found mid-build, not a review comment**: the 16 pair-scans were originally sequential (`for...of` + `await`), which timed out a 30-second e2e test against this session's own long-lived, cumulative `db-test` database; switched to `Promise.all`, cutting the same scan to under 12 seconds — a real production-quality concern, not just a test accommodation · **a clean run (zero violations) is the EXPECTED outcome, not a surprise** — every same-table pair is already DB-enforced, so proving genuine end-to-end detection meant deliberately targeting the one pair with no DB backstop: a violation was planted directly via Prisma (bypassing `assertDifferentActors` entirely, which Postgres itself would reject on any of the other 15 pairs), detected by the scan, then restored before the test finished — the #51 restore-before-finishing precedent scaled to one row; every same-table pair's own classification logic is proven correct via pure-function unit tests instead (a mocked row with `maker === checker` is flagged; Postgres would reject that same row for real) · `apps/web/` gains an **"Internal controls"** screen (`app/(app)/internal-controls/page.tsx` — stat cards, a violations table shown only when non-empty, a by-pair breakdown table, a manual "Run audit now" button) · **a `react-hooks/set-state-in-effect` ESLint false positive was hit and worked around**: `void load()` directly in a mount `useEffect` was flagged even though `load`'s only `setState` calls happen after an `await` (the same shape several other pages in this codebase already use without issue); fixed by matching `apps/web/app/(app)/incidents/page.tsx`'s existing `void (async () => { await load(); })();` pattern instead — the root cause was never fully explained by the rule's own diagnostics, only empirically bisected against a known-working file · **Verification**: +21 api unit (`internal-controls.config.spec.ts` 15, `internal-controls.service.spec.ts` 6) → api unit **1820** (127 files, from 1799). New `test/internal-controls.e2e-spec.ts` **2/2** (permission gating + the full 16-pair report shape; a live-planted cross-table violation detected end-to-end and restored). Full api unit suite 1820/1820 confirmed green. New Playwright `internal-controls.spec.ts` 4/4. `npm run typecheck`/`lint`/`build` (api + web) OK | senior-management-style real-time alerting on a finding does not exist — a violation surfaces via the audit log + the next report read/scheduled run, not a push notification · closing the `PolicyChecking`/`Policy` cross-table gap with a real DB-level mechanism (a trigger, or denormalizing `issuedByUserId` onto `PolicyChecking`) is a deliberate, undone follow-up — this scan is the compensating control, not a replacement for one · a new maker/checker pair added to the schema after this process ships needs a `MAKER_CHECKER_REGISTRY` entry added by hand — nothing discovers pairs automatically from the schema · `internal-controls.audit` is role-level (no per-officer queue) · does not feed `#57`'s `InternalAuditFinding` — a violation found here does not create one |
 | 57 | Internal Audit | **closes Domain F — #47–57 are all built or verified-covered** · two checkboxes, built as two separate modules · **checkbox 1, "Record audit findings, remediation path, and closure"**: `InternalAuditFindingService` (`apps/api/src/modules/compliance-risk/internal-audit-finding.{config,service,controller}.ts`) — `InternalAuditFinding` (core schema) is the exact bare "generic register" shape as `RiskRegisterItem` one model up in the same schema file: no maker/checker columns at all, `status` a plain string `open -> closed` · **`internal-audit.record` (`[COMPLIANCE_OFFICER]`) and `internal-audit.close` (`[COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER]`) are two DISTINCT permissions on two different actions, NOT a maker/checker pair** — the model has no maker/checker columns for `assertDifferentActors` to enforce anything against; the #48 `aml.monitor`/`aml.escalate` shape (two permissions, no dual-approval relationship between them), not a `Complaint`-style closure sign-off · reads (`GET`) accept EITHER permission (a Manager reviewing before closing needs to see the finding too) · genuinely no migration, no seed change — both permissions were pre-seeded ahead of time · **checkbox 2, "Time-boxed read-only access for the External Auditor role across all records, documents, and workflow history"**: **new module** `apps/api/src/modules/audit-trail/` — a cross-cutting read-only lens over `AuditLogEntry` (+ `Document`'s own version chain), the `SlaDashboardModule` shape (aggregates, owns nothing) · **"all records" resolves narrower than it first reads**: `ibms-brain/meta/context/roles-and-segregation-of-duties.md`'s own Part 5.1 role table names the scope precisely as "Read-only access to logs, documents and workflow history," not blanket business-table read access — confirmed by the pre-seeded permission grid itself, which never provisioned a generic `customer.read`/`policy.read`/`claim.read` for `EXTERNAL_AUDITOR`; `AuditLogEntry` being polymorphic across every entity type in the schema is what satisfies "all records" — an auditor filters the SAME table down to whichever record they're reviewing, never gaining live read access to the underlying business table itself, a materially smaller and more defensible grant · **"time-boxed" needed nothing new** — `User.accessValidUntil` + `SessionService.validate` (session revocation + an `ACCESS_WINDOW_EXPIRED` audit row) already existed and was already tested (the Auth e2e's own "External Auditor time-boxed access (Part 5.1)" suite) before this process touched anything · three routes on one new `AuditTrailController`: `GET /audit-trail?entityType=&entityId=&userId=&action=&from=&to=` (general browse, every filter optional, newest-first, capped `AUDIT_TRAIL_READ_LIMIT = 5000` — `audit-log.read`, `[COMPLIANCE_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR, EXTERNAL_AUDITOR]`), `GET /audit-trail/workflow-history?entityType=&entityId=` (the `TRANSITION`-action `AuditLogEntry` rows for one record, chronological — literally `WorkflowTransitionService`'s own audit trail read back for the first time by anything other than the engine itself — `workflow-history.read`, `[COMPLIANCE_OFFICER, EXTERNAL_AUDITOR]`, no Admin), `GET /audit-trail/documents/:id/history` (the `Document` version chain — `previousVersionId`/`nextVersion`, a doubly-linked list, `previousVersionId @unique` — walked in BOTH directions from the requested id, plus every `AuditLogEntry` row for `entityType: 'Document'` across the whole chain — `document-history.read`, `[COMPLIANCE_OFFICER, EXTERNAL_AUDITOR]`, no Admin) · **`SYSTEM_SECURITY_ADMINISTRATOR` holds `audit-log.read` but NEITHER `document-history.read` NOR `workflow-history.read`** — a real, deliberate seed-level distinction (Admin can browse the general log — their own access is itself supposed to be logged and periodically reviewed, Part 5.1 — but the two narrower historical lenses are Compliance/Auditor-only) · **the `Document` version chain is dormant today** — no application code creates a second version of a document yet (`versionNumber` stays 1, `previousVersionId`/`nextVersion` stay null for every row this codebase has written), so most documents are their own whole one-row chain right now; walked anyway, the #48/#56 dormant-feature precedent — `DOCUMENT_VERSION_CHAIN_WALK_LIMIT = 1000` is a pure safety valve against a data-anomaly cycle, not a realistic chain-length expectation · genuinely no migration, no seed change — all three read permissions were pre-seeded ahead of time with zero prior application code ever consuming them · every read writes a best-effort `READ` audit row, unconditionally `isSensitiveDataAccess: true` (no per-entityType classification the way the SLA dashboard's `hasSensitiveEntityType` does — the audit/document/workflow history of an arbitrary record can surface Highly Confidential content regardless of which specific entity is inspected) · `apps/web/` gains two new screens: **"Internal audit findings"** (`app/(app)/internal-audit-findings/page.tsx` — log/remediate/close) and **"Audit trail"** (`app/(app)/audit-trail/page.tsx` — three lookup sections: browse, workflow history, document history) · **Verification**: +26 api unit (`internal-audit-finding.config.spec.ts` 4, `internal-audit-finding.service.spec.ts` 11, `audit-trail.config.spec.ts` 5, `audit-trail.service.spec.ts` 6) → api unit **1846** (131 files, from 1820). New `test/internal-audit.e2e-spec.ts` **2/2** — the finding CRUD's per-action permission split proven end-to-end (a Manager can close but not record/remediate; an outsider can do neither); the External Auditor's three reads proven against a REAL `Lead` TRANSITION (`POST /leads` + `POST /leads/:id/transition`, the simplest real workflow-transition fixture in the codebase) and a REAL `Document` + matching `AuditLogEntry` seeded directly via Prisma, confirming Admin gets 403 on document/workflow history but 200 on the general browse. Full api unit suite 1846/1846 confirmed green. New Playwright `internal-audit-findings.spec.ts` 4/4 + `audit-trail.spec.ts` 3/3. `npm run typecheck`/`lint`/`build` (api + web) OK | no export/print capability over the audit trail — Part 10.6's watermarking/export-restriction rules would need to be satisfied first if one is ever added; today these are read-only JSON API responses only · no UI/tooling to actually SET `accessValidUntil` on an External Auditor account for a defined engagement — the field and its enforcement exist, provisioning tooling around it is a separate concern · extending `workflow-history.read`/`document-history.read` to Admin, or `audit-log.read` to any other role, is a real deliberate seed decision left alone, not an oversight · `internal-audit.record`/`internal-audit.close`/`audit-log.read`/`document-history.read`/`workflow-history.read` are all role-level (no per-officer queue) |
 
+### Part C · Domain G #58–65 — Management (begun), with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 58 | General KPI dashboard | the backlog line names no model and no metric list: "aggregate queries across every module above" · deliberately scoped to a curated, low-risk set rather than an exhaustive KPI catalogue — one plain `count` or `groupBy`-count per already-built domain: Sales/CRM (`totalCustomers`, leads/prospects/opportunities by status), Policy (policies by status + total issued premium), Claims (claims by status), Customer Service (complaints by status + open service requests), Compliance & Risk (open risk-register items/incidents/internal-audit findings), plus two unambiguous money sums for Finance (outstanding invoiced — the SAME "outstanding" definition #33's AR ageing report already uses; commission this month, a plain gross figure, no netting) · **deliberately NOT attempted**: "outstanding payables owed to insurers" — #34's own definition nets out the broker's own commission deduction, and reproducing that here risked a second, driftable copy of business logic rather than a genuinely simple aggregate; the precise figure stays at #34/#40 · **new module** `apps/api/src/modules/management-reporting/` (`kpi-dashboard.{config,service,controller,module}.ts`) + `repositories/kpi-dashboard.repository.ts` · **reads every table DIRECTLY — zero cross-module service dependency** — even though `FinancialReportService` (#40) already composes almost this exact finance summary, no prior cross-cutting reporting module in this codebase (`SlaDashboardModule` #43, `InternalControlsModule` #56, `AuditTrailModule` #57) calls into another domain's SERVICE for a number; all of them read their own tables via their own repository, and this process kept that consistency rather than widening two unrelated modules' `exports` arrays (`FinanceModule` exports only `InvoiceRepository` today; `SlaDashboardModule` exports nothing) · every method on `KpiDashboardRepository` is a genuine DB-side `count`/`groupBy`/`aggregate` call, never a loaded-then-reduced `findMany` — so unlike every prior dashboard in this codebase, there is NO read-limit/truncation-warning concept here at all, since an aggregate's result size never scales with row count · **the #56 concurrency lesson (fire independent queries via `Promise.all`, not sequentially) was applied from the FIRST draft, not rediscovered via a timing failure** — all fifteen queries in `KpiDashboardService.summary()` run concurrently · a best-effort `READ` audit row is written per read (counts only) · `GET /kpi-dashboard` — new permission `kpi-dashboard.view` (`[BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`, 149 → 150 perms) — genuinely new, unlike every OTHER Domain G permission (`dashboard.sales.view`, `dashboard.policy.view`, `dashboard.claims.view`, `dashboard.financial.view`, `dashboard.compliance.view`, `insurer-performance.view`, `employee-performance.view`, `dashboard.executive.view`, `portfolio-analysis.view`, `profitability-analysis.view`, `planning-export.generate`), ALL pre-seeded ahead of time for #59–65's own future models/schedulers · `EXTERNAL_AUDITOR` deliberately excluded — the #57 lesson: their scope is logs/documents/workflow history, not live business-KPI content · `apps/web/` gains a **"KPI dashboard"** screen (`app/(app)/kpi-dashboard/page.tsx` — six sections, one per domain, stat cards + status-breakdown tables) · **Verification**: +10 api unit (`kpi-dashboard.config.spec.ts` 6, `kpi-dashboard.service.spec.ts` 4) → api unit **1856** (133 files, from 1846). New `test/kpi-dashboard.e2e-spec.ts` **2/2** — permission gating + full response-shape assertions; a before/after DELTA test (never a global count, since `db-test` is cumulative) proving a fresh `Lead` and a fresh `RiskRegisterItem` each move their own bucket by exactly 1, covering both the `groupBy`-count and the plain-filtered-count code paths against real Postgres. New Playwright `kpi-dashboard.spec.ts` 3/3. `npm run typecheck`/`lint`/`build` (api + web) OK | #59–65 (Sales/Insurer/Employee Performance, Portfolio/Profitability Analysis, Executive Management Reporting, Strategic Planning export) — each a separate backlog item with its own permission already seeded, not built here · this dashboard's finance figures are deliberately simplified and are NOT meant to reconcile to the fils with #40's more precise consolidated report · no drill-through from a stat to the underlying record list · `kpi-dashboard.view` is role-level (no per-department scoping — that's what #59–64's own department-specific dashboards are for) |
+
 ### Not started
 
 - **Domains C–H** — Claims **#23–30 are built** (Notification, Registration, Documentation,
@@ -626,7 +632,14 @@ build actually is today:
   distinct permissions, not a maker/checker pair — the model carries no maker/checker
   columns), plus the External Auditor's time-boxed read-only lens over the audit log,
   document history, and workflow history (`AuditTrailModule`) — see their own entries
-  below for full detail. **Domain F is complete.** Management reporting (#58–65), Supporting Operations (HR, procurement, IT,
+  below for full detail. **Domain F is complete. Domain G — Management (#58–65) has
+  begun.** #58 General KPI dashboard is built: a curated, low-risk set of counts and
+  unambiguous money sums aggregated live across every domain built so far (Sales/CRM,
+  Policy, Claims, Finance, Customer Service, Compliance & Risk), reading every table
+  directly with no cross-module service dependency — see its own entry below for full
+  detail. **Not built**: #59–65 (Sales/Insurer/Employee Performance, Portfolio/
+  Profitability Analysis, Executive Management Reporting, Strategic Planning export).
+  Supporting Operations (HR, procurement, IT,
   document management, vendor management,
   BCP/DR, knowledge base,
   #66–74).
@@ -6725,6 +6738,106 @@ narrows a gap.
   All five permissions this process consumes (`internal-audit.record`,
   `internal-audit.close`, `audit-log.read`, `document-history.read`,
   `workflow-history.read`) are role-level (no per-officer queue).
+
+**Part C #58 — General KPI Dashboard (Domain G, Process 58)** — opens Domain G
+  (Management, #58–65). The backlog line names no model and no metric list: "General
+  KPI dashboard: aggregate queries across every module above."
+
+  **The scoping decision this process made.** Rather than trying to represent every
+  conceivable KPI across eight domains, this process deliberately picked a curated,
+  low-risk set: one plain `count` or `groupBy`-count per domain already built, plus two
+  money sums whose definition is unambiguous enough not to risk silently duplicating
+  (and getting subtly wrong) business logic another process already owns.
+
+  - **Sales/CRM**: `totalCustomers` (a plain count), `leadsByStatus` /
+    `prospectsByStatus` / `opportunitiesByStatus` (`groupBy` counts).
+  - **Policy**: `policiesByStatus` (`groupBy`), `totalIssuedPremiumJod` (`aggregate` sum
+    of `Policy.issuedPremium` — null before issuance, so this only ever sums real
+    issued premium).
+  - **Claims**: `claimsByStatus` (`groupBy`).
+  - **Finance**: `outstandingInvoicedJod` (sum of `Invoice.totalAmount` where
+    `status = 'INVOICED'` — the SAME "outstanding" definition #33's accounts-receivable
+    ageing report already uses), `invoicesByStatus` (`groupBy`), `commissionThisMonthJod`
+    (sum of `CommissionLedgerEntry.amount` created since the 1st of the current UTC
+    month — no netting/clawback logic, a plain gross figure).
+  - **Customer Service**: `complaintsByStatus` (`groupBy`), `openServiceRequests` (a
+    plain filtered count, `status IN ('open', 'in_progress')`).
+  - **Compliance & Risk**: `openRiskRegisterItems` / `openIncidents` /
+    `openInternalAuditFindings` (three plain filtered counts).
+
+  **Deliberately NOT attempted**: "outstanding payables owed to insurers." #34's
+  insurer-accounts-payable definition nets out the broker's own commission deduction —
+  reproducing that correctly here would mean either duplicating #34's business logic (a
+  second place that could drift out of sync) or getting it subtly wrong. A general KPI
+  glance doesn't need that precision; the real, precise figure lives at
+  `GET /insurer-accounting/payables` (#34) and the consolidated `GET /financial-report`
+  (#40).
+
+  **Why this reads every table directly — no cross-module service calls.**
+  `FinancialReportService` (#40) already composes almost exactly this kind of finance
+  summary (`receivables.outstandingTotal`, `payables.outstandingAmount`, a commission
+  roll-up, profitability). It would have been possible to inject
+  `FinancialReportService`/`SlaDashboardService`/`ClaimsAnalyticsService` into this new
+  module and pull a few fields from each. This was deliberately NOT done, for two
+  reasons: (1) no precedent for it anywhere in this codebase — every prior
+  cross-cutting reporting module (`SlaDashboardModule` #43, `InternalControlsModule`
+  #56, `AuditTrailModule` #57) reads its underlying tables DIRECTLY via its own
+  repository, none of them calls into another domain's service to get a number; (2) it
+  would have needed modifying two unrelated modules' `exports` arrays (`FinanceModule`
+  currently exports only `InvoiceRepository`; `SlaDashboardModule` exports nothing at
+  all) just to make this one new module possible — a wider blast radius than a
+  self-contained new repository needs. `KpiDashboardRepository` therefore has zero
+  dependency on any other domain's service — only `PrismaService`. Every method is a
+  genuine DB-side `count`/`groupBy`/`aggregate` call, never a `findMany` reduced in JS —
+  so unlike `SlaDashboardRepository`/`InternalControlsService` (which load rows into
+  memory and are capped with a truncation warning), there is no read-limit concept here
+  at all: the result size of a `count`/`groupBy`/`aggregate` call is always small
+  regardless of how many underlying rows exist.
+
+  **The concurrency lesson applied from the start.** #56's own build discovered, via an
+  e2e timeout, that firing many independent read queries sequentially against this
+  session's long-lived `db-test` database is measurably slow. This process applied that
+  lesson from the first draft rather than rediscovering it: all fifteen queries in
+  `KpiDashboardService.summary()` run inside one `Promise.all`, not a sequential loop.
+
+  **Permission.** `kpi-dashboard.view` (`[BRANCH_DEPARTMENT_MANAGER,
+  EXECUTIVE_MANAGEMENT]`) is a genuinely NEW permission — unlike #59–65's permissions
+  (`dashboard.sales.view`, `dashboard.policy.view`, `dashboard.claims.view`,
+  `dashboard.financial.view`, `dashboard.compliance.view`, `insurer-performance.view`,
+  `employee-performance.view`, `dashboard.executive.view`, `portfolio-analysis.view`,
+  `profitability-analysis.view`, `planning-export.generate`), which were ALL pre-seeded
+  ahead of time for their own future models/schedulers, this one was not. `EXTERNAL_
+  AUDITOR` is deliberately excluded: #57 already established that the External
+  Auditor's scope is "logs, documents, workflow history" (Part 5.1), not live business
+  KPI content — a general KPI dashboard showing premium/commission/pipeline figures is
+  squarely business content, not an audit trail.
+
+  `apps/web/` gains a new **"KPI dashboard"** screen (`app/(app)/kpi-dashboard/page.tsx`
+  — six sections, one per domain, stat cards + status-breakdown tables).
+
+  **Verification**: +10 api unit (`kpi-dashboard.config.spec.ts` 6 — status-map
+  building, start-of-month, money-sum formatting incl. a null aggregate;
+  `kpi-dashboard.service.spec.ts` 4 — full summary aggregation, the `countByStatus`
+  call set, the best-effort audit write, and a failed audit write not aborting the
+  read) → api unit **1856** (133 files, from 1846). New `test/kpi-dashboard.e2e-spec.ts`
+  **2/2** — permission gating plus full response-shape assertions (every money field
+  matches a fixed 3dp pattern); a before/after DELTA test (never a global count, since
+  `db-test` is cumulative across this whole session) proving a fresh `Lead` and a fresh
+  `RiskRegisterItem` each move their own bucket by exactly 1 against real Postgres,
+  covering both the `groupBy`-count and the plain-filtered-count code paths end to end.
+  New Playwright `kpi-dashboard.spec.ts` 3/3. `npm run typecheck`/`lint`/`build`
+  (api + web) OK.
+
+  **Deferred**: #59–65 (Sales/Insurer/Employee Performance, Portfolio/Profitability
+  Analysis, Executive Management Reporting, Strategic Planning export) — each a
+  separate backlog item with its own permission already seeded, to be picked up in its
+  own pass; #58 does not attempt to satisfy any of them. This dashboard's finance
+  figures are deliberately simplified and are NOT meant to reconcile to the fils with
+  #40's more precise consolidated report if the two are ever shown side by side — they
+  answer different questions (a fast glance vs. a full report). No drill-through from a
+  stat to the underlying record list. `kpi-dashboard.view` is role-level (no
+  per-department scoping — that's what #59–64's own department-specific dashboards are
+  for).
 
 ## Deployment
 
