@@ -2727,8 +2727,38 @@ model RopaEntry {
 }
 
 // ============================================================================
-// PART 13 — MANAGEMENT: INSURER & EMPLOYEE PERFORMANCE
+// PART 13 — MANAGEMENT: SALES, INSURER & EMPLOYEE PERFORMANCE
 // ============================================================================
+
+/// Process 59 — a sales quota set for one Sales/Relationship Officer OR one
+/// Branch (never both — SalesTarget_owner_xor_branch, a hand-authored CHECK,
+/// migration 20260910120000) for a period. `ownerUserId`/`branchId` are bare
+/// scalars (the Opportunity.createdByUserId / Policy.placedByUserId shape),
+/// not relations — this table is a live-query scope selector, not a
+/// provenance trail. `SalesPerformanceService` resolves the "actual" side
+/// (new Prospects qualified in the same window, by that owner or by anyone
+/// in that branch) live against Lead/Prospect at read time — this model
+/// never stores an actual figure itself, only the target. Two hand-authored
+/// PARTIAL unique indexes (not a single composite `@@unique`, since Postgres
+/// treats every NULL as distinct in a plain composite unique — the #48
+/// AML gotcha) enforce "at most one target per owner per period label" and
+/// "at most one target per branch per period label" independently.
+model SalesTarget {
+  id                 String   @id @default(uuid())
+  ownerUserId        String?
+  branchId           String?
+  periodLabel        String
+  periodStart        DateTime
+  periodEnd          DateTime
+  targetNewProspects Int
+  createdByUserId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@index([branchId])
+  @@index([periodStart, periodEnd])
+}
 
 /// Process 60 — score insurers on Quote Response, Claims Service, Price,
 /// Service quality.

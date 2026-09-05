@@ -39,6 +39,7 @@ import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
+import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
 
 @Module({
   imports: [
@@ -278,6 +279,11 @@ import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard
     // over every domain built so far; owns none of the tables it reads.
     // kpi-dashboard.view / Branch-Department Manager, Executive Management.
     KpiDashboardModule,
+    // Process 59 — a SalesTarget quota per employee/team for a period,
+    // resolved live against Lead/Prospect actuals. sales-target.manage
+    // (new) gates the target registry; dashboard.sales.view (pre-seeded)
+    // gates the performance-vs-target read.
+    SalesPerformanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

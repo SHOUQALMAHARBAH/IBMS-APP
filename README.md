@@ -559,6 +559,7 @@ build actually is today:
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
 | 58 | General KPI dashboard | the backlog line names no model and no metric list: "aggregate queries across every module above" · deliberately scoped to a curated, low-risk set rather than an exhaustive KPI catalogue — one plain `count` or `groupBy`-count per already-built domain: Sales/CRM (`totalCustomers`, leads/prospects/opportunities by status), Policy (policies by status + total issued premium), Claims (claims by status), Customer Service (complaints by status + open service requests), Compliance & Risk (open risk-register items/incidents/internal-audit findings), plus two unambiguous money sums for Finance (outstanding invoiced — the SAME "outstanding" definition #33's AR ageing report already uses; commission this month, a plain gross figure, no netting) · **deliberately NOT attempted**: "outstanding payables owed to insurers" — #34's own definition nets out the broker's own commission deduction, and reproducing that here risked a second, driftable copy of business logic rather than a genuinely simple aggregate; the precise figure stays at #34/#40 · **new module** `apps/api/src/modules/management-reporting/` (`kpi-dashboard.{config,service,controller,module}.ts`) + `repositories/kpi-dashboard.repository.ts` · **reads every table DIRECTLY — zero cross-module service dependency** — even though `FinancialReportService` (#40) already composes almost this exact finance summary, no prior cross-cutting reporting module in this codebase (`SlaDashboardModule` #43, `InternalControlsModule` #56, `AuditTrailModule` #57) calls into another domain's SERVICE for a number; all of them read their own tables via their own repository, and this process kept that consistency rather than widening two unrelated modules' `exports` arrays (`FinanceModule` exports only `InvoiceRepository` today; `SlaDashboardModule` exports nothing) · every method on `KpiDashboardRepository` is a genuine DB-side `count`/`groupBy`/`aggregate` call, never a loaded-then-reduced `findMany` — so unlike every prior dashboard in this codebase, there is NO read-limit/truncation-warning concept here at all, since an aggregate's result size never scales with row count · **the #56 concurrency lesson (fire independent queries via `Promise.all`, not sequentially) was applied from the FIRST draft, not rediscovered via a timing failure** — all fifteen queries in `KpiDashboardService.summary()` run concurrently · a best-effort `READ` audit row is written per read (counts only) · `GET /kpi-dashboard` — new permission `kpi-dashboard.view` (`[BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`, 149 → 150 perms) — genuinely new, unlike every OTHER Domain G permission (`dashboard.sales.view`, `dashboard.policy.view`, `dashboard.claims.view`, `dashboard.financial.view`, `dashboard.compliance.view`, `insurer-performance.view`, `employee-performance.view`, `dashboard.executive.view`, `portfolio-analysis.view`, `profitability-analysis.view`, `planning-export.generate`), ALL pre-seeded ahead of time for #59–65's own future models/schedulers · `EXTERNAL_AUDITOR` deliberately excluded — the #57 lesson: their scope is logs/documents/workflow history, not live business-KPI content · `apps/web/` gains a **"KPI dashboard"** screen (`app/(app)/kpi-dashboard/page.tsx` — six sections, one per domain, stat cards + status-breakdown tables) · **Verification**: +10 api unit (`kpi-dashboard.config.spec.ts` 6, `kpi-dashboard.service.spec.ts` 4) → api unit **1856** (133 files, from 1846). New `test/kpi-dashboard.e2e-spec.ts` **2/2** — permission gating + full response-shape assertions; a before/after DELTA test (never a global count, since `db-test` is cumulative) proving a fresh `Lead` and a fresh `RiskRegisterItem` each move their own bucket by exactly 1, covering both the `groupBy`-count and the plain-filtered-count code paths against real Postgres. New Playwright `kpi-dashboard.spec.ts` 3/3. `npm run typecheck`/`lint`/`build` (api + web) OK | #59–65 (Sales/Insurer/Employee Performance, Portfolio/Profitability Analysis, Executive Management Reporting, Strategic Planning export) — each a separate backlog item with its own permission already seeded, not built here · this dashboard's finance figures are deliberately simplified and are NOT meant to reconcile to the fils with #40's more precise consolidated report · no drill-through from a stat to the underlying record list · `kpi-dashboard.view` is role-level (no per-department scoping — that's what #59–64's own department-specific dashboards are for) |
+| 59 | Sales Performance | the backlog line names no model and no target metric: "a query per employee/team against target" · new model `SalesTarget` (migration `20260910120000` — a genuine new migration, unlike #60/#61's `InsurerPerformanceScore`/`EmployeePerformanceRecord`, both already pre-existing core schema) · target metric picked: `targetNewProspects` — new `Prospect` rows (a `Lead` qualified, Process 1→2) attributable to `Lead.ownerUserId`/`Prospect.salesOwnerUserId`, or to every user in one `Branch`, inside `[periodStart, periodEnd)` · **deliberately NOT premium/commission-based** — `Policy.placedByUserId`/`Opportunity.createdByUserId` name the PLACEMENT officer, not the sourcing Sales Officer, and `Customer.prospectId` is optional (a Customer can be onboarded with no Prospect at all), so there is no reliable way to attribute bound premium back to a Sales Officer without guessing; that dimension stays at `EmployeePerformanceRecord.premiumWritten` (#61, not built here) · `ownerUserId`/`branchId` are bare scalars, no relations (the `Opportunity.createdByUserId` shape) — exactly one is set, checked at three layers: a pure `isExactlyOneScope()` validator, a hand-authored DB `CHECK` (`SalesTarget_owner_xor_branch`, Prisma has no cross-column CHECK syntax), and re-derived again on the read side's own scope resolution · **the #48 AML NULL-uniqueness gotcha resurfaced and was avoided** — "at most one target per owner per period label" / "...per branch per period label" are TWO hand-authored PARTIAL unique indexes, not one composite `@@unique([ownerUserId, branchId, periodLabel])`, since Postgres treats every NULL as distinct in a plain composite unique and a composite key would never collide on the column that's always NULL for that row's scope · **new module** `apps/api/src/modules/management-reporting/sales-performance.{config,service,controller,module}.ts` + `repositories/sales-performance.repository.ts` (owns both `SalesTarget` CRUD and the live actual-count queries) · `POST`/`PATCH`/`GET /sales-targets*` — new permission `sales-target.manage` (`[BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`, 150 → 151 perms), the one genuinely new Domain G permission this process needed · `GET /sales-performance?ownerUserId=&branchId=&periodLabel=` reuses the already-pre-seeded `dashboard.sales.view` (`[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`) — a Sales/Relationship Officer is forced to their own `ownerUserId` regardless of query params and 403s a branch request outright (reusing `common/rbac-visibility.util.ts`'s existing `VIEW_ALL_OWNERS_ROLES` rather than a new local constant); Manager/Executive must supply exactly one of `ownerUserId`/`branchId` (422 on both/neither — no book-wide default, that is `kpi-dashboard.view`'s job) · no `periodLabel` resolves the target whose window contains "now" for that scope — no match returns `target: null`/`actual: null`/`achievementPercent: null` (a valid, expected state at this feature's genesis), while an explicit unmatched `periodLabel` 404s · a branch scope resolves to every `User.branchId` match, then counts `Lead`/`Prospect` across that whole user-id list in one call each, not N+1 per employee · `apps/web/` gains a **"Sales performance"** screen (`app/(app)/sales-performance/page.tsx` — an officer's own stat cards with no scope picker; a Manager gets a lookup form plus a set/revise-target form) · **Verification**: +24 api unit (`sales-performance.config.spec.ts` 9, `sales-performance.service.spec.ts` 15) → api unit **1880** (137 files, from 1856). New `test/sales-performance.e2e-spec.ts` **7/7** — permission gating on both `sales-target.manage`/`dashboard.sales.view`; the exactly-one-scope 422 on both create and read; a 409 duplicate-target + PATCH-revise round trip; the Sales-Officer-forced-to-self / branch-view-forbidden visibility rule; a null-target response plus an explicit-`periodLabel` 404; a REAL Lead→Prospect walk (`POST /leads` → two `/transition` calls → `POST /prospects`) moving a brand-new officer's `newProspects` from 0 to 1 and `achievementPercent` from 0% to 50%; a branch-scoped target resolving to two officers' combined actuals. Full api unit suite 1880/1880 confirmed green; full api e2e suite (39 files) green, both documented chronic flakes (`rbac`, `up-sell`) passing cleanly. New Playwright `sales-performance.spec.ts` 4/4; full Playwright suite 153/153 (from 150). `npm run typecheck`/`lint`/`build` (api + web) OK | no drill-through from a performance stat to the underlying Lead/Prospect record list · no notification/alert when a period ends with a target unmet · retargeting a different owner/branch/window is a new row (the `PATCH` only revises the number) — no "carry forward last period's target" convenience · #60–65 (Insurer/Employee Performance, Portfolio/Profitability Analysis, Executive Management Reporting, Strategic Planning export) remain unbuilt, each with its own permission already seeded |
 
 ### Not started
 
@@ -636,10 +637,14 @@ build actually is today:
   begun.** #58 General KPI dashboard is built: a curated, low-risk set of counts and
   unambiguous money sums aggregated live across every domain built so far (Sales/CRM,
   Policy, Claims, Finance, Customer Service, Compliance & Risk), reading every table
-  directly with no cross-module service dependency — see its own entry below for full
-  detail. **Not built**: #59–65 (Sales/Insurer/Employee Performance, Portfolio/
-  Profitability Analysis, Executive Management Reporting, Strategic Planning export).
-  Supporting Operations (HR, procurement, IT,
+  directly with no cross-module service dependency. #59 Sales Performance is also built:
+  a new `SalesTarget` quota (per employee or per branch/team, for a period) compared
+  live against new-Prospects-qualified actuals — deliberately not premium/commission-
+  based, since that attribution runs through the Placement officer, not the Sales
+  Officer who sourced the customer — see both entries below for full detail. **Not
+  built**: #60–65 (Insurer/Employee Performance, Portfolio/Profitability Analysis,
+  Executive Management Reporting, Strategic Planning export). Supporting Operations
+  (HR, procurement, IT,
   document management, vendor management,
   BCP/DR, knowledge base,
   #66–74).
@@ -6838,6 +6843,113 @@ narrows a gap.
   stat to the underlying record list. `kpi-dashboard.view` is role-level (no
   per-department scoping — that's what #59–64's own department-specific dashboards are
   for).
+
+**Part C #59 — Sales Performance (Domain G, Process 59)** — the second Domain G
+  item: "Sales Performance: a query per employee/team against target." Like #58, the
+  backlog names no model and no target metric — but unlike #58 (every table it read
+  already existed), #59 needed a genuinely new concept: a **target**, a quota a Manager
+  commits an employee or a branch/team to ahead of time.
+
+  **The metric this process picked, and why.** The target is
+  `SalesTarget.targetNewProspects` — the count of `Prospect` rows (a `Lead` successfully
+  qualified, Process 1→2) attributable to one Sales/Relationship Officer's
+  `Lead.ownerUserId`/`Prospect.salesOwnerUserId`, or to every user in one `Branch`,
+  created inside `[periodStart, periodEnd)`. This was deliberately NOT premium- or
+  commission-based, even though that's the more obvious "sales performance" figure a
+  manager might expect: `Policy.placedByUserId` and `Opportunity.createdByUserId` name
+  the PLACEMENT officer who bound the cover, not the Sales Officer who sourced the
+  customer (Process 11 provenance, a different role in this codebase's segregation
+  model); and `Customer.prospectId` is optional — `CustomerService.create` accepts a
+  Customer with no Prospect at all (a direct corporate onboarding), so there is no
+  reliable way to walk `Policy → Opportunity → Customer → Prospect → salesOwnerUserId`
+  for every policy without guessing and silently mis-crediting someone's quota.
+  `targetNewProspects` is the one Sales/CRM outcome that is ALWAYS cleanly attributable
+  via a bare scalar FK that already exists. Premium/commission-per-employee is exactly
+  `EmployeePerformanceRecord.premiumWritten`/`commissionEarned` (#61, Part 13 core
+  schema, not yet consumed by any application code) — deliberately left there rather
+  than duplicated here with a shakier attribution story.
+
+  **The model.** `SalesTarget` (migration `20260910120000_add_sales_target`, a
+  genuinely new migration — unlike #60/#61's `InsurerPerformanceScore`/
+  `EmployeePerformanceRecord`, both already pre-existing in the core schema, #59 had no
+  schema at all before this process). `ownerUserId`/`branchId` are bare scalars, no
+  Prisma relations (the `Opportunity.createdByUserId`/`Policy.placedByUserId`
+  provenance shape) — exactly one is set, never both, never neither, enforced at THREE
+  layers: `isExactlyOneScope()` (pure, in the validation path), a hand-authored DB
+  `CHECK` (`SalesTarget_owner_xor_branch`, since Prisma has no cross-column CHECK
+  syntax), and re-checked again for the READ side's own scope resolution.
+  `periodStart`/`periodEnd` are stored explicitly (unlike #60/#61's job-driven
+  `periodLabel`-only rows, where a job fully controls what window its own label
+  represents) since #59's target is resolved by a live query, not a periodic snapshot —
+  `periodLabel` stays a display convenience only. `targetNewProspects` is the one
+  number a Manager can later `PATCH` to revise; the scope/period are fixed at creation
+  (retargeting a different owner/branch/window is a new row, the
+  `ProfessionalIndemnityPolicy` renewal-is-a-new-row shape).
+
+  **The uniqueness gotcha this process avoided.** "At most one target per owner per
+  period label" and "at most one target per branch per period label" are enforced by
+  TWO separate hand-authored PARTIAL unique indexes, NOT a single
+  `@@unique([ownerUserId, branchId, periodLabel])`. The #48 AML gotcha resurfaces here:
+  Postgres treats every NULL as distinct in a plain (non-partial) unique index — since
+  `branchId` is NULL on every owner-scoped row, a composite unique across all three
+  columns would never actually collide on two owner-scoped rows sharing the same
+  owner+period, because the NULL in the `branchId` position makes Postgres treat them
+  as distinct tuples every time. Two partial indexes, each scoped to the column that's
+  never NULL for that half of the table, is the correct shape (the
+  `UpSellRecommendation`/`ClaimFollowUpAlert` precedent).
+
+  **How the read resolves.** `GET /sales-performance?ownerUserId=&branchId=
+  &periodLabel=` (`dashboard.sales.view`, already pre-seeded for
+  `[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`) — a
+  Sales/Relationship Officer is forced to their own `ownerUserId` regardless of what's
+  passed, and 403s outright on a `branchId` request (the `lead.service.ts`
+  `VIEW_ALL_OWNERS_ROLES` shape, reusing `common/rbac-visibility.util.ts`'s existing
+  shared constant rather than a new local one). Manager/Executive must supply EXACTLY
+  ONE of `ownerUserId`/`branchId` (422 on both or neither) — there is no "give me
+  everyone" default; a book-wide sales rollup is `kpi-dashboard.view`'s job (#58), not
+  this endpoint's. No `periodLabel` resolves the target whose window contains "now" for
+  that exact scope — no target found is a valid, expected response (`target: null`,
+  `actual: null`, `achievementPercent: null`), not an error, given this feature's
+  genesis means most scopes have no target set yet; an explicit `periodLabel` with no
+  match IS a 404 (the caller named a specific period they expected to exist). A branch
+  scope resolves to every `User.branchId` match, then counts `Lead`/`Prospect` across
+  that whole user-id list in one call each — not N+1 per employee.
+
+  **Permission.** `sales-target.manage` (`[BRANCH_DEPARTMENT_MANAGER,
+  EXECUTIVE_MANAGEMENT]`, 150 → 151 perms) is the one genuinely new permission this
+  process added — gates `POST`/`PATCH`/`GET /sales-targets*` (the raw registry). The
+  performance READ reuses `dashboard.sales.view`, which was already pre-seeded ahead of
+  #59 ever being built — the same "one real new permission per process, the rest
+  pre-seeded" pattern #58 established.
+
+  `apps/web/` gains a new **"Sales performance"** screen
+  (`app/(app)/sales-performance/page.tsx` — a Sales Officer sees only their own stat
+  cards with no scope picker; a Manager/Executive gets a lookup form (owner or branch)
+  plus a set/revise-target form).
+
+  **Verification**: +24 api unit (`sales-performance.config.spec.ts` 9 — the
+  exactly-one-scope validator, achievement-percent rounding, the view/audit-snapshot
+  derivations; `sales-performance.service.spec.ts` 15 — create/update/report validation
+  and orchestration, the audit-write-failure resilience) → api unit **1880** (137
+  files, from 1856). New `test/sales-performance.e2e-spec.ts` **7/7** — permission
+  gating on both `sales-target.manage`/`dashboard.sales.view`; the exactly-one-scope
+  422 on both create and read; a 409 duplicate-target + `PATCH`-revise round trip; the
+  Sales-Officer-forced-to-self / branch-view-forbidden visibility rule; a null-target
+  "no quota set yet" response plus an explicit-`periodLabel` 404; a REAL Lead→Prospect
+  walk (`POST /leads` → two `/transition` calls → `POST /prospects`) moving a
+  brand-new officer's `newProspects` from 0 to 1 and `achievementPercent` from 0% to
+  50%; a branch-scoped target resolving to two officers' combined actuals. Full api
+  unit suite 1880/1880 confirmed green; full api e2e suite (39 files) green, including
+  both documented chronic flakes (`rbac`, `up-sell`) passing cleanly. New Playwright
+  `sales-performance.spec.ts` 4/4; full Playwright suite 153/153 (from 150).
+  `npm run typecheck`/`lint`/`build` (api + web) OK.
+
+  **Deferred**: #60–65 (Insurer/Employee Performance, Portfolio/Profitability
+  Analysis, Executive Management Reporting, Strategic Planning export) remain unbuilt,
+  each with its own permission already seeded. No drill-through from a performance
+  stat to the underlying Lead/Prospect record list. No notification/alert when a
+  period ends with a target unmet. Retargeting a different owner/branch/window is a
+  new row — no "carry forward last period's target" convenience.
 
 ## Deployment
 
