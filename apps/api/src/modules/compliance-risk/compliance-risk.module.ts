@@ -23,6 +23,9 @@ import { PiPolicyRepository } from '../../repositories/pi-policy.repository';
 import { PiRiskEventController } from './pi-risk-event.controller';
 import { PiRiskEventService } from './pi-risk-event.service';
 import { PiRiskEventRepository } from '../../repositories/pi-risk-event.repository';
+import { IncidentController } from './incident.controller';
+import { IncidentService } from './incident.service';
+import { IncidentRepository } from '../../repositories/incident.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -74,12 +77,30 @@ import { AuthModule } from '../auth/auth.module';
  * — the same deliberate duplication-over-cross-import shape as
  * `BrokerLicenseRepository` above.
  *
+ * Process 55, Incident Management (`IncidentService`): the unified security
+ * + personal-data breach workflow — a strictly linear, pre-existing
+ * `WORKFLOW_TRANSITIONS.IncidentReport` chain (Reported -> Contained ->
+ * Impact Assessed -> Classified -> Notified -> Recovered -> Closed) this
+ * module is the first real consumer of. Material classification is a
+ * maker/checker pair (DPO classifies, Executive Management co-signs) role-
+ * checked inside the service beyond the coarse `incident.classify`
+ * permission both roles share, backed by a new CHECK constraint (migration
+ * `20260906120000`) on the two pre-existing columns. The backlog's "senior
+ * management notification (job)" checkbox deliberately has NO bespoke
+ * scheduler — it reuses the pre-existing generic `SlaTimerScheduler`
+ * (runs every 15 minutes, backlog A.8), which already lists `IncidentReport`
+ * in `SLA_DASHBOARD_SENSITIVE_ENTITY_TYPES`. This model is ALSO Part D's M09
+ * (Incident & Breach Management) — see
+ * `ibms-brain/meta/context/incident-management.md`.
+ *
  *   - AuditModule -> AuditService (CREATE / UPDATE rows)
  *   - AuthModule  -> UserRepository (the sweep resolves the system service
  *     account, same as every other scheduler)
  *
  * `TransactionMonitoringAlert.status` is a plain string, not a
- * `WorkflowTransitionService` entity — `WorkflowModule` is not needed here.
+ * `WorkflowTransitionService` entity — `WorkflowModule` is not needed here
+ * as an explicit import (it, like `SlaModule`, is `@Global()` — `IncidentReport`
+ * IS a workflow entity and uses it, without needing it listed below).
  */
 @Module({
   imports: [AuditModule, AuthModule],
@@ -91,6 +112,7 @@ import { AuthModule } from '../auth/auth.module';
     RiskRegisterController,
     PiPolicyController,
     PiRiskEventController,
+    IncidentController,
   ],
   providers: [
     TransactionMonitoringService,
@@ -111,6 +133,8 @@ import { AuthModule } from '../auth/auth.module';
     PiPolicyRepository,
     PiRiskEventService,
     PiRiskEventRepository,
+    IncidentService,
+    IncidentRepository,
   ],
 })
 export class ComplianceRiskModule {}

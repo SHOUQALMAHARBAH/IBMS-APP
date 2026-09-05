@@ -2415,7 +2415,11 @@ model IncidentReport {
   impactAssessedAt      DateTime?
   classification        IncidentClassification @default(NOT_YET_CLASSIFIED)
   classifiedByDpoUserId String?
-  seniorManagementCoSignUserId String? // Material classification irreversible without this
+  // Material classification irreversible without this — `assertDifferentActors`
+  // (app-level) + `IncidentReport_classification_maker_checker_distinct` CHECK
+  // (migration 20260906120000, Process 55) both enforce that this is a
+  // DIFFERENT officer than classifiedByDpoUserId.
+  seniorManagementCoSignUserId String?
   seniorManagementNotifiedAt DateTime? // within 1 hour of Material classification
   notifiedRegulators    String[] // CBJ | NCSC | Personal_Data_Protection_Council
   notifiedAt            DateTime?
