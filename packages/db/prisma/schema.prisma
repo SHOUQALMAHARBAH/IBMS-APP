@@ -2761,7 +2761,16 @@ model SalesTarget {
 }
 
 /// Process 60 — score insurers on Quote Response, Claims Service, Price,
-/// Service quality.
+/// Service quality. A monthly periodic job (`InsurerPerformanceScheduler`)
+/// snapshots one row per insurer per `periodLabel` ("YYYY-MM") — a recompute
+/// for the same insurer+period UPSERTS via `@@unique([insurerId,
+/// periodLabel])` (both columns are always non-null here, so unlike
+/// `SalesTarget` this is a plain composite unique, no partial-index gotcha)
+/// rather than accumulating stray duplicate snapshots. Each dimension falls
+/// back to a documented neutral `NEUTRAL_SCORE = 50.00` when the period has
+/// no computable data for it (e.g. no RFQ sent that month) — see
+/// `insurer-performance.config.ts` and `ibms-brain/meta/context/
+/// insurer-performance.md`.
 model InsurerPerformanceScore {
   id                  String   @id @default(uuid())
   insurerId           String
@@ -2772,6 +2781,8 @@ model InsurerPerformanceScore {
   priceScore          Decimal  @db.Decimal(5, 2)
   serviceQualityScore Decimal  @db.Decimal(5, 2)
   computedAt          DateTime @default(now())
+
+  @@unique([insurerId, periodLabel])
 }
 
 /// Process 61 — employee KPI achievement vs target.

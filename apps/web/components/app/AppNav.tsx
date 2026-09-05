@@ -57,6 +57,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/audit-trail', label: 'Audit trail' },
   { href: '/kpi-dashboard', label: 'KPI dashboard' },
   { href: '/sales-performance', label: 'Sales performance' },
+  { href: '/insurer-performance', label: 'Insurer performance' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

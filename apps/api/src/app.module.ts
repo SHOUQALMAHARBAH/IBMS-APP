@@ -40,6 +40,7 @@ import { InternalControlsModule } from './modules/internal-controls/internal-con
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
+import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 
 @Module({
   imports: [
@@ -284,6 +285,12 @@ import { SalesPerformanceModule } from './modules/management-reporting/sales-per
     // (new) gates the target registry; dashboard.sales.view (pre-seeded)
     // gates the performance-vs-target read.
     SalesPerformanceModule,
+    // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
+    // InsurerSlaAgreement (dormant) get their first real consumer: a
+    // monthly job scoring quote-response speed/claims service/price/
+    // service quality. No new permission — insurer-performance.view
+    // (pre-seeded) gates both the read and the manual compute trigger.
+    InsurerPerformanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

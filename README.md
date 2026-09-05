@@ -560,6 +560,7 @@ build actually is today:
 |---|---|---|---|
 | 58 | General KPI dashboard | the backlog line names no model and no metric list: "aggregate queries across every module above" · deliberately scoped to a curated, low-risk set rather than an exhaustive KPI catalogue — one plain `count` or `groupBy`-count per already-built domain: Sales/CRM (`totalCustomers`, leads/prospects/opportunities by status), Policy (policies by status + total issued premium), Claims (claims by status), Customer Service (complaints by status + open service requests), Compliance & Risk (open risk-register items/incidents/internal-audit findings), plus two unambiguous money sums for Finance (outstanding invoiced — the SAME "outstanding" definition #33's AR ageing report already uses; commission this month, a plain gross figure, no netting) · **deliberately NOT attempted**: "outstanding payables owed to insurers" — #34's own definition nets out the broker's own commission deduction, and reproducing that here risked a second, driftable copy of business logic rather than a genuinely simple aggregate; the precise figure stays at #34/#40 · **new module** `apps/api/src/modules/management-reporting/` (`kpi-dashboard.{config,service,controller,module}.ts`) + `repositories/kpi-dashboard.repository.ts` · **reads every table DIRECTLY — zero cross-module service dependency** — even though `FinancialReportService` (#40) already composes almost this exact finance summary, no prior cross-cutting reporting module in this codebase (`SlaDashboardModule` #43, `InternalControlsModule` #56, `AuditTrailModule` #57) calls into another domain's SERVICE for a number; all of them read their own tables via their own repository, and this process kept that consistency rather than widening two unrelated modules' `exports` arrays (`FinanceModule` exports only `InvoiceRepository` today; `SlaDashboardModule` exports nothing) · every method on `KpiDashboardRepository` is a genuine DB-side `count`/`groupBy`/`aggregate` call, never a loaded-then-reduced `findMany` — so unlike every prior dashboard in this codebase, there is NO read-limit/truncation-warning concept here at all, since an aggregate's result size never scales with row count · **the #56 concurrency lesson (fire independent queries via `Promise.all`, not sequentially) was applied from the FIRST draft, not rediscovered via a timing failure** — all fifteen queries in `KpiDashboardService.summary()` run concurrently · a best-effort `READ` audit row is written per read (counts only) · `GET /kpi-dashboard` — new permission `kpi-dashboard.view` (`[BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`, 149 → 150 perms) — genuinely new, unlike every OTHER Domain G permission (`dashboard.sales.view`, `dashboard.policy.view`, `dashboard.claims.view`, `dashboard.financial.view`, `dashboard.compliance.view`, `insurer-performance.view`, `employee-performance.view`, `dashboard.executive.view`, `portfolio-analysis.view`, `profitability-analysis.view`, `planning-export.generate`), ALL pre-seeded ahead of time for #59–65's own future models/schedulers · `EXTERNAL_AUDITOR` deliberately excluded — the #57 lesson: their scope is logs/documents/workflow history, not live business-KPI content · `apps/web/` gains a **"KPI dashboard"** screen (`app/(app)/kpi-dashboard/page.tsx` — six sections, one per domain, stat cards + status-breakdown tables) · **Verification**: +10 api unit (`kpi-dashboard.config.spec.ts` 6, `kpi-dashboard.service.spec.ts` 4) → api unit **1856** (133 files, from 1846). New `test/kpi-dashboard.e2e-spec.ts` **2/2** — permission gating + full response-shape assertions; a before/after DELTA test (never a global count, since `db-test` is cumulative) proving a fresh `Lead` and a fresh `RiskRegisterItem` each move their own bucket by exactly 1, covering both the `groupBy`-count and the plain-filtered-count code paths against real Postgres. New Playwright `kpi-dashboard.spec.ts` 3/3. `npm run typecheck`/`lint`/`build` (api + web) OK | #59–65 (Sales/Insurer/Employee Performance, Portfolio/Profitability Analysis, Executive Management Reporting, Strategic Planning export) — each a separate backlog item with its own permission already seeded, not built here · this dashboard's finance figures are deliberately simplified and are NOT meant to reconcile to the fils with #40's more precise consolidated report · no drill-through from a stat to the underlying record list · `kpi-dashboard.view` is role-level (no per-department scoping — that's what #59–64's own department-specific dashboards are for) |
 | 59 | Sales Performance | the backlog line names no model and no target metric: "a query per employee/team against target" · new model `SalesTarget` (migration `20260910120000` — a genuine new migration, unlike #60/#61's `InsurerPerformanceScore`/`EmployeePerformanceRecord`, both already pre-existing core schema) · target metric picked: `targetNewProspects` — new `Prospect` rows (a `Lead` qualified, Process 1→2) attributable to `Lead.ownerUserId`/`Prospect.salesOwnerUserId`, or to every user in one `Branch`, inside `[periodStart, periodEnd)` · **deliberately NOT premium/commission-based** — `Policy.placedByUserId`/`Opportunity.createdByUserId` name the PLACEMENT officer, not the sourcing Sales Officer, and `Customer.prospectId` is optional (a Customer can be onboarded with no Prospect at all), so there is no reliable way to attribute bound premium back to a Sales Officer without guessing; that dimension stays at `EmployeePerformanceRecord.premiumWritten` (#61, not built here) · `ownerUserId`/`branchId` are bare scalars, no relations (the `Opportunity.createdByUserId` shape) — exactly one is set, checked at three layers: a pure `isExactlyOneScope()` validator, a hand-authored DB `CHECK` (`SalesTarget_owner_xor_branch`, Prisma has no cross-column CHECK syntax), and re-derived again on the read side's own scope resolution · **the #48 AML NULL-uniqueness gotcha resurfaced and was avoided** — "at most one target per owner per period label" / "...per branch per period label" are TWO hand-authored PARTIAL unique indexes, not one composite `@@unique([ownerUserId, branchId, periodLabel])`, since Postgres treats every NULL as distinct in a plain composite unique and a composite key would never collide on the column that's always NULL for that row's scope · **new module** `apps/api/src/modules/management-reporting/sales-performance.{config,service,controller,module}.ts` + `repositories/sales-performance.repository.ts` (owns both `SalesTarget` CRUD and the live actual-count queries) · `POST`/`PATCH`/`GET /sales-targets*` — new permission `sales-target.manage` (`[BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`, 150 → 151 perms), the one genuinely new Domain G permission this process needed · `GET /sales-performance?ownerUserId=&branchId=&periodLabel=` reuses the already-pre-seeded `dashboard.sales.view` (`[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`) — a Sales/Relationship Officer is forced to their own `ownerUserId` regardless of query params and 403s a branch request outright (reusing `common/rbac-visibility.util.ts`'s existing `VIEW_ALL_OWNERS_ROLES` rather than a new local constant); Manager/Executive must supply exactly one of `ownerUserId`/`branchId` (422 on both/neither — no book-wide default, that is `kpi-dashboard.view`'s job) · no `periodLabel` resolves the target whose window contains "now" for that scope — no match returns `target: null`/`actual: null`/`achievementPercent: null` (a valid, expected state at this feature's genesis), while an explicit unmatched `periodLabel` 404s · a branch scope resolves to every `User.branchId` match, then counts `Lead`/`Prospect` across that whole user-id list in one call each, not N+1 per employee · `apps/web/` gains a **"Sales performance"** screen (`app/(app)/sales-performance/page.tsx` — an officer's own stat cards with no scope picker; a Manager gets a lookup form plus a set/revise-target form) · **Verification**: +24 api unit (`sales-performance.config.spec.ts` 9, `sales-performance.service.spec.ts` 15) → api unit **1880** (137 files, from 1856). New `test/sales-performance.e2e-spec.ts` **7/7** — permission gating on both `sales-target.manage`/`dashboard.sales.view`; the exactly-one-scope 422 on both create and read; a 409 duplicate-target + PATCH-revise round trip; the Sales-Officer-forced-to-self / branch-view-forbidden visibility rule; a null-target response plus an explicit-`periodLabel` 404; a REAL Lead→Prospect walk (`POST /leads` → two `/transition` calls → `POST /prospects`) moving a brand-new officer's `newProspects` from 0 to 1 and `achievementPercent` from 0% to 50%; a branch-scoped target resolving to two officers' combined actuals. Full api unit suite 1880/1880 confirmed green; full api e2e suite (39 files) green, both documented chronic flakes (`rbac`, `up-sell`) passing cleanly. New Playwright `sales-performance.spec.ts` 4/4; full Playwright suite 153/153 (from 150). `npm run typecheck`/`lint`/`build` (api + web) OK | no drill-through from a performance stat to the underlying Lead/Prospect record list · no notification/alert when a period ends with a target unmet · retargeting a different owner/branch/window is a new row (the `PATCH` only revises the number) — no "carry forward last period's target" convenience · #60–65 (Insurer/Employee Performance, Portfolio/Profitability Analysis, Executive Management Reporting, Strategic Planning export) remain unbuilt, each with its own permission already seeded |
+| 60 | Insurer Performance — `InsurerPerformanceScore` | the backlog names four dimensions with no metric per dimension, and unlike #58/#59 the model AND `InsurerSlaAgreement` already existed in the core schema — this process is their first real consumer for either · **quote-response speed** = average `RFQInsurer.sentAt`→`respondedAt` days for rows responded to in the period (only ever stamped on QUOTED/DECLINED — `rfq.service.ts`'s own `transitionInsurer`; NO_RESPONSE always leaves it null) scored against `InsurerSlaAgreement` (`slaType: 'quote_response'`, the insurer's own agreed `targetDays`) if one exists, else the same 9-day default `RFQ.followUpThresholdDays` already uses · **claims service** = the proportion of claims notified in the period (via `Claim.policy.insurerId`) with NO `ClaimFollowUpAlert` ever raised — Process 27's own definition of insurer non-responsiveness; `InsurerSlaAgreement`'s `claim_handling` type stays deliberately unconsumed, since no clean "time to insurer action" timestamp exists to score against it · **price** = this insurer's premium vs. the average of every OTHER insurer's current-version quote on the SAME RFQ (only comparable when a real competing quote exists), capped at 100 when cheaper than the field average — stays in `Prisma.Decimal` via `money.util.ts`'s `sumMoney`/`toMoney` throughout since `Quotation.premium` is a `MONEY_DECIMAL_FIELDS` column, never a raw JS float division of two premiums · **service quality** = the average of `ComparisonMatrixRow.serviceScore`, an EXISTING optional 0-100 subjective score a Placement Officer can supply when building a Quote Comparison (Process 14) — that column's own doc comment says outright "there is no Insurer-scoring module yet"; this process is exactly that module · any dimension with no computable data for the period defaults to a uniform `NEUTRAL_SCORE = 50.00` (never 0 or 100, which would misread absence of evidence as a verdict) — every insurer gets a score every period, including one with zero activity · **a real redesign happened mid-build, not a review comment**: the first draft's `POST /insurer-performance/compute` recomputed EVERY insurer with no `insurerId` field, mirroring the scheduler's own batch method too literally — this broke immediately against the shared `db-test` database, which had accumulated 2,726 `Insurer` rows from months of other modules' e2e fixtures, timing out a 30-second e2e test with Prisma "Engine is not yet connected" errors (real connection-pool pressure, not a flaky assertion) · fixed by making `insurerId` MANDATORY on the manual trigger — the `up-sell-recommendations/detect` precedent (`DetectUpSellDto.customerId`, also mandatory — there is no "detect for everyone" HTTP route there either, only the scheduler iterates the whole book internally) · `computeScores` (the scheduler's own all-insurers batch) was ALSO switched from a naive sequential loop to bounded-concurrency chunks (`Promise.allSettled`, 20 insurers at a time — the #56 concurrency lesson taken one step further: fully unbounded parallelism over a large book would open thousands of simultaneous connections and make pool pressure WORSE, not better) · `@@unique([insurerId, periodLabel])` (migration `20260911120000`, a plain composite unique — both columns always non-null here, no `SalesTarget`-style partial-index NULL gotcha) makes a recompute UPSERT rather than accumulate a duplicate snapshot · **no new permission** — `insurer-performance.view` (already pre-seeded `[BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT]`) gates both the read and the manual compute trigger, the `internal-controls.audit` "Run audit now" precedent — the first Domain G process needing zero seed change, unlike #58/#59's one-new-permission-each pattern · monthly cadence (06:00 UTC on the 1st of each month, scoring the UTC calendar month that just ended) — the first non-daily/nightly scheduler cadence in this codebase · **new module** `apps/api/src/modules/management-reporting/insurer-performance.{config,service,controller,module,scheduler}.ts` + `repositories/insurer-performance.repository.ts` · `apps/web/` gains an **"Insurer performance"** screen (`app/(app)/insurer-performance/page.tsx` — a lookup form, a stat-card + history-table view, and a compute-now form) · **Verification**: +31 api unit (`insurer-performance.config.spec.ts` 16, `insurer-performance.service.spec.ts` 15) → api unit **1911** (139 files, from 1880). New `test/insurer-performance.e2e-spec.ts` **4/4** — permission gating across all three routes; a partial-period-override 422; the default-previous-UTC-month resolution; a REAL `RFQ`→`RFQInsurer`/`Quotation`×2/`ComparisonMatrixRow`/`Policy`/`Claim` fixture chain (seeded directly via Prisma, the #57 precedent for a heavy multi-model setup) proving all four scores compute correctly for an active insurer AND the neutral-50 default for a zero-activity insurer in the SAME period, plus a same-period recompute upserting instead of duplicating. Full api unit suite 1911/1911 confirmed green; full api e2e suite (40 files) green, including both documented chronic flakes (`rbac`, `up-sell`) and one confirmed-transient TOTP-timing flake in `complaint.e2e-spec.ts` (unrelated to this diff, re-run in isolation to confirm). New Playwright `insurer-performance.spec.ts` 4/4; full Playwright suite 156/156 (from 153). `npm run typecheck`/`lint`/`build` (api + web) OK | no drill-through from a score to the underlying RFQ/Claim/Quotation/Comparison records that fed it · `InsurerSlaAgreement`'s `response_time`/`policy_issuance` SLA types remain unconsumed by any process · no combined/weighted single index across the four scores — the backlog names four SEPARATE dimensions, not one blended figure, and this process kept them separate · #61–65 (Employee Performance, Portfolio/Profitability Analysis, Executive Management Reporting, Strategic Planning export) remain unbuilt, each with its own permission already seeded |
 
 ### Not started
 
@@ -641,9 +642,13 @@ build actually is today:
   a new `SalesTarget` quota (per employee or per branch/team, for a period) compared
   live against new-Prospects-qualified actuals — deliberately not premium/commission-
   based, since that attribution runs through the Placement officer, not the Sales
-  Officer who sourced the customer — see both entries below for full detail. **Not
-  built**: #60–65 (Insurer/Employee Performance, Portfolio/Profitability Analysis,
-  Executive Management Reporting, Strategic Planning export). Supporting Operations
+  Officer who sourced the customer. #60 Insurer Performance is also built: a monthly
+  job scoring quote-response speed/claims service/price/service quality — the first
+  Domain G process to consume `InsurerPerformanceScore`/`InsurerSlaAgreement`, both
+  already pre-existing in the core schema, and the first non-daily scheduler cadence
+  in this codebase — see all three entries below for full detail. **Not built**:
+  #61–65 (Employee Performance, Portfolio/Profitability Analysis, Executive
+  Management Reporting, Strategic Planning export). Supporting Operations
   (HR, procurement, IT,
   document management, vendor management,
   BCP/DR, knowledge base,
@@ -6950,6 +6955,120 @@ narrows a gap.
   stat to the underlying Lead/Prospect record list. No notification/alert when a
   period ends with a target unmet. Retargeting a different owner/branch/window is a
   new row — no "carry forward last period's target" convenience.
+
+**Part C #60 — Insurer Performance (Domain G, Process 60)** — the third Domain G
+  item: "`InsurerPerformanceScore`: a periodic job computing the score from
+  quote-response speed/claims service/price/service quality." Unlike #58/#59, both
+  `InsurerPerformanceScore` AND `InsurerSlaAgreement` already existed in the core
+  schema (Part 13) — this process is their first real consumer for either.
+
+  **The four dimensions, and why each metric was picked.** The backlog names four
+  dimensions but no metric per dimension — each was mapped to an existing,
+  cleanly-attributable signal rather than inventing a new one:
+
+  - **Quote-response speed** (`quoteResponseScore`) — the average days between
+    `RFQInsurer.sentAt` and `RFQInsurer.respondedAt` for rows RESPONDED TO in the
+    period (`respondedAt` is only ever stamped on `QUOTED`/`DECLINED` —
+    `rfq.service.ts`'s own `transitionInsurer`; `NO_RESPONSE` always leaves it null),
+    scored against `InsurerSlaAgreement` (`slaType: 'quote_response'`, the insurer's
+    own agreed `targetDays`) if one exists, else the same 9-day default `RFQ.
+    followUpThresholdDays` already uses (backlog Part C #11) — never an unrelated
+    invented number.
+  - **Claims service** (`claimsServiceScore`) — the proportion of claims notified in
+    the period (`Claim.createdAt`, via `Claim.policy.insurerId`) that never had a
+    `ClaimFollowUpAlert` raised — Process 27's own definition of "the insurer went
+    non-responsive on this claim." `InsurerSlaAgreement`'s `claim_handling` type stays
+    deliberately unconsumed — no continuous "time to insurer action" timestamp exists
+    anywhere in the schema to score against it.
+  - **Price** (`priceScore`) — for each of this insurer's CURRENT-version quotations
+    received in the period, its premium vs. the average of every OTHER insurer's
+    current quote on the SAME RFQ (only RFQs with a real competing quote are
+    comparable). Cheaper-than-average capped at 100. Touches `Quotation.premium` (a
+    `MONEY_DECIMAL_FIELDS` column) — the whole calculation stays in `Prisma.Decimal`
+    via `money.util.ts`'s `sumMoney`/`toMoney`, never a raw JS float division of two
+    premiums.
+  - **Service quality** (`serviceQualityScore`) — the average of `ComparisonMatrixRow.
+    serviceScore`, the EXISTING optional 0-100 subjective score a Placement Officer
+    can supply when building a Quote Comparison (Process 14). That column's own doc
+    comment says outright: "there is no Insurer-scoring module yet" — this process is
+    exactly that module.
+
+  Any dimension with no computable data for the period gets a uniform
+  `NEUTRAL_SCORE = 50.00` — not 0 (misreads "no evidence" as failure) or 100 (misreads
+  it as perfection). Every insurer gets a score every period, including one with zero
+  activity at all.
+
+  **A real redesign happened mid-build, not a review comment.** The first draft
+  exposed `POST /insurer-performance/compute` with no `insurerId` — recompute every
+  insurer in the book, mirroring the scheduler's own batch method too literally. This
+  broke immediately against the shared `db-test` database: this session's `Insurer`
+  table had accumulated 2,726 rows from months of other modules' e2e fixtures, and
+  iterating every one of them timed out a 30-second e2e test with Prisma "Engine is
+  not yet connected" errors — real connection-pool pressure, not a flaky assertion.
+  The fix was not a test-only workaround — it matches a precedent already in this
+  codebase: `POST /up-sell-recommendations/detect` takes a MANDATORY `customerId`
+  (`DetectUpSellDto.customerId`) — there is no "detect for everyone" HTTP route; only
+  `UpSellDetectionScheduler` iterates the whole book internally. `Insurer
+  PerformanceController.compute` now follows the same shape: `insurerId` is required,
+  and the all-insurers batch (`InsurerPerformanceService.computeScores`) is never
+  called from the controller, only from `InsurerPerformanceScheduler`. `computeScores`
+  itself was ALSO changed from a naive sequential loop to bounded-concurrency chunks
+  (`COMPUTE_CONCURRENCY = 20`, `Promise.allSettled` per chunk) — the #56 concurrency
+  lesson taken one step further: fully sequential doesn't scale to a large book, fully
+  unbounded `Promise.all` over thousands of insurers would open thousands of
+  simultaneous connections and make the pool pressure WORSE, not better.
+
+  **Upsert, not append.** `@@unique([insurerId, periodLabel])` (migration
+  `20260911120000_add_insurer_performance_score_unique`) — a recompute for the same
+  insurer+period UPSERTS the existing row rather than accumulating a stray duplicate
+  snapshot. Unlike `SalesTarget`'s owner-xor-branch shape, both columns here are
+  always non-null, so this is a plain composite unique index — no partial-index NULL
+  gotcha to work around.
+
+  **Period resolution.** Monthly, not nightly like every other sweep in this
+  codebase — an insurer's performance over a few hours is meaningless noise. `POST
+  /compute` with no period fields scores the UTC calendar month that just ended;
+  supplying `periodLabel`+`periodStart`+`periodEnd` together recomputes an explicit
+  window (a backfill, or an e2e test that can't wait on a real calendar month) — any
+  other combination is a 422. `InsurerPerformanceScheduler` runs at 06:00 UTC on the
+  1st of each month — the first non-daily/nightly scheduler cadence in this codebase.
+
+  **Permission.** `insurer-performance.view` (`[BRANCH_DEPARTMENT_MANAGER,
+  EXECUTIVE_MANAGEMENT]`) — already pre-seeded ahead of #59-65 — gates every route,
+  including the manual compute trigger. No new permission was needed for this
+  process, unlike #58/#59, each of which needed exactly one — the `internal-controls.
+  audit` "Run audit now" precedent: the same audience who views a report is trusted
+  to trigger an on-demand recompute of it.
+
+  `apps/web/` gains a new **"Insurer performance"** screen
+  (`app/(app)/insurer-performance/page.tsx` — a lookup form, stat cards + a history
+  table, and a compute-now form).
+
+  **Verification**: +31 api unit (`insurer-performance.config.spec.ts` 16 — the
+  period-window math, the score/clamp helpers, the price-competitiveness Decimal
+  arithmetic; `insurer-performance.service.spec.ts` 15 — every dimension's
+  computation path, the neutral-default fallback, per-insurer isolation in the batch,
+  the upsert/audit-action split) → api unit **1911** (139 files, from 1880). New
+  `test/insurer-performance.e2e-spec.ts` **4/4** — permission gating across all three
+  routes; a partial-period-override 422; the default-previous-UTC-month resolution; a
+  REAL `RFQ`→`RFQInsurer`/`Quotation`×2/`ComparisonMatrixRow`/`Policy`/`Claim` fixture
+  chain (seeded directly via Prisma, the #57 precedent for a heavy multi-model setup)
+  proving all four scores compute correctly for an active insurer AND the neutral-50
+  default for a zero-activity insurer in the SAME period, plus a same-period
+  recompute upserting instead of duplicating. Full api unit suite 1911/1911 confirmed
+  green; full api e2e suite (40 files) green, including both documented chronic
+  flakes (`rbac`, `up-sell`) and one confirmed-transient TOTP-timing flake in
+  `complaint.e2e-spec.ts` (unrelated to this diff, re-run in isolation to confirm).
+  New Playwright `insurer-performance.spec.ts` 4/4; full Playwright suite 156/156
+  (from 153). `npm run typecheck`/`lint`/`build` (api + web) OK.
+
+  **Deferred**: #61–65 (Employee Performance, Portfolio/Profitability Analysis,
+  Executive Management Reporting, Strategic Planning export) remain unbuilt, each
+  with its own permission already seeded. No drill-through from a score to the
+  underlying RFQ/Claim/Quotation/Comparison records that fed it. `InsurerSlaAgreement`'s
+  `response_time`/`policy_issuance` SLA types remain unconsumed by any process. No
+  combined/weighted single index across the four scores — the backlog names four
+  separate dimensions, not one blended figure.
 
 ## Deployment
 
