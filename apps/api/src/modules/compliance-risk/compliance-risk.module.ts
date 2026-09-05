@@ -14,6 +14,15 @@ import { BrokerLicenseRepository } from '../../repositories/broker-license.repos
 import { ComplianceCalendarController } from './compliance-calendar.controller';
 import { ComplianceCalendarService } from './compliance-calendar.service';
 import { ComplianceCalendarRepository } from '../../repositories/compliance-calendar.repository';
+import { RiskRegisterController } from './risk-register.controller';
+import { RiskRegisterService } from './risk-register.service';
+import { RiskRegisterRepository } from '../../repositories/risk-register.repository';
+import { PiPolicyController } from './pi-policy.controller';
+import { PiPolicyService } from './pi-policy.service';
+import { PiPolicyRepository } from '../../repositories/pi-policy.repository';
+import { PiRiskEventController } from './pi-risk-event.controller';
+import { PiRiskEventService } from './pi-risk-event.service';
+import { PiRiskEventRepository } from '../../repositories/pi-risk-event.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -51,6 +60,20 @@ import { AuthModule } from '../auth/auth.module';
  * not a stored flag a background sweep needs to keep in sync — see that
  * function's own comment for why (the #16 `@code-reviewer` MAJOR lesson).
  *
+ * Process 53-54, Operational & Professional Indemnity Risk
+ * (`RiskRegisterService` + `PiPolicyService` + `PiRiskEventService`): a
+ * generic risk register over the five non-PI categories the source names
+ * (operational/cyber/financial/compliance/reputational — PI gets its own
+ * deeper table, see `risk-register.config.ts`), the broker's own PI policy
+ * record (NOT a fixed-id singleton like `BrokerLicense` — "current" is the
+ * row with the furthest-out `expiresAt`, see `pi-policy.config.ts`), and the
+ * PI risk events a Policy Checking discrepancy already auto-logs (Process
+ * 20/54) — this gives those rows their first read surface plus a manual log
+ * path. `PiPolicyRepository` is ALSO provided directly by `PolicyModule`
+ * (`PolicyCheckingRepository.findLatestPiPolicyId`'s discrepancy auto-link)
+ * — the same deliberate duplication-over-cross-import shape as
+ * `BrokerLicenseRepository` above.
+ *
  *   - AuditModule -> AuditService (CREATE / UPDATE rows)
  *   - AuthModule  -> UserRepository (the sweep resolves the system service
  *     account, same as every other scheduler)
@@ -65,6 +88,9 @@ import { AuthModule } from '../auth/auth.module';
     WatchlistSyncController,
     BrokerLicenseController,
     ComplianceCalendarController,
+    RiskRegisterController,
+    PiPolicyController,
+    PiRiskEventController,
   ],
   providers: [
     TransactionMonitoringService,
@@ -79,6 +105,12 @@ import { AuthModule } from '../auth/auth.module';
     BrokerLicenseRepository,
     ComplianceCalendarService,
     ComplianceCalendarRepository,
+    RiskRegisterService,
+    RiskRegisterRepository,
+    PiPolicyService,
+    PiPolicyRepository,
+    PiRiskEventService,
+    PiRiskEventRepository,
   ],
 })
 export class ComplianceRiskModule {}

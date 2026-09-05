@@ -50,6 +50,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/transaction-monitoring', label: 'AML monitoring' },
   { href: '/watchlist-sync', label: 'Watchlist sync' },
   { href: '/regulatory-compliance', label: 'Regulatory compliance' },
+  { href: '/operational-pi-risk', label: 'Operational & PI risk' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

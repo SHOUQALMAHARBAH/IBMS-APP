@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { PolicyChecking, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CoverageChecklist } from '../modules/policy/policy-checking.config';
+import { PiPolicyRepository } from './pi-policy.repository';
 
 export interface RecordCheckingInput {
   policyId: string;
@@ -32,15 +33,19 @@ export interface RecordCheckingInput {
  */
 @Injectable()
 export class PolicyCheckingRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly piPolicies: PiPolicyRepository,
+  ) {}
 
   /** The broker's most recently-expiring PI policy, if any is on record — the
-   * discrepancy risk event links to it when present (Part 7.1). */
+   * discrepancy risk event links to it when present (Part 7.1). Delegates to
+   * `PiPolicyRepository.findCurrent` (Process 53-54) — the one definition of
+   * "current" both this auto-link and the PI Policy module's own read views
+   * share, rather than two independent copies of the same query drifting
+   * apart. */
   async findLatestPiPolicyId(): Promise<string | null> {
-    const row = await this.prisma.client.professionalIndemnityPolicy.findFirst({
-      orderBy: { expiresAt: 'desc' },
-      select: { id: true },
-    });
+    const row = await this.piPolicies.findCurrent();
     return row?.id ?? null;
   }
 

@@ -7,6 +7,7 @@ import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
 import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
+import { PiPolicyRepository } from '../../repositories/pi-policy.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { OpportunityModule } from '../opportunity/opportunity.module';
@@ -37,7 +38,11 @@ import { CustomerModule } from '../customer/customer.module';
  * `ComplianceRiskModule` (which owns it) — a stateless `PrismaService`
  * wrapper, safe to instantiate twice, the `WatchlistEntryRepository` (#49)
  * shape, avoiding a `PolicyModule` <-> `ComplianceRiskModule` dependency for
- * one narrow read. `PolicyService.place()` is the ONLY caller. */
+ * one narrow read. `PolicyService.place()` is the ONLY caller.
+ *
+ * `PiPolicyRepository` (Process 53-54) is provided the same way —
+ * `PolicyCheckingRepository.findLatestPiPolicyId` (Process 20/54's
+ * discrepancy auto-link) is its only caller here. */
 @Module({
   imports: [
     AuditModule,
@@ -56,6 +61,7 @@ import { CustomerModule } from '../customer/customer.module';
     PolicyDeliveryService,
     PolicyDeliveryRepository,
     BrokerLicenseRepository,
+    PiPolicyRepository,
   ],
   exports: [PolicyRepository],
 })
