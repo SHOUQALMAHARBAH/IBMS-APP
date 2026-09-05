@@ -37,6 +37,7 @@ import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module
 import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
+import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 
 @Module({
   imports: [
@@ -265,6 +266,13 @@ import { InternalControlsModule } from './modules/internal-controls/internal-con
     // can express) for a self-approval violation. internal-controls.audit /
     // Compliance, Executive Management, External Auditor.
     InternalControlsModule,
+    // Process 57 — closes Domain F. InternalAuditFinding lives inside
+    // ComplianceRiskModule above; this is the second checkbox, the
+    // External Auditor's read-only lens over the audit log, document
+    // history, and workflow history. audit-log.read / document-history.
+    // read / workflow-history.read — all three pre-seeded, first real
+    // consumers here.
+    AuditTrailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

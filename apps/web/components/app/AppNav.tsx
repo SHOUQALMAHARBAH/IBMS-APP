@@ -53,6 +53,8 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/operational-pi-risk', label: 'Operational & PI risk' },
   { href: '/incidents', label: 'Incident management' },
   { href: '/internal-controls', label: 'Internal controls' },
+  { href: '/internal-audit-findings', label: 'Internal audit findings' },
+  { href: '/audit-trail', label: 'Audit trail' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

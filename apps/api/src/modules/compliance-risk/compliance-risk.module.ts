@@ -26,6 +26,9 @@ import { PiRiskEventRepository } from '../../repositories/pi-risk-event.reposito
 import { IncidentController } from './incident.controller';
 import { IncidentService } from './incident.service';
 import { IncidentRepository } from '../../repositories/incident.repository';
+import { InternalAuditFindingController } from './internal-audit-finding.controller';
+import { InternalAuditFindingService } from './internal-audit-finding.service';
+import { InternalAuditFindingRepository } from '../../repositories/internal-audit-finding.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -93,6 +96,18 @@ import { AuthModule } from '../auth/auth.module';
  * (Incident & Breach Management) — see
  * `ibms-brain/meta/context/incident-management.md`.
  *
+ * Process 57, Internal Audit (`InternalAuditFindingService`) — closes
+ * Domain F. `InternalAuditFinding` (core schema) is the exact same bare
+ * "generic register" shape as `RiskRegisterItem`, one model up in the same
+ * file — no maker/checker, `status`: plain string `open -> closed`.
+ * `internal-audit.record` (Compliance) and `internal-audit.close`
+ * (Compliance + Manager) are two DISTINCT permissions, not a maker/checker
+ * pair. See `ibms-brain/meta/context/internal-audit-and-external-auditor-
+ * access.md` — this process also builds #57's second checkbox, the
+ * External Auditor's time-boxed read-only access, in its own separate
+ * `AuditTrailModule` (a cross-cutting reader over `AuditLogEntry`, not
+ * owned by any one business module, the `SlaDashboardModule` shape).
+ *
  *   - AuditModule -> AuditService (CREATE / UPDATE rows)
  *   - AuthModule  -> UserRepository (the sweep resolves the system service
  *     account, same as every other scheduler)
@@ -113,6 +128,7 @@ import { AuthModule } from '../auth/auth.module';
     PiPolicyController,
     PiRiskEventController,
     IncidentController,
+    InternalAuditFindingController,
   ],
   providers: [
     TransactionMonitoringService,
@@ -135,6 +151,8 @@ import { AuthModule } from '../auth/auth.module';
     PiRiskEventRepository,
     IncidentService,
     IncidentRepository,
+    InternalAuditFindingService,
+    InternalAuditFindingRepository,
   ],
 })
 export class ComplianceRiskModule {}
