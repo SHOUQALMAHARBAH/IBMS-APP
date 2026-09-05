@@ -209,6 +209,7 @@ const complianceRisk: PermissionSeed[] = [
   { code: 'incident.contain', module: 'compliance-risk', description: 'Execute incident containment actions', roles: [ADMIN, COMPLIANCE] },
   { code: 'incident.classify', module: 'compliance-risk', description: 'Classify an incident as Material (requires DPO + Senior Management co-sign)', roles: [DPO, EXEC] },
   { code: 'incident.notify-regulator', module: 'compliance-risk', description: 'Send a multi-regulator incident notification (CBJ / NCSC / PDPC)', roles: [DPO, COMPLIANCE] },
+  { code: 'internal-controls.audit', module: 'compliance-risk', description: 'View the periodic self-approval (maker/checker) audit report', roles: [COMPLIANCE, EXEC, AUDITOR] },
   { code: 'internal-audit.record', module: 'compliance-risk', description: 'Record an internal audit finding', roles: [COMPLIANCE] },
   { code: 'internal-audit.close', module: 'compliance-risk', description: 'Close an internal audit finding after remediation', roles: [COMPLIANCE, MANAGER] },
   { code: 'audit-log.read', module: 'compliance-risk', description: 'Read the immutable audit log', roles: [COMPLIANCE, ADMIN, AUDITOR] },

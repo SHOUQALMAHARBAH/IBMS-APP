@@ -52,6 +52,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/regulatory-compliance', label: 'Regulatory compliance' },
   { href: '/operational-pi-risk', label: 'Operational & PI risk' },
   { href: '/incidents', label: 'Incident management' },
+  { href: '/internal-controls', label: 'Internal controls' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

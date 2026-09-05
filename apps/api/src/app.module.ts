@@ -36,6 +36,7 @@ import { CommissionModule } from './modules/commission/commission.module';
 import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module';
 import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
+import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
 
 @Module({
   imports: [
@@ -259,6 +260,11 @@ import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.
     // recurring re-screen moved to a 4-hourly cadence to match.
     // sanctions-pep.screen / Compliance.
     ComplianceRiskModule,
+    // Process 56 — a read-only scan across every maker/checker pair's DB
+    // CHECK constraint (plus the one cross-table pair no single-table CHECK
+    // can express) for a self-approval violation. internal-controls.audit /
+    // Compliance, Executive Management, External Auditor.
+    InternalControlsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
