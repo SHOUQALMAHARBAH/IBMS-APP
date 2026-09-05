@@ -48,6 +48,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/consent', label: 'Consent' },
   { href: '/transaction-monitoring', label: 'AML monitoring' },
   { href: '/watchlist-sync', label: 'Watchlist sync' },
+  { href: '/regulatory-compliance', label: 'Regulatory compliance' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

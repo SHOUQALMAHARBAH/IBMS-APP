@@ -6,6 +6,7 @@ import { PolicyDeliveryService } from './policy-delivery.service';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
+import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { OpportunityModule } from '../opportunity/opportunity.module';
@@ -28,7 +29,15 @@ import { CustomerModule } from '../customer/customer.module';
  *     recommendation's quotation — insurer / line / premium / currency)
  *   - ClientDecisionModule  -> ClientDecisionRepository (the ACCEPT decision,
  *     the authoritative placement precondition)
- *   - CustomerModule        -> CustomerRepository (owner, for visibility) */
+ *   - CustomerModule        -> CustomerRepository (owner, for visibility)
+ *
+ * `BrokerLicenseRepository` (Process 51, backlog Part C #51's first
+ * checkbox — "automatically block new business issuance once the license
+ * lapses") is provided directly here too, rather than importing
+ * `ComplianceRiskModule` (which owns it) — a stateless `PrismaService`
+ * wrapper, safe to instantiate twice, the `WatchlistEntryRepository` (#49)
+ * shape, avoiding a `PolicyModule` <-> `ComplianceRiskModule` dependency for
+ * one narrow read. `PolicyService.place()` is the ONLY caller. */
 @Module({
   imports: [
     AuditModule,
@@ -46,6 +55,7 @@ import { CustomerModule } from '../customer/customer.module';
     PolicyCheckingRepository,
     PolicyDeliveryService,
     PolicyDeliveryRepository,
+    BrokerLicenseRepository,
   ],
   exports: [PolicyRepository],
 })

@@ -11,6 +11,7 @@ import type { OpportunityRepository } from '../../repositories/opportunity.repos
 import type { RecommendationRepository } from '../../repositories/recommendation.repository';
 import type { ClientDecisionRepository } from '../../repositories/client-decision.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
+import type { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -77,6 +78,9 @@ interface Opts {
   transitionRejects?: boolean;
   artifactsReject?: boolean;
   customerOwner?: string;
+  // undefined -> no BrokerLicense record configured (not blocked); pass an
+  // explicit object to exercise the gate.
+  brokerLicense?: { licenseNumber: string; status: string; expiresAt: Date };
 }
 
 function makeDeps(opts: Opts = {}) {
@@ -226,6 +230,13 @@ function makeDeps(opts: Opts = {}) {
     findById: findCustomerById,
   } as unknown as CustomerRepository;
 
+  const findCurrentLicense = vi
+    .fn()
+    .mockResolvedValue(opts.brokerLicense ?? null);
+  const brokerLicenses = {
+    findCurrent: findCurrentLicense,
+  } as unknown as BrokerLicenseRepository;
+
   const record = vi
     .fn<
       (input: {
@@ -269,6 +280,7 @@ function makeDeps(opts: Opts = {}) {
       recommendations,
       clientDecisions,
       customers,
+      brokerLicenses,
       audit,
       workflow,
     ),
@@ -284,6 +296,7 @@ function makeDeps(opts: Opts = {}) {
       findRecommendationByOpportunityId,
       findClientDecisionByOpportunityId,
       findCustomerById,
+      findCurrentLicense,
       record,
       transition,
     },
@@ -314,6 +327,54 @@ describe('PolicyService', () => {
       // requested premium taken from the recommended quotation, fils-quantized
       expect(view.requestedPremium).toBe('120000.000');
       expect(view.premiumVariance).toBeNull();
+    });
+
+    // Process 51 (backlog Part C #51's first checkbox) — the license gate.
+    it('proceeds when no BrokerLicense record is configured (not an oversight — see assertLicenseNotLapsed)', async () => {
+      const { service, mocks } = makeDeps();
+      await service.place(PLACE_DTO, placement());
+      expect(mocks.findCurrentLicense).toHaveBeenCalled();
+      expect(mocks.create).toHaveBeenCalled();
+    });
+
+    it('proceeds when the license is active and not yet expired', async () => {
+      const { service, mocks } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-1',
+          status: 'active',
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        },
+      });
+      await service.place(PLACE_DTO, placement());
+      expect(mocks.create).toHaveBeenCalled();
+    });
+
+    it('422s and never creates a Policy when the license expiresAt has passed, even if status still reads active', async () => {
+      const { service, mocks } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-1',
+          status: 'active',
+          expiresAt: new Date(Date.now() - 1000),
+        },
+      });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it('422s when the license was manually marked lapsed ahead of its calendar expiry', async () => {
+      const { service, mocks } = makeDeps({
+        brokerLicense: {
+          licenseNumber: 'CBJ-1',
+          status: 'lapsed',
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        },
+      });
+      await expect(service.place(PLACE_DTO, placement())).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(mocks.create).not.toHaveBeenCalled();
     });
 
     it('422 when the Opportunity has no ACCEPT client decision', async () => {

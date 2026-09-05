@@ -3,45 +3,18 @@ import { UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import {
   assertCoverageFigures,
-  parseCalendarDate,
   policyDocumentAuditSnapshot,
   policyPlacementAuditSnapshot,
   policyScheduleAuditSnapshot,
   premiumVariance,
 } from './policy.config';
 
+// parseCalendarDate moved to common/calendar-date.util.ts (also needed by
+// endorsement.service.ts and compliance-risk) — its tests moved with it to
+// common/calendar-date.util.spec.ts; policy.config.ts re-exports the
+// function so existing `from './policy.config'` imports keep working.
+
 describe('policy.config', () => {
-  describe('parseCalendarDate', () => {
-    it('accepts a bare date as UTC midnight', () => {
-      expect(
-        parseCalendarDate('2026-10-01', 'inceptionDate').toISOString(),
-      ).toBe('2026-10-01T00:00:00.000Z');
-    });
-
-    it('accepts a future date (a policy can incept next month)', () => {
-      const d = parseCalendarDate('2099-01-01', 'inceptionDate');
-      expect(d.getUTCFullYear()).toBe(2099);
-    });
-
-    it('accepts a datetime with an explicit offset', () => {
-      expect(
-        parseCalendarDate('2026-10-01T09:00:00+03:00', 'x').toISOString(),
-      ).toBe('2026-10-01T06:00:00.000Z');
-    });
-
-    it('rejects a datetime with no offset (server-local shift trap)', () => {
-      expect(() => parseCalendarDate('2026-10-01T09:00:00', 'x')).toThrow(
-        UnprocessableEntityException,
-      );
-    });
-
-    it('rejects an unparseable string', () => {
-      expect(() => parseCalendarDate('not-a-date', 'x')).toThrow(
-        UnprocessableEntityException,
-      );
-    });
-  });
-
   describe('assertCoverageFigures', () => {
     it('passes a non-empty flat object of string/number values', () => {
       const v = assertCoverageFigures(

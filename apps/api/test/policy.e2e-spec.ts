@@ -667,4 +667,150 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     });
     expect(transitionRows).toBe(5);
   });
+
+  // Process 51 (backlog Part C #51's first checkbox) — "automatically block
+  // new business issuance once the license lapses." `BrokerLicense` is a
+  // SINGLETON shared by the whole real db-test database, not scoped to this
+  // test's own ids — unlike every other fixture in this file. Two safety
+  // rules follow directly from that and are both honoured below: (1) db-test
+  // is cumulative across test runs (see project memory) — a prior run may
+  // have already created the record, so setup tolerates a 409 rather than
+  // assuming a clean slate; (2) this test is the LAST one in this file (and
+  // wrapped in try/finally) so that whatever state it puts the license in
+  // mid-test is ALWAYS restored to active + a far-future expiry before the
+  // file ends — leaving it lapsed would silently 422 every Policy `place()`
+  // call in every e2e spec file that runs afterward (`fileParallelism:
+  // false` in vitest-e2e.config.ts means files run sequentially, so this
+  // restore-before-finish is sufficient, not just best-effort).
+  it('blocks new business (place) once the broker license has lapsed, and restores it before finishing (backlog Part C #51)', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'pol-lic-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    const plc = await makeUser(
+      app,
+      'pol-lic-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const FAR_FUTURE = '2099-01-01';
+
+    interface BrokerLicenseBody {
+      status: string;
+      isCurrentlyLapsed: boolean;
+    }
+
+    const created = await request(app.getHttpServer())
+      .post('/broker-license')
+      .set(bearer(compliance.accessToken))
+      .send({ licenseNumber: 'CBJ-E2E-1', expiresAt: FAR_FUTURE });
+    if (created.status !== 201 && created.status !== 409) {
+      throw new Error(
+        `Unexpected POST /broker-license status ${created.status}: ${JSON.stringify(created.body)}`,
+      );
+    }
+
+    // No `finally` here (ESLint's `no-unsafe-finally` — a `throw` inside
+    // `finally` would silently swallow a genuine assertion failure from the
+    // `try` block below it, hiding the real cause). Instead the restore
+    // runs unconditionally right after the try/catch, and whichever failed
+    // — the test body, the restore, or both — is what actually throws.
+    let testError: unknown = null;
+    try {
+      // A non-Compliance actor cannot touch the license at all.
+      await request(app.getHttpServer())
+        .post('/broker-license/mark-lapsed')
+        .set(bearer(plc.accessToken))
+        .expect(403);
+
+      // Confirm the license reads as active + not lapsed before the block
+      // scenario, whether this run created it or a prior run left it so.
+      const renewedActive = await request(app.getHttpServer())
+        .post('/broker-license/renew')
+        .set(bearer(compliance.accessToken))
+        .send({ licenseNumber: 'CBJ-E2E-1', expiresAt: FAR_FUTURE })
+        .expect(201);
+      expect((renewedActive.body as BrokerLicenseBody).isCurrentlyLapsed).toBe(
+        false,
+      );
+
+      // A normal placement succeeds while the license is active.
+      const { opportunityId: okOpportunityId } = await acceptedOpportunity(
+        app,
+        plc.accessToken,
+        plc.userId,
+        'license-ok',
+      );
+      await request(app.getHttpServer())
+        .post('/policies')
+        .set(bearer(plc.accessToken))
+        .send({ opportunityId: okOpportunityId, inceptionDate: '2026-10-01' })
+        .expect(201);
+
+      // Mark the license lapsed, then confirm a NEW placement is blocked.
+      const lapsed = await request(app.getHttpServer())
+        .post('/broker-license/mark-lapsed')
+        .set(bearer(compliance.accessToken))
+        .expect(201);
+      expect((lapsed.body as BrokerLicenseBody).status).toBe('lapsed');
+
+      const { opportunityId: blockedOpportunityId } = await acceptedOpportunity(
+        app,
+        plc.accessToken,
+        plc.userId,
+        'license-blocked',
+      );
+      const blocked = await request(app.getHttpServer())
+        .post('/policies')
+        .set(bearer(plc.accessToken))
+        .send({
+          opportunityId: blockedOpportunityId,
+          inceptionDate: '2026-10-01',
+        })
+        .expect(422);
+      expect((blocked.body as { message: string }).message).toMatch(
+        /license.*lapsed/i,
+      );
+      // No Policy row was created for the blocked Opportunity.
+      const noPolicy = await prisma.policy.findUnique({
+        where: { opportunityId: blockedOpportunityId },
+      });
+      expect(noPolicy).toBeNull();
+    } catch (err) {
+      testError = err;
+    }
+
+    // ALWAYS restore — see this test's own header comment for why this is
+    // load-bearing for every e2e file that runs after this one. A
+    // @code-reviewer MAJOR on the first pass: only checking
+    // isCurrentlyLapsed when restored.status === 201 misses the far more
+    // likely failure mode (renew itself returning a non-201 — a transient
+    // hiccup, an expired token, a real regression) — in that case the old
+    // check silently did nothing, leaving the singleton lapsed with no
+    // signal. Both conditions are asserted unconditionally now.
+    const restored = await request(app.getHttpServer())
+      .post('/broker-license/renew')
+      .set(bearer(compliance.accessToken))
+      .send({ licenseNumber: 'CBJ-E2E-1', expiresAt: FAR_FUTURE });
+    if (restored.status !== 201) {
+      throw new Error(
+        `Broker license restore failed (status ${restored.status}: ${JSON.stringify(restored.body)}) — every subsequent e2e file placing a Policy would now be blocked.` +
+          (testError
+            ? ` Also, the test body itself failed: ${(testError as Error).message}`
+            : ''),
+      );
+    }
+    if ((restored.body as BrokerLicenseBody).isCurrentlyLapsed) {
+      throw new Error(
+        'Broker license restore did not clear isCurrentlyLapsed — every subsequent e2e file placing a Policy would now be blocked.' +
+          (testError
+            ? ` Also, the test body itself failed: ${(testError as Error).message}`
+            : ''),
+      );
+    }
+    if (testError instanceof Error) throw testError;
+    if (testError) throw new Error(JSON.stringify(testError));
+  });
 });

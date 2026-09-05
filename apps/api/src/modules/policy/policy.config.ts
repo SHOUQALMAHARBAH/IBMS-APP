@@ -6,6 +6,9 @@ import {
   type Prisma,
 } from '@ibms/db';
 import { formatMoney, subtractMoney } from '../../common/money.util';
+import { parseCalendarDate } from '../../common/calendar-date.util';
+
+export { parseCalendarDate };
 
 /**
  * Process 18-19 — Policy Placement & Issuance (backlog Part C #18-19, Domain
@@ -29,31 +32,6 @@ export const PLACEMENT_DECISION: ClientDecisionType = 'ACCEPT';
 
 export const DOCUMENT_CATEGORIES = Object.values(DocumentCategory);
 export const DATA_CLASSIFICATIONS = Object.values(DataClassification);
-
-/**
- * Parses a client-supplied policy date (inception / expiry / schedule
- * effective-from) into a `Date`. Unlike `parseHistoricalInstant`, a policy
- * date MAY be in the future (cover can incept next month), so there is no
- * not-future check — but the same server-local-time trap applies: a datetime
- * with no offset (`2026-10-01T00:00:00`) is parsed as server-local and
- * silently shifts the instant, so a time component MUST carry an explicit
- * offset. A bare date (`2026-10-01`, parsed as UTC midnight) is the expected
- * form and is unambiguous.
- */
-export function parseCalendarDate(raw: string, label: string): Date {
-  const hasTimeComponent = /\d{2}:\d{2}/.test(raw);
-  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw);
-  if (hasTimeComponent && !hasOffset) {
-    throw new UnprocessableEntityException(
-      `${label} must be a plain date (e.g. "2026-10-01") or carry an explicit timezone offset`,
-    );
-  }
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new UnprocessableEntityException(`${label} is not a valid date`);
-  }
-  return parsed;
-}
 
 /**
  * A `PolicySchedule.limits` / `.sumsInsured` blob — the requested/issued

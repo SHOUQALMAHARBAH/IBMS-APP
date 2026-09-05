@@ -16,6 +16,8 @@ import { OpportunityRepository } from '../../repositories/opportunity.repository
 import { RecommendationRepository } from '../../repositories/recommendation.repository';
 import { ClientDecisionRepository } from '../../repositories/client-decision.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
+import { BrokerLicenseRepository } from '../../repositories/broker-license.repository';
+import { isBrokerLicenseCurrentlyLapsed } from '../compliance-risk/broker-license.config';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { POLICY_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
@@ -144,7 +146,9 @@ function isUniqueViolation(err: unknown): boolean {
  *    `Quotation`, not the request body; the caller sets the inception date.
  *    The row takes the schema `@default(PLACEMENT_CONFIRMED)` — no engine
  *    transition (initial creation, same as an Opportunity created at
- *    `NEEDS_CONFIRMED`).
+ *    `NEEDS_CONFIRMED`). Gated FIRST on `assertLicenseNotLapsed` (backlog
+ *    Part C #51's "automatically block new business issuance once the
+ *    license lapses") — see that method's own comment.
  *  - `recordIssuance` — record the insurer-issued policy: its number, the
  *    issued premium (from the premium invoice), an optional period
  *    correction, the opening `PolicySchedule`, and the issued `Document`
@@ -177,6 +181,7 @@ export class PolicyService {
     private readonly recommendations: RecommendationRepository,
     private readonly clientDecisions: ClientDecisionRepository,
     private readonly customers: CustomerRepository,
+    private readonly brokerLicenses: BrokerLicenseRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
   ) {}
@@ -235,6 +240,37 @@ export class PolicyService {
       throw new NotFoundException('Opportunity not found');
     }
     return { id: opportunity.id, customerId: opportunity.customerId };
+  }
+
+  /** Process 51 (backlog Part C #51's first checkbox) — "automatically
+   * block new business issuance once the license lapses." Checked first in
+   * `place()`, before any other precondition — the cheapest, most
+   * fail-fast gate, and logically prior to everything else (a lapsed
+   * broker may not even begin placing new business, regardless of how
+   * complete its opportunity/recommendation/decision chain is).
+   *
+   * No `BrokerLicense` record configured at all is treated as **not
+   * blocked** — deliberately, not an oversight: this system is built for an
+   * already-operating, already-licensed brokerage, and dozens of existing
+   * policy/endorsement/claim/finance e2e and unit tests place a Policy
+   * without ever configuring one. Treating "unconfigured" the same as
+   * "lapsed" would make every one of them fail the moment this gate
+   * shipped, for a condition none of them are testing. Once Compliance
+   * creates the record (`POST /broker-license`), the live check below
+   * takes over immediately — see `isBrokerLicenseCurrentlyLapsed` for why it
+   * is a live recompute, not a stored-flag read. */
+  private async assertLicenseNotLapsed(): Promise<void> {
+    const license = await this.brokerLicenses.findCurrent();
+    if (!license) return;
+    if (isBrokerLicenseCurrentlyLapsed(license, new Date())) {
+      throw new UnprocessableEntityException(
+        `New business issuance is blocked — the broker's CBJ license (${license.licenseNumber}) has lapsed` +
+          (license.status === 'lapsed'
+            ? '.'
+            : ` (expired ${license.expiresAt.toISOString()}).`) +
+          ' Contact Compliance to renew it before placing new business.',
+      );
+    }
   }
 
   /** Loads a `Policy` (with its schedules / documents / checking / delivery
@@ -343,6 +379,8 @@ export class PolicyService {
     dto: PlacePolicyDto,
     actor: AuthenticatedUser,
   ): Promise<PolicyView> {
+    await this.assertLicenseNotLapsed();
+
     const opportunity = await this.loadVisibleOpportunity(
       dto.opportunityId,
       actor,
