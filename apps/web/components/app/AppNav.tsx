@@ -62,6 +62,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/portfolio-analysis', label: 'Portfolio analysis' },
   { href: '/profitability-analysis', label: 'Profitability analysis' },
   { href: '/planning-export', label: 'Strategic planning inputs' },
+  { href: '/employees', label: 'Employees' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

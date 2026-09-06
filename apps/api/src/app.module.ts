@@ -45,6 +45,7 @@ import { EmployeePerformanceModule } from './modules/management-reporting/employ
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
 import { ProfitabilityAnalysisModule } from './modules/management-reporting/profitability-analysis.module';
 import { PlanningExportModule } from './modules/management-reporting/planning-export.module';
+import { EmployeeModule } from './modules/supporting-operations/employee.module';
 
 @Module({
   imports: [
@@ -319,6 +320,14 @@ import { PlanningExportModule } from './modules/management-reporting/planning-ex
     // (pre-seeded, Executive Management ONLY) gates the one POST route —
     // the first real writer of AuditAction.EXPORT.
     PlanningExportModule,
+    // Process 66 — opens Domain H (Supporting Operations, #66-74). Human
+    // Resources: Employee + licensing/certification + training records,
+    // plus an automated access de-provisioning checklist on termination —
+    // the first real caller of the already-registered
+    // termination_access_revocation SLA_REGISTRY entry. No new permission,
+    // no migration — employee.manage / training.record /
+    // deprovisioning.execute were all pre-seeded ahead of time.
+    EmployeeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

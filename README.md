@@ -566,6 +566,12 @@ build actually is today:
 | 63 | Profitability Analysis | the backlog: "commission income vs. cost-to-serve per segment/line" · like #62, no new model/migration/scheduler — but unlike #62, this REUSES the same written-policy data #40's `FinancialReportService` already loads, reduced into a genuinely DIFFERENT metric · **why this isn't a duplicate of #40's `netPosition`**: #40's `netPosition = premiumWritten − claimsPaid − commissionEarned` is an underwriting-result view of the INSURER's side of the book; #63's own phrase asks whether the commission the BROKER earns is enough to cover what it costs the broker to service the book — `netProfitability = commissionIncome − costToServe`, reducing the IDENTICAL raw policy/claims/commission data differently, for a different audience · **`commissionIncomeJod`** = Σ(`commissionAmount − commissionReversedAmount`) per group, the SAME net-of-clawback calculation #40's `commissionEarned` already uses (not #58/#61's deliberately-gross "no netting" simplification — this process needs the precise figure since it IS the metric, not supporting context) · **`costToServeJod`** = Σ net settlement of the group's SETTLED/CLOSED claims — **a documented scoped interpretation, not a true operational cost**: no operational-expense/staff-time/overhead tracking model exists anywhere in this schema (Domain H/#66 HR is not built), so claims-settlement payout — the one real cost-shaped figure attributable to a line/segment anywhere in the schema — stands in as the closest available signal, reusing (not duplicating) the SAME `claimsPaid` figure #40's `netPosition` already computes · grouped by `insuranceLine`/`customerType` ("segment") ONLY — the backlog names exactly these two dimensions, unlike #62's four (no insurer, no geography); rows sort worst-first (most-negative `netProfitabilityJod`), the #40 `groupProfitability` convention · **a NEW kind of promotion, not a pure-function one**: `ProfitabilityPolicyRow` + its loader (`loadProfitabilityPolicies`, a non-trivial `findMany` joining `Policy`->`Customer`/`Claim`/`Settlement`/`CommissionLedgerEntry`) were extracted OUT of `FinancialReportRepository` (#40) into a new standalone `repositories/profitability-policy.repository.ts` (`ProfitabilityPolicyRepository.loadWrittenPolicies(limit)`) — `finance.config.ts` re-exports the `ProfitabilityPolicyRow` type so its existing imports keep working unchanged, the #61/#62 re-export courtesy · **module wiring stayed zero-coupling**: the SAME repository class is provided independently in BOTH `FinanceModule`'s and the new `ProfitabilityAnalysisModule`'s own `providers` arrays — no `imports`/`exports` wiring added to either module, keeping `kpi-dashboard.md`'s "no cross-module SERVICE dependency" precedent intact even while sharing the underlying QUERY · **permission is a real deviation from #58-62's pattern**: `profitability-analysis.view` (already pre-seeded) grants `[EXECUTIVE_MANAGEMENT, FINANCE_COLLECTIONS_OFFICER]` — NOT `BRANCH_DEPARTMENT_MANAGER`, unlike every OTHER Domain G permission so far; zero seed change, the #60/#62 "no new permission" precedent repeated a third time; `EXTERNAL_AUDITOR` deliberately excluded, the #57 lesson · a best-effort `READ` audit row flags `isSensitiveDataAccess` whenever a settled claim contributed, the exact #40 `recordReadBestEffort` rule · **new module** `apps/api/src/modules/management-reporting/profitability-analysis.{config,service,controller,module}.ts` — no scheduler, no dedicated process-specific repository (unlike #58-62, which each have their own) · `apps/web/` gains a **"Profitability analysis"** screen (`app/(app)/profitability-analysis/page.tsx` — two breakdown tables: by line, by client segment) · **Verification**: +13 api unit (`profitability-analysis.config.spec.ts` 8, `profitability-analysis.service.spec.ts` 5) → api unit **1966** (144 files, from 1953); the #40 extraction re-verified transparent (`financial-report.service.spec.ts`/`finance.config.spec.ts` 55/55 unchanged, re-confirmed again after `eslint --fix` cosmetic reformatting). New `test/profitability-analysis.e2e-spec.ts` **3/3** — permission gating; an explicit assertion that Branch/Department Manager is FORBIDDEN (documenting the deliberate role-scope difference from #58-62); a REAL fixture chain (a uniquely-named line + a SETTLED `Claim`/`Settlement` + a `CommissionLedgerEntry` seeded directly via Prisma) proving `commissionIncomeJod`/`costToServeJod`/`netProfitabilityJod` compute correctly, plus a before/after DELTA on `bySegment` (a shared closed-set bucket, the #62 precedent). Full api unit suite 1966/1966 confirmed green; full 43-file api e2e suite green across 8 foreground sub-batches, both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`, including #40's OWN e2e coverage (inside `invoice.e2e-spec.ts`) re-confirmed green after the extraction. New Playwright `profitability-analysis.spec.ts` 3/3; full Playwright suite 207/207. `npm run typecheck`/`lint`/`build` (api + web) OK | no drill-through from a breakdown row to the underlying Policy/Claim list · `costToServeJod` is a scoped claims-payout proxy, not a true operational cost — would need Domain H/#66 (HR) or a new expense-tracking model to become one · no date-range filter — always the whole written book, not a period · #64–65 (Executive Management Reporting, Strategic Planning export) remain unbuilt, each with its own permission already seeded |
 | 65 | Strategic Planning Inputs | **the last Domain G item built — #64 Executive Management Reporting deliberately not built yet, the user's own pacing** · the backlog: "export portfolio/market data for planning cycles" · no new model/migration/scheduler — composes TWO already-built reports: **portfolio** = the SAME four #62 breakdowns (byLine/byInsurer/byClientSegment/byGeography, current-state, no period concept); **market** = every insurer's `InsurerPerformanceScore` (#60) for ONE period, defaulting to the previous UTC calendar month via `common/period.util.ts`'s `previousUtcMonthRange` — a third consumer · the first genuinely new CAPABILITY SHAPE in this codebase — an "export" — but stays a plain JSON payload, matching every other report's own convention; no CSV/file-download precedent existed before this process and none was introduced · **this codebase has a single, zero-exception, VERIFIED architectural rule, confirmed by inspecting every cross-module import in `apps/api/src/modules/`**: a module needing another domain's data imports that module's REPOSITORY export, never its SERVICE (`CustomerModule` exports only `CustomerRepository`, never `CustomerService`; `PolicyModule`/`RecommendationModule` the same into `FinanceModule`) — #63 extended this to a shared repository provided independently in two modules; #65 needed the SAME treatment for TWO repositories at once (`PortfolioAnalysisRepository` #62 + `InsurerPerformanceRepository` #60), both provided independently in `PlanningExportModule`'s own `providers` array, ZERO `imports`/`exports` touched on either existing module · `PlanningExportService` reuses the pure derivation functions directly (`deriveLineOrInsurerBreakdown`/`reduceByClientSegment`/`reduceByGeography` from `portfolio-analysis.config.ts`; `deriveInsurerPerformanceScoreView` from `insurer-performance.config.ts`) — the actual reduction logic is never duplicated, only the thin `Promise.all` + name-resolution orchestration glue every composing report in this codebase (e.g. #40's own `FinancialReportService.summary()`) already repeats for itself; injecting `PortfolioAnalysisService`/`InsurerPerformanceService` directly was considered and rejected — it would have been the FIRST exception to a rule with zero exceptions across 65 built processes · **permission is the NARROWEST Domain G grant**: `planning-export.generate` (already pre-seeded) grants `[EXECUTIVE_MANAGEMENT]` ONLY — no `BRANCH_DEPARTMENT_MANAGER` (unlike #58-62), no `FINANCE_COLLECTIONS_OFFICER` (unlike #63's own deviation); zero seed change; `EXTERNAL_AUDITOR` deliberately excluded, the #57 lesson · a POST route (`POST /planning-export`), not a GET, matching the permission's own "generate" verb (the `internal-controls.audit` "Run audit now" shape) even though it is a pure read with no persisted side effect of its own · **the first real writer of `AuditAction.EXPORT`** — this enum value and `AuditAnomalyDetectionService.checkBulkExport` (Part 10.3, flagging a `BULK_EXPORT` `AccessAnomalyAlert` after `BULK_EXPORT_THRESHOLD` EXPORT actions in a trailing window) have existed dormant since before this session's work began; `AuditService.record()` already calls `anomalyDetection.evaluate()` on every write, so `PlanningExportService`'s own best-effort audit call activated this dormant Part 10.3 detector with ZERO extra wiring — the same "dormant, forward-compatible feature, proven by its first real writer" pattern as #48/#56/#60/#61 · **new module** `apps/api/src/modules/management-reporting/planning-export.{config,service,controller,module}.ts` — no scheduler, no dedicated process-specific repository (the #63 shape, extended to TWO shared repositories) · `apps/web/` gains a **"Strategic Planning Inputs"** screen (`app/(app)/planning-export/page.tsx` — a form-triggered generate action, not an auto-loading dashboard, the #60/#61 "compute now" form shape since this is POST not GET) · **Verification**: +9 api unit (`planning-export.config.spec.ts` 3, `planning-export.service.spec.ts` 6) → api unit **1975** (146 files, from 1966). New `test/planning-export.e2e-spec.ts` **4/4** — permission gating; an explicit assertion that BOTH `BRANCH_DEPARTMENT_MANAGER` AND `FINANCE_COLLECTIONS_OFFICER` are FORBIDDEN (proving the narrowest-grant claim); the default-previous-UTC-month resolution; a REAL fixture (a uniquely-named `insuranceLine`/`Insurer` + a real `InsurerPerformanceScore` row seeded directly via Prisma) proving portfolio + market data compose correctly for an explicit period. Full api unit suite 1975/1975 confirmed green; full 44-file api e2e suite green across 8 foreground sub-batches — two confirmed-transient environment hiccups this run (unrelated files, both re-confirmed clean on isolated re-run), both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `planning-export.spec.ts` 3/3; full Playwright suite 210/210. `npm run typecheck`/`lint`/`build` (api + web) OK — one real lint catch: `@typescript-eslint/no-unsafe-assignment` on an asymmetric Vitest matcher (`expect.stringMatching`) nested inside a `toHaveBeenCalledWith` object literal, fixed by asserting the captured mock-call argument directly instead | no actual downloadable file (CSV/XLSX) — the backlog says "export" but this stays a JSON API response, consistent with every other report in this codebase · no drill-through from either section to its underlying records · `market` has no cap on insurer count for the period (matching #60's own uncapped `list()`) · #64 (Executive Management Reporting) remains unbuilt, its own permission already seeded |
 
+### Part C · Domain H #66–74 — Supporting Operations (begun), with these deferrals
+
+| # | Process | Built | Not done (detail in § Known gaps) |
+|---|---|---|---|
+| 66 | Human Resources — `Employee`, `SecurityAwarenessTraining`, `AccessDeprovisioningChecklist` | **opens Domain H — Supporting Operations (#66–74)** · two checkboxes: an employee record + licensing/certification tracking for regulated staff + training records; an automated access de-provisioning checklist on an employment-status change (same business day) · all three models pre-exist in the core schema (Part 8.2) with zero prior application code — the exact "dormant model, first real writer" shape #58-65 repeatedly found in Domain G · **licensing/certification tracking maps to the schema's own flat fields** — `Employee.licensedRole`/`confidentialityAgreementSignedAt`/`backgroundCheckCompletedAt` ARE the complete design; no new table invented · **`terminate()` is the first real caller of an ALREADY-REGISTERED SLA** — `pdpl-sla-timers.md`'s own registry sources "Termination access revocation (M05) | Same business day | Critical alert to IT management if still open after 24h," already transcribed in `SLA_REGISTRY` as `termination_access_revocation` (`duration: 0 hours`, one `+24h -> 'IT_MANAGEMENT'` stage) with zero prior caller · **termination is a stamp+create transaction, not a status enum** — `Employee` has no `EmploymentStatus`; `terminationDate` going null-to-set IS the transition · `EmployeeRepository.terminate()` stamps + creates the checklist in ONE `$transaction` (the `retention-case.repository.ts#escalateAndCreateRetentionCase` shape), the stamp's `where` re-asserting `terminationDate: null` so a concurrent second termination 409s instead of racing · **`systemAccessRevoked` has a REAL effect, not just a timestamp**: ticking it also sets the linked `User.isActive = false` and calls `SessionService.revokeAllForUser(userId, 'admin_revoked')` — killing every live session immediately, proven end-to-end (a real bearer token 401s the instant it fires) · **`User.employeeId` — #61's dormant FK — gets its first real writer too**: `POST /employees` accepts an optional `userId`, verified not-already-linked (409) before linking, a deliberate minimal scope addition finally making #61's `EmployeePerformanceRecord` usable · **permission split**: `employee.manage` (`[SYSTEM_SECURITY_ADMINISTRATOR, BRANCH_DEPARTMENT_MANAGER]`) gates the general record/training surface; `deprovisioning.execute` (`[SYSTEM_SECURITY_ADMINISTRATOR]` ONLY, narrower) gates BOTH `terminate` and every checklist action — terminating IS the trigger, so it sits behind the same narrow permission as executing the checklist · zero seed change — both pre-seeded ahead of time, the Domain G "seed before code" pattern extended to Domain H · **encryption mirrors `CustomerService` field-for-field** — `Employee.nationalIdEnc` was already registered in `ENCRYPTED_FIELDS` with zero prior consumer; masked-by-default, justified reveal via `POST /employees/:id/reveal-field`, the list view strips the encrypted field entirely rather than decrypt-then-mask N times · **new module** `apps/api/src/modules/supporting-operations/employee.{config,service,controller,module}.ts` + `repositories/employee.repository.ts` · `apps/web/` gains **"Employees"** (`app/(app)/employees/page.tsx` — list+create) and an `[id]` detail screen (`app/(app)/employees/[id]/page.tsx` — profile+reveal, training, the de-provisioning checklist) · **Verification**: +31 api unit (`employee.config.spec.ts` 6, `employee.service.spec.ts` 25) → api unit **2006** (148 files, from 1975). New `test/employee.e2e-spec.ts` **3/3** — permission gating (a Manager holds `employee.manage` but NOT `deprovisioning.execute`); a REAL full-lifecycle walk (create with a linked `User` → reveal → assign+complete training → terminate → verify the `SlaTimer` row exists with `escalatedTo: 'IT_MANAGEMENT'` → a second termination 409s → completing the checklist before every sub-item is done 400s → ticking `systemAccessRevoked` deactivates the linked user AND 401s their live bearer token → ticking the rest + completing resolves the SLA timer); a 409 rejecting a `userId` already linked to a different employee. Full api unit suite 2006/2006 confirmed green; full 45-file api e2e suite green across 8 foreground sub-batches — two confirmed-transient environment hiccups this run (both unrelated files, re-confirmed clean on isolated re-run), both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `employees.spec.ts` 4/4; full Playwright suite 214/214. `npm run typecheck`/`lint`/`build` (api + web) OK — a second occurrence of the #65 `@typescript-eslint/no-unsafe-assignment` pattern (an asymmetric Vitest matcher nested inside an object literal), fixed the same way | no `EmploymentStatus` for states OTHER than termination (e.g. leave, suspension) — only the one transition the backlog names is modeled · no multi-step HR onboarding/offboarding WORKFLOW (approval stages) — this is a flat CRUD + one guarded transition, not a `WorkflowTransitionService` entity, since there is no multi-state enum to move through · #67–74 (Procurement, Internal IT, Cybersecurity, Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
+
 ### Not started
 
 - **Domains C–H** — Claims **#23–30 are built** (Notification, Registration, Documentation,
@@ -676,11 +682,18 @@ build actually is today:
   anomaly detector with zero new wiring); `planning-export.generate` grants
   Executive Management ONLY — the narrowest Domain G permission of all — see all
   seven entries below for full detail. **Not built**: #64 (Executive Management
-  Reporting). Supporting Operations
-  (HR, procurement, IT,
-  document management, vendor management,
-  BCP/DR, knowledge base,
-  #66–74).
+  Reporting). **Domain H — Supporting Operations (#66–74) has begun.** #66 Human
+  Resources is built: `Employee`/`SecurityAwarenessTraining`/
+  `AccessDeprovisioningChecklist` (all three pre-existing in the core schema with
+  zero prior application code) — an employee record + licensing/certification
+  tracking + training records, plus a termination-triggered de-provisioning
+  checklist that is the first real caller of `SLA_REGISTRY`'s already-sourced
+  `termination_access_revocation` entry (same business day, 24h escalation to IT
+  management). Ticking the checklist's `systemAccessRevoked` item has a REAL
+  effect — deactivating the linked `User` account and killing every live session
+  — not just a timestamp. See its own entry below for full detail. **Not built**:
+  #67–74 (Procurement, Internal IT, Cybersecurity, Document Management, Vendor
+  Management, BCP/DR, Knowledge Management).
 - **Part D — PDPL / M-series — begun, three of nine systems built.** **M03 Consent
   Management is built**: capture a consent decision (grant or explicit decline) for a
   `Customer` or `InsuredPerson`, and withdraw it through a two-step request/confirm flow
@@ -7507,6 +7520,131 @@ narrows a gap.
   codebase. No drill-through from either section to its underlying records.
   `market` has no cap on insurer count for the period, matching #60's own
   uncapped `list()`.
+
+**Part C #66 — Human Resources (Domain H, Process 66)** — **opens Domain H,
+  Supporting Operations (#66–74).** Two checkboxes: an employee record +
+  licensing/certification tracking for regulated staff + training records; an
+  automated access de-provisioning checklist on an employment-status change
+  (same business day). `Employee`, `SecurityAwarenessTraining`, and
+  `AccessDeprovisioningChecklist` all pre-exist in the core schema (Part 8.2)
+  with zero prior application code — the exact "dormant model, first real
+  writer" shape #58-65 repeatedly found in Domain G.
+
+  **Licensing/certification tracking maps to existing flat fields.** No
+  separate `Certification`/`License` child table exists — `Employee.
+  licensedRole` (free text), `confidentialityAgreementSignedAt`, and
+  `backgroundCheckCompletedAt` ARE the schema's own complete design for this
+  (Part 8.2). No new table was invented; these three flat fields are the
+  tracking.
+
+  **`terminate()` is the first real caller of an ALREADY-REGISTERED SLA.**
+  The backlog's "same business day" de-provisioning SLA is not a new design
+  decision — `pdpl-sla-timers.md`'s own registry already sources
+  "Termination access revocation (M05) | Same business day | Critical alert
+  to IT management if still open after 24h." The machine-readable
+  `SLA_REGISTRY` (`sla-registry.config.ts`) already transcribes this as
+  `termination_access_revocation` (`duration: { value: 0, unit: 'hours' }` —
+  due AT the trigger instant, a deliberate simplification of "same business
+  day" avoiding a whole new `SlaDurationUnit`; one escalation stage at `+24
+  hours` to `'IT_MANAGEMENT'`) with ZERO prior caller. No new SLA design work
+  was needed — only wiring `SlaTimerService.startTimer()`/`.resolve()` to the
+  real termination/completion events.
+
+  **Termination is a stamp+create transaction, not a status enum.**
+  `Employee` has no `status`/`EmploymentStatus` field — the
+  "employment-status change" that triggers de-provisioning is
+  `terminationDate` going from `null` to a real date. `EmployeeRepository.
+  terminate()` stamps `terminationDate` and creates the
+  `AccessDeprovisioningChecklist` row in ONE interactive `$transaction` — the
+  `retention-case.repository.ts#escalateAndCreateRetentionCase` shape (a
+  precedented local exception to this codebase's no-`$transaction`
+  convention): the stamp's `where` re-asserts `terminationDate: null`
+  (race-safe-invariants.md), so a second concurrent termination attempt gets
+  a clean 409 instead of racing into a duplicate checklist.
+
+  **`systemAccessRevoked` has a real effect, not just a timestamp.** Ticking
+  it also, when the employee has a linked `User` account: sets `user.
+  isActive = false` (blocks future logins), and calls `SessionService.
+  revokeAllForUser(userId, 'admin_revoked')` — killing every live session
+  immediately. `JwtStrategy.validate()` calls `SessionService.
+  validateAndTouch()` on EVERY authenticated request, so a revoked session
+  fails the very next call with that access token — proven end-to-end in
+  `test/employee.e2e-spec.ts` (a real linked user's own bearer token 401s
+  immediately after the tick). A de-provisioning checklist whose "system
+  access revoked" box can be ticked with no actual access-control effect
+  would satisfy the letter of Part 8.2 while missing its entire regulatory
+  point (PRIV-STD-02, PRIV-SOP-01/02/03 — the same citation the SLA registry
+  entry already uses).
+
+  **`User.employeeId` — #61's dormant FK — gets its first real writer too.**
+  `EmployeePerformanceRecord` (#61) needs `Employee -> User` via
+  `User.employeeId`, but nothing before this process ever set it. `POST
+  /employees` accepts an optional `userId`; if given, the service verifies
+  the user exists (404) and isn't already linked to a DIFFERENT employee
+  (409 — `User.employeeId` is `@unique`), then links it. A minimal,
+  deliberate scope addition beyond the backlog's own two checkboxes — not
+  required by #66's text, but a natural completion of what "an employee
+  record" already implies, and it makes #61's dormant metric usable for the
+  first time.
+
+  **Permission split — termination sits behind the NARROWER permission.**
+  `employee.manage` (`[SYSTEM_SECURITY_ADMINISTRATOR,
+  BRANCH_DEPARTMENT_MANAGER]`) gates the general record + training surface.
+  `deprovisioning.execute` (`[SYSTEM_SECURITY_ADMINISTRATOR]` ONLY, narrower)
+  gates BOTH `POST /employees/:id/terminate` and every checklist action —
+  terminating IS the "employment-status change" the checklist's own schema
+  doc comment names as its trigger, so it sits behind the same narrow
+  permission as executing the checklist itself, not the broader
+  `employee.manage` a Branch/Department Manager also holds. Both permissions
+  were pre-seeded ahead of time — zero seed change, the Domain G "seed
+  before code" pattern extended to Domain H.
+
+  **Encryption follows the Customer precedent exactly.**
+  `Employee.nationalIdEnc` was already registered in `ENCRYPTED_FIELDS`
+  (`encrypted-fields.ts`) with zero prior consumer. `EmployeeService` mirrors
+  `CustomerService` field-for-field: masked-by-default (`toMasked()` via
+  `decryptEntityFields` + `SensitiveFieldRevealService.mask()`), full reveal
+  only via a justified `POST /employees/:id/reveal-field` (min. 10-character
+  reason, Part 10.6), and the list view STRIPS the encrypted field entirely
+  rather than decrypting-then-masking N times (the `CustomerService.list()`
+  precedent).
+
+  `apps/web/` gains new **"Employees"** (`app/(app)/employees/page.tsx` —
+  list + create) and `[id]` detail (`app/(app)/employees/[id]/page.tsx` —
+  profile + reveal, training, the de-provisioning checklist) screens.
+
+  **Verification**: +31 api unit (`employee.config.spec.ts` 6 — the masked/
+  list view builders and the checklist-fully-done pure check;
+  `employee.service.spec.ts` 25 — create/link/reveal/training/terminate/
+  checklist, every 404/409/400 branch) → api unit **2006** (148 files, from
+  1975). New `test/employee.e2e-spec.ts` **3/3** — permission gating (a
+  Manager holds `employee.manage` but NOT `deprovisioning.execute`); a REAL
+  full-lifecycle walk (create with a linked `User` → reveal → assign +
+  complete training → terminate → verify the `SlaTimer` row exists with
+  `escalatedTo: 'IT_MANAGEMENT'` → a second termination 409s → completing
+  the checklist before every sub-item is done 400s → ticking
+  `systemAccessRevoked` deactivates the linked user AND 401s their live
+  bearer token → ticking the rest + completing resolves the SLA timer); a
+  409 rejecting a `userId` already linked to a different employee. Full api
+  unit suite 2006/2006 confirmed green; full 45-file api e2e suite green
+  across 8 foreground sub-batches — two confirmed-transient environment
+  hiccups this run (both unrelated files, re-confirmed clean on isolated
+  re-run), both documented chronic flakes (`rbac`, `up-sell`) passing with
+  `--testTimeout=90000`. New Playwright `employees.spec.ts` 4/4; full
+  Playwright suite 214/214. `npm run typecheck`/`lint`/`build` (api + web)
+  OK — a second occurrence of the #65 `@typescript-eslint/no-unsafe-
+  assignment` pattern (an asymmetric Vitest matcher nested inside an object
+  literal argument), fixed the same way (asserting the captured mock-call
+  argument directly).
+
+  **Deferred**: no `EmploymentStatus` for states OTHER than termination
+  (e.g. leave, suspension) — only the one transition the backlog names is
+  modeled. No multi-step HR onboarding/offboarding WORKFLOW (approval
+  stages) — this is a flat CRUD + one guarded transition, not a
+  `WorkflowTransitionService` entity, since there is no multi-state enum to
+  move through. #67–74 (Procurement, Internal IT, Cybersecurity, Document
+  Management, Vendor Management, BCP/DR, Knowledge Management) remain
+  unbuilt, each with its own permission already seeded.
 
 ## Deployment
 
