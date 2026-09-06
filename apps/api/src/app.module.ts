@@ -41,6 +41,7 @@ import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
+import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 
 @Module({
   imports: [
@@ -291,6 +292,13 @@ import { InsurerPerformanceModule } from './modules/management-reporting/insurer
     // service quality. No new permission — insurer-performance.view
     // (pre-seeded) gates both the read and the manual compute trigger.
     InsurerPerformanceModule,
+    // Process 61 — EmployeePerformanceRecord (pre-existing core schema) gets
+    // its first real consumer, alongside Employee/User.employeeId (both
+    // dormant — Domain H/#66 HR is not built): a monthly job scoring new
+    // clients/premium/commission/renewal rate/cross-sell rate. No new
+    // permission — employee-performance.view (pre-seeded) gates both the
+    // read and the manual compute trigger.
+    EmployeePerformanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

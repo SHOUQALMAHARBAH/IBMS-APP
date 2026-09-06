@@ -1,6 +1,16 @@
 import type { InsurerPerformanceScore } from '@ibms/db';
 import { Prisma } from '@ibms/db';
 import { MONEY_ROUNDING, sumMoney, toMoney } from '../../common/money.util';
+import {
+  previousUtcMonthRange,
+  type PeriodWindow,
+} from '../../common/period.util';
+
+// Re-exported so existing `from './insurer-performance.config'` imports
+// keep working unchanged — `previousUtcMonthRange`/`PeriodWindow` moved to
+// `common/period.util.ts` once `employee-performance.config.ts` needed the
+// identical calculation (the `calendar-date.util.ts` promotion precedent).
+export { previousUtcMonthRange, type PeriodWindow };
 
 /**
  * Process 60 (backlog Part C #60, Domain G) — "Insurer Performance: a
@@ -44,12 +54,6 @@ export interface InsurerPerformanceScoreView {
   computedAt: string;
 }
 
-export interface PeriodWindow {
-  periodLabel: string;
-  periodStart: Date;
-  periodEnd: Date;
-}
-
 /** Pure: clamps a computed score into `[MIN_SCORE, MAX_SCORE]` and rounds to
  * the column's 2dp — a computed ratio (e.g. a much-cheaper-than-average
  * premium) can mathematically land outside the range; a display score never
@@ -59,18 +63,6 @@ export function clampScore(value: Prisma.Decimal): Prisma.Decimal {
     MIN_SCORE,
     Prisma.Decimal.min(MAX_SCORE, value),
   ).toDecimalPlaces(2, MONEY_ROUNDING);
-}
-
-/** Pure: `[periodStart, periodEnd)` + a "YYYY-MM" label for the UTC calendar
- * month immediately before the one containing `now` — the monthly job scores
- * a month only once it has fully elapsed. */
-export function previousUtcMonthRange(now: Date): PeriodWindow {
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth(); // 0-based; "this" month
-  const periodStart = new Date(Date.UTC(year, month - 1, 1));
-  const periodEnd = new Date(Date.UTC(year, month, 1));
-  const periodLabel = `${periodStart.getUTCFullYear()}-${String(periodStart.getUTCMonth() + 1).padStart(2, '0')}`;
-  return { periodLabel, periodStart, periodEnd };
 }
 
 /** Pure: average response time in days -> a 0-100 score, `targetDays` at

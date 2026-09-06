@@ -2785,7 +2785,23 @@ model InsurerPerformanceScore {
   @@unique([insurerId, periodLabel])
 }
 
-/// Process 61 — employee KPI achievement vs target.
+/// Process 61 — employee KPI achievement vs target. A monthly periodic job
+/// (`EmployeePerformanceScheduler`) snapshots one row per `Employee` per
+/// `periodLabel` ("YYYY-MM") for every employee with a linked `User`
+/// account (`User.employeeId` — dormant elsewhere in this codebase, no
+/// writer ever sets it; this process is its first real consumer, alongside
+/// `Employee` itself, since Domain H/#66 HR is not built) — a recompute for
+/// the same employee+period UPSERTS via `@@unique([employeeId, periodLabel])`
+/// (both columns always non-null, the `InsurerPerformanceScore` shape, not
+/// `SalesTarget`'s partial-index one). Every field stays nullable per the
+/// schema's own design: `newClients`/`premiumWritten`/`commissionEarned`
+/// are always a real number (0 when there is no activity — a plain count/
+/// sum always has a defined zero); `renewalRatePercent`/
+/// `crossSellRatePercent` are `null` specifically when their denominator is
+/// zero (no renewal/cross-sell outcomes existed to rate that period) — a
+/// genuine "not yet ratable," not a computed 0%. See
+/// `employee-performance.config.ts` and `ibms-brain/meta/context/
+/// employee-performance.md`.
 model EmployeePerformanceRecord {
   id              String   @id @default(uuid())
   employeeId      String
@@ -2796,6 +2812,8 @@ model EmployeePerformanceRecord {
   commissionEarned Decimal? @db.Decimal(18, 3)
   renewalRatePercent Decimal? @db.Decimal(5, 2)
   crossSellRatePercent Decimal? @db.Decimal(5, 2)
+
+  @@unique([employeeId, periodLabel])
 }
 
 // ============================================================================
