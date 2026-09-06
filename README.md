@@ -571,6 +571,7 @@ build actually is today:
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
 | 66 | Human Resources — `Employee`, `SecurityAwarenessTraining`, `AccessDeprovisioningChecklist` | **opens Domain H — Supporting Operations (#66–74)** · two checkboxes: an employee record + licensing/certification tracking for regulated staff + training records; an automated access de-provisioning checklist on an employment-status change (same business day) · all three models pre-exist in the core schema (Part 8.2) with zero prior application code — the exact "dormant model, first real writer" shape #58-65 repeatedly found in Domain G · **licensing/certification tracking maps to the schema's own flat fields** — `Employee.licensedRole`/`confidentialityAgreementSignedAt`/`backgroundCheckCompletedAt` ARE the complete design; no new table invented · **`terminate()` is the first real caller of an ALREADY-REGISTERED SLA** — `pdpl-sla-timers.md`'s own registry sources "Termination access revocation (M05) | Same business day | Critical alert to IT management if still open after 24h," already transcribed in `SLA_REGISTRY` as `termination_access_revocation` (`duration: 0 hours`, one `+24h -> 'IT_MANAGEMENT'` stage) with zero prior caller · **termination is a stamp+create transaction, not a status enum** — `Employee` has no `EmploymentStatus`; `terminationDate` going null-to-set IS the transition · `EmployeeRepository.terminate()` stamps + creates the checklist in ONE `$transaction` (the `retention-case.repository.ts#escalateAndCreateRetentionCase` shape), the stamp's `where` re-asserting `terminationDate: null` so a concurrent second termination 409s instead of racing · **`systemAccessRevoked` has a REAL effect, not just a timestamp**: ticking it also sets the linked `User.isActive = false` and calls `SessionService.revokeAllForUser(userId, 'admin_revoked')` — killing every live session immediately, proven end-to-end (a real bearer token 401s the instant it fires) · **`User.employeeId` — #61's dormant FK — gets its first real writer too**: `POST /employees` accepts an optional `userId`, verified not-already-linked (409) before linking, a deliberate minimal scope addition finally making #61's `EmployeePerformanceRecord` usable · **permission split**: `employee.manage` (`[SYSTEM_SECURITY_ADMINISTRATOR, BRANCH_DEPARTMENT_MANAGER]`) gates the general record/training surface; `deprovisioning.execute` (`[SYSTEM_SECURITY_ADMINISTRATOR]` ONLY, narrower) gates BOTH `terminate` and every checklist action — terminating IS the trigger, so it sits behind the same narrow permission as executing the checklist · zero seed change — both pre-seeded ahead of time, the Domain G "seed before code" pattern extended to Domain H · **encryption mirrors `CustomerService` field-for-field** — `Employee.nationalIdEnc` was already registered in `ENCRYPTED_FIELDS` with zero prior consumer; masked-by-default, justified reveal via `POST /employees/:id/reveal-field`, the list view strips the encrypted field entirely rather than decrypt-then-mask N times · **new module** `apps/api/src/modules/supporting-operations/employee.{config,service,controller,module}.ts` + `repositories/employee.repository.ts` · `apps/web/` gains **"Employees"** (`app/(app)/employees/page.tsx` — list+create) and an `[id]` detail screen (`app/(app)/employees/[id]/page.tsx` — profile+reveal, training, the de-provisioning checklist) · **Verification**: +31 api unit (`employee.config.spec.ts` 6, `employee.service.spec.ts` 25) → api unit **2006** (148 files, from 1975). New `test/employee.e2e-spec.ts` **3/3** — permission gating (a Manager holds `employee.manage` but NOT `deprovisioning.execute`); a REAL full-lifecycle walk (create with a linked `User` → reveal → assign+complete training → terminate → verify the `SlaTimer` row exists with `escalatedTo: 'IT_MANAGEMENT'` → a second termination 409s → completing the checklist before every sub-item is done 400s → ticking `systemAccessRevoked` deactivates the linked user AND 401s their live bearer token → ticking the rest + completing resolves the SLA timer); a 409 rejecting a `userId` already linked to a different employee. Full api unit suite 2006/2006 confirmed green; full 45-file api e2e suite green across 8 foreground sub-batches — two confirmed-transient environment hiccups this run (both unrelated files, re-confirmed clean on isolated re-run), both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `employees.spec.ts` 4/4; full Playwright suite 214/214. `npm run typecheck`/`lint`/`build` (api + web) OK — a second occurrence of the #65 `@typescript-eslint/no-unsafe-assignment` pattern (an asymmetric Vitest matcher nested inside an object literal), fixed the same way | no `EmploymentStatus` for states OTHER than termination (e.g. leave, suspension) — only the one transition the backlog names is modeled · no multi-step HR onboarding/offboarding WORKFLOW (approval stages) — this is a flat CRUD + one guarded transition, not a `WorkflowTransitionService` entity, since there is no multi-state enum to move through · #67–74 (Procurement, Internal IT, Cybersecurity, Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
+| 67 | Procurement | the backlog's own text carries an explicit scope warning, quoted in full since it IS the design brief: "The two source documents give no more than a one-line general description ('purchase requests and vendor selection for non-insurance operational needs') — no field-level detail or defined workflow in the source. The only task actually executable from the source directly: use `Vendor` (with `vendorType=other`) as the general vendor record for this purpose, without inventing a purchase-request model that isn't in the text." · **no `PurchaseRequest` model, no approval workflow, nothing beyond the literal instruction was built** — the opposite case from most items: the source names EXACTLY which existing model to reuse and exactly what NOT to invent, rather than leaving a gap to map · **`Vendor` is a genuinely shared register — THREE consumers, one model**: its own schema doc comment already says "Merges Process 71 (Vendor Management) and PDPL third-party governance — both describe the same register"; #67 adds a third consumer (Procurement, `vendorType: 'other'`) to the SAME rows #71 (risk tiering/DPAs/annual review) and Part D's Third-Party & Data Sharing section will also read/write · `Vendor` had zero prior application code — the same "dormant model, first real writer" shape #58-66 repeatedly found · **what #67 built vs. what stays #71's job**: `VendorRepository`/`VendorService`/`VendorController` implement ONLY the foundational CRUD (create/list/get/update on name+vendorType) — `riskTier`/`annualReviewDueAt`/`terminationDataReturnConfirmedAt`/`accessRevokedAt` all exist on the model already but are DELIBERATELY untouched by any #67 code path; #71, when built, extends the SAME `VendorModule`/`VendorRepository` rather than creating a second, parallel Vendor CRUD · `vendorType` validated against the exact 7-value set from the schema's own doc comment (`VENDOR_TYPES` in `vendor.config.ts`) so a caller can't write an arbitrary string into a column with no DB-level enum · **no new permission** — `vendor.manage` (`[COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER, SYSTEM_SECURITY_ADMINISTRATOR]`) was already pre-seeded, its own seed description already reading "Manage a vendor record AND ITS RISK TIER" — anticipating #71's extension to the SAME permission, not a new one · **new module** `apps/api/src/modules/supporting-operations/vendor.{config,service,controller,module}.ts` + `repositories/vendor.repository.ts` · `apps/web/` gains a **"Vendors"** screen (`app/(app)/vendors/page.tsx` — a single list+create+inline-rename page, no separate detail route since nothing rich exists per vendor yet) · **Verification**: +8 api unit (`vendor.service.spec.ts`) → api unit **2014** (149 files, from 2006). New `test/vendor.e2e-spec.ts` **4/4** — permission gating; a 400 rejecting a `vendorType` outside the documented 7-value set; a real create→list(filtered)→get→update walk for a procurement vendor (a name-only PATCH leaves `vendorType` untouched); 404s for an unknown vendor on both GET and PATCH. Full api unit suite 2014/2014 confirmed green; full 46-file api e2e suite green across 8 foreground sub-batches — a clean run this time, no transient flakes; both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `vendors.spec.ts` 4/4; full Playwright suite 218/218. `npm run typecheck`/`lint`/`build` (api + web) OK — no lint findings this time | no `PurchaseRequest`/purchase-order model or approval workflow — deliberately out of scope, the backlog's own instruction · no risk tiering, DPA requirement, or annual-review SLA wiring — all #71's own future work on this SAME model · #68–74 (Internal IT, Cybersecurity, Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
 
 ### Not started
 
@@ -691,9 +692,16 @@ build actually is today:
   `termination_access_revocation` entry (same business day, 24h escalation to IT
   management). Ticking the checklist's `systemAccessRevoked` item has a REAL
   effect — deactivating the linked `User` account and killing every live session
-  — not just a timestamp. See its own entry below for full detail. **Not built**:
-  #67–74 (Procurement, Internal IT, Cybersecurity, Document Management, Vendor
-  Management, BCP/DR, Knowledge Management).
+  — not just a timestamp. #67 Procurement is also built: the backlog's own text
+  names EXACTLY which existing model to reuse and what NOT to invent ("use
+  `Vendor` with `vendorType=other`... without inventing a purchase-request model
+  that isn't in the text") — no `PurchaseRequest` model or workflow was built.
+  `Vendor` (its own schema doc comment: "Merges Process 71 and PDPL third-party
+  governance") gets a foundational CRUD only — `riskTier`/DPA/annual-review
+  fields all exist already but stay untouched, #71's own future work on the SAME
+  module. See both entries below for full detail. **Not built**: #68–74
+  (Internal IT, Cybersecurity, Document Management, Vendor Management, BCP/DR,
+  Knowledge Management).
 - **Part D — PDPL / M-series — begun, three of nine systems built.** **M03 Consent
   Management is built**: capture a consent decision (grant or explicit decline) for a
   `Customer` or `InsuredPerson`, and withdraw it through a two-step request/confirm flow
@@ -7645,6 +7653,84 @@ narrows a gap.
   move through. #67–74 (Procurement, Internal IT, Cybersecurity, Document
   Management, Vendor Management, BCP/DR, Knowledge Management) remain
   unbuilt, each with its own permission already seeded.
+
+**Part C #67 — Procurement (Domain H, Process 67)** — the backlog's own text
+  carries an explicit scope warning, worth quoting in full since it IS the
+  entire design brief: "The two source documents give no more than a one-line
+  general description ('purchase requests and vendor selection for
+  non-insurance operational needs') — no field-level detail or defined
+  workflow in the source. The only task actually executable from the source
+  directly: use `Vendor` (with `vendorType=other`) as the general vendor
+  record for this purpose, without inventing a purchase-request model that
+  isn't in the text."
+
+  **No `PurchaseRequest` model, no approval workflow, nothing beyond the
+  literal instruction was built.** This is the opposite case from most
+  backlog items in this codebase: instead of mapping a vague requirement to
+  the closest existing signal, the source material itself says exactly which
+  existing model to reuse and exactly what NOT to invent.
+
+  **`Vendor` is a genuinely shared register — THREE consumers, one model.**
+  `Vendor`'s own schema doc comment: "Merges Process 71 (Vendor Management)
+  and PDPL third-party governance — both describe the same register in these
+  two source documents." #67 adds a THIRD consumer to the same model:
+  Procurement's non-insurance vendors, `vendorType: 'other'`. All three
+  consumers — #67 (this process), #71 (Vendor Management, risk tiering +
+  DPAs + annual review, not built here), and Part D's Third-Party & Data
+  Sharing PDPL section (also not built) — read and write the SAME `Vendor`
+  rows, distinguished only by `vendorType` and by which OPTIONAL fields each
+  consumer populates. `Vendor` had zero prior application code before this
+  process — the same "dormant model, first real writer" shape #58-66
+  repeatedly found.
+
+  **What #67 built vs. what stays #71's job.** `VendorRepository`/
+  `VendorService`/`VendorController` implement ONLY the foundational CRUD:
+  `create` (name, vendorType), `list` (optional `vendorType` filter), `get`,
+  `update` (name/vendorType only). Deliberately NOT touched by any #67 code
+  path: `riskTier`, `annualReviewDueAt`, `terminationDataReturnConfirmedAt`,
+  `accessRevokedAt` — all four exist on the `Vendor` model already, all four
+  are #71's own future feature (risk tiering before any data share, the
+  mandatory DPA-for-Medium/High-tier rule, the `vendor_annual_review`
+  `SLA_REGISTRY` entry already sourced in `pdpl-sla-timers.md`). #71, when
+  built, extends the SAME `VendorModule` with new methods/routes on the SAME
+  `VendorRepository` — not a second, parallel Vendor CRUD.
+
+  `vendorType` is validated against the exact 7-value set from the schema's
+  own doc comment (`insurer | reinsurer | loss_adjuster | it_cloud |
+  printing_archiving | marketing_call_centre | other`) via `VENDOR_TYPES`
+  (`vendor.config.ts`) — a caller cannot write an arbitrary string into a
+  column with no DB-level enum.
+
+  **Permission.** `vendor.manage` (`[COMPLIANCE_OFFICER,
+  BRANCH_DEPARTMENT_MANAGER, SYSTEM_SECURITY_ADMINISTRATOR]`) was already
+  pre-seeded — zero seed change, the Domain H "seed before code" pattern. Its
+  own seed description already says "Manage a vendor record AND ITS RISK
+  TIER" — anticipating #71's extension to the SAME permission, not a new one.
+
+  `apps/web/` gains a new **"Vendors"** screen
+  (`app/(app)/vendors/page.tsx` — a single list + create + inline-rename
+  page; no separate detail page, since nothing rich exists per vendor yet).
+
+  **Verification**: +8 api unit (`vendor.service.spec.ts` — create/list/get/
+  update, every 404 branch, the best-effort audit) → api unit **2014** (149
+  files, from 2006). New `test/vendor.e2e-spec.ts` **4/4** — permission
+  gating; a 400 rejecting a `vendorType` outside the documented 7-value set;
+  a REAL create → list (filtered by `vendorType`) → get → update walk for a
+  procurement vendor (a name-only PATCH leaves `vendorType` untouched); 404s
+  getting or updating an unknown vendor. Full api unit suite 2014/2014
+  confirmed green; full 46-file api e2e suite green across 8 foreground
+  sub-batches — a clean run this time, no transient flakes; both documented
+  chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New
+  Playwright `vendors.spec.ts` 4/4; full Playwright suite 218/218.
+  `npm run typecheck`/`lint`/`build` (api + web) OK — no lint findings this
+  time.
+
+  **Deferred**: no `PurchaseRequest`/purchase-order model or approval
+  workflow — deliberately out of scope, the backlog's own instruction. No
+  risk tiering, DPA requirement, or annual-review SLA wiring — all #71's own
+  future work on this SAME model. #68–74 (Internal IT, Cybersecurity,
+  Document Management, Vendor Management, BCP/DR, Knowledge Management)
+  remain unbuilt, each with its own permission already seeded.
 
 ## Deployment
 

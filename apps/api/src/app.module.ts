@@ -46,6 +46,7 @@ import { PortfolioAnalysisModule } from './modules/management-reporting/portfoli
 import { ProfitabilityAnalysisModule } from './modules/management-reporting/profitability-analysis.module';
 import { PlanningExportModule } from './modules/management-reporting/planning-export.module';
 import { EmployeeModule } from './modules/supporting-operations/employee.module';
+import { VendorModule } from './modules/supporting-operations/vendor.module';
 
 @Module({
   imports: [
@@ -328,6 +329,13 @@ import { EmployeeModule } from './modules/supporting-operations/employee.module'
     // no migration — employee.manage / training.record /
     // deprovisioning.execute were all pre-seeded ahead of time.
     EmployeeModule,
+    // Process 67 — Procurement. The source names no purchase-request
+    // model or workflow, only "use Vendor (vendorType=other) as the
+    // general vendor record." A foundational Vendor CRUD, shared with
+    // #71 (Vendor Management, not built here) — riskTier/DPA fields are
+    // deliberately untouched. No new permission, no migration —
+    // vendor.manage was already pre-seeded for #71's future use.
+    VendorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
