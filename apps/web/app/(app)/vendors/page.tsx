@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -100,11 +101,11 @@ export default function VendorsPage() {
     <main style={pageStyle}>
       <h1>Vendors</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The general vendor record — for Procurement, non-insurance
-        operational vendors (&ldquo;other&rdquo;). The other vendor types
-        (insurer, reinsurer, loss adjuster, IT/cloud, printing/archiving,
-        marketing/call-centre) belong to Vendor Management&apos;s own risk-tiering
-        and Data Processing Agreement workflow, not yet built.
+        The shared vendor register — Procurement&apos;s general
+        (&ldquo;other&rdquo;) vendors alongside Vendor Management&apos;s
+        risk-tiered ones (insurer, reinsurer, loss adjuster, IT/cloud,
+        printing/archiving, marketing/call-centre). Open a vendor for risk
+        tiering, Data Processing Agreements, and termination.
       </p>
 
       {loadError ? (
@@ -122,6 +123,7 @@ export default function VendorsPage() {
               <tr>
                 <th style={head}>Name</th>
                 <th style={head}>Type</th>
+                <th style={head}>Risk tier</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -139,15 +141,19 @@ export default function VendorsPage() {
                     )}
                   </td>
                   <td style={cell}>{vendor.vendorType}</td>
+                  <td style={cell}>{vendor.riskTier ?? 'unassigned'}</td>
                   <td style={cell}>
                     {editingId === vendor.id ? (
                       <button type="button" onClick={() => saveEdit(vendor.id)}>
                         Save
                       </button>
                     ) : (
-                      <button type="button" onClick={() => startEdit(vendor)}>
-                        Rename
-                      </button>
+                      <>
+                        <button type="button" onClick={() => startEdit(vendor)}>
+                          Rename
+                        </button>{' '}
+                        <Link href={`/vendors/${vendor.id}`}>Manage</Link>
+                      </>
                     )}
                   </td>
                 </tr>

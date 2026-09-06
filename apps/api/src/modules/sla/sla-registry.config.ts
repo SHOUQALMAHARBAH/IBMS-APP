@@ -165,6 +165,17 @@ export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
       'pdpl-sla-timers.md row "Vendor annual review (M07)"; PRIV-STD-04, PRIV-SOP-10',
   },
   {
+    workflowName: 'vendor_termination_access_revocation',
+    label: 'Vendor access revocation on termination',
+    entityType: 'Vendor',
+    duration: { value: 2, unit: 'businessDays' },
+    escalationStages: [
+      { offset: { value: 0, unit: 'businessDays' }, escalateTo: null },
+    ],
+    citation:
+      'pdpl-sla-timers.md row "Vendor access revocation on termination (M07)"; backlog Part C #71 (no independent PRIV-SOP figure identified beyond the backlog\'s own "2 business days" text — the M03 consent-withdrawal sourcing precedent)',
+  },
+  {
     workflowName: 'data_sharing_decision',
     label: 'Data sharing decision',
     entityType: 'DataSharingApproval',

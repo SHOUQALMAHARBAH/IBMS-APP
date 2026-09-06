@@ -17,11 +17,10 @@ export interface VendorFilter {
 }
 
 /**
- * Process 67 (backlog Part C #67, Domain H) — the foundational `Vendor`
- * CRUD both #67 (Procurement, `vendorType='other'`) and #71 (Vendor
- * Management, the other six types) share. `riskTier` and the DPA/
- * annual-review fields are #71's own concern — no method here reads or
- * writes them.
+ * Process 67 (backlog Part C #67, Domain H) built the foundational `Vendor`
+ * CRUD; Process 71 (backlog Part C #71) extends the SAME repository with
+ * risk tiering, the annual-review reschedule, and the two termination
+ * fields — see `vendor.config.ts` for the full design.
  */
 @Injectable()
 export class VendorRepository {
@@ -44,5 +43,42 @@ export class VendorRepository {
 
   update(id: string, input: UpdateVendorInput): Promise<Vendor> {
     return this.prisma.client.vendor.update({ where: { id }, data: input });
+  }
+
+  setRiskTier(id: string, riskTier: string): Promise<Vendor> {
+    return this.prisma.client.vendor.update({
+      where: { id },
+      data: { riskTier },
+    });
+  }
+
+  scheduleAnnualReview(id: string, dueAt: Date): Promise<Vendor> {
+    return this.prisma.client.vendor.update({
+      where: { id },
+      data: { annualReviewDueAt: dueAt },
+    });
+  }
+
+  /** Status-conditional: only stamps a vendor that has not already been
+   * terminated (race-safe-invariants.md) — returns `null` if 0 rows
+   * matched (already terminated). */
+  async terminate(id: string, confirmedAt: Date): Promise<Vendor | null> {
+    const result = await this.prisma.client.vendor.updateMany({
+      where: { id, terminationDataReturnConfirmedAt: null },
+      data: { terminationDataReturnConfirmedAt: confirmedAt },
+    });
+    if (result.count === 0) return null;
+    return this.findById(id);
+  }
+
+  /** Status-conditional: only stamps a vendor whose access has not already
+   * been revoked. Returns `null` if 0 rows matched. */
+  async revokeAccess(id: string, revokedAt: Date): Promise<Vendor | null> {
+    const result = await this.prisma.client.vendor.updateMany({
+      where: { id, accessRevokedAt: null },
+      data: { accessRevokedAt: revokedAt },
+    });
+    if (result.count === 0) return null;
+    return this.findById(id);
   }
 }

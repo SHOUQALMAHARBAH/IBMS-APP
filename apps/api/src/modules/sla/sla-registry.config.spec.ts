@@ -5,7 +5,7 @@ import {
   SLA_REGISTRY,
 } from './sla-registry.config';
 
-// The 14 SLA types named in ibms-brain/meta/lex/pdpl-sla-timers.md's
+// The 15 SLA types named in ibms-brain/meta/lex/pdpl-sla-timers.md's
 // registry table — a completeness check so a future accidental removal (or
 // typo'd rename) of a row is caught here rather than silently shrinking the
 // registry below what backlog A.8 requires ("wired to every SLA type").
@@ -18,6 +18,7 @@ const EXPECTED_PDPL_WORKFLOW_NAMES = [
   'disposal_batch_execution',
   'legal_hold_necessity_review',
   'vendor_annual_review',
+  'vendor_termination_access_revocation',
   'data_sharing_decision',
   'incident_containment',
   'incident_senior_management_notification',
@@ -39,7 +40,7 @@ const EXPECTED_NON_PDPL_WORKFLOW_NAMES = [
 ].sort();
 
 describe('SLA_REGISTRY', () => {
-  it('has exactly the 14 PDPL-sourced workflow types named in pdpl-sla-timers.md, plus the drafted non-PDPL ones', () => {
+  it('has exactly the 15 PDPL-sourced workflow types named in pdpl-sla-timers.md, plus the drafted non-PDPL ones', () => {
     expect([...SLA_REGISTRY.map((e) => e.workflowName)].sort()).toEqual(
       [
         ...EXPECTED_PDPL_WORKFLOW_NAMES,

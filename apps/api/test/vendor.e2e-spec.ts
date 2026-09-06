@@ -35,6 +35,23 @@ interface VendorBody {
   id: string;
   name: string;
   vendorType: string;
+  riskTier: string | null;
+  annualReviewDueAt: string | null;
+  terminationDataReturnConfirmedAt: string | null;
+  accessRevokedAt: string | null;
+}
+interface DpaBody {
+  id: string;
+  vendorId: string;
+  signedAt: string | null;
+  assessedByUserId: string | null;
+  dpoApprovedByUserId: string | null;
+}
+interface ReadinessBody {
+  vendorId: string;
+  riskTier: string | null;
+  ready: boolean;
+  reasons: string[];
 }
 
 let sharedApp: INestApplication<App> | undefined;
@@ -88,7 +105,7 @@ async function makeUser(
   return { accessToken, userId: user.id };
 }
 
-describe('Procurement / Vendor (e2e) — backlog Part C #67', () => {
+describe('Procurement / Vendor Management (e2e) — backlog Part C #67 / #71', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
@@ -188,5 +205,258 @@ describe('Procurement / Vendor (e2e) — backlog Part C #67', () => {
       .set(bearer(admin.accessToken))
       .send({ name: 'Nope' })
       .expect(404);
+  });
+
+  it('#71 — risk tiering auto-schedules the annual review, and a re-review re-bases it +12 months', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-tier-manager',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const created = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name: uniqueLabel('Tiered Vendor'), vendorType: 'it_cloud' })
+        .expect(201)
+    ).body as VendorBody;
+    expect(created.riskTier).toBeNull();
+
+    // no annual review scheduled yet — 422.
+    await request(app.getHttpServer())
+      .post(`/vendors/${created.id}/annual-review`)
+      .set(bearer(manager.accessToken))
+      .expect(422);
+
+    const tiered = (
+      await request(app.getHttpServer())
+        .patch(`/vendors/${created.id}/risk-tier`)
+        .set(bearer(manager.accessToken))
+        .send({ riskTier: 'medium' })
+        .expect(200)
+    ).body as VendorBody;
+    expect(tiered.riskTier).toBe('medium');
+    expect(tiered.annualReviewDueAt).not.toBeNull();
+
+    const reviewed = (
+      await request(app.getHttpServer())
+        .post(`/vendors/${created.id}/annual-review`)
+        .set(bearer(manager.accessToken))
+        .expect(201)
+    ).body as VendorBody;
+    expect(reviewed.annualReviewDueAt).not.toBeNull();
+    expect(new Date(reviewed.annualReviewDueAt!).getTime()).toBeGreaterThan(
+      new Date(tiered.annualReviewDueAt!).getTime() - 1000,
+    );
+
+    // an out-of-set riskTier 400s.
+    await request(app.getHttpServer())
+      .patch(`/vendors/${created.id}/risk-tier`)
+      .set(bearer(manager.accessToken))
+      .send({ riskTier: 'critical' })
+      .expect(400);
+  });
+
+  it('#71 — walks the full DPA maker/checker lifecycle and the data-share readiness gate for a High-tier vendor', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'vendor-dpa-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    const dpo = await makeUser(
+      app,
+      'vendor-dpa-dpo',
+      'DATA_PROTECTION_OFFICER',
+    );
+    const outsider = await makeUser(
+      app,
+      'vendor-dpa-outsider',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const vendor = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(compliance.accessToken))
+        .send({
+          name: uniqueLabel('High Risk Cloud Vendor'),
+          vendorType: 'it_cloud',
+        })
+        .expect(201)
+    ).body as VendorBody;
+
+    await request(app.getHttpServer())
+      .patch(`/vendors/${vendor.id}/risk-tier`)
+      .set(bearer(compliance.accessToken))
+      .send({ riskTier: 'high' })
+      .expect(200);
+
+    const notReadyYet = (
+      await request(app.getHttpServer())
+        .get(`/vendors/${vendor.id}/data-share-readiness`)
+        .set(bearer(compliance.accessToken))
+        .expect(200)
+    ).body as ReadinessBody;
+    expect(notReadyYet.ready).toBe(false);
+
+    const dpa = (
+      await request(app.getHttpServer())
+        .post(`/vendors/${vendor.id}/data-processing-agreements`)
+        .set(bearer(compliance.accessToken))
+        .expect(201)
+    ).body as DpaBody;
+    expect(dpa.assessedByUserId).toBe(compliance.userId);
+
+    // outsider holds neither vendor.manage nor dpa.approve.
+    await request(app.getHttpServer())
+      .post(`/data-processing-agreements/${dpa.id}/sign`)
+      .set(bearer(outsider.accessToken))
+      .expect(403);
+
+    const signed = (
+      await request(app.getHttpServer())
+        .post(`/data-processing-agreements/${dpa.id}/sign`)
+        .set(bearer(compliance.accessToken))
+        .expect(201)
+    ).body as DpaBody;
+    expect(signed.signedAt).not.toBeNull();
+
+    const stillNotReady = (
+      await request(app.getHttpServer())
+        .get(`/vendors/${vendor.id}/data-share-readiness`)
+        .set(bearer(compliance.accessToken))
+        .expect(200)
+    ).body as ReadinessBody;
+    expect(stillNotReady.ready).toBe(false); // High tier still needs DPO approval
+
+    // the assessor cannot also be the DPO approver (maker/checker).
+    await request(app.getHttpServer())
+      .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
+      .set(bearer(compliance.accessToken))
+      .expect(403);
+
+    const approved = (
+      await request(app.getHttpServer())
+        .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
+        .set(bearer(dpo.accessToken))
+        .expect(201)
+    ).body as DpaBody;
+    expect(approved.dpoApprovedByUserId).toBe(dpo.userId);
+
+    // a second approval attempt 409s.
+    await request(app.getHttpServer())
+      .post(`/data-processing-agreements/${dpa.id}/dpo-approve`)
+      .set(bearer(dpo.accessToken))
+      .expect(409);
+
+    const nowReady = (
+      await request(app.getHttpServer())
+        .get(`/vendors/${vendor.id}/data-share-readiness`)
+        .set(bearer(compliance.accessToken))
+        .expect(200)
+    ).body as ReadinessBody;
+    expect(nowReady.ready).toBe(true);
+    expect(nowReady.reasons).toEqual([]);
+
+    const list = (
+      await request(app.getHttpServer())
+        .get(`/vendors/${vendor.id}/data-processing-agreements`)
+        .set(bearer(compliance.accessToken))
+        .expect(200)
+    ).body as DpaBody[];
+    expect(list.find((d) => d.id === dpa.id)).toBeTruthy();
+  });
+
+  it('#71 — Low tier is data-share ready with no DPA at all', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-low-manager',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const vendor = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({
+          name: uniqueLabel('Low Risk Printer'),
+          vendorType: 'printing_archiving',
+        })
+        .expect(201)
+    ).body as VendorBody;
+    await request(app.getHttpServer())
+      .patch(`/vendors/${vendor.id}/risk-tier`)
+      .set(bearer(manager.accessToken))
+      .send({ riskTier: 'low' })
+      .expect(200);
+
+    const readiness = (
+      await request(app.getHttpServer())
+        .get(`/vendors/${vendor.id}/data-share-readiness`)
+        .set(bearer(manager.accessToken))
+        .expect(200)
+    ).body as ReadinessBody;
+    expect(readiness.ready).toBe(true);
+  });
+
+  it('#71 — walks termination -> access revocation, guarding order and double-execution', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-term-manager',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const vendor = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name: uniqueLabel('Vendor To Terminate'), vendorType: 'other' })
+        .expect(201)
+    ).body as VendorBody;
+
+    // access revocation before termination 422s.
+    await request(app.getHttpServer())
+      .post(`/vendors/${vendor.id}/revoke-access`)
+      .set(bearer(manager.accessToken))
+      .expect(422);
+
+    // termination without the explicit attestation 422s.
+    await request(app.getHttpServer())
+      .post(`/vendors/${vendor.id}/terminate`)
+      .set(bearer(manager.accessToken))
+      .send({})
+      .expect(422);
+
+    const terminated = (
+      await request(app.getHttpServer())
+        .post(`/vendors/${vendor.id}/terminate`)
+        .set(bearer(manager.accessToken))
+        .send({ confirmDataReturnOrDestruction: true })
+        .expect(201)
+    ).body as VendorBody;
+    expect(terminated.terminationDataReturnConfirmedAt).not.toBeNull();
+
+    // a second termination 409s.
+    await request(app.getHttpServer())
+      .post(`/vendors/${vendor.id}/terminate`)
+      .set(bearer(manager.accessToken))
+      .send({ confirmDataReturnOrDestruction: true })
+      .expect(409);
+
+    const revoked = (
+      await request(app.getHttpServer())
+        .post(`/vendors/${vendor.id}/revoke-access`)
+        .set(bearer(manager.accessToken))
+        .expect(201)
+    ).body as VendorBody;
+    expect(revoked.accessRevokedAt).not.toBeNull();
+
+    // a second revocation 409s.
+    await request(app.getHttpServer())
+      .post(`/vendors/${vendor.id}/revoke-access`)
+      .set(bearer(manager.accessToken))
+      .expect(409);
   });
 });
