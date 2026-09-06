@@ -50,6 +50,7 @@ import { VendorModule } from './modules/supporting-operations/vendor.module';
 import { InformationAssetModule } from './modules/supporting-operations/information-asset.module';
 import { DocumentModule } from './modules/supporting-operations/document.module';
 import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.module';
+import { KnowledgeBaseArticleModule } from './modules/supporting-operations/knowledge-base-article.module';
 
 @Module({
   imports: [
@@ -360,6 +361,12 @@ import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.mod
     // coverage/gap check across all five. No new permission, no
     // migration — bcp-dr.manage was already pre-seeded.
     BcpDrPlanModule,
+    // Process 74 — Knowledge Management, the LAST Domain H item.
+    // KnowledgeBaseArticle pre-exists with zero prior application code.
+    // A bilingual (optional-per-article) knowledge base across four
+    // categories. No new permission, no migration — kb.publish was
+    // already pre-seeded.
+    KnowledgeBaseArticleModule,
   ],
   controllers: [AppController],
   providers: [AppService],
