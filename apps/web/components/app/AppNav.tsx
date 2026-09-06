@@ -66,6 +66,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/vendors', label: 'Vendors' },
   { href: '/information-assets', label: 'Information assets' },
   { href: '/documents', label: 'Documents' },
+  { href: '/bcp-dr-plans', label: 'BCP / DR plans' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

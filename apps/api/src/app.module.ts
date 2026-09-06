@@ -49,6 +49,7 @@ import { EmployeeModule } from './modules/supporting-operations/employee.module'
 import { VendorModule } from './modules/supporting-operations/vendor.module';
 import { InformationAssetModule } from './modules/supporting-operations/information-asset.module';
 import { DocumentModule } from './modules/supporting-operations/document.module';
+import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.module';
 
 @Module({
   imports: [
@@ -353,6 +354,12 @@ import { DocumentModule } from './modules/supporting-operations/document.module'
     // classification present" rollup. No new permission, no migration —
     // document.manage / document.delete-override were both pre-seeded.
     DocumentModule,
+    // Process 72-73 — Business Continuity & Disaster Recovery. BcpDrPlan
+    // pre-exists with zero prior application code. Plans + RTO/RPO +
+    // test-cadence tracking for the five named scenarios, plus a
+    // coverage/gap check across all five. No new permission, no
+    // migration — bcp-dr.manage was already pre-seeded.
+    BcpDrPlanModule,
   ],
   controllers: [AppController],
   providers: [AppService],
