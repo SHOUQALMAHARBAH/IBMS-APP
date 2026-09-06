@@ -8,8 +8,10 @@ import {
   type LeadSource,
 } from '../../lib/lead/lead-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useAuth } from '../../lib/auth/auth-context';
 import { buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../auth/auth-form.styles';
 import { checkboxRowStyle, fieldStyle, formRowStyle, sectionStyle } from './lead.styles';
+import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../pdpl/PrivacyNoticeDisplay';
 
 const SOURCE_LABEL: Record<LeadSource, string> = {
   referral: 'Referral',
@@ -28,6 +30,7 @@ interface LeadIntakeFormProps {
 }
 
 export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
+  const { user } = useAuth();
   const [fullName, setFullName] = useState('');
   const [source, setSource] = useState<LeadSource>('referral');
   const [contactPhone, setContactPhone] = useState('');
@@ -77,6 +80,10 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
   return (
     <section style={sectionStyle}>
       <h2 style={{ marginTop: 0 }}>New lead</h2>
+      <PrivacyNoticeDisplay
+        touchpoint="lead_capture"
+        canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+      />
       <form onSubmit={(e) => void handleSubmit(e)}>
         <div style={formRowStyle}>
           <div style={fieldStyle}>

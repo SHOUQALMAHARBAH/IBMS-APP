@@ -272,9 +272,12 @@ describe('Internal Controls — self-approval audit (e2e) — backlog Part C #56
     expect(body.pairsScanned).toBe(16);
     expect(body.byPair).toHaveLength(16);
     expect(typeof body.generatedAt).toBe('string');
+    // DisposalBatch/DataSharingApproval/DataProcessingAgreement all gained a
+    // real writer this session (M06/M07/M08) — none of the registry's pairs
+    // remain dormant today.
     expect(
       body.byPair.some(
-        (p) => p.entityType === 'DisposalBatch' && p.dormant === true,
+        (p) => p.entityType === 'DisposalBatch' && p.dormant === false,
       ),
     ).toBe(true);
     expect(

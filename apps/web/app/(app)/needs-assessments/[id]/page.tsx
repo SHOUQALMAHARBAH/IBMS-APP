@@ -25,6 +25,7 @@ import {
   profileFieldValueStyle,
 } from '../../../../components/prospect/prospect.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
+import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
@@ -122,6 +123,10 @@ export default function NeedsAssessmentDetailPage() {
             purpose="UNDERWRITING"
             label="Needs & risk assessment consent"
             defaultConsentTextVersion="underwriting-notice-v1"
+          />
+          <PrivacyNoticeDisplay
+            touchpoint="needs_risk_assessment"
+            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
           />
 
           <div style={coveragePreviewStyle}>

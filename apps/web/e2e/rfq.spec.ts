@@ -1367,6 +1367,9 @@ async function mockRfqApi(
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 }
 
 /** Part C #26/#28 — drive a freshly-notified claim all the way to an insurer

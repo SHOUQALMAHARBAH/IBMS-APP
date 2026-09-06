@@ -115,17 +115,22 @@ describe('InternalControlsService.runSelfApprovalAudit (Process 56)', () => {
     ]);
   });
 
-  it('reports rowsChecked per pair even when every pair is empty (dormant models included)', async () => {
+  it('reports rowsChecked per pair even when a pair has zero rows (the mocked findMany returns none)', async () => {
     const { service } = makeService();
     const report = await service.runSelfApprovalAudit('user-1');
     const disposalBatchRow = report.byPair.find(
       (p) => p.entityType === 'DisposalBatch',
     );
+    // DisposalBatch/DataSharingApproval/DataProcessingAgreement all gained a
+    // real writer this session (M06/M07/M08) — none of MAKER_CHECKER_REGISTRY's
+    // pairs remain `dormant: true` today; this row's rowsChecked is 0 only
+    // because the mocked repo below returns no rows, not because the pair is
+    // still dormant.
     expect(disposalBatchRow).toEqual(
       expect.objectContaining({
         rowsChecked: 0,
         violationCount: 0,
-        dormant: true,
+        dormant: false,
       }),
     );
   });

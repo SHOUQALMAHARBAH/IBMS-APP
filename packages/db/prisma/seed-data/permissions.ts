@@ -270,6 +270,7 @@ const pdpl: PermissionSeed[] = [
   { code: 'dpia.review', module: 'pdpl', description: 'Review a DPIA screening result / escalate to a Full DPIA', roles: [DPO] },
   { code: 'privacy-notice.publish', module: 'pdpl', description: 'Publish a version-controlled bilingual privacy notice', roles: [DPO, COMPLIANCE] },
   { code: 'ropa.manage', module: 'pdpl', description: 'Maintain the Records of Processing Activities register', roles: [DPO] },
+  { code: 'dpo-workspace.view', module: 'pdpl', description: 'View the DPO Workspace aggregate screen (consent, DSR, incident, DPIA, Legal Hold, cross-border transfer registers)', roles: [DPO] },
 ];
 
 // ----------------------------------------------------------------------

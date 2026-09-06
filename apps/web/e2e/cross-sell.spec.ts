@@ -89,6 +89,9 @@ async function mockCrossSell(
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 }
 
 test("lists a customer's cross-sell opportunities and converts one", async ({ page }) => {

@@ -91,6 +91,9 @@ async function mockUpSell(
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 }
 
 test("lists a customer's up-sell recommendations and converts one", async ({ page }) => {

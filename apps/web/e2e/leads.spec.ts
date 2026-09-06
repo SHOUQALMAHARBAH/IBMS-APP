@@ -54,6 +54,9 @@ const LEADS = [
 
 test("renders the pipeline board grouped by status", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
   await page.route("http://localhost:4000/leads", (route) =>
     route.fulfill({ status: 200, json: LEADS }),
   );
@@ -67,6 +70,9 @@ test("renders the pipeline board grouped by status", async ({ page }) => {
 
 test("shows the intake form for a Sales Officer, but not for a Claims Officer", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
   await page.route("http://localhost:4000/leads", (route) => route.fulfill({ status: 200, json: [] }));
   await page.goto("/leads");
   await expect(page.getByRole("heading", { name: "New lead" })).toBeVisible();
@@ -78,6 +84,9 @@ test("shows the intake form for a Sales Officer, but not for a Claims Officer", 
 
 test("shows an empty state when there are no leads yet", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
   await page.route("http://localhost:4000/leads", (route) => route.fulfill({ status: 200, json: [] }));
 
   await page.goto("/leads");
@@ -101,6 +110,9 @@ test("shows a friendly message when the user lacks list permission", async ({ pa
 
 test("only offers a transition action on the officer's own lead, and moving it updates the board", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
   await page.route("http://localhost:4000/leads", (route) => route.fulfill({ status: 200, json: LEADS }));
   // The real endpoint returns WorkflowTransitionService's generic
   // { id, status } shape, not the full Lead — mocking the full Lead here
@@ -121,6 +133,9 @@ test("only offers a transition action on the officer's own lead, and moving it u
 
 test("leads page has no serious/critical accessibility violations @a11y", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
   await page.route("http://localhost:4000/leads", (route) => route.fulfill({ status: 200, json: LEADS }));
 
   await page.goto("/leads");
@@ -133,6 +148,9 @@ test("leads page has no serious/critical accessibility violations @a11y", async 
 
 test("the intake form's fields are reachable via keyboard", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
   await page.route("http://localhost:4000/leads", (route) => route.fulfill({ status: 200, json: [] }));
 
   await page.goto("/leads");

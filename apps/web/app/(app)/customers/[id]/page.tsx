@@ -23,6 +23,7 @@ import {
 } from '../../../../components/prospect/prospect.styles';
 import { repeatableRowStyle } from '../../../../components/customer/customer.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
+import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 
 function ProfileField({
   label,
@@ -174,6 +175,10 @@ export default function CustomerProfilePage() {
             purpose="KYC_AML"
             label="Onboarding / KYC consent"
             defaultConsentTextVersion="kyc-notice-v1"
+          />
+          <PrivacyNoticeDisplay
+            touchpoint="onboarding_kyc"
+            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
           />
 
           <div style={profileGridStyle}>

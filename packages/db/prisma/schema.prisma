@@ -2727,7 +2727,11 @@ model DpiaScreening {
 }
 
 /// Part 6.2 — bilingual, version-controlled privacy notice text presented
-/// at each relevant collection point.
+/// at each relevant collection point. Publishing a new version for a
+/// touchpoint is a new row, never an edit of an old one (immutable
+/// history, the Quotation negotiation-round shape) — @@unique closes the
+/// race where two concurrent publishes for the same touchpoint could
+/// otherwise land on the same versionNumber.
 model PrivacyNotice {
   id            String   @id @default(uuid())
   touchpoint    String   // lead_capture | onboarding_kyc | needs_risk_assessment | rfq_market_placement | claims | group_medical_life_motor_fleet | renewal_cross_sell
@@ -2736,6 +2740,8 @@ model PrivacyNotice {
   textEn        String
   legallyReviewedAt DateTime?
   publishedAt   DateTime @default(now())
+
+  @@unique([touchpoint, versionNumber])
 }
 
 /// Part 9.3 — system-maintained Records of Processing Activities register.

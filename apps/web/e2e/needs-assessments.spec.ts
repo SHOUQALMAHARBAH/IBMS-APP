@@ -68,6 +68,9 @@ test("renders the needs assessments list and opens a detail on click", async ({ 
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 
   await page.goto("/needs-assessments");
   await expect(page.getByRole("heading", { name: "Needs assessments" })).toBeVisible();
@@ -123,6 +126,9 @@ test("the new-assessment flow: pick a risk profile, answer the questionnaire, la
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 
   await page.goto("/needs-assessments/new?customerId=cust-1");
   await expect(page.getByRole("heading", { name: "New needs assessment" })).toBeVisible();
@@ -143,6 +149,9 @@ test("a manager sees the review panel for an assessment pending review", async (
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 
   await page.goto("/needs-assessments/na-1");
   await expect(page.getByRole("heading", { name: "Review & approval" })).toBeVisible();
@@ -162,6 +171,9 @@ test("needs assessment list and detail screens have no serious/critical accessib
   );
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
   );
 
   await page.goto("/needs-assessments");

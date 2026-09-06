@@ -24,6 +24,7 @@ import {
   crossSellBadgeStyle,
 } from '../../../../components/cross-sell/cross-sell.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
+import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 
 const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
@@ -121,6 +122,10 @@ export default function CrossSellOpportunityDetailPage() {
             purpose="MARKETING"
             label="Cross-sell consent"
             defaultConsentTextVersion="privacy-notice-v1.2"
+          />
+          <PrivacyNoticeDisplay
+            touchpoint="renewal_cross_sell"
+            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
           />
 
           <div

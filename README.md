@@ -774,7 +774,7 @@ build actually is today:
   #66 Employee, #67 Vendor CRUD, #68 verified/not built, #69
   InformationAsset, #70 Document, #71 Vendor risk-tiering/DPA, #72-73
   BcpDrPlan, #74 KnowledgeBaseArticle.
-- **Part D — PDPL / M-series — begun, four of nine systems built.** **M03 Consent
+- **Part D — PDPL / M-series — COMPLETE, all nine backlog items built.** **M03 Consent
   Management is built**: capture a consent decision (grant or explicit decline) for a
   `Customer`, `InsuredPerson`, or `Lead`, and withdraw it through a two-step
   request/confirm flow that finally gives the previously-unused `consent_withdrawal`
@@ -817,15 +817,30 @@ build actually is today:
   Legal-Hold exclusion re-checked live at every step, no `CertificateOfDestruction`
   means no `CLOSED`) — see § Known gaps, Part D M06, for the full detail, including the
   scope boundary that `execute()` is a staff attestation, never a live delete against the
-  records the schedule item describes. **Still not built**: cross-border transfer
-  gating (M05), the one-off `DataSharingApproval` workflow (M08 — `Vendor` risk
-  tiering/DPA maker-checker/`computeDataShareReadiness()` were already built as backlog
-  #71, but nothing yet calls that readiness gate before an actual data share), DPIA
-  screening (M10), version-controlled bilingual privacy notices, the RoPA register, and
-  the DPO workspace dashboard. The A.8 SLA registry carries all the PDPL timer
-  definitions; `consent_withdrawal`, the two DSR workflows, and M06's
-  `legal_hold_necessity_review` / `disposal_batch_execution` are the only ones a real
-  caller uses so far.
+  records the schedule item describes. **The remaining six items (#4-9) are built** —
+  Cross-Border Transfer (blocks any transfer outside Jordan unless exactly one of three
+  legal bases is recorded; the schema cites "Part 6.2," not an M-number — no single
+  M01-M12 module names this checklist item, M05 is a different, already-built system, a
+  labeling mistake this build made and fixed before push); **M08 Data Sharing** (the
+  one-off `DataSharingApproval` maker/checker workflow, now the FIRST live caller of
+  backlog #71's `computeDataShareReadiness()` — a regulatory channel skips only the
+  vendor-risk check, never classification/secure-channel discipline); **M10 DPIA
+  Screening** (the 5-question form, any single "Yes" → 5-business-day DPO review, an
+  all-"No" auto-approval with an untimed spot-check, escalation to a Full DPIA as a
+  manual DPO judgment call with no numeric threshold); **Notices** (bilingual,
+  version-controlled text — creation IS publishing, append-only versioning via a real
+  `@@unique([touchpoint, versionNumber])` constraint, displayed via a new
+  `PrivacyNoticeDisplay` widget at the same touchpoints Consent already reaches); the
+  **RoPA register** (`RopaEntry` — plain mutable CRUD plus an `EXPORT`-audited register
+  dump, the #65 Strategic Planning Inputs precedent); and the **DPO Workspace** screen
+  (a genuinely new `dpo-workspace.view` permission aggregating consent status, the open
+  DSR queue with SLA countdowns, the non-closed incident register, the DPIA-awaiting-review
+  register, the active Legal Hold register, and the cross-border transfer register, on
+  one screen, with zero cross-module service dependency) — see § Known gaps, Part D
+  items #4-9, for the full detail. The A.8 SLA registry carries all the PDPL timer
+  definitions; `consent_withdrawal`, the two DSR workflows, M06's
+  `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
+  / `dpia_review` are the ones a real caller uses.
 - **Part E — dashboards** — none of the six management dashboards (Sales, Policy, Claims,
   Financial, Compliance, Insurer & Employee Performance) exist.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
@@ -5978,11 +5993,129 @@ narrows a gap.
   nominated; the real per-category retention periods from `PRIV-STD-03`
   have still never been handed to engineering (the one seeded
   `AuditLogEntry` row stays an engineering-invented, unconfirmed draft).
-  The other six Part D systems (cross-border transfer/M05, the
-  `DataSharingApproval` one-off workflow/M08 — `Vendor` risk
-  tiering/DPA/readiness already exist as backlog #71, but nothing calls
-  that readiness gate before an actual share, DPIA/M10, notices, RoPA) and
-  the DPO Workspace dashboard remain unbuilt.
+  The other six Part D systems (cross-border transfer — Part 6.2, no
+  M01-M12 module name applies, not "M05" as an earlier draft of this
+  entry mislabeled it — the `DataSharingApproval` one-off workflow/M08 —
+  `Vendor` risk tiering/DPA/readiness already exist as backlog #71, but
+  nothing calls that readiness gate before an actual share, DPIA/M10,
+  notices, RoPA) and the DPO Workspace dashboard remain unbuilt at this
+  point in the session — all six landed later the same day, see the
+  entry below.
+
+**Part D — Cross-Border Transfer, Data Sharing (M08), DPIA (M10), Notices, RoPA, DPO
+  Workspace** — closes Part D's full 9-item checklist (items #4-9, after Consent/M03,
+  DSR/M04, Retention & Disposal/M06), all in `apps/api/src/modules/pdpl/`.
+  **Cross-Border Transfer** (`CrossBorderTransferRecord`) blocks any transfer of
+  personal data outside Jordan unless exactly one of three legal bases
+  (`statutory_exception` / `standard_contractual_clauses` / `explicit_consent`) is
+  recorded. `cross-border-transfer.approve` is the ONLY pre-seeded permission
+  (DPO-only) — there is no separate request/log permission, so `create()` IS the
+  approval act (the #74 KnowledgeBaseArticle "creation IS publishing" shape):
+  `approvedByUserId` is always stamped to the caller's own id, never set separately.
+  The record is append-only (the `Interaction` "no edit/delete of a logged
+  interaction" precedent) and rejects `destinationCountry: "Jordan"` (case-insensitively)
+  as a 400 — a domestic "cross-border" transfer would misuse the model. **This backlog
+  item names no single M01-M12 PCMS module** — the schema cites "Part 6.2," and M05 is
+  already a different, existing system ("Data Collection & Access Governance"); this
+  build initially mislabeled it "M05" across 6 files by assuming the next unused-looking
+  number, caught and fixed before push (`ibms-brain/meta/context/part-d-completion.md`
+  has the full story).
+  **Third Parties & Data Sharing / M08** (`DataSharingApproval`) is the one-off,
+  non-recurring sharing path — `vendorId` is optional so a share can be logged with no
+  `Vendor` row at all, "separate from the standing vendor relationship." Two permissions:
+  `data-sharing.request` (the maker, broad) and `data-sharing.approve` (DPO, the
+  checker) — a maker/checker pair the covered-pairs table already named, backed by the
+  pre-existing DB CHECK. **This is the FIRST live caller of backlog #71's
+  `computeDataShareReadiness()`** — built with "no live enforcement call site yet"
+  explicitly flagged; `create()` now calls it live when `vendorId` is set and the
+  channel is not regulatory (a regulatory channel skips ONLY this check, never the
+  classification/secure-channel discipline `assertSecureChannel()` already enforced).
+  The model tracks approval, not a status enum — a decision is "approved"
+  (`approvedByUserId` + `decidedAt` both set) or "declined" (`decidedAt` set,
+  `approvedByUserId` left null), both independently-nullable columns, no migration
+  needed. `slaDueAt` (`data_sharing_decision`: 3 business days / 1 for the
+  regulatory-channel fast track) is computed and persisted at create time, plus a
+  matching generic `SlaTimer` row for the #43 SLA dashboard.
+  **DPIA Screening / M10** (`DpiaScreening`) is the 5-question yes/no form; any single
+  "Yes" → `DPO_REVIEW_REQUIRED`, a 5-business-day SLA (`dpia_review`, its first real
+  caller); an all-"No" result auto-approves subject only to an UN-TIMED DPO spot-check.
+  `dpia.review` (DPO-only) gates the whole surface including submission — the #67/#69/
+  #71/#74 "one pre-seeded permission gates the whole CRUD" precedent. **`outcome` is a
+  status-shaped enum that is NOT named `status`**, so it cannot be registered in
+  `WORKFLOW_TRANSITIONS` — `WorkflowTransitionService`'s delegate interface hardcodes
+  reading a column literally called `status`; `escalateToFullDpia()` is therefore a
+  hand-written, status-conditional repository update instead (the `LegalHold.release()`
+  shape). The one real state move, `DPO_REVIEW_REQUIRED → ESCALATED_FULL_DPIA`, is a
+  manual DPO judgment call for a "materially high-risk" case — no numeric Yes-count
+  threshold is specified anywhere in the backlog, so escalation is never automatic.
+  **Notices** (`PrivacyNotice`) is bilingual, version-controlled text per touchpoint —
+  unlike #74's optional-per-article bilingual shape, `textAr`/`textEn` are BOTH
+  mandatory (the `DocumentTemplate` shape). Creation IS publishing (`privacy-notice.publish`,
+  DPO + Compliance); a new version for a touchpoint is a new row with `versionNumber`
+  one higher than the previous highest (the `Quotation` negotiation-round shape,
+  immutable history) — closed by a genuine NEW `@@unique([touchpoint, versionNumber])`
+  constraint (migration `20260915120000`), a concurrent double-publish now 409s instead
+  of silently landing two rows on the same version. `GET /privacy-notices/current`
+  returns `{ notice: PrivacyNoticeView | null }`, never a bare `null` — Nest sends an
+  EMPTY body for a `null`/`undefined` controller return, not the JSON literal `null`,
+  which this build's own first e2e attempt could not tell apart from an absent response
+  at all. That endpoint deliberately ALSO accepts `consent.manage` (not just
+  `privacy-notice.publish`) — the same touchpoint-facing roles that capture consent need
+  to read the notice text that applies there. A new `PrivacyNoticeDisplay` widget is
+  mounted alongside `ConsentCaptureWidget` at the same 5 touchpoints Consent/M03 already
+  reached (`customers/[id]`, `needs-assessments/[id]`, `rfqs/[id]`, `cross-sell/[id]`,
+  `up-sell/[id]`) plus `LeadIntakeForm` for lead capture — Claims and Group Medical/Life
+  & Motor Fleet remain the SAME documented gap Consent's own build already established
+  (no web UI/CRUD exists for either yet), not a fresh scope decision.
+  **Records of Processing Activities** (`RopaEntry`, Part 9.3) is plain, fully-mutable
+  CRUD (`ropa.manage`, DPO-only) — a living register entry corrected in place as its
+  data categories/recipients change, the `KnowledgeBaseArticle` mutability shape rather
+  than `PrivacyNotice`'s immutable-history one. "Exportable" reuses the #65 Strategic
+  Planning Inputs precedent — the previously-dormant `AuditAction.EXPORT`, an `EXPORT`
+  audit row with a synthetic `entityId` (`'ropa-register'`), not a real CSV/file-download
+  mechanism, since none exists anywhere else in this codebase.
+  **The DPO Workspace** screen aggregates consent status + the open DSR queue with SLA
+  countdowns + the non-CLOSED incident register + the DPIA-awaiting-review register +
+  the active Legal Hold register + the cross-border transfer register, on one screen —
+  zero cross-module SERVICE dependency (the #58 KPI Dashboard shape): `DpoWorkspaceService`
+  reads five already-built PDPL repositories directly plus ONE cross-module repository,
+  `IncidentRepository` (`compliance-risk`), injected directly. **`dpo-workspace.view` is
+  a genuinely NEW permission** — unlike every other Part D item, none was pre-seeded for
+  this screen at all (the #71 "vendor_termination_access_revocation... a genuine gap"
+  precedent applied to a permission code).
+  **Also fixed while touching this code**: 3 stale `dormant: true` flags in
+  `internal-controls.config.ts` (`DisposalBatch`/`DataProcessingAgreement`/
+  `DataSharingApproval` all now have real writers — the first two were stale from
+  EARLIER sessions, not just this one) plus the hardcoded e2e assertion expecting the
+  stale value.
+  **Verification**: +67 api unit (12 new spec files: `cross-border-transfer.config/
+  service`, `data-sharing-approval.config/service`, `dpia-screening.config/service`,
+  `privacy-notice.config/service`, `ropa-entry.config/service`, `dpo-workspace.config/
+  service`) → api unit **2238** (175 files, from 2171). 6 new e2e spec files (32 tests,
+  all green): permission gating on every route; the Jordan-destination 400; the
+  Medium-tier-no-DPA 422 wired live for the first time; the regulatory-channel
+  vendor-risk bypass; the maker/checker 403 on self-approval; the auto-approve →
+  spot-check and any-Yes → review/escalate DPIA walks; the version-increment +
+  `current()` walk for Notices; the create → export walk for RoPA; the DPO Workspace
+  before/after-delta walk (db-test is cumulative) across DSR/Legal-Hold/cross-border
+  registers. Full api unit suite 2238/2238 confirmed green; full 57-file api e2e suite
+  green across 8 foreground sub-batches, both chronic flakes (`rbac`, `up-sell`) passing
+  with `--testTimeout=90000`. 6 new Playwright spec files (18 tests) — one real a11y bug
+  caught and fixed: `scrollable-region-focusable` on the RoPA register table's
+  horizontally-scrolling wrapper (missing `tabIndex`/`role="region"`/`aria-label`, since
+  a `next start` production server must be REBUILT after a page edit for Playwright to
+  see the fix — `reuseExistingServer` otherwise silently serves the stale build). Full
+  Playwright suite **264/264** (from 246). `npm run typecheck`/`lint`/`build` (api + web)
+  OK — lint caught the same `react-hooks/set-state-in-effect` false positive on the new
+  `PrivacyNoticeDisplay` widget (same async-IIFE fix as every prior occurrence) plus 2
+  real unused-import/variable errors after `eslint --fix` removed now-redundant type
+  casts. **Deferred:** no i18n/RTL framework for the Notices Arabic text display (plain
+  `dir="rtl"` on the textarea/paragraph, the same level of Arabic support every other
+  bilingual screen this session has); the DPO Workspace has no drill-down/detail links
+  into each register's own screen, just a flat read; Cross-Border Transfer's
+  `legalBasisEvidenceRef` is a free-text field, not validated against a real `Document`
+  or `ConsentRecord` (the exact evidence shape differs per legal basis and isn't
+  specified in the backlog). **Part D §5.1 (all 9 backlog items) is now COMPLETE.**
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

@@ -137,6 +137,9 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 
   await page.goto("/customers/new");
   await page.getByRole("button", { name: "Individual" }).click();
@@ -198,6 +201,9 @@ test("captures onboarding/KYC consent from the customer profile screen (Part D Â
     }
     return route.fulfill({ status: 200, json: captured ? [{ id: "consent-1", isActive: true }] : [] });
   });
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
 
   await page.goto("/customers/cust-1");
   await expect(page.getByRole("heading", { name: "Onboarding / KYC consent" })).toBeVisible();
@@ -225,6 +231,9 @@ test("customer list and profile screens have no serious/critical accessibility v
   );
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
   );
 
   await page.goto("/customers");

@@ -15,13 +15,14 @@
  * `20260906120000_add_incident_maker_checker_check`. Two entities
  * (`NeedsAssessment`, `PolicyChecking`) contribute more than one pair.
  *
- * `DisposalBatch` / `DataSharingApproval` / `DataProcessingAgreement` are
- * "core schema" models with no application code writing to them yet (M06/
- * M07/M08 are not built — see root README.md's Part D gaps) — `dormant:
- * true` documents that today's scan of them will always see 0 rows, not
- * that they were forgotten (the #48 `third_party_payment_source` dormant-
- * classifier precedent: kept and scanned, not removed, so the day M06/M07/
- * M08 land this report already covers them).
+ * `DisposalBatch` / `DataSharingApproval` / `DataProcessingAgreement` were
+ * originally "core schema" models with no application code writing to them
+ * (`dormant: true`, the #48 `third_party_payment_source` dormant-classifier
+ * precedent: kept and scanned even at 0 rows, not removed, so the day a
+ * real writer lands this report already covers it). All three now have a
+ * real writer — `DisposalBatch`/M06 (backlog Part D item #3),
+ * `DataProcessingAgreement`/M07 (backlog #71), `DataSharingApproval`/M08
+ * (backlog Part D item #5) — so all three are now `dormant: false`.
  *
  * The ONE pair with `dbCheckConstraint: null` — `PolicyChecking.checkedByUserId`
  * vs the PARENT `Policy.issuedByUserId` — is not an oversight: a Postgres
@@ -86,7 +87,7 @@ export const MAKER_CHECKER_REGISTRY: MakerCheckerPair[] = [
     makerField: 'nominatedByUserId',
     checkerField: 'dpoApprovedByUserId',
     dbCheckConstraint: 'DisposalBatch_maker_checker_distinct',
-    dormant: true,
+    dormant: false,
     source: 'PRIV-SRS-01 M06',
   },
   {
@@ -96,7 +97,7 @@ export const MAKER_CHECKER_REGISTRY: MakerCheckerPair[] = [
     makerField: 'requestedByUserId',
     checkerField: 'approvedByUserId',
     dbCheckConstraint: 'DataSharingApproval_maker_checker_distinct',
-    dormant: true,
+    dormant: false,
     source: 'PRIV-SRS-01 M08',
   },
   {
@@ -106,7 +107,7 @@ export const MAKER_CHECKER_REGISTRY: MakerCheckerPair[] = [
     makerField: 'assessedByUserId',
     checkerField: 'dpoApprovedByUserId',
     dbCheckConstraint: 'DataProcessingAgreement_maker_checker_distinct',
-    dormant: true,
+    dormant: false,
     source: 'PRIV-SRS-01 M07',
   },
   {

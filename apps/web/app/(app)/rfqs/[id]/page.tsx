@@ -32,6 +32,7 @@ import {
   rfqTableStyle,
 } from '../../../../components/rfq/rfq.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
+import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
@@ -234,6 +235,10 @@ export default function RfqDetailPage() {
             purpose="SHARING_WITH_INSURER"
             label="RFQ / market placement consent"
             defaultConsentTextVersion="market-placement-notice-v1"
+          />
+          <PrivacyNoticeDisplay
+            touchpoint="rfq_market_placement"
+            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
           />
 
           <h2 style={{ marginTop: '2rem' }}>Insurer submissions</h2>
