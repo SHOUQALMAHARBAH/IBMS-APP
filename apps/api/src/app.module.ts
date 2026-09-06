@@ -44,6 +44,7 @@ import { InsurerPerformanceModule } from './modules/management-reporting/insurer
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
 import { ProfitabilityAnalysisModule } from './modules/management-reporting/profitability-analysis.module';
+import { PlanningExportModule } from './modules/management-reporting/planning-export.module';
 
 @Module({
   imports: [
@@ -311,6 +312,13 @@ import { ProfitabilityAnalysisModule } from './modules/management-reporting/prof
     // scheduler. profitability-analysis.view (pre-seeded, Executive
     // Management / Finance) gates the one read.
     ProfitabilityAnalysisModule,
+    // Process 65 — exports portfolio (#62) + market (#60) data for planning
+    // cycles. Reuses (not duplicates) both processes' own repositories,
+    // never their services (this codebase's universal cross-module rule).
+    // No new model, no migration, no scheduler. planning-export.generate
+    // (pre-seeded, Executive Management ONLY) gates the one POST route —
+    // the first real writer of AuditAction.EXPORT.
+    PlanningExportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
