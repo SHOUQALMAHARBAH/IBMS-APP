@@ -66,12 +66,36 @@ const RUN_ID = `${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
 const OFAC_ENT_NUM = `9${RUN_ID}`.slice(0, 9);
 const SANCTIONED_NAME = `Zzq Watchlist Test ${RUN_ID}`;
 
-const OFAC_CSV_FIXTURE = `${OFAC_ENT_NUM},"${SANCTIONED_NAME}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"DOB 01 Jan 1980."\n`;
+// WatchlistSyncService refuses to trust a parse of fewer than
+// WATCHLIST_MIN_ABSOLUTE_RECORDS (10) records when there is no PRIOR
+// successful sync for that source to compare against — a real, deliberate
+// plausibility floor against a WAF/interstitial page parsing to
+// near-nothing "for free" on day one. A brand-new database (exactly what
+// CI's fresh db-test is, every run) always takes this branch, so the fixture
+// must clear the same floor a real first sync would — 9 harmless filler
+// records alongside the one record each test actually asserts against.
+const OFAC_FILLER_ROWS = Array.from(
+  { length: 9 },
+  (_, i) =>
+    `F${i}-${RUN_ID},"Filler OFAC Entry ${i} ${RUN_ID}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"filler row to clear the no-prior-sync plausibility floor"`,
+).join('\n');
+const OFAC_CSV_FIXTURE = `${OFAC_FILLER_ROWS}\n${OFAC_ENT_NUM},"${SANCTIONED_NAME}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"DOB 01 Jan 1980."\n`;
 
 const UN_DATA_ID = `8${RUN_ID}`.slice(0, 9);
+const UN_FILLER_INDIVIDUALS = Array.from(
+  { length: 9 },
+  (_, i) => `
+    <INDIVIDUAL>
+      <DATAID>F${i}-${UN_DATA_ID}</DATAID>
+      <FIRST_NAME>FillerUnListedPerson</FIRST_NAME>
+      <SECOND_NAME>${i}-${RUN_ID}</SECOND_NAME>
+      <UN_LIST_TYPE>TEST</UN_LIST_TYPE>
+      <REFERENCE_NUMBER>T.F${i}.${RUN_ID}</REFERENCE_NUMBER>
+    </INDIVIDUAL>`,
+).join('');
 const UN_XML_FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
 <CONSOLIDATED_LIST>
-  <INDIVIDUALS>
+  <INDIVIDUALS>${UN_FILLER_INDIVIDUALS}
     <INDIVIDUAL>
       <DATAID>${UN_DATA_ID}</DATAID>
       <FIRST_NAME>UnrelatedUnListedPerson</FIRST_NAME>
