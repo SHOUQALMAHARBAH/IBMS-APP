@@ -774,7 +774,7 @@ build actually is today:
   #66 Employee, #67 Vendor CRUD, #68 verified/not built, #69
   InformationAsset, #70 Document, #71 Vendor risk-tiering/DPA, #72-73
   BcpDrPlan, #74 KnowledgeBaseArticle.
-- **Part D — PDPL / M-series — begun, three of nine systems built.** **M03 Consent
+- **Part D — PDPL / M-series — begun, four of nine systems built.** **M03 Consent
   Management is built**: capture a consent decision (grant or explicit decline) for a
   `Customer`, `InsuredPerson`, or `Lead`, and withdraw it through a two-step
   request/confirm flow that finally gives the previously-unused `consent_withdrawal`
@@ -806,15 +806,26 @@ build actually is today:
   CHECK), the pre-existing generic `SlaTimerScheduler` catching a missed 1-hour
   senior-management notification, and independent multi-regulator notification
   (CBJ/NCSC/Personal Data Protection Council) — see § Known gaps, Part C #55, for the full
-  detail. **Still not built**: retention & disposal *execution* (M06 — the
-  `RetentionScheduleItem` / `LegalHold` / `DisposalBatch` / `CertificateOfDestruction`
-  models exist since the initial migration, nothing drives them — M04's DELETION gate
-  above is a staff attestation for exactly this reason, not an automated check against
-  them), vendor risk tiering (M07), cross-border transfer gating and one-off
-  `DataSharingApproval` (M08), DPIA screening (M10), version-controlled bilingual
-  privacy notices, the RoPA register, and the DPO workspace dashboard. The A.8 SLA
-  registry carries all the PDPL timer definitions; `consent_withdrawal` and the two DSR
-  workflows are the only ones a real caller uses so far.
+  detail. **M06 Data Retention & Secure Disposal is built** — Part D's item #3 (worked
+  one item at a time after Consent/DSR): the retention-period table CRUD
+  (`RetentionScheduleItem`, a real `@unique recordCategory` closing a previously-flagged
+  schema gap, gated by a new `retention-schedule.manage` permission since no "Legal
+  Counsel" role exists in this RBAC model — Compliance/DPO stand in), Legal Hold
+  place/review/release (a 6-month re-basing SLA, excluding a held category from
+  disposal), and the full dual-control disposal workflow (`DisposalBatch`:
+  nominate → manager-approve → dpo-approve → execute → certificate → close, the
+  Legal-Hold exclusion re-checked live at every step, no `CertificateOfDestruction`
+  means no `CLOSED`) — see § Known gaps, Part D M06, for the full detail, including the
+  scope boundary that `execute()` is a staff attestation, never a live delete against the
+  records the schedule item describes. **Still not built**: cross-border transfer
+  gating (M05), the one-off `DataSharingApproval` workflow (M08 — `Vendor` risk
+  tiering/DPA maker-checker/`computeDataShareReadiness()` were already built as backlog
+  #71, but nothing yet calls that readiness gate before an actual data share), DPIA
+  screening (M10), version-controlled bilingual privacy notices, the RoPA register, and
+  the DPO workspace dashboard. The A.8 SLA registry carries all the PDPL timer
+  definitions; `consent_withdrawal`, the two DSR workflows, and M06's
+  `legal_hold_necessity_review` / `disposal_batch_execution` are the only ones a real
+  caller uses so far.
 - **Part E — dashboards** — none of the six management dashboards (Sales, Policy, Claims,
   Financial, Compliance, Insurer & Employee Performance) exist.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
@@ -5854,6 +5865,124 @@ narrows a gap.
   still green after 5+ sessions of unrelated work since this originally
   shipped. **No code changes** — this backlog re-paste found the same
   system already fully built, the #47/#50/#68 "verified, not built" shape.
+
+**Part D — Data Retention & Secure Disposal (M06)** — extends
+  `apps/api/src/modules/pdpl/` alongside M03/M04; third of Part D's nine
+  systems worked one item at a time (after Consent/M03, DSR/M04), bundled
+  under backlog Process #52. **All four M06 entities
+  (`RetentionScheduleItem`, `LegalHold`, `DisposalBatch`,
+  `CertificateOfDestruction`) pre-existed** since the initial domain-model
+  migration, but only `RetentionScheduleItem` had ever been written to — a
+  single seeded row for `AuditLogEntry` (2026-08-26) plus a
+  `getRetentionCutoffDate()` reader. This build is the first real writer
+  for all three sub-systems: the retention-period table CRUD, Legal Hold
+  place/review/release, and the full dual-control disposal workflow.
+  **Closed a previously-flagged schema gap** — migration
+  `20260914120000` (48th) adds a genuine `@@unique` constraint on
+  `RetentionScheduleItem.recordCategory` (this file's own prior text had
+  explicitly flagged its absence as an accepted-but-not-ideal gap: "nothing
+  stops two rows for the same category"); `seed.ts`'s hand-rolled
+  find-then-create/update `ensureRetentionSchedule()` became a real Prisma
+  `upsert` now that the constraint exists. The same migration widens
+  `LegalHold` with an optional `retentionScheduleItemId` FK (so a hold can
+  name the category it excludes from disposal) and adds four supporting
+  indexes. **A genuinely new permission** — `retention-schedule.manage`
+  (`[COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER]`) — since no "Legal
+  Counsel" role exists among this codebase's 11 seeded `RoleName` values;
+  the backlog's own "needs Legal Counsel confirmation as a pending input"
+  phrase is therefore attested by the closest standing compliance-adjacent
+  roles, a real, documented limitation of this RBAC model. `create()`
+  handles a duplicate-category race as an ordinary Prisma `P2002` → 409
+  (the `rfq.service.ts` shape); `update()` refuses to edit an
+  already-confirmed row (422 — "add a new item instead"); `confirm()` is a
+  status-conditional `updateMany` re-asserting `confirmedByLegalCounselAt:
+  null` (0 rows → re-check: already-confirmed is 422, a genuine race is
+  409). **Legal Hold** reuses the DSR `applyExtension` start-then-resolve
+  SLA re-basing shape for `recordReview()` — a new 6-month
+  `legal_hold_necessity_review` timer starts BEFORE the old one resolves,
+  never the reverse, so a partial failure leaves an extra open timer rather
+  than zero; `release()` is idempotent and permanently resolves the timer.
+  **`DisposalBatch`'s "dual-control... two different users" checkbox
+  wording only actually enforces HALF of what it names** — there is no
+  `managerApprovedByUserId` column, only a timestamp; the pre-existing DB
+  `CHECK` constraint (`DisposalBatch_maker_checker_distinct`, migration
+  `20260826091424`) compares only `dpoApprovedByUserId` against
+  `nominatedByUserId`, so `MANAGER_APPROVED` is a self-transition
+  checkpoint reachable by the nominating manager or any other
+  `retention.dispose.nominate` holder — the real two-different-humans
+  enforcement (`assertDifferentActors` + the DB CHECK) is specifically
+  nominate-vs-DPO-approve. **The Legal-Hold exclusion check is re-derived
+  from live data at every dual-control step** — `nominate()`,
+  `managerApprove()`, AND `dpoApprove()` all independently call a private
+  `assertNoActiveLegalHold()` (422 if held, a no-op if the batch names no
+  category) — the #16 Broker Recommendation "re-derive the approval gate
+  from live data" precedent, since a hold placed between two approval
+  steps must still block execution. A `DisposalBatch` cannot reach
+  `CLOSED` without a `CertificateOfDestruction` attached (422 otherwise —
+  the literal "no closing without a Certificate of Destruction"
+  requirement), backed by a real DB `@unique` on `disposalBatchId`
+  (P2002 → 409 on a duplicate certificate). **`execute()` remains a staff
+  ATTESTATION** — a status stamp to `EXECUTED` plus a `method` field
+  naming an external destruction process
+  (`certified_secure_wipe_nist_800_88` / `physical_destruction` /
+  `certified_shredding`) — never a live `DELETE` against the records the
+  schedule item describes, deliberately avoiding a bypass of
+  `AuditLogEntry`'s immutability trigger; this repeats the file's own
+  pre-existing "retention informs eligibility, it does not execute
+  disposal" framing rather than building a deletion engine. **Endpoints**:
+  `POST/GET /retention-schedule` + `/:id`, `PATCH /retention-schedule/:id`,
+  `POST /retention-schedule/:id/confirm`; `POST/GET /legal-holds` + `/:id`,
+  `POST /legal-holds/:id/review`, `POST /legal-holds/:id/release`;
+  `POST/GET /disposal-batches` + `/:id`, `POST
+  /disposal-batches/:id/manager-approve`, `POST
+  /disposal-batches/:id/dpo-approve`, `POST /disposal-batches/:id/execute`,
+  `POST /disposal-batches/:id/certificate`, `POST
+  /disposal-batches/:id/close`. New
+  `apps/api/src/modules/pdpl/{retention-schedule,legal-hold,disposal-batch}.{config,service,controller}.ts`
+  + 3 new repositories, all registered in the existing `pdpl.module.ts`
+  (`LegalHoldRepository` injected directly into `DisposalBatchService` —
+  same-module, not a cross-module coupling violation). `apps/web/` gains a
+  **"Retention & Disposal"** screen (`app/(app)/retention-disposal/
+  page.tsx` — three stacked sections: schedule / holds / batches, each
+  independently permission-gated). **Verification**: +51 api unit (6 new
+  spec files: `retention-schedule.config/service.spec.ts`,
+  `legal-hold.config/service.spec.ts`, `disposal-batch.config/
+  service.spec.ts`) → api unit **2171** (163 files, from 2120). New
+  `test/retention-disposal.e2e-spec.ts` **2/2** — a full lifecycle walk
+  (schedule create → 409 duplicate → list → Legal Hold placed → disposal
+  blocked while held (422) → hold released, idempotent re-release →
+  nominate → 422 certificate-before-executed → manager-approve → 403
+  same-manager attempting DPO-approve → distinct-DPO-approve → `slaDueAt`
+  + 1 open `disposal_batch_execution` timer → execute → timer resolved →
+  422 close without certificate → certificate → 409 duplicate certificate
+  → close → schedule confirm → 422 edit/re-confirm after confirmation →
+  CREATE+TRANSITION audit rows confirmed) plus a second test covering
+  permission-denial on schedule update and a Legal-Hold review re-basing
+  (`nextReviewDueAt` increases, exactly 1 open + 1 resolved timer remain).
+  Full api unit suite 2171/2171 confirmed green; full 51-file api e2e
+  suite green across 8 foreground sub-batches, both chronic flakes
+  (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright
+  `retention-disposal.spec.ts` 3/3; full Playwright suite **246/246**
+  (from 243). `npm run typecheck`/`lint`/`build` (api + web) OK — lint
+  caught 5 real type-safety errors on first run: an untyped `let row`
+  losing its inferred Prisma type across a try/catch boundary in
+  `retention-schedule.service.ts` (fixed with an explicit `let row:
+  RetentionScheduleItem`); two nested `expect.objectContaining()` calls
+  and one bare `expect.any(Date)` used as an object-literal property value
+  in the new service specs (both trip
+  `@typescript-eslint/no-unsafe-assignment`; fixed by capturing the mock
+  call's argument into a locally-typed `const` and asserting its fields
+  individually, the `dsr.service.spec.ts` precedent). **Deferred:** no
+  automated retention-expiry sweep that turns "past its cutoff" into an
+  actual `DisposalBatch` nomination — every batch today is manually
+  nominated; the real per-category retention periods from `PRIV-STD-03`
+  have still never been handed to engineering (the one seeded
+  `AuditLogEntry` row stays an engineering-invented, unconfirmed draft).
+  The other six Part D systems (cross-border transfer/M05, the
+  `DataSharingApproval` one-off workflow/M08 — `Vendor` risk
+  tiering/DPA/readiness already exist as backlog #71, but nothing calls
+  that readiness gate before an actual share, DPIA/M10, notices, RoPA) and
+  the DPO Workspace dashboard remain unbuilt.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

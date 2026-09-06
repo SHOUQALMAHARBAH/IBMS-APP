@@ -47,6 +47,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/sla-dashboard', label: 'SLA dashboard' },
   { href: '/consent', label: 'Consent' },
   { href: '/dsr', label: 'Data Subject Requests' },
+  { href: '/retention-disposal', label: 'Retention & Disposal' },
   { href: '/transaction-monitoring', label: 'AML monitoring' },
   { href: '/watchlist-sync', label: 'Watchlist sync' },
   { href: '/regulatory-compliance', label: 'Regulatory compliance' },

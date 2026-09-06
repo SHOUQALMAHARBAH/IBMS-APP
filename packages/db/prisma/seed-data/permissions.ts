@@ -260,6 +260,7 @@ const pdpl: PermissionSeed[] = [
   { code: 'dsr.log', module: 'pdpl', description: 'Log a Data Subject Request the same business day it is received', roles: [SALES, FINANCE, CLAIMS, COMPLIANCE, DPO] },
   { code: 'dsr.handle', module: 'pdpl', description: 'Work a DSR as its assigned DPO handler', roles: [DPO] },
   { code: 'dsr.close', module: 'pdpl', description: 'Close a Data Subject Request (never closeable while a retention flag is open)', roles: [DPO] },
+  { code: 'retention-schedule.manage', module: 'pdpl', description: 'Maintain the retention-period table (record categories, months, Legal Counsel confirmation)', roles: [COMPLIANCE, DPO] },
   { code: 'retention.dispose.nominate', module: 'pdpl', description: 'Nominate a disposal batch (maker side of dual control)', roles: [MANAGER] },
   { code: 'retention.dispose.approve', module: 'pdpl', description: 'Give final DPO approval on a disposal batch (checker side of dual control)', roles: [DPO] },
   { code: 'legal-hold.manage', module: 'pdpl', description: 'Place/review a Legal Hold', roles: [DPO] },

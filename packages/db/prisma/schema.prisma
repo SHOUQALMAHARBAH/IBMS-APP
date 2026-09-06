@@ -2544,19 +2544,27 @@ model DataSubjectRequest {
 }
 
 /// Part 6.2 (M06) — retention periods per record category against a
-/// documented legal-minimum retention table.
+/// documented legal-minimum retention table. `recordCategory` is unique —
+/// one schedule row per category, not a free-running log (Process #52
+/// widening: the original model had no constraint stopping a duplicate).
 model RetentionScheduleItem {
   id                String   @id @default(uuid())
-  recordCategory    String
+  recordCategory    String   @unique
   retentionPeriodMonths Int
   legalBasis        String?
   confirmedByLegalCounselAt DateTime?
 
   disposalBatches   DisposalBatch[]
+  legalHolds        LegalHold[]
 }
 
-/// Part 6.2 (M06) — records under active Legal Hold are excluded from
-/// routine disposal. Reviewed every 6 months (SLA).
+/// Part 6.2 (M06) — records under active Legal Hold (releasedAt IS NULL)
+/// are excluded from routine disposal. Reviewed every 6 months (SLA).
+/// `retentionScheduleItemId` (Process #52 widening) is what makes the
+/// exclusion check against a DisposalBatch's own category mechanically
+/// checkable — `scope` stays free text for the human-readable reference
+/// (a specific customer file, a litigation case number) a hold not tied to
+/// a whole category still needs.
 model LegalHold {
   id            String   @id @default(uuid())
   scope         String   // description / entity reference under hold
@@ -2564,6 +2572,11 @@ model LegalHold {
   placedAt      DateTime @default(now())
   nextReviewDueAt DateTime
   releasedAt    DateTime?
+  retentionScheduleItemId String?
+  retentionScheduleItem   RetentionScheduleItem? @relation(fields: [retentionScheduleItemId], references: [id])
+
+  @@index([retentionScheduleItemId])
+  @@index([releasedAt])
 }
 
 enum DisposalBatchStatus {
@@ -2592,6 +2605,9 @@ model DisposalBatch {
   createdAt             DateTime @default(now())
 
   certificateOfDestruction CertificateOfDestruction?
+
+  @@index([retentionScheduleItemId])
+  @@index([status])
 }
 
 /// A DisposalBatch cannot reach Closed without this attached.
