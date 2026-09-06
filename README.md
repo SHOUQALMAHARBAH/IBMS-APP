@@ -573,7 +573,8 @@ build actually is today:
 | 66 | Human Resources — `Employee`, `SecurityAwarenessTraining`, `AccessDeprovisioningChecklist` | **opens Domain H — Supporting Operations (#66–74)** · two checkboxes: an employee record + licensing/certification tracking for regulated staff + training records; an automated access de-provisioning checklist on an employment-status change (same business day) · all three models pre-exist in the core schema (Part 8.2) with zero prior application code — the exact "dormant model, first real writer" shape #58-65 repeatedly found in Domain G · **licensing/certification tracking maps to the schema's own flat fields** — `Employee.licensedRole`/`confidentialityAgreementSignedAt`/`backgroundCheckCompletedAt` ARE the complete design; no new table invented · **`terminate()` is the first real caller of an ALREADY-REGISTERED SLA** — `pdpl-sla-timers.md`'s own registry sources "Termination access revocation (M05) | Same business day | Critical alert to IT management if still open after 24h," already transcribed in `SLA_REGISTRY` as `termination_access_revocation` (`duration: 0 hours`, one `+24h -> 'IT_MANAGEMENT'` stage) with zero prior caller · **termination is a stamp+create transaction, not a status enum** — `Employee` has no `EmploymentStatus`; `terminationDate` going null-to-set IS the transition · `EmployeeRepository.terminate()` stamps + creates the checklist in ONE `$transaction` (the `retention-case.repository.ts#escalateAndCreateRetentionCase` shape), the stamp's `where` re-asserting `terminationDate: null` so a concurrent second termination 409s instead of racing · **`systemAccessRevoked` has a REAL effect, not just a timestamp**: ticking it also sets the linked `User.isActive = false` and calls `SessionService.revokeAllForUser(userId, 'admin_revoked')` — killing every live session immediately, proven end-to-end (a real bearer token 401s the instant it fires) · **`User.employeeId` — #61's dormant FK — gets its first real writer too**: `POST /employees` accepts an optional `userId`, verified not-already-linked (409) before linking, a deliberate minimal scope addition finally making #61's `EmployeePerformanceRecord` usable · **permission split**: `employee.manage` (`[SYSTEM_SECURITY_ADMINISTRATOR, BRANCH_DEPARTMENT_MANAGER]`) gates the general record/training surface; `deprovisioning.execute` (`[SYSTEM_SECURITY_ADMINISTRATOR]` ONLY, narrower) gates BOTH `terminate` and every checklist action — terminating IS the trigger, so it sits behind the same narrow permission as executing the checklist · zero seed change — both pre-seeded ahead of time, the Domain G "seed before code" pattern extended to Domain H · **encryption mirrors `CustomerService` field-for-field** — `Employee.nationalIdEnc` was already registered in `ENCRYPTED_FIELDS` with zero prior consumer; masked-by-default, justified reveal via `POST /employees/:id/reveal-field`, the list view strips the encrypted field entirely rather than decrypt-then-mask N times · **new module** `apps/api/src/modules/supporting-operations/employee.{config,service,controller,module}.ts` + `repositories/employee.repository.ts` · `apps/web/` gains **"Employees"** (`app/(app)/employees/page.tsx` — list+create) and an `[id]` detail screen (`app/(app)/employees/[id]/page.tsx` — profile+reveal, training, the de-provisioning checklist) · **Verification**: +31 api unit (`employee.config.spec.ts` 6, `employee.service.spec.ts` 25) → api unit **2006** (148 files, from 1975). New `test/employee.e2e-spec.ts` **3/3** — permission gating (a Manager holds `employee.manage` but NOT `deprovisioning.execute`); a REAL full-lifecycle walk (create with a linked `User` → reveal → assign+complete training → terminate → verify the `SlaTimer` row exists with `escalatedTo: 'IT_MANAGEMENT'` → a second termination 409s → completing the checklist before every sub-item is done 400s → ticking `systemAccessRevoked` deactivates the linked user AND 401s their live bearer token → ticking the rest + completing resolves the SLA timer); a 409 rejecting a `userId` already linked to a different employee. Full api unit suite 2006/2006 confirmed green; full 45-file api e2e suite green across 8 foreground sub-batches — two confirmed-transient environment hiccups this run (both unrelated files, re-confirmed clean on isolated re-run), both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `employees.spec.ts` 4/4; full Playwright suite 214/214. `npm run typecheck`/`lint`/`build` (api + web) OK — a second occurrence of the #65 `@typescript-eslint/no-unsafe-assignment` pattern (an asymmetric Vitest matcher nested inside an object literal), fixed the same way | no `EmploymentStatus` for states OTHER than termination (e.g. leave, suspension) — only the one transition the backlog names is modeled · no multi-step HR onboarding/offboarding WORKFLOW (approval stages) — this is a flat CRUD + one guarded transition, not a `WorkflowTransitionService` entity, since there is no multi-state enum to move through · #67–74 (Procurement, Internal IT, Cybersecurity, Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
 | 67 | Procurement | the backlog's own text carries an explicit scope warning, quoted in full since it IS the design brief: "The two source documents give no more than a one-line general description ('purchase requests and vendor selection for non-insurance operational needs') — no field-level detail or defined workflow in the source. The only task actually executable from the source directly: use `Vendor` (with `vendorType=other`) as the general vendor record for this purpose, without inventing a purchase-request model that isn't in the text." · **no `PurchaseRequest` model, no approval workflow, nothing beyond the literal instruction was built** — the opposite case from most items: the source names EXACTLY which existing model to reuse and exactly what NOT to invent, rather than leaving a gap to map · **`Vendor` is a genuinely shared register — THREE consumers, one model**: its own schema doc comment already says "Merges Process 71 (Vendor Management) and PDPL third-party governance — both describe the same register"; #67 adds a third consumer (Procurement, `vendorType: 'other'`) to the SAME rows #71 (risk tiering/DPAs/annual review) and Part D's Third-Party & Data Sharing section will also read/write · `Vendor` had zero prior application code — the same "dormant model, first real writer" shape #58-66 repeatedly found · **what #67 built vs. what stays #71's job**: `VendorRepository`/`VendorService`/`VendorController` implement ONLY the foundational CRUD (create/list/get/update on name+vendorType) — `riskTier`/`annualReviewDueAt`/`terminationDataReturnConfirmedAt`/`accessRevokedAt` all exist on the model already but are DELIBERATELY untouched by any #67 code path; #71, when built, extends the SAME `VendorModule`/`VendorRepository` rather than creating a second, parallel Vendor CRUD · `vendorType` validated against the exact 7-value set from the schema's own doc comment (`VENDOR_TYPES` in `vendor.config.ts`) so a caller can't write an arbitrary string into a column with no DB-level enum · **no new permission** — `vendor.manage` (`[COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER, SYSTEM_SECURITY_ADMINISTRATOR]`) was already pre-seeded, its own seed description already reading "Manage a vendor record AND ITS RISK TIER" — anticipating #71's extension to the SAME permission, not a new one · **new module** `apps/api/src/modules/supporting-operations/vendor.{config,service,controller,module}.ts` + `repositories/vendor.repository.ts` · `apps/web/` gains a **"Vendors"** screen (`app/(app)/vendors/page.tsx` — a single list+create+inline-rename page, no separate detail route since nothing rich exists per vendor yet) · **Verification**: +8 api unit (`vendor.service.spec.ts`) → api unit **2014** (149 files, from 2006). New `test/vendor.e2e-spec.ts` **4/4** — permission gating; a 400 rejecting a `vendorType` outside the documented 7-value set; a real create→list(filtered)→get→update walk for a procurement vendor (a name-only PATCH leaves `vendorType` untouched); 404s for an unknown vendor on both GET and PATCH. Full api unit suite 2014/2014 confirmed green; full 46-file api e2e suite green across 8 foreground sub-batches — a clean run this time, no transient flakes; both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `vendors.spec.ts` 4/4; full Playwright suite 218/218. `npm run typecheck`/`lint`/`build` (api + web) OK — no lint findings this time | no `PurchaseRequest`/purchase-order model or approval workflow — deliberately out of scope, the backlog's own instruction · no risk tiering, DPA requirement, or annual-review SLA wiring — all #71's own future work on this SAME model · #68–74 (Internal IT, Cybersecurity, Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
 | 68 | Internal Information Technology | the backlog's own annotation: "Also only a general description ('system administration, change management, environment management') with no field-level detail. The tasks actually executable from the source already exist under A.10 (environment separation) and Part 10.5 (change management with security sign-off before deployment) — no standalone data table is required by the text." · **VERIFIED 2026-09-19 against the real current state, not taken at face value** — the "no standalone data table" conclusion is correct: #68's description is system-administration/environment/change-management, not a business-entity concern, so there is genuinely no schema gap a new module could close · **but the coverage claim is OVERSTATED on the other two counts**: (1) A.10's own "Separate Dev/Test/UAT/Prod environments" checkbox is self-documented in this SAME README's § Known gaps, A.10 as **"scaffolded, not achieved"** — `db`/`db-test`/`db-uat` are three local docker-compose Postgres instances with no real UAT/Prod *deployment* target, so "UAT" today means a fourth local database, not a reachable separate environment; (2) **"Part 10.5" as a distinct "change management with security sign-off" control has NO independent definition anywhere in this repo or `ibms-brain`** — grepped exhaustively, it appears nowhere except inside this #68 annotation itself; it is the backlog author's own gloss on A.10's combined "Part 10.4/10.5" citation, not a quote from a defined section. The closest real artifact — DAST in CI (`.github/workflows/ci.yml`'s ZAP step) — is explicitly informational-only (`fail_action: false`, § Known gaps A.10), and there is no deployment pipeline in this repo at all (`.github/workflows/` has `ci.yml`/`codeql.yml`/`backup-drill.yml` only) for a "sign-off before deployment" gate to attach to · **no separate build was made regardless** — #68 names no new business-entity concern a schema/CRUD module could address, so this verification itself IS the process's own completion, the #47/#50 "verified-covered" shape — but its coverage should be read as "the same infra gaps A.10 already tracks," not as "done" | no CI-enforced hard gate before deployment exists (DAST stays informational; no deploy pipeline exists to attach a gate to) · Dev/Test/UAT/Prod separation stays three local databases, not real deployed environments · nothing #68-specific beyond what § Known gaps, A.10 already tracks in full · #69–74 (Cybersecurity, Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt/unverified, each with its own permission already seeded |
-| 69 | Cybersecurity — `InformationAsset` | the backlog's own annotation: "fully covered by Part A + `IncidentReport` + `InformationAsset`." · **VERIFIED, not taken at face value — the #68 discipline applied again, and this claim was OVERSTATED MORE than #68's case** · Part A's cybersecurity-relevant items (A.1 Auth/Sessions, A.3 Encryption/Key Management, A.4 Immutable Audit Trail, A.9 Data Masking, A.10 Infra/Deployment) are real but each carries its own already-tracked gap (hardware-token MFA, a real KMS/HSM, encryption-at-rest, unwired `assertSecureChannel`/`assertExportAllowed` callers, "scaffolded, not achieved" env separation) — all already listed under § Known gaps, none restated here · `IncidentReport` (#55/M09) is genuinely real — its own doc comment already frames it as a "unified security + personal-data breach workflow" — but carries no dedicated cyber/category field, just free-text `title`/`description` + a `severity` string (`low|medium|high|critical`) · **`InformationAsset` (ISO 27001 Clause 8.1 asset inventory) was the one genuine gap: completely dormant, zero prior application code anywhere in this repo** — the exact "dormant model, first real writer" shape #58-67 repeatedly found · built its foundational CRUD ONLY: create/list(filtered by `assetType`/`classification`)/get/update on the model's own four fields (`name`, `assetType`, `ownerUserId`, `classification`) — the #67 `Vendor` "minimal CRUD only" scope · `assetType` has no DB enum but is validated app-side against the model's own doc-comment 6-value set (`ASSET_TYPES` in `information-asset.config.ts`: `customer_data | policy_data | document_store | backup | integration | other`) · `ownerUserId` is a bare scalar with no Prisma relation (the `Opportunity.createdByUserId` shape), validated against a real `User` via `UserRepository.findById()` in the SERVICE layer (404 if not found) — the #66 `Employee.userId` link-validation precedent · **this is Domain H's FIRST item to break the "seed before code" pattern** — #66/#67 both found their permissions already pre-seeded; `information-asset.manage` (`[SYSTEM_SECURITY_ADMINISTRATOR, COMPLIANCE_OFFICER]`) had NO pre-seeded grant, requiring a genuine `packages/db/prisma/seed-data/permissions.ts` change and a re-seed of both dev and test databases (151 → 152 permissions) · **new module** `apps/api/src/modules/supporting-operations/information-asset.{config,service,controller,module}.ts` + `repositories/information-asset.repository.ts` · `apps/web/` gains an **"Information Assets"** screen (`app/(app)/information-assets/page.tsx` — list+create+inline-rename, the `vendors` page shape) · **Verification**: +9 api unit (`information-asset.service.spec.ts`) → api unit **2023** (150 files, from 2014). New `test/information-asset.e2e-spec.ts` **7/7** — permission gating; a 400 rejecting an `assetType` outside the documented 6-value set; a 400 rejecting a `classification` outside the `DataClassification` enum; a 404 creating an asset owned by a non-existent user; a real create→list(filtered)→get→update walk; a 404 reassigning an asset to a non-existent owner on update; 404s for an unknown asset on both GET and PATCH. Full api unit suite 2023/2023 confirmed green; full 47-file api e2e suite green across 8 foreground sub-batches, both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `information-assets.spec.ts` 4/4; full Playwright suite 222/222 (from 218). `npm run typecheck`/`lint`/`build` (api + web) OK | Part A's own gaps (hardware-token MFA, a real KMS/HSM, encryption-at-rest, unwired masking/export-gate callers, env separation) stay exactly as tracked under § Known gaps, A.1/A.3/A.9/A.10 · `IncidentReport` still has no dedicated cyber/category taxonomy field · no risk-tiering or review-cadence field on `InformationAsset` (mirroring `Vendor`'s own #67→#71 extension path) — not asked for by #69's own text, not built here · #70–74 (Document Management, Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
+| 69 | Cybersecurity — `InformationAsset` | the backlog's own annotation: "fully covered by Part A + `IncidentReport` + `InformationAsset`." · **VERIFIED, not taken at face value — the #68 discipline applied again, and this claim was OVERSTATED MORE than #68's case** · Part A's cybersecurity-relevant items (A.1 Auth/Sessions, A.3 Encryption/Key Management, A.4 Immutable Audit Trail, A.9 Data Masking, A.10 Infra/Deployment) are real but each carries its own already-tracked gap (hardware-token MFA, a real KMS/HSM, encryption-at-rest, unwired `assertSecureChannel`/`assertExportAllowed` callers, "scaffolded, not achieved" env separation) — all already listed under § Known gaps, none restated here · `IncidentReport` (#55/M09) is genuinely real — its own doc comment already frames it as a "unified security + personal-data breach workflow" — but carries no dedicated cyber/category field, just free-text `title`/`description` + a `severity` string (`low|medium|high|critical`) · **`InformationAsset` (ISO 27001 Clause 8.1 asset inventory) was the one genuine gap: completely dormant, zero prior application code anywhere in this repo** — the exact "dormant model, first real writer" shape #58-67 repeatedly found · built its foundational CRUD ONLY: create/list(filtered by `assetType`/`classification`)/get/update on the model's own four fields (`name`, `assetType`, `ownerUserId`, `classification`) — the #67 `Vendor` "minimal CRUD only" scope · `assetType` has no DB enum but is validated app-side against the model's own doc-comment 6-value set (`ASSET_TYPES` in `information-asset.config.ts`: `customer_data | policy_data | document_store | backup | integration | other`) · `ownerUserId` is a bare scalar with no Prisma relation (the `Opportunity.createdByUserId` shape), validated against a real `User` via `UserRepository.findById()` in the SERVICE layer (404 if not found) — the #66 `Employee.userId` link-validation precedent · **this is Domain H's FIRST item to break the "seed before code" pattern** — #66/#67 both found their permissions already pre-seeded; `information-asset.manage` (`[SYSTEM_SECURITY_ADMINISTRATOR, COMPLIANCE_OFFICER]`) had NO pre-seeded grant, requiring a genuine `packages/db/prisma/seed-data/permissions.ts` change and a re-seed of both dev and test databases (151 → 152 permissions) · **new module** `apps/api/src/modules/supporting-operations/information-asset.{config,service,controller,module}.ts` + `repositories/information-asset.repository.ts` · `apps/web/` gains an **"Information Assets"** screen (`app/(app)/information-assets/page.tsx` — list+create+inline-rename, the `vendors` page shape) · **Verification**: +9 api unit (`information-asset.service.spec.ts`) → api unit **2023** (150 files, from 2014). New `test/information-asset.e2e-spec.ts` **7/7** — permission gating; a 400 rejecting an `assetType` outside the documented 6-value set; a 400 rejecting a `classification` outside the `DataClassification` enum; a 404 creating an asset owned by a non-existent user; a real create→list(filtered)→get→update walk; a 404 reassigning an asset to a non-existent owner on update; 404s for an unknown asset on both GET and PATCH. Full api unit suite 2023/2023 confirmed green; full 47-file api e2e suite green across 8 foreground sub-batches, both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `information-assets.spec.ts` 4/4; full Playwright suite 222/222 (from 218). `npm run typecheck`/`lint`/`build` (api + web) OK | Part A's own gaps (hardware-token MFA, a real KMS/HSM, encryption-at-rest, unwired masking/export-gate callers, env separation) stay exactly as tracked under § Known gaps, A.1/A.3/A.9/A.10 · `IncidentReport` still has no dedicated cyber/category taxonomy field · no risk-tiering or review-cadence field on `InformationAsset` (mirroring `Vendor`'s own #67→#71 extension path) — not asked for by #69's own text, not built here · #71–74 (Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded (#70 Document Management, the next entry below, is now built) |
+| 70 | Document Management — `Document` | full version control (previous/next version) + mandatory classification + a deletion lock disabled by default except via a logged privileged override (`deletionOverrideByUserId`); plus enforcing the "highest classification present" rule (`sensitive-data-handling.md` / `PRIV-STD-02` §6.7) when a file/record mixes classification levels · `Document` (Part 4.2, the electronic Insurance File) pre-exists with THREE prior writers (Policy issuance/attach #18-19, Claim documentation #25, Customer onboarding #3-4), each only ever creating a version-1 row — `versionNumber`/`previousVersionId` and `deletionLocked`/`deletionOverrideByUserId` had sat dormant since before this process; `audit-trail.repository.ts`'s own `findDocumentVersionChain` doc comment already said "no application code creates a second version yet" — a READ-side capability (#57's External Auditor lens) had existed for LONGER than any writer · **version control mirrors `QuotationService.revise` exactly**: `id` must be the chain's own current (leaf) version — a superseded id 422s rather than silently resolving to the real leaf; a genuine concurrent double-version loses `previousVersionId`'s own `@unique` constraint and 409s (`Prisma.PrismaClientKnownRequestError` code `P2002`) · a new version's `category`/`policyId`/`customerId` are inherited from its predecessor, never accepted from the caller — only `fileName`/`storageRef`/`classification` can change per version, `classification` staying mandatory on every version (not just the first) · **deletion is a single-actor privileged override, NOT the M06 Disposal dual control** — `roles-and-segregation-of-duties.md` requires Department Manager + DPO dual control for the *disposal BATCH* destruction decision (`DisposalBatch`, a separate, still-unbuilt process); #70's own singular field and its pre-seeded single-code permission (`document.delete-override`, `[SYSTEM_SECURITY_ADMINISTRATOR, DATA_PROTECTION_OFFICER]`) both anticipate the narrower, ad hoc, single-document shape instead · **a document can only be deleted from the leaf of its own chain — an APPLICATION-level guard, not a DB one**: `Document_previousVersionId_fkey` is `ON DELETE SET NULL`, not `RESTRICT` — Postgres will not stop a delete that orphans a successor, it silently nulls the successor's `previousVersionId` instead; `hasSuccessor()` is checked before every delete, a documented, deliberate limitation (hardening the FK to `RESTRICT` was considered and deferred) · a document still linked to a `ClaimDocument` also cannot be deleted — here the DB's own `ON DELETE RESTRICT` on `ClaimDocument.documentId` IS a genuine backstop behind the same app-level pre-check · `overrideDeletionLock`/`deleteIfUnlocked` are both status-conditional writes (`updateMany`/`deleteMany` re-asserting `deletionLocked` in the `where`), never a `findUnique` + unconditional write · **the "highest classification present" rollup is scoped to `Document.policyId` only** (`GET /documents/classification-summary?policyId=`) — matching the schema's own "every Policy resolves to ONE electronic Insurance File" framing; a claim-linked document (joined via `ClaimDocument`, never carrying its own `policyId`) is deliberately out of scope · **`#70`'s new `document.manage` routes deliberately do NOT duplicate `#57`'s existing `GET /audit-trail/documents/:id/history`** (`document-history.read`, COMPLIANCE/AUDITOR only, a compliance-forensics lens) — the people who actually upload/version documents mostly cannot reach that route at all; #70's own `GET /documents`/`GET /documents/:id` are a plain operational browse instead · **no new permission, no migration** — `document.manage`/`document.delete-override` were both pre-seeded (Domain H's "seed before code" pattern holding again after #69 broke it) · **new module** `apps/api/src/modules/supporting-operations/document.{config,service,controller,module}.ts` + `repositories/document.repository.ts` · `apps/web/` gains a **"Documents"** screen (`app/(app)/documents/page.tsx` — a policy-scoped lookup, per-row version/unlock/delete actions, a classification-summary lookup) · **Verification**: +21 api unit (`document.config.spec.ts` 6, `document.service.spec.ts` 15) → api unit **2044** (152 files, from 2023). New `test/document.e2e-spec.ts` **6/6** — permission gating (`document.manage` vs `document.delete-override` checked separately); create-version → 422 on a superseded id; the full lock/unlock/delete lifecycle (409 while locked, unlock, a second override 409s, delete succeeds, row confirmed gone via a direct Prisma read since the deleting ADMIN role holds no read permission); 409 deleting a document with a newer version even once unlocked; 409 deleting a document still attached to a claim; the classification-summary rollup + a 404 for an unknown policy. Full api unit suite 2044/2044 confirmed green; full 48-file api e2e suite green across 8 foreground sub-batches — one confirmed-transient environment hiccup and one confirmed-transient TOTP-timing flake this run (both unrelated files, re-confirmed clean on isolated re-run), both documented chronic flakes (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright `documents.spec.ts` 5/5; full Playwright suite 227/227 (from 222). `npm run typecheck`/`lint`/`build` (api + web) OK — two real lint catches: unescaped apostrophes (`react/no-unescaped-entities`) in the new web page's prose, and a TypeScript literal-type inference gap in the new Playwright spec's mutable fixture object, both fixed | hardening `Document_previousVersionId_fkey` from `ON DELETE SET NULL` to `RESTRICT` is a real, documented follow-up, not built here · the M06 Disposal Management dual-control workflow (`DisposalBatch`, Department Manager + DPO) remains a separate, still-unbuilt process · `#57`'s External Auditor document-history lens is unchanged, still the compliance-forensics view · a new version's classification is validated against the full `DataClassification` set regardless of whether the chain is customer-linked — `create-customer-document.dto.ts`'s own narrower CONFIDENTIAL/HIGHLY_CONFIDENTIAL-only restriction is a create-time-only rule, not re-derived for later versions · #71–74 (Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each with its own permission already seeded |
 
 ### Not started
 
@@ -718,9 +719,20 @@ build actually is today:
   completely dormant — the one genuine gap, closed with a foundational CRUD
   (create/list/get/update). `information-asset.manage` is Domain H's FIRST
   permission needing a genuine seed-data change (no pre-seeded grant existed,
-  unlike #66/#67). See all three entries below for full detail. **Not
-  built/unverified**: #70–74 (Document Management, Vendor Management,
-  BCP/DR, Knowledge Management).
+  unlike #66/#67). #70 Document Management is built too: `Document` (Part
+  4.2) had three prior writers (Policy/Claim/Customer attach flows) that
+  each only ever created a version-1 row — `versionNumber`/
+  `previousVersionId` and `deletionLocked`/`deletionOverrideByUserId` sat
+  dormant since before this process, with a READ-side capability (#57's
+  audit-trail version-chain walker) existing LONGER than any writer.
+  Version-chain creation mirrors `QuotationService.revise`; deletion is a
+  single-actor privileged override (NOT the M06 Disposal dual control,
+  a separate unbuilt process); the "highest classification present" rollup
+  (`PRIV-STD-02` §6.7) is scoped to a Policy's own documents. No new
+  permission, no migration — both were pre-seeded, the "seed before code"
+  pattern holding again after #69 broke it. See all four entries below for
+  full detail. **Not built/unverified**: #71–74 (Vendor Management, BCP/DR,
+  Knowledge Management).
 - **Part D — PDPL / M-series — begun, three of nine systems built.** **M03 Consent
   Management is built**: capture a consent decision (grant or explicit decline) for a
   `Customer` or `InsuredPerson`, and withdraw it through a two-step request/confirm flow
@@ -7792,10 +7804,10 @@ narrows a gap.
 
   **Deferred**: everything already listed under § Known gaps, A.10 (no
   CI-enforced hard gate before deployment; Dev/Test/UAT/Prod separation
-  stays three local databases). Nothing #68-specific beyond that. #70–74
-  (Document Management, Vendor Management, BCP/DR, Knowledge Management)
-  remain unbuilt, each with its own permission already seeded (#69
-  Cybersecurity, the next entry below, is now built).
+  stays three local databases). Nothing #68-specific beyond that. #71–74
+  (Vendor Management, BCP/DR, Knowledge Management) remain unbuilt, each
+  with its own permission already seeded (#69 Cybersecurity and #70
+  Document Management, the next two entries below, are now built).
 
 **Part C #69 — Cybersecurity (Domain H, Process 69)** — **verified AND
   built.** The backlog's own annotation: "fully covered by Part A +
@@ -7877,9 +7889,144 @@ narrows a gap.
   separation) stay exactly as tracked under § Known gaps, A.1/A.3/A.9/A.10.
   `IncidentReport` still has no dedicated cyber/category taxonomy field. No
   risk-tiering or review-cadence field on `InformationAsset` — not asked for
-  by #69's own text, not built here. #70–74 (Document Management, Vendor
-  Management, BCP/DR, Knowledge Management) remain unbuilt, each with its
-  own permission already seeded.
+  by #69's own text, not built here. #71–74 (Vendor Management, BCP/DR,
+  Knowledge Management) remain unbuilt, each with its own permission
+  already seeded (#70 Document Management, the next entry below, is now
+  built).
+
+**Part C #70 — Document Management (Domain H, Process 70)** — full version
+  control (previous/next version) + mandatory classification + a deletion
+  lock disabled by default except via a logged privileged override
+  (`deletionOverrideByUserId`); plus enforcing the "highest classification
+  present" rule when a file/record mixes classification levels.
+
+  **`Document` (Part 4.2, the electronic Insurance File) pre-exists with
+  THREE prior writers** — Policy issuance/attach (#18-19), Claim
+  documentation (#25), Customer onboarding (#3-4) — each of which only ever
+  creates a version-1 row. `versionNumber`/`previousVersionId` and
+  `deletionLocked`/`deletionOverrideByUserId` had sat dormant since before
+  this process — `audit-trail.repository.ts`'s own
+  `findDocumentVersionChain` doc comment already said as much ("no
+  application code creates a second version yet"). Notably, a READ-side
+  capability (#57's External Auditor document-history lens) had existed for
+  LONGER than any writer — the version-chain walker was built before
+  anything ever populated a second link in the chain. #70 is that first
+  real writer.
+
+  **Version-chain creation mirrors `QuotationService.revise` exactly.**
+  The target `id` must be the chain's own CURRENT (leaf) version — passing
+  a superseded id 422s ("create a new version from its own latest version
+  instead"), never silently resolving to the real leaf. A genuine
+  concurrent double-version loses `previousVersionId`'s own `@unique`
+  constraint and 409s (caught via `Prisma.PrismaClientKnownRequestError`
+  code `P2002`). A new version's `category`/`policyId`/`customerId` are
+  inherited from its predecessor, never accepted from the caller — a
+  version is a revision of the SAME logical document, not a new artifact.
+  Only `fileName`/`storageRef`/`classification` can change per version, and
+  `classification` stays mandatory on every version (not just the first) —
+  the Part 10.6 "the officer must say which, never assume" reasoning
+  `create-customer-document.dto.ts` already established for version 1.
+
+  **Deletion is a single-actor privileged override, NOT the M06 Disposal
+  dual control.** `roles-and-segregation-of-duties.md` requires dual
+  control — Department Manager sign-off plus DPO final approval — for the
+  *disposal BATCH* destruction decision (`DisposalBatch`, a separate,
+  still-unbuilt process, already flagged `dormant: true` in
+  `internal-controls.config.ts`'s `MAKER_CHECKER_REGISTRY`). #70's own
+  field is singular (`deletionOverrideByUserId`), and its pre-seeded
+  permission is a single code, not two distinct maker/checker codes
+  (`document.delete-override`, `[SYSTEM_SECURITY_ADMINISTRATOR,
+  DATA_PROTECTION_OFFICER]`) — both anticipate the narrower, ad hoc,
+  single-document shape instead of the batch-level dual control. This was
+  checked against the actual seed data and `maker-checker-segregation.md`'s
+  own maker/checker table before assuming a two-actor pattern was needed.
+
+  **A document can only be deleted from the leaf of its own version
+  chain — an APPLICATION-level guard, not a DB one.**
+  `Document_previousVersionId_fkey` is `ON DELETE SET NULL`, not
+  `RESTRICT` — Postgres will not stop a delete that orphans a successor,
+  it will silently null the successor's `previousVersionId` instead,
+  breaking the chain. `hasSuccessor(id)` is checked before every delete; a
+  document still linked to a `ClaimDocument` also cannot be deleted, and
+  there the DB's own `ON DELETE RESTRICT` on `ClaimDocument.documentId` IS
+  a genuine backstop behind the same app-level pre-check. Hardening the
+  `previousVersionId` FK to `RESTRICT` was considered and deferred — not
+  asked for by #70's own two checkboxes, a documented, deliberate
+  limitation rather than an oversight. `overrideDeletionLock`/
+  `deleteIfUnlocked` are both status-conditional writes (`updateMany`/
+  `deleteMany` re-asserting `deletionLocked` in the `where`), never a
+  `findUnique` followed by an unconditional write — a second concurrent
+  override 409s instead of silently overwriting who is on record for it.
+
+  **The "highest classification present" rollup is scoped to
+  `Document.policyId` only** (`GET /documents/classification-summary?
+  policyId=`), matching the schema's own "every Policy resolves to ONE
+  electronic Insurance File" framing. A claim-linked document (joined via
+  `ClaimDocument`, never carrying its own `policyId`) is deliberately out
+  of scope — a literal reading of what the source text anchors the rule
+  to, not a gap. The rule itself is `sensitive-data-handling.md` /
+  `PRIV-STD-02` §6.7 verbatim: "a file combining multiple classification
+  levels is classified at the highest level present — never averaged."
+
+  **`#70`'s new `document.manage` routes deliberately do not duplicate
+  `#57`'s existing `GET /audit-trail/documents/:id/history`**
+  (`document-history.read`, `[COMPLIANCE_OFFICER, EXTERNAL_AUDITOR]` only —
+  a compliance/forensics lens combining the version list with
+  `AuditLogEntry` rows). The people who actually upload/version documents
+  (`document.manage`: Sales/Placement/Claims/Finance/Compliance) mostly
+  cannot reach that route at all — a Placement officer versioning a policy
+  document has no read access to `document-history.read`. #70's own
+  `GET /documents`/`GET /documents/:id` are a plain OPERATIONAL browse
+  ("what documents exist right now"), not a forensic view — a deliberate,
+  non-overlapping addition.
+
+  **No new permission, no migration** — `document.manage`/
+  `document.delete-override` were both pre-seeded ahead of time, Domain
+  H's "seed before code" pattern holding again after #69 broke it.
+
+  **New module** `apps/api/src/modules/supporting-operations/document.
+  {config,service,controller,module}.ts` + `repositories/document.
+  repository.ts`. `apps/web/` gains a **"Documents"** screen
+  (`app/(app)/documents/page.tsx` — a policy-scoped lookup, per-row
+  version/unlock/delete actions, and a classification-summary lookup).
+
+  **Verification**: +21 api unit (`document.config.spec.ts` 6,
+  `document.service.spec.ts` 15) → api unit **2044** (152 files, from
+  2023). New `test/document.e2e-spec.ts` **6/6** — permission gating
+  (`document.manage` vs `document.delete-override` checked separately, not
+  as one grant); create-version → 422 on a superseded id; the full
+  lock/unlock/delete lifecycle (409 while locked, unlock, a second override
+  409s, delete succeeds, the row confirmed gone via a direct Prisma read
+  since the deleting ADMIN role holds no read permission of its own); a
+  409 deleting a document with a newer version even once unlocked; a 409
+  deleting a document still attached to a claim; the classification-summary
+  rollup for a real Policy fixture + a 404 for an unknown policy. Full api
+  unit suite 2044/2044 confirmed green; full 48-file api e2e suite green
+  across 8 foreground sub-batches — one confirmed-transient environment
+  hiccup (an unrelated file's Prisma engine blip) and one confirmed-
+  transient TOTP-timing flake (also an unrelated file) this run, both
+  re-confirmed clean on isolated re-run, both documented chronic flakes
+  (`rbac`, `up-sell`) passing with `--testTimeout=90000`. New Playwright
+  `documents.spec.ts` 5/5; full Playwright suite 227/227 (from 222).
+  `npm run typecheck`/`lint`/`build` (api + web) OK — two real lint
+  catches: unescaped apostrophes (`react/no-unescaped-entities`) in the new
+  web page's prose, and a TypeScript literal-type inference gap in the new
+  Playwright spec's mutable fixture object (a `null`-typed field needing
+  `as string | null`), both fixed.
+
+  **Deferred**: hardening `Document_previousVersionId_fkey` from
+  `ON DELETE SET NULL` to `RESTRICT` is a real, documented follow-up, not
+  built here. The M06 Disposal Management dual-control workflow
+  (`DisposalBatch`, Department Manager + DPO) remains a separate,
+  still-unbuilt process. `#57`'s External Auditor document-history lens is
+  unchanged, still the compliance-forensics view. A new version's
+  classification is validated against the full `DataClassification` set
+  regardless of whether the chain is customer-linked —
+  `create-customer-document.dto.ts`'s own narrower CONFIDENTIAL/
+  HIGHLY_CONFIDENTIAL-only restriction is a create-time-only rule, not
+  re-derived for later versions. #71–74 (Vendor Management, BCP/DR,
+  Knowledge Management) remain unbuilt, each with its own permission
+  already seeded.
 
 ## Deployment
 

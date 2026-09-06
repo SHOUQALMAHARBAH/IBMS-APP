@@ -65,6 +65,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/employees', label: 'Employees' },
   { href: '/vendors', label: 'Vendors' },
   { href: '/information-assets', label: 'Information assets' },
+  { href: '/documents', label: 'Documents' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];

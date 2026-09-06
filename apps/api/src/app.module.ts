@@ -48,6 +48,7 @@ import { PlanningExportModule } from './modules/management-reporting/planning-ex
 import { EmployeeModule } from './modules/supporting-operations/employee.module';
 import { VendorModule } from './modules/supporting-operations/vendor.module';
 import { InformationAssetModule } from './modules/supporting-operations/information-asset.module';
+import { DocumentModule } from './modules/supporting-operations/document.module';
 
 @Module({
   imports: [
@@ -343,6 +344,15 @@ import { InformationAssetModule } from './modules/supporting-operations/informat
     // was completely dormant, the one genuine gap. A new permission,
     // information-asset.manage, was needed (no pre-seeded grant existed).
     InformationAssetModule,
+    // Process 70 — Document Management. Document (Part 4.2) pre-exists
+    // with three prior writers (Policy/Claim/Customer attach flows) that
+    // each only ever create a version-1 row — versionNumber/
+    // previousVersionId and deletionLocked/deletionOverrideByUserId have
+    // sat dormant since before this process. First real writer of a
+    // second version, the deletion-lock override, and the "highest
+    // classification present" rollup. No new permission, no migration —
+    // document.manage / document.delete-override were both pre-seeded.
+    DocumentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
