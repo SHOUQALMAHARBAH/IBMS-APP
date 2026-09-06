@@ -35,6 +35,7 @@ const QUESTIONNAIRE = {
 const DRAFT_ASSESSMENT = {
   id: "na-1",
   riskProfileId: "rp-1",
+  customerId: "cust-1",
   questionnaireAnswers: {
     ownsOrLeasesPremises: true,
     employeeCount: 10,
@@ -63,6 +64,9 @@ test("renders the needs assessments list and opens a detail on click", async ({ 
   );
   await page.route("http://localhost:4000/needs-assessments/na-1", (route) =>
     route.fulfill({ status: 200, json: DRAFT_ASSESSMENT }),
+  );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
   );
 
   await page.goto("/needs-assessments");
@@ -116,6 +120,9 @@ test("the new-assessment flow: pick a risk profile, answer the questionnaire, la
   await page.route("http://localhost:4000/needs-assessments/na-1", (route) =>
     route.fulfill({ status: 200, json: DRAFT_ASSESSMENT }),
   );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 
   await page.goto("/needs-assessments/new?customerId=cust-1");
   await expect(page.getByRole("heading", { name: "New needs assessment" })).toBeVisible();
@@ -133,6 +140,9 @@ test("a manager sees the review panel for an assessment pending review", async (
   await page.route("http://localhost:4000/needs-assessments/na-1", (route) =>
     route.fulfill({ status: 200, json: pending }),
   );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 
   await page.goto("/needs-assessments/na-1");
   await expect(page.getByRole("heading", { name: "Review & approval" })).toBeVisible();
@@ -149,6 +159,9 @@ test("needs assessment list and detail screens have no serious/critical accessib
   );
   await page.route("http://localhost:4000/needs-assessments/na-1", (route) =>
     route.fulfill({ status: 200, json: DRAFT_ASSESSMENT }),
+  );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
   );
 
   await page.goto("/needs-assessments");

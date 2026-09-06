@@ -84,6 +84,11 @@ async function mockCrossSell(
     }
     return route.fulfill({ status: 200, json: [] });
   });
+  // Part D §5.1 touchpoint #7 (cross-sell) — the detail page's
+  // consent-capture control reads this on mount.
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 }
 
 test("lists a customer's cross-sell opportunities and converts one", async ({ page }) => {

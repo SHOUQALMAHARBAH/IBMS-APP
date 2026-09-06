@@ -33,6 +33,7 @@ export class LeadService {
       contactPhone: dto.contactPhone,
       contactEmail: dto.contactEmail,
       marketingConsentGranted: dto.marketingConsentGranted,
+      consentTextVersion: dto.consentTextVersion,
     });
 
     await this.audit.record({

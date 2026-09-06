@@ -345,7 +345,20 @@ export class NeedsAssessmentService {
     return this.assessments.findMany(filter);
   }
 
-  get(id: string, actor: AuthenticatedUser): Promise<NeedsAssessment> {
-    return this.findVisible(id, actor);
+  /** `customerId` is resolved off the parent Risk Profile for the web
+   * detail page's consent-capture control (Part D §5.1 touchpoint #3,
+   * needs & risk assessment) — `NeedsAssessment` itself has no direct
+   * customerId, only via `RiskProfile.customerId`. The Risk Profile is
+   * guaranteed to exist once a NeedsAssessment references it (the FK), so
+   * no null-guard is needed here beyond what `findVisible` already did. */
+  async get(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<NeedsAssessment & { customerId: string }> {
+    const assessment = await this.findVisible(id, actor);
+    const riskProfile = await this.riskProfiles.findById(
+      assessment.riskProfileId,
+    );
+    return { ...assessment, customerId: riskProfile!.customerId };
   }
 }

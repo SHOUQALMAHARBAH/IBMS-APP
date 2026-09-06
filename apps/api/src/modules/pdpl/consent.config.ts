@@ -3,6 +3,25 @@ import { hasExactlyOneOwner } from '../../common/dto.util';
 
 export { hasExactlyOneOwner };
 
+/** Consent's own three-way owner check — customerId / insuredPersonId /
+ * leadId (lead capture, the one touchpoint that pre-dates a Customer row).
+ * Deliberately NOT a generalization of the shared `hasExactlyOneOwner`
+ * (DSR's own two-way check reuses that one and has no `leadId` concept) —
+ * a local, Consent-specific validator instead, so DSR's shape stays
+ * untouched. */
+export function hasExactlyOneConsentOwner(input: {
+  customerId?: string | null;
+  insuredPersonId?: string | null;
+  leadId?: string | null;
+}): boolean {
+  const ownerCount = [
+    input.customerId,
+    input.insuredPersonId,
+    input.leadId,
+  ].filter(Boolean).length;
+  return ownerCount === 1;
+}
+
 /**
  * M03 — Consent Management (backlog Part D §5.1 / `IMPROVEMENTS.md` §5.1;
  * the backlog bundles all of Part D under Process **#52 Data Protection
@@ -40,6 +59,7 @@ export interface ConsentRecordRow {
   id: string;
   customerId: string | null;
   insuredPersonId: string | null;
+  leadId: string | null;
   purpose: string;
   isMarketing: boolean;
   granted: boolean;
@@ -53,6 +73,7 @@ export interface ConsentRecordView {
   id: string;
   customerId: string | null;
   insuredPersonId: string | null;
+  leadId: string | null;
   purpose: string;
   isMarketing: boolean;
   granted: boolean;
@@ -69,6 +90,7 @@ export function deriveConsentView(row: ConsentRecordRow): ConsentRecordView {
     id: row.id,
     customerId: row.customerId,
     insuredPersonId: row.insuredPersonId,
+    leadId: row.leadId,
     purpose: row.purpose,
     isMarketing: row.isMarketing,
     granted: row.granted,
@@ -87,6 +109,7 @@ export function consentAuditSnapshot(input: {
   consentRecordId: string;
   customerId: string | null;
   insuredPersonId: string | null;
+  leadId: string | null;
   purpose: string;
   isMarketing: boolean;
   granted: boolean;
@@ -96,6 +119,7 @@ export function consentAuditSnapshot(input: {
     consentRecordId: input.consentRecordId,
     customerId: input.customerId,
     insuredPersonId: input.insuredPersonId,
+    leadId: input.leadId,
     purpose: input.purpose,
     isMarketing: input.isMarketing,
     granted: input.granted,

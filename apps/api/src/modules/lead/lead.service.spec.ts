@@ -48,6 +48,7 @@ const CREATE_DTO: CreateLeadDto = {
   fullName: 'Ahmad Test',
   source: 'referral',
   marketingConsentGranted: false,
+  consentTextVersion: 'privacy-notice-v1.2',
 };
 
 describe('LeadService', () => {
@@ -84,6 +85,19 @@ describe('LeadService', () => {
 
       expect(mocks.create).toHaveBeenCalledWith(
         expect.objectContaining({ marketingConsentGranted: true }),
+      );
+    });
+
+    it('forwards the consent-text version to the repository, which is what stamps it onto the lead-capture ConsentRecord (Part D §5.1 touchpoint #1)', async () => {
+      const { service, mocks } = makeDeps();
+
+      await service.create(
+        { ...CREATE_DTO, consentTextVersion: 'privacy-notice-v2.0' },
+        'sales-1',
+      );
+
+      expect(mocks.create).toHaveBeenCalledWith(
+        expect.objectContaining({ consentTextVersion: 'privacy-notice-v2.0' }),
       );
     });
   });

@@ -114,7 +114,12 @@ async function createLead(
   const res = await request(app.getHttpServer())
     .post('/leads')
     .set(bearer(accessToken))
-    .send({ fullName, source: 'referral', marketingConsentGranted: false })
+    .send({
+      fullName,
+      source: 'referral',
+      marketingConsentGranted: false,
+      consentTextVersion: 'privacy-notice-v1.2',
+    })
     .expect(201);
   return (res.body as LeadBody).id;
 }

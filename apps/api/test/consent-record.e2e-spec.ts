@@ -32,6 +32,7 @@ interface ConsentRecordBody {
   id: string;
   customerId: string | null;
   insuredPersonId: string | null;
+  leadId: string | null;
   purpose: string;
   isMarketing: boolean;
   granted: boolean;
@@ -320,5 +321,80 @@ describe('Consent Management (e2e) — Part D §5.1 / M03', () => {
     const actions = audit.map((a) => a.action);
     expect(actions).toContain('CREATE');
     expect(actions).toContain('UPDATE');
+  });
+
+  it('captures consent for a Lead (touchpoint #1, lead capture) — the third owner kind that pre-dates a Customer row', async () => {
+    const app = await boot();
+    const sales = await makeUser(
+      app,
+      'consent-lead-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const leadRes = await request(app.getHttpServer())
+      .post('/leads')
+      .set(bearer(sales.accessToken))
+      .send({
+        fullName: 'Consent-Lead E2E',
+        source: 'referral',
+        marketingConsentGranted: false,
+        consentTextVersion: 'privacy-notice-v1.2',
+      })
+      .expect(201);
+    const leadId = (leadRes.body as { id: string }).id;
+
+    // combining leadId with customerId is 422 (exactly one owner)
+    await request(app.getHttpServer())
+      .post('/consent-records')
+      .set(bearer(sales.accessToken))
+      .send({
+        leadId,
+        customerId: '11111111-1111-4111-8111-111111111111',
+        purpose: 'MARKETING',
+        granted: true,
+        consentTextVersion: 'v1',
+      })
+      .expect(422);
+
+    // unknown lead -> 404
+    await request(app.getHttpServer())
+      .post('/consent-records')
+      .set(bearer(sales.accessToken))
+      .send({
+        leadId: '11111111-1111-4111-8111-111111111111',
+        purpose: 'MARKETING',
+        granted: true,
+        consentTextVersion: 'v1',
+      })
+      .expect(404);
+
+    // a second, distinct consent decision for the SAME lead (e.g. a
+    // Placement/Technical Officer capturing UNDERWRITING interest before
+    // this lead is ever converted to a Customer)
+    const created = await request(app.getHttpServer())
+      .post('/consent-records')
+      .set(bearer(sales.accessToken))
+      .send({
+        leadId,
+        purpose: 'UNDERWRITING',
+        granted: true,
+        consentTextVersion: 'underwriting-notice-v1',
+      })
+      .expect(201);
+    const leadConsent = created.body as ConsentRecordBody;
+    expect(leadConsent.leadId).toBe(leadId);
+    expect(leadConsent.customerId).toBeNull();
+    expect(leadConsent.insuredPersonId).toBeNull();
+
+    // the register now holds BOTH the lead-capture-time MARKETING record
+    // and this newly-captured UNDERWRITING one for the same lead
+    const byLead = await request(app.getHttpServer())
+      .get(`/consent-records?leadId=${leadId}`)
+      .set(bearer(sales.accessToken))
+      .expect(200);
+    const purposes = (byLead.body as ConsentRecordBody[])
+      .map((r) => r.purpose)
+      .sort();
+    expect(purposes).toEqual(['MARKETING', 'UNDERWRITING']);
   });
 });

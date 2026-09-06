@@ -431,6 +431,7 @@ model Lead {
   updatedAt     DateTime   @updatedAt
 
   prospect      Prospect?
+  consentRecords ConsentRecord[] // Part D §5.1 — marketing consent, pre-Customer
 
   @@index([ownerUserId])
   @@index([source])
@@ -2454,6 +2455,12 @@ model ConsentRecord {
   customer        Customer? @relation(fields: [customerId], references: [id])
   insuredPersonId String?
   insuredPerson   InsuredPerson? @relation(fields: [insuredPersonId], references: [id])
+  // Part D touchpoint #1 (lead capture) — the one touchpoint that pre-dates
+  // a Customer/InsuredPerson row existing at all. Exactly one of
+  // customerId/insuredPersonId/leadId is app-level validated (service layer,
+  // not a DB CHECK — see consent.config.ts's hasExactlyOneConsentOwner).
+  leadId          String?
+  lead            Lead?     @relation(fields: [leadId], references: [id])
   purpose         ConsentPurpose
   isMarketing     Boolean   @default(false) // never combined with contractual-necessity processing
   granted         Boolean   @default(false) // defaults unchecked — pre-ticked boxes prohibited
@@ -2465,6 +2472,7 @@ model ConsentRecord {
   communicationLogs CommunicationLog[] // Process 44 — marketing sends that relied on this consent
 
   @@index([customerId])
+  @@index([leadId])
 }
 
 enum DsrType {

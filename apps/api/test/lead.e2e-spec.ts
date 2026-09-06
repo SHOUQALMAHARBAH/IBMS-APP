@@ -124,6 +124,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Rejected Attempt',
           source: 'referral',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(403);
     });
@@ -142,6 +143,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Bad Source',
           source: 'not_a_real_source',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(400);
     });
@@ -162,6 +164,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           source: 'referral',
           contactPhone: '+962-7-0000-0000',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
 
@@ -169,6 +172,48 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
       expect(lead.ownerUserId).toBe(sales.userId);
       expect(lead.status).toBe('NEW');
       expect(lead.marketingConsentGranted).toBe(false);
+    });
+
+    it('also creates a lead-capture ConsentRecord in the unified Part D §5.1 register — the one touchpoint that pre-dates a Customer row', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'lead-sales-consent',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+
+      const res = await request(app.getHttpServer())
+        .post('/leads')
+        .set(bearer(sales.accessToken))
+        .send({
+          fullName: 'Consent Register Check',
+          source: 'referral',
+          marketingConsentGranted: true,
+          consentTextVersion: 'privacy-notice-v2.0',
+        })
+        .expect(201);
+      const leadId = (res.body as LeadBody).id;
+
+      const consentRes = await request(app.getHttpServer())
+        .get('/consent-records')
+        .query({ leadId })
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const records = consentRes.body as {
+        leadId: string | null;
+        purpose: string;
+        granted: boolean;
+        consentTextVersion: string;
+        isActive: boolean;
+      }[];
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({
+        leadId,
+        purpose: 'MARKETING',
+        granted: true,
+        consentTextVersion: 'privacy-notice-v2.0',
+        isActive: true,
+      });
     });
 
     it('treats an empty-string optional contactEmail as not provided, not a validation error', async () => {
@@ -187,6 +232,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           source: 'referral',
           contactEmail: '',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
     });
@@ -222,6 +268,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Owned By A',
           source: 'website',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       await request(app.getHttpServer())
@@ -231,6 +278,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Owned By B',
           source: 'website',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
 
@@ -265,6 +313,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Manager Visible',
           source: 'campaign',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
 
@@ -329,6 +378,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Not Yours',
           source: 'tender',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       const leadId = (created.body as LeadBody).id;
@@ -354,6 +404,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Skip Attempt',
           source: 'tender',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       const leadId = (created.body as LeadBody).id;
@@ -379,6 +430,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Full Pipeline',
           source: 'bank_partner',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       const leadId = (created.body as LeadBody).id;
@@ -411,6 +463,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Direct Convert Attempt',
           source: 'bank_partner',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       const leadId = (created.body as LeadBody).id;
@@ -444,6 +497,7 @@ describe('Lead management (e2e) — backlog Part C #1', () => {
           fullName: 'Timing Check',
           source: 'renewal',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       const lead = created.body as LeadBody;

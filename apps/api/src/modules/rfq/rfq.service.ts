@@ -507,9 +507,17 @@ export class RfqService {
     return this.rfqs.findRfqsByCustomerId(customerId as string);
   }
 
-  async get(id: string, actor: AuthenticatedUser): Promise<RfqWithSubmissions> {
-    const { rfq } = await this.findVisibleRfq(id, actor);
-    return rfq;
+  /** `opportunity.customerId` is resolved for the web RFQ detail page's
+   * consent-capture control (Part D §5.1 touchpoint #4, RFQ/market
+   * placement) — RFQ itself has no direct customerId, only via its parent
+   * Opportunity, which `findVisibleRfq` already resolves for the visibility
+   * check. */
+  async get(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<RfqWithSubmissions & { opportunity: { customerId: string } }> {
+    const { rfq, opportunityCustomerId } = await this.findVisibleRfq(id, actor);
+    return { ...rfq, opportunity: { customerId: opportunityCustomerId } };
   }
 
   listSelectableInsurers(): Promise<SelectableInsurer[]> {

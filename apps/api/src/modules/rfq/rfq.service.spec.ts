@@ -804,4 +804,12 @@ describe('RfqService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('get', () => {
+    it("resolves opportunity.customerId off the parent Opportunity (Part D §5.1 touchpoint #4's consent-capture control needs it — RFQ itself has no direct customerId)", async () => {
+      const { service } = makeDeps();
+      const result = await service.get('rfq-1', placement());
+      expect(result.opportunity.customerId).toBe('cust-1');
+    });
+  });
 });

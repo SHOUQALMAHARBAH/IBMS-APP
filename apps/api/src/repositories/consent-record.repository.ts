@@ -30,9 +30,16 @@ export class ConsentRecordRepository {
       .then((n) => n > 0);
   }
 
+  leadExists(leadId: string): Promise<boolean> {
+    return this.prisma.client.lead
+      .count({ where: { id: leadId } })
+      .then((n) => n > 0);
+  }
+
   create(input: {
     customerId: string | null;
     insuredPersonId: string | null;
+    leadId: string | null;
     purpose: string;
     isMarketing: boolean;
     granted: boolean;
@@ -43,6 +50,7 @@ export class ConsentRecordRepository {
       data: {
         customerId: input.customerId,
         insuredPersonId: input.insuredPersonId,
+        leadId: input.leadId,
         purpose: input.purpose as ConsentRecord['purpose'],
         isMarketing: input.isMarketing,
         granted: input.granted,
@@ -60,6 +68,7 @@ export class ConsentRecordRepository {
     scope: {
       customerId?: string;
       insuredPersonId?: string;
+      leadId?: string;
       purpose?: string;
       granted?: boolean;
     },
@@ -71,6 +80,7 @@ export class ConsentRecordRepository {
         ...(scope.insuredPersonId
           ? { insuredPersonId: scope.insuredPersonId }
           : {}),
+        ...(scope.leadId ? { leadId: scope.leadId } : {}),
         ...(scope.purpose
           ? { purpose: scope.purpose as ConsentRecord['purpose'] }
           : {}),

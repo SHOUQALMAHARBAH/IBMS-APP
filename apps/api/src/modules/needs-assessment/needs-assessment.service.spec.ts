@@ -386,4 +386,19 @@ describe('NeedsAssessmentService', () => {
       });
     });
   });
+
+  describe('get', () => {
+    it("resolves customerId off the parent Risk Profile (Part D §5.1 touchpoint #3's consent-capture control needs it)", async () => {
+      const { service, mocks } = makeDeps();
+      mocks.findAssessmentById.mockResolvedValue({
+        id: 'na-1',
+        riskProfileId: 'rp-1',
+        createdByUserId: 'sales-1',
+        status: 'DRAFT',
+      });
+      const result = await service.get('na-1', makeUser({ id: 'sales-1' }));
+      expect(result.customerId).toBe('cust-1');
+      expect(mocks.findRiskProfileById).toHaveBeenCalledWith('rp-1');
+    });
+  });
 });

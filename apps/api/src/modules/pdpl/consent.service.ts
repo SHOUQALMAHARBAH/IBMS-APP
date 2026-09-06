@@ -15,7 +15,7 @@ import {
   consentAuditSnapshot,
   consentWithdrawalAuditSnapshot,
   deriveConsentView,
-  hasExactlyOneOwner,
+  hasExactlyOneConsentOwner,
   type ConsentRecordRow,
   type ConsentRecordView,
 } from './consent.config';
@@ -78,9 +78,9 @@ export class ConsentService {
     dto: CreateConsentRecordDto,
     actorUserId: string,
   ): Promise<ConsentRecordView> {
-    if (!hasExactlyOneOwner(dto)) {
+    if (!hasExactlyOneConsentOwner(dto)) {
       throw new UnprocessableEntityException(
-        'Exactly one of customerId / insuredPersonId must identify the data subject.',
+        'Exactly one of customerId / insuredPersonId / leadId must identify the data subject.',
       );
     }
     if (dto.customerId && !(await this.repo.customerExists(dto.customerId))) {
@@ -94,6 +94,9 @@ export class ConsentService {
         `Insured person ${dto.insuredPersonId} not found.`,
       );
     }
+    if (dto.leadId && !(await this.repo.leadExists(dto.leadId))) {
+      throw new NotFoundException(`Lead ${dto.leadId} not found.`);
+    }
 
     const isMarketing = dto.purpose === 'MARKETING';
     const grantedAt = dto.granted ? new Date() : null;
@@ -101,6 +104,7 @@ export class ConsentService {
     const row = await this.repo.create({
       customerId: dto.customerId ?? null,
       insuredPersonId: dto.insuredPersonId ?? null,
+      leadId: dto.leadId ?? null,
       purpose: dto.purpose,
       isMarketing,
       granted: dto.granted,
@@ -117,6 +121,7 @@ export class ConsentService {
         consentRecordId: row.id,
         customerId: row.customerId,
         insuredPersonId: row.insuredPersonId,
+        leadId: row.leadId,
         purpose: row.purpose,
         isMarketing: row.isMarketing,
         granted: row.granted,
@@ -241,6 +246,7 @@ export class ConsentService {
       {
         customerId: query.customerId,
         insuredPersonId: query.insuredPersonId,
+        leadId: query.leadId,
         purpose: query.purpose,
         granted: query.granted,
       },

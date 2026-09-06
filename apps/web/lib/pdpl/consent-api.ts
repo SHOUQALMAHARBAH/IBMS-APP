@@ -20,6 +20,7 @@ export interface ConsentRecord {
   id: string;
   customerId: string | null;
   insuredPersonId: string | null;
+  leadId: string | null;
   purpose: string;
   isMarketing: boolean;
   granted: boolean;
@@ -40,6 +41,7 @@ export function listConsentRecords(
   opts: {
     customerId?: string;
     insuredPersonId?: string;
+    leadId?: string;
     purpose?: string;
     granted?: boolean;
   } = {},
@@ -47,6 +49,7 @@ export function listConsentRecords(
   const params = new URLSearchParams();
   if (opts.customerId) params.set('customerId', opts.customerId);
   if (opts.insuredPersonId) params.set('insuredPersonId', opts.insuredPersonId);
+  if (opts.leadId) params.set('leadId', opts.leadId);
   if (opts.purpose) params.set('purpose', opts.purpose);
   if (opts.granted !== undefined) params.set('granted', String(opts.granted));
   const qs = params.toString();
@@ -56,6 +59,7 @@ export function listConsentRecords(
 export function createConsentRecord(body: {
   customerId?: string;
   insuredPersonId?: string;
+  leadId?: string;
   purpose: string;
   granted: boolean;
   consentTextVersion: string;

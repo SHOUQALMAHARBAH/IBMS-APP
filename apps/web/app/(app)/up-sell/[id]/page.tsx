@@ -24,6 +24,7 @@ import {
   upSellBadgeStyle,
   upSellFigureRowStyle,
 } from '../../../../components/up-sell/up-sell.styles';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 
 const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
@@ -114,6 +115,13 @@ export default function UpSellRecommendationDetailPage() {
           <p style={{ opacity: 0.8 }}>
             <span style={upSellBadgeStyle}>{recommendation.status}</span>
           </p>
+
+          <ConsentCaptureWidget
+            customerId={recommendation.customerId}
+            purpose="MARKETING"
+            label="Up-sell consent"
+            defaultConsentTextVersion="privacy-notice-v1.2"
+          />
 
           <div style={upSellFigureRowStyle}>
             <div>

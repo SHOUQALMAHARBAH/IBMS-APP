@@ -22,6 +22,7 @@ import {
   profileGridStyle,
 } from '../../../../components/prospect/prospect.styles';
 import { repeatableRowStyle } from '../../../../components/customer/customer.styles';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 
 function ProfileField({
   label,
@@ -167,6 +168,13 @@ export default function CustomerProfilePage() {
           <p style={{ opacity: 0.8 }}>
             {customer.customerType} — Status: {customer.status}
           </p>
+
+          <ConsentCaptureWidget
+            customerId={customer.id}
+            purpose="KYC_AML"
+            label="Onboarding / KYC consent"
+            defaultConsentTextVersion="kyc-notice-v1"
+          />
 
           <div style={profileGridStyle}>
             <ProfileField

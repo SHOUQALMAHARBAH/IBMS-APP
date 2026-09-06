@@ -24,6 +24,7 @@ import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
 } from '../../../../components/prospect/prospect.styles';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
@@ -115,6 +116,13 @@ export default function NeedsAssessmentDetailPage() {
         <>
           <h1>Needs assessment</h1>
           <p style={{ opacity: 0.8 }}>Status: {assessment.status}</p>
+
+          <ConsentCaptureWidget
+            customerId={assessment.customerId}
+            purpose="UNDERWRITING"
+            label="Needs & risk assessment consent"
+            defaultConsentTextVersion="underwriting-notice-v1"
+          />
 
           <div style={coveragePreviewStyle}>
             <strong>Recommended coverage</strong>

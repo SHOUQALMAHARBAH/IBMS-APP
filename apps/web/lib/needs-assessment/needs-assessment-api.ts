@@ -35,6 +35,10 @@ export interface NeedsAssessment {
   approvedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Resolved off the parent Risk Profile — Part D §5.1 touchpoint #3
+   * (needs & risk assessment) needs it for the detail page's
+   * consent-capture control. */
+  customerId: string;
 }
 
 export interface ListNeedsAssessmentsFilter {

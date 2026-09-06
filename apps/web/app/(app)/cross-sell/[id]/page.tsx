@@ -23,6 +23,7 @@ import {
   crossSellActionsStyle,
   crossSellBadgeStyle,
 } from '../../../../components/cross-sell/cross-sell.styles';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 
 const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
@@ -114,6 +115,13 @@ export default function CrossSellOpportunityDetailPage() {
           <p style={{ opacity: 0.8 }}>
             <span style={crossSellBadgeStyle}>{opportunity.status}</span>
           </p>
+
+          <ConsentCaptureWidget
+            customerId={opportunity.customerId}
+            purpose="MARKETING"
+            label="Cross-sell consent"
+            defaultConsentTextVersion="privacy-notice-v1.2"
+          />
 
           <div
             style={{

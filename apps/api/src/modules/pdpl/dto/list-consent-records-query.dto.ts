@@ -18,6 +18,11 @@ export class ListConsentRecordsQueryDto {
 
   @IsOptional()
   @Transform(emptyStringToUndefined)
+  @IsUUID()
+  leadId?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
   @IsIn(Object.values(ConsentPurpose))
   purpose?: string;
 

@@ -68,6 +68,9 @@ export interface CreateLeadInput {
   contactPhone?: string;
   contactEmail?: string;
   marketingConsentGranted: boolean;
+  /** Part D §5.1 (touchpoint #1) — which approved privacy-notice wording
+   * was shown at intake. */
+  consentTextVersion: string;
 }
 
 export interface ListLeadsFilter {

@@ -776,13 +776,18 @@ build actually is today:
   BcpDrPlan, #74 KnowledgeBaseArticle.
 - **Part D — PDPL / M-series — begun, three of nine systems built.** **M03 Consent
   Management is built**: capture a consent decision (grant or explicit decline) for a
-  `Customer` or `InsuredPerson`, and withdraw it through a two-step request/confirm flow
-  that finally gives the previously-unused `consent_withdrawal` `SlaTimer` (2 business
-  days) a real window — see § Known gaps, Part D §5.1, for the full detail. Not built as
-  part of M03: the capture form is a generic screen, not wired into the 7 named
-  touchpoints (lead capture, onboarding/KYC, needs & risk assessment, RFQ/market
-  placement, claims, Group Medical/Life & Motor Fleet, renewal & cross/up-sell)
-  individually. **M04 Data Subject Request Management is built**: the full
+  `Customer`, `InsuredPerson`, or `Lead`, and withdraw it through a two-step
+  request/confirm flow that finally gives the previously-unused `consent_withdrawal`
+  `SlaTimer` (2 business days) a real window — see § Known gaps, Part D §5.1, for the
+  full detail. **5 of the backlog's 7 named touchpoints are now wired** (lead capture,
+  onboarding/KYC, needs & risk assessment, RFQ/market placement, cross/up-sell) — a
+  shared `ConsentCaptureWidget` on each touchpoint's existing detail screen, plus a real
+  schema change (`ConsentRecord.leadId`) for lead capture, the one touchpoint that
+  pre-dates a `Customer` row. **2 remain a deliberate, documented gap**: claims (no web
+  UI for an individual claim exists anywhere in this app) and Group Medical/Life & Motor
+  Fleet (maps to `InsuredPerson`, which has no CRUD anywhere) — both need a genuinely
+  separate prerequisite module built first, not a Consent fix. **M04 Data Subject Request
+  Management is built**: the full
   Access/Correction/Deletion/Objection workflow (`RECEIVED -> IDENTITY_VERIFIED ->
   IN_PROGRESS -> {FULFILLED, PARTIALLY_FULFILLED, REJECTED} -> CLOSED`) against
   `dsr_access_deletion` (15 business days) / `dsr_correction_objection` (10 business
@@ -5648,17 +5653,95 @@ narrows a gap.
   live, list filters, `CREATE`+`UPDATE` audit rows); new Playwright
   `consent.spec.ts` (3). turbo `typecheck` / `lint` / `build` (8 tasks)
   OK; `ibms-brain` `brain-doctor.sh` 0 errors; `prisma migrate status`
-  clean (**43**, unchanged). **Deferred:** the capture screen is generic,
-  not wired into the backlog's 7 named touchpoints individually; no
+  clean (**43**, unchanged). **Deferred (at the time):** the capture screen
+  was generic, not wired into the backlog's 7 named touchpoints
+  individually — see the next entry, which closed 5 of the 7. no
   per-subject "current status" read for a non-MARKETING purpose (a caller
   must apply `evaluateMarketingConsent`-style logic itself); no bulk/
   import capture path; a genuine double-call race on `request-withdrawal`
   can create more than one open `SlaTimer` for the same record — cosmetic
   only, `resolve` closes every matching row together, not hardened
-  further. M04 (DSR) is now built too — see the next entry. The other
-  seven Part D systems (retention & disposal *execution*, vendor risk,
-  data sharing, incident & breach, DPIA, notices, RoPA) and the DPO
+  further. M04 (DSR) is now built too — see the entry after next. The
+  other seven Part D systems (retention & disposal *execution*, vendor
+  risk, data sharing, incident & breach, DPIA, notices, RoPA) and the DPO
   Workspace dashboard remain unbuilt.
+
+**Part D §5.1 — Consent Management touchpoint wiring (2026-09-06)** — the
+  first item of Part D's full 9-system checklist worked one item at a time,
+  per user direction (the user pasted the whole Part D checklist and asked
+  for it one item at a time, confirming each before the next). M03's
+  original build (above) shipped a generic, unwired capture screen; the
+  backlog names 7 explicit touchpoints (lead capture, onboarding/KYC,
+  needs & risk assessment, RFQ/market placement, claims, Group Medical/Life
+  & Motor Fleet, renewal & cross/up-sell). **5 of 7 wired, 2 confirmed with
+  the user (via `AskUserQuestion`) as a deliberate, documented gap rather
+  than decided silently**: claims has no web UI for an individual claim
+  record anywhere in `apps/web` (only the `claims-analytics` aggregate
+  page); Group Medical/Life & Motor Fleet maps to `InsuredPerson`, which
+  has ZERO CRUD anywhere in this codebase — both require a genuinely
+  separate, substantial prerequisite module (a Claims detail UI; an
+  `InsuredPerson` CRUD module) before this touchpoint can be closed, not a
+  Consent fix. **Lead capture needed a real schema change** — a Lead
+  pre-dates a Customer/InsuredPerson row entirely, so `ConsentRecord`
+  gained a THIRD optional owner column, `leadId` (migration
+  `20260913120000`, FK to `Lead`, `ON DELETE SET NULL`, matching the
+  existing two owner FKs). Exactly-one-of-three is a NEW, Consent-local
+  `hasExactlyOneConsentOwner` (`consent.config.ts`) — deliberately NOT a
+  generalization of the shared `common/dto.util.ts#hasExactlyOneOwner`,
+  which DSR (M04) also depends on with a different, two-way shape; two
+  genuinely different owner-count shapes for two different callers, not
+  one function outgrowing its interface. `LeadRepository.create()` now
+  creates the `Lead` row AND its lead-capture `ConsentRecord`
+  (`purpose: MARKETING`, `granted: dto.marketingConsentGranted`) in ONE
+  interactive transaction — a deliberate, documented local exception to
+  this codebase's no-`$transaction` convention, the
+  `EmployeeRepository.terminate()` "create-together" shape.
+  `Lead.marketingConsentGranted` (the pre-existing boolean, unticked by
+  default since #1's original build) is UNCHANGED — the new `ConsentRecord`
+  row is additive, making the same decision register-visible and
+  2-business-day-withdrawal-capable, which the bare boolean never was.
+  `CreateLeadDto` gained a new MANDATORY `consentTextVersion` field (the
+  exact `CreateConsentRecordDto.consentTextVersion` shape) — a real,
+  intentional breaking change to `POST /leads`'s contract, not an
+  oversight; every existing caller (5 e2e files, the web intake form) was
+  updated to supply it. **The other 4 touchpoints needed NO backend
+  capability change** — onboarding/KYC, needs & risk assessment, RFQ/market
+  placement, and cross/up-sell all already operate on an existing
+  `Customer`; a single new shared web component,
+  `apps/web/components/pdpl/ConsentCaptureWidget.tsx`, mounted on each
+  touchpoint's existing detail page, is the entire fix — a thin wrapper
+  around the SAME generic `POST`/`GET /consent-records` API the standalone
+  Consent page already called. Needs Assessment has no direct `customerId`
+  (only via `RiskProfile.customerId`) and RFQ has none either (only via
+  `Opportunity.customerId`) — both services now resolve it via an
+  ALREADY-INJECTED sibling repository (`RiskProfileRepository`,
+  `OpportunityRepository`) in their own `get()` method; widening the
+  shared `RfqWithSubmissions` Prisma-payload type itself was tried first
+  and reverted as more invasive than resolving in the service from a
+  dependency already there. Purpose mapping: onboarding/KYC → `KYC_AML`;
+  needs & risk assessment → `UNDERWRITING`; RFQ/market placement →
+  `SHARING_WITH_INSURER`; cross-sell/up-sell → `MARKETING`.
+  **Verification**: +9 api unit → api unit **2120** (from 2111). Extended
+  `test/lead.e2e-spec.ts` (+1, now 15/15) and
+  `test/consent-record.e2e-spec.ts` (+1, now 2/2) for the `leadId` path;
+  new unit coverage for `hasExactlyOneConsentOwner` and both widened
+  `get()` methods. Full api unit suite 2120/2120 confirmed green; full
+  50-file api e2e suite green across 8 foreground sub-batches (one
+  confirmed-transient TOTP-timing flake in `auth.e2e-spec.ts`,
+  re-confirmed clean in isolation), both chronic flakes (`rbac`, `up-sell`)
+  passing with `--testTimeout=90000`. Full Playwright suite **243/243**
+  (from 242) — including a real bug caught mid-verification: the RFQ
+  detail page crashed outright in Playwright because the shared mock RFQ
+  fixture lacked the new `opportunity.customerId` field the page now reads
+  unconditionally; fixed the fixture, not the page. `npm run
+  typecheck`/`lint`/`build` (api + web) OK — one real lint catch (the same
+  `react-hooks/set-state-in-effect` false positive `internal-controls/
+  page.tsx` hit before; same async-IIFE fix). **Deferred:** claims and
+  Group Medical/Life & Motor Fleet touchpoints (above); a broader
+  read/withdraw UI for lead-linked consent beyond the generic Consent
+  page's now-3-way owner-kind selector; the other 7 Part D systems (M06
+  execution, M07 vendor risk beyond what #71 already covers, M08 data
+  sharing, notices, RoPA) and the DPO Workspace dashboard remain unbuilt.
 
 **Part D — Data Subject Request Management (M04)** — extends
   `apps/api/src/modules/pdpl/` alongside M03; second of Part D's nine

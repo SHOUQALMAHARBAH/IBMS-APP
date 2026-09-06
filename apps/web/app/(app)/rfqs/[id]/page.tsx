@@ -31,6 +31,7 @@ import {
   rfqFieldStyle,
   rfqTableStyle,
 } from '../../../../components/rfq/rfq.styles';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
@@ -227,6 +228,13 @@ export default function RfqDetailPage() {
             threshold {rfq.followUpThresholdDays} business day
             {rfq.followUpThresholdDays === 1 ? '' : 's'}
           </div>
+
+          <ConsentCaptureWidget
+            customerId={rfq.opportunity.customerId}
+            purpose="SHARING_WITH_INSURER"
+            label="RFQ / market placement consent"
+            defaultConsentTextVersion="market-placement-notice-v1"
+          />
 
           <h2 style={{ marginTop: '2rem' }}>Insurer submissions</h2>
           <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.25rem 0 0' }}>

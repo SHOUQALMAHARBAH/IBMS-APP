@@ -175,6 +175,7 @@ describe('General KPI Dashboard (e2e) — backlog Part C #58', () => {
         fullName: 'KPI Dashboard E2E Lead',
         source: 'referral',
         marketingConsentGranted: false,
+        consentTextVersion: 'privacy-notice-v1.2',
       })
       .expect(201);
     await request(app.getHttpServer())

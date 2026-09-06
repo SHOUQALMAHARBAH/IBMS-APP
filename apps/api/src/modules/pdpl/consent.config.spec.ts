@@ -3,6 +3,7 @@ import {
   consentAuditSnapshot,
   consentWithdrawalAuditSnapshot,
   deriveConsentView,
+  hasExactlyOneConsentOwner,
   type ConsentRecordRow,
 } from './consent.config';
 
@@ -15,6 +16,7 @@ const row = (over: Partial<ConsentRecordRow> = {}): ConsentRecordRow => ({
   id: 'consent-1',
   customerId: 'cust-1',
   insuredPersonId: null,
+  leadId: null,
   purpose: 'MARKETING',
   isMarketing: true,
   granted: true,
@@ -23,6 +25,31 @@ const row = (over: Partial<ConsentRecordRow> = {}): ConsentRecordRow => ({
   withdrawnAt: null,
   createdAt: new Date('2026-09-04T09:00:00.000Z'),
   ...over,
+});
+
+describe('hasExactlyOneConsentOwner', () => {
+  it('is true for exactly one of customerId / insuredPersonId / leadId', () => {
+    expect(hasExactlyOneConsentOwner({ customerId: 'cust-1' })).toBe(true);
+    expect(hasExactlyOneConsentOwner({ insuredPersonId: 'ip-1' })).toBe(true);
+    expect(hasExactlyOneConsentOwner({ leadId: 'lead-1' })).toBe(true);
+  });
+
+  it('is false when none are set', () => {
+    expect(hasExactlyOneConsentOwner({})).toBe(false);
+  });
+
+  it('is false when two or all three are set', () => {
+    expect(
+      hasExactlyOneConsentOwner({ customerId: 'cust-1', leadId: 'lead-1' }),
+    ).toBe(false);
+    expect(
+      hasExactlyOneConsentOwner({
+        customerId: 'cust-1',
+        insuredPersonId: 'ip-1',
+        leadId: 'lead-1',
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('deriveConsentView', () => {
@@ -59,6 +86,7 @@ describe('audit snapshots', () => {
         consentRecordId: 'consent-1',
         customerId: 'cust-1',
         insuredPersonId: null,
+        leadId: null,
         purpose: 'MARKETING',
         isMarketing: true,
         granted: true,
@@ -68,6 +96,7 @@ describe('audit snapshots', () => {
       consentRecordId: 'consent-1',
       customerId: 'cust-1',
       insuredPersonId: null,
+      leadId: null,
       purpose: 'MARKETING',
       isMarketing: true,
       granted: true,

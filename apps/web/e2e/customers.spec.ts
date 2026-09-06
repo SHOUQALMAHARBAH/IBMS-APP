@@ -134,6 +134,9 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 
   await page.goto("/customers/new");
   await page.getByRole("button", { name: "Individual" }).click();
@@ -158,6 +161,52 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await expect(page).toHaveURL("/customers/cust-1");
 });
 
+test("captures onboarding/KYC consent from the customer profile screen (Part D §5.1 touchpoint #2)", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({ status: 200, json: CUSTOMER }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  let captured = false;
+  await page.route("http://localhost:4000/consent-records**", (route) => {
+    if (route.request().method() === "POST") {
+      captured = true;
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: "consent-1",
+          customerId: "cust-1",
+          insuredPersonId: null,
+          leadId: null,
+          purpose: "KYC_AML",
+          isMarketing: false,
+          granted: true,
+          consentTextVersion: "kyc-notice-v1",
+          grantedAt: "2026-08-26T00:00:00.000Z",
+          withdrawnAt: null,
+          isActive: true,
+          createdAt: "2026-08-26T00:00:00.000Z",
+        },
+      });
+    }
+    return route.fulfill({ status: 200, json: captured ? [{ id: "consent-1", isActive: true }] : [] });
+  });
+
+  await page.goto("/customers/cust-1");
+  await expect(page.getByRole("heading", { name: "Onboarding / KYC consent" })).toBeVisible();
+  await expect(page.getByText("No decision captured yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Grant" }).click();
+  await expect.poll(() => captured).toBe(true);
+});
+
 test("customer list and profile screens have no serious/critical accessibility violations @a11y", async ({
   page,
 }) => {
@@ -172,6 +221,9 @@ test("customer list and profile screens have no serious/critical accessibility v
     route.fulfill({ status: 200, json: [] }),
   );
   await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
 

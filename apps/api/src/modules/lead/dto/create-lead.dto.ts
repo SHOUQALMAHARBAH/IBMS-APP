@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsString,
   Length,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import {
@@ -36,4 +38,14 @@ export class CreateLeadDto {
    * no default here on purpose: the intake screen must ask, not assume. */
   @IsBoolean()
   marketingConsentGranted!: boolean;
+
+  /** Part D §5.1 (touchpoint #1) — the exact wording version presented at
+   * intake (`PRIV-FRM-04/05`'s consent-text versioning), the same
+   * `CreateConsentRecordDto.consentTextVersion` shape. Mandatory for the
+   * same reason `marketingConsentGranted` has no default: the intake
+   * screen must show a real, identifiable notice, not assume one. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  consentTextVersion!: string;
 }

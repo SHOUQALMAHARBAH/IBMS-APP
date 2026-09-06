@@ -20,9 +20,12 @@ import { emptyStringToUndefined } from '../../../common/dto.util';
  * mandatory so a caller can never omit the decision and have it default to
  * "granted").
  *
- * Exactly one of `customerId` / `insuredPersonId` identifies the data
- * subject (validated in the service — `hasExactlyOneOwner`). `isMarketing`
- * is NOT accepted here — it is derived from `purpose` (`consent.config.ts`).
+ * Exactly one of `customerId` / `insuredPersonId` / `leadId` identifies the
+ * data subject (validated in the service —
+ * `hasExactlyOneConsentOwner`). `leadId` covers the lead-capture touchpoint
+ * — the one of the seven named touchpoints that pre-dates a Customer row
+ * existing at all. `isMarketing` is NOT accepted here — it is derived from
+ * `purpose` (`consent.config.ts`).
  */
 export class CreateConsentRecordDto {
   @IsOptional()
@@ -34,6 +37,11 @@ export class CreateConsentRecordDto {
   @Transform(emptyStringToUndefined)
   @IsUUID()
   insuredPersonId?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsUUID()
+  leadId?: string;
 
   @IsIn(Object.values(ConsentPurpose))
   purpose!: string;

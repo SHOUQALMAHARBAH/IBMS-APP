@@ -48,6 +48,7 @@ const RFQ = {
   issuedAt: "2026-03-02T00:00:00.000Z",
   followUpThresholdDays: 9,
   issuedByUserId: "user-1",
+  opportunity: { customerId: "cust-1" },
   insurerSubmissions: [
     {
       id: "sub-1",
@@ -1360,6 +1361,12 @@ async function mockRfqApi(
       json: { ...RFQ.insurerSubmissions[0], status: body.toStatus, respondedAt: "2026-03-05T00:00:00.000Z" },
     });
   });
+  // Part D §5.1 touchpoint #4 — the RFQ detail page's consent-capture
+  // control reads this on mount; no test here exercises the control
+  // itself (see customers.spec.ts for that), so an empty, quiet list.
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
 }
 
 /** Part C #26/#28 — drive a freshly-notified claim all the way to an insurer

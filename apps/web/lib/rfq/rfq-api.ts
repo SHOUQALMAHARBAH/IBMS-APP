@@ -49,6 +49,10 @@ export interface Rfq {
   followUpThresholdDays: number;
   issuedByUserId: string | null;
   insurerSubmissions: RfqInsurerSubmission[];
+  /** Resolved off the parent Opportunity — Part D §5.1 touchpoint #4
+   * (RFQ/market placement) needs it for the RFQ detail page's
+   * consent-capture control. */
+  opportunity: { customerId: string };
 }
 
 /** Process 12 — a broker<->insurer exchange on an RFQ: an insurer's query

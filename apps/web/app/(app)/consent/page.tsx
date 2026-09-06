@@ -46,9 +46,9 @@ export default function ConsentPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [ownerKind, setOwnerKind] = useState<'customer' | 'insuredPerson'>(
-    'customer',
-  );
+  const [ownerKind, setOwnerKind] = useState<
+    'customer' | 'insuredPerson' | 'lead'
+  >('customer');
   const [ownerId, setOwnerId] = useState('');
   const [purpose, setPurpose] = useState<string>(CONSENT_PURPOSES[2]); // MARKETING
   const [decision, setDecision] = useState<'grant' | 'decline'>('grant');
@@ -89,7 +89,9 @@ export default function ConsentPage() {
       await createConsentRecord({
         ...(ownerKind === 'customer'
           ? { customerId: ownerId.trim() }
-          : { insuredPersonId: ownerId.trim() }),
+          : ownerKind === 'insuredPerson'
+            ? { insuredPersonId: ownerId.trim() }
+            : { leadId: ownerId.trim() }),
         purpose,
         granted: decision === 'grant',
         consentTextVersion: consentTextVersion.trim(),
@@ -180,19 +182,32 @@ export default function ConsentPage() {
               aria-label="Data subject kind"
               value={ownerKind}
               onChange={(e) =>
-                setOwnerKind(e.target.value as 'customer' | 'insuredPerson')
+                setOwnerKind(
+                  e.target.value as 'customer' | 'insuredPerson' | 'lead',
+                )
               }
             >
               <option value="customer">Customer</option>
               <option value="insuredPerson">Insured person</option>
+              <option value="lead">Lead</option>
             </select>
           </label>
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            {ownerKind === 'customer' ? 'Customer ID' : 'Insured person ID'}
+            {ownerKind === 'customer'
+              ? 'Customer ID'
+              : ownerKind === 'insuredPerson'
+                ? 'Insured person ID'
+                : 'Lead ID'}
             <input
-              aria-label={ownerKind === 'customer' ? 'Customer ID' : 'Insured person ID'}
+              aria-label={
+                ownerKind === 'customer'
+                  ? 'Customer ID'
+                  : ownerKind === 'insuredPerson'
+                    ? 'Insured person ID'
+                    : 'Lead ID'
+              }
               value={ownerId}
               onChange={(e) => setOwnerId(e.target.value)}
               required
@@ -295,7 +310,9 @@ export default function ConsentPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>
-                      {(r.customerId ?? r.insuredPersonId ?? '—').slice(0, 8)}…
+                      {r.leadId
+                        ? `Lead ${r.leadId.slice(0, 8)}…`
+                        : `${(r.customerId ?? r.insuredPersonId ?? '—').slice(0, 8)}…`}
                     </td>
                     <td style={cell}>{r.purpose}</td>
                     <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>

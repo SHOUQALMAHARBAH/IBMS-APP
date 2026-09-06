@@ -13,6 +13,7 @@ const consentRow = (over: Record<string, unknown> = {}) => ({
   id: 'consent-1',
   customerId: 'cust-1',
   insuredPersonId: null,
+  leadId: null,
   purpose: 'MARKETING',
   isMarketing: true,
   granted: true,
@@ -27,6 +28,7 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
   const repo = {
     customerExists: vi.fn().mockResolvedValue(true),
     insuredPersonExists: vi.fn().mockResolvedValue(true),
+    leadExists: vi.fn().mockResolvedValue(true),
     create: vi.fn().mockResolvedValue(consentRow()),
     findById: vi.fn().mockResolvedValue(consentRow()),
     findMany: vi.fn().mockResolvedValue([]),
@@ -178,6 +180,70 @@ describe('ConsentService.create (M03)', () => {
         'u-sales',
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('captures a lead-capture consent decision (Part D §5.1 touchpoint #1 — the one owner kind that pre-dates a Customer)', async () => {
+    const { service, repo } = makeService({
+      repo: {
+        create: vi
+          .fn()
+          .mockResolvedValue(
+            consentRow({ customerId: null, leadId: 'lead-1' }),
+          ),
+      },
+    });
+    const v = await service.create(
+      {
+        leadId: 'lead-1',
+        purpose: 'MARKETING',
+        granted: true,
+        consentTextVersion: 'privacy-notice-v1.2',
+      },
+      'u-sales',
+    );
+    expect(v.leadId).toBe('lead-1');
+    expect(repo.leadExists).toHaveBeenCalledWith('lead-1');
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId: null,
+        insuredPersonId: null,
+        leadId: 'lead-1',
+      }),
+    );
+  });
+
+  it('404s an unknown lead', async () => {
+    const { service } = makeService({
+      repo: { leadExists: vi.fn().mockResolvedValue(false) },
+    });
+    await expect(
+      service.create(
+        {
+          leadId: 'nope',
+          purpose: 'MARKETING',
+          granted: true,
+          consentTextVersion: 'v1',
+        },
+        'u-sales',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('422s when both customerId and leadId are given', async () => {
+    const { service, repo } = makeService();
+    await expect(
+      service.create(
+        {
+          customerId: 'cust-1',
+          leadId: 'lead-1',
+          purpose: 'MARKETING',
+          granted: true,
+          consentTextVersion: 'v1',
+        },
+        'u-sales',
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(repo.create).not.toHaveBeenCalled();
   });
 });
 

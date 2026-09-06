@@ -320,6 +320,7 @@ describe('Sales Performance (e2e) — backlog Part C #59', () => {
         fullName: 'Sales Performance E2E Lead',
         source: 'referral',
         marketingConsentGranted: false,
+        consentTextVersion: 'privacy-notice-v1.2',
       })
       .expect(201);
     const leadId = (lead.body as { id: string }).id;
@@ -400,6 +401,7 @@ describe('Sales Performance (e2e) — backlog Part C #59', () => {
           fullName: 'Sales Performance E2E Branch Lead',
           source: 'referral',
           marketingConsentGranted: false,
+          consentTextVersion: 'privacy-notice-v1.2',
         })
         .expect(201);
       const leadId = (lead.body as { id: string }).id;

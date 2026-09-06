@@ -35,6 +35,12 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
   // Marketing consent is unticked by default and captured distinctly from
   // KYC consent (Part 6.3) — never pre-check this box.
   const [marketingConsentGranted, setMarketingConsentGranted] = useState(false);
+  // Part D §5.1 — which approved privacy-notice wording was shown at
+  // intake (`PRIV-FRM-04/05`). Pre-filled with the current default so this
+  // checkbox stays low-friction for the common case, but stays editable —
+  // the same free-text-with-a-default shape every other touchpoint's
+  // consent-text-version field uses.
+  const [consentTextVersion, setConsentTextVersion] = useState('privacy-notice-v1.2');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,6 +57,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
         contactPhone: contactPhone || undefined,
         contactEmail: contactEmail || undefined,
         marketingConsentGranted,
+        consentTextVersion,
       });
       setMessage(`Lead "${lead.fullName}" added to your pipeline.`);
       setFullName('');
@@ -58,6 +65,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
       setContactPhone('');
       setContactEmail('');
       setMarketingConsentGranted(false);
+      setConsentTextVersion('privacy-notice-v1.2');
       onLeadCreated(lead);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create the lead — try again.');
@@ -138,6 +146,19 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
           <label htmlFor="lead-marketing-consent">
             This lead has agreed to receive marketing communications
           </label>
+        </div>
+        <div style={fieldStyle}>
+          <label htmlFor="lead-consent-text-version" style={labelStyle}>
+            Consent text version
+          </label>
+          <input
+            id="lead-consent-text-version"
+            required
+            value={consentTextVersion}
+            onChange={(e) => setConsentTextVersion(e.target.value)}
+            style={inputStyle}
+            placeholder="e.g. privacy-notice-v1.2"
+          />
         </div>
         <button type="submit" disabled={isSubmitting} style={buttonStyle}>
           {isSubmitting ? 'Adding…' : 'Add lead'}
