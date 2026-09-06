@@ -6,7 +6,7 @@ import { emptyStringToUndefined, trimIfString } from '../../../common/dto.util';
  * Process 60 — `POST /insurer-performance/compute` (`insurer-performance.
  * view` — no separate "manage" permission was pre-seeded for this process;
  * the same Manager/Executive audience who views the scores is trusted to
- * trigger an on-demand recompute, the `internal-controls.audit` "Run audit
+ * trigger an on-demand recompute, the `internal-controls.view` "Run audit
  * now" precedent). Scoped to ONE insurer, required — the `up-sell-
  * recommendations/detect` shape (`DetectUpSellDto.customerId`, also
  * mandatory): a manual trigger recomputes one target, never "everybody,"

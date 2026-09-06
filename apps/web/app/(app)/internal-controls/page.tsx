@@ -26,7 +26,7 @@ const leftHead: CSSProperties = { ...head, textAlign: 'left' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 const NO_PERMISSION =
-  "You don't hold the internal-controls.audit permission, so there's nothing to show here.";
+  "You don't hold the internal-controls.view permission, so there's nothing to show here.";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (

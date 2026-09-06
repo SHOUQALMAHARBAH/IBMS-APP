@@ -247,7 +247,7 @@ describe('Internal Controls — self-approval audit (e2e) — backlog Part C #56
     sharedApp = undefined;
   });
 
-  it('gates the report behind internal-controls.audit and returns the full 16-pair registry shape', async () => {
+  it('gates the report behind internal-controls.view and returns the full 16-pair registry shape', async () => {
     const app = await boot();
     const auditor = await makeUser(app, 'ic-auditor', 'EXTERNAL_AUDITOR');
     const outsider = await makeUser(

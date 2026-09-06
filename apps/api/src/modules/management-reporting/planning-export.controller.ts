@@ -10,7 +10,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * Process 65 — `planning-export.generate` (already pre-seeded, Executive
  * Management ONLY — the narrowest Domain G grant) gates the one export
  * here. A POST, not a GET — the permission's own verb ("generate") matches
- * the `internal-controls.audit` "Run audit now" shape, even though this is
+ * the `internal-controls.view` "Run audit now" shape, even though this is
  * a pure read with no persisted side effect of its own.
  */
 @ApiTags('management-reporting')

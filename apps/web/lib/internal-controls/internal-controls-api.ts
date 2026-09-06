@@ -1,7 +1,7 @@
 // Process 56 — Internal Controls (Maker/Checker) (backlog Part C #56, Domain
 // F). Reads apps/api's GET /internal-controls/self-approval-audit: a
 // registry-driven scan across every maker/checker pair in the schema for a
-// self-approval violation. `internal-controls.audit`.
+// self-approval violation. `internal-controls.view`.
 
 import { apiGet } from '../auth/api-client';
 

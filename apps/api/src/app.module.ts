@@ -276,7 +276,7 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     ComplianceRiskModule,
     // Process 56 — a read-only scan across every maker/checker pair's DB
     // CHECK constraint (plus the one cross-table pair no single-table CHECK
-    // can express) for a self-approval violation. internal-controls.audit /
+    // can express) for a self-approval violation. internal-controls.view /
     // Compliance, Executive Management, External Auditor.
     InternalControlsModule,
     // Process 57 — closes Domain F. InternalAuditFinding lives inside

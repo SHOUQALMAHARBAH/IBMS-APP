@@ -22,9 +22,13 @@ import { AuthModule } from '../auth/auth.module';
  *   - The global `PermissionsGuard` / `@CurrentUser` cover the controller.
  *
  * No migration (a pure read over existing tables). New permission
- * `internal-controls.audit` — this is genuinely new capability, not
+ * `internal-controls.view` — this is genuinely new capability, not
  * something Part A.5's original seed anticipated the way #55's four
- * permissions were pre-seeded ahead of time.
+ * permissions were pre-seeded ahead of time. (Originally seeded as
+ * `internal-controls.audit`; renamed to `.view` to fix a real
+ * `permissions.spec.ts` failure — the "External Auditor is read-only by
+ * construction" test checks every EXTERNAL_AUDITOR-granted code ends in
+ * `.read`/`.view`, and this route was always a plain GET, never a mutation.)
  */
 @Module({
   imports: [AuditModule, AuthModule],
