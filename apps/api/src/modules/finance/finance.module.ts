@@ -16,6 +16,7 @@ import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import { ReconciliationRepository } from '../../repositories/reconciliation.repository';
 import { FinancialReportRepository } from '../../repositories/financial-report.repository';
+import { ProfitabilityPolicyRepository } from '../../repositories/profitability-policy.repository';
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
@@ -95,6 +96,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
     PaymentChannelRepository,
     ReconciliationRepository,
     FinancialReportRepository,
+    ProfitabilityPolicyRepository,
   ],
   exports: [InvoiceRepository],
 })

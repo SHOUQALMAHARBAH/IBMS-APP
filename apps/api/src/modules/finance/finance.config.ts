@@ -9,6 +9,7 @@ import {
   subtractMoney,
   sumMoney,
 } from '../../common/money.util';
+import type { ProfitabilityPolicyRow } from '../../repositories/profitability-policy.repository';
 
 /**
  * Process 31–32 — Premium Billing + Collection (backlog Part C #31–32, Domain
@@ -1238,25 +1239,11 @@ export function buildCommissionRollup(
 export const PROFITABILITY_GROUP_BY = ['line', 'segment'] as const;
 export type ProfitabilityGroupBy = (typeof PROFITABILITY_GROUP_BY)[number];
 
-/** One written policy's contribution to the profitability section. Matches
- * `FinancialReportRepository.loadProfitabilityPolicies`'s row. */
-export interface ProfitabilityPolicyRow {
-  policyId: string;
-  insuranceLine: string;
-  /** `CustomerType` — `'CORPORATE'` | `'INDIVIDUAL'`. */
-  customerType: string;
-  /** `issuedPremium ?? requestedPremium` — written premium (a cancelled /
-   * expired policy still contributes its full written premium; earned-premium
-   * proration is a renewal-module refinement, the #30 assumption). */
-  premium: Prisma.Decimal | string;
-  /** net settlement of each SETTLED / CLOSED claim on the policy (null when
-   * unsettled). HIGHLY_CONFIDENTIAL source — the service records a READ. */
-  claimNetSettlements: (Prisma.Decimal | string | null)[];
-  /** the policy's `CommissionLedgerEntry` effective `amount`, or null. */
-  commissionAmount: Prisma.Decimal | string | null;
-  /** accumulated clawback on that entry, or null. */
-  commissionReversedAmount: Prisma.Decimal | string | null;
-}
+/** `ProfitabilityPolicyRow` moved to `repositories/profitability-policy.
+ * repository.ts` once #63 (Profitability Analysis) needed the identical
+ * written-policy query — re-exported here so existing `from
+ * './finance.config'` imports keep working unchanged. */
+export type { ProfitabilityPolicyRow };
 
 export interface ProfitabilityRow {
   /** the group key — the line string, or `'CORPORATE'` / `'INDIVIDUAL'`. */

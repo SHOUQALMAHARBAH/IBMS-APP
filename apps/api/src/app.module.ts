@@ -43,6 +43,7 @@ import { SalesPerformanceModule } from './modules/management-reporting/sales-per
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
+import { ProfitabilityAnalysisModule } from './modules/management-reporting/profitability-analysis.module';
 
 @Module({
   imports: [
@@ -304,6 +305,12 @@ import { PortfolioAnalysisModule } from './modules/management-reporting/portfoli
     // segment/geography. No new model, no migration, no scheduler.
     // portfolio-analysis.view (pre-seeded) gates the one read.
     PortfolioAnalysisModule,
+    // Process 63 — commission income vs. cost-to-serve per segment/line.
+    // Reuses (not duplicates) #40's written-policy read via the shared
+    // ProfitabilityPolicyRepository. No new model, no migration, no
+    // scheduler. profitability-analysis.view (pre-seeded, Executive
+    // Management / Finance) gates the one read.
+    ProfitabilityAnalysisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

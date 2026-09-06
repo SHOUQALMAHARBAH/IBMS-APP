@@ -4,6 +4,7 @@ import { FinancialReportService } from './financial-report.service';
 import type { ClientAccountingService } from './client-accounting.service';
 import type { InsurerAccountingService } from './insurer-accounting.service';
 import type { FinancialReportRepository } from '../../repositories/financial-report.repository';
+import type { ProfitabilityPolicyRepository } from '../../repositories/profitability-policy.repository';
 import type { AuditService } from '../audit/audit.service';
 import type {
   CommissionRollupEntryRow,
@@ -57,16 +58,26 @@ function makeService(
     loadCommissionRollupEntries: vi
       .fn()
       .mockResolvedValue(over.commissionEntries ?? []),
-    loadProfitabilityPolicies: vi.fn().mockResolvedValue(over.policies ?? []),
+  };
+  const profitabilityPolicyRepo = {
+    loadWrittenPolicies: vi.fn().mockResolvedValue(over.policies ?? []),
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new FinancialReportService(
     clientAccounting as unknown as ClientAccountingService,
     insurerAccounting as unknown as InsurerAccountingService,
     repo as unknown as FinancialReportRepository,
+    profitabilityPolicyRepo as unknown as ProfitabilityPolicyRepository,
     audit as unknown as AuditService,
   );
-  return { service, clientAccounting, insurerAccounting, repo, audit };
+  return {
+    service,
+    clientAccounting,
+    insurerAccounting,
+    repo,
+    profitabilityPolicyRepo,
+    audit,
+  };
 }
 
 const commissionEntry = (

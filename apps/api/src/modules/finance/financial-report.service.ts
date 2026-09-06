@@ -5,6 +5,7 @@ import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import { ClientAccountingService } from './client-accounting.service';
 import { InsurerAccountingService } from './insurer-accounting.service';
 import { FinancialReportRepository } from '../../repositories/financial-report.repository';
+import { ProfitabilityPolicyRepository } from '../../repositories/profitability-policy.repository';
 import {
   buildCommissionRollup,
   buildProfitability,
@@ -50,6 +51,7 @@ export class FinancialReportService {
     private readonly clientAccounting: ClientAccountingService,
     private readonly insurerAccounting: InsurerAccountingService,
     private readonly repo: FinancialReportRepository,
+    private readonly profitabilityPolicyRepo: ProfitabilityPolicyRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -80,7 +82,9 @@ export class FinancialReportService {
         this.clientAccounting.receivablesAgeing({ asOf: asOfDate }),
         this.insurerAccounting.payables({ asOf: asOfDate }),
         this.repo.loadCommissionRollupEntries(),
-        this.repo.loadProfitabilityPolicies(),
+        this.profitabilityPolicyRepo.loadWrittenPolicies(
+          FINANCIAL_REPORT_ROW_LIMIT,
+        ),
       ]);
 
     if (commissionEntries.length >= FINANCIAL_REPORT_ROW_LIMIT) {

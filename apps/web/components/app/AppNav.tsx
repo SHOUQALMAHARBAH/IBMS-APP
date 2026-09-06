@@ -60,6 +60,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/insurer-performance', label: 'Insurer performance' },
   { href: '/employee-performance', label: 'Employee performance' },
   { href: '/portfolio-analysis', label: 'Portfolio analysis' },
+  { href: '/profitability-analysis', label: 'Profitability analysis' },
   { href: '/access-recertification', label: 'Access recertification' },
   { href: '/settings/security', label: 'Security' },
 ];
