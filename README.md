@@ -793,7 +793,10 @@ build actually is today:
   `dsr_access_deletion` (15 business days) / `dsr_correction_objection` (10 business
   days), the one ACCESS-only +15-day extension, a DELETION request's staff-attested
   no-open-retention-hold gate before it can be marked fully fulfilled, and mandatory
-  closure sign-off from a second, distinct DPO officer — see § Known gaps, Part D M04,
+  closure sign-off from a second, distinct DPO officer — **re-verified 2026-09-06** as
+  Part D's item #2 (worked one item at a time after Consent): every clause of this exact
+  checklist's DSR text already maps onto this build, confirmed by re-running the full
+  suite rather than re-reading code; no changes needed — see § Known gaps, Part D M04,
   for the full detail. **M09 Incident & Breach Management is built** — landed as Part C
   #55 (Domain F), one build satisfying both backlog references: the full
   Reported→Contained→Impact Assessed→Classified→Notified→Recovered→Closed chain on
@@ -5836,6 +5839,21 @@ narrows a gap.
   other seven Part D systems (retention & disposal *execution*, vendor
   risk, data sharing, incident & breach, DPIA, notices, RoPA) and the DPO
   Workspace dashboard remain unbuilt.
+
+  **Re-verified 2026-09-06** as Part D's item #2 of 9 (the checklist was
+  pasted whole and is being worked one item at a time, after Consent/M03
+  as item #1): the checklist's own DSR clause maps onto this build
+  clause-by-clause — same-business-day logging (`receivedAt`, never
+  caller-suppliable), the identity-verification step, the 15/10-business-day
+  SLA computation + ACCESS-only extension, the DPO handler assignment, and
+  the mandatory partially-fulfilled path when a retention flag is open
+  (never re-closeable as fully fulfilled — `PARTIALLY_FULFILLED`'s own
+  transition map allows only `-> CLOSED`, never `-> FULFILLED`). Confirmed
+  by re-running the suite, not just re-reading code — api unit 53/53
+  (unchanged), `test/dsr.e2e-spec.ts` 3/3, Playwright `dsr.spec.ts` 3/3, all
+  still green after 5+ sessions of unrelated work since this originally
+  shipped. **No code changes** — this backlog re-paste found the same
+  system already fully built, the #47/#50/#68 "verified, not built" shape.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
