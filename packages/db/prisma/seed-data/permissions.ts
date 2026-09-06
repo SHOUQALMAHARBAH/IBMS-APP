@@ -244,6 +244,7 @@ const supportingOperations: PermissionSeed[] = [
   { code: 'training.record', module: 'supporting-operations', description: 'Record security-awareness training completion', roles: [ADMIN, MANAGER] },
   { code: 'deprovisioning.execute', module: 'supporting-operations', description: 'Execute the access de-provisioning checklist on an employment-status change', roles: [ADMIN] },
   { code: 'vendor.manage', module: 'supporting-operations', description: 'Manage a vendor record and its risk tier', roles: [COMPLIANCE, MANAGER, ADMIN] },
+  { code: 'information-asset.manage', module: 'supporting-operations', description: 'Manage the ISO 27001 information asset inventory', roles: [ADMIN, COMPLIANCE] },
   { code: 'dpa.approve', module: 'supporting-operations', description: 'Give High-tier DPO approval on a Data Processing Agreement', roles: [DPO] },
   { code: 'bcp-dr.manage', module: 'supporting-operations', description: 'Manage Business Continuity / Disaster Recovery plans', roles: [ADMIN, COMPLIANCE] },
   { code: 'kb.publish', module: 'supporting-operations', description: 'Publish a knowledge-base article', roles: [COMPLIANCE, MANAGER, PLACEMENT] },

@@ -47,6 +47,7 @@ import { ProfitabilityAnalysisModule } from './modules/management-reporting/prof
 import { PlanningExportModule } from './modules/management-reporting/planning-export.module';
 import { EmployeeModule } from './modules/supporting-operations/employee.module';
 import { VendorModule } from './modules/supporting-operations/vendor.module';
+import { InformationAssetModule } from './modules/supporting-operations/information-asset.module';
 
 @Module({
   imports: [
@@ -336,6 +337,12 @@ import { VendorModule } from './modules/supporting-operations/vendor.module';
     // deliberately untouched. No new permission, no migration —
     // vendor.manage was already pre-seeded for #71's future use.
     VendorModule,
+    // Process 69 — Cybersecurity. The backlog claims "fully covered by
+    // Part A + IncidentReport + InformationAsset" — verified, and only
+    // partially true: InformationAsset (ISO 27001 8.1 asset inventory)
+    // was completely dormant, the one genuine gap. A new permission,
+    // information-asset.manage, was needed (no pre-seeded grant existed).
+    InformationAssetModule,
   ],
   controllers: [AppController],
   providers: [AppService],
