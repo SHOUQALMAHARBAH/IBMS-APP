@@ -42,6 +42,7 @@ import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
+import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
 
 @Module({
   imports: [
@@ -299,6 +300,10 @@ import { EmployeePerformanceModule } from './modules/management-reporting/employ
     // permission — employee-performance.view (pre-seeded) gates both the
     // read and the manual compute trigger.
     EmployeePerformanceModule,
+    // Process 62 — a live, book-wide snapshot by line/insurer/client
+    // segment/geography. No new model, no migration, no scheduler.
+    // portfolio-analysis.view (pre-seeded) gates the one read.
+    PortfolioAnalysisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

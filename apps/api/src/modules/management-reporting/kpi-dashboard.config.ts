@@ -1,9 +1,10 @@
 import type { StatusCountRow } from '../../repositories/kpi-dashboard.repository';
-import {
-  formatMoney,
-  sumMoney,
-  type MoneyInput,
-} from '../../common/money.util';
+import { formatMoneySum } from '../../common/money.util';
+
+// Re-exported so existing `from './kpi-dashboard.config'` imports keep
+// working unchanged — `formatMoneySum` moved to `common/money.util.ts` once
+// `portfolio-analysis.config.ts` needed the identical helper.
+export { formatMoneySum };
 
 /**
  * Process 58 (backlog Part C #58, Domain G — opens Domain G) — "General KPI
@@ -69,10 +70,4 @@ export function buildStatusCountMap(
 /** Pure: midnight UTC on the 1st of the month containing `now`. */
 export function startOfCurrentUtcMonth(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-}
-
-/** Pure: formats a possibly-null Prisma aggregate sum as a fixed 3dp JOD
- * string — `null` (no matching rows) renders as `"0.000"`, not a crash. */
-export function formatMoneySum(value: MoneyInput | null): string {
-  return value === null ? formatMoney(0) : formatMoney(sumMoney([value]));
 }

@@ -136,3 +136,14 @@ export function compareMoney(a: MoneyInput, b: MoneyInput): number {
 export function formatMoney(value: MoneyInput): string {
   return quantizeMoney(value).toFixed(MONEY_SCALE);
 }
+
+/** Formats a possibly-null Prisma `_sum` aggregate as a fixed 3dp JOD
+ * string — `null` (no matching rows) renders as `"0.000"`, not a crash.
+ * Originally local to `kpi-dashboard.config.ts` (Process 58); promoted
+ * here once `portfolio-analysis.config.ts` (Process 62) needed the
+ * identical helper — `kpi-dashboard.config.ts` re-exports it so its
+ * existing imports keep working unchanged (the `calendar-date.util.ts`/
+ * `period.util.ts` promotion precedent). */
+export function formatMoneySum(value: MoneyInput | null): string {
+  return value === null ? formatMoney(0) : formatMoney(sumMoney([value]));
+}

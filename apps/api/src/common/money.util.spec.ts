@@ -5,6 +5,7 @@ import {
   applyPercentage,
   compareMoney,
   formatMoney,
+  formatMoneySum,
   isZeroMoney,
   MONEY_PRECISION,
   MONEY_ROUNDING,
@@ -170,5 +171,15 @@ describe('formatMoney', () => {
     expect(formatMoney('5')).toBe('5.000');
     expect(formatMoney('5.5')).toBe('5.500');
     expect(formatMoney('5.5551')).toBe('5.555');
+  });
+});
+
+describe('formatMoneySum', () => {
+  it('formats a Prisma.Decimal sum to fixed 3dp', () => {
+    expect(formatMoneySum(new Prisma.Decimal('1234.5'))).toBe('1234.500');
+  });
+
+  it('renders a null aggregate (no matching rows) as zero, not a crash', () => {
+    expect(formatMoneySum(null)).toBe('0.000');
   });
 });
