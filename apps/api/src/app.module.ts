@@ -43,6 +43,7 @@ import { SalesPerformanceModule } from './modules/management-reporting/sales-per
 import { SalesDashboardModule } from './modules/management-reporting/sales-dashboard.module';
 import { PolicyDashboardModule } from './modules/management-reporting/policy-dashboard.module';
 import { ClaimsDashboardModule } from './modules/management-reporting/claims-dashboard.module';
+import { FinancialDashboardModule } from './modules/management-reporting/financial-dashboard.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
@@ -316,6 +317,13 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // permission and #30's loss-ratio breakdown (widened with an insurer
     // grouping) — see claims-dashboard.config.ts.
     ClaimsDashboardModule,
+    // Part E — the fourth of six named dashboards: receivables and ageing,
+    // payables to insurers, commission income and outstanding commission,
+    // profitability by client segment/line. #40's own FinancialReportService
+    // already computes every section; this adds the branch/line/insurer
+    // filtering #40's own DTO deferred as "a Part E dashboard refinement" —
+    // see financial-dashboard.config.ts.
+    FinancialDashboardModule,
     // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
     // InsurerSlaAgreement (dormant) get their first real consumer: a
     // monthly job scoring quote-response speed/claims service/price/

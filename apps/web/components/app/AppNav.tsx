@@ -67,6 +67,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
   { href: '/dashboards/sales', label: 'Sales Dashboard' },
   { href: '/dashboards/policy', label: 'Policy Dashboard' },
   { href: '/dashboards/claims', label: 'Claims Dashboard' },
+  { href: '/dashboards/financial', label: 'Financial Dashboard' },
   { href: '/insurer-performance', label: 'Insurer performance' },
   { href: '/employee-performance', label: 'Employee performance' },
   { href: '/portfolio-analysis', label: 'Portfolio analysis' },

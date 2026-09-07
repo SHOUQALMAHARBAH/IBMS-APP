@@ -841,7 +841,7 @@ build actually is today:
   definitions; `consent_withdrawal`, the two DSR workflows, M06's
   `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
   / `dpia_review` are the ones a real caller uses.
-- **Part E — dashboards — begun, three of six built.** Part E's header cross-references
+- **Part E — dashboards — begun, four of six built.** Part E's header cross-references
   Domain G's own Process #64 directly ("Executive Management Reporting — Part E below")
   — it IS #64's own detail, not six unrelated processes. **Sales Dashboard is built**:
   `GET /dashboards/sales` — new leads and conversion rate, premium written (new vs.
@@ -868,9 +868,21 @@ build actually is today:
   of a `periodStart`/`periodEnd` range. Widened backlog #30's own `LOSS_RATIO_GROUP_BY`
   to add an `insurer` dimension — a free capability upgrade to the pre-existing `GET
   /claims-analytics/loss-ratio?groupBy=` endpoint too. The first real consumer of the
-  pre-seeded `dashboard.claims.view` permission. **Not yet built**: Financial and
-  Compliance dashboards, and verifying the Insurer & Employee Performance dashboard
-  (likely already substantially covered by backlog #60/#61) — each its own pass. The
+  pre-seeded `dashboard.claims.view` permission. **Financial Dashboard is built**: `GET
+  /dashboards/financial` — receivables and ageing, payables to insurers, commission
+  income and outstanding commission, profitability by client segment/line. Not a fresh
+  build — backlog #40's own `FinancialReportService.summary()` already computed every
+  section verbatim, but its own DTO said outright "No line / insurer / branch filters
+  here — those are a Part E dashboard refinement." This dashboard closes exactly that
+  gap, reusing #40's own pure builders via direct import and widening three existing
+  repositories (`InvoiceRepository`, `FinancialReportRepository`, the SHARED
+  `ProfitabilityPolicyRepository`, also used by #63) with additive optional
+  branch/line/insurer scope params — no existing caller's call site changed. The first
+  real consumer of the pre-seeded `dashboard.financial.view` permission (a strict subset
+  of `financial-report.view`'s own broader grant, so no practical access gap existed).
+  **Not yet built**: the Compliance dashboard, and verifying the Insurer & Employee
+  Performance dashboard (likely already substantially covered by backlog #60/#61) —
+  each its own pass. The
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission) also remains unbuilt.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
@@ -6302,9 +6314,63 @@ narrows a gap.
   `--testTimeout=90000`, plus two confirmed-transient TOTP-timing flakes (`prospect`,
   `sales-performance`) re-confirmed clean in isolation. New Playwright
   `claims-dashboard.spec.ts` 3/3; full Playwright suite **273/273** (from 270).
-  `npm run typecheck`/`lint`/`build` (api + web) OK. **Deferred:** Financial/Compliance
-  dashboards and the Insurer & Employee Performance verification — each a separate
-  pass; the `dashboard.executive.view` cross-department rollup screen itself.
+  `npm run typecheck`/`lint`/`build` (api + web) OK. **Deferred (at the time):**
+  Financial/Compliance dashboards and the Insurer & Employee Performance
+  verification — each a separate pass; the `dashboard.executive.view` cross-department
+  rollup screen itself. (Financial Dashboard is now built — see the next entry.)
+
+**Part E — Financial Dashboard (backlog Process #64)** — fourth of Part E's six named
+  dashboards, after Sales, Policy, and Claims. `GET /dashboards/financial` — "receivables
+  and ageing, payables to insurers, commission income and outstanding commission,
+  profitability by client segment/line." **Neither a fresh build nor a pure "verify,
+  don't build" outcome — a third, in-between shape.** Backlog #40's own
+  `FinancialReportService.summary()` (`GET /financial-report/summary`) already computes
+  every one of these four sections verbatim — its own doc comment quotes this exact Part
+  E bullet. But #40's own `FinancialReportQueryDto` says outright: "No line / insurer /
+  branch filters here — those are a Part E dashboard refinement." That is the ONE genuine
+  gap between #40 and Part E's cross-cutting "filterable by branch/line/insurer/period"
+  rule, and this dashboard supplies it. **Reused #40's own PURE builders via direct
+  import** — `buildReceivablesAgeing` / `buildInsurerPayables` / `buildCommissionRollup` /
+  `buildProfitability`, all untouched — rather than re-deriving a single line of
+  bucket/rollup/`netPosition` math, the Claims Dashboard "reuse a pure function directly"
+  precedent applied to four functions in one module instead of one. **Widened THREE
+  existing repositories** with optional `insuranceLine`/`insurerId`/`ownerUserIds` scope
+  params (all additive — no existing caller's call site changed):
+  `InvoiceRepository.loadOutstandingReceivables`/`loadInsurerObligations` (#33/#34,
+  narrowed via the invoice's OPTIONAL `policy` relation — an invoice with no linked
+  policy is excluded whenever any of these three is given), `FinancialReportRepository.
+  loadCommissionRollupEntries` (#40), and the SHARED
+  `ProfitabilityPolicyRepository.loadWrittenPolicies` (#40/#63 — #63's own call site is
+  untouched and re-confirmed green). **Deliberately did NOT widen
+  `loadInsurerRemittances`** — a `Remittance` has no `Policy` relation of its own (one
+  lump payment can cover many invoices/lines/branches), so `insuranceLine`/`branchId`
+  genuinely cannot narrow it, a real "not applicable" case, the Sales Dashboard "filter
+  applicability is real, not uniform" discipline. **`dashboard.financial.view`'s role
+  grant is a strict SUBSET of `financial-report.view`'s** (`[FINANCE, MANAGER, EXEC]` vs.
+  `+ EXTERNAL_AUDITOR`, confirmed by mapping seed-file role aliases) — no practical
+  access gap, so kept as its own dedicated route rather than widening #40's own
+  `@RequirePermissions` the Notices "also accepts" way, since this endpoint's filtering
+  needs genuinely differ from #40's. Like Claims Dashboard, every section is
+  current-state (a single `asOf` reference date, no period range) — mirrored exactly
+  from #40's own pre-existing design. `apps/web/` gains a **"Financial Dashboard"**
+  screen (`app/(app)/dashboards/financial/page.tsx` — a filter form, receivables/
+  payables/commission sections, and 2 profitability tables). **Verification**: +8 api
+  unit (`financial-dashboard.config.spec.ts` 2, `financial-dashboard.service.spec.ts` 6)
+  → api unit **2287** (183 files, from 2279). New `test/financial-dashboard.e2e-spec.ts`
+  **5/5** — permission gating, a 400/422 on `asOf` validation, a full receivables/
+  payables/commission/profitability walk isolated via a fresh `Insurer` row, a
+  branch-scoping test. Full api unit suite 2287/2287 confirmed green (including #33/#34/
+  #40/#63's own pre-existing suites, unchanged); full 61-file api e2e suite green across
+  8 foreground sub-batches, both chronic flakes (`rbac`, `up-sell`) passing with
+  `--testTimeout=90000` — critically, `invoice.e2e-spec.ts` (#40's own consolidated
+  summary test) and `profitability-analysis.e2e-spec.ts` (#63) both passed alongside the
+  new dashboard, confirming zero regression from the repository widening. New Playwright
+  `financial-dashboard.spec.ts` 3/3 (one real test-authoring bug caught and fixed: a
+  `getByText` strict-mode violation on a `netPosition` figure appearing in both the
+  byLine and bySegment tables); full Playwright suite **276/276** (from 273). `npm run
+  typecheck`/`lint`/`build` (api + web) OK. **Deferred:** the Compliance dashboard, and
+  verifying the Insurer & Employee Performance dashboard — each a separate pass; the
+  `dashboard.executive.view` cross-department rollup screen itself.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

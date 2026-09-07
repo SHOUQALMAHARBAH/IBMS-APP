@@ -32,18 +32,37 @@ export interface ProfitabilityPolicyRow {
 /**
  * Every "written" policy (status past `PLACEMENT_CONFIRMED`) with its
  * customer segment, its SETTLED / CLOSED claim net settlements, and its
- * `CommissionLedgerEntry` figures. Book-wide, no per-owner filter — both
- * consumers gate on a cross-book reporting permission. Capped at the
+ * `CommissionLedgerEntry` figures. Book-wide, no per-owner filter by
+ * default — both existing consumers (#40, #63) gate on a cross-book
+ * reporting permission and never pass `scope`. Capped at the
  * caller-supplied `limit`; the caller `logger.warn`s on truncation (the #30 /
  * #33 precedent).
+ *
+ * `scope` is a Part E Financial Dashboard (backlog #64) addition, added as an
+ * optional trailing parameter so neither existing caller's call site needed
+ * to change.
  */
 @Injectable()
 export class ProfitabilityPolicyRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async loadWrittenPolicies(limit: number): Promise<ProfitabilityPolicyRow[]> {
+  async loadWrittenPolicies(
+    limit: number,
+    scope: {
+      insuranceLine?: string;
+      insurerId?: string;
+      ownerUserIds?: string[];
+    } = {},
+  ): Promise<ProfitabilityPolicyRow[]> {
     const policies = await this.prisma.client.policy.findMany({
-      where: { status: { in: [...ANALYTICS_WRITTEN_POLICY_STATUSES] } },
+      where: {
+        status: { in: [...ANALYTICS_WRITTEN_POLICY_STATUSES] },
+        ...(scope.insuranceLine ? { insuranceLine: scope.insuranceLine } : {}),
+        ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
+        ...(scope.ownerUserIds
+          ? { placedByUserId: { in: scope.ownerUserIds } }
+          : {}),
+      },
       select: {
         id: true,
         insuranceLine: true,

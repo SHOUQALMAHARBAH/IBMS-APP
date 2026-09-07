@@ -22,9 +22,37 @@ export class FinancialReportRepository {
 
   /** Every `CommissionLedgerEntry` with its policy's insurer id + name — the
    * input to `buildCommissionRollup`. `amount` is the effective commission at
-   * every stage (`deriveLedgerEntryView`'s `effectiveAmount` rule). */
-  async loadCommissionRollupEntries(): Promise<CommissionRollupEntryRow[]> {
+   * every stage (`deriveLedgerEntryView`'s `effectiveAmount` rule).
+   *
+   * `scope` is a Part E Financial Dashboard (backlog #64) addition — narrowed
+   * via `CommissionLedgerEntry.policy` (a required relation, so no orphan
+   * exclusion concern the way `Invoice.policy` had). `#40`'s own caller
+   * (`FinancialReportService`) never passes it. */
+  async loadCommissionRollupEntries(
+    scope: {
+      insuranceLine?: string;
+      insurerId?: string;
+      ownerUserIds?: string[];
+    } = {},
+  ): Promise<CommissionRollupEntryRow[]> {
     const rows = await this.prisma.client.commissionLedgerEntry.findMany({
+      where: {
+        ...(scope.insuranceLine || scope.insurerId || scope.ownerUserIds
+          ? {
+              policy: {
+                is: {
+                  ...(scope.insuranceLine
+                    ? { insuranceLine: scope.insuranceLine }
+                    : {}),
+                  ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
+                  ...(scope.ownerUserIds
+                    ? { placedByUserId: { in: scope.ownerUserIds } }
+                    : {}),
+                },
+              },
+            }
+          : {}),
+      },
       select: {
         id: true,
         amount: true,

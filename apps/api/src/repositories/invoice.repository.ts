@@ -115,16 +115,44 @@ export class InvoiceRepository {
    * reporting permission), optionally narrowed to one customer. Capped at
    * {@link AR_AGEING_INVOICE_LIMIT} (`orderBy createdAt asc` — oldest first);
    * `ClientAccountingService` warns on truncation.
+   *
+   * `insuranceLine` / `insurerId` / `ownerUserIds` are Part E Financial
+   * Dashboard (backlog #64) additions — narrowed via the invoice's OPTIONAL
+   * `policy` relation (`Invoice.policyId` is nullable), so an invoice with no
+   * linked policy is excluded whenever any of these three is given: a filter
+   * on the underlying policy's line/insurer/branch cannot include a
+   * receivable with no policy to check it against. `#33`'s own callers
+   * (`ClientAccountingService`) never pass them.
    */
   async loadOutstandingReceivables(scope: {
     customerId?: string;
+    insuranceLine?: string;
+    insurerId?: string;
+    ownerUserIds?: string[];
     asOfExclusiveUpper: Date;
   }): Promise<OutstandingInvoiceRow[]> {
+    const policyFilter =
+      (scope.insuranceLine ?? scope.insurerId ?? scope.ownerUserIds)
+        ? {
+            policy: {
+              is: {
+                ...(scope.insuranceLine
+                  ? { insuranceLine: scope.insuranceLine }
+                  : {}),
+                ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
+                ...(scope.ownerUserIds
+                  ? { placedByUserId: { in: scope.ownerUserIds } }
+                  : {}),
+              },
+            },
+          }
+        : {};
     const rows = await this.prisma.client.invoice.findMany({
       where: {
         createdAt: { lt: scope.asOfExclusiveUpper },
         receipts: { none: { receivedAt: { lt: scope.asOfExclusiveUpper } } },
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
+        ...policyFilter,
       },
       select: {
         id: true,
@@ -160,9 +188,16 @@ export class InvoiceRepository {
    * insurer to owe). Book-wide (`insurer-accounting.read` is a cross-book
    * reporting permission), optionally narrowed to one insurer. Capped at
    * {@link INSURER_PAYABLES_ROW_LIMIT}.
+   *
+   * `insuranceLine` / `ownerUserIds` are Part E Financial Dashboard (backlog
+   * #64) additions, narrowed the same way `insurerId` already was — via the
+   * (guaranteed-present here) `policy` relation. `#34`'s own caller
+   * (`InsurerAccountingService`) never passes them.
    */
   async loadInsurerObligations(scope: {
     insurerId?: string;
+    insuranceLine?: string;
+    ownerUserIds?: string[];
     asOfExclusiveUpper: Date;
   }): Promise<InsurerObligationRow[]> {
     const rows = await this.prisma.client.invoice.findMany({
@@ -174,8 +209,20 @@ export class InvoiceRepository {
             remittance: { remittedAt: { lt: scope.asOfExclusiveUpper } },
           },
         },
-        ...(scope.insurerId
-          ? { policy: { is: { insurerId: scope.insurerId } } }
+        ...(scope.insurerId || scope.insuranceLine || scope.ownerUserIds
+          ? {
+              policy: {
+                is: {
+                  ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
+                  ...(scope.insuranceLine
+                    ? { insuranceLine: scope.insuranceLine }
+                    : {}),
+                  ...(scope.ownerUserIds
+                    ? { placedByUserId: { in: scope.ownerUserIds } }
+                    : {}),
+                },
+              },
+            }
           : {}),
       },
       select: {
@@ -216,6 +263,13 @@ export class InvoiceRepository {
    * `asOfExclusiveUpper` (`remittedAt <` it; the `{ lt }` excludes the
    * still-null ones). Book-wide, optionally narrowed to one insurer. Capped at
    * {@link INSURER_PAYABLES_ROW_LIMIT}.
+   *
+   * **Deliberately has no `insuranceLine` / `ownerUserIds` filter** — the
+   * Part E Financial Dashboard's cross-cutting rule does not apply here: a
+   * `Remittance` is a lump payment against one insurer (potentially covering
+   * many invoices/policies across several lines/branches at once), with no
+   * `Policy` relation of its own to narrow by. `insurerId` already covers the
+   * only dimension a remittance genuinely has.
    */
   async loadInsurerRemittances(scope: {
     insurerId?: string;
