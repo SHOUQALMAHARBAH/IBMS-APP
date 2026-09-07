@@ -841,7 +841,7 @@ build actually is today:
   definitions; `consent_withdrawal`, the two DSR workflows, M06's
   `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
   / `dpia_review` are the ones a real caller uses.
-- **Part E — dashboards — begun, one of six built.** Part E's header cross-references
+- **Part E — dashboards — begun, two of six built.** Part E's header cross-references
   Domain G's own Process #64 directly ("Executive Management Reporting — Part E below")
   — it IS #64's own detail, not six unrelated processes. **Sales Dashboard is built**:
   `GET /dashboards/sales` — new leads and conversion rate, premium written (new vs.
@@ -851,11 +851,18 @@ build actually is today:
   see § Known gaps, Part E, for the full detail. It reuses the already-pre-seeded
   `dashboard.sales.view` permission alongside backlog #59's own narrower
   `GET /sales-performance` (quota-vs-actual tracking) — two separate, coexisting
-  endpoints sharing one access-control code. **Not yet built**: Policy, Claims,
-  Financial, and Compliance dashboards, and verifying the Insurer & Employee
-  Performance dashboard (likely already substantially covered by backlog #60/#61) —
-  each its own pass. The `dashboard.executive.view` cross-department rollup screen
-  (#64's own top-level permission) also remains unbuilt.
+  endpoints sharing one access-control code. **Policy Dashboard is built**:
+  `GET /dashboards/policy` — active policies and expiring policies (renewal window,
+  default 90 days reusing `RenewalCase.leadTimeDays`'s own default) are a LIVE snapshot
+  as of now, ignoring the period filter; new policies issued and cancelled policies (with
+  reasons) are period-scoped, the cancellation date coming from `Endorsement.appliedAt`
+  (confirmed by reading `EndorsementService.apply()` directly), not
+  `Cancellation.createdAt`. The first real consumer of the pre-seeded
+  `dashboard.policy.view` permission. **Not yet built**: Claims, Financial, and
+  Compliance dashboards, and verifying the Insurer & Employee Performance dashboard
+  (likely already substantially covered by backlog #60/#61) — each its own pass. The
+  `dashboard.executive.view` cross-department rollup screen (#64's own top-level
+  permission) also remains unbuilt.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
   is no i18n framework, no RTL layout, no bidirectional-text handling, no locale-aware
   number/date/currency formatting (Gregorian/Hijri, JOD base + multi-currency), no
@@ -6187,6 +6194,52 @@ narrows a gap.
   (api + web) OK. **Deferred:** Policy/Claims/Financial/Compliance dashboards and the
   Insurer & Employee Performance verification — each a separate pass; the
   `dashboard.executive.view` cross-department rollup screen itself.
+
+**Part E — Policy Dashboard (backlog Process #64)** — second of Part E's six named
+  dashboards, after Sales. `GET /dashboards/policy` — "active policies, expiring
+  policies (renewal window), new policies issued, cancelled policies and cancellation
+  reasons." The FIRST real consumer of the pre-seeded `dashboard.policy.view`
+  permission (unlike Sales, no earlier backlog item had touched this code).
+  **Two of the four metrics are a LIVE snapshot as of `now`, two are period-scoped — a
+  deliberate asymmetry, not an inconsistency**: "active policies" and "expiring
+  policies" describe current state and ignore the period filter entirely; "new
+  policies issued" and "cancelled policies" describe an event within the selected
+  period, read directly off the backlog bullet's own mixed phrasing (one snapshot verb,
+  two historical-event verbs, in the same sentence). "Expiring policies" reuses
+  `RenewalCase.leadTimeDays`'s own existing 90-day default as
+  `DEFAULT_RENEWAL_WINDOW_DAYS`, exposed as a caller-overridable `renewalWindowDays`
+  query param (confirmed to coerce correctly as a GET query int under the api's global
+  `ValidationPipe({transform: true})`). "New policies issued" reuses the KPI
+  Dashboard's own `issuedPremium is not null` test for "issued." **"Cancelled policies"
+  scopes by `Endorsement.appliedAt`, not `Cancellation.createdAt`** — confirmed by
+  reading `EndorsementService.apply()`'s cancellation branch directly: the
+  `Policy.status -> CANCELLED` transition fires exactly when `appliedAt` is stamped,
+  while `Cancellation.createdAt` reflects only when the cancellation was requested
+  (which can predate the period it actually took effect in). `reason` (free text) is
+  returned as a capped, ordered `findMany` list (`CANCELLED_POLICIES_READ_LIMIT = 200`),
+  never a `groupBy` — the #62 Portfolio Analysis "don't group free text" precedent.
+  Unlike Sales, every one of the four metrics reads the same `Policy` table, so
+  branch/insuranceLine/insurerId filters apply uniformly across all four — no
+  per-metric carve-out needed this time. The audit READ snapshot records counts only
+  (`cancelledPoliciesCount`), never the `reason` text itself. No migration, no new
+  permission, no cross-module service dependency (reads `Policy`/`Endorsement`/
+  `Cancellation` directly). `apps/web/` gains a **"Policy Dashboard"** screen
+  (`app/(app)/dashboards/policy/page.tsx` — a filter form, 3 count sections, and a
+  cancelled-policies table). **Verification**: +11 api unit
+  (`policy-dashboard.config.spec.ts` 3, `policy-dashboard.service.spec.ts` 8) → api unit
+  **2265** (179 files, from 2254). New `test/policy-dashboard.e2e-spec.ts` **4/4** —
+  permission gating; a 422 on a partial period override; a full
+  active/expiring/newly-issued/cancelled walk against a distinctive historical period
+  window with a real `Endorsement`+`Cancellation` fixture; a `renewalWindowDays`
+  override test proving a wider window flags strictly more expiring policies. Full api
+  unit suite 2265/2265 confirmed green; full 59-file api e2e suite green across 8
+  foreground sub-batches, both chronic flakes (`rbac`, `up-sell`) passing with
+  `--testTimeout=90000`. New Playwright `policy-dashboard.spec.ts` 3/3; full Playwright
+  suite **270/270** (from 267) — one confirmed-transient Chromium "Target crashed" on an
+  unrelated `retention-disposal.spec.ts` a11y test, re-confirmed clean in isolation.
+  `npm run typecheck`/`lint`/`build` (api + web) OK. **Deferred:** Claims/Financial/
+  Compliance dashboards and the Insurer & Employee Performance verification — each a
+  separate pass; the `dashboard.executive.view` cross-department rollup screen itself.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

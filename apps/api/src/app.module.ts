@@ -41,6 +41,7 @@ import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
 import { SalesDashboardModule } from './modules/management-reporting/sales-dashboard.module';
+import { PolicyDashboardModule } from './modules/management-reporting/policy-dashboard.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
@@ -303,6 +304,11 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // dashboard.sales.view permission (also #59's own), a separate
     // endpoint from GET /sales-performance — see sales-dashboard.config.ts.
     SalesDashboardModule,
+    // Part E — the second of six named dashboards: active policies,
+    // expiring policies (renewal window), new policies issued, cancelled
+    // policies and cancellation reasons. Reuses the pre-seeded
+    // dashboard.policy.view permission — see policy-dashboard.config.ts.
+    PolicyDashboardModule,
     // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
     // InsurerSlaAgreement (dormant) get their first real consumer: a
     // monthly job scoring quote-response speed/claims service/price/
