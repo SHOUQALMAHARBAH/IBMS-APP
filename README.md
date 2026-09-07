@@ -841,7 +841,7 @@ build actually is today:
   definitions; `consent_withdrawal`, the two DSR workflows, M06's
   `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
   / `dpia_review` are the ones a real caller uses.
-- **Part E — dashboards — begun, four of six built.** Part E's header cross-references
+- **Part E — dashboards — begun, five of six built.** Part E's header cross-references
   Domain G's own Process #64 directly ("Executive Management Reporting — Part E below")
   — it IS #64's own detail, not six unrelated processes. **Sales Dashboard is built**:
   `GET /dashboards/sales` — new leads and conversion rate, premium written (new vs.
@@ -880,10 +880,24 @@ build actually is today:
   branch/line/insurer scope params — no existing caller's call site changed. The first
   real consumer of the pre-seeded `dashboard.financial.view` permission (a strict subset
   of `financial-report.view`'s own broader grant, so no practical access gap existed).
-  **Not yet built**: the Compliance dashboard, and verifying the Insurer & Employee
-  Performance dashboard (likely already substantially covered by backlog #60/#61) —
-  each its own pass. The
-  `dashboard.executive.view` cross-department rollup screen (#64's own top-level
+  **Compliance Dashboard is built**: `GET /dashboards/compliance` — KYC status
+  (approved/pending/overdue-for-refresh, the last already a real, live-transitioned
+  `KycStatus.PERIODIC_REVIEW_DUE`), complaints by status/category, compliance
+  breaches/exceptions (open AML/CFT alerts by pattern type, plus the most recently
+  persisted Internal Controls self-approval scan's violation count — read, never
+  re-run live), regulatory filing/report status (reusing #51's own
+  `deriveComplianceCalendarItemView` directly), open DSRs and breach-register status
+  (both reusing Claims Dashboard's own "`CLOSED` is the sole terminal status" rule),
+  and the DPIA backlog. Seven sections, each reading a different existing table
+  directly — the DPO Workspace aggregate-screen shape. No period range at all (one
+  step further than Claims/Financial's own `asOf` compromise — reconstructing genuine
+  point-in-time status across seven different entities, most with no status-history
+  table, would be disproportionate for a rollup screen); `branchId` is the only
+  cross-cutting filter with real reach, since none of the seven registers ties to a
+  `Policy` at all. The first real consumer of the pre-seeded `dashboard.
+  compliance.view` permission. **Not yet built**: verifying the Insurer & Employee
+  Performance dashboard (likely already substantially covered by backlog #60/#61).
+  The `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission) also remains unbuilt.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
   is no i18n framework, no RTL layout, no bidirectional-text handling, no locale-aware
@@ -6368,8 +6382,76 @@ narrows a gap.
   `financial-dashboard.spec.ts` 3/3 (one real test-authoring bug caught and fixed: a
   `getByText` strict-mode violation on a `netPosition` figure appearing in both the
   byLine and bySegment tables); full Playwright suite **276/276** (from 273). `npm run
-  typecheck`/`lint`/`build` (api + web) OK. **Deferred:** the Compliance dashboard, and
-  verifying the Insurer & Employee Performance dashboard — each a separate pass; the
+  typecheck`/`lint`/`build` (api + web) OK. **Deferred (at the time):** the Compliance
+  dashboard, and verifying the Insurer & Employee Performance dashboard — each a
+  separate pass; the `dashboard.executive.view` cross-department rollup screen itself.
+  (Compliance Dashboard is now built — see the next entry.)
+
+**Part E — Compliance Dashboard (backlog Process #64)** — fifth of Part E's six named
+  dashboards, after Sales, Policy, Claims, and Financial. `GET /dashboards/compliance` —
+  "KYC status (approved/pending/overdue for refresh), complaints by status/category,
+  compliance breaches/exceptions, regulatory filing/report status, open DSRs,
+  breach-register status, DPIA backlog." **Seven sections, each reading a different
+  existing table directly — the DPO Workspace "aggregate several registers on one
+  screen, zero cross-module SERVICE dependency" shape**, reused here for the Compliance
+  Officer's own audience instead of the DPO's (real overlap with DPO Workspace on
+  DSR/DPIA/breach-register is expected, not a bug — both audiences legitimately need
+  this visibility). **No period range at all — one step further than Claims/Financial's
+  own `asOf` compromise**: `KYCRecord`/`Complaint` statuses move through 6-7 states over
+  an entity's life, so a `createdAt` cutoff while still reading the CURRENT status
+  column would misrepresent "status as of a date" far more than Claims Dashboard's own
+  accepted limitation; only `Claim` has a status-history table (`ClaimStatusHistory`),
+  so genuine point-in-time reconstruction across seven different entities is
+  disproportionate for a compliance rollup screen — deliberately omitted. **`branchId`
+  is the ONE cross-cutting filter with real reach; `insuranceLine`/`insurerId` are
+  omitted dashboard-wide** — checked every one of the seven underlying models directly:
+  `KYCRecord`/`Complaint`/`DataSubjectRequest`/`TransactionMonitoringAlert` each tie
+  (optionally, for the latter two) to a `Customer` with an `ownerUserId`, so `branchId`
+  scopes those four; `ComplianceCalendarItem.ownerUserId` names the COMPLIANCE STAFF
+  member tracking an obligation, not a Sales Officer; `IncidentReport`/`DpiaScreening`
+  carry no owner relation at all. None of the seven ties to a `Policy`, so
+  `insuranceLine`/`insurerId` have no genuine dimension anywhere on this dashboard — the
+  first Part E dashboard where a filter fails to apply to an ENTIRE dashboard, not just
+  to some of its metrics. **"Compliance breaches/exceptions" needed a genuinely drafted
+  interpretation** — the backlog names no model. `breach-register status` (its own,
+  separate clause) unambiguously means `IncidentReport` (confirmed by grepping the
+  schema for every use of "breach"). The only other real "exception" concept,
+  `ReconciliationException` (#39), is FINANCE-owned (`reconciliation-exception.*`
+  grants `[FINANCE, MANAGER]`, no Compliance role) — not genuinely Compliance's own.
+  `TransactionMonitoringAlert` (#48, AML/CFT) IS Compliance-owned (`aml.monitor` grants
+  `[COMPLIANCE_OFFICER]` only) and cheap to query — used here. Internal Controls' own
+  self-approval findings were a plausible second candidate, but re-running its
+  expensive 16-query live scan inline on every dashboard load would be disproportionate
+  — instead this reads the MOST RECENT already-persisted `InternalControlsAuditReport`
+  READ audit row (via `AuditTrailRepository.findAuditLog`, reused directly, no re-scan)
+  for a "last known" violation count, `null` if the audit has never run. **KYC's own
+  "overdue for refresh" bucket already exists as a real, live-transitioned status** —
+  `KycStatus.PERIODIC_REVIEW_DUE`, driven by the pre-existing `kyc-periodic-
+  review.scheduler.ts` off `KYCRecord.nextReviewDueAt` — no derivation needed, a plain
+  `groupBy` status breakdown already carries it. "Open DSRs" and breach-register "open"
+  both reuse Claims Dashboard's own "`CLOSED` is the sole terminal status" rule
+  (confirmed via `WORKFLOW_TRANSITIONS`); "DPIA backlog" needed a dedicated count query
+  (`outcome IN (DPO_REVIEW_REQUIRED, ESCALATED_FULL_DPIA) AND dpoReviewedAt IS NULL`,
+  since a plain outcome `groupBy` can't express "still unreviewed"); "regulatory filing
+  status" reuses #51's own `deriveComplianceCalendarItemView` pure function directly.
+  `apps/web/` gains a **"Compliance Dashboard"** screen (`app/(app)/dashboards/
+  compliance/page.tsx` — a branch filter and seven breakdown sections).
+  **Verification**: +16 api unit (`compliance-dashboard.config.spec.ts` 10,
+  `compliance-dashboard.service.spec.ts` 6) → api unit **2303** (185 files, from 2287).
+  New `test/compliance-dashboard.e2e-spec.ts` **4/4** — permission gating, a
+  branch-scoped walk isolating KYC/complaints/DSR/AML sections exactly, a BEFORE/AFTER
+  delta walk for the three sections with no owner dimension (regulatory
+  filings/breach-register/DPIA backlog, the DPO Workspace precedent), and a
+  direct-audit-row test proving the self-approval read is not a live re-scan. Full api
+  unit suite 2303/2303 confirmed green; full 62-file api e2e suite green across 8
+  foreground sub-batches — the system ran roughly 2x slower than prior sessions
+  throughout this verification pass, and the chronic `rbac` flake needed a 180s re-run
+  (confirmed clean, ruling out a genuine regression rather than machine load) alongside
+  the always-passing `up-sell` flake. New Playwright `compliance-dashboard.spec.ts`
+  3/3; full Playwright suite **279/279** (from 276). `npm run typecheck`/`lint`/`build`
+  (api + web) OK. No migration, no widening of any existing repository — unlike
+  Financial Dashboard, every table this dashboard reads already supported everything it
+  needed. **Deferred:** verifying the Insurer & Employee Performance dashboard; the
   `dashboard.executive.view` cross-department rollup screen itself.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line

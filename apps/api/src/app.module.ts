@@ -44,6 +44,7 @@ import { SalesDashboardModule } from './modules/management-reporting/sales-dashb
 import { PolicyDashboardModule } from './modules/management-reporting/policy-dashboard.module';
 import { ClaimsDashboardModule } from './modules/management-reporting/claims-dashboard.module';
 import { FinancialDashboardModule } from './modules/management-reporting/financial-dashboard.module';
+import { ComplianceDashboardModule } from './modules/management-reporting/compliance-dashboard.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
@@ -324,6 +325,13 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // filtering #40's own DTO deferred as "a Part E dashboard refinement" —
     // see financial-dashboard.config.ts.
     FinancialDashboardModule,
+    // Part E — the fifth of six named dashboards: KYC status, complaints by
+    // status/category, compliance breaches/exceptions (open AML alerts +
+    // the latest Internal Controls self-approval scan), regulatory filing
+    // status, open DSRs, breach-register status, DPIA backlog. Seven
+    // sections, each reading a different existing table directly — see
+    // compliance-dashboard.config.ts.
+    ComplianceDashboardModule,
     // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
     // InsurerSlaAgreement (dormant) get their first real consumer: a
     // monthly job scoring quote-response speed/claims service/price/
