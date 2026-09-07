@@ -17,16 +17,21 @@ const row = (over: Record<string, unknown> = {}) => ({
   nextReviewDueAt: new Date('2027-03-14T00:00:00.000Z'),
   releasedAt: null,
   retentionScheduleItemId: 'rsi-1',
+  customerId: null,
+  insuredPersonId: null,
   ...over,
 });
 
 function makeService(over: { repo?: Record<string, unknown> } = {}) {
   const repo = {
     retentionScheduleItemExists: vi.fn().mockResolvedValue(true),
+    customerExists: vi.fn().mockResolvedValue(true),
+    insuredPersonExists: vi.fn().mockResolvedValue(true),
     create: vi.fn().mockResolvedValue(row()),
     findById: vi.fn().mockResolvedValue(row()),
     findMany: vi.fn().mockResolvedValue([row()]),
     hasActiveHold: vi.fn().mockResolvedValue(false),
+    hasActiveHoldForSubject: vi.fn().mockResolvedValue(false),
     recordReview: vi.fn().mockResolvedValue({ count: 1 }),
     release: vi.fn().mockResolvedValue({ count: 1 }),
     ...over.repo,
@@ -89,6 +94,58 @@ describe('LegalHoldService.create', () => {
     const { service, repo } = makeService();
     await service.create({ scope: 's', reason: 'r' }, 'u-dpo');
     expect(repo.retentionScheduleItemExists).not.toHaveBeenCalled();
+  });
+
+  it('places a hold naming a customer, existence-checked, passed through to the repository', async () => {
+    const { service, repo } = makeService();
+    await service.create(
+      { scope: 's', reason: 'r', customerId: 'cust-1' },
+      'u-dpo',
+    );
+    expect(repo.customerExists).toHaveBeenCalledWith('cust-1');
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'cust-1', insuredPersonId: null }),
+    );
+  });
+
+  it('404s an unknown customerId', async () => {
+    const { service } = makeService({
+      repo: { customerExists: vi.fn().mockResolvedValue(false) },
+    });
+    await expect(
+      service.create(
+        { scope: 's', reason: 'r', customerId: 'nope' },
+        'u-dpo',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('404s an unknown insuredPersonId', async () => {
+    const { service } = makeService({
+      repo: { insuredPersonExists: vi.fn().mockResolvedValue(false) },
+    });
+    await expect(
+      service.create(
+        { scope: 's', reason: 'r', insuredPersonId: 'nope' },
+        'u-dpo',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('422s when both customerId and insuredPersonId are set — ambiguous which one names the subject', async () => {
+    const { service, repo } = makeService();
+    await expect(
+      service.create(
+        {
+          scope: 's',
+          reason: 'r',
+          customerId: 'cust-1',
+          insuredPersonId: 'ip-1',
+        },
+        'u-dpo',
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(repo.create).not.toHaveBeenCalled();
   });
 });
 
@@ -177,6 +234,14 @@ describe('LegalHoldService reads', () => {
       retentionScheduleItemId: 'rsi-1',
       active: true,
     });
+  });
+
+  it('lists holds scoped to one data subject — the same query fulfil() runs internally', async () => {
+    const { service, repo } = makeService();
+    await service.list({ customerId: 'cust-1' });
+    expect(repo.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: 'cust-1' }),
+    );
   });
 
   it('404s an unknown hold on get', async () => {

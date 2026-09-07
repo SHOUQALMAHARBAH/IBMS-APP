@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { DsrService } from './dsr.service';
 import type { DsrRepository } from '../../repositories/dsr.repository';
+import type { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuditService } from '../audit/audit.service';
@@ -37,6 +38,7 @@ const row = (over: Record<string, unknown> = {}) => ({
 function makeService(
   over: {
     repo?: Record<string, unknown>;
+    legalHolds?: Record<string, unknown>;
     slaTimer?: Record<string, unknown>;
   } = {},
 ) {
@@ -50,6 +52,10 @@ function makeService(
     recordHandlerAssignment: vi.fn().mockResolvedValue({ count: 1 }),
     applyExtension: vi.fn().mockResolvedValue({ count: 1 }),
     ...over.repo,
+  };
+  const legalHolds = {
+    hasActiveHoldForSubject: vi.fn().mockResolvedValue(false),
+    ...over.legalHolds,
   };
   const workflow = {
     transition: vi
@@ -79,11 +85,12 @@ function makeService(
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new DsrService(
     repo as unknown as DsrRepository,
+    legalHolds as unknown as LegalHoldRepository,
     workflow as unknown as WorkflowTransitionService,
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
   );
-  return { service, repo, workflow, slaTimer, audit };
+  return { service, repo, legalHolds, workflow, slaTimer, audit };
 }
 
 describe('DsrService.create (M04)', () => {
@@ -430,6 +437,44 @@ describe('DsrService.fulfil (M04)', () => {
     await expect(service.fulfil('dsr-1', {}, 'u-dpo')).rejects.toBeInstanceOf(
       UnprocessableEntityException,
     );
+  });
+
+  it('422s a DELETION fulfil when an active Legal Hold names this subject, EVEN with confirmNoOpenRetentionHold: true — a live check the attestation cannot override', async () => {
+    const { service, legalHolds, workflow } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(row({ type: 'DELETION', status: 'IN_PROGRESS' })),
+      },
+      legalHolds: {
+        hasActiveHoldForSubject: vi.fn().mockResolvedValue(true),
+      },
+    });
+    await expect(
+      service.fulfil(
+        'dsr-1',
+        { confirmNoOpenRetentionHold: true },
+        'u-dpo',
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(legalHolds.hasActiveHoldForSubject).toHaveBeenCalledWith({
+      customerId: 'cust-1',
+      insuredPersonId: null,
+    });
+    expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('does not consult the Legal Hold register for a non-DELETION fulfil', async () => {
+    const { service, legalHolds } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValueOnce(row({ type: 'ACCESS', status: 'IN_PROGRESS' }))
+          .mockResolvedValue(row({ type: 'ACCESS', status: 'FULFILLED' })),
+      },
+    });
+    await service.fulfil('dsr-1', {}, 'u-dpo');
+    expect(legalHolds.hasActiveHoldForSubject).not.toHaveBeenCalled();
   });
 
   it('fulfils a DELETION with confirmNoOpenRetentionHold: true', async () => {

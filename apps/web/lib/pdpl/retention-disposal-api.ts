@@ -30,6 +30,8 @@ export interface LegalHold {
   nextReviewDueAt: string;
   releasedAt: string | null;
   retentionScheduleItemId: string | null;
+  customerId: string | null;
+  insuredPersonId: string | null;
   isActive: boolean;
 }
 
@@ -78,12 +80,19 @@ export function confirmRetentionScheduleItem(
 // --- Legal holds -----------------------------------------------
 
 export function listLegalHolds(
-  opts: { retentionScheduleItemId?: string; active?: boolean } = {},
+  opts: {
+    retentionScheduleItemId?: string;
+    active?: boolean;
+    customerId?: string;
+    insuredPersonId?: string;
+  } = {},
 ): Promise<LegalHold[]> {
   const params = new URLSearchParams();
   if (opts.retentionScheduleItemId)
     params.set('retentionScheduleItemId', opts.retentionScheduleItemId);
   if (opts.active !== undefined) params.set('active', String(opts.active));
+  if (opts.customerId) params.set('customerId', opts.customerId);
+  if (opts.insuredPersonId) params.set('insuredPersonId', opts.insuredPersonId);
   const qs = params.toString();
   return apiGet(`/legal-holds${qs ? `?${qs}` : ''}`);
 }
@@ -92,6 +101,8 @@ export function createLegalHold(body: {
   scope: string;
   reason: string;
   retentionScheduleItemId?: string;
+  customerId?: string;
+  insuredPersonId?: string;
 }): Promise<LegalHold> {
   return apiPost('/legal-holds', body);
 }

@@ -69,6 +69,8 @@ export default function RetentionDisposalPage() {
   const [holdScope, setHoldScope] = useState('');
   const [holdReason, setHoldReason] = useState('');
   const [holdCategoryId, setHoldCategoryId] = useState('');
+  const [holdCustomerId, setHoldCustomerId] = useState('');
+  const [holdInsuredPersonId, setHoldInsuredPersonId] = useState('');
 
   const [nominateCategoryId, setNominateCategoryId] = useState('');
   const [method, setMethod] = useState<string>(DISPOSAL_METHODS[0]);
@@ -142,10 +144,14 @@ export default function RetentionDisposalPage() {
         scope: holdScope.trim(),
         reason: holdReason.trim(),
         retentionScheduleItemId: holdCategoryId.trim() || undefined,
+        customerId: holdCustomerId.trim() || undefined,
+        insuredPersonId: holdInsuredPersonId.trim() || undefined,
       });
       setHoldScope('');
       setHoldReason('');
       setHoldCategoryId('');
+      setHoldCustomerId('');
+      setHoldInsuredPersonId('');
     });
   }
 
@@ -332,6 +338,22 @@ export default function RetentionDisposalPage() {
                 onChange={(e) => setHoldCategoryId(e.target.value)}
               />
             </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              Customer ID (optional)
+              <input
+                aria-label="Legal hold customer ID"
+                value={holdCustomerId}
+                onChange={(e) => setHoldCustomerId(e.target.value)}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              Insured person ID (optional)
+              <input
+                aria-label="Legal hold insured person ID"
+                value={holdInsuredPersonId}
+                onChange={(e) => setHoldInsuredPersonId(e.target.value)}
+              />
+            </label>
             <button type="submit" disabled={busy}>
               {busy ? 'Saving…' : 'Place hold'}
             </button>
@@ -347,6 +369,7 @@ export default function RetentionDisposalPage() {
                   <tr>
                     <th style={head}>Scope</th>
                     <th style={head}>Category</th>
+                    <th style={head}>Subject</th>
                     <th style={head}>Next review due</th>
                     <th style={head}>Status</th>
                     <th style={head}>Action</th>
@@ -358,6 +381,13 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>{h.scope}</td>
                       <td style={cell}>
                         {h.retentionScheduleItemId ? h.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
+                      </td>
+                      <td style={cell}>
+                        {h.customerId
+                          ? `Customer ${h.customerId.slice(0, 8)}…`
+                          : h.insuredPersonId
+                            ? `Insured person ${h.insuredPersonId.slice(0, 8)}…`
+                            : '—'}
                       </td>
                       <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
                       <td style={cell}>{h.isActive ? 'Active' : 'Released'}</td>

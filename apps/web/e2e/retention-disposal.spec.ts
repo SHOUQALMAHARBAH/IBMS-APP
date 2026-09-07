@@ -43,6 +43,20 @@ const HOLDS = [
     nextReviewDueAt: "2027-03-01T00:00:00.000Z",
     releasedAt: null,
     retentionScheduleItemId: "rsi-1",
+    customerId: null,
+    insuredPersonId: null,
+    isActive: true,
+  },
+  {
+    id: "lh-2",
+    scope: "Litigation hold on a named customer",
+    reason: "Active litigation pending discovery.",
+    placedAt: "2026-09-01T00:00:00.000Z",
+    nextReviewDueAt: "2027-03-01T00:00:00.000Z",
+    releasedAt: null,
+    retentionScheduleItemId: null,
+    customerId: "cust-12345678-e2e",
+    insuredPersonId: null,
     isActive: true,
   },
 ];
@@ -102,13 +116,64 @@ test("lists the retention schedule, Legal Holds, and disposal batches with their
   await expect(
     page.getByText("Customer XYZ file", { exact: false }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Release" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Record review" })).toBeVisible();
+  // Two Legal Holds are fixtured (one bare, one naming a customer) — each
+  // row gets its own Release/Record review pair.
+  await expect(
+    page.getByRole("button", { name: "Release" }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record review" }).first(),
+  ).toBeVisible();
 
   await expect(page.getByRole("cell", { name: "DPO_APPROVED" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record execution" }),
   ).toBeVisible();
+});
+
+test("shows a Legal Hold's named subject and lets a DPO place a new hold naming a customer", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await mockRegister(page);
+
+  await page.goto("/retention-disposal");
+  await expect(page.getByText("Customer cust-123…")).toBeVisible();
+
+  let lastCreateBody: Record<string, unknown> | null = null;
+  await page.route("http://localhost:4000/legal-holds", (route) => {
+    if (route.request().method() === "POST") {
+      lastCreateBody = route.request().postDataJSON() as Record<string, unknown>;
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: "lh-3",
+          scope: "New hold",
+          reason: "New reason",
+          placedAt: "2026-09-07T00:00:00.000Z",
+          nextReviewDueAt: "2027-03-07T00:00:00.000Z",
+          releasedAt: null,
+          retentionScheduleItemId: null,
+          customerId: "cust-new",
+          insuredPersonId: null,
+          isActive: true,
+        },
+      });
+    }
+    return route.fulfill({ status: 200, json: HOLDS });
+  });
+
+  await page.getByLabel("Legal hold scope").fill("New hold");
+  await page.getByLabel("Legal hold reason").fill("New reason");
+  await page.getByLabel("Legal hold customer ID").fill("cust-new");
+  await page.getByRole("button", { name: "Place hold" }).click();
+
+  await expect.poll(() => lastCreateBody).not.toBeNull();
+  expect(lastCreateBody).toMatchObject({
+    scope: "New hold",
+    reason: "New reason",
+    customerId: "cust-new",
+  });
 });
 
 test("a user without the schedule permission sees the underlying error message", async ({

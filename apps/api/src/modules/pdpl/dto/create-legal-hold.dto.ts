@@ -8,7 +8,15 @@ import { emptyStringToUndefined } from '../../../common/dto.util';
  * its own; only a category-scoped hold participates in the routine-
  * disposal exclusion check (`disposal-batch.config.ts`). `nextReviewDueAt`
  * is never caller-suppliable — always computed from the 6-month
- * `legal_hold_necessity_review` SLA entry at `placedAt`. */
+ * `legal_hold_necessity_review` SLA entry at `placedAt`.
+ *
+ * `customerId`/`insuredPersonId` (Process #52 widening, migration
+ * `20260916120000`) structurally name the ONE data subject this hold
+ * covers, independent of `retentionScheduleItemId` — at most one of the
+ * two may be set (`hasAtMostOneSubjectReference`, validated in the
+ * service); a hold naming neither is still valid (the pre-widening,
+ * `scope`-text-only shape). Only a hold naming a subject participates in
+ * `DsrService.fulfil()`'s live retention-hold check. */
 export class CreateLegalHoldDto {
   @IsString()
   @Length(1, 500)
@@ -22,4 +30,14 @@ export class CreateLegalHoldDto {
   @Transform(emptyStringToUndefined)
   @IsUUID()
   retentionScheduleItemId?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsUUID()
+  customerId?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsUUID()
+  insuredPersonId?: string;
 }

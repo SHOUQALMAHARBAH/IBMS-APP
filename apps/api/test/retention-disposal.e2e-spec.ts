@@ -40,6 +40,8 @@ interface LegalHoldBody {
   id: string;
   scope: string;
   retentionScheduleItemId: string | null;
+  customerId: string | null;
+  insuredPersonId: string | null;
   nextReviewDueAt: string;
   releasedAt: string | null;
   isActive: boolean;
@@ -413,5 +415,80 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
     expect((activeOnly.body as LegalHoldBody[]).map((h) => h.id)).toEqual([
       hold.id,
     ]);
+  });
+
+  it('a Legal Hold can name one data subject structurally — validated, listable, and blocking the M04 DSR cross-check (see dsr.e2e-spec.ts for the full DSR-side walk)', async () => {
+    const app = await boot();
+    const sales = await makeUser(
+      app,
+      'retention-hold-subject-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const dpo = await makeUser(
+      app,
+      'retention-hold-subject-dpo',
+      'DATA_PROTECTION_OFFICER',
+    );
+
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `Legal Hold Subject E2E ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+      },
+    });
+
+    // both customerId and insuredPersonId at once is ambiguous — 422
+    await request(app.getHttpServer())
+      .post('/legal-holds')
+      .set(bearer(dpo.accessToken))
+      .send({
+        scope: 'ambiguous',
+        reason: 'r',
+        customerId: customer.id,
+        insuredPersonId: customer.id, // any UUID — rejected before an existence check runs
+      })
+      .expect(422);
+
+    // an unknown customerId is 404
+    await request(app.getHttpServer())
+      .post('/legal-holds')
+      .set(bearer(dpo.accessToken))
+      .send({
+        scope: 'unknown subject',
+        reason: 'r',
+        customerId: '00000000-0000-0000-0000-000000000000',
+      })
+      .expect(404);
+
+    // a hold naming a real customer is created and listable by that subject
+    const hold = (
+      await request(app.getHttpServer())
+        .post('/legal-holds')
+        .set(bearer(dpo.accessToken))
+        .send({
+          scope: `Litigation hold on ${customer.id}`,
+          reason: 'Active litigation pending discovery.',
+          customerId: customer.id,
+        })
+        .expect(201)
+    ).body as LegalHoldBody;
+    expect(hold.customerId).toBe(customer.id);
+    expect(hold.insuredPersonId).toBeNull();
+
+    const byCustomer = await request(app.getHttpServer())
+      .get('/legal-holds')
+      .query({ customerId: customer.id })
+      .set(bearer(dpo.accessToken))
+      .expect(200);
+    expect((byCustomer.body as LegalHoldBody[]).map((h) => h.id)).toEqual([
+      hold.id,
+    ]);
+
+    // release it so this test leaves no dangling active hold behind
+    await request(app.getHttpServer())
+      .post(`/legal-holds/${hold.id}/release`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
   });
 });

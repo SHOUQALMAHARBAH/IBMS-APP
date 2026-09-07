@@ -12,6 +12,7 @@ import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
   LEGAL_HOLD_REVIEW_SLA_WORKFLOW,
   deriveLegalHoldView,
+  hasAtMostOneSubjectReference,
   legalHoldAuditSnapshot,
   type LegalHoldRow,
   type LegalHoldView,
@@ -31,6 +32,12 @@ import type { ListLegalHoldsQueryDto } from './dto/list-legal-holds-query.dto';
  * the row `startTimer()` just created if the old rows were resolved first.
  * Release is terminal — no further review is ever due once data can
  * finally be considered for routine disposal again.
+ *
+ * `create()` validates `customerId`/`insuredPersonId` the ConsentRecord/DSR
+ * way (existence-checked, at most one — `hasAtMostOneSubjectReference`)
+ * before a hold can name a data subject structurally; this is the register
+ * `DsrService.fulfil()` now cross-checks live before letting a DELETION
+ * request close as fully fulfilled.
  */
 @Injectable()
 export class LegalHoldService {
@@ -46,6 +53,11 @@ export class LegalHoldService {
     dto: CreateLegalHoldDto,
     actorUserId: string,
   ): Promise<LegalHoldView> {
+    if (!hasAtMostOneSubjectReference(dto)) {
+      throw new UnprocessableEntityException(
+        'At most one of customerId / insuredPersonId may identify the data subject this hold covers.',
+      );
+    }
     if (
       dto.retentionScheduleItemId &&
       !(await this.repo.retentionScheduleItemExists(
@@ -54,6 +66,17 @@ export class LegalHoldService {
     ) {
       throw new NotFoundException(
         `Retention schedule item ${dto.retentionScheduleItemId} not found.`,
+      );
+    }
+    if (dto.customerId && !(await this.repo.customerExists(dto.customerId))) {
+      throw new NotFoundException(`Customer ${dto.customerId} not found.`);
+    }
+    if (
+      dto.insuredPersonId &&
+      !(await this.repo.insuredPersonExists(dto.insuredPersonId))
+    ) {
+      throw new NotFoundException(
+        `Insured person ${dto.insuredPersonId} not found.`,
       );
     }
 
@@ -68,6 +91,8 @@ export class LegalHoldService {
       reason: dto.reason,
       nextReviewDueAt,
       retentionScheduleItemId: dto.retentionScheduleItemId ?? null,
+      customerId: dto.customerId ?? null,
+      insuredPersonId: dto.insuredPersonId ?? null,
     });
 
     await this.startSlaTimerBestEffort(row.id, nextReviewDueAt, actorUserId);
@@ -91,6 +116,8 @@ export class LegalHoldService {
     const rows = await this.repo.findMany({
       retentionScheduleItemId: query.retentionScheduleItemId,
       active: query.active,
+      customerId: query.customerId,
+      insuredPersonId: query.insuredPersonId,
     });
     return rows.map((r) => deriveLegalHoldView(r));
   }

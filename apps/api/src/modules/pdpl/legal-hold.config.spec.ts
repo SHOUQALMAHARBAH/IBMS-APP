@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   deriveLegalHoldView,
+  hasAtMostOneSubjectReference,
   legalHoldAuditSnapshot,
   type LegalHoldRow,
 } from './legal-hold.config';
@@ -13,7 +14,31 @@ const row = (over: Partial<LegalHoldRow> = {}): LegalHoldRow => ({
   nextReviewDueAt: new Date('2027-03-14T00:00:00.000Z'),
   releasedAt: null,
   retentionScheduleItemId: 'rsi-1',
+  customerId: null,
+  insuredPersonId: null,
   ...over,
+});
+
+describe('hasAtMostOneSubjectReference', () => {
+  it('allows neither set (a category- or scope-text-only hold)', () => {
+    expect(hasAtMostOneSubjectReference({})).toBe(true);
+  });
+
+  it('allows exactly one set', () => {
+    expect(hasAtMostOneSubjectReference({ customerId: 'cust-1' })).toBe(true);
+    expect(
+      hasAtMostOneSubjectReference({ insuredPersonId: 'ip-1' }),
+    ).toBe(true);
+  });
+
+  it('rejects both set — ambiguous which one names the subject', () => {
+    expect(
+      hasAtMostOneSubjectReference({
+        customerId: 'cust-1',
+        insuredPersonId: 'ip-1',
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('deriveLegalHoldView', () => {
@@ -30,6 +55,12 @@ describe('deriveLegalHoldView', () => {
     expect(v.isActive).toBe(false);
     expect(v.releasedAt).toBe('2026-10-01T00:00:00.000Z');
   });
+
+  it('carries the subject reference through, when set', () => {
+    const v = deriveLegalHoldView(row({ customerId: 'cust-1' }));
+    expect(v.customerId).toBe('cust-1');
+    expect(v.insuredPersonId).toBeNull();
+  });
 });
 
 describe('legalHoldAuditSnapshot', () => {
@@ -40,7 +71,14 @@ describe('legalHoldAuditSnapshot', () => {
       scope: 'Customer XYZ file — litigation ABC-2026-123',
       reason: 'Active litigation pending discovery.',
       retentionScheduleItemId: 'rsi-1',
+      customerId: null,
+      insuredPersonId: null,
       isActive: true,
     });
+  });
+
+  it('carries the subject reference into the audit snapshot, when set', () => {
+    const snap = legalHoldAuditSnapshot(row({ customerId: 'cust-1' }));
+    expect(snap).toMatchObject({ customerId: 'cust-1', insuredPersonId: null });
   });
 });

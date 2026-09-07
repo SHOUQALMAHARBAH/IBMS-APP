@@ -521,6 +521,7 @@ model Customer {
   crossSellOpportunities CrossSellOpportunity[]
   upSellRecommendations  UpSellRecommendation[]
   transactionMonitoringAlerts TransactionMonitoringAlert[]
+  legalHolds        LegalHold[]
 
   @@index([legalName])
   @@index([status])
@@ -557,6 +558,7 @@ model InsuredPerson {
 
   consentRecords  ConsentRecord[]
   dataSubjectRequests DataSubjectRequest[] @relation("DsrInsuredPerson")
+  legalHolds      LegalHold[]
 }
 
 /// Process 3-4 (Customer Acquisition/Onboarding) KYC lifecycle — mirrors the
@@ -2564,7 +2566,14 @@ model RetentionScheduleItem {
 /// exclusion check against a DisposalBatch's own category mechanically
 /// checkable — `scope` stays free text for the human-readable reference
 /// (a specific customer file, a litigation case number) a hold not tied to
-/// a whole category still needs.
+/// a whole category still needs. `customerId`/`insuredPersonId` (a second,
+/// later Process #52 widening — at most one set, independent of
+/// `retentionScheduleItemId`) make a hold placed against ONE data subject's
+/// file mechanically checkable too — the live cross-check
+/// `DsrService.fulfil()` runs before letting a DELETION request close as
+/// fully fulfilled, so "never closeable while a retention flag is open"
+/// (M04) is a real, current-data check against THIS register, not a staff
+/// attestation alone.
 model LegalHold {
   id            String   @id @default(uuid())
   scope         String   // description / entity reference under hold
@@ -2574,9 +2583,15 @@ model LegalHold {
   releasedAt    DateTime?
   retentionScheduleItemId String?
   retentionScheduleItem   RetentionScheduleItem? @relation(fields: [retentionScheduleItemId], references: [id])
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  insuredPersonId String?
+  insuredPerson   InsuredPerson? @relation(fields: [insuredPersonId], references: [id])
 
   @@index([retentionScheduleItemId])
   @@index([releasedAt])
+  @@index([customerId])
+  @@index([insuredPersonId])
 }
 
 enum DisposalBatchStatus {

@@ -5883,12 +5883,18 @@ narrows a gap.
   actions" table was silent on this despite the brain `CLAUDE.md`'s
   summary already naming "DSR closure" as covered — fixed alongside this
   build (a documentation gap the build itself surfaced, not a new rule). A
-  DELETION request cannot be marked fully FULFILLED without an explicit,
-  now-**persisted** staff attestation (`confirmNoOpenRetentionHold` →
-  `noOpenRetentionHoldConfirmedAt`) — Retention & Disposal (M06) isn't
-  built yet, so this is deliberately a staff attestation, not an automated
-  check against real retention data (the #48 `third_party_payment_source`-
-  dormancy lesson applied up front). The one ACCESS-only +15-business-day
+  DELETION request cannot be marked fully FULFILLED while an active Legal
+  Hold names this exact data subject — a REAL, live check
+  (`LegalHoldRepository.hasActiveHoldForSubject()`, added 2026-09-07 once
+  Retention & Disposal/M06 shipped a real register — see § Part D below and
+  `ibms-brain/meta/context/data-subject-requests.md`) that a staff
+  attestation cannot override. For the one case that check cannot cover (a
+  record category whose retention period hasn't elapsed has no per-subject
+  hold row), an explicit, **persisted** staff attestation
+  (`confirmNoOpenRetentionHold` → `noOpenRetentionHoldConfirmedAt`) is still
+  mandatory — deliberately kept a LIVE, enforced gate rather than a dormant
+  one (the #48 `third_party_payment_source`-dormancy lesson applied up
+  front). The one ACCESS-only +15-business-day
   extension re-bases `slaDueAt` additive to the *existing* due date
   (write-once, `accessExtensionAppliedAt IS NULL` **and** `status IN
   (RECEIVED, IDENTITY_VERIFIED, IN_PROGRESS)` re-asserted together in the
@@ -6064,7 +6070,35 @@ narrows a gap.
   in the new service specs (both trip
   `@typescript-eslint/no-unsafe-assignment`; fixed by capturing the mock
   call's argument into a locally-typed `const` and asserting its fields
-  individually, the `dsr.service.spec.ts` precedent). **Deferred:** no
+  individually, the `dsr.service.spec.ts` precedent).
+
+  **Follow-up (2026-09-07)**: a meticulousness re-audit of Part D against
+  the literal backlog text found and closed a real M04/M06 integration gap
+  — `LegalHold` gained optional `customerId`/`insuredPersonId` columns
+  (migration `20260916120000`, at most one of the two set —
+  `hasAtMostOneSubjectReference`, the ConsentRecord/DSR "at most" not
+  "exactly" shape) so a hold can name ONE data subject structurally, not
+  just in `scope`'s free text. `LegalHoldRepository.
+  hasActiveHoldForSubject()` is the new live check `DsrService.fulfil()`
+  (M04) now runs before letting a DELETION request close as fully
+  fulfilled — see § Part D — Data Subject Request Management (M04) above
+  for the DSR-side detail. `CreateLegalHoldDto`/`ListLegalHoldsQueryDto`
+  gained matching optional fields (existence-checked at creation,
+  at-most-one validated); `apps/web/app/(app)/retention-disposal/page.tsx`
+  gained Customer ID / Insured person ID inputs and a Subject column.
+  Verification: +12 api unit → api unit **2316** (185 files, from 2304);
+  new e2e coverage in both `test/dsr.e2e-spec.ts` (a hold naming the
+  subject blocks `fulfil` outright even with the attestation ticked;
+  releasing it lets a fresh DELETION request for the same customer fulfil
+  normally, proving the check is live, not cached) and
+  `test/retention-disposal.e2e-spec.ts` (at-most-one 422, unknown-subject
+  404, list-by-customerId); full api unit suite 2316/2316 and full 62-file
+  api e2e suite green across 8 foreground sub-batches. A pre-existing
+  Playwright test needed a `.first()` fix after a second fixture row made
+  its own `Release`-button locator ambiguous (a real, caught
+  test-authoring bug from widening a shared fixture, not a product one).
+
+  **Deferred:** no
   automated retention-expiry sweep that turns "past its cutoff" into an
   actual `DisposalBatch` nomination — every batch today is manually
   nominated; the real per-category retention periods from `PRIV-STD-03`

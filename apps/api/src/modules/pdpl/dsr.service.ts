@@ -13,6 +13,7 @@ import { WorkflowTransitionService } from '../workflow/workflow-transition.servi
 import { assertDifferentActors } from '../../common/maker-checker.util';
 import { hasExactlyOneOwner } from '../../common/dto.util';
 import { DsrRepository } from '../../repositories/dsr.repository';
+import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
   applyDsrExtension,
   canApplyDsrExtension,
@@ -56,6 +57,19 @@ const DSR_READ_LIMIT = 5000;
  * `dsr.handle` and `dsr.close` are DPO-only, so this segregates between two
  * distinct DPO officers, not between roles.
  *
+ * **DELETION never closes as fully fulfilled while an active Legal Hold
+ * names this subject** (Process #52 widening, migration `20260916120000`
+ * on M06's `LegalHold`): `fulfil()` runs a REAL, live
+ * `LegalHoldRepository.hasActiveHoldForSubject()` check first — an
+ * outright 422 if one exists, not just a staff checkbox. This closes a gap
+ * that was honest when M04 first shipped (M06 didn't exist yet, so
+ * `confirmNoOpenRetentionHold` was necessarily attestation-only) but went
+ * stale once M06 landed with a real, queryable register and nobody wired
+ * the two together. The `confirmNoOpenRetentionHold` attestation still
+ * gates the case with NO formally-placed hold — a category's retention
+ * period not yet elapsed is a real reason to hold off that this register
+ * alone cannot detect (`fulfil-dsr.dto.ts`'s own header comment).
+ *
  * Reads are audited (`isSensitiveDataAccess: true`) — a DSR is a data
  * subject's own exercise of a PDPL right (Access/Correction/Deletion/
  * Objection), the most privacy-central content this system holds, closer
@@ -68,6 +82,7 @@ export class DsrService {
 
   constructor(
     private readonly repo: DsrRepository,
+    private readonly legalHolds: LegalHoldRepository,
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
@@ -360,10 +375,21 @@ export class DsrService {
     if (dsr.status === 'FULFILLED') {
       return deriveDsrView(dsr, new Date()); // idempotent
     }
-    if (dsr.type === 'DELETION' && dto.confirmNoOpenRetentionHold !== true) {
-      throw new UnprocessableEntityException(
-        `Data Subject Request ${id} is a DELETION request — it cannot be marked fully fulfilled without confirming no retention hold applies (confirmNoOpenRetentionHold: true). Use partially-fulfil if one does.`,
-      );
+    if (dsr.type === 'DELETION') {
+      const hasActiveHold = await this.legalHolds.hasActiveHoldForSubject({
+        customerId: dsr.customerId,
+        insuredPersonId: dsr.insuredPersonId,
+      });
+      if (hasActiveHold) {
+        throw new UnprocessableEntityException(
+          `Data Subject Request ${id} cannot be marked fully fulfilled — an active Legal Hold names this data subject. Use partially-fulfil, referencing the hold, until it is released.`,
+        );
+      }
+      if (dto.confirmNoOpenRetentionHold !== true) {
+        throw new UnprocessableEntityException(
+          `Data Subject Request ${id} is a DELETION request — it cannot be marked fully fulfilled without confirming no retention hold applies (confirmNoOpenRetentionHold: true). Use partially-fulfil if one does.`,
+        );
+      }
     }
 
     const workflowName = dsrSlaWorkflowFor(dsr.type);

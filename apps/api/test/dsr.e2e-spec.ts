@@ -402,6 +402,103 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .expect(403);
   });
 
+  it('an active Legal Hold naming the same data subject blocks FULFILLED outright — the attestation cannot override a real, live hold', async () => {
+    const app = await boot();
+    const sales = await makeUser(
+      app,
+      'dsr-hold-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const dpo = await makeUser(app, 'dsr-hold-dpo', 'DATA_PROTECTION_OFFICER');
+
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `DSR Legal Hold E2E ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+      },
+    });
+
+    const del = (
+      await request(app.getHttpServer())
+        .post('/dsr')
+        .set(bearer(sales.accessToken))
+        .send({ customerId: customer.id, type: 'DELETION' })
+        .expect(201)
+    ).body as DsrBody;
+    await request(app.getHttpServer())
+      .post(`/dsr/${del.id}/verify-identity`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/dsr/${del.id}/start`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+
+    const hold = (
+      await request(app.getHttpServer())
+        .post('/legal-holds')
+        .set(bearer(dpo.accessToken))
+        .send({
+          scope: `Litigation hold on customer ${customer.id}`,
+          reason: 'Active litigation pending discovery.',
+          customerId: customer.id,
+        })
+        .expect(201)
+    ).body as { id: string };
+
+    // The staff attestation alone is no longer sufficient — the live hold
+    // check runs first and blocks it, even with the checkbox ticked.
+    const blocked = await request(app.getHttpServer())
+      .post(`/dsr/${del.id}/fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({ confirmNoOpenRetentionHold: true })
+      .expect(422);
+    expect((blocked.body as { message: string }).message).toContain(
+      'active Legal Hold',
+    );
+
+    // partially-fulfil remains available regardless of the hold
+    const partial = await request(app.getHttpServer())
+      .post(`/dsr/${del.id}/partially-fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({
+        retentionScheduleReference: hold.id,
+        partialFulfilmentJustification: 'Active Legal Hold on this file.',
+      })
+      .expect(201);
+    expect((partial.body as DsrBody).status).toBe('PARTIALLY_FULFILLED');
+
+    // Once released, a fresh DELETION request for the same customer can
+    // fulfil normally — the check is live, not cached from the earlier call.
+    await request(app.getHttpServer())
+      .post(`/legal-holds/${hold.id}/release`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+
+    const del2 = (
+      await request(app.getHttpServer())
+        .post('/dsr')
+        .set(bearer(sales.accessToken))
+        .send({ customerId: customer.id, type: 'DELETION' })
+        .expect(201)
+    ).body as DsrBody;
+    await request(app.getHttpServer())
+      .post(`/dsr/${del2.id}/verify-identity`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/dsr/${del2.id}/start`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+    const fulfilled = await request(app.getHttpServer())
+      .post(`/dsr/${del2.id}/fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({ confirmNoOpenRetentionHold: true })
+      .expect(201);
+    expect((fulfilled.body as DsrBody).status).toBe('FULFILLED');
+  });
+
   it('rejects a request (from RECEIVED, before identity is even verified) with a mandatory reason, and lists/filters book-wide', async () => {
     const app = await boot();
     const sales = await makeUser(
