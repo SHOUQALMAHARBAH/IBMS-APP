@@ -188,6 +188,7 @@ export class EmployeePerformanceService {
     const rows = await this.repo.findMany({
       employeeId: query.employeeId,
       periodLabel: query.periodLabel,
+      branchId: query.branchId,
     });
     return rows.map(deriveEmployeePerformanceRecordView);
   }

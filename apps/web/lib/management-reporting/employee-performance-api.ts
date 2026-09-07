@@ -32,10 +32,14 @@ export function computeEmployeePerformance(
 export function listEmployeePerformance(filters: {
   employeeId?: string;
   periodLabel?: string;
+  /** Part E Insurer & Employee Performance Dashboard (backlog #64)
+   * addition — scopes to employees whose linked User.branchId matches. */
+  branchId?: string;
 }): Promise<EmployeePerformanceRecord[]> {
   const params = new URLSearchParams();
   if (filters.employeeId) params.set('employeeId', filters.employeeId);
   if (filters.periodLabel) params.set('periodLabel', filters.periodLabel);
+  if (filters.branchId) params.set('branchId', filters.branchId);
   const qs = params.toString();
   return apiGet(`/employee-performance${qs ? `?${qs}` : ''}`);
 }

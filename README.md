@@ -841,7 +841,7 @@ build actually is today:
   definitions; `consent_withdrawal`, the two DSR workflows, M06's
   `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
   / `dpia_review` are the ones a real caller uses.
-- **Part E — dashboards — begun, five of six built.** Part E's header cross-references
+- **Part E — dashboards — COMPLETE, six of six.** Part E's header cross-references
   Domain G's own Process #64 directly ("Executive Management Reporting — Part E below")
   — it IS #64's own detail, not six unrelated processes. **Sales Dashboard is built**:
   `GET /dashboards/sales` — new leads and conversion rate, premium written (new vs.
@@ -895,10 +895,31 @@ build actually is today:
   table, would be disproportionate for a rollup screen); `branchId` is the only
   cross-cutting filter with real reach, since none of the seven registers ties to a
   `Policy` at all. The first real consumer of the pre-seeded `dashboard.
-  compliance.view` permission. **Not yet built**: verifying the Insurer & Employee
-  Performance dashboard (likely already substantially covered by backlog #60/#61).
-  The `dashboard.executive.view` cross-department rollup screen (#64's own top-level
-  permission) also remains unbuilt.
+  compliance.view` permission. **Insurer & Employee Performance Dashboard is
+  verified + one small gap closed** — backlog #60/#61, already fully built, ARE this
+  6th dashboard (Part E's own permission grid names their existing
+  `insurer-performance.view`/`employee-performance.view` pair, not a new
+  `dashboard.*.view` code — the signal that no fresh build was owed here). Confirmed
+  "insurer performance score across 4 axes" is a literal match to
+  `InsurerPerformanceScore`'s four columns and "employee KPI achievement" reads as
+  #61's own `EmployeePerformanceRecord` scorecard (not #59's narrower `SalesTarget`
+  mechanism); re-ran both #60/#61's full existing suites to confirm. Closed one small,
+  real gap: `GET /employee-performance` gained a `branchId` filter (via the employee's
+  optional linked `User.branchId`) — `GET /insurer-performance` deliberately left
+  untouched, since its score is a book-wide, per-insurer figure that branch/line
+  scoping would mean recomputing, not filtering. A new, lightweight
+  `/dashboards/insurer-employee-performance` page presents both book-wide for one
+  period; the two existing single-lookup pages (`/insurer-performance`,
+  `/employee-performance`) stay untouched. **The cross-cutting closing bullet**
+  ("every dashboard filterable by branch/line of business/insurer/time period, and
+  renderable in either language") resolves as: the filter half is honestly satisfied
+  per-dashboard (each of Part E's six sections above documents exactly which
+  dimensions apply, not a blanket checkbox); the bilingual half is NOT satisfied
+  anywhere in the app and is explicitly Part F's own unbuilt scope, not something Part
+  E's dashboards could close. **PART E IS NOW COMPLETE.** The
+  `dashboard.executive.view` cross-department rollup screen (#64's own top-level
+  permission, never one of the six NAMED dashboards, no backlog bullet describing its
+  content) remains unbuilt.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
   is no i18n framework, no RTL layout, no bidirectional-text handling, no locale-aware
   number/date/currency formatting (Gregorian/Hijri, JOD base + multi-currency), no
@@ -6451,8 +6472,70 @@ narrows a gap.
   3/3; full Playwright suite **279/279** (from 276). `npm run typecheck`/`lint`/`build`
   (api + web) OK. No migration, no widening of any existing repository — unlike
   Financial Dashboard, every table this dashboard reads already supported everything it
-  needed. **Deferred:** verifying the Insurer & Employee Performance dashboard; the
-  `dashboard.executive.view` cross-department rollup screen itself.
+  needed. **Deferred (at the time):** verifying the Insurer & Employee Performance
+  dashboard; the `dashboard.executive.view` cross-department rollup screen itself.
+  (Insurer & Employee Performance is now verified — see the next entry, which CLOSES
+  Part E.)
+
+**Part E — Insurer & Employee Performance Dashboard (backlog Process #64) — CLOSES
+  PART E** — the sixth and final named dashboard, after Sales, Policy, Claims,
+  Financial, and Compliance. Backlog text: "insurer performance score across 4 axes,
+  employee KPI achievement." **A third, distinct outcome shape — "verify, then close
+  one small real gap"** — neither a fresh build nor Financial Dashboard's "close one
+  real gap." Part E's OWN permission inventory already names
+  `insurer-performance.view` + `employee-performance.view` (NOT a new
+  `dashboard.*.view` code) as this 6th dashboard's own pair — the signal that #60/#61,
+  already fully built, together already ARE the dashboard, not that a fresh build was
+  owed. Confirmed "insurer performance score across 4 axes" is a literal, exact match
+  to `InsurerPerformanceScore`'s four columns (`quoteResponseScore`/
+  `claimsServiceScore`/`priceScore`/`serviceQualityScore`); "employee KPI achievement"
+  reads as #61's own `EmployeePerformanceRecord` scorecard (`newClients`/
+  `premiumWritten`/`commissionEarned`/`renewalRatePercent`/`crossSellRatePercent`), a
+  broader KPI scorecard distinct from #59's narrower, Sales-Officer-specific
+  `SalesTarget` achievement-percentage mechanism. Both #60/#61's full existing test
+  suites were RE-RUN (not just re-read) to confirm — the #47/#50/#68/DSR
+  "verification is the deliverable" discipline. **One small, real, well-motivated gap
+  closed**: `GET /employee-performance` gained a `branchId` filter (via the employee's
+  OPTIONAL linked `User.branchId` relation) — additive only, no existing caller's call
+  site changed. **`GET /insurer-performance` was deliberately left unchanged** —
+  `InsurerPerformanceScore` is an inherently book-wide, per-insurer metric; segmenting
+  it by branch/line would mean RECOMPUTING a fundamentally different score, not just
+  filtering a read, out of proportion for this pass. No `insuranceLine`/`insurerId`
+  filter on Employee Performance either — an employee isn't tied to a policy/insurer
+  at all. `apps/web/` gains a new, lightweight
+  `/dashboards/insurer-employee-performance` page presenting both scores book-wide for
+  one period side by side, reusing the existing `insurer-performance-api.ts`/
+  `employee-performance-api.ts` clients directly (the latter widened with the new
+  `branchId` param) — no new API client file. The two EXISTING single-lookup pages
+  (`/insurer-performance`, `/employee-performance`) stay untouched, still serving
+  their own distinct "look up one specific insurer/employee's history" purpose.
+  Deliberately shows raw `insurerId`/`employeeId`, not a resolved name — matching the
+  pre-existing, consistent convention on every other insurer/employee-referencing
+  screen in this app. **The cross-cutting closing bullet** ("every dashboard
+  filterable by branch/line of business/insurer/time period, and renderable in either
+  language") resolves as: the filter half is honestly satisfied per-dashboard — every
+  one of Part E's six dashboards has been checked against all four dimensions
+  individually, and each one's own entry above documents exactly which apply and
+  which genuinely don't; this dimension-by-dimension audit, not a blanket checkbox, is
+  the correct way to satisfy the rule's actual intent. The bilingual half is NOT
+  satisfied anywhere in this app and is explicitly, deliberately out of scope here —
+  Part F's own multi-bullet scope (instant language switch, full RTL layout, bidi
+  text, Arabic-first input, locale-aware formatting, bilingual document generation, a
+  4-state screenshot requirement per screen), an effort on the scale of its own Part,
+  not a Part E dashboard's own deliverable. **Verification**: +1 api unit
+  (`employee-performance.service.spec.ts`) → api unit **2304** (185 files, from 2303).
+  Widened `test/employee-performance.e2e-spec.ts` (+1, now 6/6) for the new branchId
+  scoping; both #60/#61's full existing e2e suites (9 tests) re-confirmed green,
+  unchanged. Full api unit suite 2304/2304 confirmed green; full 62-file api e2e suite
+  green across 8 foreground sub-batches, both chronic flakes (`rbac`, `up-sell`)
+  passing, one confirmed-transient TOTP-timing flake in an unrelated file
+  (`information-asset.e2e-spec.ts`) re-confirmed clean in isolation. New Playwright
+  `insurer-employee-performance-dashboard.spec.ts` 3/3; full Playwright suite
+  **282/282** (from 279). `npm run typecheck`/`lint`/`build` (api + web) OK. **PART E
+  (backlog Process #64) IS NOW COMPLETE** — all six named dashboards built/verified;
+  only `dashboard.executive.view` (a future cross-department rollup, never one of the
+  six named dashboards, no backlog bullet describing its content) remains unbuilt,
+  plus the bilingual gap owned by Part F.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

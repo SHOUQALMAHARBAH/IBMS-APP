@@ -210,8 +210,17 @@ describe('EmployeePerformanceService.list / latest', () => {
     expect(repo.findMany).toHaveBeenCalledWith({
       employeeId: 'employee-1',
       periodLabel: undefined,
+      branchId: undefined,
     });
     expect(rows[0].id).toBe('record-1');
+  });
+
+  it('list() forwards branchId — Part E Insurer & Employee Performance Dashboard addition', async () => {
+    const { service, repo } = makeService();
+    await service.list({ branchId: 'branch-1' });
+    expect(repo.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ branchId: 'branch-1' }),
+    );
   });
 
   it('latest() 404s when no record has ever been computed', async () => {

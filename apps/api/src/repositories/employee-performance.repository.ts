@@ -13,6 +13,12 @@ export interface EmployeePerformanceRecordInput {
 export interface EmployeePerformanceRecordFilter {
   employeeId?: string;
   periodLabel?: string;
+  /** Part E Insurer & Employee Performance Dashboard (backlog #64) addition
+   * — scopes to employees whose linked `User.branchId` matches, via the
+   * (optional — an employee need not have a linked User) `employee.user`
+   * relation. No `insuranceLine`/`insurerId` equivalent: an employee isn't
+   * tied to a policy/insurer at all. */
+  branchId?: string;
 }
 
 export interface OutcomeCount {
@@ -204,6 +210,9 @@ export class EmployeePerformanceRepository {
       where: {
         employeeId: filter.employeeId,
         periodLabel: filter.periodLabel,
+        ...(filter.branchId
+          ? { employee: { user: { is: { branchId: filter.branchId } } } }
+          : {}),
       },
       orderBy: { periodLabel: 'desc' },
     });

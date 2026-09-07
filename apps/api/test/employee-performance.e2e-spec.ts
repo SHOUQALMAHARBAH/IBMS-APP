@@ -386,4 +386,65 @@ describe('Employee Performance (e2e) — backlog Part C #61', () => {
     ).body as EmployeePerformanceRecordBody[];
     expect(afterRecompute).toHaveLength(1);
   });
+
+  it("scopes the list to one branch via the employee's linked User.branchId — Part E Insurer & Employee Performance Dashboard addition", async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'ep-manager-branch',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const branch = await prisma.branch.create({
+      data: { name: uniqueLabel('Employee Performance E2E Branch') },
+    });
+    const employee = await prisma.employee.create({
+      data: {
+        fullName: uniqueLabel('Branch-Scoped Employee'),
+        nationalIdEnc: 'enc',
+      },
+    });
+    await prisma.user.create({
+      data: {
+        fullName: 'Branch-Scoped Scored User',
+        email: uniqueEmail('ep-branch-scored'),
+        passwordHash: 'unused-scored-user',
+        employeeId: employee.id,
+        branchId: branch.id,
+      },
+    });
+    const periodLabel = uniqueLabel('2020-07');
+
+    await request(app.getHttpServer())
+      .post('/employee-performance/compute')
+      .set(bearer(manager.accessToken))
+      .send({
+        employeeId: employee.id,
+        periodLabel,
+        periodStart: '2020-07-01',
+        periodEnd: '2020-08-01',
+      })
+      .expect(201);
+
+    const scoped = (
+      await request(app.getHttpServer())
+        .get('/employee-performance')
+        .query({ branchId: branch.id, periodLabel })
+        .set(bearer(manager.accessToken))
+        .expect(200)
+    ).body as EmployeePerformanceRecordBody[];
+    expect(scoped).toHaveLength(1);
+    expect(scoped[0].employeeId).toBe(employee.id);
+
+    const otherBranch = await prisma.branch.create({
+      data: { name: uniqueLabel('Employee Performance E2E Other Branch') },
+    });
+    const emptyScoped = (
+      await request(app.getHttpServer())
+        .get('/employee-performance')
+        .query({ branchId: otherBranch.id, periodLabel })
+        .set(bearer(manager.accessToken))
+        .expect(200)
+    ).body as EmployeePerformanceRecordBody[];
+    expect(emptyScoped).toHaveLength(0);
+  });
 });
