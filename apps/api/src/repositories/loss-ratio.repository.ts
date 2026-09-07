@@ -20,6 +20,8 @@ export interface AnalyticsPolicyRow {
   customerId: string;
   customerLegalName: string;
   insuranceLine: string;
+  insurerId: string;
+  insurerName: string;
   /** the human-readable policy reference (falls back to the id). */
   policyRef: string;
   /** `issuedPremium ?? requestedPremium`. */
@@ -89,15 +91,20 @@ export class LossRatioRepository {
 
   /**
    * Process 30 — load every "written" policy (optionally scoped to one
-   * customer / line / policy) with its customer name and its SETTLED / CLOSED
-   * claim net settlements, for the aggregate loss-ratio breakdown. Book-wide:
-   * `claims-analytics.view` is a cross-book reporting permission
-   * (`[CLAIMS, MANAGER, EXEC, AUDITOR]`), so there is no per-owner filter.
+   * customer / line / policy / insurer / branch owner set) with its customer
+   * name and its SETTLED / CLOSED claim net settlements, for the aggregate
+   * loss-ratio breakdown. Book-wide: `claims-analytics.view` is a cross-book
+   * reporting permission (`[CLAIMS, MANAGER, EXEC, AUDITOR]`), so there is no
+   * per-owner filter by default — `ownerUserIds` and `insurerId` are only
+   * populated by the Part E Claims Dashboard (backlog #64), which DOES scope
+   * by branch/insurer; `ClaimsAnalyticsService` (#30) never passes them.
    */
   async loadPoliciesForAnalytics(scope: {
     customerId?: string;
     insuranceLine?: string;
     policyId?: string;
+    insurerId?: string;
+    ownerUserIds?: string[];
   }): Promise<AnalyticsPolicyRow[]> {
     const policies = await this.prisma.client.policy.findMany({
       where: {
@@ -105,15 +112,21 @@ export class LossRatioRepository {
         ...(scope.customerId ? { customerId: scope.customerId } : {}),
         ...(scope.insuranceLine ? { insuranceLine: scope.insuranceLine } : {}),
         ...(scope.policyId ? { id: scope.policyId } : {}),
+        ...(scope.insurerId ? { insurerId: scope.insurerId } : {}),
+        ...(scope.ownerUserIds
+          ? { placedByUserId: { in: scope.ownerUserIds } }
+          : {}),
       },
       select: {
         id: true,
         customerId: true,
         insuranceLine: true,
+        insurerId: true,
         policyNumber: true,
         issuedPremium: true,
         requestedPremium: true,
         customer: { select: { legalName: true } },
+        insurer: { select: { name: true } },
         claims: {
           where: { status: { in: ['SETTLED', 'CLOSED'] } },
           select: { settlement: { select: { netSettlement: true } } },
@@ -127,6 +140,8 @@ export class LossRatioRepository {
       customerId: p.customerId,
       customerLegalName: p.customer.legalName,
       insuranceLine: p.insuranceLine,
+      insurerId: p.insurerId,
+      insurerName: p.insurer.name,
       policyRef: p.policyNumber ?? p.id,
       premium: p.issuedPremium ?? p.requestedPremium,
       claimNetSettlements: p.claims.map(

@@ -42,6 +42,7 @@ import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
 import { SalesDashboardModule } from './modules/management-reporting/sales-dashboard.module';
 import { PolicyDashboardModule } from './modules/management-reporting/policy-dashboard.module';
+import { ClaimsDashboardModule } from './modules/management-reporting/claims-dashboard.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
@@ -309,6 +310,12 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // policies and cancellation reasons. Reuses the pre-seeded
     // dashboard.policy.view permission — see policy-dashboard.config.ts.
     PolicyDashboardModule,
+    // Part E — the third of six named dashboards: open vs. closed claims,
+    // outstanding claims value, claims ageing, loss ratio by
+    // client/line/insurer. Reuses the pre-seeded dashboard.claims.view
+    // permission and #30's loss-ratio breakdown (widened with an insurer
+    // grouping) — see claims-dashboard.config.ts.
+    ClaimsDashboardModule,
     // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
     // InsurerSlaAgreement (dormant) get their first real consumer: a
     // monthly job scoring quote-response speed/claims service/price/

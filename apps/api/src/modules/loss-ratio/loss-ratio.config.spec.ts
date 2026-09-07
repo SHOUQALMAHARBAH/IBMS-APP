@@ -15,6 +15,8 @@ function pol(over: Partial<AnalyticsPolicyLike>): AnalyticsPolicyLike {
     customerId: 'cus-1',
     customerLegalName: 'Acme Ltd',
     insuranceLine: 'Property All Risks',
+    insurerId: 'ins-1',
+    insurerName: 'National Insurance',
     policyRef: 'POL-1',
     premium: d('10000.000'),
     claimNetSettlements: [],
@@ -137,13 +139,15 @@ describe('buildLossRatioBreakdown (Process 30)', () => {
       premium: d('10000.000'),
       claimNetSettlements: [], // no settled claims
     }),
-    // Beta — 1 property policy, a big loss
+    // Beta — 1 property policy, a big loss, placed with a different insurer
     pol({
       id: 'p-b1',
       customerId: 'beta',
       customerLegalName: 'Beta Co',
       policyRef: 'POL-B1',
       insuranceLine: 'Property All Risks',
+      insurerId: 'ins-2',
+      insurerName: 'Gulf Insurance',
       premium: d('20000.000'),
       claimNetSettlements: [d('30000.000')], // 30000 paid on 20000 premium -> 1.5
     }),
@@ -197,6 +201,28 @@ describe('buildLossRatioBreakdown (Process 30)', () => {
     expect(b.rows.find((r) => r.key === 'p-a1')).toMatchObject({
       label: 'POL-A1',
       ratio: '0.5000', // 20000 / 40000
+    });
+  });
+
+  it('groups by insurer (Part E Claims Dashboard, backlog #64): pools across customers', () => {
+    const b = buildLossRatioBreakdown({ groupBy: 'insurer', policies });
+    expect(b.groupBy).toBe('insurer');
+    expect(b.rows.map((r) => r.key)).toEqual(['ins-2', 'ins-1']); // 1.5 before 0.4
+    const national = b.rows.find((r) => r.key === 'ins-1')!;
+    expect(national).toMatchObject({
+      label: 'National Insurance',
+      periodClaims: '20000.000', // both Acme policies
+      periodPremium: '50000.000',
+      ratio: '0.4000',
+      policyCount: 2,
+    });
+    const gulf = b.rows.find((r) => r.key === 'ins-2')!;
+    expect(gulf).toMatchObject({
+      label: 'Gulf Insurance',
+      periodClaims: '30000.000',
+      periodPremium: '20000.000',
+      ratio: '1.5000',
+      policyCount: 1,
     });
   });
 

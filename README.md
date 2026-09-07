@@ -841,7 +841,7 @@ build actually is today:
   definitions; `consent_withdrawal`, the two DSR workflows, M06's
   `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
   / `dpia_review` are the ones a real caller uses.
-- **Part E — dashboards — begun, two of six built.** Part E's header cross-references
+- **Part E — dashboards — begun, three of six built.** Part E's header cross-references
   Domain G's own Process #64 directly ("Executive Management Reporting — Part E below")
   — it IS #64's own detail, not six unrelated processes. **Sales Dashboard is built**:
   `GET /dashboards/sales` — new leads and conversion rate, premium written (new vs.
@@ -858,7 +858,17 @@ build actually is today:
   reasons) are period-scoped, the cancellation date coming from `Endorsement.appliedAt`
   (confirmed by reading `EndorsementService.apply()` directly), not
   `Cancellation.createdAt`. The first real consumer of the pre-seeded
-  `dashboard.policy.view` permission. **Not yet built**: Claims, Financial, and
+  `dashboard.policy.view` permission. **Claims Dashboard is built**: `GET
+  /dashboards/claims` — open vs. closed claims (`CLOSED` is the only terminal
+  `ClaimStatus`), outstanding claims value (`Settlement.netSettlement` once known, else
+  `Claim.estimatedLoss`), claims ageing (days-open buckets `d0_30`/`d31_60`/`d61_90`/
+  `d90_plus`), and loss ratio by client/line/insurer. Every metric here is a LIVE
+  snapshot — the bullet names no period-scoped event at all — so this dashboard carries
+  a single `asOf` reference-date override (the #33 AR ageing report's own shape) instead
+  of a `periodStart`/`periodEnd` range. Widened backlog #30's own `LOSS_RATIO_GROUP_BY`
+  to add an `insurer` dimension — a free capability upgrade to the pre-existing `GET
+  /claims-analytics/loss-ratio?groupBy=` endpoint too. The first real consumer of the
+  pre-seeded `dashboard.claims.view` permission. **Not yet built**: Financial and
   Compliance dashboards, and verifying the Insurer & Employee Performance dashboard
   (likely already substantially covered by backlog #60/#61) — each its own pass. The
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
@@ -6237,9 +6247,64 @@ narrows a gap.
   `--testTimeout=90000`. New Playwright `policy-dashboard.spec.ts` 3/3; full Playwright
   suite **270/270** (from 267) — one confirmed-transient Chromium "Target crashed" on an
   unrelated `retention-disposal.spec.ts` a11y test, re-confirmed clean in isolation.
-  `npm run typecheck`/`lint`/`build` (api + web) OK. **Deferred:** Claims/Financial/
-  Compliance dashboards and the Insurer & Employee Performance verification — each a
-  separate pass; the `dashboard.executive.view` cross-department rollup screen itself.
+  `npm run typecheck`/`lint`/`build` (api + web) OK. **Deferred (at the time):**
+  Claims/Financial/Compliance dashboards and the Insurer & Employee Performance
+  verification — each a separate pass; the `dashboard.executive.view` cross-department
+  rollup screen itself. (Claims Dashboard is now built — see the next entry.)
+
+**Part E — Claims Dashboard (backlog Process #64)** — third of Part E's six named
+  dashboards, after Sales and Policy. `GET /dashboards/claims` — "open vs. closed
+  claims, outstanding claims value, claims ageing, loss ratio by client/line/insurer."
+  The FIRST real consumer of the pre-seeded `dashboard.claims.view` permission.
+  **Every one of this bullet's four metrics is a CURRENT-STATE noun, not a
+  period-scoped event** — unlike Sales/Policy, this dashboard carries NO
+  `periodStart`/`periodEnd` range at all; a single `asOf` reference-date override (the
+  #33 AR ageing report's own shape) satisfies Part E's cross-cutting "filterable by
+  time period" rule instead. `asOf` narrows which claims are considered but classifies
+  each by its CURRENT `Claim.status`, not the status it held as of that date — a
+  documented limitation, the same shape as the AR ageing report's own "a receipt means
+  paid in full" simplification. **"Open vs. closed"**: `CLOSED` is the ONLY terminal
+  `ClaimStatus` (reachable only via `DECLINED -> CLOSED` or `SETTLED -> CLOSED`), so
+  "open" is simply "status != CLOSED." **"Outstanding claims value"** sums, per open
+  claim, `Settlement.netSettlement` when known, else `Claim.estimatedLoss` — the same
+  "netSettlement is the ground truth once available" precedent `computeLossRatio`
+  itself uses. **"Claims ageing"** buckets open claims by days since `createdAt` into
+  new `d0_30`/`d31_60`/`d61_90`/`d90_plus` bands — no "not yet due" bucket, since an
+  open claim ages from day zero (unlike the AR ageing report's own `current` bucket).
+  **"Loss ratio by client/line/insurer" required WIDENING backlog #30's own
+  `LOSS_RATIO_GROUP_BY`** (`['customer','policy','line']` → `+ 'insurer'`, with
+  `AnalyticsPolicyLike`/`AnalyticsPolicyRow` gaining `insurerId`/`insurerName`) — a
+  genuine, free capability upgrade to the pre-existing `GET
+  /claims-analytics/loss-ratio?groupBy=` endpoint too, since its DTO validates against
+  the same constant. The three breakdowns (by client/line/insurer) reuse the SAME
+  pre-existing, all-time `buildLossRatioBreakdown` pure function via direct import —
+  one step lighter than the #63 Profitability Analysis repository-injection precedent
+  (no DI wiring needed for a pure function); `LossRatioRepository` itself IS reused the
+  #63 way (independently provided in `ClaimsDashboardModule`'s own `providers`, no
+  module-to-module wiring to `LossRatioModule`). Every metric filters uniformly by
+  branch/insuranceLine/insurerId (every read goes through a `Claim`'s owning `Policy`)
+  — no per-metric carve-out, like Policy Dashboard. Audited as a sensitive READ
+  (`isSensitiveDataAccess: true` unconditionally, `Claim` being HIGHLY_CONFIDENTIAL by
+  default), counts only in the snapshot. No migration, no new permission, no
+  cross-module SERVICE dependency. `apps/web/` gains a **"Claims Dashboard"** screen
+  (`app/(app)/dashboards/claims/page.tsx` — a filter form, 3 count/value sections, an
+  ageing breakdown, and 3 loss-ratio tables). **Verification**: +14 api unit (7
+  `claims-dashboard.config.spec.ts`, 6 `claims-dashboard.service.spec.ts`, +1 new
+  insurer-groupBy test in `loss-ratio.config.spec.ts`) → api unit **2279** (181 files,
+  from 2265). New `test/claims-dashboard.e2e-spec.ts` **5/5** — permission gating, a
+  400 on a malformed `asOf`, a 422 on a future `asOf`, a full
+  open/closed/outstanding/ageing/loss-ratio walk isolated via a fresh `Insurer` row
+  (this dashboard's `createdAt < asOf` scope has no lower bound, unlike a period range,
+  so a date window alone can't isolate one e2e test's fixtures from `db-test`'s
+  cumulative history — insurerId scoping does), and a branch-scoping test. Full api
+  unit suite 2279/2279 confirmed green; full 60-file api e2e suite green across 8
+  foreground sub-batches, both chronic flakes (`rbac`, `up-sell`) passing with
+  `--testTimeout=90000`, plus two confirmed-transient TOTP-timing flakes (`prospect`,
+  `sales-performance`) re-confirmed clean in isolation. New Playwright
+  `claims-dashboard.spec.ts` 3/3; full Playwright suite **273/273** (from 270).
+  `npm run typecheck`/`lint`/`build` (api + web) OK. **Deferred:** Financial/Compliance
+  dashboards and the Insurer & Employee Performance verification — each a separate
+  pass; the `dashboard.executive.view` cross-department rollup screen itself.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

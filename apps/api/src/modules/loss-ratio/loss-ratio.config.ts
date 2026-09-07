@@ -72,7 +72,21 @@ export function computeLossRatio(input: LossRatioInput): LossRatioFigures {
 
 // --- Process 30: aggregate Loss Ratio breakdown -------------------------------
 
-export const LOSS_RATIO_GROUP_BY = ['customer', 'policy', 'line'] as const;
+/**
+ * `insurer` was added for the Part E Claims Dashboard (backlog Process #64)
+ * — "loss ratio by client/line/insurer" needs a third grouping this module
+ * didn't originally carry. Widening this union (rather than a Claims
+ * Dashboard-local copy) also upgrades the pre-existing `GET
+ * /claims-analytics/loss-ratio?groupBy=` endpoint (#30) to accept
+ * `groupBy=insurer` for free, since its `LossRatioBreakdownQueryDto`
+ * validates against this same constant.
+ */
+export const LOSS_RATIO_GROUP_BY = [
+  'customer',
+  'policy',
+  'line',
+  'insurer',
+] as const;
 export type LossRatioGroupBy = (typeof LOSS_RATIO_GROUP_BY)[number];
 
 /** Minimal per-policy shape `buildLossRatioBreakdown` needs — matches
@@ -82,6 +96,8 @@ export interface AnalyticsPolicyLike {
   customerId: string;
   customerLegalName: string;
   insuranceLine: string;
+  insurerId: string;
+  insurerName: string;
   policyRef: string;
   premium: Prisma.Decimal | string;
   claimNetSettlements: (Prisma.Decimal | string | null)[];
@@ -117,6 +133,9 @@ function groupKeyLabel(
   }
   if (groupBy === 'policy') {
     return { key: p.id, label: p.policyRef };
+  }
+  if (groupBy === 'insurer') {
+    return { key: p.insurerId, label: p.insurerName };
   }
   return { key: p.insuranceLine, label: p.insuranceLine };
 }
