@@ -495,6 +495,95 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
           expect(Number(line?.sumInsuredBasis)).toBe(1000000);
         });
     });
+
+    it('a concurrent finalize() vs reassemble() never lets a FINALIZED program have its lines silently rewritten (race-safe-invariants.md)', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'ip-fzrace-sales',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const manager = await makeUser(
+        app,
+        'ip-fzrace-mgr',
+        'BRANCH_DEPARTMENT_MANAGER',
+      );
+      const placement = await makeUser(
+        app,
+        'ip-fzrace-plc',
+        'PLACEMENT_TECHNICAL_OFFICER',
+      );
+      const customerId = await createCustomer(sales.accessToken);
+      const rpId = await createRiskProfile(sales.accessToken, customerId);
+      await request(app.getHttpServer())
+        .post(`/risk-profiles/${rpId}/assets`)
+        .set(bearer(sales.accessToken))
+        .send({ assetType: 'building', declaredValue: '500000' })
+        .expect(201);
+      const naId = await approvedNeedsAssessment(
+        sales.accessToken,
+        manager.accessToken,
+        rpId,
+        { ...FULL_ANSWERS, ownsOrLeasesPremises: true },
+      );
+
+      const assembled = await request(app.getHttpServer())
+        .post('/insurance-programs')
+        .set(bearer(placement.accessToken))
+        .send({ needsAssessmentId: naId })
+        .expect(201);
+      const programId = (assembled.body as ProgramBody).id;
+
+      // A second asset so a reassembly, if it goes through, actually
+      // changes the Property basis (500000 -> 9500000) — proof that a
+      // "won" reassemble genuinely rewrote lines, not a no-op.
+      await request(app.getHttpServer())
+        .post(`/risk-profiles/${rpId}/assets`)
+        .set(bearer(sales.accessToken))
+        .send({ assetType: 'building', declaredValue: '9000000' })
+        .expect(201);
+
+      const [finalizeRes, reassembleRes] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/insurance-programs/${programId}/finalize`)
+          .set(bearer(placement.accessToken)),
+        request(app.getHttpServer())
+          .post(`/insurance-programs/${programId}/reassemble`)
+          .set(bearer(placement.accessToken)),
+      ]);
+
+      // finalize() only ever moves DRAFT -> FINALIZED and nothing else in
+      // this pair ever changes `status` away from DRAFT concurrently, so it
+      // always succeeds regardless of interleaving.
+      expect(finalizeRes.status).toBe(201);
+      // reassemble() either committed its rewrite before finalize() locked
+      // the program (201), or lost the race and was cleanly rejected (409,
+      // InsuranceProgramRepository#reassembleLines returned null) — what
+      // must NEVER happen is a reassemble that "succeeds" after finalize()
+      // already committed FINALIZED, silently rewriting a finalized
+      // program's lines out from under the lock.
+      expect([201, 409]).toContain(reassembleRes.status);
+
+      const final = await request(app.getHttpServer())
+        .get(`/insurance-programs/${programId}`)
+        .set(bearer(placement.accessToken))
+        .expect(200);
+      const finalBody = final.body as ProgramBody;
+      expect(finalBody.status).toBe('FINALIZED');
+      const property = finalBody.lines.find(
+        (l) => l.insuranceLine === 'Property All Risks',
+      );
+      if (reassembleRes.status === 201) {
+        // reassemble() won: it committed its rewrite while the program was
+        // still DRAFT, so finalize() (blocked behind the same row lock)
+        // locked in the freshly reassembled basis.
+        expect(Number(property?.sumInsuredBasis)).toBe(9500000);
+      } else {
+        // finalize() won: reassemble()'s guard found the program no longer
+        // DRAFT and touched nothing — the original basis survives untouched.
+        expect(Number(property?.sumInsuredBasis)).toBe(500000);
+      }
+    });
   });
 
   describe('visibility', () => {

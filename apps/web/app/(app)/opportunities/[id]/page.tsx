@@ -23,6 +23,7 @@ import { EndorsementSection } from '../../../../components/policy/EndorsementSec
 import { ClaimSection } from '../../../../components/policy/ClaimSection';
 import { FinanceSection } from '../../../../components/policy/FinanceSection';
 import { CommissionSection } from '../../../../components/policy/CommissionSection';
+import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
@@ -239,6 +240,13 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canCalculate={isFinance}
             canApproveOverride={isManager}
+          />
+
+          <ConsentCaptureWidget
+            customerId={opportunity.customerId}
+            purpose="CLAIMS"
+            label="Claims consent"
+            defaultConsentTextVersion="claims-notice-v1"
           />
 
           <ClaimSection

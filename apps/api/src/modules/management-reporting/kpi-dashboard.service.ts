@@ -112,6 +112,11 @@ export class KpiDashboardService {
         action: 'READ',
         entityType: 'KpiDashboard',
         entityId: 'summary',
+        // Unconditional: this summary always aggregates claimsByStatus (Claim —
+        // Highly Confidential by default) and complaintsByStatus (Complaint),
+        // both named in sensitive-data-handling.md's trigger list — there is no
+        // code path through this method that skips them.
+        isSensitiveDataAccess: true,
         afterValue: {
           view: 'kpi-dashboard-summary',
           generatedAt: summary.generatedAt,

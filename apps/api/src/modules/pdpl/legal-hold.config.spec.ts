@@ -26,9 +26,9 @@ describe('hasAtMostOneSubjectReference', () => {
 
   it('allows exactly one set', () => {
     expect(hasAtMostOneSubjectReference({ customerId: 'cust-1' })).toBe(true);
-    expect(
-      hasAtMostOneSubjectReference({ insuredPersonId: 'ip-1' }),
-    ).toBe(true);
+    expect(hasAtMostOneSubjectReference({ insuredPersonId: 'ip-1' })).toBe(
+      true,
+    );
   });
 
   it('rejects both set — ambiguous which one names the subject', () => {

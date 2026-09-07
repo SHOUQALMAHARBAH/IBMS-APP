@@ -451,11 +451,7 @@ describe('DsrService.fulfil (M04)', () => {
       },
     });
     await expect(
-      service.fulfil(
-        'dsr-1',
-        { confirmNoOpenRetentionHold: true },
-        'u-dpo',
-      ),
+      service.fulfil('dsr-1', { confirmNoOpenRetentionHold: true }, 'u-dpo'),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(legalHolds.hasActiveHoldForSubject).toHaveBeenCalledWith({
       customerId: 'cust-1',

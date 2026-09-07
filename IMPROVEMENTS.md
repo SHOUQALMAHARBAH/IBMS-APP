@@ -17,6 +17,24 @@ now **begun**, starting with **§5.1 (PDPL foundations)** — M03 Consent
 Management landed 2026-09-04, the first of the pass's items to be actioned
 (partially — §5.1 covers nine Part D systems, one is built).
 
+**2026-09-07 note:** this file was NOT kept current across the many sessions
+since it was last topped up here — §5.1 (Part D/PDPL), §7.1 (Part F/bilingual
+UI), §7.2 (Part E/dashboards), and §8 (not-yet-started backlog) all still
+read as if those Parts were unbuilt or barely begun. They are not: Part D's
+full 9-system checklist is complete, Part E's six dashboards are complete,
+Part F items #1-2 of 8 are complete, and Domains F/G/H (#47-74) are all
+complete — see `CLAUDE.md` § What's New and `README.md` § Scope status for
+the real current state. A full-codebase code-review audit this session (§10
+below) found this exact "a context file's claim survives past the session
+that made it true" pattern independently in `meta/context/consent-
+management.md` and in stale code comments — this file has the same disease
+and needs the same cure: a dedicated pass re-reading §5.1/§7.1/§7.2/§8
+against current reality and updating or striking each stale claim, the way
+"Resolved since this file was first compiled" already does for individual
+items above. Not attempted in this session (out of scope for a "review the
+code, then ship Part F #2" request) — flagging it here rather than silently
+leaving a misleading document in place.
+
 **Priority key:** `P0` blocks correctness, security, or a real "definition of
 done" · `P1` must be fixed before the system goes near production · `P2` tech
 debt / quality-of-life.
@@ -549,8 +567,6 @@ complete picture. **Not** improvements to existing code; net-new build.
 - **Part F — Bilingual UI** (7.1).
 - **Part G — Final verification checklist** — the sign-off gate for "done".
 
----
-
 ## 9. Suggested order of attack (after the backlog build)
 
 1. **CI isolation (1.1–1.4)** — until the e2e gate is reliable, nothing else's
@@ -566,3 +582,121 @@ complete picture. **Not** improvements to existing code; net-new build.
 6. **Reporting → SQL aggregation + `truncated` flags (6.1/3.10)**.
 7. **Bilingual UI + dashboards (§7)** — the remaining Parts E/F.
 8. Everything in §8 (net-new domains).
+
+---
+
+---
+
+## 10. 2026-09-07 — full-codebase code-review audit (MINOR/NIT findings)
+
+A `/review all the code` request dispatched 10 parallel `@code-reviewer` batches
+across all 35 `apps/api/src/modules/*` plus the whole `apps/web` frontend. The
+2 `BLOCKER` + 8 `MAJOR` findings were fixed immediately (not tracked here — see
+`CLAUDE.md` § What's New for the full detail: the shared
+`WorkflowTransitionService.transition()` non-atomic status+audit write, the JWT
+secret's missing production fail-fast, three read-then-write races (Access
+Recertification, password reset, Insurance Program reassembly), two dashboards
+missing `isSensitiveDataAccess`, `PaymentChannel`'s missing bank-data input
+guard, and a stale `consent-management.md` premise that had left the Claims
+consent touchpoint unwired). These `MINOR`/`NIT` findings did not block and are
+logged here instead, ordered by area:
+
+### 10.1 `P2` — Stale doc comments citing a module as "not built yet"
+
+- `workflow-transition.service.ts`'s own docstring said "No domain module calls
+  this yet" — false, 30+ services call it. Already fixed as part of the
+  BLOCKER work above (cheap, done inline).
+- `sla-timer.service.ts:73-81` says "No domain module calls startTimer()/
+  resolve() yet for 13 of the 14 registry entries... the one exception:
+  AccessRecertificationService" — false, 12+ services call these already.
+  The exact same "cites another module as not-built-yet, goes stale the day
+  that module ships" pattern this file's own history has hit before (see
+  §5.1's own note above). **Not fixed** — a one-line doc correction, worth
+  doing next time this file is touched.
+- `sla-timer.service.ts:51` and `ibms-brain/meta/context/business-day-
+  calendar.md:54` both say "the 14-entry SLA registry" / "all 14 SLA
+  types" — the real registry has 15 entries (`sla-registry.config.spec.ts`
+  already gets this right). Harmless off-by-one, not fixed.
+- `common/maker-checker.util.ts:22-37`'s "covered pairs" doc table omits
+  `NeedsAssessment` and `DataSubjectRequest`, both of which ARE correctly
+  enforced — the table itself just hasn't been kept in sync with every
+  module that adopted the pattern. Not fixed.
+
+### 10.2 `P2` — Missing `P2002`-to-409 mapping on two creates
+
+- `ProspectRepository.create()` (`Prospect.leadId @unique`) and
+  `CustomerRepository.create()` (`Customer.prospectId @unique`) don't catch
+  Prisma `P2002`, unlike every comparable unique-constraint-backed create
+  elsewhere (`rfq`, `quotation`, `disposal-batch`, `retention-schedule`,
+  `endorsement`, `policy`). The underlying invariant IS enforced by the DB
+  constraint — a genuine concurrent double-conversion surfaces as an
+  unhandled 500 instead of a clean 409, not a data-integrity gap.
+
+### 10.3 `P2` — Best-effort writes not wrapped in try/catch (inconsistent with sibling code)
+
+- `ScreeningService.run()`'s per-`ScreeningType` audit call, and PDPL's
+  `data-sharing-approval.service.ts`/`dpia-screening.service.ts`'s
+  `startTimer()` calls, are NOT wrapped in the "log and continue" try/catch
+  every sibling service in the same file/module uses for the identical
+  call. `KycService` never lets a partially-failed `run()` reach `decide()`
+  (no compliance bypass), and the PDPL SLA-timer gap means a transient
+  timer-start failure surfaces as a 500 to a caller whose write actually
+  committed, with no idempotency key to make a retry safe.
+
+### 10.4 `P2` — Two more read-then-write race gaps, lower stakes than the fixed ones
+
+- `commission.repository.ts`'s `recordEntryReversal` doesn't re-assert
+  `reversedAmount` in its `updateMany` `where` — mitigated because `settle()`
+  independently re-derives the true reversal state before any payout;
+  exposure is a transiently-wrong ledger/report figure, not an overpayment.
+- `insurer-performance.repository.ts`/`employee-performance.repository.ts`'s
+  `upsertScore`/`upsertRecord` run a separate `findUnique` to derive the
+  audit CREATE/UPDATE label, then a separate `upsert` — under genuine
+  concurrency both could audit CREATE; the row itself stays correct (the
+  real `@@unique` backs the upsert).
+
+### 10.5 `P2` — Dashboard/reporting gaps found this pass
+
+- `management-reporting/sales-dashboard.service.ts` applies no
+  officer-level visibility scoping, unlike the sibling
+  `sales-performance.service.ts` sharing the same `dashboard.sales.view`
+  permission (which forces a non-manager caller to their own book) — a
+  plain Sales Officer can see book-wide figures across every branch/officer.
+- `claims-dashboard.repository.ts`'s `findOpenClaimsForAgeing` orders
+  `createdAt asc` before capping at `CLAIMS_DASHBOARD_READ_LIMIT` — if open
+  claims ever exceed the cap, truncation keeps the OLDEST rows and drops the
+  newest, backwards from what an ageing reader would expect.
+
+### 10.6 `P2` — Web frontend gaps found this pass
+
+- `ConsentCaptureWidget.withdraw()` collapses the documented two-step
+  withdrawal flow (request → confirm) into one atomic click at every
+  touchpoint it's mounted on — the standalone `/consent` register page
+  correctly offers both steps separately. Never late, but creates-then-
+  instantly-resolves an `SlaTimer` row every time, adding noise.
+- `lib/supporting-operations/employee-api.ts`'s `nationalId: string` has no
+  comment noting it's a masked display value (unlike the equivalent
+  `customer-api.ts` field) — not a live leak, a documentation gap that
+  could mislead a future reader into treating it as raw.
+- `employees/[id]/page.tsx`'s reveal-reason input's label states "min. 10
+  characters" but the `<input>` has no `minLength={10}` to match — backend
+  presumably still enforces it.
+- The JOD-3-decimal `money()` formatter is hand-duplicated verbatim across
+  `financial-report`, `client-accounting`, `insurer-accounting` pages and
+  `ClaimSection.tsx` — an extraction candidate (`lib/finance/format.ts`),
+  matching this codebase's own pattern of promoting shared constants out of
+  per-page files.
+- `vendors/[id]/page.tsx`'s DPA "Sign"/"DPO approve" buttons have no
+  client-side role gate, unlike every sibling maker/checker screen in this
+  app (backend is the real authority either way).
+- `retention-disposal/page.tsx`'s Legal Hold form allows both Customer ID
+  and Insured person ID to be filled at once with no client-side "at most
+  one" guard, even though the backend 422s on that combination — an
+  avoidable round trip.
+
+Full findings, including everything already fixed, are in the 10 code-review
+transcripts this session ran; this section only carries what wasn't fixed
+inline. The web-frontend batch explicitly sampled ~45 of ~90 pages rather
+than reading every one (its own coverage note lists exactly which) — treat
+this section as a partial pass, not an exhaustive one.
+

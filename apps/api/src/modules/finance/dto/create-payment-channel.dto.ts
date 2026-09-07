@@ -7,7 +7,12 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { emptyStringToUndefined, trimIfString } from '../../../common/dto.util';
+import {
+  emptyStringToUndefined,
+  NO_FULL_ACCOUNT_NUMBER,
+  NO_FULL_ACCOUNT_NUMBER_MESSAGE,
+  trimIfString,
+} from '../../../common/dto.util';
 import {
   ACCOUNT_LAST4,
   PAYMENT_CHANNEL_OWNER_TYPES,
@@ -43,15 +48,24 @@ export class CreatePaymentChannelDto {
   })
   channelType!: string;
 
-  /** A human-readable name for the channel, e.g. "Cairo Amman Bank — JOD". */
+  /** A human-readable name for the channel, e.g. "Cairo Amman Bank — JOD". Free
+   * text next to the masked `accountLast4` field below — must not become the
+   * de facto capture point for a full account/card number
+   * (`sensitive-data-handling.md`). */
   @Transform(trimIfString)
   @MinLength(2)
   @MaxLength(120)
+  @Matches(NO_FULL_ACCOUNT_NUMBER, {
+    message: `label ${NO_FULL_ACCOUNT_NUMBER_MESSAGE}`,
+  })
   label!: string;
 
   @IsOptional()
   @Transform(trimIfString)
   @MaxLength(120)
+  @Matches(NO_FULL_ACCOUNT_NUMBER, {
+    message: `bankName ${NO_FULL_ACCOUNT_NUMBER_MESSAGE}`,
+  })
   bankName?: string;
 
   /** The last 2–4 digits of the account — the ONLY bank-account fragment

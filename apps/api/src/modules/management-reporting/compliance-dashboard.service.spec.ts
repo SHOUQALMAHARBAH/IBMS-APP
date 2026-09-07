@@ -113,7 +113,7 @@ describe('ComplianceDashboardService.summary', () => {
     expect(summary.complianceExceptions.lastSelfApprovalScan).toBeNull();
   });
 
-  it('records a READ audit row with counts only', async () => {
+  it('records a READ audit row as sensitive data access, with counts only', async () => {
     const { service, audit } = makeService();
     await service.summary({}, 'u-actor');
     expect(audit.record).toHaveBeenCalledWith(
@@ -121,6 +121,7 @@ describe('ComplianceDashboardService.summary', () => {
         userId: 'u-actor',
         action: 'READ',
         entityType: 'ComplianceDashboard',
+        isSensitiveDataAccess: true,
       }),
     );
   });

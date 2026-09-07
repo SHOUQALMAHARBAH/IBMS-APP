@@ -381,18 +381,23 @@ export class InsuranceProgramService {
       summary,
     );
 
-    // Re-read status immediately before the wholesale rewrite: a finalize()
-    // landing in the window since the guard above must not have its lines
-    // silently replaced under the FINALIZED lock.
-    const current = await this.programs.findById(program.id);
-    if (!current || current.status !== 'DRAFT') {
-      throw new UnprocessableEntityException(
-        `InsuranceProgram ${id}: no longer DRAFT — re-assembly aborted.`,
+    // The guard against a concurrent finalize() is the transaction's own
+    // status-conditional UPDATE inside reassembleLines(), not a re-read
+    // here — a re-read followed by a separate unconditional delete+create
+    // leaves the exact window ibms-brain/meta/lex/race-safe-invariants.md
+    // warns about open: a finalize() landing between the read and the
+    // rewrite would have a FINALIZED program's lines silently replaced. A
+    // `null` result means this call lost that race.
+    const result = await this.programs.reassembleLines(
+      program.id,
+      actor.id,
+      this.toLineInputs(lines),
+    );
+    if (!result) {
+      throw new ConflictException(
+        `InsuranceProgram ${id}: status changed concurrently — no longer DRAFT, re-assembly aborted.`,
       );
     }
-
-    await this.programs.deleteLines(program.id);
-    await this.programs.createLines(program.id, this.toLineInputs(lines));
 
     await this.safeAudit({
       userId: actor.id,

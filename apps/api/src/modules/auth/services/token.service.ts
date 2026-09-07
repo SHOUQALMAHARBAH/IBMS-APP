@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { generateOpaqueToken, hashToken } from '../../../common/crypto.util';
+import {
+  generateOpaqueToken,
+  hashToken,
+  jwtSecret,
+} from '../../../common/crypto.util';
 
 export interface AccessTokenPayload {
   sub: string;
@@ -11,16 +15,9 @@ export interface AccessTokenPayload {
 export class TokenService {
   constructor(private readonly jwtService: JwtService) {}
 
-  private accessSecret(): string {
-    return (
-      process.env.JWT_ACCESS_SECRET ??
-      'dev-insecure-secret-change-me-32chars-minimum'
-    );
-  }
-
   signAccessToken(payload: AccessTokenPayload, ttlMinutes: number): string {
     return this.jwtService.sign(payload, {
-      secret: this.accessSecret(),
+      secret: jwtSecret(),
       expiresIn: `${ttlMinutes}m`,
     });
   }
@@ -31,13 +28,13 @@ export class TokenService {
     ttlMinutes: number,
   ): string {
     return this.jwtService.sign(payload, {
-      secret: this.accessSecret(),
+      secret: jwtSecret(),
       expiresIn: `${ttlMinutes}m`,
     });
   }
 
   verifyPurposeToken<T extends object>(token: string): T {
-    return this.jwtService.verify<T>(token, { secret: this.accessSecret() });
+    return this.jwtService.verify<T>(token, { secret: jwtSecret() });
   }
 
   /** Opaque (non-JWT) refresh/reset bearer secret — raw value + its stored hash. */

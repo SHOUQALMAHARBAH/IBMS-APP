@@ -56,7 +56,7 @@ describe('KpiDashboardService.summary (Process 58)', () => {
     expect(repo.countByStatus).toHaveBeenCalledWith('complaint');
   });
 
-  it('writes a best-effort READ audit row', async () => {
+  it('writes a best-effort READ audit row as sensitive data access', async () => {
     const { service, audit } = makeService();
     await service.summary('u-manager');
     expect(audit.record).toHaveBeenCalledWith(
@@ -65,6 +65,7 @@ describe('KpiDashboardService.summary (Process 58)', () => {
         action: 'READ',
         entityType: 'KpiDashboard',
         entityId: 'summary',
+        isSensitiveDataAccess: true,
       }),
     );
   });

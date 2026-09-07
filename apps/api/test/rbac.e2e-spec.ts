@@ -303,5 +303,54 @@ describe('RBAC / access recertification (e2e)', () => {
         .send({ decision: 'confirmed' })
         .expect(403);
     });
+
+    it('closes the double-decide race: two concurrent decisions on the same item — exactly one succeeds, the other gets a clean 409', async () => {
+      const app = await boot();
+      await resetReviewerPool();
+      const compliance = await makeUser(
+        app,
+        'recert-race-compliance',
+        'COMPLIANCE_OFFICER',
+      );
+      const subject = await makeUser(
+        app,
+        'recert-race-subject',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+
+      const cycleRes = await request(app.getHttpServer())
+        .post('/access-recertification/cycles')
+        .set(bearer(compliance.accessToken))
+        .send({ cycleLabel: `e2e-race-${Date.now()}` })
+        .expect(201);
+      const cycleId = (cycleRes.body as CycleBody).id;
+
+      const itemsRes = await request(app.getHttpServer())
+        .get('/access-recertification/items')
+        .query({ cycleId })
+        .set(bearer(compliance.accessToken))
+        .expect(200);
+      const subjectItem = (itemsRes.body as RecertificationItemBody[]).find(
+        (i) => i.subjectUserId === subject.userId,
+      );
+      expect(subjectItem).toBeDefined();
+
+      // Both requests read the item before either has decided — only the
+      // status-conditional updateMany in AccessRecertificationRepository
+      // (not the in-app pre-check) can close this race
+      // (race-safe-invariants.md).
+      const [a, b] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/access-recertification/items/${subjectItem!.id}/decision`)
+          .set(bearer(compliance.accessToken))
+          .send({ decision: 'confirmed' }),
+        request(app.getHttpServer())
+          .post(`/access-recertification/items/${subjectItem!.id}/decision`)
+          .set(bearer(compliance.accessToken))
+          .send({ decision: 'revoked' }),
+      ]);
+      const statuses = [a.status, b.status].sort();
+      expect(statuses).toEqual([201, 409]);
+    });
   });
 });

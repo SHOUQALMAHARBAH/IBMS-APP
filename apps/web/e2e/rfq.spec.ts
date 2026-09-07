@@ -1361,9 +1361,13 @@ async function mockRfqApi(
       json: { ...RFQ.insurerSubmissions[0], status: body.toStatus, respondedAt: "2026-03-05T00:00:00.000Z" },
     });
   });
-  // Part D §5.1 touchpoint #4 — the RFQ detail page's consent-capture
-  // control reads this on mount; no test here exercises the control
-  // itself (see customers.spec.ts for that), so an empty, quiet list.
+  // Part D §5.1 touchpoint #4 (RFQ) and the claims touchpoint (both on
+  // pages this helper drives) each mount a consent-capture control that
+  // reads this on mount; the base mock here is an empty, quiet list —
+  // individual tests override it with route.fulfill precedence (most
+  // recently registered wins) when they need to exercise capture itself
+  // (see the dedicated "captures Claims consent..." test below, or
+  // customers.spec.ts for the onboarding/KYC touchpoint).
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
@@ -1987,6 +1991,52 @@ test("notifies a claim against an issued policy", async ({ page }) => {
   await expect(
     page.getByText("coverage version in force", { exact: false }),
   ).toBeVisible();
+});
+
+test("captures Claims consent from the opportunity detail screen (Part D §5.1, Claims touchpoint)", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+  });
+  let captured = false;
+  await page.route("http://localhost:4000/consent-records**", (route) => {
+    if (route.request().method() === "POST") {
+      captured = true;
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: "consent-claims-1",
+          customerId: "cust-1",
+          insuredPersonId: null,
+          leadId: null,
+          purpose: "CLAIMS",
+          isMarketing: false,
+          granted: true,
+          consentTextVersion: "claims-notice-v1",
+          grantedAt: "2026-11-15T00:00:00.000Z",
+          withdrawnAt: null,
+          isActive: true,
+          createdAt: "2026-11-15T00:00:00.000Z",
+        },
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      json: captured ? [{ id: "consent-claims-1", isActive: true }] : [],
+    });
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims consent" }),
+  ).toBeVisible();
+  await expect(page.getByText("No decision captured yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Grant" }).click();
+  await expect.poll(() => captured).toBe(true);
 });
 
 test("registers a NOTIFIED claim with the insurer and assigns the adjuster", async ({

@@ -901,6 +901,30 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       })
       .expect(403);
 
+    // a full account/card number in the free-text label or bankName -> 400
+    // (the shared DTO guard — accountLast4 is the only governed bank fragment)
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'Client account 0123456789',
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'Client — Cairo Amman JOD',
+        bankName: 'Cairo Amman Bank IBAN JO94CBJO0010000000000131000302',
+      })
+      .expect(400);
+
     // Finance adds an approved customer channel + an insurer channel
     const custChan = await request(app.getHttpServer())
       .post('/payment-channels')

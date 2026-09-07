@@ -1,10 +1,11 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import {
   decryptField,
   encryptField,
   generateOpaqueToken,
   hashToken,
+  jwtSecret,
 } from './crypto.util';
 
 beforeAll(() => {
@@ -58,5 +59,24 @@ describe('generateOpaqueToken', () => {
     const b = generateOpaqueToken();
     expect(a).not.toBe(b);
     expect(a.length).toBeGreaterThanOrEqual(64);
+  });
+});
+
+describe('jwtSecret', () => {
+  const original = process.env.JWT_ACCESS_SECRET;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.JWT_ACCESS_SECRET;
+    else process.env.JWT_ACCESS_SECRET = original;
+  });
+
+  it('returns JWT_ACCESS_SECRET when set', () => {
+    process.env.JWT_ACCESS_SECRET = 'a-real-production-secret-32-chars-min';
+    expect(jwtSecret()).toBe('a-real-production-secret-32-chars-min');
+  });
+
+  it('falls back to the hardcoded dev-only value when unset — main.ts is what fails the boot in production, not this function', () => {
+    delete process.env.JWT_ACCESS_SECRET;
+    expect(jwtSecret()).toBe('dev-insecure-secret-change-me-32chars-minimum');
   });
 });

@@ -78,13 +78,24 @@ export class AccessRecertificationRepository {
     });
   }
 
-  recordDecision(
+  /** Status-conditional: only writes if the item hasn't been decided yet
+   * AND is still assigned to this reviewer — re-asserts both fields
+   * `decide()` validated between its read and this write
+   * (race-safe-invariants.md). `null` when 0 rows matched (a concurrent
+   * decision won the race). */
+  async recordDecision(
     id: string,
+    reviewerUserId: string,
     decision: 'confirmed' | 'revoked' | 'changed',
-  ): Promise<AccessRecertificationItem> {
-    return this.prisma.client.accessRecertificationItem.update({
+  ): Promise<AccessRecertificationItem | null> {
+    const { count } =
+      await this.prisma.client.accessRecertificationItem.updateMany({
+        where: { id, reviewerUserId, decision: null },
+        data: { decision, reviewedAt: new Date() },
+      });
+    if (count === 0) return null;
+    return this.prisma.client.accessRecertificationItem.findUniqueOrThrow({
       where: { id },
-      data: { decision, reviewedAt: new Date() },
     });
   }
 

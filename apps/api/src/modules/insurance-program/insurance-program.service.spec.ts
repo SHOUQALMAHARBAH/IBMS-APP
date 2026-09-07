@@ -60,14 +60,14 @@ function makeDeps() {
   const findManyByCustomerId = vi.fn().mockResolvedValue([]);
   const findManyByRiskProfileId = vi.fn().mockResolvedValue([]);
   const createLines = vi.fn().mockResolvedValue({ count: 0 });
-  const deleteLines = vi.fn().mockResolvedValue({ count: 0 });
+  const reassembleLines = vi.fn().mockResolvedValue({ count: 0 });
   const programs = {
     create: createProgram,
     findById: findProgramById,
     findManyByCustomerId,
     findManyByRiskProfileId,
     createLines,
-    deleteLines,
+    reassembleLines,
   } as unknown as InsuranceProgramRepository;
 
   const findAssessmentById = vi.fn().mockResolvedValue({ ...APPROVED_NA });
@@ -135,7 +135,7 @@ function makeDeps() {
       findManyByCustomerId,
       findManyByRiskProfileId,
       createLines,
-      deleteLines,
+      reassembleLines,
       findAssessmentById,
       findRiskProfileById,
       findAssetsByRiskProfileId,
@@ -292,8 +292,11 @@ describe('InsuranceProgramService', () => {
     it('rewrites a DRAFT program’s lines from the current survey', async () => {
       const { service, mocks } = makeDeps();
       await service.reassemble('prog-1', placement());
-      expect(mocks.deleteLines).toHaveBeenCalledWith('prog-1');
-      expect(mocks.createLines).toHaveBeenCalled();
+      expect(mocks.reassembleLines).toHaveBeenCalledWith(
+        'prog-1',
+        'plc-1',
+        expect.any(Array),
+      );
       expect(mocks.record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'UPDATE',
@@ -318,7 +321,18 @@ describe('InsuranceProgramService', () => {
       await expect(service.reassemble('prog-1', placement())).rejects.toThrow(
         UnprocessableEntityException,
       );
-      expect(mocks.deleteLines).not.toHaveBeenCalled();
+      expect(mocks.reassembleLines).not.toHaveBeenCalled();
+    });
+
+    it('a concurrent finalize() winning the race (reassembleLines returns null) is a clean 409, not a silent no-op', async () => {
+      const { service, mocks } = makeDeps();
+      mocks.reassembleLines.mockResolvedValue(null);
+      await expect(service.reassemble('prog-1', placement())).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mocks.record).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'UPDATE' }),
+      );
     });
   });
 

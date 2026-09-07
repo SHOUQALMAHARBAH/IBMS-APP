@@ -30,20 +30,33 @@ function makeDeps(overrides?: {
     .fn()
     .mockResolvedValue({ count: overrides?.updateManyCount ?? 1 });
 
+  const opportunityDelegate = { findUnique, updateMany };
   const prisma = {
     client: {
-      opportunity: { findUnique, updateMany },
+      opportunity: opportunityDelegate,
+      // The status write + audit row commit in one `$transaction` — the
+      // callback gets a `tx` exposing the SAME delegate mock as the
+      // top-level client, so assertions below see the same calls either way.
+      $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn({ opportunity: opportunityDelegate }),
+      ),
     },
   } as unknown as PrismaService;
 
-  const record = vi.fn().mockResolvedValue(undefined);
-  const audit = { record } as unknown as AuditService;
+  const recordInTransaction = vi
+    .fn()
+    .mockResolvedValue({ id: 'audit-1', action: 'TRANSITION' });
+  const runAnomalyDetection = vi.fn().mockResolvedValue(undefined);
+  const audit = {
+    recordInTransaction,
+    runAnomalyDetection,
+  } as unknown as AuditService;
 
   return {
     service: new WorkflowTransitionService(prisma, audit),
     findUnique,
     updateMany,
-    record,
+    record: recordInTransaction,
   };
 }
 
@@ -63,7 +76,9 @@ describe('WorkflowTransitionService.transition', () => {
       where: { id: 'opp-1', status: 'NEEDS_CONFIRMED' },
       data: { status: 'RFQ_ISSUED' },
     });
-    expect(record).toHaveBeenCalledWith({
+    // recordInTransaction(tx, input) — the tx object is whatever the mocked
+    // $transaction handed the callback; only the input payload matters here.
+    expect(record).toHaveBeenCalledWith(expect.anything(), {
       userId: 'user-1',
       action: 'TRANSITION',
       entityType: 'Opportunity',
