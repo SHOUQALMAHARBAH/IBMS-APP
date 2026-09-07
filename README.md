@@ -921,7 +921,7 @@ build actually is today:
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
 - **Part F — bilingual UI — begun, items #1-4 of 8 built (item #4 with one
-  narrow, documented exception) + item #5 PARTIALLY built.** A working instant
+  narrow, documented exception) + items #5-6 PARTIALLY built.** A working instant
   language switch + persistent per-user preference exists (`PATCH
   /auth/me/language`, a `LanguageProvider` React context, a switcher in
   `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
@@ -936,21 +936,26 @@ build actually is today:
   and corporate UBOs now capture their name in the Jordanian national-ID
   convention (given/father's/grandfather's/family name) via a real schema
   migration, with the existing display field kept as a computed value so every
-  downstream consumer keeps working unchanged; and every money/date/datetime
+  downstream consumer keeps working unchanged; every money/date/datetime
   value across the app now renders through one shared, locale-aware
   `formatMoney`/`formatDate`/`formatDateTime` utility, driven by the same live
   language switcher (Western numerals preserved in Arabic via a deliberately
-  bare `'ar'` tag, not `'ar-JO'`) — see § Part F below for the full detail.
-  **`InsuredPerson` name-splitting was deliberately excluded from item #4**
-  (that model has zero CRUD anywhere in this app yet — revisit once it does)
-  **and item #5's other two sub-problems (Hijri calendar, multi-currency for
-  reinsurance) remain explicitly deferred as future work by user decision** —
-  not attempted, and genuinely undocumented anywhere beyond their one-line
-  backlog bullets. Every screen's remaining TEXT is still **English-only**: no
-  bilingual full-text search, and no system-generated bilingual documents.
-  Screens implement the loading / empty / error / populated
-  states, but the Part F rule of capturing a screenshot of each state as evidence
-  is not met.
+  bare `'ar'` tag, not `'ar-JO'`); and Customers/Prospects/Vendors are now
+  genuinely searchable in either Arabic or English (a real Postgres full-text
+  search — the built-in `'arabic'` text-search config's own linguistic
+  stemming, not a plain substring match) — see § Part F below for the full
+  detail. **`InsuredPerson` name-splitting was deliberately excluded from item
+  #4** (that model has zero CRUD anywhere in this app yet — revisit once it
+  does); **item #5's other two sub-problems (Hijri calendar, multi-currency
+  for reinsurance) and item #6's own other two sub-problems (fuzzy
+  transliteration matching, same-script typo tolerance) all remain explicitly
+  deferred as future work by user decision** — not attempted, and genuinely
+  undocumented anywhere beyond their one-line backlog bullets; `Insurer`
+  search was also excluded — no dedicated module or web list page exists for
+  it anywhere. Every screen's remaining TEXT is still **English-only**: no
+  system-generated bilingual documents. Screens implement the loading / empty
+  / error / populated states, but the Part F rule of capturing a screenshot
+  of each state as evidence is not met.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -7129,6 +7134,133 @@ narrows a gap.
   multi-currency for reinsurance deferred) — wait for the user's explicit
   go-ahead before resuming either, starting item #6 (bilingual full-text
   search), or any other Part F item — do not self-select.
+
+**Part F — Bilingual UI (backlog Part 11) — item #6 of 8: bilingual
+  full-text search — PARTIALLY built: full-text search only.** The backlog
+  bullet bundles two sub-problems of very different size: full-text search
+  across Arabic and English, and fuzzy transliteration matching. Presented
+  with that split before implementing (per this session's own "pause and
+  confirm before implementing" convention), the user confirmed scope down
+  to real full-text search only — fuzzy transliteration matching AND
+  same-script typo tolerance both deferred as documented future work.
+
+  **Entity scope, also explicitly confirmed with the user**: `Customer`,
+  `Prospect`, `Vendor` — the only 3 entities in this app with BOTH a
+  genuinely bilingual name field AND an existing list endpoint + web list
+  page. `Insurer` was considered and explicitly EXCLUDED after a
+  follow-up finding, not an oversight: it has no dedicated module
+  anywhere in this codebase (no `insurer.controller.ts`/`.service.ts` —
+  only narrow lookups embedded inside RFQ's and commission's own
+  insurer-picker endpoints) and no `/insurers` web list page at all (only
+  `insurer-accounting`/`insurer-performance`, which are per-insurer
+  REPORTS, not a browse screen) — the same class of gap item #4 hit with
+  `InsuredPerson`: adding search to Insurer would mean building its
+  first-ever browse screen from scratch, out of proportion with "add
+  search."
+
+  **Mechanism — empirically verified against the actual running Postgres
+  (18-alpine), not assumed, before any code was written**: this Postgres
+  install ships a real built-in `'arabic'` text-search configuration with
+  genuine linguistic stemming, confirmed directly —
+  `to_tsvector('arabic', 'شركة الأفق للتأمين')` strips the Arabic
+  definite article and common suffixes, producing real stems, not a
+  passthrough. Bilingual documents are built by concatenating BOTH the
+  `'arabic'` and `'english'` configs' tsvectors on the same source text
+  (`to_tsvector('arabic', x) || to_tsvector('english', x)`) — verified
+  each config tokenizes text from the OTHER script without erroring
+  (passing it through largely unstemmed rather than dropping it), so the
+  combined vector correctly matches both a real Arabic stem and an
+  English word from the same field. The query side uses
+  `websearch_to_tsquery` (deliberately never raw `to_tsquery`, which
+  would require the caller to write valid boolean-operator syntax) against
+  both configs, OR'd together — verified empty input and punctuation-only
+  input both degrade safely to an empty tsquery (a harmless Postgres
+  NOTICE, not a crash), and a string shaped like a SQL-injection attempt
+  (`"Ahmad' OR 1=1; --"`) is parsed entirely within tsquery's own
+  mini-language when passed through Prisma's PARAMETERIZED tagged-template
+  `$queryRaw` — never `$queryRawUnsafe`, never string concatenation —
+  confirmed empirically not a real injection vector this way. This is the
+  FIRST real use of `$queryRaw` with user input anywhere in this codebase
+  (the one pre-existing use, `app.controller.ts`'s health check, is a
+  literal `SELECT 1`).
+
+  **What's built**: one new `GENERATED ALWAYS ... STORED` tsvector column
+  + GIN index per model, computed by Postgres itself and never written to
+  by the application — `Customer.searchVector` from `legalName` ONLY
+  (`contactPhoneEnc`/`contactEmailEnc` are Highly Confidential
+  `-- ENCRYPT` fields and must never be indexed in plaintext);
+  `Prospect.searchVector` from `companyName` + `contactPerson`;
+  `Vendor.searchVector` from `name`. No backfill needed — the generated
+  column computes for every existing row the moment it's added (verified
+  directly against real pre-existing rows in the dev database before
+  trusting the migration, not just on fresh inserts). Each repository
+  (`customer.repository.ts`, `prospect.repository.ts`,
+  `vendor.repository.ts`) gained a `searchIds(term): Promise<string[]>`
+  method resolving a search term to matching ids; the SAME existing
+  Prisma `findMany()` then filters by `id: { in: ids }` alongside its
+  existing filters — this avoids duplicating any filter logic in raw SQL,
+  the raw query's only job is turning free text into a list of ids. Each
+  list-query DTO gained an optional `search` field with
+  `@Transform(emptyStringToUndefined)` — verified empirically that an
+  empty-string tsquery matches NOTHING (not everything), so this
+  transform is load-bearing: it turns an empty search box into "no
+  filter" before the query ever runs, the same way this codebase's other
+  optional filters already behave.
+
+  **Web**: none of the 3 list pages (`customers/page.tsx`,
+  `prospects/page.tsx`, `vendors/page.tsx`) had ANY filter UI at all
+  before this item — confirmed by reading each, every one called its
+  `list*()` function with no arguments on mount. Each gained one
+  `<input dir="auto">` (a search term may itself be typed in either
+  script) inside a `<form onSubmit>` — a submit-triggered search (Enter
+  key or a "Search" button), not search-as-you-type, since this app has
+  no debounce utility anywhere and introducing one for a first pass was
+  judged disproportionate — plus an empty-state message that distinguishes
+  "no results match your search" from "none exist yet."
+
+  **A genuine tooling detour, resolved without shortcuts**: applying this
+  item's migration hit the SAME pre-existing, unrelated Prisma checksum-
+  drift issue documented during item #4 (3 older already-applied
+  migrations were modified after being applied, so plain `prisma migrate
+  dev` refuses to run without a full `migrate reset`, which would drop
+  all local data) — worked around identically: hand-write the migration
+  SQL, apply it directly via `docker exec ... psql -f /dev/stdin`, then
+  `prisma migrate resolve --applied` to register it without a
+  shadow-database diff, confirmed via `prisma migrate status` on both
+  `db` and `db-test` afterward.
+
+  **Verification**: no new unit tests — this needs a real Postgres to
+  exercise `$queryRaw`/tsvector, and no repository in this codebase has a
+  unit-test precedent that mocks Prisma raw SQL (faking tsvector behavior
+  would prove nothing) — api unit stays **2326/2326** (unchanged). +12
+  new api e2e tests, 4 per entity (`customer.e2e-spec.ts`,
+  `prospect.e2e-spec.ts`, `vendor.e2e-spec.ts`): an English search term
+  that is a genuine Porter stem of a stored word but never a literal
+  substring of it (searching `"trade"` finds a stored `"...Trading
+  Co."`), an Arabic SINGULAR search term matching a stored PLURAL form
+  via a shared stem (searching `"سيارة"` finds a stored
+  `"...للسيارات..."`) — both proving REAL linguistic stemming, not
+  substring luck, verified directly against this Postgres build before
+  writing the assertions — plus an empty-search-shows-everything test and
+  a nonsense-term-matches-nothing test. Targeted `customer`/`prospect`/
+  `vendor` e2e: **43/43**. Full 62-file api e2e suite: **305/305** (from
+  293). Web: +3 new Playwright tests (`customers.spec.ts`,
+  `prospects.spec.ts`, `vendors.spec.ts`), one per entity, proving the
+  WIRING (search input → correct querystring → re-rendered filtered
+  list) against a mocked api — the real Postgres full-text-search
+  behavior is proven by the api's own e2e tests, not re-tested here
+  against a mock, the same web-proves-wiring/api-proves-behavior split
+  this session has used throughout Part F. Full web suite: **297/297**
+  (from 294, split 231 non-`@a11y` + 66 `@a11y`, no flakes this run).
+  `npm run typecheck`/`lint`/`build`/`test` (api + web) OK.
+
+  **No seed change.** Read `ibms-brain/meta/context/bilingual-ui.md`'s
+  "What item #6 covers/does NOT cover" before assuming item #6 is fully
+  closed — it is NOT. Fuzzy transliteration matching, same-script typo
+  tolerance, and `Insurer` search all remain open, documented future
+  work; wait for the user's explicit go-ahead before resuming any of
+  them, starting item #7 (system-generated bilingual documents), or any
+  other Part F item — do not self-select.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

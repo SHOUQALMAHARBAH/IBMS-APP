@@ -46,6 +46,36 @@ test("renders the vendor list with the create form", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Record a new vendor" })).toBeVisible();
 });
 
+// Part F item #6 — bilingual full-text search. Proves the WIRING — the
+// real Postgres full-text-search behavior is proven by the api's own e2e
+// tests (vendor.e2e-spec.ts), not re-tested here against a mock.
+test("the search box re-fetches with a search querystring and renders the filtered result", async ({
+  page,
+}) => {
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  const OTHER_VENDOR = { ...VENDOR, id: "vendor-2", name: "Nour Printing House" };
+  let lastUrl = "";
+  await page.route("http://localhost:4000/vendors**", (route) => {
+    lastUrl = route.request().url();
+    const url = new URL(lastUrl);
+    if (url.searchParams.get("search") === "Nour") {
+      return route.fulfill({ status: 200, json: [OTHER_VENDOR] });
+    }
+    return route.fulfill({ status: 200, json: [VENDOR, OTHER_VENDOR] });
+  });
+
+  await page.goto("/vendors");
+  await expect(page.getByRole("cell", { name: "Acme Office Supplies" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Nour Printing House" })).toBeVisible();
+
+  await page.getByLabel("Search").fill("Nour");
+  await page.getByRole("button", { name: "Search" }).click();
+
+  await expect(page.getByRole("cell", { name: "Nour Printing House" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Acme Office Supplies" })).toHaveCount(0);
+  expect(new URL(lastUrl).searchParams.get("search")).toBe("Nour");
+});
+
 test("a user without the permission sees a friendly message", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("http://localhost:4000/vendors", (route) =>

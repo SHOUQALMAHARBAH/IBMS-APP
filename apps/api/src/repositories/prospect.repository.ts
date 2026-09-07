@@ -18,6 +18,9 @@ export interface CreateProspectInput {
 
 export interface ProspectFilter {
   salesOwnerUserId?: string;
+  /** Part F item #6 — pre-resolved ids from a full-text search
+   * (searchIds()); undefined means no search filter is active. */
+  id?: string[];
 }
 
 @Injectable()
@@ -34,8 +37,25 @@ export class ProspectRepository {
 
   findMany(filter: ProspectFilter): Promise<Prospect[]> {
     return this.prisma.client.prospect.findMany({
-      where: { salesOwnerUserId: filter.salesOwnerUserId },
+      where: {
+        salesOwnerUserId: filter.salesOwnerUserId,
+        id: filter.id ? { in: filter.id } : undefined,
+      },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** Part F item #6 — bilingual full-text search over companyName +
+   * contactPerson. See CustomerRepository.searchIds()'s own comment for
+   * the full mechanism/safety rationale (identical here). */
+  async searchIds(term: string): Promise<string[]> {
+    const rows = await this.prisma.client.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Prospect"
+      WHERE "searchVector" @@ (
+        websearch_to_tsquery('arabic', ${term}) ||
+        websearch_to_tsquery('english', ${term})
+      )
+    `;
+    return rows.map((r) => r.id);
   }
 }

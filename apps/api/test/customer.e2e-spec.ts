@@ -340,6 +340,115 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
     });
   });
 
+  // Part F item #6 — bilingual full-text search (Arabic + English) over
+  // legalName. Each test proves REAL linguistic stemming, not substring
+  // luck: the search term is never a literal substring of the stored
+  // value (an English word stemmed by Postgres's 'english' config, an
+  // Arabic singular form stemmed from a stored plural) — verified
+  // directly against this Postgres build before writing these assertions.
+  describe('GET /customers (search)', () => {
+    it('finds a customer via a stemmed English search term ("trade" -> "Trading")', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-en',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: `Al-Ufuq Trading Co. ${unique}`,
+          registrationNumber: `REG-${unique}`,
+          registeredAddress: 'Amman, Jordan',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-0000001',
+          contactEmail: `search-en-${unique}@example.test`,
+          languagePreference: 'EN',
+        })
+        .expect(201);
+      const customerId = (created.body as CustomerBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get('/customers?search=trade')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      expect(ids).toContain(customerId);
+    });
+
+    it('finds a customer via a stemmed Arabic search term (singular matches a stored plural)', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-ar',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: `شركة الأفق للسيارات ${unique}`,
+          registrationNumber: `REG-AR-${unique}`,
+          registeredAddress: 'Amman, Jordan',
+          natureOfBusiness: 'Motor trading',
+          contactPhone: '+962-7-0000002',
+          contactEmail: `search-ar-${unique}@example.test`,
+          languagePreference: 'AR',
+        })
+        .expect(201);
+      const customerId = (created.body as CustomerBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get(`/customers?search=${encodeURIComponent('سيارة')}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      expect(ids).toContain(customerId);
+    });
+
+    it('an empty search param behaves like no search param at all (shows everything, matches nothing)', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-empty',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const customer = await createIndividualCustomer(
+        app,
+        sales.accessToken,
+        'Empty Search Subject',
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/customers?search=')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      expect(ids).toContain(customer.id);
+    });
+
+    it('a nonsense search term matches nothing', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-nomatch',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const nonsense = `zzznomatch${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+      const res = await request(app.getHttpServer())
+        .get(`/customers?search=${nonsense}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect(res.body as CustomerBody[]).toHaveLength(0);
+    });
+  });
+
   describe('POST /customers/:id/ubos', () => {
     it('rejects a UBO on an INDIVIDUAL customer', async () => {
       const app = await boot();

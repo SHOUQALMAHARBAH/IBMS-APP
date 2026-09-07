@@ -232,9 +232,15 @@ export class CustomerService {
     const canViewAllOwners = actor.roles.some((role) =>
       (CUSTOMER_CROSS_OWNER_ROLES as readonly string[]).includes(role),
     );
+    // Part F item #6 — resolve the search term to a set of ids first, then
+    // filter the existing Prisma query by them, rather than duplicating
+    // ownerUserId/status filtering logic in raw SQL.
     const filter: CustomerFilter = {
       status: query.status,
       ownerUserId: canViewAllOwners ? query.ownerUserId : actor.id,
+      id: query.search
+        ? await this.customers.searchIds(query.search)
+        : undefined,
     };
     const customers = await this.customers.findMany(filter);
     // Explicit allow-list, not destructure-and-strip — same reasoning as

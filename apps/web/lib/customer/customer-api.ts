@@ -64,6 +64,8 @@ export interface CreateCustomerInput {
 export interface ListCustomersFilter {
   ownerUserId?: string;
   status?: CustomerStatus;
+  /** Part F item #6 — bilingual full-text search over legalName. */
+  search?: string;
 }
 
 export interface Ubo {
@@ -122,6 +124,7 @@ export function listCustomers(filter: ListCustomersFilter = {}): Promise<Custome
   const params = new URLSearchParams();
   if (filter.ownerUserId) params.set('ownerUserId', filter.ownerUserId);
   if (filter.status) params.set('status', filter.status);
+  if (filter.search) params.set('search', filter.search);
   const qs = params.toString();
   return apiGet(`/customers${qs ? `?${qs}` : ''}`);
 }

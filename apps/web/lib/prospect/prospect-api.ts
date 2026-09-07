@@ -36,6 +36,9 @@ export interface ConvertLeadToProspectInput {
 
 export interface ListProspectsFilter {
   salesOwnerUserId?: string;
+  /** Part F item #6 — bilingual full-text search over companyName +
+   * contactPerson. */
+  search?: string;
 }
 
 export function convertLeadToProspect(
@@ -47,6 +50,7 @@ export function convertLeadToProspect(
 export function listProspects(filter: ListProspectsFilter = {}): Promise<Prospect[]> {
   const params = new URLSearchParams();
   if (filter.salesOwnerUserId) params.set('salesOwnerUserId', filter.salesOwnerUserId);
+  if (filter.search) params.set('search', filter.search);
   const qs = params.toString();
   return apiGet(`/prospects${qs ? `?${qs}` : ''}`);
 }

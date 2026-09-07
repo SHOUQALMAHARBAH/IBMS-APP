@@ -118,15 +118,20 @@ export class ProspectService {
     return prospect;
   }
 
-  list(
+  async list(
     query: ListProspectsQueryDto,
     actor: AuthenticatedUser,
   ): Promise<Prospect[]> {
     const canViewAllOwners = actor.roles.some((role) =>
       VIEW_ALL_OWNERS_ROLES.includes(role),
     );
+    // Part F item #6 — resolve the search term to a set of ids first, then
+    // filter the existing Prisma query by them.
     return this.prospects.findMany({
       salesOwnerUserId: canViewAllOwners ? query.salesOwnerUserId : actor.id,
+      id: query.search
+        ? await this.prospects.searchIds(query.search)
+        : undefined,
     });
   }
 

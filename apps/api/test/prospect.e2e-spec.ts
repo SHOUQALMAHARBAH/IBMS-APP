@@ -321,6 +321,100 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
       ).toBe(true);
       expect(prospects.some((p) => p.companyName === 'Owned By B')).toBe(false);
     });
+
+    // Part F item #6 — bilingual full-text search over companyName +
+    // contactPerson. Same "prove real stemming, not substring luck"
+    // discipline as customer.e2e-spec.ts's own search tests.
+    it('finds a prospect via a stemmed English search term ("trade" -> "Trading")', async () => {
+      const app = await boot();
+      const officer = await makeUser(
+        app,
+        'prospect-search-en',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const leadId = await createLead(app, officer.accessToken, `Search EN Lead ${unique}`);
+      await qualifyLead(app, officer.accessToken, leadId);
+      const created = await request(app.getHttpServer())
+        .post('/prospects')
+        .set(bearer(officer.accessToken))
+        .send({ leadId, companyName: `Al-Ufuq Trading Co. ${unique}` })
+        .expect(201);
+      const prospectId = (created.body as ProspectBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get('/prospects?search=trade')
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      const ids = (res.body as ProspectBody[]).map((p) => p.id);
+      expect(ids).toContain(prospectId);
+    });
+
+    it('finds a prospect via a stemmed Arabic search term (singular matches a stored plural)', async () => {
+      const app = await boot();
+      const officer = await makeUser(
+        app,
+        'prospect-search-ar',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const leadId = await createLead(app, officer.accessToken, `Search AR Lead ${unique}`);
+      await qualifyLead(app, officer.accessToken, leadId);
+      const created = await request(app.getHttpServer())
+        .post('/prospects')
+        .set(bearer(officer.accessToken))
+        .send({ leadId, companyName: `شركة الأفق للسيارات ${unique}` })
+        .expect(201);
+      const prospectId = (created.body as ProspectBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get(`/prospects?search=${encodeURIComponent('سيارة')}`)
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      const ids = (res.body as ProspectBody[]).map((p) => p.id);
+      expect(ids).toContain(prospectId);
+    });
+
+    it('an empty search param behaves like no search param at all', async () => {
+      const app = await boot();
+      const officer = await makeUser(
+        app,
+        'prospect-search-empty',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const leadId = await createLead(app, officer.accessToken, `Empty Search Lead ${unique}`);
+      await qualifyLead(app, officer.accessToken, leadId);
+      const created = await request(app.getHttpServer())
+        .post('/prospects')
+        .set(bearer(officer.accessToken))
+        .send({ leadId, companyName: `Empty Search Co. ${unique}` })
+        .expect(201);
+      const prospectId = (created.body as ProspectBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get('/prospects?search=')
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      const ids = (res.body as ProspectBody[]).map((p) => p.id);
+      expect(ids).toContain(prospectId);
+    });
+
+    it('a nonsense search term matches nothing', async () => {
+      const app = await boot();
+      const officer = await makeUser(
+        app,
+        'prospect-search-nomatch',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const nonsense = `zzznomatch${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+      const res = await request(app.getHttpServer())
+        .get(`/prospects?search=${nonsense}`)
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      expect(res.body as ProspectBody[]).toHaveLength(0);
+    });
   });
 
   describe('GET /prospects/:id', () => {

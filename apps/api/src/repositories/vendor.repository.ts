@@ -14,6 +14,9 @@ export interface UpdateVendorInput {
 
 export interface VendorFilter {
   vendorType?: string;
+  /** Part F item #6 — pre-resolved ids from a full-text search
+   * (searchIds()); undefined means no search filter is active. */
+  id?: string[];
 }
 
 /**
@@ -36,9 +39,26 @@ export class VendorRepository {
 
   findMany(filter: VendorFilter): Promise<Vendor[]> {
     return this.prisma.client.vendor.findMany({
-      where: { vendorType: filter.vendorType },
+      where: {
+        vendorType: filter.vendorType,
+        id: filter.id ? { in: filter.id } : undefined,
+      },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** Part F item #6 — bilingual full-text search over name. See
+   * CustomerRepository.searchIds()'s own comment for the full
+   * mechanism/safety rationale (identical here). */
+  async searchIds(term: string): Promise<string[]> {
+    const rows = await this.prisma.client.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Vendor"
+      WHERE "searchVector" @@ (
+        websearch_to_tsquery('arabic', ${term}) ||
+        websearch_to_tsquery('english', ${term})
+      )
+    `;
+    return rows.map((r) => r.id);
   }
 
   update(id: string, input: UpdateVendorInput): Promise<Vendor> {

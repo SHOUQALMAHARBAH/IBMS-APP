@@ -57,8 +57,13 @@ export class VendorService {
     return vendor;
   }
 
-  list(query: ListVendorsQueryDto): Promise<Vendor[]> {
-    return this.vendors.findMany({ vendorType: query.vendorType });
+  // Part F item #6 — resolve the search term to a set of ids first, then
+  // filter the existing Prisma query by them.
+  async list(query: ListVendorsQueryDto): Promise<Vendor[]> {
+    return this.vendors.findMany({
+      vendorType: query.vendorType,
+      id: query.search ? await this.vendors.searchIds(query.search) : undefined,
+    });
   }
 
   async get(id: string): Promise<Vendor> {

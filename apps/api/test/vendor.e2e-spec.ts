@@ -189,6 +189,97 @@ describe('Procurement / Vendor Management (e2e) — backlog Part C #67 / #71', (
     expect(updated.vendorType).toBe('other'); // untouched by a name-only patch
   });
 
+  // Part F item #6 — bilingual full-text search over name. Same "prove
+  // real stemming, not substring luck" discipline as customer.e2e-spec.ts's
+  // own search tests.
+  it('finds a vendor via a stemmed English search term ("trade" -> "Trading")', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-search-en',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const name = uniqueLabel('Al-Ufuq Trading Co.');
+    const created = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name, vendorType: 'other' })
+        .expect(201)
+    ).body as VendorBody;
+
+    const res = await request(app.getHttpServer())
+      .get('/vendors?search=trade')
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    const ids = (res.body as VendorBody[]).map((v) => v.id);
+    expect(ids).toContain(created.id);
+  });
+
+  it('finds a vendor via a stemmed Arabic search term (singular matches a stored plural)', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-search-ar',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const name = uniqueLabel('شركة الأفق للسيارات');
+    const created = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name, vendorType: 'other' })
+        .expect(201)
+    ).body as VendorBody;
+
+    const res = await request(app.getHttpServer())
+      .get(`/vendors?search=${encodeURIComponent('سيارة')}`)
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    const ids = (res.body as VendorBody[]).map((v) => v.id);
+    expect(ids).toContain(created.id);
+  });
+
+  it('an empty search param behaves like no search param at all', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-search-empty',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const name = uniqueLabel('Empty Search Co.');
+    const created = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name, vendorType: 'other' })
+        .expect(201)
+    ).body as VendorBody;
+
+    const res = await request(app.getHttpServer())
+      .get('/vendors?search=')
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    const ids = (res.body as VendorBody[]).map((v) => v.id);
+    expect(ids).toContain(created.id);
+  });
+
+  it('a nonsense search term matches nothing', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-search-nomatch',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const nonsense = `zzznomatch${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+    const res = await request(app.getHttpServer())
+      .get(`/vendors?search=${nonsense}`)
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    expect(res.body as VendorBody[]).toHaveLength(0);
+  });
+
   it('404s getting or updating an unknown vendor', async () => {
     const app = await boot();
     const admin = await makeUser(
