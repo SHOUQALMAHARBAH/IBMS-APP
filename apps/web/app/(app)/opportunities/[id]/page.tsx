@@ -24,6 +24,8 @@ import { ClaimSection } from '../../../../components/policy/ClaimSection';
 import { FinanceSection } from '../../../../components/policy/FinanceSection';
 import { CommissionSection } from '../../../../components/policy/CommissionSection';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDate } from '../../../../lib/i18n/format';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
@@ -46,6 +48,7 @@ export default function OpportunityDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [opportunity, setOpportunity] = useState<OpportunityWithContext | null>(
     null,
@@ -196,7 +199,7 @@ export default function OpportunityDetailPage() {
                     </span>
                   </div>
                   <div style={cardMetaStyle}>
-                    Issued {new Date(rfq.issuedAt).toLocaleDateString()} ·{' '}
+                    Issued {formatDate(rfq.issuedAt, language)} ·{' '}
                     {statusBreakdown(rfq)}
                   </div>
                 </button>

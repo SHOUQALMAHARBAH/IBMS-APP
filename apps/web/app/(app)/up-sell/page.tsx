@@ -21,6 +21,8 @@ import {
   upSellFigureRowStyle,
   upSellPanelStyle,
 } from '../../../components/up-sell/up-sell.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate } from '../../../lib/i18n/format';
 
 const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 const CAN_SCAN_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
@@ -34,6 +36,7 @@ function RecommendationRow({
   canConvert: boolean;
   onChanged: (updated: UpSellRecommendation) => void;
 }) {
+  const { language } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [reason, setReason] = useState('');
@@ -72,7 +75,7 @@ function RecommendationRow({
         <span>Current asset value (JOD): {recommendation.currentAssetValue}</span>
       </div>
       <div style={cardMetaStyle}>
-        Flagged {new Date(recommendation.detectedAt).toLocaleDateString()}
+        Flagged {formatDate(recommendation.detectedAt, language)}
       </div>
       {recommendation.status === 'DISMISSED' && recommendation.dismissReason ? (
         <div style={cardMetaStyle}>Reason: {recommendation.dismissReason}</div>

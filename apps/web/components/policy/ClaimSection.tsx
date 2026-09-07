@@ -33,6 +33,9 @@ import {
   quoteChainCardStyle,
   quoteFieldStyle,
 } from '../quotation/quotation.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDate, formatMoney } from '../../lib/i18n/format';
+import type { Language } from '../../lib/i18n/translations';
 
 interface Props {
   opportunityId: string;
@@ -55,21 +58,13 @@ interface Props {
   canClose: boolean;
 }
 
-function money(value: string | null): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${value}`;
-}
-
-function coverageLabel(c: Claim): string {
+function coverageLabel(c: Claim, language: Language): string {
   if (!c.coverageResolvedAtLossDate || !c.coverage) {
     return 'coverage at loss date could not be resolved';
   }
-  const from = new Date(c.coverage.effectiveFrom).toLocaleDateString();
+  const from = formatDate(c.coverage.effectiveFrom, language);
   const to = c.coverage.effectiveTo
-    ? new Date(c.coverage.effectiveTo).toLocaleDateString()
+    ? formatDate(c.coverage.effectiveTo, language)
     : 'open';
   return `coverage version in force: ${from} → ${to}`;
 }
@@ -334,6 +329,7 @@ function ClaimAssessment({
   canAssess: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { language } = useLanguage();
   const [when, setWhen] = useState('');
   const [outcome, setOutcome] =
     useState<ClaimAssessmentOutcome>('PARTIALLY_APPROVED');
@@ -368,7 +364,7 @@ function ClaimAssessment({
   }
 
   const stamp = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString() : '—';
+    iso ? formatDate(iso, language) : '—';
   // an <input type="date"> yields YYYY-MM-DD; the API accepts a bare date.
   const instant = () => when.trim();
 
@@ -500,6 +496,7 @@ function ClaimFollowUp({
   canFollowUp: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { language } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -537,7 +534,7 @@ function ClaimFollowUp({
       <p style={{ fontSize: '0.85rem', margin: '0.25rem 0', opacity: 0.8 }}>
         No insurer response {claim.followUp.followUpAlertThresholdDays} business
         days after registration — raised{' '}
-        {new Date(alert.triggeredAt).toLocaleDateString()}.
+        {formatDate(alert.triggeredAt, language)}.
       </p>
       {canFollowUp ? (
         <button
@@ -572,6 +569,7 @@ function ClaimSettlement({
   canSecondApproveSettlement: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { language } = useLanguage();
   const [approvedAmount, setApprovedAmount] = useState('');
   const [deductible, setDeductible] = useState('');
   const [brokerProcessedPayment, setBrokerProcessedPayment] = useState(false);
@@ -610,9 +608,10 @@ function ClaimSettlement({
 
       {s ? (
         <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
-          Estimated {money(s.estimatedLoss)} · approved{' '}
-          {money(s.approvedAmount)} · deductible {money(s.deductible)} · net{' '}
-          {money(s.netSettlement)}
+          Estimated {formatMoney(s.estimatedLoss, language)} · approved{' '}
+          {formatMoney(s.approvedAmount, language)} · deductible{' '}
+          {formatMoney(s.deductible, language)} · net{' '}
+          {formatMoney(s.netSettlement, language)}
           {s.brokerProcessedPayment ? ' · broker-processed' : ''}
           {s.secondApproverRequired
             ? s.secondApproverUserId
@@ -711,6 +710,7 @@ function ClaimClosure({
   canClose: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { language } = useLanguage();
   const [confirmedOn, setConfirmedOn] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -748,13 +748,12 @@ function ClaimClosure({
       {claim.status === 'CLOSED' ? (
         <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
           Closed{' '}
-          {claim.closedAt
-            ? new Date(claim.closedAt).toLocaleDateString()
-            : ''}
+          {claim.closedAt ? formatDate(claim.closedAt, language) : ''}
           {paymentConfirmed
-            ? ` · client payment confirmed ${new Date(
+            ? ` · client payment confirmed ${formatDate(
                 paymentConfirmed,
-              ).toLocaleDateString()}`
+                language,
+              )}`
             : ''}
         </p>
       ) : claim.status === 'DECLINED' ? (
@@ -778,7 +777,7 @@ function ClaimClosure({
         <>
           <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
             Client payment confirmed{' '}
-            {new Date(paymentConfirmed).toLocaleDateString()}.
+            {formatDate(paymentConfirmed, language)}.
           </p>
           {canClose ? (
             <button
@@ -831,6 +830,7 @@ export function ClaimSection({
   canSecondApproveSettlement,
   canClose,
 }: Props) {
+  const { language } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -992,13 +992,13 @@ export function ClaimSection({
               }}
             >
               <strong>
-                Loss {new Date(c.lossDate).toLocaleDateString()}
+                Loss {formatDate(c.lossDate, language)}
                 {c.isLargeClaim ? ' · large claim' : ''}
               </strong>
               <span style={rfqBadgeStyle}>{c.status}</span>
             </div>
             <p style={{ margin: '0.4rem 0' }}>
-              Estimated loss {money(c.estimatedLoss)}
+              Estimated loss {formatMoney(c.estimatedLoss, language)}
               {c.claimNumber ? (
                 <>
                   {' · '}
@@ -1066,7 +1066,7 @@ export function ClaimSection({
               </p>
             ) : null}
             <p style={{ opacity: 0.6, fontSize: '0.8rem', margin: '0.4rem 0' }}>
-              {coverageLabel(c)}
+              {coverageLabel(c, language)}
             </p>
             {canRegister && c.status === 'NOTIFIED' ? (
               <ClaimRegistrationForm claimId={c.id} onDone={load} />

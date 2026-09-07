@@ -8,6 +8,8 @@ import {
   type InsurerScoreInput,
 } from '../../lib/comparison/comparison-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDateTime, formatMoney } from '../../lib/i18n/format';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqCellStyle, rfqTableStyle } from '../rfq/rfq.styles';
 import {
@@ -27,15 +29,8 @@ interface ScoreDraft {
   serviceScore: string;
 }
 
-function money(value: string | null, currency: string): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
-
 export function ComparisonSection({ rfqId, isPlacement }: Props) {
+  const { language } = useLanguage();
   const [matrix, setMatrix] = useState<ComparisonMatrix | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -148,7 +143,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       ) : (
         <>
           <div style={{ ...comparisonPreStyle, opacity: 0.6, marginTop: '0.5rem' }}>
-            Built {new Date(matrix.builtAt).toLocaleString()}
+            Built {formatDateTime(matrix.builtAt, language)}
           </div>
 
           <div style={comparisonScrollStyle}>
@@ -184,13 +179,13 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                         )}
                       </td>
                       <td style={rfqCellStyle}>
-                        {money(q.premium, q.currency)}
+                        {formatMoney(q.premium, language, q.currency)}
                       </td>
                       <td style={rfqCellStyle}>
-                        {money(q.deductible, q.currency)}
+                        {formatMoney(q.deductible, language, q.currency)}
                       </td>
                       <td style={rfqCellStyle}>
-                        {money(q.liabilityLimit, q.currency)}
+                        {formatMoney(q.liabilityLimit, language, q.currency)}
                       </td>
                       <td style={rfqCellStyle}>
                         {q.biPeriodMonths === null

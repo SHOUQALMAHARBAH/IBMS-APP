@@ -920,25 +920,29 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — begun, items #1-3 of 8 built + item #4 PARTIALLY built.**
-  A working instant language switch + persistent per-user preference exists
-  (`PATCH /auth/me/language`, a `LanguageProvider` React context, a switcher in
-  `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
+- **Part F — bilingual UI — begun, items #1-3 of 8 built + items #4-5 PARTIALLY
+  built.** A working instant language switch + persistent per-user preference
+  exists (`PATCH /auth/me/language`, a `LanguageProvider` React context, a switcher
+  in `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
   (nav/forms/tables via CSS logical properties + free flex/table mirroring; charts
   N/A — none exist in this app yet); mixed-content fields (an Arabic legal name, an
   Arabic insurance-line label next to a Latin policy number, a bilingual address) now
-  isolate correctly via native `<bdi>` elements and `dir="auto"` capture inputs; and
+  isolate correctly via native `<bdi>` elements and `dir="auto"` capture inputs;
   name/label sorting for genuinely bilingual fields (customer/insurer names,
   insurance-line labels) now uses Arabic-locale collation instead of a hardcoded
-  English one — see § Part F below for the full detail. **Item #4's other two
-  sub-problems (Arabic keyboards, national-ID-convention name-field splitting) were
-  explicitly deferred as future work by user decision** — not attempted, and
-  genuinely undocumented anywhere beyond the one-line backlog bullet. Every screen's
-  remaining TEXT is still **English-only**: no locale-aware number/date/currency
-  formatting (Gregorian/Hijri, JOD base + multi-currency), no bilingual full-text
-  search, and no system-generated bilingual documents. Screens implement the loading
-  / empty / error / populated states, but the
-  Part F rule of capturing a screenshot of each state as evidence is not met.
+  English one; and every money/date/datetime value across the app now renders
+  through one shared, locale-aware `formatMoney`/`formatDate`/`formatDateTime`
+  utility, driven by the same live language switcher (Western numerals preserved
+  in Arabic via a deliberately bare `'ar'` tag, not `'ar-JO'`) — see § Part F below
+  for the full detail. **Item #4's other two sub-problems (Arabic keyboards,
+  national-ID-convention name-field splitting) and item #5's other two sub-problems
+  (Hijri calendar, multi-currency for reinsurance) were all explicitly deferred as
+  future work by user decision** — not attempted, and genuinely undocumented
+  anywhere beyond their one-line backlog bullets. Every screen's remaining TEXT is
+  still **English-only**: no bilingual full-text search, and no system-generated
+  bilingual documents. Screens implement the loading / empty / error / populated
+  states, but the Part F rule of capturing a screenshot of each state as evidence
+  is not met.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -6894,6 +6898,97 @@ narrows a gap.
   documented future work; wait for the user's explicit go-ahead before
   resuming either, or starting item #5 (locale-aware number/date/currency
   formatting) or any other Part F item — do not self-select.
+
+**Part F — Bilingual UI (backlog Part 11) — item #5 of 8: locale-aware
+  number/date formatting — PARTIALLY built: number/date formatting only.**
+  The backlog bullet bundles three sub-problems of very different size:
+  number/date formatting, Hijri calendar support ("optional" per the
+  bullet's own wording), and multi-currency for reinsurance. Presented with
+  that split before implementing (per this session's own "pause and confirm
+  before implementing" convention), the user confirmed scope down to
+  sub-problem #1 only — Hijri calendar and multi-currency both deferred as
+  documented future work.
+
+  **What's fixed**: a new shared `apps/web/lib/i18n/format.ts`
+  (`formatMoney`/`formatDate`/`formatDateTime`) replaces roughly nine
+  duplicated local `money()`/`fmtMoney()`/`fmtDateTime()` implementations
+  scattered across `components/**` (`ClaimSection`, `PolicySection`,
+  `CommissionSection`, `FinanceSection`, `EndorsementSection`,
+  `ComparisonSection`, `QuotationsSection`, `RecommendationSection`,
+  `ClientDecisionSection`) and 16 `app/(app)/**/page.tsx` files. Every call
+  site threads the live `useLanguage()` value through — directly via the
+  hook inside a component, or as an explicit `language: Language` parameter
+  into a plain helper function that cannot call a hook itself (e.g.
+  `coverageLabel(c, language)` in `ClaimSection.tsx`, `oldest(daysOverdue,
+  dueDate, language)` in the client- and insurer-accounting ageing pages).
+  Each duplicated formatter's exact null/non-finite fallback behavior (an
+  em dash for `null`, the raw value with a currency prefix for a
+  non-numeric string) was preserved byte-for-byte — a behavior-preserving
+  consolidation, not a new contract.
+
+  **Locale tags were empirically verified against Node's own ICU before
+  being chosen, not assumed** — the same discipline item #4's sorting fix
+  used. The specific risk: a region-qualified Arabic tag (`'ar-JO'`)
+  silently switches to Eastern Arabic-Indic numerals for a JOD amount
+  (`١٬٢٣٤٫٥٠٠` instead of `1,234.500`), an unwanted surprise nothing in this
+  app or brain ever asked for. Bare `'ar'` (no region) keeps Western
+  numerals while still formatting the date in genuine Arabic-locale order
+  (`D/M/YYYY`, no leading zeros, with invisible RTL direction marks between
+  components) — confirmed directly via `node -e` scripts calling
+  `toLocaleDateString`/`toLocaleString`. English uses `'en-GB'`
+  (`DD/MM/YYYY`), matching the existing backend precedent in
+  `audit-anomaly-detection.service.ts`, rather than bare `'en'` (US-style
+  `MM/DD/YYYY`). Presented with this empirical divergence via
+  `AskUserQuestion`, the user confirmed the `'ar'` + `'en-GB'` pairing
+  directly rather than it being assumed.
+
+  **Full mechanical sweep, not a sample**: every `.toLocaleString()`/
+  `.toLocaleDateString()` call site and every duplicated `money()`-shaped
+  helper across `apps/web` was converted — confirmed via a whole-codebase
+  grep showing zero remaining `toLocaleString`/`toLocaleDateString` calls
+  and zero remaining local `money`/`fmtMoney`/`fmtDateTime` function
+  definitions anywhere in `apps/web` afterward, the same exhaustive-sweep
+  bar items #2/#3 held themselves to. Two raw, non-locale-aware date
+  displays that predated `toLocaleString` entirely (`client-accounting`'s
+  and `insurer-accounting`'s own local `oldest()` helpers, which sliced a
+  raw ISO string to its first 10 characters) were judged in scope and
+  converted to call `formatDate()` too, since they were still a raw date
+  display even though they weren't one of the original `toLocaleString`
+  call sites.
+
+  **Explicitly deferred as future work, not attempted here**: Hijri
+  calendar support (every date renders Gregorian regardless of language)
+  and multi-currency for reinsurance (`formatMoney()` takes a `currency`
+  parameter defaulting to `'JOD'` and every call site already passes the
+  record's own actual currency where one exists, but no currency-conversion
+  or reinsurance-specific formatting rule was added beyond what already
+  existed).
+
+  **A new Playwright spec proves the mechanism end to end, not just in
+  isolation**: `locale-formatting.spec.ts` drives the real, live language
+  switcher (the same mechanism `language-switcher.spec.ts` already
+  exercises) against a real page (`client-accounting`) — asserting a
+  rendered date genuinely changes from `en-GB` to `ar` formatting on
+  switch, while the SAME money cell's rendered digits stay byte-identical
+  across the switch. This is the specific end-to-end proof that the
+  `'ar'`-not-`'ar-JO'` locale-tag choice holds in a real rendered page, not
+  only in `format.test.ts`'s isolated function calls.
+
+  **Verification**: +7 new web unit tests (`format.test.ts`, new file) →
+  web unit **16/16** (from 9). +1 new Playwright spec
+  (`locale-formatting.spec.ts`) → full web suite **294/294** (from 287,
+  228 non-`@a11y` + 66 `@a11y`, no flakes this run). `npm run
+  typecheck`/`lint`/`build`/`test` (web) OK. **No backend files touched — a
+  pure frontend change**, confirmed via `git diff --stat` (25 files, all
+  under `apps/web`); no api gate applies.
+
+  **No migration, no seed change.** Read
+  `ibms-brain/meta/context/bilingual-ui.md`'s "What item #5 covers/does NOT
+  cover" before assuming item #5 is fully closed — it is NOT. Hijri
+  calendar and multi-currency for reinsurance remain open, documented
+  future work; wait for the user's explicit go-ahead before resuming
+  either, or starting item #6 (bilingual full-text search) or any other
+  Part F item — do not self-select.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

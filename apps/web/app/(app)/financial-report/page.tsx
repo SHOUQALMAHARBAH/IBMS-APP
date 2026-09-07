@@ -10,13 +10,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
-
-function money(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${v}`;
-}
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatMoney } from '../../../lib/i18n/format';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -31,6 +26,7 @@ const head: CSSProperties = {
 const sectionStyle: CSSProperties = { margin: '1.5rem 0' };
 
 function Figure({ label, value }: { label: string; value: string }) {
+  const { language } = useLanguage();
   return (
     <div
       style={{
@@ -43,7 +39,9 @@ function Figure({ label, value }: { label: string; value: string }) {
       }}
     >
       <span style={{ opacity: 0.75 }}>{label}</span>
-      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(value)}</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {formatMoney(value, language)}
+      </span>
     </div>
   );
 }
@@ -51,6 +49,7 @@ function Figure({ label, value }: { label: string; value: string }) {
 export default function FinancialReportPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<FinancialReportSummary | null>(null);
@@ -186,10 +185,10 @@ export default function FinancialReportPage() {
                         <td style={{ ...cell, textAlign: 'start' }}>
                           <bdi>{r.insurerName}</bdi>
                         </td>
-                        <td style={cell}>{money(r.earned)}</td>
-                        <td style={cell}>{money(r.paid)}</td>
-                        <td style={cell}>{money(r.outstanding)}</td>
-                        <td style={cell}>{money(r.reversed)}</td>
+                        <td style={cell}>{formatMoney(r.earned, language)}</td>
+                        <td style={cell}>{formatMoney(r.paid, language)}</td>
+                        <td style={cell}>{formatMoney(r.outstanding, language)}</td>
+                        <td style={cell}>{formatMoney(r.reversed, language)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -222,6 +221,7 @@ function ProfitTable({
 }: {
   rows: FinancialReportSummary['profitability']['byLine'];
 }) {
+  const { language } = useLanguage();
   if (rows.length === 0)
     return <p style={{ opacity: 0.6 }}>No written policies.</p>;
   return (
@@ -243,10 +243,10 @@ function ProfitTable({
               <td style={{ ...cell, textAlign: 'start' }}>
                 <bdi>{r.label}</bdi>
               </td>
-              <td style={cell}>{money(r.premiumWritten)}</td>
-              <td style={cell}>{money(r.claimsPaid)}</td>
-              <td style={cell}>{money(r.commissionEarned)}</td>
-              <td style={cell}>{money(r.netPosition)}</td>
+              <td style={cell}>{formatMoney(r.premiumWritten, language)}</td>
+              <td style={cell}>{formatMoney(r.claimsPaid, language)}</td>
+              <td style={cell}>{formatMoney(r.commissionEarned, language)}</td>
+              <td style={cell}>{formatMoney(r.netPosition, language)}</td>
               <td style={cell}>{r.policyCount}</td>
             </tr>
           ))}

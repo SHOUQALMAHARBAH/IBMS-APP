@@ -23,6 +23,8 @@ import {
   crossSellActionsStyle,
   crossSellBadgeStyle,
 } from '../../../../components/cross-sell/cross-sell.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDateTime } from '../../../../lib/i18n/format';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 
@@ -32,6 +34,7 @@ export default function CrossSellOpportunityDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [opportunity, setOpportunity] = useState<CrossSellOpportunity | null>(
     null,
@@ -139,14 +142,14 @@ export default function CrossSellOpportunityDetailPage() {
             <div>
               <div style={profileFieldLabelStyle}>Flagged</div>
               <div style={profileFieldValueStyle}>
-                {new Date(opportunity.detectedAt).toLocaleString()}
+                {formatDateTime(opportunity.detectedAt, language)}
               </div>
             </div>
             {opportunity.resolvedAt ? (
               <div>
                 <div style={profileFieldLabelStyle}>Resolved</div>
                 <div style={profileFieldValueStyle}>
-                  {new Date(opportunity.resolvedAt).toLocaleString()}
+                  {formatDateTime(opportunity.resolvedAt, language)}
                 </div>
               </div>
             ) : null}

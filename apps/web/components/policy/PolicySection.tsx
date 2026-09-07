@@ -23,6 +23,8 @@ import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
 
 interface Props {
   opportunity: OpportunityWithContext;
@@ -42,14 +44,6 @@ const CHECKABLE_STATES = new Set([
  * reaches PLACEMENT) — or a Policy already exists (a status that lagged the
  * routing shouldn't hide a real placed policy). */
 const POLICY_ELIGIBLE_STATES = new Set(['PLACEMENT']);
-
-function money(value: string | null, currency = 'JOD'): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
 
 function emptyDocRow(): PolicyDocumentInput {
   return { category: 'POLICY', classification: 'CONFIDENTIAL', fileName: '', storageRef: '' };
@@ -160,6 +154,7 @@ export function PolicySection({
   canDeliver,
   onOpportunityChanged,
 }: Props) {
+  const { language } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -338,18 +333,19 @@ export function PolicySection({
             )}
           </p>
           <p style={{ margin: '0.4rem 0' }}>
-            Requested {money(policy.requestedPremium, policy.currency)}
+            Requested {formatMoney(policy.requestedPremium, language, policy.currency)}
             {policy.issuedPremium
-              ? ` · Issued ${money(policy.issuedPremium, policy.currency)}` +
+              ? ` · Issued ${formatMoney(policy.issuedPremium, language, policy.currency)}` +
                 (policy.premiumVariance
-                  ? ` (Δ ${money(policy.premiumVariance, policy.currency)})`
+                  ? ` (Δ ${formatMoney(policy.premiumVariance, language, policy.currency)})`
                   : '')
               : ''}
           </p>
           <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.4rem 0' }}>
-            Inception {policy.inceptionDate ? new Date(policy.inceptionDate).toLocaleDateString() : '—'}
+            Inception{' '}
+            {policy.inceptionDate ? formatDate(policy.inceptionDate, language) : '—'}
             {' · '}
-            Expiry {policy.expiryDate ? new Date(policy.expiryDate).toLocaleDateString() : '—'}
+            Expiry {policy.expiryDate ? formatDate(policy.expiryDate, language) : '—'}
           </p>
 
           {policy.status === 'PLACEMENT_CONFIRMED' && isPlacement ? (
@@ -453,9 +449,9 @@ export function PolicySection({
               <p style={{ fontWeight: 600 }}>Coverage schedule</p>
               {policy.schedules.map((s) => (
                 <div key={s.id} style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
-                  Effective {new Date(s.effectiveFrom).toLocaleDateString()}
+                  Effective {formatDate(s.effectiveFrom, language)}
                   {s.effectiveTo
-                    ? ` – ${new Date(s.effectiveTo).toLocaleDateString()}`
+                    ? ` – ${formatDate(s.effectiveTo, language)}`
                     : ' – ongoing'}
                   {' · perils: '}
                   {s.namedPerils.join(', ') || '—'}
@@ -537,7 +533,7 @@ export function PolicySection({
               <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', opacity: 0.6 }}>
                 Checked by {policy.checking.checkedByUserId ?? '—'}
                 {policy.checking.checkedAt
-                  ? ` on ${new Date(policy.checking.checkedAt).toLocaleString()}`
+                  ? ` on ${formatDateTime(policy.checking.checkedAt, language)}`
                   : ''}
               </p>
             </div>
@@ -617,10 +613,10 @@ export function PolicySection({
               <p style={{ fontWeight: 600 }}>Delivery</p>
               <p style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
                 {policy.delivery.method} · to {policy.delivery.recipient} ·{' '}
-                {new Date(policy.delivery.deliveredAt).toLocaleDateString()}
+                {formatDate(policy.delivery.deliveredAt, language)}
                 {' · '}
                 {policy.delivery.receiptAcknowledgedAt
-                  ? `receipt acknowledged ${new Date(policy.delivery.receiptAcknowledgedAt).toLocaleDateString()}`
+                  ? `receipt acknowledged ${formatDate(policy.delivery.receiptAcknowledgedAt, language)}`
                   : 'awaiting client acknowledgement'}
               </p>
               {canDeliver && !policy.delivery.receiptAcknowledgedAt ? (

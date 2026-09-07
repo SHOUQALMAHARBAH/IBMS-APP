@@ -16,6 +16,8 @@ import {
 import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatMoney } from '../../lib/i18n/format';
 
 interface Props {
   opportunityId: string;
@@ -25,19 +27,12 @@ interface Props {
   canApproveOverride: boolean;
 }
 
-function money(value: string | null, currency = 'JOD'): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
-
 export function CommissionSection({
   opportunityId,
   canCalculate,
   canApproveOverride,
 }: Props) {
+  const { language } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [entry, setEntry] = useState<CommissionEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,19 +102,19 @@ export function CommissionSection({
         <div style={quoteChainCardStyle}>
           <div style={quoteFieldStyle}>
             <span>Governed amount</span>
-            <span>{money(entry.amount)}</span>
+            <span>{formatMoney(entry.amount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
             <span>VAT ({entry.vatRatePercent}%)</span>
-            <span>{money(entry.vatAmount)}</span>
+            <span>{formatMoney(entry.vatAmount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
             <span>Gross (incl. VAT)</span>
-            <span>{money(entry.grossAmount)}</span>
+            <span>{formatMoney(entry.grossAmount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
             <span>Effective amount</span>
-            <strong>{money(entry.effectiveAmount)}</strong>
+            <strong>{formatMoney(entry.effectiveAmount, language)}</strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Status</span>
@@ -129,7 +124,7 @@ export function CommissionSection({
             <div style={quoteFieldStyle}>
               <span>Reconciled</span>
               <span>
-                {money(entry.paidAmount)}
+                {formatMoney(entry.paidAmount, language)}
                 {entry.paymentReference ? ` · ${entry.paymentReference}` : ''}
               </span>
             </div>
@@ -138,7 +133,7 @@ export function CommissionSection({
             <div style={quoteFieldStyle}>
               <span>Reversed</span>
               <span>
-                {money(entry.reversedAmount)}
+                {formatMoney(entry.reversedAmount, language)}
                 {entry.reversalReason ? ` · ${entry.reversalReason}` : ''}
               </span>
             </div>
@@ -148,7 +143,7 @@ export function CommissionSection({
               <div style={quoteFieldStyle}>
                 <span>Manual override</span>
                 <span>
-                  {money(entry.overrideAmount)}{' '}
+                  {formatMoney(entry.overrideAmount, language)}{' '}
                   {entry.overridePending
                     ? '(pending approval)'
                     : '(approved)'}
@@ -243,7 +238,7 @@ export function CommissionSection({
               }}
             >
               <label>
-                Insurer statement amount (must equal {money(entry.amount)})
+                Insurer statement amount (must equal {formatMoney(entry.amount, language)})
                 <input
                   aria-label="Statement amount"
                   value={statementAmount}

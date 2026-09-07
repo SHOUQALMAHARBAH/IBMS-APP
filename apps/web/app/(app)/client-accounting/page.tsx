@@ -12,17 +12,13 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate, formatMoney } from '../../../lib/i18n/format';
+import type { Language } from '../../../lib/i18n/translations';
 
-function money(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${v}`;
-}
-
-function oldest(daysOverdue: number, dueDate: string | null): string {
+function oldest(daysOverdue: number, dueDate: string | null, language: Language): string {
   if (daysOverdue > 0) return `${daysOverdue}d overdue`;
-  if (dueDate) return `due ${dueDate.slice(0, 10)}`;
+  if (dueDate) return `due ${formatDate(dueDate, language)}`;
   return '—';
 }
 
@@ -40,6 +36,7 @@ const headCellStyle: CSSProperties = {
 export default function ClientAccountingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<ReceivablesAgeingReport | null>(null);
@@ -129,13 +126,13 @@ export default function ClientAccountingPage() {
                     </td>
                     {AR_AGEING_BUCKET_KEYS.map((k) => (
                       <td key={k} style={cellStyle}>
-                        {money(r[k])}
+                        {formatMoney(r[k], language)}
                       </td>
                     ))}
-                    <td style={cellStyle}>{money(r.outstandingTotal)}</td>
+                    <td style={cellStyle}>{formatMoney(r.outstandingTotal, language)}</td>
                     <td style={cellStyle}>{r.invoiceCount}</td>
                     <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      {oldest(r.oldestDaysOverdue, r.oldestDueDate)}
+                      {oldest(r.oldestDaysOverdue, r.oldestDueDate, language)}
                     </td>
                   </tr>
                 ))}
@@ -147,11 +144,11 @@ export default function ClientAccountingPage() {
                   </td>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <td key={k} style={{ ...cellStyle, fontWeight: 600 }}>
-                      {money(data.totals[k])}
+                      {formatMoney(data.totals[k], language)}
                     </td>
                   ))}
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {money(data.totals.outstandingTotal)}
+                    {formatMoney(data.totals.outstandingTotal, language)}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {data.totals.invoiceCount}

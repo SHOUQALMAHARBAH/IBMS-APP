@@ -8,6 +8,8 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate } from '../../../lib/i18n/format';
 
 function RfqList({
   scope,
@@ -15,6 +17,7 @@ function RfqList({
   scope: { opportunityId: string } | { customerId: string };
 }) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [rfqs, setRfqs] = useState<Rfq[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -82,7 +85,7 @@ function RfqList({
             </span>
           </div>
           <div style={cardMetaStyle}>
-            Issued {new Date(rfq.issuedAt).toLocaleDateString()}
+            Issued {formatDate(rfq.issuedAt, language)}
           </div>
         </button>
       ))}

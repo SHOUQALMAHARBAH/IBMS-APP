@@ -11,9 +11,12 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { programListCardStyle } from '../../../components/insurance-program/insurance-program.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate } from '../../../lib/i18n/format';
 
 function ProgramsForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
+  const { language } = useLanguage();
 
   const [programs, setPrograms] = useState<InsuranceProgram[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -74,7 +77,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
             {program.lines.length} line{program.lines.length === 1 ? '' : 's'}
           </div>
           <div style={cardMetaStyle}>
-            Assembled {new Date(program.createdAt).toLocaleDateString()}
+            Assembled {formatDate(program.createdAt, language)}
           </div>
         </button>
       ))}

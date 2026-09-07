@@ -24,6 +24,8 @@ import {
   crmTimelineItemStyle,
   crmTimelineWhenStyle,
 } from '../../../components/crm/crm.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDateTime } from '../../../lib/i18n/format';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
@@ -39,6 +41,7 @@ const CAN_LOG_ROLES = [
 ];
 
 function TimelineList({ view }: { view: Customer360View }) {
+  const { language } = useLanguage();
   if (view.timeline.length === 0) {
     return (
       <p style={{ opacity: 0.6, marginTop: '1rem' }}>
@@ -62,7 +65,7 @@ function TimelineList({ view }: { view: Customer360View }) {
             </div>
             {event.detail ? <div>{event.detail}</div> : null}
             <div style={crmTimelineWhenStyle}>
-              {new Date(event.at).toLocaleString()}
+              {formatDateTime(event.at, language)}
             </div>
           </div>
         </div>

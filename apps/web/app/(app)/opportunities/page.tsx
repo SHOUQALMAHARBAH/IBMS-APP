@@ -11,9 +11,12 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate } from '../../../lib/i18n/format';
 
 function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [opportunities, setOpportunities] = useState<Opportunity[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -80,7 +83,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
           </div>
           <div style={cardMetaStyle}>
             {opportunity.isRenewal ? 'Renewal' : 'New business'} · created{' '}
-            {new Date(opportunity.createdAt).toLocaleDateString()}
+            {formatDate(opportunity.createdAt, language)}
           </div>
         </button>
       ))}
