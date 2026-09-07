@@ -129,7 +129,8 @@ describe('Cross-Selling (e2e) — backlog Part C #8', () => {
       .set(bearer(salesToken))
       .send({
         customerType: 'INDIVIDUAL',
-        legalName: 'Cross-Sell Subject',
+        givenName: 'Cross-Sell',
+        familyName: 'Subject',
         nationalId: '9905050000',
         contactPhone: '+962-7-9000-1234',
         contactEmail: 'xs-subject@example.test',

@@ -23,6 +23,12 @@ export interface CreateCustomerInput {
   prospectId?: string;
   customerType: CustomerType;
   legalName: string;
+  /** Individual only — Jordanian national-ID-convention name parts (Part F
+   * item #4). Undefined for a CORPORATE customer. */
+  givenName?: string;
+  fatherName?: string;
+  grandfatherName?: string;
+  familyName?: string;
   registrationNumber?: string;
   nationalIdEnc?: string;
   taxRegistrationNumber?: string;
@@ -45,6 +51,12 @@ export interface CreateUboInput {
   id: string;
   customerId: string;
   fullName: string;
+  /** Jordanian national-ID-convention name parts (Part F item #4) — a UBO
+   * is always a real individual, so unlike Customer these always apply. */
+  givenName: string;
+  fatherName?: string;
+  grandfatherName?: string;
+  familyName: string;
   nationalIdEnc: string;
   ownershipPercent?: Prisma.Decimal;
   isAuthorizedSignatory: boolean;

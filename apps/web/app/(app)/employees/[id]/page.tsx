@@ -158,7 +158,28 @@ export default function EmployeeDetailPage() {
       {employee ? (
         <>
           <section style={sectionStyle}>
-            <h2>{employee.fullName}</h2>
+            <h2>
+              <bdi>{employee.fullName}</bdi>
+            </h2>
+            {employee.givenName ? (
+              <p>
+                Given name: <bdi>{employee.givenName}</bdi>
+                {employee.fatherName ? (
+                  <>
+                    {' '}
+                    — Father&apos;s name: <bdi>{employee.fatherName}</bdi>
+                  </>
+                ) : null}
+                {employee.grandfatherName ? (
+                  <>
+                    {' '}
+                    — Grandfather&apos;s name: <bdi>{employee.grandfatherName}</bdi>
+                  </>
+                ) : null}
+                {' '}
+                — Family name: <bdi>{employee.familyName}</bdi>
+              </p>
+            ) : null}
             <p>National ID: {employee.nationalId}</p>
             <p>Position: {employee.position ?? '—'}</p>
             <p>Licensed role: {employee.licensedRole ?? '—'}</p>

@@ -360,7 +360,11 @@ model Branch {
 /// tracking for regulated staff, training records (Part 8.2).
 model Employee {
   id                     String    @id @default(uuid())
-  fullName               String
+  fullName               String    // computed from the 4 parts below when they're set (see composeFullName) — historical rows keep only this field, parts null
+  givenName              String?   // Jordanian national-ID convention (Part F item #4) — given/father's/grandfather's/family name
+  fatherName             String?
+  grandfatherName        String?
+  familyName             String?
   nationalIdEnc          String    // -- ENCRYPT (Part 10.2 field-level encryption)
   position               String?
   hireDate               DateTime?
@@ -481,7 +485,11 @@ model Customer {
   prospectId        String?        @unique
   prospect          Prospect?      @relation(fields: [prospectId], references: [id])
   customerType      CustomerType
-  legalName         String         // corporate: legal name; individual: full name
+  legalName         String         // corporate: legal name; individual: computed full name (see composeFullName) — historical individual rows keep only this field, parts null
+  givenName         String?        // individual only — Jordanian national-ID convention (Part F item #4)
+  fatherName        String?        // individual only
+  grandfatherName   String?        // individual only
+  familyName        String?        // individual only
   registrationNumber String?       // corporate: commercial registration number
   nationalIdEnc     String?        // individual -- ENCRYPT
   taxRegistrationNumber String?
@@ -532,7 +540,11 @@ model UltimateBeneficialOwner {
   id             String   @id @default(uuid())
   customerId     String
   customer       Customer @relation(fields: [customerId], references: [id])
-  fullName       String
+  fullName       String   // computed from the 4 parts below (see composeFullName) — historical rows keep only this field, parts null
+  givenName      String?  // Jordanian national-ID convention (Part F item #4)
+  fatherName     String?
+  grandfatherName String?
+  familyName     String?
   nationalIdEnc  String   // -- ENCRYPT
   ownershipPercent Decimal? @db.Decimal(5, 2)
   isAuthorizedSignatory Boolean @default(false)

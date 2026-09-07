@@ -7,11 +7,32 @@ import { emptyStringToUndefined } from '../../../common/dto.util';
  * (always in the past, like every other backdatable-instant field in this
  * codebase) — validated here only as non-empty strings. `userId` is an
  * OPTIONAL link to an existing login account, finally giving #61 (Employee
- * Performance)'s dormant `User.employeeId` FK a real writer. */
+ * Performance)'s dormant `User.employeeId` FK a real writer.
+ *
+ * Part F item #4 — the Jordanian national-ID-convention name parts
+ * (given/father's/grandfather's/family name) always apply here (an Employee
+ * is always a real individual); the flat `fullName` is computed
+ * server-side from them (see `composeFullName()`), not accepted directly. */
 export class CreateEmployeeDto {
   @IsString()
-  @Length(1, 200)
-  fullName!: string;
+  @Length(1, 150)
+  givenName!: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 150)
+  fatherName?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 150)
+  grandfatherName?: string;
+
+  @IsString()
+  @Length(1, 150)
+  familyName!: string;
 
   @IsString()
   @Length(1, 100)

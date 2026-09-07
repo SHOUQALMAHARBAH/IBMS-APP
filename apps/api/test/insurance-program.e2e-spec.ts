@@ -158,7 +158,8 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
       .set(bearer(salesToken))
       .send({
         customerType: 'INDIVIDUAL',
-        legalName: 'Program Subject',
+        givenName: 'Program',
+        familyName: 'Subject',
         nationalId: '9902020000',
         contactPhone: '+962-7-9000-4321',
         contactEmail: 'ip-subject@example.test',

@@ -208,6 +208,14 @@ export default function CustomerProfilePage() {
             <ProfileField label="Registered address" value={customer.registeredAddress} />
             <ProfileField label="Nature of business" value={customer.natureOfBusiness} />
             <ProfileField label="Language preference" value={customer.languagePreference} />
+            {customer.customerType === 'INDIVIDUAL' ? (
+              <>
+                <ProfileField label="Given name" value={customer.givenName} />
+                <ProfileField label="Father's name" value={customer.fatherName} />
+                <ProfileField label="Grandfather's name" value={customer.grandfatherName} />
+                <ProfileField label="Family name" value={customer.familyName} />
+              </>
+            ) : null}
           </div>
 
           {revealTarget ? (
@@ -242,7 +250,9 @@ export default function CustomerProfilePage() {
               {ubos.length === 0 ? <p style={{ opacity: 0.6 }}>None recorded.</p> : null}
               {ubos.map((u) => (
                 <div key={u.id} style={repeatableRowStyle}>
-                  <strong>{u.fullName}</strong>
+                  <strong>
+                    <bdi>{u.fullName}</bdi>
+                  </strong>
                   {u.ownershipPercent ? <span> — {u.ownershipPercent}%</span> : null}
                   {u.isPep ? <span> — PEP</span> : null}
                 </div>

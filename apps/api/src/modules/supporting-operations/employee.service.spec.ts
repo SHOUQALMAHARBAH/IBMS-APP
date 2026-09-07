@@ -128,7 +128,8 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
 }
 
 const CREATE_DTO: CreateEmployeeDto = {
-  fullName: 'Jane Doe',
+  givenName: 'Jane',
+  familyName: 'Doe',
   nationalId: '9999999999',
   hireDate: '2024-01-15',
 };

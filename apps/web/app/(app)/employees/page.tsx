@@ -30,7 +30,13 @@ export default function EmployeesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const [fullName, setFullName] = useState('');
+  // Jordanian national-ID-convention name parts (Part F item #4) —
+  // givenName/familyName are required, fatherName/grandfatherName optional;
+  // fullName is computed server-side from these.
+  const [givenName, setGivenName] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [grandfatherName, setGrandfatherName] = useState('');
+  const [familyName, setFamilyName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [position, setPosition] = useState('');
   const [hireDate, setHireDate] = useState('');
@@ -68,13 +74,19 @@ export default function EmployeesPage() {
     setCreateError(null);
     try {
       await createEmployee({
-        fullName,
+        givenName,
+        fatherName: fatherName || undefined,
+        grandfatherName: grandfatherName || undefined,
+        familyName,
         nationalId,
         position: position || undefined,
         hireDate,
         licensedRole: licensedRole || undefined,
       });
-      setFullName('');
+      setGivenName('');
+      setFatherName('');
+      setGrandfatherName('');
+      setFamilyName('');
       setNationalId('');
       setPosition('');
       setHireDate('');
@@ -121,7 +133,9 @@ export default function EmployeesPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <td style={cell}>{row.fullName}</td>
+                  <td style={cell}>
+                    <bdi>{row.fullName}</bdi>
+                  </td>
                   <td style={cell}>{row.position ?? '—'}</td>
                   <td style={cell}>{row.licensedRole ?? '—'}</td>
                   <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
@@ -141,8 +155,34 @@ export default function EmployeesPage() {
       <form onSubmit={onCreate} style={formStyle}>
         <h2>Record a new employee</h2>
         <label style={labelStyle}>
-          Full name
-          <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          Given name
+          <input
+            dir="auto"
+            value={givenName}
+            onChange={(e) => setGivenName(e.target.value)}
+            required
+          />
+        </label>
+        <label style={labelStyle}>
+          Father&apos;s name (optional)
+          <input dir="auto" value={fatherName} onChange={(e) => setFatherName(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Grandfather&apos;s name (optional)
+          <input
+            dir="auto"
+            value={grandfatherName}
+            onChange={(e) => setGrandfatherName(e.target.value)}
+          />
+        </label>
+        <label style={labelStyle}>
+          Family name
+          <input
+            dir="auto"
+            value={familyName}
+            onChange={(e) => setFamilyName(e.target.value)}
+            required
+          />
         </label>
         <label style={labelStyle}>
           National ID

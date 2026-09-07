@@ -151,7 +151,8 @@ describe('Up-Selling (e2e) — backlog Part C #9', () => {
       .set(bearer(salesToken))
       .send({
         customerType: 'INDIVIDUAL',
-        legalName: 'Up-Sell Subject',
+        givenName: 'Up-Sell',
+        familyName: 'Subject',
         nationalId: '9906060000',
         contactPhone: '+962-7-9000-5678',
         contactEmail: 'us-subject@example.test',

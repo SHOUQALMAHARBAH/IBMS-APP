@@ -107,17 +107,28 @@ async function makeUser(
   return { accessToken, userId };
 }
 
+/** Part F item #4 — an INDIVIDUAL customer's `legalName` is now computed
+ * server-side from 4 national-ID-convention parts, not accepted directly
+ * (see CustomerTypeFieldCoherence). This helper keeps every existing
+ * caller's single display-name string working unchanged by splitting it on
+ * the first space into givenName/familyName — `composeFullName()` rejoins
+ * them with a single space, so the resulting `legalName` is byte-identical
+ * to the string passed in, which every caller's own assertions (including
+ * the EDD watchlist-match test's exact-string match) still depend on. */
 async function createIndividualCustomer(
   app: INestApplication<App>,
   accessToken: string,
   legalName: string,
 ): Promise<CustomerBody> {
+  const [givenName, ...rest] = legalName.split(' ');
+  const familyName = rest.join(' ');
   const res = await request(app.getHttpServer())
     .post('/customers')
     .set(bearer(accessToken))
     .send({
       customerType: 'INDIVIDUAL',
-      legalName,
+      givenName,
+      familyName,
       nationalId: '9901012345',
       contactPhone: '+962-7-9000-0000',
       contactEmail: 'customer@example.test',
@@ -221,6 +232,112 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
       expect(customer.nationalId).not.toBe('9901012345');
       expect(customer.nationalId).toMatch(/\*+2345$/);
     });
+
+    // Part F item #4 — Jordanian national-ID-convention name splitting.
+    it('computes legalName from the 4 Jordanian national-ID-convention name parts on an INDIVIDUAL customer', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-owner-name-parts',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const res = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'INDIVIDUAL',
+          givenName: 'Ahmad',
+          fatherName: 'Mohammad',
+          grandfatherName: 'Ali',
+          familyName: 'Al-Sharif',
+          nationalId: '9901012345',
+          contactPhone: '+962-7-9000-0000',
+          contactEmail: 'name-parts@example.test',
+          languagePreference: 'AR',
+        })
+        .expect(201);
+      const customer = res.body as CustomerBody & {
+        givenName: string;
+        fatherName: string;
+        grandfatherName: string;
+        familyName: string;
+      };
+      expect(customer.legalName).toBe('Ahmad Mohammad Ali Al-Sharif');
+      expect(customer.givenName).toBe('Ahmad');
+      expect(customer.fatherName).toBe('Mohammad');
+      expect(customer.grandfatherName).toBe('Ali');
+      expect(customer.familyName).toBe('Al-Sharif');
+    });
+
+    it("omits father's/grandfather's name from the computed legalName when they are not supplied", async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-owner-name-parts-min',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const res = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'INDIVIDUAL',
+          givenName: 'Layla',
+          familyName: 'Nassar',
+          nationalId: '9901012399',
+          contactPhone: '+962-7-9000-1111',
+          contactEmail: 'name-parts-min@example.test',
+          languagePreference: 'AR',
+        })
+        .expect(201);
+      const customer = res.body as CustomerBody;
+      expect(customer.legalName).toBe('Layla Nassar');
+    });
+
+    it('rejects an INDIVIDUAL customer that sends legalName directly (it is computed server-side from the 4 name parts)', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-owner-individual-legalname',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'INDIVIDUAL',
+          legalName: 'Should Be Rejected',
+          nationalId: '9901012345',
+          contactPhone: '+962-7-0000000',
+          contactEmail: 'individual-legalname@example.test',
+          languagePreference: 'AR',
+        })
+        .expect(400);
+    });
+
+    it('rejects a CORPORATE customer that carries the individual name-part fields', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-owner-corp-name-parts',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: 'Should Be Rejected Co.',
+          givenName: 'Should',
+          familyName: 'Not Be Here',
+          registrationNumber: 'REG-777',
+          registeredAddress: 'Amman, Jordan',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-0000000',
+          contactEmail: 'corp-name-parts@example.test',
+          languagePreference: 'EN',
+        })
+        .expect(400);
+    });
   });
 
   describe('POST /customers/:id/ubos', () => {
@@ -240,7 +357,12 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
       await request(app.getHttpServer())
         .post(`/customers/${customer.id}/ubos`)
         .set(bearer(sales.accessToken))
-        .send({ fullName: 'Someone', nationalId: '1112223334', isPep: false })
+        .send({
+          givenName: 'Someone',
+          familyName: 'Person',
+          nationalId: '1112223334',
+          isPep: false,
+        })
         .expect(422);
     });
 
@@ -271,7 +393,8 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .post(`/customers/${customerId}/ubos`)
         .set(bearer(sales.accessToken))
         .send({
-          fullName: 'Owner One',
+          givenName: 'Owner',
+          familyName: 'One',
           nationalId: '5556667778',
           ownershipPercent: 60,
           isPep: true,
@@ -286,6 +409,58 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
       expect(list).toHaveLength(1);
       expect(list[0].fullName).toBe('Owner One');
       expect(list[0].isPep).toBe(true);
+    });
+
+    // Part F item #4 — Jordanian national-ID-convention name splitting. A
+    // UBO is always a real individual, so all 4 parts always apply (unlike
+    // Customer, which branches on customerType).
+    it('computes a UBO fullName from all 4 Jordanian national-ID-convention name parts', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-owner-ubo-name-parts',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const corp = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: 'UBO Name Parts Co.',
+          registrationNumber: 'REG-002',
+          registeredAddress: 'Amman, Jordan',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-2222222',
+          contactEmail: 'ubo-name-parts@example.test',
+          languagePreference: 'AR',
+        })
+        .expect(201);
+      const customerId = (corp.body as CustomerBody).id;
+
+      const res = await request(app.getHttpServer())
+        .post(`/customers/${customerId}/ubos`)
+        .set(bearer(sales.accessToken))
+        .send({
+          givenName: 'Nour',
+          fatherName: 'Khaled',
+          grandfatherName: 'Yousef',
+          familyName: 'Al-Masri',
+          nationalId: '9998887776',
+          isPep: false,
+        })
+        .expect(201);
+      const ubo = res.body as {
+        fullName: string;
+        givenName: string;
+        fatherName: string;
+        grandfatherName: string;
+        familyName: string;
+      };
+      expect(ubo.fullName).toBe('Nour Khaled Yousef Al-Masri');
+      expect(ubo.givenName).toBe('Nour');
+      expect(ubo.fatherName).toBe('Khaled');
+      expect(ubo.grandfatherName).toBe('Yousef');
+      expect(ubo.familyName).toBe('Al-Masri');
     });
   });
 

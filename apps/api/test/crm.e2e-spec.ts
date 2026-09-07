@@ -141,7 +141,8 @@ describe('Relationship Management / CRM (e2e) — backlog Part C #10', () => {
       .set(bearer(salesToken))
       .send({
         customerType: 'INDIVIDUAL',
-        legalName: 'CRM Subject',
+        givenName: 'CRM',
+        familyName: 'Subject',
         nationalId: '9907070000',
         contactPhone: '+962-7-9000-5678',
         contactEmail: 'crm-subject@example.test',

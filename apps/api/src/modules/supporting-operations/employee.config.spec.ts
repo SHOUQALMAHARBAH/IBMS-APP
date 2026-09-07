@@ -10,6 +10,10 @@ function employee(over: Partial<Employee> = {}): Employee {
   return {
     id: 'emp-1',
     fullName: 'Jane Doe',
+    givenName: 'Jane',
+    fatherName: null,
+    grandfatherName: null,
+    familyName: 'Doe',
     nationalIdEnc: 'encrypted-value',
     position: 'Placement Officer',
     hireDate: new Date('2024-01-15T00:00:00.000Z'),
@@ -45,6 +49,10 @@ describe('toEmployeeListRow', () => {
     expect(row).toEqual({
       id: 'emp-1',
       fullName: 'Jane Doe',
+      givenName: 'Jane',
+      fatherName: null,
+      grandfatherName: null,
+      familyName: 'Doe',
       position: 'Placement Officer',
       hireDate: '2024-01-15T00:00:00.000Z',
       terminationDate: null,

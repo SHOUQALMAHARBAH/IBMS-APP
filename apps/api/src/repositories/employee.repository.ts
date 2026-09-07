@@ -10,6 +10,12 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface CreateEmployeeInput {
   id: string;
   fullName: string;
+  /** Jordanian national-ID-convention name parts (Part F item #4) — an
+   * Employee is always a real individual, so these always apply. */
+  givenName: string;
+  fatherName?: string;
+  grandfatherName?: string;
+  familyName: string;
   nationalIdEnc: string;
   position?: string;
   hireDate: Date;

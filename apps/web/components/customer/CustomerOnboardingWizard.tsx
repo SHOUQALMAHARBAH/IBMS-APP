@@ -84,8 +84,14 @@ export function CustomerOnboardingWizard() {
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
 
   // Profile form fields — the sensitive three start empty on purpose (see
-  // SENSITIVE_FIELD_NAMES above).
+  // SENSITIVE_FIELD_NAMES above). `legalName` is CORPORATE-only now; an
+  // individual's name is captured as the 4 Jordanian national-ID-convention
+  // parts below and computed server-side (Part F item #4).
   const [legalName, setLegalName] = useState('');
+  const [givenName, setGivenName] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [grandfatherName, setGrandfatherName] = useState('');
+  const [familyName, setFamilyName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [taxRegistrationNumber, setTaxRegistrationNumber] = useState('');
@@ -95,8 +101,11 @@ export function CustomerOnboardingWizard() {
   const [contactEmail, setContactEmail] = useState('');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('AR');
 
-  // UBO mini-form
-  const [uboFullName, setUboFullName] = useState('');
+  // UBO mini-form — always an individual, so always the 4-part split.
+  const [uboGivenName, setUboGivenName] = useState('');
+  const [uboFatherName, setUboFatherName] = useState('');
+  const [uboGrandfatherName, setUboGrandfatherName] = useState('');
+  const [uboFamilyName, setUboFamilyName] = useState('');
   const [uboNationalId, setUboNationalId] = useState('');
   const [uboOwnershipPercent, setUboOwnershipPercent] = useState('');
   const [uboIsPep, setUboIsPep] = useState(false);
@@ -122,7 +131,11 @@ export function CustomerOnboardingWizard() {
     try {
       const createdCustomer = await createCustomer({
         customerType,
-        legalName,
+        legalName: customerType === 'CORPORATE' ? legalName : undefined,
+        givenName: customerType === 'INDIVIDUAL' ? givenName : undefined,
+        fatherName: customerType === 'INDIVIDUAL' ? (fatherName || undefined) : undefined,
+        grandfatherName: customerType === 'INDIVIDUAL' ? (grandfatherName || undefined) : undefined,
+        familyName: customerType === 'INDIVIDUAL' ? familyName : undefined,
         nationalId: customerType === 'INDIVIDUAL' ? nationalId : undefined,
         registrationNumber: customerType === 'CORPORATE' ? registrationNumber : undefined,
         taxRegistrationNumber: taxRegistrationNumber || undefined,
@@ -150,13 +163,19 @@ export function CustomerOnboardingWizard() {
     setIsSubmitting(true);
     try {
       const ubo = await addUbo(customer.id, {
-        fullName: uboFullName,
+        givenName: uboGivenName,
+        fatherName: uboFatherName || undefined,
+        grandfatherName: uboGrandfatherName || undefined,
+        familyName: uboFamilyName,
         nationalId: uboNationalId,
         ownershipPercent: uboOwnershipPercent ? Number(uboOwnershipPercent) : undefined,
         isPep: uboIsPep,
       });
       setUbos((prev) => [...prev, ubo]);
-      setUboFullName('');
+      setUboGivenName('');
+      setUboFatherName('');
+      setUboGrandfatherName('');
+      setUboFamilyName('');
       setUboNationalId('');
       setUboOwnershipPercent('');
       setUboIsPep(false);
@@ -252,20 +271,76 @@ export function CustomerOnboardingWizard() {
           <h2 style={{ marginTop: 0 }}>
             {customerType === 'CORPORATE' ? 'Corporate profile' : 'Individual profile'}
           </h2>
-          <div style={formRowStyle}>
-            <div style={fieldStyle}>
-              <label htmlFor="cust-legal-name" style={labelStyle}>
-                {customerType === 'CORPORATE' ? 'Legal (registered) name' : 'Full name'}
-              </label>
-              <input
-                id="cust-legal-name"
-                required
-                dir="auto"
-                value={legalName}
-                onChange={(e) => setLegalName(e.target.value)}
-                style={inputStyle}
-              />
+          {customerType === 'INDIVIDUAL' ? (
+            <div style={formRowStyle}>
+              <div style={fieldStyle}>
+                <label htmlFor="cust-given-name" style={labelStyle}>
+                  Given name
+                </label>
+                <input
+                  id="cust-given-name"
+                  required
+                  dir="auto"
+                  value={givenName}
+                  onChange={(e) => setGivenName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="cust-father-name" style={labelStyle}>
+                  Father&apos;s name (optional)
+                </label>
+                <input
+                  id="cust-father-name"
+                  dir="auto"
+                  value={fatherName}
+                  onChange={(e) => setFatherName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="cust-grandfather-name" style={labelStyle}>
+                  Grandfather&apos;s name (optional)
+                </label>
+                <input
+                  id="cust-grandfather-name"
+                  dir="auto"
+                  value={grandfatherName}
+                  onChange={(e) => setGrandfatherName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="cust-family-name" style={labelStyle}>
+                  Family name
+                </label>
+                <input
+                  id="cust-family-name"
+                  required
+                  dir="auto"
+                  value={familyName}
+                  onChange={(e) => setFamilyName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
             </div>
+          ) : null}
+          <div style={formRowStyle}>
+            {customerType === 'CORPORATE' ? (
+              <div style={fieldStyle}>
+                <label htmlFor="cust-legal-name" style={labelStyle}>
+                  Legal (registered) name
+                </label>
+                <input
+                  id="cust-legal-name"
+                  required
+                  dir="auto"
+                  value={legalName}
+                  onChange={(e) => setLegalName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            ) : null}
             {customerType === 'INDIVIDUAL' ? (
               <div style={fieldStyle}>
                 <label htmlFor="cust-national-id" style={labelStyle}>
@@ -410,18 +485,57 @@ export function CustomerOnboardingWizard() {
           <form onSubmit={(e) => void handleAddUbo(e)} style={repeatableRowStyle}>
             <div style={formRowStyle}>
               <div style={fieldStyle}>
-                <label htmlFor="ubo-full-name" style={labelStyle}>
-                  Full name
+                <label htmlFor="ubo-given-name" style={labelStyle}>
+                  Given name
                 </label>
                 <input
-                  id="ubo-full-name"
+                  id="ubo-given-name"
                   required
                   dir="auto"
-                  value={uboFullName}
-                  onChange={(e) => setUboFullName(e.target.value)}
+                  value={uboGivenName}
+                  onChange={(e) => setUboGivenName(e.target.value)}
                   style={inputStyle}
                 />
               </div>
+              <div style={fieldStyle}>
+                <label htmlFor="ubo-father-name" style={labelStyle}>
+                  Father&apos;s name (optional)
+                </label>
+                <input
+                  id="ubo-father-name"
+                  dir="auto"
+                  value={uboFatherName}
+                  onChange={(e) => setUboFatherName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="ubo-grandfather-name" style={labelStyle}>
+                  Grandfather&apos;s name (optional)
+                </label>
+                <input
+                  id="ubo-grandfather-name"
+                  dir="auto"
+                  value={uboGrandfatherName}
+                  onChange={(e) => setUboGrandfatherName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={fieldStyle}>
+                <label htmlFor="ubo-family-name" style={labelStyle}>
+                  Family name
+                </label>
+                <input
+                  id="ubo-family-name"
+                  required
+                  dir="auto"
+                  value={uboFamilyName}
+                  onChange={(e) => setUboFamilyName(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+            <div style={formRowStyle}>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-national-id" style={labelStyle}>
                   National ID
@@ -546,15 +660,18 @@ export function CustomerOnboardingWizard() {
       {step === 'review' && customer && kyc ? (
         <div>
           <h2 style={{ marginTop: 0 }}>Review & submit</h2>
-          {/* Render the values the officer actually typed on the profile
-              step (still in local state) — NOT the create() response, whose
-              contactPhone/contactEmail come back masked, so a typo in the
-              contact fields would be impossible to catch here. These stay
-              client-side only; nothing is logged. */}
+          {/* legalName comes from the create() response, not local state:
+              for an individual it's server-computed from the 4 name parts
+              (Part F item #4), and it's never masked either way, so this is
+              the correct source for BOTH customer types. Contact fields
+              still render from local state (still in memory, not the
+              create() response), whose contactPhone/contactEmail come back
+              masked, so a typo in the contact fields would be impossible to
+              catch here. These stay client-side only; nothing is logged. */}
           <ul>
             <li>
               <strong>
-                <bdi>{legalName}</bdi>
+                <bdi>{customer.legalName}</bdi>
               </strong>{' '}
               ({customer.customerType})
             </li>

@@ -151,7 +151,8 @@ describe('Needs Assessment (e2e) — backlog Part C #5', () => {
       .set(bearer(salesToken))
       .send({
         customerType: 'INDIVIDUAL',
-        legalName: 'Needs Assessment Subject',
+        givenName: 'Needs Assessment',
+        familyName: 'Subject',
         nationalId: '9901019999',
         contactPhone: '+962-7-9000-1234',
         contactEmail: 'na-subject@example.test',

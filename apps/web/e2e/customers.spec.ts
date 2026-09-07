@@ -28,6 +28,10 @@ const CUSTOMER = {
   prospectId: null,
   customerType: "INDIVIDUAL",
   legalName: "Ahmad Al-Fulani",
+  givenName: "Ahmad",
+  fatherName: null,
+  grandfatherName: null,
+  familyName: "Al-Fulani",
   registrationNumber: null,
   taxRegistrationNumber: null,
   registeredAddress: null,
@@ -144,7 +148,8 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.goto("/customers/new");
   await page.getByRole("button", { name: "Individual" }).click();
 
-  await page.getByLabel("Full name").fill("Ahmad Al-Fulani");
+  await page.getByLabel("Given name").fill("Ahmad");
+  await page.getByLabel("Family name").fill("Al-Fulani");
   await page.getByLabel("National ID").fill("9901012345");
   await page.getByLabel("Contact phone").fill("+962-7-9000-0000");
   await page.getByLabel("Contact email").fill("ahmad@example.test");

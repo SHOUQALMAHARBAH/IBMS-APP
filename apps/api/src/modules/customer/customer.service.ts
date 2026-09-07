@@ -26,6 +26,7 @@ import {
   CUSTOMER_CROSS_OWNER_ROLES,
   isCustomerVisibleTo,
 } from '../../common/rbac-visibility.util';
+import { composeFullName } from '../../common/person-name.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
@@ -92,6 +93,10 @@ export class CustomerService {
       prospectId: customer.prospectId,
       customerType: customer.customerType,
       legalName: customer.legalName,
+      givenName: customer.givenName,
+      fatherName: customer.fatherName,
+      grandfatherName: customer.grandfatherName,
+      familyName: customer.familyName,
       registrationNumber: customer.registrationNumber,
       taxRegistrationNumber: customer.taxRegistrationNumber,
       registeredAddress: customer.registeredAddress,
@@ -136,6 +141,18 @@ export class CustomerService {
     // one that matters most — a corporate record must never carry an
     // encrypted personal ID.
     const isIndividual = dto.customerType === 'INDIVIDUAL';
+    // Part F item #4 — an individual's legalName is computed from the 4
+    // national-ID-convention parts, never accepted directly (see
+    // CustomerTypeFieldCoherence); a corporate customer keeps sending its
+    // registered legal name as-is.
+    const legalName = isIndividual
+      ? composeFullName({
+          givenName: dto.givenName!,
+          fatherName: dto.fatherName,
+          grandfatherName: dto.grandfatherName,
+          familyName: dto.familyName!,
+        })
+      : dto.legalName!;
 
     const id = randomUUID();
     const encrypted = await encryptEntityFields(
@@ -153,7 +170,11 @@ export class CustomerService {
       id,
       prospectId: dto.prospectId,
       customerType: dto.customerType,
-      legalName: dto.legalName,
+      legalName,
+      givenName: isIndividual ? dto.givenName : undefined,
+      fatherName: isIndividual ? dto.fatherName : undefined,
+      grandfatherName: isIndividual ? dto.grandfatherName : undefined,
+      familyName: isIndividual ? dto.familyName : undefined,
       registrationNumber: isIndividual ? undefined : dto.registrationNumber,
       nationalIdEnc: encrypted.nationalIdEnc,
       taxRegistrationNumber: dto.taxRegistrationNumber,
@@ -224,6 +245,10 @@ export class CustomerService {
       prospectId: customer.prospectId,
       customerType: customer.customerType,
       legalName: customer.legalName,
+      givenName: customer.givenName,
+      fatherName: customer.fatherName,
+      grandfatherName: customer.grandfatherName,
+      familyName: customer.familyName,
       registrationNumber: customer.registrationNumber,
       taxRegistrationNumber: customer.taxRegistrationNumber,
       registeredAddress: customer.registeredAddress,
@@ -348,10 +373,24 @@ export class CustomerService {
       { userId: actor.id, entityType: 'Customer', entityId: customerId },
     );
 
+    // Part F item #4 — a UBO is always a real individual, so the 4
+    // national-ID-convention parts always apply (unlike Customer, which
+    // branches on customerType).
+    const fullName = composeFullName({
+      givenName: dto.givenName,
+      fatherName: dto.fatherName,
+      grandfatherName: dto.grandfatherName,
+      familyName: dto.familyName,
+    });
+
     const ubo = await this.customers.createUbo({
       id,
       customerId,
-      fullName: dto.fullName,
+      fullName,
+      givenName: dto.givenName,
+      fatherName: dto.fatherName,
+      grandfatherName: dto.grandfatherName,
+      familyName: dto.familyName,
       nationalIdEnc: encrypted.nationalIdEnc,
       ownershipPercent:
         dto.ownershipPercent !== undefined

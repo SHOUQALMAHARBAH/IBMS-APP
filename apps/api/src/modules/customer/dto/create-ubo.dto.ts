@@ -7,15 +7,39 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { emptyStringToUndefined } from '../../../common/dto.util';
 
 /** Process 3 — corporate KYC UBO capture. `isPep` has no default, same
  * rationale as CreateLeadDto.marketingConsentGranted: a PEP flag is a
  * material compliance fact the officer must affirmatively state, never
- * silently default to "false" (Part 5.1/6.3 — the caller must say). */
+ * silently default to "false" (Part 5.1/6.3 — the caller must say).
+ *
+ * A UBO is always a real individual, so — unlike Customer, which branches on
+ * customerType — the Part F item #4 Jordanian national-ID-convention name
+ * parts (given/father's/grandfather's/family name) always apply here; the
+ * flat `fullName` is computed server-side from them (see
+ * `composeFullName()`), not accepted directly. */
 export class CreateUboDto {
   @IsString()
-  @Length(1, 200)
-  fullName!: string;
+  @Length(1, 150)
+  givenName!: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 150)
+  fatherName?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 150)
+  grandfatherName?: string;
+
+  @IsString()
+  @Length(1, 150)
+  familyName!: string;
 
   @IsString()
   @Length(5, 40)

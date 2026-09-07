@@ -16,6 +16,13 @@ export interface Customer {
   prospectId: string | null;
   customerType: CustomerType;
   legalName: string;
+  // Individual only — Jordanian national-ID-convention name parts (Part F
+  // item #4). Null for a CORPORATE customer, and for a historical
+  // individual record created before this item shipped.
+  givenName: string | null;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  familyName: string | null;
   registrationNumber: string | null;
   taxRegistrationNumber: string | null;
   registeredAddress: string | null;
@@ -33,7 +40,16 @@ export interface Customer {
 
 export interface CreateCustomerInput {
   customerType: CustomerType;
-  legalName: string;
+  /** Corporate only — an individual's legalName is computed server-side
+   * from givenName/fatherName/grandfatherName/familyName. */
+  legalName?: string;
+  /** Individual only — Jordanian national-ID-convention name parts (Part F
+   * item #4). givenName/familyName are required whenever customerType is
+   * INDIVIDUAL; fatherName/grandfatherName are optional. */
+  givenName?: string;
+  fatherName?: string;
+  grandfatherName?: string;
+  familyName?: string;
   nationalId?: string;
   registrationNumber?: string;
   taxRegistrationNumber?: string;
@@ -54,6 +70,10 @@ export interface Ubo {
   id: string;
   customerId: string;
   fullName: string;
+  givenName: string | null;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  familyName: string | null;
   ownershipPercent: string | null;
   isAuthorizedSignatory: boolean;
   isPep: boolean;
@@ -62,7 +82,13 @@ export interface Ubo {
 }
 
 export interface CreateUboInput {
-  fullName: string;
+  /** Jordanian national-ID-convention name parts (Part F item #4) — a UBO
+   * is always a real individual. `fullName` is computed server-side from
+   * these, not accepted directly. */
+  givenName: string;
+  fatherName?: string;
+  grandfatherName?: string;
+  familyName: string;
   nationalId: string;
   ownershipPercent?: number;
   isAuthorizedSignatory?: boolean;

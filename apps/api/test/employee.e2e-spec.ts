@@ -14,6 +14,14 @@ function uniqueEmail(label: string): string {
 function uniqueLabel(label: string): string {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+/** Part F item #4 — an Employee's `fullName` is now computed server-side
+ * from 4 national-ID-convention parts, not accepted directly. Splits a
+ * single display-name string on the first space into givenName/familyName
+ * — none of this file's assertions depend on the exact resulting string. */
+function splitName(name: string): { givenName: string; familyName: string } {
+  const [givenName, ...rest] = name.split(' ');
+  return { givenName, familyName: rest.join(' ') || givenName };
+}
 function bearer(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
@@ -102,6 +110,80 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
     sharedApp = undefined;
   });
 
+  // Part F item #4 — Jordanian national-ID-convention name splitting. An
+  // Employee is always a real individual, so all 4 parts always apply.
+  it('computes fullName from the 4 Jordanian national-ID-convention name parts', async () => {
+    const app = await boot();
+    const admin = await makeUser(
+      app,
+      'hr-admin-name-parts',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    const res = await request(app.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'Rania',
+        fatherName: 'Samir',
+        grandfatherName: 'Fouad',
+        familyName: 'Hijazi',
+        nationalId: '9911223344',
+        hireDate: '2022-03-01',
+      })
+      .expect(201);
+    const employee = res.body as EmployeeDetailBody & {
+      fullName: string;
+      givenName: string;
+      fatherName: string;
+      grandfatherName: string;
+      familyName: string;
+    };
+    expect(employee.fullName).toBe('Rania Samir Fouad Hijazi');
+    expect(employee.givenName).toBe('Rania');
+    expect(employee.fatherName).toBe('Samir');
+    expect(employee.grandfatherName).toBe('Fouad');
+    expect(employee.familyName).toBe('Hijazi');
+  });
+
+  it("omits father's/grandfather's name from the computed fullName when they are not supplied", async () => {
+    const app = await boot();
+    const admin = await makeUser(
+      app,
+      'hr-admin-name-parts-min',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    const res = await request(app.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'Tariq',
+        familyName: 'Odeh',
+        nationalId: '9922334455',
+        hireDate: '2022-03-01',
+      })
+      .expect(201);
+    const employee = res.body as { fullName: string };
+    expect(employee.fullName).toBe('Tariq Odeh');
+  });
+
+  it('rejects a create with no familyName (required, not just givenName)', async () => {
+    const app = await boot();
+    const admin = await makeUser(
+      app,
+      'hr-admin-name-parts-invalid',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    await request(app.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'NoFamilyName',
+        nationalId: '9933445566',
+        hireDate: '2022-03-01',
+      })
+      .expect(400);
+  });
+
   it('gates create behind employee.manage and terminate behind deprovisioning.execute', async () => {
     const app = await boot();
     const outsider = await makeUser(
@@ -113,7 +195,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       .post('/employees')
       .set(bearer(outsider.accessToken))
       .send({
-        fullName: 'Nobody',
+        ...splitName('Nobody'),
         nationalId: '1111111111',
         hireDate: '2024-01-01',
       })
@@ -131,7 +213,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
         .post('/employees')
         .set(bearer(manager.accessToken))
         .send({
-          fullName: uniqueLabel('Perm Test Employee'),
+          ...splitName(uniqueLabel('Perm Test Employee')),
           nationalId: '2222222222',
           hireDate: '2024-01-01',
         })
@@ -155,13 +237,12 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
     // genuine effect (deactivation + session kill), not just a timestamp.
     const linkedUser = await makeUser(app, 'hr-linked');
 
-    const fullName = uniqueLabel('Jane Employee');
     const created = (
       await request(app.getHttpServer())
         .post('/employees')
         .set(bearer(admin.accessToken))
         .send({
-          fullName,
+          ...splitName(uniqueLabel('Jane Employee')),
           nationalId: '9988776655',
           hireDate: '2020-06-01',
           position: 'Placement Officer',
@@ -302,7 +383,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       .post('/employees')
       .set(bearer(admin.accessToken))
       .send({
-        fullName: uniqueLabel('First Link'),
+        ...splitName(uniqueLabel('First Link')),
         nationalId: '3333333333',
         hireDate: '2024-01-01',
         userId: target.userId,
@@ -313,7 +394,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       .post('/employees')
       .set(bearer(admin.accessToken))
       .send({
-        fullName: uniqueLabel('Second Link'),
+        ...splitName(uniqueLabel('Second Link')),
         nationalId: '4444444444',
         hireDate: '2024-01-01',
         userId: target.userId,

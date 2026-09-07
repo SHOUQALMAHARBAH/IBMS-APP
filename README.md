@@ -920,27 +920,35 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — begun, items #1-3 of 8 built + items #4-5 PARTIALLY
-  built.** A working instant language switch + persistent per-user preference
-  exists (`PATCH /auth/me/language`, a `LanguageProvider` React context, a switcher
-  in `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
+- **Part F — bilingual UI — begun, items #1-4 of 8 built (item #4 with one
+  narrow, documented exception) + item #5 PARTIALLY built.** A working instant
+  language switch + persistent per-user preference exists (`PATCH
+  /auth/me/language`, a `LanguageProvider` React context, a switcher in
+  `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
   (nav/forms/tables via CSS logical properties + free flex/table mirroring; charts
   N/A — none exist in this app yet); mixed-content fields (an Arabic legal name, an
   Arabic insurance-line label next to a Latin policy number, a bilingual address) now
   isolate correctly via native `<bdi>` elements and `dir="auto"` capture inputs;
   name/label sorting for genuinely bilingual fields (customer/insurer names,
   insurance-line labels) now uses Arabic-locale collation instead of a hardcoded
-  English one; and every money/date/datetime value across the app now renders
-  through one shared, locale-aware `formatMoney`/`formatDate`/`formatDateTime`
-  utility, driven by the same live language switcher (Western numerals preserved
-  in Arabic via a deliberately bare `'ar'` tag, not `'ar-JO'`) — see § Part F below
-  for the full detail. **Item #4's other two sub-problems (Arabic keyboards,
-  national-ID-convention name-field splitting) and item #5's other two sub-problems
-  (Hijri calendar, multi-currency for reinsurance) were all explicitly deferred as
-  future work by user decision** — not attempted, and genuinely undocumented
-  anywhere beyond their one-line backlog bullets. Every screen's remaining TEXT is
-  still **English-only**: no bilingual full-text search, and no system-generated
-  bilingual documents. Screens implement the loading / empty / error / populated
+  English one; Arabic keyboard input is confirmed unblocked everywhere (no
+  Latin-only validation anywhere in the app); individual customers, employees,
+  and corporate UBOs now capture their name in the Jordanian national-ID
+  convention (given/father's/grandfather's/family name) via a real schema
+  migration, with the existing display field kept as a computed value so every
+  downstream consumer keeps working unchanged; and every money/date/datetime
+  value across the app now renders through one shared, locale-aware
+  `formatMoney`/`formatDate`/`formatDateTime` utility, driven by the same live
+  language switcher (Western numerals preserved in Arabic via a deliberately
+  bare `'ar'` tag, not `'ar-JO'`) — see § Part F below for the full detail.
+  **`InsuredPerson` name-splitting was deliberately excluded from item #4**
+  (that model has zero CRUD anywhere in this app yet — revisit once it does)
+  **and item #5's other two sub-problems (Hijri calendar, multi-currency for
+  reinsurance) remain explicitly deferred as future work by user decision** —
+  not attempted, and genuinely undocumented anywhere beyond their one-line
+  backlog bullets. Every screen's remaining TEXT is still **English-only**: no
+  bilingual full-text search, and no system-generated bilingual documents.
+  Screens implement the loading / empty / error / populated
   states, but the Part F rule of capturing a screenshot of each state as evidence
   is not met.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
@@ -6989,6 +6997,138 @@ narrows a gap.
   future work; wait for the user's explicit go-ahead before resuming
   either, or starting item #6 (bilingual full-text search) or any other
   Part F item — do not self-select.
+
+**Part F — Bilingual UI (backlog Part 11) — CLOSES item #4 of 8: Arabic-first
+  input.** Resumed item #4's two sub-problems left deferred earlier this
+  session (Arabic keyboards, national-ID-convention name-splitting) after
+  the user's explicit go-ahead.
+
+  **Arabic keyboards — investigated, confirmed CLEAR, no code change
+  needed.** Grepped all 67 `@Matches` validators across every api DTO —
+  none restrict any name field to Latin-only characters (all are money/
+  date/score/account-number/currency-code patterns); grepped every web
+  `pattern=` attribute — only 3 exist, all on 6-digit MFA code inputs,
+  unrelated to names; `@Length`/`@MinLength` on name fields count JS string
+  length correctly for Arabic script (no surrogate-pair miscount, since
+  Arabic sits in the Basic Multilingual Plane). Nothing in this codebase
+  blocks or miscounts Arabic input anywhere — a real, empirically-checked
+  finding, not an assumption.
+
+  **National-ID-convention name-splitting — built, as a real schema
+  migration, scoped with the user before implementing.** Presented with a
+  research survey (per this session's own "pause and confirm before
+  implementing" convention) showing that 10 models across the schema carry
+  a flat name field, the user confirmed splitting only the 3 models with
+  BOTH a real CRUD surface AND an existing `nationalIdEnc` field to verify
+  a split name against — `Customer` (`INDIVIDUAL` type only —
+  `CORPORATE.legalName` is a company name, untouched), `Employee`,
+  `UltimateBeneficialOwner`. `InsuredPerson` (the 4th model with
+  `nationalIdEnc`) was explicitly scoped OUT after a follow-up finding: it
+  has zero CRUD anywhere in this app yet (confirmed by grep — no
+  controller/service/repository ever creates or updates one), so splitting
+  its name now would be schema-only busywork. Each of the 3 target models
+  gained 4 new nullable columns (`givenName`, `fatherName`,
+  `grandfatherName`, `familyName`) via migration
+  `20260917120000_add_national_id_name_parts`; the user separately
+  confirmed keeping the existing flat field (`Customer.legalName`/
+  `Employee.fullName`/`UltimateBeneficialOwner.fullName`) as a computed/
+  denormalized display string rather than replacing it outright, so every
+  existing consumer (Arabic sorting from earlier in item #4, `<bdi>`
+  display from item #3, search, audit logs, exports) keeps working
+  unchanged. One new shared helper, `apps/api/src/common/
+  person-name.util.ts`'s `composeFullName()`, does the join identically for
+  all 3 services instead of three copies of the same logic.
+
+  **`givenName`/`familyName` are required whenever the split applies (the
+  two universally-present anchors of a name); `fatherName`/`grandfatherName`
+  are optional** — a judgment call made in the absence of any stricter
+  sourced rule (the Jordanian convention itself was never defined anywhere
+  in this brain beyond a one-line backlog bullet before this item), flagged
+  to the user rather than silently assumed, and left open to revise.
+  **No backfill**: historical rows keep only their flat name with all 4
+  new parts NULL — inventing a split for text no one actually entered that
+  way would be fabricating data. **No update path exists for these names
+  today** (confirmed by grep before starting — no `update-*.dto.ts`
+  references any of them), so this item only touches CREATE paths.
+
+  **Web forms gained the 4-input treatment**: `CustomerOnboardingWizard.tsx`'s
+  profile step (INDIVIDUAL branch only — CORPORATE keeps its single legal-name
+  input) and its UBO mini-form (always split, a UBO is always an individual);
+  `employees/page.tsx`'s create form. Each new input carries `dir="auto"`,
+  matching every other mixed-script capture input already in these files.
+  `customers/[id]/page.tsx` and `employees/[id]/page.tsx` gained read-only
+  display rows for the 4 parts (shown only when present) — the whole point
+  of capturing them is that a KYC reviewer can verify each part against a
+  physical/scanned national ID, so they need to actually be visible, not
+  just stored. **3 genuine pre-existing item #3 (`<bdi>`) gaps found and
+  fixed while reading these exact files**, not otherwise related to this
+  item's own scope: `employees/page.tsx`'s list-table name cell,
+  `employees/[id]/page.tsx`'s detail heading, and `customers/[id]/page.tsx`'s
+  UBO list row — none had been wrapped in `<bdi>` despite being genuinely
+  bilingual name fields.
+
+  **A real migration-tooling blocker, not a code problem**: Docker
+  Desktop's engine returned 500s from its own API for a large stretch of
+  this session. Root-caused by checking its own log
+  (`com.docker.backend.exe.log` under `%LOCALAPPDATA%\Docker\log\host\`),
+  which showed a background software update actively downloading/preparing
+  to install, and confirmed via `Get-Process` that the actual backend
+  process had NOT restarted despite an apparent Docker Desktop app
+  relaunch (same PID, 3-day-old start time) — only a full quit from the
+  system tray actually cycled it. Once genuinely restarted, both `db` and
+  `db-test` came up healthy and the migration applied cleanly via this
+  repo's own established hand-authored-migration-plus-`prisma migrate
+  resolve` workaround (a pre-existing, unrelated checksum-drift issue on 3
+  older already-applied migrations blocks a plain `prisma migrate dev` on
+  both local databases, documented separately in this session's own
+  memory).
+
+  **Every existing e2e fixture that POSTs to `/customers`, `/customers/:id/
+  ubos`, or `/employees` with a `legalName`/`fullName` literal needed
+  updating for the new contract** — confirmed exhaustively via grep for
+  every e2e spec file referencing those three routes at all, not just the
+  ones an initial pattern search happened to catch.
+  `customer.e2e-spec.ts`'s own `createIndividualCustomer()` helper (and a
+  new local `splitName()` helper added to `employee.e2e-spec.ts`) split a
+  single display-name string on its first space into givenName/familyName,
+  so `composeFullName()` rejoins it back to the BYTE-IDENTICAL original
+  string — every existing assertion (including the EDD watchlist-match
+  test's exact-string match against a sample sanctioned name) keeps
+  passing unchanged. 6 other e2e files that create a Customer purely as
+  setup data for an unrelated feature (`crm`, `cross-sell`,
+  `insurance-program`, `needs-assessment`, `risk-profile`, `up-sell`)
+  needed the identical fix — confirmed via grep that none of them assert
+  on the resulting `legalName` before changing them.
+
+  **Verification**: +5 new unit tests (`person-name.util.spec.ts`) → api
+  unit **2326/2326** (from 2321) — every existing unit-test fixture
+  constructing a raw `Customer`/`Employee`/`UltimateBeneficialOwner` Prisma
+  object literal needed the 4 new fields added to compile (Prisma's
+  generated types require a nullable column's key present as `null`, not
+  merely omittable), the same class of ripple this codebase has hit before
+  on an additive schema change. Full 62-file api e2e suite: **293/293**
+  (292 green + 1 transient MFA/TOTP-timing flake in `employee.e2e-spec.ts`'s
+  shared `makeUser()` setup helper — unrelated to this item's own logic,
+  re-confirmed clean in isolation with `--testTimeout=180000`, this
+  suite's own established chronic-flake precedent). Web: `npm run
+  typecheck`/`lint`/`build`/`test` OK (web unit stays 16/16 — no new web
+  unit test for this item, form/display changes verified via Playwright
+  per this codebase's established split); 2 existing Playwright specs
+  (`customers.spec.ts`, `employees.spec.ts`) fixed where their
+  accessible-name queries depended on the now-replaced single name input.
+  Full web suite: **228/228** non-`@a11y` (224 + 4 tests that flaked once
+  under full-suite parallel load, all 4 re-confirmed clean in isolation —
+  the same transient-flake class this session has hit before, not a
+  regression) + **66/66** `@a11y`.
+
+  **No seed change.** Read `ibms-brain/meta/context/bilingual-ui.md`'s
+  "What item #4 covers/does NOT cover" before assuming item #4 is fully
+  closed — it is NOT, quite: `InsuredPerson` name-splitting remains open,
+  deferred until that model has real CRUD (a pre-existing gap this item
+  did not create). Item #5 remains PARTIALLY built (Hijri calendar,
+  multi-currency for reinsurance deferred) — wait for the user's explicit
+  go-ahead before resuming either, starting item #6 (bilingual full-text
+  search), or any other Part F item — do not self-select.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
