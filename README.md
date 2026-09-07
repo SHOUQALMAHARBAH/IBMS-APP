@@ -841,8 +841,21 @@ build actually is today:
   definitions; `consent_withdrawal`, the two DSR workflows, M06's
   `legal_hold_necessity_review` / `disposal_batch_execution`, and now `data_sharing_decision`
   / `dpia_review` are the ones a real caller uses.
-- **Part E — dashboards** — none of the six management dashboards (Sales, Policy, Claims,
-  Financial, Compliance, Insurer & Employee Performance) exist.
+- **Part E — dashboards — begun, one of six built.** Part E's header cross-references
+  Domain G's own Process #64 directly ("Executive Management Reporting — Part E below")
+  — it IS #64's own detail, not six unrelated processes. **Sales Dashboard is built**:
+  `GET /dashboards/sales` — new leads and conversion rate, premium written (new vs.
+  renewal, splitting on the schema's own `Opportunity.isRenewal` boolean), commission
+  income, and cross-sell/up-sell opportunity conversion, filterable by branch/insurance
+  line/insurer/period wherever that dimension actually exists on the underlying model —
+  see § Known gaps, Part E, for the full detail. It reuses the already-pre-seeded
+  `dashboard.sales.view` permission alongside backlog #59's own narrower
+  `GET /sales-performance` (quota-vs-actual tracking) — two separate, coexisting
+  endpoints sharing one access-control code. **Not yet built**: Policy, Claims,
+  Financial, and Compliance dashboards, and verifying the Insurer & Employee
+  Performance dashboard (likely already substantially covered by backlog #60/#61) —
+  each its own pass. The `dashboard.executive.view` cross-department rollup screen
+  (#64's own top-level permission) also remains unbuilt.
 - **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
   is no i18n framework, no RTL layout, no bidirectional-text handling, no locale-aware
   number/date/currency formatting (Gregorian/Hijri, JOD base + multi-currency), no
@@ -6116,6 +6129,64 @@ narrows a gap.
   `legalBasisEvidenceRef` is a free-text field, not validated against a real `Document`
   or `ConsentRecord` (the exact evidence shape differs per legal basis and isn't
   specified in the backlog). **Part D §5.1 (all 9 backlog items) is now COMPLETE.**
+
+**Part E — Sales Dashboard (backlog Process #64)** — opens Part E (Dashboards &
+  Management Reporting, Part 13). Part E's own header cross-references Domain G's
+  Process #64 directly — its one-liner reads "Executive Management Reporting — Part E
+  below" — so Part E IS #64's full detail, not six unrelated processes. The permission
+  grid was pre-seeded for exactly this: `dashboard.sales.view` / `dashboard.policy.view`
+  / `dashboard.claims.view` / `dashboard.financial.view` / `dashboard.compliance.view`
+  (the five department dashboards), `insurer-performance.view` + `employee-performance.
+  view` (the sixth, already built as backlog #60/#61), and `dashboard.executive.view`
+  (#64's own top-level code, for a future cross-department rollup screen). Worked one
+  dashboard at a time — the Part D one-at-a-time default resumed after its single
+  explicit "finish everything" override.
+  **Sales Dashboard**: `GET /dashboards/sales` — "new leads and conversion rate, premium
+  written (new vs. renewal), commission income, cross-sell/up-sell opportunity
+  conversion." **`dashboard.sales.view` is ALREADY consumed by backlog #59's own `GET
+  /sales-performance`** (quota-vs-actual `newProspects` tracking against a
+  `SalesTarget`) — that endpoint is untouched. This is a SEPARATE, broader endpoint
+  sharing the same permission code on purpose: both are genuinely "the sales dashboard"
+  from an access-control point of view, so a new `SalesDashboardModule` was built
+  alongside `SalesPerformanceModule` rather than extending it — the metric sets are
+  genuinely different (Lead/Prospect quota-tracking vs. premium/commission/cross-sell/
+  up-sell), and conflating them under one endpoint would mean two backlog items writing
+  to one payload. **Filter applicability is real, not uniform** — Part E's cross-cutting
+  "every dashboard filterable by branch/line of business/insurer/time period" rule is
+  honored per-metric ONLY where the dimension exists on the underlying model:
+  `branchId` (resolved to the concrete `User.branchId` set, the #59 precedent) scopes
+  leads (`Lead.ownerUserId`) and premium/commission (`Policy.placedByUserId`) — NOT
+  cross-sell/up-sell, which are system-detected against a `Customer` with no
+  officer-ownership concept at all. `insuranceLine` scopes premium/commission
+  (`Policy.insuranceLine`) AND cross-sell (`CrossSellOpportunity.gapLine` IS itself a
+  line) — NOT leads or up-sell (a Sum-Insured gap, not a line). `insurerId` scopes only
+  premium/commission — nothing pre-placement has an insurer yet. `period` (default: the
+  previous UTC calendar month, the all-or-none #60/#61 shape — 422 on a partial
+  override) applies to every metric via its own date field.
+  **"Premium written (new vs. renewal)" splits on `Opportunity.isRenewal`** — a real
+  boolean ALREADY on the schema, found by checking rather than assuming new modeling was
+  needed. Computed via two separate `Policy.aggregate()` calls with a relation filter (a
+  genuine DB-side sum, never a capped `findMany` reduced in JS), combined into a total
+  using `addMoney()`/`formatMoney()` — a real `Prisma.Decimal` add, never by parsing
+  formatted money strings back into JS floating-point numbers. Conversion rate is 0%,
+  not NaN/undefined, for an empty cohort. No migration, no new permission, no
+  cross-module service dependency (reads `Lead`/`Policy`/`Opportunity`/
+  `CommissionLedgerEntry`/`CrossSellOpportunity`/`UpSellRecommendation` directly — the
+  #58 KPI Dashboard / #62 Portfolio Analysis shape). `apps/web/` gains a **"Sales
+  Dashboard"** screen (`app/(app)/dashboards/sales/page.tsx` — a filter form plus 5
+  metric sections). **Verification**: +16 api unit (`sales-dashboard.config.spec.ts` 7,
+  `sales-dashboard.service.spec.ts` 9) → api unit **2254** (177 files, from 2238). New
+  `test/sales-dashboard.e2e-spec.ts` **4/4** — permission gating; a 422 on a partial
+  period override; a full leads/premium(new-vs-renewal)/commission/cross-sell/up-sell
+  walk against a distinctive historical period window (`db-test` is cumulative); a
+  branch-scoping test proving leads/premium scope to the branch while cross-sell/up-sell
+  correctly stay unscoped. Full api unit suite 2254/2254 confirmed green; full 58-file
+  api e2e suite green across 8 foreground sub-batches, both chronic flakes (`rbac`,
+  `up-sell`) passing with `--testTimeout=90000`. New Playwright `sales-dashboard.spec.ts`
+  3/3; full Playwright suite **267/267** (from 264). `npm run typecheck`/`lint`/`build`
+  (api + web) OK. **Deferred:** Policy/Claims/Financial/Compliance dashboards and the
+  Insurer & Employee Performance verification — each a separate pass; the
+  `dashboard.executive.view` cross-department rollup screen itself.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

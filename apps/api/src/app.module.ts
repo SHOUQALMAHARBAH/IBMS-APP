@@ -40,6 +40,7 @@ import { InternalControlsModule } from './modules/internal-controls/internal-con
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
 import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
+import { SalesDashboardModule } from './modules/management-reporting/sales-dashboard.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
@@ -295,6 +296,13 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // (new) gates the target registry; dashboard.sales.view (pre-seeded)
     // gates the performance-vs-target read.
     SalesPerformanceModule,
+    // Part E — Dashboards & Management Reporting (Part 13), backlog Process
+    // #64. The first of six named dashboards: new leads and conversion
+    // rate, premium written (new vs. renewal), commission income,
+    // cross-sell/up-sell opportunity conversion. Reuses the pre-seeded
+    // dashboard.sales.view permission (also #59's own), a separate
+    // endpoint from GET /sales-performance — see sales-dashboard.config.ts.
+    SalesDashboardModule,
     // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
     // InsurerSlaAgreement (dormant) get their first real consumer: a
     // monthly job scoring quote-response speed/claims service/price/
