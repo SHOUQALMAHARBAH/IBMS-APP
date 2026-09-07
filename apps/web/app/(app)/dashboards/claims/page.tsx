@@ -34,7 +34,9 @@ function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdo
           <tbody>
             {rows.map((r) => (
               <tr key={r.key}>
-                <td style={{ padding: '0.25rem 0.5rem' }}>{r.label}</td>
+                <td style={{ padding: '0.25rem 0.5rem' }}>
+                  <bdi>{r.label}</bdi>
+                </td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.periodClaims}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.periodPremium}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>
@@ -126,6 +128,7 @@ export default function ClaimsDashboardPage() {
           Insurance line
           <input
             aria-label="Insurance line filter"
+            dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />

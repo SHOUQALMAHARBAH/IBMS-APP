@@ -39,7 +39,9 @@ function BreakdownTable({ rows }: { rows: ProfitabilityBreakdownRow[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.key}>
-            <td style={cell}>{row.key}</td>
+            <td style={cell}>
+              <bdi>{row.key}</bdi>
+            </td>
             <td style={cell}>{row.commissionIncomeJod}</td>
             <td style={cell}>{row.costToServeJod}</td>
             <td style={cell}>{row.netProfitabilityJod}</td>

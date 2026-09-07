@@ -123,7 +123,7 @@ export default function InsurerAccountingPage() {
                 {data.rows.map((r) => (
                   <tr key={r.insurerId}>
                     <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      {r.insurerName}
+                      <bdi>{r.insurerName}</bdi>
                     </td>
                     <td style={cellStyle}>{money(r.outstandingAmount)}</td>
                     <td style={cellStyle}>{r.outstandingCount}</td>

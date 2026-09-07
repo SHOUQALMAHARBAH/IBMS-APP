@@ -260,6 +260,7 @@ export function CustomerOnboardingWizard() {
               <input
                 id="cust-legal-name"
                 required
+                dir="auto"
                 value={legalName}
                 onChange={(e) => setLegalName(e.target.value)}
                 style={inputStyle}
@@ -286,6 +287,7 @@ export function CustomerOnboardingWizard() {
                 <input
                   id="cust-registration-number"
                   required
+                  dir="auto"
                   value={registrationNumber}
                   onChange={(e) => setRegistrationNumber(e.target.value)}
                   style={inputStyle}
@@ -303,6 +305,7 @@ export function CustomerOnboardingWizard() {
                 <input
                   id="cust-address"
                   required
+                  dir="auto"
                   value={registeredAddress}
                   onChange={(e) => setRegisteredAddress(e.target.value)}
                   style={inputStyle}
@@ -315,6 +318,7 @@ export function CustomerOnboardingWizard() {
                 <input
                   id="cust-nature"
                   required
+                  dir="auto"
                   value={natureOfBusiness}
                   onChange={(e) => setNatureOfBusiness(e.target.value)}
                   style={inputStyle}
@@ -330,6 +334,7 @@ export function CustomerOnboardingWizard() {
               </label>
               <input
                 id="cust-tax-reg"
+                dir="auto"
                 value={taxRegistrationNumber}
                 onChange={(e) => setTaxRegistrationNumber(e.target.value)}
                 style={inputStyle}
@@ -390,11 +395,14 @@ export function CustomerOnboardingWizard() {
         <div>
           <h2 style={{ marginTop: 0 }}>Ultimate Beneficial Owners</h2>
           <p style={{ opacity: 0.8 }}>
-            Record every individual with significant ownership or control of {customer.legalName}.
+            Record every individual with significant ownership or control of{' '}
+            <bdi>{customer.legalName}</bdi>.
           </p>
           {ubos.map((u) => (
             <div key={u.id} style={repeatableRowStyle}>
-              <strong>{u.fullName}</strong>
+              <strong>
+                <bdi>{u.fullName}</bdi>
+              </strong>
               {u.ownershipPercent ? <span> — {u.ownershipPercent}%</span> : null}
               {u.isPep ? <span> — PEP</span> : null}
             </div>
@@ -408,6 +416,7 @@ export function CustomerOnboardingWizard() {
                 <input
                   id="ubo-full-name"
                   required
+                  dir="auto"
                   value={uboFullName}
                   onChange={(e) => setUboFullName(e.target.value)}
                   style={inputStyle}
@@ -467,8 +476,9 @@ export function CustomerOnboardingWizard() {
         <div>
           <h2 style={{ marginTop: 0 }}>Supporting documents</h2>
           <p style={{ opacity: 0.8 }}>
-            Application/proposal documents for {customer.legalName}&apos;s KYC file. No file-upload
-            storage exists yet — record the document reference/filename.
+            Application/proposal documents for <bdi>{customer.legalName}</bdi>
+            &apos;s KYC file. No file-upload storage exists yet — record the
+            document reference/filename.
           </p>
           {documents.map((d) => (
             <div key={d.id} style={repeatableRowStyle}>
@@ -543,7 +553,10 @@ export function CustomerOnboardingWizard() {
               client-side only; nothing is logged. */}
           <ul>
             <li>
-              <strong>{legalName}</strong> ({customer.customerType})
+              <strong>
+                <bdi>{legalName}</bdi>
+              </strong>{' '}
+              ({customer.customerType})
             </li>
             <li>Contact: {contactPhone} / {contactEmail}</li>
             {customerType === 'CORPORATE' ? <li>Beneficial owners recorded: {ubos.length}</li> : null}

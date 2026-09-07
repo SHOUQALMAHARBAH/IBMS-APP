@@ -132,7 +132,9 @@ export default function ClaimsAnalyticsPage() {
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.key}>
-                    <td style={{ ...cellStyle, textAlign: 'start' }}>{r.label}</td>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                      <bdi>{r.label}</bdi>
+                    </td>
                     <td style={cellStyle}>
                       {ratioPct(r.ratio)}
                       {r.ratioCapped ? ' (capped)' : ''}

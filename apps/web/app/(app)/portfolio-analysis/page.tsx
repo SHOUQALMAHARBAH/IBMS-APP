@@ -36,7 +36,9 @@ function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.key}>
-            <td style={cell}>{row.key}</td>
+            <td style={cell}>
+              <bdi>{row.key}</bdi>
+            </td>
             <td style={cell}>{row.policyCount}</td>
             <td style={cell}>{row.totalIssuedPremiumJod}</td>
           </tr>

@@ -183,7 +183,9 @@ export default function VendorDetailPage() {
       {vendor ? (
         <>
           <section style={sectionStyle}>
-            <h2>{vendor.name}</h2>
+            <h2>
+              <bdi>{vendor.name}</bdi>
+            </h2>
             <p>Type: {vendor.vendorType}</p>
             <p>
               Risk tier: <strong>{vendor.riskTier ?? 'unassigned'}</strong>

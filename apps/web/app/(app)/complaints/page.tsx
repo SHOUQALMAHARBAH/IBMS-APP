@@ -162,6 +162,7 @@ export default function ComplaintsPage() {
             Issue
             <textarea
               aria-label="Issue"
+              dir="auto"
               value={issue}
               onChange={(e) => setIssue(e.target.value)}
               required
@@ -228,18 +229,21 @@ export default function ComplaintsPage() {
                 {rows.map((c) => (
                   <tr key={c.id}>
                     <td style={cell}>{c.customerId.slice(0, 8)}…</td>
-                    <td style={cell}>{c.issue}</td>
+                    <td style={cell}>
+                      <bdi>{c.issue}</bdi>
+                    </td>
                     <td style={cell}>{c.status}</td>
                     <td style={cell}>{slaLabel(c)}</td>
                     <td style={cell}>{c.escalations.length || '—'}</td>
                     <td style={cell}>
                       {c.isClosed ? (
-                        (c.resolution ?? '—')
+                        <bdi>{c.resolution ?? '—'}</bdi>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '16rem' }}>
                           <input
                             aria-label={`Text for ${c.id}`}
                             placeholder="assignee id / action / resolution / reason"
+                            dir="auto"
                             value={text[c.id] ?? ''}
                             onChange={(e) => setVal(c.id, e.target.value)}
                           />

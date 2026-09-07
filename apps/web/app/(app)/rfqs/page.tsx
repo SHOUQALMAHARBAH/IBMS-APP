@@ -73,7 +73,9 @@ function RfqList({
               flexWrap: 'wrap',
             }}
           >
-            <strong>{rfq.insuranceLine}</strong>
+            <strong>
+              <bdi>{rfq.insuranceLine}</bdi>
+            </strong>
             <span style={rfqBadgeStyle}>
               {rfq.insurerSubmissions.length} insurer
               {rfq.insurerSubmissions.length === 1 ? '' : 's'}

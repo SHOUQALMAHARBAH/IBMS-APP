@@ -85,7 +85,9 @@ export default function CustomersPage() {
                 aria-label={`View profile — ${customer.legalName}`}
                 onClick={() => router.push(`/customers/${customer.id}`)}
               >
-                <strong>{customer.legalName}</strong>
+                <strong>
+                  <bdi>{customer.legalName}</bdi>
+                </strong>
                 <div style={cardMetaStyle}>{customer.customerType}</div>
                 <div style={cardMetaStyle}>Status: {customer.status}</div>
               </button>

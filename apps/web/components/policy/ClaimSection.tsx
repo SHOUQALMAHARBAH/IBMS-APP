@@ -145,6 +145,7 @@ function ClaimRegistrationForm({
         <input
           id={`reg-adj-${claimId}`}
           maxLength={200}
+          dir="auto"
           value={adjusterName}
           onChange={(ev) => setAdjusterName(ev.target.value)}
         />
@@ -154,6 +155,7 @@ function ClaimRegistrationForm({
         <input
           id={`reg-firm-${claimId}`}
           maxLength={200}
+          dir="auto"
           value={adjusterFirm}
           onChange={(ev) => setAdjusterFirm(ev.target.value)}
         />
@@ -997,18 +999,39 @@ export function ClaimSection({
             </div>
             <p style={{ margin: '0.4rem 0' }}>
               Estimated loss {money(c.estimatedLoss)}
-              {c.claimNumber ? ` · ${c.claimNumber}` : ''}
+              {c.claimNumber ? (
+                <>
+                  {' · '}
+                  <bdi>{c.claimNumber}</bdi>
+                </>
+              ) : (
+                ''
+              )}
             </p>
             {c.causeOfLoss ? (
               <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                {c.causeOfLoss}
-                {c.lossLocation ? ` — ${c.lossLocation}` : ''}
+                <bdi>{c.causeOfLoss}</bdi>
+                {c.lossLocation ? (
+                  <>
+                    {' — '}
+                    <bdi>{c.lossLocation}</bdi>
+                  </>
+                ) : (
+                  ''
+                )}
               </p>
             ) : null}
             {c.isThirdPartyInvolved ? (
               <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
                 Third party involved
-                {c.thirdParty?.fullName ? `: ${c.thirdParty.fullName}` : ''}
+                {c.thirdParty?.fullName ? (
+                  <>
+                    {': '}
+                    <bdi>{c.thirdParty.fullName}</bdi>
+                  </>
+                ) : (
+                  ''
+                )}
                 {c.thirdParty?.subrogationRecoveryFlag
                   ? ' · subrogation/recovery flagged'
                   : ''}
@@ -1016,14 +1039,30 @@ export function ClaimSection({
             ) : null}
             {c.insurerClaimReference || c.adjuster ? (
               <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                {c.insurerClaimReference
-                  ? `Insurer ref ${c.insurerClaimReference}`
-                  : ''}
-                {c.adjuster
-                  ? `${c.insurerClaimReference ? ' · ' : ''}adjuster ${c.adjuster.name}${
-                      c.adjuster.firm ? ` (${c.adjuster.firm})` : ''
-                    }`
-                  : ''}
+                {c.insurerClaimReference ? (
+                  <>
+                    Insurer ref <bdi>{c.insurerClaimReference}</bdi>
+                  </>
+                ) : (
+                  ''
+                )}
+                {c.adjuster ? (
+                  <>
+                    {c.insurerClaimReference ? ' · ' : ''}
+                    adjuster <bdi>{c.adjuster.name}</bdi>
+                    {c.adjuster.firm ? (
+                      <>
+                        {' ('}
+                        <bdi>{c.adjuster.firm}</bdi>
+                        {')'}
+                      </>
+                    ) : (
+                      ''
+                    )}
+                  </>
+                ) : (
+                  ''
+                )}
               </p>
             ) : null}
             <p style={{ opacity: 0.6, fontSize: '0.8rem', margin: '0.4rem 0' }}>
@@ -1079,6 +1118,7 @@ export function ClaimSection({
             <input
               id="claim-cause"
               maxLength={2000}
+              dir="auto"
               value={causeOfLoss}
               onChange={(ev) => setCauseOfLoss(ev.target.value)}
             />
@@ -1088,6 +1128,7 @@ export function ClaimSection({
             <input
               id="claim-location"
               maxLength={500}
+              dir="auto"
               value={lossLocation}
               onChange={(ev) => setLossLocation(ev.target.value)}
             />
@@ -1119,6 +1160,7 @@ export function ClaimSection({
                 <input
                   id="claim-tp-name"
                   maxLength={200}
+                  dir="auto"
                   value={tpName}
                   onChange={(ev) => setTpName(ev.target.value)}
                 />

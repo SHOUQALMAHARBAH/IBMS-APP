@@ -184,7 +184,7 @@ export default function FinancialReportPage() {
                     {data.commission.byInsurer.map((r) => (
                       <tr key={r.insurerId}>
                         <td style={{ ...cell, textAlign: 'start' }}>
-                          {r.insurerName}
+                          <bdi>{r.insurerName}</bdi>
                         </td>
                         <td style={cell}>{money(r.earned)}</td>
                         <td style={cell}>{money(r.paid)}</td>
@@ -240,7 +240,9 @@ function ProfitTable({
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
-              <td style={{ ...cell, textAlign: 'start' }}>{r.label}</td>
+              <td style={{ ...cell, textAlign: 'start' }}>
+                <bdi>{r.label}</bdi>
+              </td>
               <td style={cell}>{money(r.premiumWritten)}</td>
               <td style={cell}>{money(r.claimsPaid)}</td>
               <td style={cell}>{money(r.commissionEarned)}</td>

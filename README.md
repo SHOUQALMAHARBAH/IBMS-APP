@@ -920,13 +920,15 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — begun, items #1-2 of 8 built.** A working instant language
+- **Part F — bilingual UI — begun, items #1-3 of 8 built.** A working instant language
   switch + persistent per-user preference exists (`PATCH /auth/me/language`, a
-  `LanguageProvider` React context, a switcher in `AppNav`'s footer), and every screen's
-  LAYOUT now genuinely mirrors under `dir="rtl"` (nav/forms/tables via CSS logical
-  properties + free flex/table mirroring; charts N/A — none exist in this app yet) — see
-  § Part F below for the full detail. Every screen's TEXT remains **English-only**: no
-  bidirectional-text handling for mixed-content fields, no locale-aware number/date/
+  `LanguageProvider` React context, a switcher in `AppNav`'s footer); every screen's
+  LAYOUT genuinely mirrors under `dir="rtl"` (nav/forms/tables via CSS logical
+  properties + free flex/table mirroring; charts N/A — none exist in this app yet); and
+  mixed-content fields (an Arabic legal name, an Arabic insurance-line label next to a
+  Latin policy number, a bilingual address) now isolate correctly via native `<bdi>`
+  elements and `dir="auto"` capture inputs — see § Part F below for the full detail.
+  Every screen's remaining TEXT is still **English-only**: no locale-aware number/date/
   currency formatting (Gregorian/Hijri, JOD base + multi-currency), no Arabic-first input
   or Arabic collation, no bilingual full-text search, and no system-generated bilingual
   documents. Screens implement the loading / empty / error / populated states, but the
@@ -6729,6 +6731,80 @@ narrows a gap.
   infrastructure to build on at all yet); item #8 (the 4-state screenshot
   discipline) is a verification overlay on whichever of #3-7 land, not a standalone
   build.
+
+**Part F — Bilingual UI (backlog Part 11) — item #3 of 8: bidirectional (bidi)
+  text handling for mixed-content fields — CLOSES this item.** Distinct from
+  item #2 (whole-screen LAYOUT mirroring) and from `PrivacyNoticeDisplay`'s
+  `textAr`/`textEn` (two whole, separate single-language fields shown
+  together) — item #3 is about a SINGLE field/string that may itself mix
+  Arabic and Latin script: an Arabic customer/company legal name, an Arabic
+  insurance-line label sitting next to a Latin policy number, an Arabic
+  address containing a Latin building number, a person's name typed in
+  either script. No concrete field list existed anywhere in the brain beyond
+  `verification-contract.md`'s 4 example categories (Arabic names with
+  English codes, Arabic insurance names with product codes, English
+  reference numbers inside Arabic forms, Arabic addresses with Latin
+  characters) — a codebase survey (schema + render-site grep) identified the
+  real fields at risk: `Customer`/`Prospect`/`Vendor` names and addresses,
+  UBO full names, `Policy.policyNumber`/`insuranceLine`,
+  `Claim.claimNumber`/`causeOfLoss`/`lossLocation`/adjuster and third-party
+  names, `Insurer.name`, `Complaint.issue`/`resolution`, and the
+  management-reporting dashboards' group-by breakdown labels.
+
+  Fixed via two native, zero-JS-logic HTML/CSS mechanisms across ~30 files,
+  rather than inventing custom bidi logic: every dynamically-rendered value
+  from an at-risk field wrapped in a native `<bdi>` element (isolates the
+  value's bidi runs from surrounding text and auto-detects its own base
+  direction — the HTML spec's own mechanism for "content of unknown
+  directionality"); where two independently-directioned values are joined by
+  a literal separator (`PolicySection.tsx`'s `insuranceLine · policyNumber`,
+  `ClaimSection.tsx`'s claim-number line and `causeOfLoss — lossLocation`),
+  each value wrapped SEPARATELY — `<bdi>{a}</bdi> · <bdi>{b}</bdi>` — so the
+  separator glyph sits between two isolated runs and stays stable, rather
+  than one wrapper around the whole concatenated string; `dir="auto"` added
+  to every capture `<input>`/`<textarea>` for a field typeable in either
+  script, letting the browser set caret/alignment direction from the first
+  strong character typed. Fixed once at the shared `ProfileField` primitive
+  (`customers/[id]/page.tsx`, `prospects/[id]/page.tsx`) rather than
+  per-call-site — the same "fix the shared primitive once" precedent item #2
+  used for `app.styles.ts`. Confirmed via grep that `WatchlistEntry`/
+  `ScreeningResult` fields (also schema-level mixed-content risks) are never
+  rendered on the frontend at all — a backend-only model, screening logs
+  counts/`listSource` only per `sensitive-data-handling.md` — genuinely
+  nothing to fix there. Dedicated single-language fields (`titleAr`/`bodyAr`/
+  `textAr`/`nameAr` pairs) were deliberately left untouched — already
+  correctly handled via hardcoded `dir="rtl"` from earlier work, not a
+  mixed-content case.
+
+  **A build-cache gotcha caught while verifying**: the new spec's first run
+  found zero `<bdi>` elements at all, even though the source edits were
+  correct — Playwright's `webServer` reuses an existing `next start` process
+  (`reuseExistingServer: !process.env.CI`) serving the LAST `npm run build`
+  output, not live source; every source edit needs a fresh `npm run build`
+  before the next Playwright run picks it up. The exact same class of gotcha
+  item #2's own Claims-consent-widget fix hit once already ("a leftover
+  port-3000 server from before my edit").
+
+  **Verification**: +1 new Playwright spec (`bidi-text.spec.ts`, 3 tests) —
+  a customer legal name (and, via the shared `ProfileField`, its registered
+  address) each render inside a genuine `<bdi>` element; a policy number
+  sitting next to an Arabic insurance-line label are each their OWN isolate
+  (an exact-text match against either value alone would fail if a single
+  shared wrapper held both); a mixed-content capture input (`vendors` create
+  form) carries `dir="auto"`. Full web suite **227/227** non-`@a11y` +
+  **66/66** `@a11y` green. `npm run typecheck`/`lint`/`build`/`test` (web)
+  all OK. No backend gate applies (this item touches only `apps/web`,
+  confirmed via `git diff --stat`) — the api unit suite was re-run anyway as
+  a sanity baseline (2320/2320, unaffected) rather than assumed unrelated.
+  **No migration, no seed change.** Read
+  `ibms-brain/meta/context/bilingual-ui.md`'s "What item #3 covers/does NOT
+  cover" before starting item #4 (Arabic-first input: keyboards,
+  national-ID-convention name fields, correct Arabic sorting) or any other
+  Part F item — do not self-select. Items #4-7 each look like their own
+  multi-session effort (item #7 in particular has no document-generation
+  infrastructure to build on at all yet); item #8 (the 4-state screenshot
+  discipline) is a verification overlay on whichever of #4-7 land, not a
+  standalone build.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

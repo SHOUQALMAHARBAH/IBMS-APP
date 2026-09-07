@@ -72,9 +72,15 @@ export default function ProspectsPage() {
                 aria-label={`View profile — ${prospect.companyName}`}
                 onClick={() => router.push(`/prospects/${prospect.id}`)}
               >
-                <strong>{prospect.companyName}</strong>
+                <strong>
+                  <bdi>{prospect.companyName}</bdi>
+                </strong>
                 {prospect.sector ? <div style={cardMetaStyle}>{prospect.sector}</div> : null}
-                {prospect.location ? <div style={cardMetaStyle}>{prospect.location}</div> : null}
+                {prospect.location ? (
+                  <div style={cardMetaStyle}>
+                    <bdi>{prospect.location}</bdi>
+                  </div>
+                ) : null}
                 <div style={cardMetaStyle}>Status: {prospect.status}</div>
               </button>
             ))}

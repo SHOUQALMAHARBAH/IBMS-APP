@@ -17,7 +17,9 @@ function ProfileField({ label, value }: { label: string; value: string | number 
   return (
     <div>
       <div style={profileFieldLabelStyle}>{label}</div>
-      <div style={profileFieldValueStyle}>{value ?? '—'}</div>
+      <div style={profileFieldValueStyle}>
+        <bdi>{value ?? '—'}</bdi>
+      </div>
     </div>
   );
 }
@@ -73,7 +75,9 @@ export default function ProspectProfilePage() {
 
       {prospect ? (
         <>
-          <h1>{prospect.companyName}</h1>
+          <h1>
+            <bdi>{prospect.companyName}</bdi>
+          </h1>
           <p style={{ opacity: 0.8 }}>Status: {prospect.status}</p>
           <div style={profileGridStyle}>
             <ProfileField label="Sector" value={prospect.sector} />

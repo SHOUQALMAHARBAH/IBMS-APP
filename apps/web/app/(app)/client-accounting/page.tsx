@@ -125,7 +125,7 @@ export default function ClientAccountingPage() {
                 {data.rows.map((r) => (
                   <tr key={r.customerId}>
                     <td style={{ ...cellStyle, textAlign: 'start' }}>
-                      {r.customerLegalName}
+                      <bdi>{r.customerLegalName}</bdi>
                     </td>
                     {AR_AGEING_BUCKET_KEYS.map((k) => (
                       <td key={k} style={cellStyle}>

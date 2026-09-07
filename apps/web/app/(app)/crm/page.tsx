@@ -171,7 +171,9 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     <div style={{ marginTop: '1rem' }}>
       {view ? (
         <>
-          <h2 style={{ marginBottom: 0 }}>{view.customer.legalName}</h2>
+          <h2 style={{ marginBottom: 0 }}>
+            <bdi>{view.customer.legalName}</bdi>
+          </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
             {view.customer.customerType} — Status: {view.customer.status}
           </p>

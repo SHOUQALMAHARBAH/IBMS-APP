@@ -226,7 +226,9 @@ export default function InsuranceProgramDetailPage() {
               <tbody>
                 {program.lines.map((line) => (
                   <tr key={line.id}>
-                    <td style={programCellStyle}>{line.insuranceLine}</td>
+                    <td style={programCellStyle}>
+                      <bdi>{line.insuranceLine}</bdi>
+                    </td>
                     <td style={programCellNumStyle}>
                       {line.sumInsuredBasis ?? 'set at quotation'}
                     </td>

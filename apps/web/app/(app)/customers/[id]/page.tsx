@@ -40,7 +40,7 @@ function ProfileField({
     <div>
       <div style={profileFieldLabelStyle}>{label}</div>
       <div style={profileFieldValueStyle}>
-        {revealed ?? value ?? '—'}
+        <bdi>{revealed ?? value ?? '—'}</bdi>
         {onReveal && !revealed ? (
           <button
             type="button"
@@ -165,7 +165,9 @@ export default function CustomerProfilePage() {
 
       {customer ? (
         <>
-          <h1>{customer.legalName}</h1>
+          <h1>
+            <bdi>{customer.legalName}</bdi>
+          </h1>
           <p style={{ opacity: 0.8 }}>
             {customer.customerType} — Status: {customer.status}
           </p>

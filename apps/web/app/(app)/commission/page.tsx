@@ -229,8 +229,12 @@ export default function CommissionRatesPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={cellStyle}>{r.insurerName}</td>
-                    <td style={cellStyle}>{r.insuranceLine}</td>
+                    <td style={cellStyle}>
+                      <bdi>{r.insurerName}</bdi>
+                    </td>
+                    <td style={cellStyle}>
+                      <bdi>{r.insuranceLine}</bdi>
+                    </td>
                     <td style={{ ...cellStyle, textAlign: 'end' }}>
                       {pct(r.ratePercent)}
                     </td>

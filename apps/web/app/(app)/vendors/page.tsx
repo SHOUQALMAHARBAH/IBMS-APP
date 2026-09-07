@@ -133,11 +133,12 @@ export default function VendorsPage() {
                   <td style={cell}>
                     {editingId === vendor.id ? (
                       <input
+                        dir="auto"
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
                       />
                     ) : (
-                      vendor.name
+                      <bdi>{vendor.name}</bdi>
                     )}
                   </td>
                   <td style={cell}>{vendor.vendorType}</td>
@@ -169,7 +170,7 @@ export default function VendorsPage() {
         <h2>Record a new vendor</h2>
         <label style={labelStyle}>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
+          <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label style={labelStyle}>
           Type

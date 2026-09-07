@@ -82,6 +82,7 @@ export function ProspectConversionForm({
             <input
               id="prospect-company-name"
               required
+              dir="auto"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               style={inputStyle}
@@ -145,6 +146,7 @@ export function ProspectConversionForm({
             </label>
             <input
               id="prospect-location"
+              dir="auto"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               style={inputStyle}
@@ -158,6 +160,7 @@ export function ProspectConversionForm({
             </label>
             <input
               id="prospect-contact-person"
+              dir="auto"
               value={contactPerson}
               onChange={(e) => setContactPerson(e.target.value)}
               style={inputStyle}

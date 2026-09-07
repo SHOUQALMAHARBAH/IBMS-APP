@@ -263,7 +263,9 @@ export default function RfqDetailPage() {
               <tbody>
                 {rfq.insurerSubmissions.map((submission) => (
                   <tr key={submission.id}>
-                    <td style={rfqCellStyle}>{submission.insurer.name}</td>
+                    <td style={rfqCellStyle}>
+                      <bdi>{submission.insurer.name}</bdi>
+                    </td>
                     <td style={rfqCellStyle}>
                       <span style={rfqBadgeStyle}>{submission.status}</span>
                     </td>
@@ -342,7 +344,9 @@ export default function RfqDetailPage() {
                                 })
                               }
                             />
-                            <span>{insurer.name}</span>
+                            <span>
+                              <bdi>{insurer.name}</bdi>
+                            </span>
                           </label>
                         ))}
                       {insurers.filter((i) => !shortlistedIds.has(i.id))
@@ -430,7 +434,7 @@ export default function RfqDetailPage() {
                     </td>
                     <td style={rfqCellStyle}>{c.channel}</td>
                     <td style={rfqCellStyle}>
-                      {c.rfqInsurer?.insurer.name ?? 'Panel'}
+                      <bdi>{c.rfqInsurer?.insurer.name ?? 'Panel'}</bdi>
                     </td>
                     <td style={rfqCellStyle}>
                       {c.subject ? <strong>{c.subject}</strong> : null}

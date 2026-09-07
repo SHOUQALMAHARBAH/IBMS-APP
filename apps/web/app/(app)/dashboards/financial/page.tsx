@@ -35,7 +35,9 @@ function ProfitabilityTable({ title, rows }: { title: string; rows: Profitabilit
           <tbody>
             {rows.map((r) => (
               <tr key={r.key}>
-                <td style={{ padding: '0.25rem 0.5rem' }}>{r.label}</td>
+                <td style={{ padding: '0.25rem 0.5rem' }}>
+                  <bdi>{r.label}</bdi>
+                </td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.premiumWritten}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.claimsPaid}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.commissionEarned}</td>
@@ -125,6 +127,7 @@ export default function FinancialDashboardPage() {
           Insurance line
           <input
             aria-label="Insurance line filter"
+            dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />

@@ -321,12 +321,21 @@ export function PolicySection({
               flexWrap: 'wrap',
             }}
           >
-            <strong>{policy.insurer?.name ?? policy.insurerId}</strong>
+            <strong>
+              <bdi>{policy.insurer?.name ?? policy.insurerId}</bdi>
+            </strong>
             <span style={rfqBadgeStyle}>{policy.status}</span>
           </div>
           <p style={{ margin: '0.4rem 0' }}>
-            {policy.insuranceLine}
-            {policy.policyNumber ? ` · ${policy.policyNumber}` : ''}
+            <bdi>{policy.insuranceLine}</bdi>
+            {policy.policyNumber ? (
+              <>
+                {' · '}
+                <bdi>{policy.policyNumber}</bdi>
+              </>
+            ) : (
+              ''
+            )}
           </p>
           <p style={{ margin: '0.4rem 0' }}>
             Requested {money(policy.requestedPremium, policy.currency)}

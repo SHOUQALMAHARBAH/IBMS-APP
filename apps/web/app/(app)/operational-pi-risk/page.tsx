@@ -303,6 +303,7 @@ export default function OperationalPiRiskPage() {
             Insurer
             <input
               aria-label="PI insurer name"
+              dir="auto"
               value={insurerName}
               onChange={(e) => setInsurerName(e.target.value)}
               required
@@ -348,7 +349,9 @@ export default function OperationalPiRiskPage() {
           <tbody>
             {policies.map((p) => (
               <tr key={p.id}>
-                <td style={cell}>{p.insurerName}</td>
+                <td style={cell}>
+                  <bdi>{p.insurerName}</bdi>
+                </td>
                 <td style={cell}>{p.coverageLimit}</td>
                 <td style={cell}>{p.expiresAt.slice(0, 10)}</td>
                 <td style={cell}>{p.claimsHistorySummary ?? '—'}</td>

@@ -97,6 +97,7 @@ export default function PolicyDashboardPage() {
           Insurance line
           <input
             aria-label="Insurance line filter"
+            dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
@@ -189,9 +190,15 @@ export default function PolicyDashboardPage() {
                 <tbody>
                   {summary.cancelledPolicies.map((c) => (
                     <tr key={c.policyId}>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>{c.policyNumber ?? c.policyId}</td>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>{c.insuranceLine}</td>
-                      <td style={{ padding: '0.25rem 0.5rem' }}>{c.reason}</td>
+                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                        <bdi>{c.policyNumber ?? c.policyId}</bdi>
+                      </td>
+                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                        <bdi>{c.insuranceLine}</bdi>
+                      </td>
+                      <td style={{ padding: '0.25rem 0.5rem' }}>
+                        <bdi>{c.reason}</bdi>
+                      </td>
                       <td style={{ padding: '0.25rem 0.5rem' }}>{c.cancelledAt.slice(0, 10)}</td>
                     </tr>
                   ))}
