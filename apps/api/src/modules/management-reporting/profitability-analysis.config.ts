@@ -107,7 +107,10 @@ function groupBy(
     .sort(
       (a, b) =>
         compareMoney(a.netProfitabilityJod, b.netProfitabilityJod) ||
-        a.key.localeCompare(b.key, 'en'),
+        // Part F item #4 — 'ar', not 'en': key is `insuranceLine` for the
+        // `byLine` grouping (genuinely bilingual) or `customerType` for
+        // `bySegment` (a fixed English enum, unaffected by locale choice).
+        a.key.localeCompare(b.key, 'ar'),
     );
 }
 

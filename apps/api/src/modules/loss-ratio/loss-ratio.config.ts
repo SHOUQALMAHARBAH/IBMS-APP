@@ -191,8 +191,11 @@ export function buildLossRatioBreakdown(input: {
       const byRatio = new Prisma.Decimal(b.ratio).comparedTo(
         new Prisma.Decimal(a.ratio),
       );
-      // fixed locale so the tie-break order is identical across environments
-      return byRatio !== 0 ? byRatio : a.label.localeCompare(b.label, 'en');
+      // Fixed locale so the tie-break order is identical across environments.
+      // 'ar', not 'en' (Part F item #4): label can be customerLegalName,
+      // insurerName, or insuranceLine, all genuinely bilingual — only
+      // policyRef (a reference code) is ASCII-only, unaffected by locale.
+      return byRatio !== 0 ? byRatio : a.label.localeCompare(b.label, 'ar');
     });
 
   return {

@@ -920,18 +920,24 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — begun, items #1-3 of 8 built.** A working instant language
-  switch + persistent per-user preference exists (`PATCH /auth/me/language`, a
-  `LanguageProvider` React context, a switcher in `AppNav`'s footer); every screen's
-  LAYOUT genuinely mirrors under `dir="rtl"` (nav/forms/tables via CSS logical
-  properties + free flex/table mirroring; charts N/A — none exist in this app yet); and
-  mixed-content fields (an Arabic legal name, an Arabic insurance-line label next to a
-  Latin policy number, a bilingual address) now isolate correctly via native `<bdi>`
-  elements and `dir="auto"` capture inputs — see § Part F below for the full detail.
-  Every screen's remaining TEXT is still **English-only**: no locale-aware number/date/
-  currency formatting (Gregorian/Hijri, JOD base + multi-currency), no Arabic-first input
-  or Arabic collation, no bilingual full-text search, and no system-generated bilingual
-  documents. Screens implement the loading / empty / error / populated states, but the
+- **Part F — bilingual UI — begun, items #1-3 of 8 built + item #4 PARTIALLY built.**
+  A working instant language switch + persistent per-user preference exists
+  (`PATCH /auth/me/language`, a `LanguageProvider` React context, a switcher in
+  `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
+  (nav/forms/tables via CSS logical properties + free flex/table mirroring; charts
+  N/A — none exist in this app yet); mixed-content fields (an Arabic legal name, an
+  Arabic insurance-line label next to a Latin policy number, a bilingual address) now
+  isolate correctly via native `<bdi>` elements and `dir="auto"` capture inputs; and
+  name/label sorting for genuinely bilingual fields (customer/insurer names,
+  insurance-line labels) now uses Arabic-locale collation instead of a hardcoded
+  English one — see § Part F below for the full detail. **Item #4's other two
+  sub-problems (Arabic keyboards, national-ID-convention name-field splitting) were
+  explicitly deferred as future work by user decision** — not attempted, and
+  genuinely undocumented anywhere beyond the one-line backlog bullet. Every screen's
+  remaining TEXT is still **English-only**: no locale-aware number/date/currency
+  formatting (Gregorian/Hijri, JOD base + multi-currency), no bilingual full-text
+  search, and no system-generated bilingual documents. Screens implement the loading
+  / empty / error / populated states, but the
   Part F rule of capturing a screenshot of each state as evidence is not met.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
@@ -6805,6 +6811,89 @@ narrows a gap.
   infrastructure to build on at all yet); item #8 (the 4-state screenshot
   discipline) is a verification overlay on whichever of #4-7 land, not a
   standalone build.
+
+**Part F — Bilingual UI (backlog Part 11) — item #4 of 8: Arabic-first input —
+  PARTIALLY built: correct Arabic sorting only.** The backlog bullet ("Arabic
+  keyboards, national-ID-convention name fields, correct Arabic sorting")
+  bundles three sub-problems of very different size. Presented with that split
+  before implementing (per this session's own "pause and confirm before
+  implementing" convention), the user made two explicit scoping decisions:
+  fix Arabic sorting only, defer name-splitting and keyboards as documented
+  future work; and hardcode the sort locale to `'ar'` rather than threading
+  the caller's own `languagePreference` through.
+
+  **What's fixed**: every `localeCompare(x, 'en')` call sorting a genuinely
+  bilingual name/label field switched to `localeCompare(x, 'ar')` —
+  `finance.config.ts` (customer legal name in the receivables-ageing report,
+  insurer name in both the insurer-payables and profitability-by-insurer
+  reports, the insurance-line/segment key in the by-line/by-segment
+  profitability breakdown), `loss-ratio.config.ts` (a label that can be
+  customer legal name, insurer name, or insurance line depending on the
+  requested grouping), `profitability-analysis.config.ts` (the same
+  insurance-line/segment key pattern in the management-reporting module's
+  own parallel implementation). Two DB-level sorts using plain Postgres
+  default collation — `commission.repository.ts`'s `listInsurers()` and
+  `rfq.repository.ts`'s `findSelectableInsurers()`, both ordering
+  `Insurer.name` — were converted from a Prisma `orderBy` clause to a
+  fetch-then-JS-sort with the identical `'ar'` comparator; no DB-level ICU
+  collation migration was needed since both are small, unpaginated lookup
+  lists (a page of insurers for a picker), not paginated queries where an
+  in-memory sort would be the wrong trade-off.
+
+  **What's deliberately unchanged**: two sort sites that look identical in
+  shape were checked against their actual field source before deciding, and
+  left alone because the sorted value is a fixed, always-English constant,
+  never user content — `sla-dashboard.config.ts`'s `label` (a hardcoded
+  SLA-workflow name like "DSR — Access / Deletion", sourced from
+  `sla-registry.config.ts`) and `role.repository.ts`'s `Role.name` (a
+  `RoleName` enum value like `SALES_RELATIONSHIP_OFFICER`). Switching either
+  to `'ar'` would have been a wrong "fix" for a field that is never Arabic
+  content in the first place — confirmed by reading the actual field
+  definition, not assumed from the field name alone.
+
+  **A genuine, empirically-verified test proves the mechanism, not just that
+  it doesn't crash**: `"إبراهيم للتأمين"` (Ibrahim) sorts BEFORE `"أحمد
+  للتجارة"` (Ahmad) under a real `'ar'` collation, but AFTER it under `'en'`
+  — verified directly against Node's own ICU implementation before writing
+  the assertion (not assumed), then locked in as a new regression test in
+  `finance.config.spec.ts`. This is a genuinely different pair under the two
+  locales, not an artificial fixture picked to look different.
+
+  **Explicitly deferred as future work, not attempted here**: Arabic
+  keyboards (the one keyboard-adjacent risk flagged but not checked — no DTO
+  validation regex on a name/address field was confirmed to allow or block
+  Arabic characters; a future session should grep every such DTO for a
+  `@Matches` pattern before assuming Arabic input is unblocked everywhere)
+  and national-ID-convention name fields (every name field in the schema —
+  `Customer.legalName`, `Prospect.companyName`, `Employee.fullName`,
+  `Adjuster.name`, etc. — remains a single flat string; the Jordanian
+  convention of given name + father's name + grandfather's name + family
+  name is not represented anywhere, and as written the backlog bullet reads
+  as a real schema migration touching every form and consumer of these
+  fields, genuinely undocumented anywhere in this brain beyond the one-line
+  bullet — no field list, no definition of the convention, no design doc).
+
+  **Verification**: +1 new unit test (`finance.config.spec.ts`) → api unit
+  **2321/2321** (from 2320). Targeted + adjacent e2e sweep across every e2e
+  file exercising a touched config module — `commission` (1/1), `claim`
+  (10/10, exercises the Loss Ratio recompute path), `financial-dashboard`
+  (5/5), `sla-dashboard` (1/1, confirms the deliberately-unchanged
+  workflow-label sort still passes), `claims-dashboard` (5/5),
+  `profitability-analysis` (3/3) — 25/25 green. No existing test asserted an
+  exact insurer/name ordering the locale switch could have broken (confirmed
+  by reading each assertion, not just trusting a green exit code) — the one
+  existing name tie-break test in `finance.config.spec.ts` uses ASCII-only
+  fixture names, unaffected either way. `npm run typecheck`/`lint`/`test`
+  (api) OK. **No web files touched — a pure backend change**, confirmed via
+  `git diff --stat`; no Playwright/a11y gate applies.
+
+  **No migration, no seed change.** Read
+  `ibms-brain/meta/context/bilingual-ui.md`'s "What item #4 covers/does NOT
+  cover" before assuming item #4 is fully closed — it is NOT. Arabic
+  keyboards and national-ID-convention name-splitting remain open,
+  documented future work; wait for the user's explicit go-ahead before
+  resuming either, or starting item #5 (locale-aware number/date/currency
+  formatting) or any other Part F item — do not self-select.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
