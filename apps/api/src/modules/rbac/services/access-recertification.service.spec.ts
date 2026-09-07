@@ -8,14 +8,14 @@ import type { AuditService } from '../../audit/audit.service';
 import type { SlaTimerService } from '../../sla/sla-timer.service';
 
 interface Mocks {
-  createItem: Mock;
+  createManyItems: Mock;
   findItemById: Mock;
   findItemsByReviewer: Mock;
   recordDecision: Mock;
   revokeAllActiveRoleAssignmentsForUser: Mock;
   findItemsByCycle: Mock;
   findSummariesByIds: Mock;
-  getRoleNames: Mock;
+  getRoleNamesByIds: Mock;
   startTimer: Mock;
 }
 
@@ -29,15 +29,20 @@ function makeDeps(overrides?: {
   service: AccessRecertificationService;
   mocks: Mocks;
 } {
-  const createItem = vi.fn(
-    (cycleId: string, subjectUserId: string, reviewerUserId: string) =>
-      Promise.resolve({
-        id: `item-${subjectUserId}`,
-        cycleId,
-        subjectUserId,
-        reviewerUserId,
-        decision: null,
-      }),
+  const createManyItems = vi.fn(
+    (
+      cycleId: string,
+      pairs: { subjectUserId: string; reviewerUserId: string }[],
+    ) =>
+      Promise.resolve(
+        pairs.map((pair) => ({
+          id: `item-${pair.subjectUserId}`,
+          cycleId,
+          subjectUserId: pair.subjectUserId,
+          reviewerUserId: pair.reviewerUserId,
+          decision: null,
+        })),
+      ),
   );
   const findItemById = vi.fn();
   const findItemsByReviewer = vi.fn().mockResolvedValue([]);
@@ -52,7 +57,7 @@ function makeDeps(overrides?: {
     findActiveSubjectUserIds: vi
       .fn()
       .mockResolvedValue(overrides?.activeSubjectUserIds ?? []),
-    createItem,
+    createManyItems,
     findItemById,
     findItemsByCycle,
     findItemsByReviewer,
@@ -75,14 +80,15 @@ function makeDeps(overrides?: {
   } as unknown as RoleRepository;
 
   const findSummariesByIds = vi.fn().mockResolvedValue([]);
-  const getRoleNames = vi.fn().mockResolvedValue([]);
+  const getRoleNamesByIds = vi.fn().mockResolvedValue(new Map());
   const users = {
     findSummariesByIds,
-    getRoleNames,
+    getRoleNamesByIds,
   } as unknown as UserRepository;
 
   const audit = {
     record: vi.fn().mockResolvedValue(undefined),
+    recordMany: vi.fn().mockResolvedValue(undefined),
   } as unknown as AuditService;
 
   const startTimer = vi.fn().mockResolvedValue([]);
@@ -97,14 +103,14 @@ function makeDeps(overrides?: {
       slaTimer,
     ),
     mocks: {
-      createItem,
+      createManyItems,
       findItemById,
       findItemsByReviewer,
       recordDecision,
       revokeAllActiveRoleAssignmentsForUser,
       findItemsByCycle,
       findSummariesByIds,
-      getRoleNames,
+      getRoleNamesByIds,
       startTimer,
     },
   };
@@ -120,11 +126,26 @@ describe('AccessRecertificationService', () => {
 
       await service.startCycle('Q1', new Date(), 'admin-1');
 
-      expect(mocks.createItem).toHaveBeenCalledWith(
-        'cycle-1',
-        'sales-1',
-        'compliance-1',
-      );
+      expect(mocks.createManyItems).toHaveBeenCalledWith('cycle-1', [
+        { subjectUserId: 'sales-1', reviewerUserId: 'compliance-1' },
+      ]);
+    });
+
+    it('inserts every item in one createManyItems and audits them in one recordMany (not N round-trips)', async () => {
+      const { service, mocks } = makeDeps({
+        activeSubjectUserIds: ['sales-1', 'sales-2', 'sales-3'],
+        complianceOfficers: ['compliance-1'],
+      });
+      const recordMany = (
+        service as unknown as { audit: { recordMany: Mock; record: Mock } }
+      ).audit.recordMany;
+
+      await service.startCycle('Q1', new Date(), 'admin-1');
+
+      expect(mocks.createManyItems).toHaveBeenCalledTimes(1);
+      expect(mocks.createManyItems.mock.calls[0][1]).toHaveLength(3);
+      expect(recordMany).toHaveBeenCalledTimes(1);
+      expect(recordMany.mock.calls[0][0]).toHaveLength(3);
     });
 
     it("starts the cycle's SLA timer (backlog A.8) once it is created", async () => {
@@ -166,11 +187,9 @@ describe('AccessRecertificationService', () => {
 
       await service.startCycle('Q1', new Date(), 'admin-1');
 
-      expect(mocks.createItem).toHaveBeenCalledWith(
-        'cycle-1',
-        'compliance-1',
-        'exec-1',
-      );
+      expect(mocks.createManyItems).toHaveBeenCalledWith('cycle-1', [
+        { subjectUserId: 'compliance-1', reviewerUserId: 'exec-1' },
+      ]);
     });
 
     it('includes System/Security Administrator subjects — never skips them', async () => {
@@ -182,11 +201,9 @@ describe('AccessRecertificationService', () => {
 
       await service.startCycle('Q1', new Date(), 'admin-1');
 
-      expect(mocks.createItem).toHaveBeenCalledWith(
-        'cycle-1',
-        'admin-1',
-        'manager-1',
-      );
+      expect(mocks.createManyItems).toHaveBeenCalledWith('cycle-1', [
+        { subjectUserId: 'admin-1', reviewerUserId: 'manager-1' },
+      ]);
     });
 
     it('skips (never self-assigns) a subject with no eligible reviewer, without blocking the rest of the cycle', async () => {
@@ -202,16 +219,11 @@ describe('AccessRecertificationService', () => {
       await expect(
         service.startCycle('Q1', new Date(), 'admin-1'),
       ).resolves.toBeDefined();
-      expect(mocks.createItem).not.toHaveBeenCalledWith(
-        'cycle-1',
-        'compliance-1',
-        expect.anything(),
-      );
-      expect(mocks.createItem).toHaveBeenCalledWith(
-        'cycle-1',
-        'sales-1',
-        'compliance-1',
-      );
+      // Exactly one item — for sales-1. compliance-1 (the un-reviewable
+      // subject) is absent from the pair list, not self-assigned.
+      expect(mocks.createManyItems).toHaveBeenCalledWith('cycle-1', [
+        { subjectUserId: 'sales-1', reviewerUserId: 'compliance-1' },
+      ]);
     });
   });
 
@@ -307,7 +319,9 @@ describe('AccessRecertificationService', () => {
       mocks.findSummariesByIds.mockResolvedValue([
         { id: 'sales-1', fullName: 'Sales Officer', email: 'sales@ibms.test' },
       ]);
-      mocks.getRoleNames.mockResolvedValue(['SALES_RELATIONSHIP_OFFICER']);
+      mocks.getRoleNamesByIds.mockResolvedValue(
+        new Map([['sales-1', ['SALES_RELATIONSHIP_OFFICER']]]),
+      );
 
       const items = await service.listItemsForReviewer('reviewer-1');
 

@@ -5,12 +5,14 @@ import {
   applyPercentage,
   compareMoney,
   formatMoney,
+  formatMoneySum,
   isZeroMoney,
   MONEY_PRECISION,
   MONEY_ROUNDING,
   MONEY_SCALE,
   quantizeMoney,
   subtractMoney,
+  sumMoney,
   toMoney,
 } from './money.util';
 
@@ -93,6 +95,23 @@ describe('addMoney', () => {
   });
 });
 
+describe('sumMoney', () => {
+  it('sums a list (no spread) and quantizes once', () => {
+    expect(
+      sumMoney(['10.1111', '0.0004', new Prisma.Decimal('1.000')]).toString(),
+    ).toBe('11.112');
+  });
+
+  it('is a clean zero for an empty list (a sum over nothing), never a throw', () => {
+    expect(sumMoney([]).toString()).toBe('0');
+  });
+
+  it('handles a list far longer than a safe spread would allow', () => {
+    const many = Array.from({ length: 200_000 }, () => '0.001');
+    expect(sumMoney(many).toString()).toBe('200');
+  });
+});
+
 describe('subtractMoney', () => {
   it('subtracts a single amount', () => {
     expect(subtractMoney('100.000', '25.555').toString()).toBe('74.445');
@@ -152,5 +171,15 @@ describe('formatMoney', () => {
     expect(formatMoney('5')).toBe('5.000');
     expect(formatMoney('5.5')).toBe('5.500');
     expect(formatMoney('5.5551')).toBe('5.555');
+  });
+});
+
+describe('formatMoneySum', () => {
+  it('formats a Prisma.Decimal sum to fixed 3dp', () => {
+    expect(formatMoneySum(new Prisma.Decimal('1234.5'))).toBe('1234.500');
+  });
+
+  it('renders a null aggregate (no matching rows) as zero, not a crash', () => {
+    expect(formatMoneySum(null)).toBe('0.000');
   });
 });

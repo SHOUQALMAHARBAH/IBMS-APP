@@ -84,33 +84,42 @@ export class AccessRecertificationService {
     const primaryPool = [...new Set([...complianceOfficers, ...managers])];
     const fallbackPool = [...new Set(executives)];
 
+    const pairs: { subjectUserId: string; reviewerUserId: string }[] = [];
     for (const subjectUserId of subjectUserIds) {
-      let reviewerUserId: string;
       try {
-        reviewerUserId = this.pickReviewer(
+        pairs.push({
           subjectUserId,
-          primaryPool,
-          fallbackPool,
-        );
+          reviewerUserId: this.pickReviewer(
+            subjectUserId,
+            primaryPool,
+            fallbackPool,
+          ),
+        });
       } catch (err) {
         // One subject with no eligible reviewer must not block recertifying
         // everyone else in the org — skip and surface it loudly instead.
         this.logger.warn((err as Error).message);
-        continue;
       }
-      const item = await this.repo.createItem(
-        cycle.id,
-        subjectUserId,
-        reviewerUserId,
-      );
-      await this.audit.record({
+    }
+
+    // One INSERT for every item + one INSERT for every item's audit row,
+    // rather than 2 round-trips per subject over the whole active-user set —
+    // the O(N) sequential writes here were what pushed `startCycle` past the
+    // e2e test timeout once the shared test DB had accumulated enough users.
+    const items = await this.repo.createManyItems(cycle.id, pairs);
+    await this.audit.recordMany(
+      items.map((item) => ({
         userId: startedByUserId,
-        action: 'CREATE',
+        action: 'CREATE' as const,
         entityType: 'AccessRecertificationItem',
         entityId: item.id,
-        afterValue: { subjectUserId, reviewerUserId, cycleId: cycle.id },
-      });
-    }
+        afterValue: {
+          subjectUserId: item.subjectUserId,
+          reviewerUserId: item.reviewerUserId,
+          cycleId: cycle.id,
+        },
+      })),
+    );
 
     await this.audit.record({
       userId: startedByUserId,
@@ -153,16 +162,13 @@ export class AccessRecertificationService {
     if (items.length === 0) return [];
 
     const subjectIds = [...new Set(items.map((i) => i.subjectUserId))];
-    const [subjects, rolesBySubjectEntries] = await Promise.all([
+    const [subjects, rolesBySubject] = await Promise.all([
       this.users.findSummariesByIds(subjectIds),
-      Promise.all(
-        subjectIds.map(
-          async (id) => [id, await this.users.getRoleNames(id)] as const,
-        ),
-      ),
+      // One query for every subject's roles, not one per item — see
+      // UserRepository.getRoleNamesByIds.
+      this.users.getRoleNamesByIds(subjectIds),
     ]);
     const subjectById = new Map(subjects.map((s) => [s.id, s]));
-    const rolesBySubject = new Map(rolesBySubjectEntries);
 
     return items.map((item) => {
       const subject = subjectById.get(item.subjectUserId);

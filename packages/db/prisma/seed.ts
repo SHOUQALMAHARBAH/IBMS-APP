@@ -46,33 +46,25 @@ async function ensureSystemAccount(): Promise<void> {
 }
 
 /**
- * Part 6.2 (M06) — seeds the retention-schedule row(s). RetentionScheduleItem
- * has no unique constraint on recordCategory (future M06 work may want to
- * version these), so this upserts by hand via findFirst instead of a real
- * Prisma upsert.
+ * Part 6.2 (M06) — seeds the retention-schedule row(s). `recordCategory` is
+ * now a real unique constraint (backlog Part D §5.1's Retention & Disposal
+ * build) — a genuine Prisma `upsert`, not the hand-rolled findFirst/
+ * create-or-update this used before that constraint existed.
  */
 async function ensureRetentionSchedule(): Promise<void> {
   for (const item of RETENTION_SCHEDULE) {
-    const existing = await prisma.retentionScheduleItem.findFirst({
+    await prisma.retentionScheduleItem.upsert({
       where: { recordCategory: item.recordCategory },
+      update: {
+        retentionPeriodMonths: item.retentionPeriodMonths,
+        legalBasis: item.legalBasis,
+      },
+      create: {
+        recordCategory: item.recordCategory,
+        retentionPeriodMonths: item.retentionPeriodMonths,
+        legalBasis: item.legalBasis,
+      },
     });
-    if (existing) {
-      await prisma.retentionScheduleItem.update({
-        where: { id: existing.id },
-        data: {
-          retentionPeriodMonths: item.retentionPeriodMonths,
-          legalBasis: item.legalBasis,
-        },
-      });
-    } else {
-      await prisma.retentionScheduleItem.create({
-        data: {
-          recordCategory: item.recordCategory,
-          retentionPeriodMonths: item.retentionPeriodMonths,
-          legalBasis: item.legalBasis,
-        },
-      });
-    }
   }
   console.log(`Seeded ${RETENTION_SCHEDULE.length} retention schedule item(s).`);
 }

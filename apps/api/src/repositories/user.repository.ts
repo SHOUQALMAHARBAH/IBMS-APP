@@ -22,6 +22,25 @@ export class UserRepository {
     return assignments.map((a) => a.role.name);
   }
 
+  /** Active (non-revoked) role names for a set of users, keyed by user id,
+   * in ONE query. `AccessRecertificationService.listItemsForReviewer` fired
+   * one `getRoleNames` per item — for a large cycle that fanned out to N
+   * concurrent queries and could exhaust the connection pool. */
+  async getRoleNamesByIds(userIds: string[]): Promise<Map<string, RoleName[]>> {
+    const byUser = new Map<string, RoleName[]>();
+    if (userIds.length === 0) return byUser;
+    const assignments = await this.prisma.client.userRoleAssignment.findMany({
+      where: { userId: { in: userIds }, revokedAt: null },
+      select: { userId: true, role: { select: { name: true } } },
+    });
+    for (const assignment of assignments) {
+      const list = byUser.get(assignment.userId);
+      if (list) list.push(assignment.role.name);
+      else byUser.set(assignment.userId, [assignment.role.name]);
+    }
+    return byUser;
+  }
+
   /** Minimal display info for a set of users — e.g. rendering a
    * recertification queue without exposing full User records. */
   findSummariesByIds(

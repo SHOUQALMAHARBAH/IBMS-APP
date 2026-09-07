@@ -45,6 +45,35 @@ export class AuditService {
     await this.anomalyDetection.evaluate(entry);
   }
 
+  /**
+   * Writes many entries in ONE `INSERT` (`createManyAndReturn`) instead of
+   * one round-trip each, then runs anomaly detection per persisted row —
+   * for a caller emitting a row per element of a large collection (e.g.
+   * `AccessRecertificationService.startCycle`, one `CREATE` per subject over
+   * the whole active-user set), the N sequential `record()` calls were the
+   * bottleneck. Anomaly detection stays per-row (it keys off the persisted
+   * `id` / `occurredAt`), but for the common `CREATE` / non-sensitive row it
+   * is a synchronous no-op, so this is effectively one DB write for the
+   * batch. Same append-only guarantees as `record()`.
+   */
+  async recordMany(inputs: RecordAuditEntryInput[]): Promise<void> {
+    if (inputs.length === 0) return;
+    const entries = await this.prisma.client.auditLogEntry.createManyAndReturn({
+      data: inputs.map((input) => ({
+        userId: input.userId,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        beforeValue: input.beforeValue,
+        afterValue: input.afterValue,
+        isSensitiveDataAccess: input.isSensitiveDataAccess ?? false,
+      })),
+    });
+    for (const entry of entries) {
+      await this.anomalyDetection.evaluate(entry);
+    }
+  }
+
   /** Part 6.2 (M06) — reads the RetentionScheduleItem row for AuditLogEntry
    * (seeded by packages/db/prisma/seed-data/retention-schedule.ts) and
    * returns the cutoff date before which entries are retention-eligible.

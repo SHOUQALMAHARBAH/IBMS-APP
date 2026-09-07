@@ -77,8 +77,18 @@ export function addMoney(...values: MoneyInput[]): Prisma.Decimal {
   if (values.length === 0) {
     throw new Error('addMoney: at least one value is required');
   }
+  return sumMoney(values);
+}
+
+/**
+ * Sums a *list* of monetary amounts, quantized once at the end. Unlike
+ * {@link addMoney} this takes an array (no spread), so it is safe on a list
+ * whose length scales with the data — an aggregate/report reducing thousands
+ * of rows. An empty list is `0` (a sum over nothing), never a throw.
+ */
+export function sumMoney(values: readonly MoneyInput[]): Prisma.Decimal {
   const sum = values.reduce<Prisma.Decimal>(
-    (acc, value) => acc.plus(toMoney(value, 'addMoney')),
+    (acc, value) => acc.plus(toMoney(value, 'sumMoney')),
     new Prisma.Decimal(0),
   );
   return quantizeMoney(sum);
@@ -125,4 +135,15 @@ export function compareMoney(a: MoneyInput, b: MoneyInput): number {
 /** Formats a quantized amount as a fixed 3dp string (`"1234.500"`) — for persistence/logging, not display. */
 export function formatMoney(value: MoneyInput): string {
   return quantizeMoney(value).toFixed(MONEY_SCALE);
+}
+
+/** Formats a possibly-null Prisma `_sum` aggregate as a fixed 3dp JOD
+ * string — `null` (no matching rows) renders as `"0.000"`, not a crash.
+ * Originally local to `kpi-dashboard.config.ts` (Process 58); promoted
+ * here once `portfolio-analysis.config.ts` (Process 62) needed the
+ * identical helper — `kpi-dashboard.config.ts` re-exports it so its
+ * existing imports keep working unchanged (the `calendar-date.util.ts`/
+ * `period.util.ts` promotion precedent). */
+export function formatMoneySum(value: MoneyInput | null): string {
+  return value === null ? formatMoney(0) : formatMoney(sumMoney([value]));
 }

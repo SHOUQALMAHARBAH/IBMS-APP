@@ -22,6 +22,13 @@ const entityTypes: WorkflowEntityType[] = [
   'DataSubjectRequest',
   'IncidentReport',
   'DisposalBatch',
+  'Lead',
+  'KYCRecord',
+  'Customer',
+  'NeedsAssessment',
+  'InsuranceProgram',
+  'CrossSellOpportunity',
+  'UpSellRecommendation',
 ];
 
 describe('WORKFLOW_TRANSITIONS', () => {
@@ -190,6 +197,204 @@ describe('isWorkflowTransitionAllowed', () => {
     }
     expect(
       isWorkflowTransitionAllowed('DisposalBatch', 'NOMINATED', 'DPO_APPROVED'),
+    ).toBe(false);
+  });
+
+  it('allows Lead NEW -> CONTACTED -> QUALIFIED -> CONVERTED_TO_PROSPECT (backlog Part C #1, verbatim)', () => {
+    const chain: Array<
+      Parameters<typeof isWorkflowTransitionAllowed<'Lead'>>[1]
+    > = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED_TO_PROSPECT'];
+    for (let i = 0; i < chain.length - 1; i++) {
+      expect(isWorkflowTransitionAllowed('Lead', chain[i], chain[i + 1])).toBe(
+        true,
+      );
+    }
+  });
+
+  it('allows a Lead to be disqualified right after first contact, not only once qualified', () => {
+    expect(isWorkflowTransitionAllowed('Lead', 'NEW', 'DISQUALIFIED')).toBe(
+      true,
+    );
+    expect(
+      isWorkflowTransitionAllowed('Lead', 'CONTACTED', 'DISQUALIFIED'),
+    ).toBe(true);
+  });
+
+  it('rejects Lead NEW -> QUALIFIED (skips CONTACTED)', () => {
+    expect(isWorkflowTransitionAllowed('Lead', 'NEW', 'QUALIFIED')).toBe(false);
+  });
+
+  it('rejects any move out of a terminal Lead status', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'Lead',
+        'CONVERTED_TO_PROSPECT',
+        'DISQUALIFIED',
+      ),
+    ).toBe(false);
+  });
+
+  it('follows the KYCRecord model comment chain (backlog Part C #3-4, verbatim)', () => {
+    const chain: Array<
+      Parameters<typeof isWorkflowTransitionAllowed<'KYCRecord'>>[1]
+    > = [
+      'DRAFT',
+      'SUBMITTED',
+      'SCREENING',
+      'EDD',
+      'COMPLIANCE_REVIEW',
+      'APPROVED',
+      'PERIODIC_REVIEW_DUE',
+    ];
+    for (let i = 0; i < chain.length - 1; i++) {
+      expect(
+        isWorkflowTransitionAllowed('KYCRecord', chain[i], chain[i + 1]),
+      ).toBe(true);
+    }
+  });
+
+  it('allows KYCRecord SCREENING -> COMPLIANCE_REVIEW directly (no EDD needed on a clear result)', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'KYCRecord',
+        'SCREENING',
+        'COMPLIANCE_REVIEW',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects KYCRecord DRAFT -> SCREENING (skips SUBMITTED)', () => {
+    expect(isWorkflowTransitionAllowed('KYCRecord', 'DRAFT', 'SCREENING')).toBe(
+      false,
+    );
+  });
+
+  it('rejects any move out of a terminal KYCRecord status', () => {
+    expect(isWorkflowTransitionAllowed('KYCRecord', 'REJECTED', 'DRAFT')).toBe(
+      false,
+    );
+  });
+
+  it('allows Customer PENDING_KYC -> ACTIVE (the sole legal activation move)', () => {
+    expect(
+      isWorkflowTransitionAllowed('Customer', 'PENDING_KYC', 'ACTIVE'),
+    ).toBe(true);
+  });
+
+  it('rejects Customer PENDING_KYC -> SUSPENDED (cannot suspend before activation)', () => {
+    expect(
+      isWorkflowTransitionAllowed('Customer', 'PENDING_KYC', 'SUSPENDED'),
+    ).toBe(false);
+  });
+
+  it('allows NeedsAssessment DRAFT -> PENDING_REVIEW -> REVIEWED -> APPROVED (backlog Part C #5)', () => {
+    const chain: Array<
+      Parameters<typeof isWorkflowTransitionAllowed<'NeedsAssessment'>>[1]
+    > = ['DRAFT', 'PENDING_REVIEW', 'REVIEWED', 'APPROVED'];
+    for (let i = 0; i < chain.length - 1; i++) {
+      expect(
+        isWorkflowTransitionAllowed('NeedsAssessment', chain[i], chain[i + 1]),
+      ).toBe(true);
+    }
+  });
+
+  it('rejects NeedsAssessment DRAFT -> REVIEWED (skips the review submission)', () => {
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'DRAFT', 'REVIEWED'),
+    ).toBe(false);
+  });
+
+  it('rejects NeedsAssessment PENDING_REVIEW -> APPROVED (a review must be recorded first)', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'NeedsAssessment',
+        'PENDING_REVIEW',
+        'APPROVED',
+      ),
+    ).toBe(false);
+  });
+
+  it('lets a manager bounce a NeedsAssessment back to DRAFT from either review stage', () => {
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'PENDING_REVIEW', 'DRAFT'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'REVIEWED', 'DRAFT'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a terminal NeedsAssessment status', () => {
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'APPROVED', 'DRAFT'),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed('NeedsAssessment', 'REJECTED', 'DRAFT'),
+    ).toBe(false);
+  });
+
+  it('allows InsuranceProgram DRAFT -> FINALIZED and back (reopen) (backlog Part C #7)', () => {
+    expect(
+      isWorkflowTransitionAllowed('InsuranceProgram', 'DRAFT', 'FINALIZED'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('InsuranceProgram', 'FINALIZED', 'DRAFT'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a SUPERSEDED InsuranceProgram (terminal)', () => {
+    expect(
+      isWorkflowTransitionAllowed('InsuranceProgram', 'SUPERSEDED', 'DRAFT'),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed(
+        'InsuranceProgram',
+        'SUPERSEDED',
+        'FINALIZED',
+      ),
+    ).toBe(false);
+  });
+
+  it('allows CrossSellOpportunity OPEN -> CONVERTED and OPEN -> DISMISSED (backlog Part C #8)', () => {
+    expect(
+      isWorkflowTransitionAllowed('CrossSellOpportunity', 'OPEN', 'CONVERTED'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('CrossSellOpportunity', 'OPEN', 'DISMISSED'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a resolved CrossSellOpportunity (both non-OPEN states terminal)', () => {
+    expect(
+      isWorkflowTransitionAllowed(
+        'CrossSellOpportunity',
+        'CONVERTED',
+        'DISMISSED',
+      ),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed('CrossSellOpportunity', 'DISMISSED', 'OPEN'),
+    ).toBe(false);
+  });
+
+  it('allows UpSellRecommendation OPEN -> CONVERTED and OPEN -> DISMISSED (backlog Part C #9)', () => {
+    expect(
+      isWorkflowTransitionAllowed('UpSellRecommendation', 'OPEN', 'CONVERTED'),
+    ).toBe(true);
+    expect(
+      isWorkflowTransitionAllowed('UpSellRecommendation', 'OPEN', 'DISMISSED'),
+    ).toBe(true);
+  });
+
+  it('rejects any move out of a resolved UpSellRecommendation (both non-OPEN states terminal)', () => {
+    expect(
+      isWorkflowTransitionAllowed('UpSellRecommendation', 'CONVERTED', 'OPEN'),
+    ).toBe(false);
+    expect(
+      isWorkflowTransitionAllowed(
+        'UpSellRecommendation',
+        'DISMISSED',
+        'CONVERTED',
+      ),
     ).toBe(false);
   });
 });

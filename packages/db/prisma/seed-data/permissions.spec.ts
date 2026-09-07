@@ -92,10 +92,27 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     expect(granted).toContain('claim.settle.approve');
   });
 
-  it('Finance/Collections Officer cannot approve refunds or alter commission rate tables', () => {
+  it('Finance/Collections Officer can raise and approve refunds (but never its own), and cannot alter commission rate tables', () => {
     const granted = codesGrantedTo(RoleName.FINANCE_COLLECTIONS_OFFICER);
-    expect(granted).not.toContain('refund.approve');
+    // roles-and-segregation-of-duties.md: Finance "Cannot approve OWN
+    // refunds/write-offs" — that constraint is instance-level ("own"), the
+    // same shape as the Claims Officer first-approver case above, not a
+    // role-level "never holds the code". maker-checker-segregation.md maps
+    // the refund *checker* to a "Finance approver above the value threshold",
+    // so the role legitimately holds BOTH sides; raiser != approver on a
+    // given Refund is enforced by assertDifferentActors + the
+    // Refund_maker_checker_distinct CHECK (endorsement.service.ts
+    // approveRefund), never by withholding the permission.
+    expect(granted).toContain('refund.raise');
+    expect(granted).toContain('refund.approve');
+    // "alter commission rate tables without approval" IS a role-level
+    // exclusion — commission-rate.manage goes to Compliance / Manager only.
     expect(granted).not.toContain('commission-rate.manage');
+    // Finance DOES reconcile the commission ledger against insurer statements
+    // (Process 36) — applying/settling the governed figure, not altering it.
+    expect(granted).toContain('commission.reconcile');
+    // Finance maintains the approved payment-channel list (Process 38).
+    expect(granted).toContain('payment-channel.manage');
   });
 
   it('Compliance Officer cannot originate sales transactions or close a DSR (DPO-only)', () => {

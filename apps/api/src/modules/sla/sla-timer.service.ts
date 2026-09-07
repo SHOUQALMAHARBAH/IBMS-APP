@@ -32,6 +32,13 @@ export interface ResolveSlaTimerParams {
   workflowName: string;
   actorUserId: string;
   resolvedAt?: Date;
+  /** Only resolve rows created before this instant. For a caller re-basing a
+   * deadline (start the new timer(s), then resolve the old ones) where the
+   * new and old rows share the same `workflowName` prefix — so `resolve()`'s
+   * own `startsWith` match would otherwise also catch rows `startTimer()`
+   * just created a moment earlier. Omit for the ordinary case (resolving
+   * everything open because the workflow itself concluded). */
+  createdBefore?: Date;
 }
 
 /**
@@ -159,6 +166,9 @@ export class SlaTimerService {
         entityId: params.entityId,
         workflowName: { startsWith: params.workflowName },
         resolvedAt: null,
+        ...(params.createdBefore
+          ? { createdAt: { lt: params.createdBefore } }
+          : {}),
       },
       data: { resolvedAt },
     });
