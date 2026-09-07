@@ -920,12 +920,16 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI** — every screen built so far is **English-only, LTR**. There
-  is no i18n framework, no RTL layout, no bidirectional-text handling, no locale-aware
+- **Part F — bilingual UI — begun, item #1 of 8 built.** A working instant language
+  switch + persistent per-user preference now exists (`PATCH /auth/me/language`, a
+  `LanguageProvider` React context, a switcher in `AppNav`'s footer) — see § Part F
+  below for the full detail. Every OTHER screen remains **English-only, LTR**: no full
+  RTL layout, no bidirectional-text handling for mixed-content fields, no locale-aware
   number/date/currency formatting (Gregorian/Hijri, JOD base + multi-currency), no
-  Arabic-first input or Arabic collation, and no system-generated bilingual documents.
-  Screens implement the loading / empty / error / populated states, but the Part F rule
-  of capturing a screenshot of each state as evidence is not met.
+  Arabic-first input or Arabic collation, no bilingual full-text search, and no
+  system-generated bilingual documents. Screens implement the loading / empty / error /
+  populated states, but the Part F rule of capturing a screenshot of each state as
+  evidence is not met.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -6590,6 +6594,73 @@ narrows a gap.
   parallel pass (`needs-assessments`, `operational-pi-risk`, `payment-channels`)
   re-confirmed clean in isolation, the same pre-existing parallel-worker flake pattern
   documented elsewhere in this file, unrelated to any Part E code.
+
+**Part F — Bilingual UI (backlog Part 11) — item #1 of 8: instant language switch +
+  persistent per-user preference.** Opens Part F; worked one item at a time, the Part
+  D/E pacing default. `User.languagePreference` (`LanguagePreference` enum, `AR`/`EN`,
+  `@default(AR)`) pre-existed in the schema and was already readable via `GET
+  /auth/me`, but write-once-at-signup only — no update path, and nothing on the
+  frontend ever applied it to rendering. New `PATCH /auth/me/language`
+  (`auth.controller.ts`, `@SkipMfaRequired()`, no permission beyond being signed in —
+  every user manages their own) + `UserRepository.updateLanguagePreference()` (the
+  `setMfaEnabled`/`updatePassword` self-service shape) closes that. **Design decision:
+  a hand-rolled `LanguageProvider` React context (`apps/web/lib/i18n/`), not a
+  locale-routing i18n library** (`next-intl` or similar) — see
+  `ibms-brain/meta/designs/2026-09-bilingual-ui-i18n-architecture.md` for the full
+  alternatives-considered writeup; the short version: "instant... without losing
+  session context" reads as a same-URL, client-only toggle, which a routing library's
+  default App Router integration (URL-prefixed locales, e.g. `/en/leads` vs.
+  `/ar/leads`) does not give for free, and migrating ~80 existing routes under a
+  `[locale]` segment would be a large, invasive restructure disproportionate to a bare
+  switch. `LanguageProvider` (wraps `AuthProvider`'s children in `app/layout.tsx`)
+  initializes from `localStorage` (a fast, per-device pre-auth GUESS) then syncs from
+  the ACCOUNT's own preference exactly ONCE per session load, after which local state
+  is authoritative — a manual mid-session switch is never silently overwritten by a
+  stale re-render of the same already-fetched `user` object. Every switch updates React
+  state + `document.documentElement.lang`/`dir` synchronously (genuinely instant — no
+  navigation, no URL change, no lost session context) and persists via a best-effort
+  background `PATCH` (the `SlaTimerService.startTimer` "local action already succeeded,
+  remote-persistence failure logged not surfaced" precedent used everywhere else in
+  this codebase). A small, REAL (not stubbed) translation dictionary
+  (`apps/web/lib/i18n/translations.ts`) backs a `t()` hook — deliberately scoped ONLY to
+  the new switcher control (two toggle buttons, `aria-pressed`, always showing
+  "العربية"/"English" — the target language's own name, never translated based on
+  current state) + `AppNav`'s account footer (signed-in-as / role / sign-out),
+  mounted in the nav shell that wraps every authenticated screen. Translating the other
+  ~80 screens is items #2-5's own separate, much larger scope (RTL layout, bidi text,
+  Arabic-first input, locale formatting) — not attempted here. Login/signup (outside
+  the authenticated `AppNav` shell) get no switcher yet — a `languagePreference` has
+  nowhere to persist against before an account exists; a documented gap, not silently
+  dropped. `<html lang="en">` still hardcodes the FIRST server-rendered paint (no
+  locale cookie/middleware exists) — the correct `dir`/`lang` applies client-side after
+  hydration, so an Arabic-preferring user can see a brief LTR flash on first load, an
+  accepted, documented limitation. **Caught a real test-authoring bug while verifying**:
+  the new Playwright spec's first draft used `page.route("**/leads**", ...)` with no
+  host, which ALSO matched the page's own navigation request (`page.goto("/leads")`),
+  rendering literal `[]` text instead of the real app shell — fixed by scoping to the
+  api origin explicitly (`http://localhost:4000/leads**`), the convention every other
+  spec in this codebase already follows. **Verification**: +1 api e2e test in
+  `auth.e2e-spec.ts` (12/12, was 11; no dedicated `AuthService` unit spec exists, none
+  did before this item either — its login/MFA/session orchestration is verified via
+  e2e, the established pattern for this class); +3 web unit tests (new
+  `translations.test.ts`, the `privacy-by-default.test.ts` "pure logic gets a vitest
+  unit test" precedent — this web app has no React-Testing-Library-style component-test
+  precedent, so `LanguageProvider`'s own context/effect behavior is verified via
+  Playwright instead); +3 new Playwright tests (new `language-switcher.spec.ts`:
+  instant-switch-no-reload + persistence round-trip, default-from-account on load,
+  a11y) → full Playwright suite **287/287** (from 283) — 4 unrelated specs
+  (`information-assets`/`insurance-programs`) flaked once under a concurrent-process
+  memory-pressure episode (an unrelated api unit suite run alongside the Playwright
+  run), re-confirmed clean in isolation, not a regression. Full api unit suite
+  2316/2316 confirmed green (unchanged — this item added no new backend unit spec).
+  Full 62-file api e2e suite green across all 8 foreground sub-batches; the chronic
+  `rbac.e2e-spec.ts` flake needed its established `--testTimeout=180000` re-run to
+  confirm clean (individual tests now taking 65-75s against the very large cumulative
+  `db-test` this project's long history has accumulated). `npm run
+  typecheck`/`lint`/`build` (api + web) OK. **No migration** — `User.languagePreference`
+  pre-existed; no seed change. Items #2-8 remain entirely unbuilt — see
+  `ibms-brain/meta/context/bilingual-ui.md` before starting any of them, or before
+  assuming this item's infrastructure covers more than the switcher + nav footer.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

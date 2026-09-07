@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, setAccessToken } from './api-client';
+import { apiGet, apiPatch, apiPost, apiPut, setAccessToken } from './api-client';
 
 export interface AuthUser {
   id: string;
@@ -81,6 +81,12 @@ export function resetPassword(input: { token: string; newPassword: string }): Pr
 
 export function me(): Promise<MeResponse> {
   return apiGet('/auth/me');
+}
+
+export function updateLanguagePreference(
+  languagePreference: 'AR' | 'EN',
+): Promise<MeResponse> {
+  return apiPatch('/auth/me/language', { languagePreference });
 }
 
 export function heartbeat(): Promise<{ ok: true }> {

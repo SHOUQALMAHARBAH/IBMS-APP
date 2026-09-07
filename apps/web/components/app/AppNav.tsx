@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
 import { logout } from '../../lib/auth/auth-api';
+import { useLanguage } from '../../lib/i18n/language-context';
 import {
   brandStyle,
   navLinkActiveStyle,
@@ -94,6 +95,7 @@ export function AppNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearUser } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   // Longest matching href wins, so /customers/kyc-queue highlights "KYC
   // queue" only — not "Customers" as well.
@@ -127,13 +129,38 @@ export function AppNav() {
         );
       })}
 
+      <div
+        role="group"
+        aria-label={t('language')}
+        style={{ display: 'flex', gap: '0.4rem', padding: '0 0.75rem', marginTop: '0.5rem' }}
+      >
+        <button
+          type="button"
+          aria-pressed={language === 'AR'}
+          onClick={() => setLanguage('AR')}
+          style={language === 'AR' ? navLinkActiveStyle : navLinkStyle}
+        >
+          {t('switchToArabic')}
+        </button>
+        <button
+          type="button"
+          aria-pressed={language === 'EN'}
+          onClick={() => setLanguage('EN')}
+          style={language === 'EN' ? navLinkActiveStyle : navLinkStyle}
+        >
+          {t('switchToEnglish')}
+        </button>
+      </div>
+
       <div style={sidebarFooterStyle}>
-        <div>{user?.fullName}</div>
+        <div>
+          {t('signedInAs')} {user?.fullName}
+        </div>
         <div style={{ opacity: 0.8 }}>
-          {user && user.roles.length > 0 ? user.roles.join(', ') : 'No role assigned'}
+          {user && user.roles.length > 0 ? user.roles.join(', ') : t('noRoleAssigned')}
         </div>
         <button type="button" onClick={() => void handleSignOut()} style={signOutButtonStyle}>
-          Sign out
+          {t('signOut')}
         </button>
       </div>
     </nav>

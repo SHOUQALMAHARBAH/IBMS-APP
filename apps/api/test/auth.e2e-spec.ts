@@ -19,6 +19,7 @@ interface MfaChallengeBody {
 interface MeBody {
   email: string;
   mfaEnabled: boolean;
+  languagePreference: 'AR' | 'EN';
 }
 interface ForgotPasswordBody {
   devResetToken?: string;
@@ -138,6 +139,43 @@ describe('Auth (e2e)', () => {
 
       // ...and a refresh after logout is rejected (session revoked).
       await agent.post('/auth/refresh').expect(401);
+    });
+
+    it('Part F #1 — a user changes their own persistent language preference, defaulting to AR and rejecting an invalid value', async () => {
+      const app = await boot();
+      const email = uniqueEmail('language-pref');
+      const { agent, accessToken } = await signupAndLogin(app, email);
+
+      const initial = await agent
+        .get('/auth/me')
+        .set(bearer(accessToken))
+        .expect(200);
+      expect((initial.body as MeBody).languagePreference).toBe('AR');
+
+      const updated = await agent
+        .patch('/auth/me/language')
+        .set(bearer(accessToken))
+        .send({ languagePreference: 'EN' })
+        .expect(200);
+      expect((updated.body as MeBody).languagePreference).toBe('EN');
+
+      // it's actually persisted, not just echoed back
+      const reread = await agent
+        .get('/auth/me')
+        .set(bearer(accessToken))
+        .expect(200);
+      expect((reread.body as MeBody).languagePreference).toBe('EN');
+
+      await agent
+        .patch('/auth/me/language')
+        .set(bearer(accessToken))
+        .send({ languagePreference: 'FR' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .patch('/auth/me/language')
+        .send({ languagePreference: 'EN' })
+        .expect(401);
     });
 
     it('rejects requests with no access token', async () => {

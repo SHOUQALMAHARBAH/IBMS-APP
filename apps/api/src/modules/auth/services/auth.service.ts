@@ -440,6 +440,23 @@ export class AuthService {
     };
   }
 
+  /**
+   * Part F — Bilingual UI, item #1: "a persistent per-user language
+   * preference." Every user manages their own — no maker/checker, no
+   * permission beyond being signed in (the same self-service shape as
+   * `updatePassword`/`setMfaEnabled`). Returns the fresh `me()` shape so the
+   * frontend can just re-render from one response, the same round-trip its
+   * own instant local UI flip already made optimistically.
+   */
+  async updateLanguagePreference(
+    userId: string,
+    sessionId: string,
+    languagePreference: 'AR' | 'EN',
+  ) {
+    await this.users.updateLanguagePreference(userId, languagePreference);
+    return this.me(userId, sessionId);
+  }
+
   private mfaPolicySatisfied(user: User, roles: RoleName[]): boolean {
     // WebAuthn is not implemented yet (see A.1 plan) — privileged roles can
     // never satisfy the hardware-token requirement today, so this is
