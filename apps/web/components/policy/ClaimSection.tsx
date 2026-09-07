@@ -226,7 +226,7 @@ function ClaimDocumentation({
           ? '· complete'
           : `· missing ${claim.missingMandatoryDocuments.join(', ')}`}
       </strong>
-      <ul style={{ margin: '0.35rem 0', paddingLeft: '1.1rem', fontSize: '0.85rem' }}>
+      <ul style={{ margin: '0.35rem 0', paddingInlineStart: '1.1rem', fontSize: '0.85rem' }}>
         {claim.documentChecklist
           .filter((i) => i.required || i.present)
           .map((i) => (

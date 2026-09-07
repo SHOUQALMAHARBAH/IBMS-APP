@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 export const rfqCardStyle: CSSProperties = {
   display: 'block',
   width: '100%',
-  textAlign: 'left',
+  textAlign: 'start',
   padding: '1rem',
   border: '1px solid rgba(128,128,128,0.3)',
   borderRadius: '0.5rem',
@@ -26,7 +26,7 @@ export const rfqTableStyle: CSSProperties = {
 };
 
 export const rfqCellStyle: CSSProperties = {
-  textAlign: 'left',
+  textAlign: 'start',
   padding: '0.5rem 0.6rem',
   borderBottom: '1px solid rgba(128,128,128,0.2)',
   verticalAlign: 'top',

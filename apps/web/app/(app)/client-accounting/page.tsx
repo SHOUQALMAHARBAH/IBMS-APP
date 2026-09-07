@@ -29,7 +29,7 @@ function oldest(daysOverdue: number, dueDate: string | null): string {
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
@@ -110,7 +110,7 @@ export default function ClientAccountingPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Client</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Client</th>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <th key={k} style={headCellStyle}>
                       {AR_AGEING_BUCKET_LABEL[k]}
@@ -118,13 +118,13 @@ export default function ClientAccountingPage() {
                   ))}
                   <th style={headCellStyle}>Outstanding</th>
                   <th style={headCellStyle}>Invoices</th>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Oldest</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Oldest</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.customerId}>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
                       {r.customerLegalName}
                     </td>
                     {AR_AGEING_BUCKET_KEYS.map((k) => (
@@ -134,14 +134,14 @@ export default function ClientAccountingPage() {
                     ))}
                     <td style={cellStyle}>{money(r.outstandingTotal)}</td>
                     <td style={cellStyle}>{r.invoiceCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
                       {oldest(r.oldestDaysOverdue, r.oldestDueDate)}
                     </td>
                   </tr>
                 ))}
                 <tr>
                   <td
-                    style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}
+                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
                   >
                     Total
                   </td>

@@ -44,7 +44,7 @@ function ProfileField({
         {onReveal && !revealed ? (
           <button
             type="button"
-            style={{ ...smallButtonStyle, marginLeft: '0.5rem' }}
+            style={{ ...smallButtonStyle, marginInlineStart: '0.5rem' }}
             onClick={onReveal}
           >
             Reveal

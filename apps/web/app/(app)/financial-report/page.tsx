@@ -21,7 +21,7 @@ function money(v: string): string {
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const head: CSSProperties = {
   ...cell,
@@ -173,7 +173,7 @@ export default function FinancialReportPage() {
                 >
                   <thead>
                     <tr>
-                      <th style={{ ...head, textAlign: 'left' }}>Insurer</th>
+                      <th style={{ ...head, textAlign: 'start' }}>Insurer</th>
                       <th style={head}>Earned</th>
                       <th style={head}>Paid</th>
                       <th style={head}>Outstanding</th>
@@ -183,7 +183,7 @@ export default function FinancialReportPage() {
                   <tbody>
                     {data.commission.byInsurer.map((r) => (
                       <tr key={r.insurerId}>
-                        <td style={{ ...cell, textAlign: 'left' }}>
+                        <td style={{ ...cell, textAlign: 'start' }}>
                           {r.insurerName}
                         </td>
                         <td style={cell}>{money(r.earned)}</td>
@@ -229,7 +229,7 @@ function ProfitTable({
       <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
         <thead>
           <tr>
-            <th style={{ ...head, textAlign: 'left' }}>Group</th>
+            <th style={{ ...head, textAlign: 'start' }}>Group</th>
             <th style={head}>Premium written</th>
             <th style={head}>Claims paid</th>
             <th style={head}>Commission</th>
@@ -240,7 +240,7 @@ function ProfitTable({
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
-              <td style={{ ...cell, textAlign: 'left' }}>{r.label}</td>
+              <td style={{ ...cell, textAlign: 'start' }}>{r.label}</td>
               <td style={cell}>{money(r.premiumWritten)}</td>
               <td style={cell}>{money(r.claimsPaid)}</td>
               <td style={cell}>{money(r.commissionEarned)}</td>

@@ -920,16 +920,17 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — begun, item #1 of 8 built.** A working instant language
-  switch + persistent per-user preference now exists (`PATCH /auth/me/language`, a
-  `LanguageProvider` React context, a switcher in `AppNav`'s footer) — see § Part F
-  below for the full detail. Every OTHER screen remains **English-only, LTR**: no full
-  RTL layout, no bidirectional-text handling for mixed-content fields, no locale-aware
-  number/date/currency formatting (Gregorian/Hijri, JOD base + multi-currency), no
-  Arabic-first input or Arabic collation, no bilingual full-text search, and no
-  system-generated bilingual documents. Screens implement the loading / empty / error /
-  populated states, but the Part F rule of capturing a screenshot of each state as
-  evidence is not met.
+- **Part F — bilingual UI — begun, items #1-2 of 8 built.** A working instant language
+  switch + persistent per-user preference exists (`PATCH /auth/me/language`, a
+  `LanguageProvider` React context, a switcher in `AppNav`'s footer), and every screen's
+  LAYOUT now genuinely mirrors under `dir="rtl"` (nav/forms/tables via CSS logical
+  properties + free flex/table mirroring; charts N/A — none exist in this app yet) — see
+  § Part F below for the full detail. Every screen's TEXT remains **English-only**: no
+  bidirectional-text handling for mixed-content fields, no locale-aware number/date/
+  currency formatting (Gregorian/Hijri, JOD base + multi-currency), no Arabic-first input
+  or Arabic collation, no bilingual full-text search, and no system-generated bilingual
+  documents. Screens implement the loading / empty / error / populated states, but the
+  Part F rule of capturing a screenshot of each state as evidence is not met.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -6662,6 +6663,73 @@ narrows a gap.
   `ibms-brain/meta/context/bilingual-ui.md` before starting any of them, or before
   assuming this item's infrastructure covers more than the switcher + nav footer.
 
+**Part F — Bilingual UI (backlog Part 11) — item #2 of 8: full RTL layout for Arabic
+  and LTR for English — CLOSES this item.** Scope per the backlog text: "navigation,
+  forms, tables, charts genuinely mirrored, not just mirrored text" — a pure LAYOUT
+  requirement, not a translation one; the ~80 other screens' text stays exactly as
+  English as item #1 left it (that remains unbuilt, separate scope). **A genuine
+  process finding, not a code one**: this item's actual implementation — a 60-file
+  conversion from physical CSS properties to their logical equivalents, plus a new
+  Playwright spec proving real mirroring — was already sitting UNCOMMITTED in the
+  working tree when this session started, done in an earlier session that never
+  finished verifying, documenting, or committing it. `ibms-brain/meta/context/
+  bilingual-ui.md` and `CLAUDE.md` both still said item #2 was "not started" and to
+  "wait for the user's explicit go-ahead" — a context file's claim is only as current
+  as the last session that wrote it; this session checked the working tree itself
+  rather than taking the doc at face value. The uncommitted work was reviewed
+  file-by-file in full before being trusted (all 60 files, ~110 changed lines) — no
+  mistakes found; every change is the identical mechanical swap
+  (`textAlign:'left'/'right'` → `'start'/'end'`, `marginLeft/Right` →
+  `marginInlineStart/End`, `borderLeft/Right` → `borderInlineStart/End`), relying on
+  `dir="rtl"` cascading from `<html>` (item #1's own mechanism). A whole-codebase grep
+  afterward confirmed **zero remaining physical-direction CSS properties anywhere in
+  `apps/web`**.
+
+  **Nav**: `components/app/app.styles.ts`'s `sidebarStyle` — `shellStyle`'s plain
+  `flexDirection: 'row'` already mirrors the sidebar to the opposite screen edge for
+  free once `dir` cascades (no CSS change needed there at all); the one real edit was
+  the separator border (`borderRight` → `borderInlineEnd`), so it stays on the edge
+  touching the content column, not the outer edge, in both directions. **Forms**:
+  confirmed already-structural, not new work — the shared `formRowStyle`/
+  `checkboxRowStyle` (`lead.styles.ts`) and `inputStyle`/`labelStyle`
+  (`auth-form.styles.ts`) primitives, reused across the large majority of this app's
+  ~90 pages, were already direction-agnostic flex layouts with zero physical
+  properties. **Tables**: native `<table>` column mirroring is a plain BROWSER
+  DEFAULT once `direction` inherits as `rtl` — no CSS or markup change needed; 57
+  files use a native `<table>` element, none needed touching. **Charts**: confirmed
+  vacuously N/A, not silently skipped — grepped the whole `apps/web` tree for
+  `recharts`/`chart.js`/`d3`/`<canvas>`/`<svg>`; this app has NO chart/graph
+  visualization anywhere yet (dashboards render numbers/tables, not visual charts;
+  the only real `<svg>` files are Next.js's own boilerplate `public/*.svg` assets) —
+  flagged as a re-check trigger for whenever this app's first real chart lands, since
+  SVG/canvas do not inherit CSS logical-property mirroring the way flex/table layout
+  does.
+
+  Because a LOGICAL CSS value reads back unchanged via `getComputedStyle` in both
+  directions (`textAlign: 'start'` reports `"start"` whether the page is AR or EN),
+  proving mirroring actually happened requires a real BOUNDING-BOX assertion, not a
+  computed-style check — the new `apps/web/e2e/rtl-layout.spec.ts` does exactly that:
+  one test proves the sidebar nav hugs the opposite screen edge in AR vs. EN (same
+  DOM order, mirrored render), the other proves a table's column order visually
+  reverses (native browser behavior) while DOM order stays identical, both against a
+  real page (`watchlist-sync`) rather than a synthetic fixture.
+
+  **Verification**: +1 new Playwright spec (`rtl-layout.spec.ts`, 2 tests) — full web
+  suite **224/224** non-`@a11y` + **66/66** `@a11y` green (one `rfq.spec.ts` test hit
+  a transient `write UNKNOWN` — a broken-pipe/process-contention error, not an
+  assertion failure — under full-suite parallel load; re-run in isolation 27/27
+  clean, not a regression). `npm run typecheck`/`lint`/`build`/`test` (web) all OK.
+  No backend gate applies (this item touches only `apps/web`) — the api unit suite
+  was re-run anyway as a sanity baseline (2320/2320, confirmed unaffected) rather than
+  assumed unrelated. **No migration, no seed change.** Read
+  `ibms-brain/meta/context/bilingual-ui.md`'s "What item #2 covers/does NOT cover"
+  before starting item #3 (bidi text handling for mixed-content fields) or any other
+  Part F item — do not self-select. Items #3-7 each look like their own
+  multi-session effort (item #7 in particular has no document-generation
+  infrastructure to build on at all yet); item #8 (the 4-state screenshot
+  discipline) is a verification overlay on whichever of #3-7 land, not a standalone
+  build.
+
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
   2026-09-04 (user request, before starting #48): every #3-4 checkbox — the two-form
@@ -9247,6 +9315,21 @@ narrows a gap.
   #67 Procurement, #68 Internal IT (verified, not built), #69
   Cybersecurity, #70 Document Management, #71 Vendor Management, #72-73
   BCP/DR, #74 Knowledge Management.
+
+**Full-codebase code-review audit (2026-09-07)** — a `/review all the code` request
+  dispatched 10 parallel `@code-reviewer` batches across all 35 `apps/api/src/modules/*`
+  plus the whole `apps/web` frontend (not tied to a single backlog item, so logged here
+  rather than inline above). Found and fixed 2 `BLOCKER` + 8 `MAJOR` findings — full
+  detail in `CLAUDE.md` § What's New (both this repo's and `ibms-brain`'s) — spanning
+  the shared workflow-transition engine's non-atomic status+audit write, a JWT secret
+  with no production fail-fast, three separate read-then-write race gaps (Access
+  Recertification, password reset, Insurance Program reassembly), two dashboards
+  missing the sensitive-data-access audit flag, a payment-channel DTO missing the
+  standard bank-data input guard, and a stale context-doc premise that had left a real
+  Consent touchpoint (Claims) unwired. ~20 `MINOR`/`NIT` findings were logged to a new
+  root `IMPROVEMENTS.md` rather than fixed inline — check that file before assuming
+  this audit's scope was exhaustive; the web-frontend batch explicitly sampled ~45 of
+  ~90 pages rather than reading every one, and logged its own coverage gaps.
 
 ## Deployment
 

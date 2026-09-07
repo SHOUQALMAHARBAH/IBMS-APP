@@ -56,6 +56,6 @@ export const queueTableStyle: CSSProperties = {
 export const queueCellStyle: CSSProperties = {
   padding: '0.5rem',
   borderBottom: '1px solid rgba(128,128,128,0.2)',
-  textAlign: 'left',
+  textAlign: 'start',
   verticalAlign: 'top',
 };

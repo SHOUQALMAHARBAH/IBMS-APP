@@ -25,10 +25,10 @@ function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdo
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Group</th>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Claims (JOD)</th>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Premium (JOD)</th>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Ratio</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Group</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Claims (JOD)</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Premium (JOD)</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Ratio</th>
             </tr>
           </thead>
           <tbody>

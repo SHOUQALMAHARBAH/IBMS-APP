@@ -19,7 +19,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };

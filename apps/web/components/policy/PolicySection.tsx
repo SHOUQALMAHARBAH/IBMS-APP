@@ -506,7 +506,7 @@ export function PolicySection({
               style={{
                 marginTop: '0.8rem',
                 padding: '0.6rem',
-                borderLeft: `3px solid ${policy.checking.discrepancyFound ? 'var(--error, #c00)' : 'var(--ok, #2a7)'}`,
+                borderInlineStart: `3px solid ${policy.checking.discrepancyFound ? 'var(--error, #c00)' : 'var(--ok, #2a7)'}`,
               }}
             >
               <p style={{ fontWeight: 600, margin: 0 }}>

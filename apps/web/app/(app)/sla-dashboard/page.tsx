@@ -21,15 +21,15 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
   borderBottom: '2px solid #d1d5db',
 };
-const leftCell: CSSProperties = { ...cell, textAlign: 'left' };
-const leftHead: CSSProperties = { ...head, textAlign: 'left' };
+const leftCell: CSSProperties = { ...cell, textAlign: 'start' };
+const leftHead: CSSProperties = { ...head, textAlign: 'start' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 const NO_PERMISSION =

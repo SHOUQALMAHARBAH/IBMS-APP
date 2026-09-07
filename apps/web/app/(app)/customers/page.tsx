@@ -81,7 +81,7 @@ export default function CustomersPage() {
               <button
                 key={customer.id}
                 type="button"
-                style={{ ...cardStyle, textAlign: 'left', width: '100%', cursor: 'pointer' }}
+                style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
                 aria-label={`View profile — ${customer.legalName}`}
                 onClick={() => router.push(`/customers/${customer.id}`)}
               >

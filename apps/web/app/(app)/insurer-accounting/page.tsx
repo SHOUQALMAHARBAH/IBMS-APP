@@ -27,7 +27,7 @@ function oldest(daysOutstanding: number, collectedAt: string | null): string {
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
@@ -111,10 +111,10 @@ export default function InsurerAccountingPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Insurer</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Insurer</th>
                   <th style={headCellStyle}>Outstanding</th>
                   <th style={headCellStyle}>Invoices</th>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Oldest</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Oldest</th>
                   <th style={headCellStyle}>Remitted to date</th>
                   <th style={headCellStyle}>Remittances</th>
                 </tr>
@@ -122,12 +122,12 @@ export default function InsurerAccountingPage() {
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.insurerId}>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
                       {r.insurerName}
                     </td>
                     <td style={cellStyle}>{money(r.outstandingAmount)}</td>
                     <td style={cellStyle}>{r.outstandingCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
                       {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt)}
                     </td>
                     <td style={cellStyle}>{money(r.remittedAmount)}</td>
@@ -136,7 +136,7 @@ export default function InsurerAccountingPage() {
                 ))}
                 <tr>
                   <td
-                    style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}
+                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
                   >
                     Total
                   </td>

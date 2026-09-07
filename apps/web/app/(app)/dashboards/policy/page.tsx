@@ -180,10 +180,10 @@ export default function PolicyDashboardPage() {
               <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Policy</th>
-                    <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Line</th>
-                    <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Reason</th>
-                    <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Cancelled at</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Policy</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Line</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Reason</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Cancelled at</th>
                   </tr>
                 </thead>
                 <tbody>

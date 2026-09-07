@@ -356,7 +356,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                             <span style={{ opacity: 0.6 }}>v{v.versionNumber}</span>
                             {v.isCurrentVersion ? (
                               <span
-                                style={{ ...rfqBadgeStyle, marginLeft: '0.4rem' }}
+                                style={{ ...rfqBadgeStyle, marginInlineStart: '0.4rem' }}
                               >
                                 current
                               </span>

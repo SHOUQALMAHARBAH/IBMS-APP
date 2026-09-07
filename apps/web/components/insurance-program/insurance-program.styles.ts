@@ -7,7 +7,7 @@ export const programTableStyle: CSSProperties = {
 };
 
 export const programCellStyle: CSSProperties = {
-  textAlign: 'left',
+  textAlign: 'start',
   padding: '0.5rem 0.6rem',
   borderBottom: '1px solid rgba(128,128,128,0.2)',
   verticalAlign: 'top',
@@ -15,7 +15,7 @@ export const programCellStyle: CSSProperties = {
 
 export const programCellNumStyle: CSSProperties = {
   ...programCellStyle,
-  textAlign: 'right',
+  textAlign: 'end',
   fontVariantNumeric: 'tabular-nums',
 };
 
@@ -30,7 +30,7 @@ export const programPanelStyle: CSSProperties = {
 export const programListCardStyle: CSSProperties = {
   display: 'block',
   width: '100%',
-  textAlign: 'left',
+  textAlign: 'start',
   padding: '1rem',
   border: '1px solid rgba(128,128,128,0.3)',
   borderRadius: '0.5rem',

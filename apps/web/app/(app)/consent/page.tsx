@@ -25,7 +25,7 @@ const CONSENT_ROLES = [
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {

@@ -34,11 +34,11 @@ function ratioPct(v: string): string {
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
-  textAlign: 'right',
+  textAlign: 'end',
   fontWeight: 600,
   borderBottom: '2px solid #d1d5db',
 };
@@ -119,7 +119,7 @@ export default function ClaimsAnalyticsPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>
                     {GROUP_LABEL[data.groupBy]}
                   </th>
                   <th style={headCellStyle}>Loss ratio</th>
@@ -132,7 +132,7 @@ export default function ClaimsAnalyticsPage() {
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.key}>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>{r.label}</td>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>{r.label}</td>
                     <td style={cellStyle}>
                       {ratioPct(r.ratio)}
                       {r.ratioCapped ? ' (capped)' : ''}
@@ -144,7 +144,7 @@ export default function ClaimsAnalyticsPage() {
                   </tr>
                 ))}
                 <tr>
-                  <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}>
+                  <td style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}>
                     Total
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>

@@ -70,7 +70,7 @@ export default function NeedsAssessmentsPage() {
               <button
                 key={assessment.id}
                 type="button"
-                style={{ ...cardStyle, textAlign: 'left', width: '100%', cursor: 'pointer' }}
+                style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
                 aria-label={`View needs assessment ${assessment.id}`}
                 onClick={() => router.push(`/needs-assessments/${assessment.id}`)}
               >
