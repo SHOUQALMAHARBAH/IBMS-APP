@@ -35,6 +35,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
 
   const [periodLabel, setPeriodLabel] = useState(previousUtcMonthLabel());
   const [branchId, setBranchId] = useState('');
+  const [insurerId, setInsurerId] = useState('');
 
   const [insurerScores, setInsurerScores] = useState<InsurerPerformanceScore[] | null>(null);
   const [employeeRecords, setEmployeeRecords] = useState<EmployeePerformanceRecord[] | null>(null);
@@ -47,7 +48,10 @@ export default function InsurerEmployeePerformanceDashboardPage() {
   const load = useCallback(async () => {
     try {
       const [scores, records] = await Promise.all([
-        listInsurerPerformance({ periodLabel: periodLabel.trim() || undefined }),
+        listInsurerPerformance({
+          periodLabel: periodLabel.trim() || undefined,
+          insurerId: insurerId.trim() || undefined,
+        }),
         listEmployeePerformance({
           periodLabel: periodLabel.trim() || undefined,
           branchId: branchId.trim() || undefined,
@@ -67,7 +71,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
             : 'Could not load the Insurer & Employee Performance Dashboard — try again.',
       );
     }
-  }, [periodLabel, branchId]);
+  }, [periodLabel, branchId, insurerId]);
 
   useEffect(() => {
     if (!user) return;
@@ -90,9 +94,11 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       <h1>Insurer &amp; Employee Performance Dashboard</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         Insurer performance score across 4 axes (backlog #60) and employee KPI
-        achievement (backlog #61), book-wide for one period. Branch scoping
-        applies only to employee performance — an insurer&apos;s score is a
-        book-wide, insurer-level figure with no branch dimension.
+        achievement (backlog #61) for one period. Insurer ID scopes the
+        insurer table to a single insurer&apos;s already-computed score;
+        branch scoping applies only to employee performance — an
+        insurer&apos;s score is a book-wide figure with no branch dimension.
+        Neither table has an insurance-line dimension of its own.
       </p>
 
       <form
@@ -107,6 +113,10 @@ export default function InsurerEmployeePerformanceDashboardPage() {
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
           />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          Insurer ID (insurer table only)
+          <input aria-label="Insurer ID filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Branch ID (employees only)

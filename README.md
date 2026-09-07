@@ -6537,6 +6537,26 @@ narrows a gap.
   six named dashboards, no backlog bullet describing its content) remains unbuilt,
   plus the bilingual gap owned by Part F.
 
+  **Follow-up audit (same item, re-checked line-by-line against the literal backlog
+  text after a "was this meticulous?" request) caught and closed one real UI gap**:
+  `GET /insurer-performance?insurerId=` already accepted an `insurerId` filter since
+  #60's own original build (narrowing the LIST to one insurer's already-computed score
+  — not a recompute, unlike the branch/line scoping correctly left alone above), but
+  the new combined page's first cut omitted an "Insurer ID" filter input despite the
+  capability already existing end-to-end. Added the input, scoping only the insurer
+  table (the employee table has no insurer dimension and correctly ignores it); no new
+  endpoint, reuses the existing client as-is. A new Playwright test asserts the filled
+  `insurerId` reaches only the `/insurer-performance` request. Re-verified the whole
+  Part E surface while auditing: every dashboard's DTO/service/repository/web-page
+  filter wiring read end-to-end against the backlog bullet text; api unit
+  management-reporting suite re-run (24 files/190 tests green); all 7 Part E-related
+  api e2e spec files re-run against the live test DB (32/32 green); full Playwright
+  suite re-run **283/283** (from 282, +1 for the new filter test), including the 65
+  a11y-tagged tests separately (65/65) — the 3 non-dashboard failures seen in one
+  parallel pass (`needs-assessments`, `operational-pi-risk`, `payment-channels`)
+  re-confirmed clean in isolation, the same pre-existing parallel-worker flake pattern
+  documented elsewhere in this file, unrelated to any Part E code.
+
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
   2026-09-04 (user request, before starting #48): every #3-4 checkbox — the two-form

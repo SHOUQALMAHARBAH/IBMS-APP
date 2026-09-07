@@ -69,6 +69,30 @@ test("renders both the insurer and employee performance sections", async ({ page
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });
 
+test("applying the Insurer ID filter sends it only to the insurer-performance request", async ({ page }) => {
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  let lastInsurerPerformanceUrl = "";
+  let lastEmployeePerformanceUrl = "";
+  await page.route("http://localhost:4000/insurer-performance**", (route) => {
+    lastInsurerPerformanceUrl = route.request().url();
+    return route.fulfill({ status: 200, json: INSURER_SCORES });
+  });
+  await page.route("http://localhost:4000/employee-performance**", (route) => {
+    lastEmployeePerformanceUrl = route.request().url();
+    return route.fulfill({ status: 200, json: EMPLOYEE_RECORDS });
+  });
+
+  await page.goto("/dashboards/insurer-employee-performance");
+  await expect(page.getByText("ins-1")).toBeVisible();
+
+  await page.getByLabel("Insurer ID filter").fill("ins-1");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText("ins-1")).toBeVisible();
+
+  expect(lastInsurerPerformanceUrl).toContain("insurerId=ins-1");
+  expect(lastEmployeePerformanceUrl).not.toContain("insurerId");
+});
+
 test("a user without either permission sees the underlying error message", async ({ page }) => {
   await mockAuth(page, ["CLAIMS_OFFICER"]);
   await page.route("http://localhost:4000/insurer-performance**", (route) =>
