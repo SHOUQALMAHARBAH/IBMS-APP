@@ -411,6 +411,77 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
       expect(ids).toContain(customerId);
     });
 
+    // Part F item #6 remainder — curated synonym-table fuzzy
+    // transliteration matching (name-transliteration.config.ts). Proves a
+    // Latin search term finds a customer whose legalName contains ONLY the
+    // Arabic spelling (never "Ahmad" in Latin anywhere in the document),
+    // and vice versa — the base bilingual tsvector query alone could not
+    // find either (the two scripts share no tokens); only the
+    // known-variant expansion can.
+    it('finds a customer via a known Arabic name variant when searching its Latin spelling', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-translit-latin',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: `شركة أحمد للتجارة ${unique}`,
+          registrationNumber: `REG-TL-${unique}`,
+          registeredAddress: 'Amman, Jordan',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-0000003',
+          contactEmail: `search-translit-latin-${unique}@example.test`,
+          languagePreference: 'AR',
+        })
+        .expect(201);
+      const customerId = (created.body as CustomerBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get('/customers?search=Ahmad')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      expect(ids).toContain(customerId);
+    });
+
+    it('finds a customer via a known Latin name variant when searching its Arabic spelling', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-search-translit-arabic',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const created = await request(app.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'CORPORATE',
+          legalName: `Khaled Trading Co. ${unique}`,
+          registrationNumber: `REG-TA-${unique}`,
+          registeredAddress: 'Amman, Jordan',
+          natureOfBusiness: 'Trading',
+          contactPhone: '+962-7-0000004',
+          contactEmail: `search-translit-arabic-${unique}@example.test`,
+          languagePreference: 'EN',
+        })
+        .expect(201);
+      const customerId = (created.body as CustomerBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get(`/customers?search=${encodeURIComponent('خالد')}`)
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      expect(ids).toContain(customerId);
+    });
+
     it('an empty search param behaves like no search param at all (shows everything, matches nothing)', async () => {
       const app = await boot();
       const sales = await makeUser(

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, Prospect } from '@ibms/db';
+import { Prisma } from '@ibms/db';
+import type { Prospect } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { expandSearchTerms } from '../common/name-transliteration.config';
 
 export interface CreateProspectInput {
   leadId: string;
@@ -47,14 +49,21 @@ export class ProspectRepository {
 
   /** Part F item #6 — bilingual full-text search over companyName +
    * contactPerson. See CustomerRepository.searchIds()'s own comment for
-   * the full mechanism/safety rationale (identical here). */
+   * the full mechanism/safety rationale (identical here, including the
+   * Part F item #6 remainder fuzzy-transliteration-variant expansion). */
   async searchIds(term: string): Promise<string[]> {
+    const terms = [term, ...expandSearchTerms(term)];
     const rows = await this.prisma.client.$queryRaw<{ id: string }[]>`
       SELECT id FROM "Prospect"
-      WHERE "searchVector" @@ (
-        websearch_to_tsquery('arabic', ${term}) ||
-        websearch_to_tsquery('english', ${term})
-      )
+      WHERE (${Prisma.join(
+        terms.map(
+          (t) => Prisma.sql`"searchVector" @@ (
+            websearch_to_tsquery('arabic', ${t}) ||
+            websearch_to_tsquery('english', ${t})
+          )`,
+        ),
+        ' OR ',
+      )})
     `;
     return rows.map((r) => r.id);
   }

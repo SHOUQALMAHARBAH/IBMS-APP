@@ -333,7 +333,11 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
         'SALES_RELATIONSHIP_OFFICER',
       );
       const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const leadId = await createLead(app, officer.accessToken, `Search EN Lead ${unique}`);
+      const leadId = await createLead(
+        app,
+        officer.accessToken,
+        `Search EN Lead ${unique}`,
+      );
       await qualifyLead(app, officer.accessToken, leadId);
       const created = await request(app.getHttpServer())
         .post('/prospects')
@@ -358,7 +362,11 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
         'SALES_RELATIONSHIP_OFFICER',
       );
       const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const leadId = await createLead(app, officer.accessToken, `Search AR Lead ${unique}`);
+      const leadId = await createLead(
+        app,
+        officer.accessToken,
+        `Search AR Lead ${unique}`,
+      );
       await qualifyLead(app, officer.accessToken, leadId);
       const created = await request(app.getHttpServer())
         .post('/prospects')
@@ -375,6 +383,68 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
       expect(ids).toContain(prospectId);
     });
 
+    // Part F item #6 remainder — curated synonym-table fuzzy
+    // transliteration matching (name-transliteration.config.ts). Same
+    // "the base tsvector query alone could not find this" proof as
+    // customer.e2e-spec.ts's own transliteration tests.
+    it('finds a prospect via a known Arabic name variant when searching its Latin spelling', async () => {
+      const app = await boot();
+      const officer = await makeUser(
+        app,
+        'prospect-search-translit-latin',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const leadId = await createLead(
+        app,
+        officer.accessToken,
+        `Search Translit Latin Lead ${unique}`,
+      );
+      await qualifyLead(app, officer.accessToken, leadId);
+      const created = await request(app.getHttpServer())
+        .post('/prospects')
+        .set(bearer(officer.accessToken))
+        .send({ leadId, companyName: `شركة أحمد للتجارة ${unique}` })
+        .expect(201);
+      const prospectId = (created.body as ProspectBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get('/prospects?search=Ahmad')
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      const ids = (res.body as ProspectBody[]).map((p) => p.id);
+      expect(ids).toContain(prospectId);
+    });
+
+    it('finds a prospect via a known Latin name variant when searching its Arabic spelling', async () => {
+      const app = await boot();
+      const officer = await makeUser(
+        app,
+        'prospect-search-translit-arabic',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const leadId = await createLead(
+        app,
+        officer.accessToken,
+        `Search Translit Arabic Lead ${unique}`,
+      );
+      await qualifyLead(app, officer.accessToken, leadId);
+      const created = await request(app.getHttpServer())
+        .post('/prospects')
+        .set(bearer(officer.accessToken))
+        .send({ leadId, companyName: `Khaled Trading Co. ${unique}` })
+        .expect(201);
+      const prospectId = (created.body as ProspectBody).id;
+
+      const res = await request(app.getHttpServer())
+        .get(`/prospects?search=${encodeURIComponent('خالد')}`)
+        .set(bearer(officer.accessToken))
+        .expect(200);
+      const ids = (res.body as ProspectBody[]).map((p) => p.id);
+      expect(ids).toContain(prospectId);
+    });
+
     it('an empty search param behaves like no search param at all', async () => {
       const app = await boot();
       const officer = await makeUser(
@@ -383,7 +453,11 @@ describe('Prospect management (e2e) — backlog Part C #2', () => {
         'SALES_RELATIONSHIP_OFFICER',
       );
       const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const leadId = await createLead(app, officer.accessToken, `Empty Search Lead ${unique}`);
+      const leadId = await createLead(
+        app,
+        officer.accessToken,
+        `Empty Search Lead ${unique}`,
+      );
       await qualifyLead(app, officer.accessToken, leadId);
       const created = await request(app.getHttpServer())
         .post('/prospects')

@@ -240,6 +240,58 @@ describe('Procurement / Vendor Management (e2e) — backlog Part C #67 / #71', (
     expect(ids).toContain(created.id);
   });
 
+  // Part F item #6 remainder — curated synonym-table fuzzy transliteration
+  // matching (name-transliteration.config.ts). Same "the base tsvector
+  // query alone could not find this" proof as customer.e2e-spec.ts's own
+  // transliteration tests.
+  it('finds a vendor via a known Arabic name variant when searching its Latin spelling', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-search-translit-latin',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const name = uniqueLabel('شركة أحمد للتجارة');
+    const created = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name, vendorType: 'other' })
+        .expect(201)
+    ).body as VendorBody;
+
+    const res = await request(app.getHttpServer())
+      .get('/vendors?search=Ahmad')
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    const ids = (res.body as VendorBody[]).map((v) => v.id);
+    expect(ids).toContain(created.id);
+  });
+
+  it('finds a vendor via a known Latin name variant when searching its Arabic spelling', async () => {
+    const app = await boot();
+    const manager = await makeUser(
+      app,
+      'vendor-search-translit-arabic',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const name = uniqueLabel('Khaled Trading Co.');
+    const created = (
+      await request(app.getHttpServer())
+        .post('/vendors')
+        .set(bearer(manager.accessToken))
+        .send({ name, vendorType: 'other' })
+        .expect(201)
+    ).body as VendorBody;
+
+    const res = await request(app.getHttpServer())
+      .get(`/vendors?search=${encodeURIComponent('خالد')}`)
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    const ids = (res.body as VendorBody[]).map((v) => v.id);
+    expect(ids).toContain(created.id);
+  });
+
   it('an empty search param behaves like no search param at all', async () => {
     const app = await boot();
     const manager = await makeUser(
