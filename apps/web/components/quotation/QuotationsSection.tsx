@@ -103,7 +103,7 @@ function deltaSign(delta: string): string {
 }
 
 export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [chains, setChains] = useState<QuotationChain[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -123,10 +123,10 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load quotations — try again.',
+          : t('quoteLoadError'),
       );
     }
-  }, [rfqId]);
+  }, [rfqId, t]);
 
   useEffect(() => {
     void (async () => {
@@ -153,7 +153,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
 
   async function submit() {
     if (form.premium.trim().length === 0) {
-      setFormError('Premium is required.');
+      setFormError(t('quotePremiumRequiredError'));
       return;
     }
     setBusy(true);
@@ -161,7 +161,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
     try {
       if (mode === 'capture') {
         if (!captureInsurerId) {
-          setFormError('Pick the insurer this quote is from.');
+          setFormError(t('quotePickInsurerError'));
           setBusy(false);
           return;
         }
@@ -183,7 +183,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not save the quotation — try again.',
+          : t('quoteSaveError'),
       );
     } finally {
       setBusy(false);
@@ -199,11 +199,8 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
 
   return (
     <section>
-      <h2 style={{ marginTop: '2.5rem' }}>Quotations</h2>
-      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
-        One version chain per insurer. A renegotiation is saved as a new
-        version — the previous terms are kept, never overwritten.
-      </p>
+      <h2 style={{ marginTop: '2.5rem' }}>{t('quoteSectionHeading')}</h2>
+      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('quoteSectionIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -212,9 +209,9 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
       ) : null}
 
       {chains === null ? (
-        <p>Loading…</p>
+        <p>{t('commonLoading')}</p>
       ) : chains.length === 0 ? (
-        <p style={{ opacity: 0.6 }}>No quotations captured yet.</p>
+        <p style={{ opacity: 0.6 }}>{t('quoteNoneYet')}</p>
       ) : (
         chains.map((chain) => {
           const c = chain.current;
@@ -231,40 +228,44 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               >
                 <strong>{chain.insurer.name}</strong>
                 <span style={rfqBadgeStyle}>
-                  v{c.versionNumber} · {chain.versions.length} version
-                  {chain.versions.length === 1 ? '' : 's'}
+                  {t(
+                    chain.versions.length === 1 ? 'quoteVersionCountOne' : 'quoteVersionCountOther',
+                    { version: c.versionNumber, count: chain.versions.length },
+                  )}
                 </span>
               </div>
 
               <div style={quoteTermGridStyle}>
                 <div>
-                  <span style={quoteTermLabelStyle}>Premium</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermPremium')}</span>
                   <span style={quoteTermValueStyle}>
                     {formatMoney(c.premium, language, c.currency)}
                   </span>
                 </div>
                 <div>
-                  <span style={quoteTermLabelStyle}>Deductible</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermDeductible')}</span>
                   <span style={quoteTermValueStyle}>
                     {formatMoney(c.deductible, language, c.currency)}
                   </span>
                 </div>
                 <div>
-                  <span style={quoteTermLabelStyle}>Liability limit</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermLiabilityLimit')}</span>
                   <span style={quoteTermValueStyle}>
                     {formatMoney(c.liabilityLimit, language, c.currency)}
                   </span>
                 </div>
                 <div>
-                  <span style={quoteTermLabelStyle}>BI period</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermBiPeriod')}</span>
                   <span style={quoteTermValueStyle}>
                     {c.biPeriodMonths === null
                       ? '—'
-                      : `${c.biPeriodMonths} month${c.biPeriodMonths === 1 ? '' : 's'}`}
+                      : t(c.biPeriodMonths === 1 ? 'quoteBiPeriodMonthsOne' : 'quoteBiPeriodMonthsOther', {
+                          months: c.biPeriodMonths,
+                        })}
                   </span>
                 </div>
                 <div>
-                  <span style={quoteTermLabelStyle}>Commission rate</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermCommissionRate')}</span>
                   <span style={quoteTermValueStyle}>
                     {c.commissionRatePercent === null
                       ? '—'
@@ -275,13 +276,13 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
 
               {c.exclusions ? (
                 <p style={quoteHistoryPreStyle}>
-                  <span style={quoteTermLabelStyle}>Exclusions</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermExclusions')}</span>
                   {c.exclusions}
                 </p>
               ) : null}
               {c.conditions ? (
                 <p style={quoteHistoryPreStyle}>
-                  <span style={quoteTermLabelStyle}>Conditions</span>
+                  <span style={quoteTermLabelStyle}>{t('quoteTermConditions')}</span>
                   {c.conditions}
                 </p>
               ) : null}
@@ -308,7 +309,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                       })
                     }
                   >
-                    {isOpen ? 'Hide history' : 'Version history'}
+                    {isOpen ? t('quoteHideHistoryButton') : t('quoteVersionHistoryButton')}
                   </button>
                 ) : null}
                 {isPlacement ? (
@@ -317,7 +318,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                     style={{ ...buttonStyle, width: 'auto' }}
                     onClick={() => startRevise(chain)}
                   >
-                    Revise (new version)
+                    {t('quoteReviseButton')}
                   </button>
                 ) : null}
               </div>
@@ -326,11 +327,11 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 <table style={rfqTableStyle}>
                   <thead>
                     <tr>
-                      <th style={rfqCellStyle}>Round</th>
-                      <th style={rfqCellStyle}>Premium</th>
-                      <th style={rfqCellStyle}>Δ premium</th>
-                      <th style={rfqCellStyle}>Terms changed</th>
-                      <th style={rfqCellStyle}>Captured</th>
+                      <th style={rfqCellStyle}>{t('quoteColumnRound')}</th>
+                      <th style={rfqCellStyle}>{t('quoteTermPremium')}</th>
+                      <th style={rfqCellStyle}>{t('quoteColumnDeltaPremium')}</th>
+                      <th style={rfqCellStyle}>{t('quoteColumnTermsChanged')}</th>
+                      <th style={rfqCellStyle}>{t('quoteColumnCaptured')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -342,14 +343,14 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                         <tr key={v.id}>
                           <td style={rfqCellStyle}>
                             {round && round.round > 0
-                              ? `Round ${round.round}`
-                              : 'Opening quote'}{' '}
+                              ? t('quoteRoundLabel', { round: round.round })
+                              : t('quoteOpeningQuote')}{' '}
                             <span style={{ opacity: 0.6 }}>v{v.versionNumber}</span>
                             {v.isCurrentVersion ? (
                               <span
                                 style={{ ...rfqBadgeStyle, marginInlineStart: '0.4rem' }}
                               >
-                                current
+                                {t('quoteCurrentBadge')}
                               </span>
                             ) : null}
                             {v.negotiationNotes ? (
@@ -377,7 +378,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                             {round && round.changedTermFields.length > 0
                               ? round.changedTermFields.join(', ')
                               : round && round.round > 0
-                                ? 'no term change'
+                                ? t('quoteNoTermChange')
                                 : '—'}
                           </td>
                           <td style={rfqCellStyle}>
@@ -397,9 +398,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
       {isPlacement ? (
         <div style={{ marginTop: '1.5rem', maxWidth: '40rem' }}>
           <strong>
-            {mode === 'capture'
-              ? 'Capture a quote'
-              : 'Revise — save a new version'}
+            {mode === 'capture' ? t('quoteCaptureHeading') : t('quoteReviseHeading')}
           </strong>
           {formError ? (
             <p role="alert" style={errorStyle}>
@@ -409,13 +408,13 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
 
           {mode === 'capture' ? (
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-insurer">Insurer</label>
+              <label htmlFor="quote-insurer">{t('quoteInsurerLabel')}</label>
               <select
                 id="quote-insurer"
                 value={captureInsurerId}
                 onChange={(e) => setCaptureInsurerId(e.target.value)}
               >
-                <option value="">Select an insurer…</option>
+                <option value="">{t('quoteSelectInsurerOption')}</option>
                 {capturable.map((s) => (
                   <option key={s.insurerId} value={s.insurerId}>
                     {s.insurer.name}
@@ -424,14 +423,13 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               </select>
               {capturable.length === 0 ? (
                 <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>
-                  Every shortlisted insurer already has a quotation (revise it)
-                  or has declined.
+                  {t('quoteAllShortlistedHaveQuote')}
                 </span>
               ) : null}
             </div>
           ) : (
             <p style={{ opacity: 0.7, margin: '0.5rem 0' }}>
-              Revising the current version. rfqId / insurer are inherited.{' '}
+              {t('quoteRevisingHint')}{' '}
               <button
                 type="button"
                 style={{
@@ -445,14 +443,14 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 }}
                 onClick={startCapture}
               >
-                Cancel
+                {t('commonCancel')}
               </button>
             </p>
           )}
 
           <div style={quoteFormGridStyle}>
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-premium">Premium *</label>
+              <label htmlFor="quote-premium">{t('quotePremiumLabel')}</label>
               <input
                 id="quote-premium"
                 value={form.premium}
@@ -462,7 +460,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-currency">Currency</label>
+              <label htmlFor="quote-currency">{t('quoteCurrencyLabel')}</label>
               <input
                 id="quote-currency"
                 value={form.currency}
@@ -471,7 +469,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-deductible">Deductible</label>
+              <label htmlFor="quote-deductible">{t('quoteDeductibleLabel')}</label>
               <input
                 id="quote-deductible"
                 value={form.deductible}
@@ -480,7 +478,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-liability">Liability limit</label>
+              <label htmlFor="quote-liability">{t('quoteLiabilityLimitLabel')}</label>
               <input
                 id="quote-liability"
                 value={form.liabilityLimit}
@@ -489,7 +487,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-bi">BI period (months)</label>
+              <label htmlFor="quote-bi">{t('quoteBiPeriodLabel')}</label>
               <input
                 id="quote-bi"
                 value={form.biPeriodMonths}
@@ -498,7 +496,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="quote-commission">Commission rate %</label>
+              <label htmlFor="quote-commission">{t('quoteCommissionRateLabel')}</label>
               <input
                 id="quote-commission"
                 value={form.commissionRatePercent}
@@ -508,7 +506,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
             </div>
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="quote-exclusions">Exclusions</label>
+            <label htmlFor="quote-exclusions">{t('quoteExclusionsLabel')}</label>
             <textarea
               id="quote-exclusions"
               value={form.exclusions}
@@ -518,7 +516,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="quote-conditions">Conditions</label>
+            <label htmlFor="quote-conditions">{t('quoteConditionsLabel')}</label>
             <textarea
               id="quote-conditions"
               value={form.conditions}
@@ -530,7 +528,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
           {mode === 'capture' ? null : (
             <div style={quoteFieldStyle}>
               <label htmlFor="quote-negotiation-notes">
-                Negotiation notes (what was requested / conceded this round)
+                {t('quoteNegotiationNotesLabel')}
               </label>
               <textarea
                 id="quote-negotiation-notes"
@@ -550,10 +548,10 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
             onClick={() => void submit()}
           >
             {busy
-              ? 'Saving…'
+              ? t('quoteSavingButton')
               : mode === 'capture'
-                ? 'Capture quote'
-                : 'Save new version'}
+                ? t('quoteCaptureQuoteButton')
+                : t('quoteSaveNewVersionButton')}
           </button>
         </div>
       ) : null}

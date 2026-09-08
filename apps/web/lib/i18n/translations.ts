@@ -17,14 +17,15 @@ import { COMMON } from './translations/common';
 import { NAV } from './translations/nav';
 import { LEADS } from './translations/leads';
 import { CUSTOMERS } from './translations/customers';
+import { RFQ } from './translations/rfq';
 
 export type Language = 'AR' | 'EN';
 
 export const LANGUAGES: readonly Language[] = ['AR', 'EN'];
 
 const translations = {
-  AR: { ...COMMON.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR },
-  EN: { ...COMMON.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN },
+  AR: { ...COMMON.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR },
+  EN: { ...COMMON.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN },
 } as const;
 
 export type TranslationKey = keyof (typeof translations)['EN'];

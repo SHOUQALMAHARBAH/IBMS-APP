@@ -12,9 +12,11 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
 import { insurerPickerStyle } from '../../../../components/rfq/rfq.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [insurers, setInsurers] = useState<SelectableInsurer[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,14 +35,14 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       } catch (err) {
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? "You don't hold the rfq.create permission."
+            ? t('rfqNewNoPermission')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load the insurer list — try again.',
+              : t('rfqNewInsurerListLoadError'),
         );
       }
     })();
-  }, []);
+  }, [t]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -70,7 +72,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       setSubmitError(
         err instanceof ApiError
           ? err.message
-          : 'Could not create the RFQ — try again.',
+          : t('rfqNewCreateError'),
       );
       setSubmitting(false);
     }
@@ -83,7 +85,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       </p>
     );
   }
-  if (!insurers) return <p>Loading…</p>;
+  if (!insurers) return <p>{t('commonLoading')}</p>;
 
   const canSubmit =
     insuranceLine.trim().length >= 2 && selected.size > 0 && !submitting;
@@ -91,13 +93,9 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
   return (
     <form onSubmit={(e) => void submit(e)} style={{ marginTop: '1rem' }}>
       <label htmlFor="insuranceLine" style={{ display: 'block', fontWeight: 600 }}>
-        Insurance line
+        {t('rfqNewLineLabel')}
       </label>
-      <div style={cardMetaStyle}>
-        One RFQ per line (e.g. &ldquo;Property All Risks&rdquo;, &ldquo;Business
-        Interruption&rdquo;). A line already covered by an RFQ on this
-        opportunity is rejected.
-      </div>
+      <div style={cardMetaStyle}>{t('rfqNewLineHint')}</div>
       <input
         id="insuranceLine"
         dir="auto"
@@ -108,11 +106,11 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       />
 
       <fieldset style={{ border: 'none', padding: 0, marginTop: '1.5rem' }}>
-        <legend style={{ fontWeight: 600 }}>Insurer shortlist</legend>
-        <div style={cardMetaStyle}>Select at least one insurer.</div>
+        <legend style={{ fontWeight: 600 }}>{t('rfqNewShortlistLegend')}</legend>
+        <div style={cardMetaStyle}>{t('rfqNewShortlistHint')}</div>
         <div style={insurerPickerStyle}>
           {insurers.length === 0 ? (
-            <span style={{ opacity: 0.6 }}>No insurers on file.</span>
+            <span style={{ opacity: 0.6 }}>{t('rfqNewNoInsurersOnFile')}</span>
           ) : (
             insurers.map((insurer) => (
               <label
@@ -140,12 +138,9 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         htmlFor="threshold"
         style={{ display: 'block', fontWeight: 600, marginTop: '1.5rem' }}
       >
-        Follow-up threshold (business days)
+        {t('rfqNewThresholdLabel')}
       </label>
-      <div style={cardMetaStyle}>
-        The nightly sweep raises a follow-up alert on any insurer that has not
-        responded within this many Jordan business days.
-      </div>
+      <div style={cardMetaStyle}>{t('rfqNewThresholdHint')}</div>
       <input
         id="threshold"
         type="number"
@@ -158,7 +153,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
 
       <div style={{ marginTop: '1.5rem' }}>
         <button type="submit" disabled={!canSubmit} style={buttonStyle}>
-          {submitting ? 'Creating…' : 'Create RFQ'}
+          {submitting ? t('rfqNewCreatingButton') : t('rfqNewCreateButton')}
         </button>
       </div>
 
@@ -174,20 +169,21 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
 function NewRfqFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const opportunityId = searchParams.get('opportunityId') ?? '';
 
   if (!opportunityId) {
     return (
       <p role="alert" style={errorStyle}>
-        No opportunity selected — open an opportunity from{' '}
+        {t('rfqNewNoOpportunitySelectedPrefix')}{' '}
         <button
           type="button"
           onClick={() => router.push('/opportunities')}
           style={{ textDecoration: 'underline', cursor: 'pointer' }}
         >
-          RFQ / market
+          {t('rfqListNoParentLinkLabel')}
         </button>{' '}
-        and create the RFQ from there.
+        {t('rfqNewNoOpportunitySelectedSuffix')}
       </p>
     );
   }
@@ -198,6 +194,7 @@ function NewRfqFlow() {
 export default function NewRfqPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -207,11 +204,8 @@ export default function NewRfqPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>New RFQ</h1>
-      <p style={{ opacity: 0.8 }}>
-        Process 11 — create one RFQ for one insurance line and send it to a
-        shortlist of insurers. Each insurer starts at SENT.
-      </p>
+      <h1>{t('rfqNewHeading')}</h1>
+      <p style={{ opacity: 0.8 }}>{t('rfqNewIntro')}</p>
       <Suspense fallback={null}>
         <NewRfqFlow />
       </Suspense>

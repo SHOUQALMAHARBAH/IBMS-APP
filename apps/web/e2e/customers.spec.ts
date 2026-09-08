@@ -82,7 +82,7 @@ test("renders the customer list and navigates to a profile on click", async ({ p
 
   await expect(page).toHaveURL("/customers/cust-1");
   await expect(page.getByRole("heading", { name: "Ahmad Al-Fulani" })).toBeVisible();
-  await expect(page.getByText("INDIVIDUAL — Status: PENDING_KYC")).toBeVisible();
+  await expect(page.getByText("Individual — Status: Pending KYC")).toBeVisible();
 });
 
 // Part F item #6 — bilingual full-text search. Proves the WIRING (search

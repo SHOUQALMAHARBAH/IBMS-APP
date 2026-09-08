@@ -98,7 +98,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
   const g = gate([CUSTOMER_AR]);
   await page.route("http://localhost:4000/customers", g.route);
   await page.goto("/customers");
-  await expect(page.getByText("Loading…")).toBeVisible();
+  await expect(page.getByText("جارٍ التحميل…")).toBeVisible();
   await capture(page, "customers", "loading");
   g.resolve();
   await expect(page.getByText("شركة الأفق للتأمين")).toBeVisible();
@@ -110,7 +110,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
     route.fulfill({ status: 200, json: [] }),
   );
   await page.goto(page.url());
-  await expect(page.getByText("No customers yet.")).toBeVisible();
+  await expect(page.getByText("لا يوجد عملاء بعد.")).toBeVisible();
   await capture(page, "customers", "empty");
   await page.unroute("http://localhost:4000/customers");
 
