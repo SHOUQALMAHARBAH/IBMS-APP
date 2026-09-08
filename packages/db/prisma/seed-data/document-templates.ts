@@ -122,4 +122,32 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
       'التأمين إلى جانب السعر — لا ينبغي قراءة هذه المقارنة بناءً على ' +
       'السعر فقط.',
   },
+  /**
+   * Part F item #7 — the third of `templateType`'s 6 real document types
+   * to get an actual seeded row. Editable boilerplate prose only; the
+   * per-recommendation facts (customer, insurer, premium, rationale, the
+   * 6 factor notes, the COI disclosure text when flagged) are real
+   * domain data merged in by
+   * `apps/api/src/modules/recommendation/recommendation-report.template.ts`,
+   * never stored here. `RecommendationReportDocumentService` falls back
+   * to this exact wording in code when no row exists yet — kept
+   * identical so the seeded and fallback-default text never silently
+   * diverge.
+   */
+  {
+    templateType: 'recommendation_report',
+    nameEn: 'Recommendation Report',
+    nameAr: 'تقرير التوصية',
+    bodyEn:
+      'Based on a structured comparison of the quotations received for ' +
+      'this insurance requirement, we recommend the following. Our ' +
+      'assessment considered coverage, price, insurer financial ' +
+      'strength, claims service, deductible, and policy conditions ' +
+      'together — never price alone.',
+    bodyAr:
+      'بناءً على مقارنة منظّمة لعروض التأمين الواردة لهذا الطلب، نوصي ' +
+      'بما يلي. أخذ تقييمنا بعين الاعتبار التغطية والسعر والقوة المالية ' +
+      'لشركة التأمين وخدمة المطالبات والتحمل وشروط الوثيقة معاً — وليس ' +
+      'السعر فقط.',
+  },
 ];

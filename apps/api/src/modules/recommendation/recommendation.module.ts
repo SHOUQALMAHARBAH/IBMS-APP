@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { RecommendationController } from './recommendation.controller';
 import { RecommendationService } from './recommendation.service';
+import { RecommendationReportDocumentService } from './recommendation-report-document.service';
 import { RecommendationRepository } from '../../repositories/recommendation.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { OpportunityModule } from '../opportunity/opportunity.module';
 import { QuotationModule } from '../quotation/quotation.module';
 import { CustomerModule } from '../customer/customer.module';
+import { DocumentGenerationModule } from '../document-generation/document-generation.module';
 
 /** Process 16 — Broker Recommendation (backlog Part C #16, Domain B).
  *
@@ -19,7 +21,10 @@ import { CustomerModule } from '../customer/customer.module';
  *     visibility, status gate, targetPremiumThreshold)
  *   - QuotationModule   -> QuotationRepository (the recommended quote + the
  *     competing quotes for the conflict-of-interest check)
- *   - CustomerModule    -> CustomerRepository (owner, for visibility) */
+ *   - CustomerModule    -> CustomerRepository (owner, for visibility)
+ *   - DocumentGenerationModule -> PdfRendererService +
+ *     DocumentTemplateRepository (Part F item #7 — bilingual
+ *     recommendation-report PDF, `RecommendationReportDocumentService`) */
 @Module({
   imports: [
     AuditModule,
@@ -27,9 +32,14 @@ import { CustomerModule } from '../customer/customer.module';
     OpportunityModule,
     QuotationModule,
     CustomerModule,
+    DocumentGenerationModule,
   ],
   controllers: [RecommendationController],
-  providers: [RecommendationService, RecommendationRepository],
+  providers: [
+    RecommendationService,
+    RecommendationReportDocumentService,
+    RecommendationRepository,
+  ],
   // ClientDecisionModule (backlog Part C #17) reads the sent Recommendation
   // as the precondition for capturing a client decision.
   exports: [RecommendationRepository],

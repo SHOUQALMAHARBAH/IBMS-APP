@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   approveRecommendation,
   discloseConflictOfInterest,
+  downloadRecommendationDocument,
   draftRecommendation,
   listRecommendationsForOpportunity,
   sendRecommendation,
@@ -87,6 +88,33 @@ export function RecommendationSection({
       await load();
     })();
   }, [load]);
+
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass.
+  // The button is only rendered once blockedFromSend is empty (see
+  // below), so this call should never actually hit the api's own 422 —
+  // the try/catch here is a safety net for a race (e.g. a threshold
+  // changing between render and click), not the expected path.
+  async function downloadDocument(id: string) {
+    setFormError(null);
+    try {
+      const blob = await downloadRecommendationDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recommendation-report-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setFormError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the recommendation report — try again.',
+      );
+    }
+  }
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -362,6 +390,15 @@ export function RecommendationSection({
                 }
               >
                 Send to client
+              </button>
+            ) : null}
+            {rec.blockedFromSend.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => void downloadDocument(rec.id)}
+                style={{ ...buttonStyle, width: 'auto' }}
+              >
+                Download report (PDF)
               </button>
             ) : null}
           </div>

@@ -3,7 +3,7 @@
 // documented recommendation, clear the senior-officer approval gate and the
 // mandatory conflict-of-interest disclosure, then send it to the client.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 
 export interface RecommendationInsurer {
   id: string;
@@ -109,4 +109,18 @@ export function discloseConflictOfInterest(
 
 export function sendRecommendation(id: string): Promise<Recommendation> {
   return apiPost(`/recommendations/${id}/send`);
+}
+
+// Part F item #7 — bilingual recommendation-report PDF. Omitting
+// `language` defaults server-side to the customer's own
+// languagePreference; 'DUAL' renders both, Arabic section first. The api
+// refuses (422) while a required approval or COI disclosure is still
+// outstanding — mirrored here by only showing the button once
+// `blockedFromSend` is empty (see RecommendationSection.tsx).
+export function downloadRecommendationDocument(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/recommendations/${id}/document${qs}`);
 }

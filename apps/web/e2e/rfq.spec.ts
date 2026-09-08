@@ -1642,6 +1642,19 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
       drafted = b;
     },
   });
+  // Registered AFTER mockRfqApi's own broader "recommendations**" route —
+  // Playwright runs routes in reverse-registration order, so this more
+  // specific one wins for the document endpoint while the general one
+  // still handles draft/approve/disclose/send/read.
+  await page.route(
+    "http://localhost:4000/recommendations/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
 
   // Capture a quote first so the recommendation form has something to pick.
   await page.goto("/rfqs/rfq-1");
@@ -1686,6 +1699,11 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
   await expect(
     page.getByRole("button", { name: "Send to client" }),
   ).toHaveCount(0);
+  // Part F item #7 — the download button is gated the same way: not
+  // shown at all while blockedFromSend is non-empty.
+  await expect(
+    page.getByRole("button", { name: "Download report (PDF)" }),
+  ).toHaveCount(0);
 
   // Approve, then disclose, then send.
   await page.getByRole("button", { name: "Approve" }).click();
@@ -1698,6 +1716,12 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
 
   await page.getByRole("button", { name: "Send to client" }).click();
   await expect(page.getByText("sent to client")).toBeVisible();
+
+  // Part F item #7 — once unblocked, downloads a real bilingual PDF.
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download report (PDF)" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("recommendation-report-rec-1.pdf");
 });
 
 test("records a client decision and shows the route it takes", async ({

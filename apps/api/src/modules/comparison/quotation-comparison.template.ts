@@ -1,8 +1,10 @@
 import {
   DOCUMENT_BASE_CSS,
   escapeHtml,
+  formatDocumentBiPeriod,
   formatDocumentDate,
   formatDocumentMoney,
+  formatDocumentPercent,
   type DocumentLanguage,
 } from '../document-generation/document-html.util';
 
@@ -83,20 +85,6 @@ function scoreCell(value: { toString(): string } | null): string {
   return value === null ? '—' : escapeHtml(value.toString());
 }
 
-function biPeriodCell(months: number | null, lang: 'en' | 'ar'): string {
-  if (months === null) return '—';
-  return lang === 'ar' ? `${months} شهر` : `${months} mo`;
-}
-
-function commissionCell(
-  value: { toString(): string } | null,
-  lang: 'en' | 'ar',
-): string {
-  if (value === null) return '—';
-  const pct = escapeHtml(value.toString());
-  return lang === 'ar' ? `%${pct}` : `${pct}%`;
-}
-
 function supersededTag(lang: 'en' | 'ar'): string {
   return lang === 'ar'
     ? ' <span style="opacity:0.6;font-size:0.8em">(نسخة سابقة)</span>'
@@ -109,8 +97,8 @@ function renderRow(row: QuotationComparisonRow, lang: 'en' | 'ar'): string {
     formatDocumentMoney(row.premium, lang, row.currency),
     formatDocumentMoney(row.deductible, lang, row.currency),
     formatDocumentMoney(row.liabilityLimit, lang, row.currency),
-    biPeriodCell(row.biPeriodMonths, lang),
-    commissionCell(row.commissionRatePercent, lang),
+    formatDocumentBiPeriod(row.biPeriodMonths, lang),
+    formatDocumentPercent(row.commissionRatePercent, lang),
     scoreCell(row.insurerQualityScore),
     scoreCell(row.serviceScore),
     escapeHtml(
@@ -149,11 +137,13 @@ function renderSection(
   const metaRows: [string, string][] =
     lang === 'ar'
       ? [
+          ['رقم المرجع', data.comparisonId],
           ['العميل', data.customerLegalName],
           ['خط التأمين', data.insuranceLine],
           ['تاريخ الإعداد', formatDocumentDate(data.builtAt, 'ar')],
         ]
       : [
+          ['Reference', data.comparisonId],
           ['Customer', data.customerLegalName],
           ['Insurance Line', data.insuranceLine],
           ['Prepared', formatDocumentDate(data.builtAt, 'en')],

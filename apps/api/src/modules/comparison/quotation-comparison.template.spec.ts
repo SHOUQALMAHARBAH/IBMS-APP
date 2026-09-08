@@ -78,6 +78,11 @@ describe('buildQuotationComparisonHtml', () => {
     expect(html).toContain('JOD 1,250.500');
   });
 
+  it('includes the comparison reference number so a client can cite it back', () => {
+    const html = buildQuotationComparisonHtml(BASE_DATA, 'EN');
+    expect(html).toContain('cmp-123');
+  });
+
   it('marks a non-current-version quotation as superseded', () => {
     const html = buildQuotationComparisonHtml(BASE_DATA, 'EN');
     expect(html).toContain('superseded');

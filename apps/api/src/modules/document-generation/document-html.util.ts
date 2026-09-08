@@ -77,6 +77,33 @@ export function formatDocumentMoney(
     : `${escapeHtml(currency)} ${escapeHtml(raw)}`;
 }
 
+/** Promoted out of `quotation-comparison.template.ts` (the second
+ * document type) once the THIRD (recommendation report) needed the exact
+ * same "N months" bilingual rendering — the same "promote before a third
+ * template forks its own copy" discipline this file's own header already
+ * established for the first→second promotion. */
+export function formatDocumentBiPeriod(
+  months: number | null,
+  lang: 'en' | 'ar',
+): string {
+  if (months === null) return '—';
+  return lang === 'ar' ? `${months} شهر` : `${months} mo`;
+}
+
+/** Promoted alongside `formatDocumentBiPeriod` above, for the same
+ * reason. Escapes ONCE, internally — a caller must place its result
+ * directly into HTML, never re-escape it (re-escaping a percent sign or
+ * digit is harmless, but re-escaping this function's own `&lt;`-shaped
+ * output from a pathological value would double-encode it). */
+export function formatDocumentPercent(
+  value: { toString(): string } | null,
+  lang: 'en' | 'ar',
+): string {
+  if (value === null) return '—';
+  const pct = escapeHtml(value.toString());
+  return lang === 'ar' ? `%${pct}` : `${pct}%`;
+}
+
 /** Base rules every document shares (fonts, table borders, page-break
  * marker). A template may append its own additional rules after this. */
 export const DOCUMENT_BASE_CSS = `

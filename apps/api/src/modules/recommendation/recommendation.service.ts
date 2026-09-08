@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { OpportunityStatus, Recommendation } from '@ibms/db';
+import type { Customer, OpportunityStatus, Recommendation } from '@ibms/db';
 import {
   RecommendationRepository,
   type RecommendationWithContext,
@@ -149,10 +149,15 @@ export class RecommendationService {
     }
   }
 
+  /** Returns the Customer (not just a boolean) so a caller that also needs
+   * the row — `loadVisibleWithCustomer()`'s language/legalName lookup — is
+   * not forced into a second, redundant `findById` immediately after this
+   * one already fetched it (the same lesson Part F item #7's comparison
+   * slice applied after a `@code-reviewer` MINOR finding). */
   private async assertCustomerVisible(
     customerId: string,
     actor: AuthenticatedUser,
-  ): Promise<void> {
+  ): Promise<Customer> {
     const customer = await this.customers.findById(customerId);
     if (
       !customer ||
@@ -160,6 +165,7 @@ export class RecommendationService {
     ) {
       throw new NotFoundException('Customer not found');
     }
+    return customer;
   }
 
   /** Loads an Opportunity and enforces the caller's visibility on its
@@ -211,6 +217,39 @@ export class RecommendationService {
       throw new NotFoundException(label);
     }
     return recommendation;
+  }
+
+  /** Part F item #7 — recommendation-report document generation. Same
+   * lookup/visibility as `loadVisible()` above, but also returns the
+   * `Customer` row (for the document's language default and display
+   * name) without a second, redundant fetch. A sibling helper rather
+   * than changing `loadVisible()`'s own return shape — that method has 5
+   * other callers (`draft`/`approve`/`discloseConflictOfInterest`/`send`/
+   * `get`) that only need the recommendation itself; broadening its
+   * return type would have forced every one of them to re-destructure
+   * for no benefit. */
+  private async loadVisibleWithCustomer(
+    id: string,
+    actor: AuthenticatedUser,
+    label = 'Recommendation not found',
+  ): Promise<{
+    recommendation: RecommendationWithContext;
+    customer: Customer;
+  }> {
+    const recommendation = await this.recommendations.findById(id);
+    if (!recommendation) {
+      throw new NotFoundException(label);
+    }
+    let customer: Customer;
+    try {
+      customer = await this.assertCustomerVisible(
+        recommendation.opportunity.customerId,
+        actor,
+      );
+    } catch {
+      throw new NotFoundException(label);
+    }
+    return { recommendation, customer };
   }
 
   /** Best-effort Opportunity advance. Logged, never thrown — not
@@ -722,5 +761,44 @@ export class RecommendationService {
 
   async get(id: string, actor: AuthenticatedUser): Promise<RecommendationView> {
     return await this.toView(await this.loadVisible(id, actor));
+  }
+
+  /** Part F item #7 — recommendation-report document generation. Same
+   * visibility rule as `get()` PLUS the resolved `Customer` row, and —
+   * a deliberate, user-confirmed design decision — the SAME gate `send()`
+   * itself enforces: refuses (422, the identical `blockedFromSend`
+   * messages) while a required senior-officer approval or
+   * conflict-of-interest disclosure is still outstanding. This is
+   * "retained as professional-indemnity evidence" (this module's own
+   * header comment) — letting an ungated draft leave the system as a
+   * PDF that could reach a client by hand would defeat the entire
+   * maker/checker + COI safeguard `send()` exists to enforce. Once this
+   * check passes, `conflictOfInterestFlagged` implies
+   * `conflictOfInterestDisclosure` is non-null (the same gate guarantees
+   * it) — the template can render the disclosure text without a
+   * separate null check. */
+  async getByIdWithCustomer(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<{
+    view: RecommendationView;
+    customer: Customer;
+    recommendation: RecommendationWithContext;
+  }> {
+    const { recommendation, customer } = await this.loadVisibleWithCustomer(
+      id,
+      actor,
+    );
+    const view = await this.toView(recommendation);
+    if (view.blockedFromSend.length > 0) {
+      throw new UnprocessableEntityException(view.blockedFromSend.join(' '));
+    }
+    // The raw `recommendation` (real Prisma.Decimal fields on
+    // `recommendedQuotation`) is also returned, alongside the already-
+    // formatted `view` — the recommendation-report document reads
+    // straight from here rather than re-parsing `view`'s display strings,
+    // the same raw-Decimal-in pattern the quotation-comparison document
+    // already uses (`@code-reviewer` MINOR, this slice's own first pass).
+    return { view, customer, recommendation };
   }
 }

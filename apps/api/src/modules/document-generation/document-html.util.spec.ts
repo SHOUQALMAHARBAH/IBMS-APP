@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   escapeHtml,
+  formatDocumentBiPeriod,
   formatDocumentDate,
   formatDocumentMoney,
+  formatDocumentPercent,
 } from './document-html.util';
 
 describe('escapeHtml', () => {
@@ -50,6 +52,34 @@ describe('formatDocumentMoney', () => {
   it('escapes an HTML-shaped non-finite value instead of injecting it raw', () => {
     expect(formatDocumentMoney({ toString: () => '<b>x</b>' }, 'en')).toBe(
       'JOD &lt;b&gt;x&lt;/b&gt;',
+    );
+  });
+});
+
+describe('formatDocumentBiPeriod', () => {
+  it('returns an em dash for null', () => {
+    expect(formatDocumentBiPeriod(null, 'en')).toBe('—');
+  });
+
+  it('renders bilingual "N months" labels', () => {
+    expect(formatDocumentBiPeriod(12, 'en')).toBe('12 mo');
+    expect(formatDocumentBiPeriod(12, 'ar')).toBe('12 شهر');
+  });
+});
+
+describe('formatDocumentPercent', () => {
+  it('returns an em dash for null', () => {
+    expect(formatDocumentPercent(null, 'en')).toBe('—');
+  });
+
+  it('renders a bilingual percent sign on the correct side', () => {
+    expect(formatDocumentPercent({ toString: () => '15' }, 'en')).toBe('15%');
+    expect(formatDocumentPercent({ toString: () => '15' }, 'ar')).toBe('%15');
+  });
+
+  it('escapes HTML-shaped content exactly once, not zero or twice', () => {
+    expect(formatDocumentPercent({ toString: () => '<b>1</b>' }, 'en')).toBe(
+      '&lt;b&gt;1&lt;/b&gt;%',
     );
   });
 });
