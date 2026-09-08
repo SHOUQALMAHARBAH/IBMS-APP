@@ -16,6 +16,8 @@ import {
 import { startKyc, submitKyc, type KycRecord } from '../../lib/kyc/kyc-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { assertNoPresetSensitiveDefaults } from '../../lib/forms/privacy-by-default';
+import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import {
   buttonStyle,
   errorStyle,
@@ -48,12 +50,22 @@ type Step = 'type' | 'profile' | 'ubos' | 'documents' | 'review';
 const INDIVIDUAL_STEPS: Step[] = ['type', 'profile', 'documents', 'review'];
 const CORPORATE_STEPS: Step[] = ['type', 'profile', 'ubos', 'documents', 'review'];
 
-const STEP_LABEL: Record<Step, string> = {
-  type: 'Customer type',
-  profile: 'Profile',
-  ubos: 'Beneficial owners',
-  documents: 'Documents',
-  review: 'Review & submit',
+const STEP_LABEL_KEY: Record<Step, TranslationKey> = {
+  type: 'customerWizardStepType',
+  profile: 'customerWizardStepProfile',
+  ubos: 'customerWizardStepUbos',
+  documents: 'customerWizardStepDocuments',
+  review: 'customerWizardStepReview',
+};
+
+const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
+  INDIVIDUAL: 'customerTypeIndividual',
+  CORPORATE: 'customerTypeCorporate',
+};
+
+const CLASSIFICATION_LABEL_KEY: Record<DocumentClassification, TranslationKey> = {
+  CONFIDENTIAL: 'customerWizardClassificationConfidentialOption',
+  HIGHLY_CONFIDENTIAL: 'customerWizardClassificationHighlyConfidentialOption',
 };
 
 // Runs once per module load against the LITERAL initial-values object this
@@ -70,6 +82,7 @@ assertNoPresetSensitiveDefaults(
 
 export function CustomerOnboardingWizard() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
   const steps = useMemo(
     () => (customerType === 'CORPORATE' ? CORPORATE_STEPS : INDIVIDUAL_STEPS),
@@ -150,7 +163,7 @@ export function CustomerOnboardingWizard() {
       setKyc(createdKyc);
       goTo(customerType === 'CORPORATE' ? 'ubos' : 'documents');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create the customer — try again.');
+      setError(err instanceof ApiError ? err.message : t('customerWizardCreateError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -180,7 +193,7 @@ export function CustomerOnboardingWizard() {
       setUboOwnershipPercent('');
       setUboIsPep(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not add this beneficial owner — try again.');
+      setError(err instanceof ApiError ? err.message : t('customerWizardUboError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -202,7 +215,7 @@ export function CustomerOnboardingWizard() {
       setDocStorageRef('');
       setDocClassification('CONFIDENTIAL');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not attach this document — try again.');
+      setError(err instanceof ApiError ? err.message : t('customerWizardDocError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -216,7 +229,7 @@ export function CustomerOnboardingWizard() {
       await submitKyc(kyc.id);
       router.push(`/customers/${customer.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not submit this KYC file — try again.');
+      setError(err instanceof ApiError ? err.message : t('customerWizardKycError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -227,7 +240,7 @@ export function CustomerOnboardingWizard() {
       <div style={stepIndicatorStyle}>
         {steps.map((s, i) => (
           <span key={s} style={stepPillStyle(i === stepIndex, i < stepIndex)}>
-            {i + 1}. {STEP_LABEL[s]}
+            {i + 1}. {t(STEP_LABEL_KEY[s])}
           </span>
         ))}
       </div>
@@ -240,7 +253,7 @@ export function CustomerOnboardingWizard() {
 
       {step === 'type' ? (
         <div>
-          <h2 style={{ marginTop: 0 }}>Is this an individual or corporate customer?</h2>
+          <h2 style={{ marginTop: 0 }}>{t('customerWizardTypeQuestion')}</h2>
           <div style={{ ...formRowStyle, marginTop: '1rem' }}>
             <button
               type="button"
@@ -250,7 +263,7 @@ export function CustomerOnboardingWizard() {
                 setStepIndex(1);
               }}
             >
-              Individual
+              {t(TYPE_LABEL_KEY.INDIVIDUAL)}
             </button>
             <button
               type="button"
@@ -260,7 +273,7 @@ export function CustomerOnboardingWizard() {
                 setStepIndex(1);
               }}
             >
-              Corporate
+              {t(TYPE_LABEL_KEY.CORPORATE)}
             </button>
           </div>
         </div>
@@ -269,13 +282,15 @@ export function CustomerOnboardingWizard() {
       {step === 'profile' ? (
         <form onSubmit={(e) => void handleProfileSubmit(e)}>
           <h2 style={{ marginTop: 0 }}>
-            {customerType === 'CORPORATE' ? 'Corporate profile' : 'Individual profile'}
+            {customerType === 'CORPORATE'
+              ? t('customerWizardProfileHeadingCorporate')
+              : t('customerWizardProfileHeadingIndividual')}
           </h2>
           {customerType === 'INDIVIDUAL' ? (
             <div style={formRowStyle}>
               <div style={fieldStyle}>
                 <label htmlFor="cust-given-name" style={labelStyle}>
-                  Given name
+                  {t('customerFieldGivenName')}
                 </label>
                 <input
                   id="cust-given-name"
@@ -288,7 +303,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="cust-father-name" style={labelStyle}>
-                  Father&apos;s name (optional)
+                  {t('customerWizardFatherNameOptionalLabel')}
                 </label>
                 <input
                   id="cust-father-name"
@@ -300,7 +315,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="cust-grandfather-name" style={labelStyle}>
-                  Grandfather&apos;s name (optional)
+                  {t('customerWizardGrandfatherNameOptionalLabel')}
                 </label>
                 <input
                   id="cust-grandfather-name"
@@ -312,7 +327,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="cust-family-name" style={labelStyle}>
-                  Family name
+                  {t('customerFieldFamilyName')}
                 </label>
                 <input
                   id="cust-family-name"
@@ -329,7 +344,7 @@ export function CustomerOnboardingWizard() {
             {customerType === 'CORPORATE' ? (
               <div style={fieldStyle}>
                 <label htmlFor="cust-legal-name" style={labelStyle}>
-                  Legal (registered) name
+                  {t('customerWizardLegalNameLabel')}
                 </label>
                 <input
                   id="cust-legal-name"
@@ -344,7 +359,7 @@ export function CustomerOnboardingWizard() {
             {customerType === 'INDIVIDUAL' ? (
               <div style={fieldStyle}>
                 <label htmlFor="cust-national-id" style={labelStyle}>
-                  National ID
+                  {t('customerFieldNationalId')}
                 </label>
                 <input
                   id="cust-national-id"
@@ -357,7 +372,7 @@ export function CustomerOnboardingWizard() {
             ) : (
               <div style={fieldStyle}>
                 <label htmlFor="cust-registration-number" style={labelStyle}>
-                  Commercial registration number
+                  {t('customerWizardRegistrationNumberLabel')}
                 </label>
                 <input
                   id="cust-registration-number"
@@ -375,7 +390,7 @@ export function CustomerOnboardingWizard() {
             <div style={formRowStyle}>
               <div style={fieldStyle}>
                 <label htmlFor="cust-address" style={labelStyle}>
-                  Registered address
+                  {t('customerFieldRegisteredAddress')}
                 </label>
                 <input
                   id="cust-address"
@@ -388,7 +403,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="cust-nature" style={labelStyle}>
-                  Nature of business
+                  {t('customerFieldNatureOfBusiness')}
                 </label>
                 <input
                   id="cust-nature"
@@ -405,7 +420,7 @@ export function CustomerOnboardingWizard() {
           <div style={formRowStyle}>
             <div style={fieldStyle}>
               <label htmlFor="cust-tax-reg" style={labelStyle}>
-                Tax registration number (optional)
+                {t('customerWizardTaxRegLabel')}
               </label>
               <input
                 id="cust-tax-reg"
@@ -417,7 +432,7 @@ export function CustomerOnboardingWizard() {
             </div>
             <div style={fieldStyle}>
               <label htmlFor="cust-language" style={labelStyle}>
-                Language preference
+                {t('customerFieldLanguagePreference')}
               </label>
               <select
                 id="cust-language"
@@ -425,8 +440,8 @@ export function CustomerOnboardingWizard() {
                 onChange={(e) => setLanguagePreference(e.target.value as LanguagePreference)}
                 style={inputStyle}
               >
-                <option value="AR">Arabic</option>
-                <option value="EN">English</option>
+                <option value="AR">{t('customerWizardLanguageArabicOption')}</option>
+                <option value="EN">{t('customerWizardLanguageEnglishOption')}</option>
               </select>
             </div>
           </div>
@@ -434,7 +449,7 @@ export function CustomerOnboardingWizard() {
           <div style={formRowStyle}>
             <div style={fieldStyle}>
               <label htmlFor="cust-phone" style={labelStyle}>
-                Contact phone
+                {t('customerFieldContactPhone')}
               </label>
               <input
                 id="cust-phone"
@@ -447,7 +462,7 @@ export function CustomerOnboardingWizard() {
             </div>
             <div style={fieldStyle}>
               <label htmlFor="cust-email" style={labelStyle}>
-                Contact email
+                {t('customerFieldContactEmail')}
               </label>
               <input
                 id="cust-email"
@@ -461,17 +476,18 @@ export function CustomerOnboardingWizard() {
           </div>
 
           <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-            {isSubmitting ? 'Creating…' : 'Create customer & start KYC'}
+            {isSubmitting ? t('customerWizardCreatingButton') : t('customerWizardCreateButton')}
           </button>
         </form>
       ) : null}
 
       {step === 'ubos' && customer ? (
         <div>
-          <h2 style={{ marginTop: 0 }}>Ultimate Beneficial Owners</h2>
+          <h2 style={{ marginTop: 0 }}>{t('customerUbosHeading')}</h2>
           <p style={{ opacity: 0.8 }}>
-            Record every individual with significant ownership or control of{' '}
-            <bdi>{customer.legalName}</bdi>.
+            {t('customerWizardUbosIntroPrefix')}{' '}
+            <bdi>{customer.legalName}</bdi>
+            {t('customerWizardUbosIntroSuffix')}
           </p>
           {ubos.map((u) => (
             <div key={u.id} style={repeatableRowStyle}>
@@ -479,14 +495,14 @@ export function CustomerOnboardingWizard() {
                 <bdi>{u.fullName}</bdi>
               </strong>
               {u.ownershipPercent ? <span> — {u.ownershipPercent}%</span> : null}
-              {u.isPep ? <span> — PEP</span> : null}
+              {u.isPep ? <span> — {t('customerUboPep')}</span> : null}
             </div>
           ))}
           <form onSubmit={(e) => void handleAddUbo(e)} style={repeatableRowStyle}>
             <div style={formRowStyle}>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-given-name" style={labelStyle}>
-                  Given name
+                  {t('customerFieldGivenName')}
                 </label>
                 <input
                   id="ubo-given-name"
@@ -499,7 +515,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-father-name" style={labelStyle}>
-                  Father&apos;s name (optional)
+                  {t('customerWizardFatherNameOptionalLabel')}
                 </label>
                 <input
                   id="ubo-father-name"
@@ -511,7 +527,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-grandfather-name" style={labelStyle}>
-                  Grandfather&apos;s name (optional)
+                  {t('customerWizardGrandfatherNameOptionalLabel')}
                 </label>
                 <input
                   id="ubo-grandfather-name"
@@ -523,7 +539,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-family-name" style={labelStyle}>
-                  Family name
+                  {t('customerFieldFamilyName')}
                 </label>
                 <input
                   id="ubo-family-name"
@@ -538,7 +554,7 @@ export function CustomerOnboardingWizard() {
             <div style={formRowStyle}>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-national-id" style={labelStyle}>
-                  National ID
+                  {t('customerFieldNationalId')}
                 </label>
                 <input
                   id="ubo-national-id"
@@ -550,7 +566,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="ubo-ownership" style={labelStyle}>
-                  Ownership %
+                  {t('customerWizardOwnershipPercentLabel')}
                 </label>
                 <input
                   id="ubo-ownership"
@@ -571,16 +587,16 @@ export function CustomerOnboardingWizard() {
                   checked={uboIsPep}
                   onChange={(e) => setUboIsPep(e.target.checked)}
                 />{' '}
-                Politically Exposed Person (PEP)
+                {t('customerWizardPepCheckboxLabel')}
               </label>
             </div>
             <button type="submit" disabled={isSubmitting} style={{ ...buttonStyle, width: 'auto' }}>
-              Add owner
+              {t('customerWizardAddOwnerButton')}
             </button>
           </form>
           <div style={wizardNavStyle}>
             <button type="button" style={buttonStyle} onClick={() => goTo('documents')}>
-              Continue
+              {t('customerWizardContinueButton')}
             </button>
           </div>
         </div>
@@ -588,22 +604,21 @@ export function CustomerOnboardingWizard() {
 
       {step === 'documents' && customer ? (
         <div>
-          <h2 style={{ marginTop: 0 }}>Supporting documents</h2>
+          <h2 style={{ marginTop: 0 }}>{t('customerWizardDocumentsHeading')}</h2>
           <p style={{ opacity: 0.8 }}>
-            Application/proposal documents for <bdi>{customer.legalName}</bdi>
-            &apos;s KYC file. No file-upload storage exists yet — record the
-            document reference/filename.
+            {t('customerWizardDocumentsIntroPrefix')} <bdi>{customer.legalName}</bdi>
+            {t('customerWizardDocumentsIntroSuffix')}
           </p>
           {documents.map((d) => (
             <div key={d.id} style={repeatableRowStyle}>
-              <strong>{d.fileName}</strong> — {d.classification}
+              <strong>{d.fileName}</strong> — {t(CLASSIFICATION_LABEL_KEY[d.classification])}
             </div>
           ))}
           <form onSubmit={(e) => void handleAddDocument(e)} style={repeatableRowStyle}>
             <div style={formRowStyle}>
               <div style={fieldStyle}>
                 <label htmlFor="doc-file-name" style={labelStyle}>
-                  File name / reference
+                  {t('customerWizardFileNameLabel')}
                 </label>
                 <input
                   id="doc-file-name"
@@ -615,7 +630,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="doc-storage-ref" style={labelStyle}>
-                  Storage reference
+                  {t('customerWizardStorageRefLabel')}
                 </label>
                 <input
                   id="doc-storage-ref"
@@ -627,7 +642,7 @@ export function CustomerOnboardingWizard() {
               </div>
               <div style={fieldStyle}>
                 <label htmlFor="doc-classification" style={labelStyle}>
-                  Classification
+                  {t('customerWizardClassificationLabel')}
                 </label>
                 <select
                   id="doc-classification"
@@ -635,23 +650,27 @@ export function CustomerOnboardingWizard() {
                   onChange={(e) => setDocClassification(e.target.value as DocumentClassification)}
                   style={inputStyle}
                 >
-                  <option value="CONFIDENTIAL">Confidential</option>
-                  <option value="HIGHLY_CONFIDENTIAL">Highly confidential (e.g. ID scan)</option>
+                  <option value="CONFIDENTIAL">
+                    {t('customerWizardClassificationConfidentialOption')}
+                  </option>
+                  <option value="HIGHLY_CONFIDENTIAL">
+                    {t('customerWizardClassificationHighlyConfidentialOption')}
+                  </option>
                 </select>
               </div>
             </div>
             <button type="submit" disabled={isSubmitting} style={{ ...buttonStyle, width: 'auto' }}>
-              Attach document
+              {t('customerWizardAttachDocumentButton')}
             </button>
           </form>
           <div style={wizardNavStyle}>
             {customerType === 'CORPORATE' ? (
               <button type="button" style={buttonStyle} onClick={() => goTo('ubos')}>
-                Back
+                {t('commonBack')}
               </button>
             ) : null}
             <button type="button" style={buttonStyle} onClick={() => goTo('review')}>
-              Continue
+              {t('customerWizardContinueButton')}
             </button>
           </div>
         </div>
@@ -659,7 +678,7 @@ export function CustomerOnboardingWizard() {
 
       {step === 'review' && customer && kyc ? (
         <div>
-          <h2 style={{ marginTop: 0 }}>Review & submit</h2>
+          <h2 style={{ marginTop: 0 }}>{t('customerWizardStepReview')}</h2>
           {/* legalName comes from the create() response, not local state:
               for an individual it's server-computed from the 4 name parts
               (Part F item #4), and it's never masked either way, so this is
@@ -673,22 +692,21 @@ export function CustomerOnboardingWizard() {
               <strong>
                 <bdi>{customer.legalName}</bdi>
               </strong>{' '}
-              ({customer.customerType})
+              ({t(TYPE_LABEL_KEY[customer.customerType])})
             </li>
-            <li>Contact: {contactPhone} / {contactEmail}</li>
-            {customerType === 'CORPORATE' ? <li>Beneficial owners recorded: {ubos.length}</li> : null}
-            <li>Documents attached: {documents.length}</li>
+            <li>{t('customerWizardReviewContactLine', { phone: contactPhone, email: contactEmail })}</li>
+            {customerType === 'CORPORATE' ? (
+              <li>{t('customerWizardReviewUbosLine', { count: ubos.length })}</li>
+            ) : null}
+            <li>{t('customerWizardReviewDocumentsLine', { count: documents.length })}</li>
           </ul>
-          <p style={{ opacity: 0.8 }}>
-            Submitting hands this KYC file to Compliance for sanctions/PEP/AML screening and
-            approval — the Customer stays PENDING_KYC until it&apos;s approved.
-          </p>
+          <p style={{ opacity: 0.8 }}>{t('customerWizardReviewSubmitIntro')}</p>
           <div style={wizardNavStyle}>
             <button type="button" style={buttonStyle} onClick={() => goTo('documents')}>
-              Back
+              {t('commonBack')}
             </button>
             <button type="button" disabled={isSubmitting} style={buttonStyle} onClick={() => void handleSubmitKyc()}>
-              {isSubmitting ? 'Submitting…' : 'Submit for compliance review'}
+              {isSubmitting ? t('customerWizardSubmittingButton') : t('customerWizardSubmitButton')}
             </button>
           </div>
         </div>

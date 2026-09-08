@@ -8,6 +8,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { KycQueue } from '../../../../components/customer/KycQueue';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 // Roles the seeded permission grid grants `kyc.approve` to — the queue is
 // COMPLIANCE_OFFICER-only; the backend independently enforces this
@@ -17,6 +18,7 @@ const CAN_APPROVE_KYC_ROLES = ['COMPLIANCE_OFFICER'];
 export default function KycQueuePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   const [items, setItems] = useState<KycQueueRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -29,13 +31,13 @@ export default function KycQueuePage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the kyc.approve/kyc.capture permission, so there's nothing to show here."
+          ? t('kycQueueNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the KYC queue — try again.',
+            : t('commonTryAgain'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -64,18 +66,14 @@ export default function KycQueuePage() {
 
   return (
     <main style={pageStyle}>
-      <h1>KYC compliance queue</h1>
-      <p style={{ opacity: 0.8 }}>
-        Process 3-4 — run sanctions/PEP/AML screening, route high-risk results through enhanced
-        due diligence, and approve or reject each KYC file. Approving activates the Customer;
-        maker/checker prevents the capturing officer from also being the approver.
-      </p>
+      <h1>{t('kycQueuePageHeading')}</h1>
+      <p style={{ opacity: 0.8 }}>{t('kycQueuePageIntro')}</p>
       {!canApprove ? (
         <p role="alert" style={errorStyle}>
-          You don&apos;t hold the kyc.approve permission — this queue is Compliance-only.
+          {t('kycQueueNoApprovePermission')}
         </p>
       ) : null}
-      {items === null && !loadError ? <p>Loading…</p> : null}
+      {items === null && !loadError ? <p>{t('commonLoading')}</p> : null}
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}

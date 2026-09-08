@@ -12,17 +12,19 @@ import { useAuth } from '../../lib/auth/auth-context';
 import { buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../auth/auth-form.styles';
 import { checkboxRowStyle, fieldStyle, formRowStyle, sectionStyle } from './lead.styles';
 import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../pdpl/PrivacyNoticeDisplay';
+import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 
-const SOURCE_LABEL: Record<LeadSource, string> = {
-  referral: 'Referral',
-  website: 'Website',
-  social_media: 'Social media',
-  campaign: 'Campaign',
-  tender: 'Tender',
-  bank_partner: 'Bank partner',
-  strategic_partner: 'Strategic partner',
-  ex_customer: 'Ex-customer',
-  renewal: 'Renewal opportunity',
+const SOURCE_LABEL_KEY: Record<LeadSource, TranslationKey> = {
+  referral: 'leadSourceReferral',
+  website: 'leadSourceWebsite',
+  social_media: 'leadSourceSocialMedia',
+  campaign: 'leadSourceCampaign',
+  tender: 'leadSourceTender',
+  bank_partner: 'leadSourceBankPartner',
+  strategic_partner: 'leadSourceStrategicPartner',
+  ex_customer: 'leadSourceExCustomer',
+  renewal: 'leadSourceRenewal',
 };
 
 interface LeadIntakeFormProps {
@@ -31,6 +33,7 @@ interface LeadIntakeFormProps {
 
 export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [fullName, setFullName] = useState('');
   const [source, setSource] = useState<LeadSource>('referral');
   const [contactPhone, setContactPhone] = useState('');
@@ -62,7 +65,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
         marketingConsentGranted,
         consentTextVersion,
       });
-      setMessage(`Lead "${lead.fullName}" added to your pipeline.`);
+      setMessage(t('leadsAddedMessage', { name: lead.fullName }));
       setFullName('');
       setSource('referral');
       setContactPhone('');
@@ -71,7 +74,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
       setConsentTextVersion('privacy-notice-v1.2');
       onLeadCreated(lead);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create the lead — try again.');
+      setError(err instanceof ApiError ? err.message : t('leadsCreateError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -79,7 +82,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
 
   return (
     <section style={sectionStyle}>
-      <h2 style={{ marginTop: 0 }}>New lead</h2>
+      <h2 style={{ marginTop: 0 }}>{t('leadsNewLeadHeading')}</h2>
       <PrivacyNoticeDisplay
         touchpoint="lead_capture"
         canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
@@ -88,7 +91,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
         <div style={formRowStyle}>
           <div style={fieldStyle}>
             <label htmlFor="lead-full-name" style={labelStyle}>
-              Full name
+              {t('leadsFullNameLabel')}
             </label>
             <input
               id="lead-full-name"
@@ -96,12 +99,13 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. Ahmad Al-Fulani"
+              dir="auto"
+              placeholder={t('leadsFullNamePlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
             <label htmlFor="lead-source" style={labelStyle}>
-              Source
+              {t('leadsSourceLabel')}
             </label>
             <select
               id="lead-source"
@@ -111,7 +115,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
             >
               {LEAD_SOURCES.map((s) => (
                 <option key={s} value={s}>
-                  {SOURCE_LABEL[s]}
+                  {t(SOURCE_LABEL_KEY[s])}
                 </option>
               ))}
             </select>
@@ -120,7 +124,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
         <div style={formRowStyle}>
           <div style={fieldStyle}>
             <label htmlFor="lead-phone" style={labelStyle}>
-              Contact phone (optional)
+              {t('leadsPhoneLabel')}
             </label>
             <input
               id="lead-phone"
@@ -132,7 +136,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
           </div>
           <div style={fieldStyle}>
             <label htmlFor="lead-email" style={labelStyle}>
-              Contact email (optional)
+              {t('leadsEmailLabel')}
             </label>
             <input
               id="lead-email"
@@ -150,13 +154,11 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
             checked={marketingConsentGranted}
             onChange={(e) => setMarketingConsentGranted(e.target.checked)}
           />
-          <label htmlFor="lead-marketing-consent">
-            This lead has agreed to receive marketing communications
-          </label>
+          <label htmlFor="lead-marketing-consent">{t('leadsMarketingConsentLabel')}</label>
         </div>
         <div style={fieldStyle}>
           <label htmlFor="lead-consent-text-version" style={labelStyle}>
-            Consent text version
+            {t('leadsConsentTextVersionLabel')}
           </label>
           <input
             id="lead-consent-text-version"
@@ -168,7 +170,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
           />
         </div>
         <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-          {isSubmitting ? 'Adding…' : 'Add lead'}
+          {isSubmitting ? t('leadsAddingButton') : t('leadsAddButton')}
         </button>
         {message ? <p style={successStyle}>{message}</p> : null}
         {error ? (

@@ -524,16 +524,6 @@ const RECOMMENDATION = {
   blockedFromSend: [],
 };
 
-const CLIENT_DECISION = {
-  id: "cd-1",
-  opportunityId: "opp-1",
-  decision: "ACCEPT",
-  evidenceType: "e-signature",
-  evidenceRef: "env-1",
-  notes: null,
-  decidedAt: "2026-09-06T00:00:00.000Z",
-};
-
 const POLICY = {
   id: "pol-1",
   opportunityId: "opp-1",

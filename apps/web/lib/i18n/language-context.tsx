@@ -33,7 +33,7 @@ const STORAGE_KEY = 'ibms.languagePreference';
 interface LanguageContextValue {
   language: Language;
   setLanguage: (language: Language) => void;
-  t: (key: TranslationKey) => string;
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
@@ -78,7 +78,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const t = useCallback((key: TranslationKey) => translate(language, key), [language]);
+  const t = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>) =>
+      translate(language, key, params),
+    [language],
+  );
 
   const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
 

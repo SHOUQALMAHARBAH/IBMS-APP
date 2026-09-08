@@ -8,6 +8,21 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/prospect/prospect.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
+import type { CustomerStatus, CustomerType } from '../../../lib/customer/customer-api';
+
+const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
+  INDIVIDUAL: 'customerTypeIndividual',
+  CORPORATE: 'customerTypeCorporate',
+};
+
+const STATUS_LABEL_KEY: Record<CustomerStatus, TranslationKey> = {
+  PENDING_KYC: 'customerStatusPendingKyc',
+  ACTIVE: 'customerStatusActive',
+  SUSPENDED: 'customerStatusSuspended',
+  CLOSED: 'customerStatusClosed',
+};
 
 // Roles the seeded permission grid grants `customer.create` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
@@ -17,6 +32,7 @@ const CAN_CREATE_CUSTOMER_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 export default function CustomersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -35,13 +51,13 @@ export default function CustomersPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the customer.360-view.read permission, so there's nothing to show here."
+          ? t('customersNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load customers — try again.',
+            : t('commonTryAgain'),
       );
     }
-  }, []);
+  }, [t]);
 
   function onSearchSubmit(e: FormEvent) {
     e.preventDefault();
@@ -65,35 +81,32 @@ export default function CustomersPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Customers</h1>
-      <p style={{ opacity: 0.8 }}>
-        Process 3-4 — customer acquisition and onboarding (individual and corporate), KYC, and
-        beneficial ownership.
-      </p>
+      <h1>{t('customersHeading')}</h1>
+      <p style={{ opacity: 0.8 }}>{t('customersProcessIntro')}</p>
 
       {canCreateCustomer ? (
         <button type="button" onClick={() => router.push('/customers/new')} style={{ cursor: 'pointer' }}>
-          + Onboard a new customer
+          {t('customersOnboardButton')}
         </button>
       ) : null}
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
         <label htmlFor="customer-search" style={{ marginInlineEnd: '0.5rem' }}>
-          Search
+          {t('customersSearchLabel')}
         </label>
         <input
           id="customer-search"
           dir="auto"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Name, in Arabic or English"
+          placeholder={t('commonSearchPlaceholder')}
         />
         <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
-          Search
+          {t('customersSearchLabel')}
         </button>
       </form>
 
-      {customers === null && !loadError ? <p>Loading…</p> : null}
+      {customers === null && !loadError ? <p>{t('commonLoading')}</p> : null}
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}
@@ -102,7 +115,7 @@ export default function CustomersPage() {
       {customers !== null && !loadError ? (
         customers.length === 0 ? (
           <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-            {searchTerm ? 'No customers match your search.' : 'No customers yet.'}
+            {searchTerm ? t('customersNoneMatch') : t('customersNoneYet')}
           </p>
         ) : (
           <div style={listGridStyle}>
@@ -111,14 +124,16 @@ export default function CustomersPage() {
                 key={customer.id}
                 type="button"
                 style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
-                aria-label={`View profile — ${customer.legalName}`}
+                aria-label={t('customersViewProfileAria', { name: customer.legalName })}
                 onClick={() => router.push(`/customers/${customer.id}`)}
               >
                 <strong>
                   <bdi>{customer.legalName}</bdi>
                 </strong>
-                <div style={cardMetaStyle}>{customer.customerType}</div>
-                <div style={cardMetaStyle}>Status: {customer.status}</div>
+                <div style={cardMetaStyle}>{t(TYPE_LABEL_KEY[customer.customerType])}</div>
+                <div style={cardMetaStyle}>
+                  {t('customerStatusLabel', { status: t(STATUS_LABEL_KEY[customer.status]) })}
+                </div>
               </button>
             ))}
           </div>
