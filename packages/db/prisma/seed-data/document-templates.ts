@@ -150,4 +150,32 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
       'لشركة التأمين وخدمة المطالبات والتحمل وشروط الوثيقة معاً — وليس ' +
       'السعر فقط.',
   },
+  /**
+   * Part F item #7 — the fourth of `templateType`'s 6 real document types
+   * to get an actual seeded row. Editable boilerplate prose only; the
+   * per-policy facts (customer, insurer, policy number, premium, the
+   * most recent coverage schedule's limits/sums insured/named perils/
+   * extensions) are real domain data merged in by
+   * `apps/api/src/modules/policy/policy-schedule-summary.template.ts`,
+   * never stored here. `PolicyScheduleSummaryDocumentService` falls back
+   * to this exact wording in code when no row exists yet — kept
+   * identical so the seeded and fallback-default text never silently
+   * diverge.
+   */
+  {
+    templateType: 'policy_schedule_summary',
+    nameEn: 'Policy Schedule Summary',
+    nameAr: 'ملخص جدول الوثيقة',
+    bodyEn:
+      'This document summarizes the coverage currently in force under ' +
+      'this policy, as recorded from the insurer-issued schedule. ' +
+      'Please review the limits, sums insured, named perils and ' +
+      'extensions below, and contact us promptly if anything does not ' +
+      'match your requirements.',
+    bodyAr:
+      'يلخّص هذا المستند التغطية السارية حالياً بموجب هذه الوثيقة، كما ' +
+      'وردت في الجدول الصادر عن شركة التأمين. يرجى مراجعة الحدود ' +
+      'ومبالغ التأمين والأخطار المسماة والامتدادات أدناه، والتواصل ' +
+      'معنا فوراً في حال وجود أي تعارض مع متطلباتكم.',
+  },
 ];

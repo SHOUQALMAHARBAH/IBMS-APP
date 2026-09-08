@@ -3,6 +3,7 @@ import { PolicyController } from './policy.controller';
 import { PolicyService } from './policy.service';
 import { PolicyCheckingService } from './policy-checking.service';
 import { PolicyDeliveryService } from './policy-delivery.service';
+import { PolicyScheduleSummaryDocumentService } from './policy-schedule-summary-document.service';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
@@ -14,6 +15,7 @@ import { OpportunityModule } from '../opportunity/opportunity.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { ClientDecisionModule } from '../client-decision/client-decision.module';
 import { CustomerModule } from '../customer/customer.module';
+import { DocumentGenerationModule } from '../document-generation/document-generation.module';
 
 /** Process 18-19 — Policy Placement & Issuance + Process 20 — Policy Checking
  * + Process 21 — Policy Delivery (backlog Part C #18-21, Domain B).
@@ -31,6 +33,9 @@ import { CustomerModule } from '../customer/customer.module';
  *   - ClientDecisionModule  -> ClientDecisionRepository (the ACCEPT decision,
  *     the authoritative placement precondition)
  *   - CustomerModule        -> CustomerRepository (owner, for visibility)
+ *   - DocumentGenerationModule -> PdfRendererService +
+ *     DocumentTemplateRepository (Part F item #7 — bilingual
+ *     policy-schedule-summary PDF, `PolicyScheduleSummaryDocumentService`)
  *
  * `BrokerLicenseRepository` (Process 51, backlog Part C #51's first
  * checkbox — "automatically block new business issuance once the license
@@ -51,6 +56,7 @@ import { CustomerModule } from '../customer/customer.module';
     RecommendationModule,
     ClientDecisionModule,
     CustomerModule,
+    DocumentGenerationModule,
   ],
   controllers: [PolicyController],
   providers: [
@@ -60,6 +66,7 @@ import { CustomerModule } from '../customer/customer.module';
     PolicyCheckingRepository,
     PolicyDeliveryService,
     PolicyDeliveryRepository,
+    PolicyScheduleSummaryDocumentService,
     BrokerLicenseRepository,
     PiPolicyRepository,
   ],

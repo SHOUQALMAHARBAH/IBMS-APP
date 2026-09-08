@@ -1766,15 +1766,36 @@ test("places a policy from an accepted opportunity and records its issuance", as
       issued = b;
     },
   });
+  // Registered AFTER mockRfqApi's own broader "policies**" route —
+  // Playwright runs routes in reverse-registration order, so this more
+  // specific one wins for the document endpoint while the general one
+  // still handles place/issuance/checking/delivery/read.
+  await page.route(
+    "http://localhost:4000/policies/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
 
   await page.goto("/opportunities/opp-1");
   await expect(page.getByRole("heading", { name: "Policy" })).toBeVisible();
+
+  // Part F item #7 — no coverage schedule yet, so no download button.
+  await expect(
+    page.getByRole("button", { name: "Download schedule summary (PDF)" }),
+  ).toHaveCount(0);
 
   await page.getByLabel("Inception date").fill("2026-10-01");
   await page.getByRole("button", { name: "Place policy" }).click();
 
   await expect.poll(() => placed?.inceptionDate).toBe("2026-10-01");
   await expect(page.getByText("PLACEMENT_CONFIRMED")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download schedule summary (PDF)" }),
+  ).toHaveCount(0);
 
   await page.getByLabel("Policy number").fill("POL-WEB-1");
   await page.getByLabel("Issued premium").fill("118500.000");
@@ -1784,6 +1805,17 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await expect.poll(() => issued?.issuedPremium).toBe("118500.000");
   await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
   await expect(page.getByText("POL-WEB-1")).toBeVisible();
+
+  // Part F item #7 — a schedule now exists, so the button appears and
+  // produces a real bilingual PDF download.
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download schedule summary (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    "policy-schedule-summary-pol-1.pdf",
+  );
 });
 
 test("a Policy Checking Officer runs the QC check and sees a discrepancy block Delivery", async ({

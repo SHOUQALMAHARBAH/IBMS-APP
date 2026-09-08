@@ -5,6 +5,7 @@ import {
   acknowledgePolicyReceipt,
   attachPolicyDocuments,
   checkPolicy,
+  downloadPolicyScheduleDocument,
   listPoliciesForOpportunity,
   placePolicy,
   recordPolicyDelivery,
@@ -207,6 +208,32 @@ export function PolicySection({
       await load();
     })();
   }, [load]);
+
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass.
+  // The button is only rendered once schedules.length > 0 (see below),
+  // so this call should never actually hit the api's own 422 — the
+  // try/catch here is a safety net, not the expected path.
+  async function downloadDocument(id: string) {
+    setFormError(null);
+    try {
+      const blob = await downloadPolicyScheduleDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `policy-schedule-summary-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setFormError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the schedule summary — try again.',
+      );
+    }
+  }
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -459,6 +486,13 @@ export function PolicySection({
                   {s.extensions.join(', ') || '—'}
                 </div>
               ))}
+              <button
+                type="button"
+                onClick={() => void downloadDocument(policy.id)}
+                style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
+              >
+                Download schedule summary (PDF)
+              </button>
             </div>
           ) : null}
 
