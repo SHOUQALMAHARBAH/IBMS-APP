@@ -34,7 +34,6 @@ import {
   quoteFieldStyle,
 } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
-import type { TranslationKey } from '../../lib/i18n/translations';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
 import type { Language } from '../../lib/i18n/translations';
 
@@ -863,7 +862,7 @@ export function ClaimSection({
           : t('claimLoadError'),
       );
     }
-  }, [opportunityId]);
+  }, [opportunityId, t]);
 
   useEffect(() => {
     void (async () => {

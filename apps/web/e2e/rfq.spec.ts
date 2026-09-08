@@ -1997,7 +1997,7 @@ test("raises a premium invoice from the Billing block — commission netted, tot
 
   await page.goto("/opportunities/opp-1");
   await expect(
-    page.getByRole("heading", { name: "Billing", exact: true }),
+    page.getByRole("heading", { name: "Finance", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("No premium invoice yet")).toBeVisible();
   await expect(
@@ -2039,7 +2039,7 @@ test("a non-Finance user sees no raise-invoice control on the Billing block", as
 
   await page.goto("/opportunities/opp-1");
   await expect(
-    page.getByRole("heading", { name: "Billing", exact: true }),
+    page.getByRole("heading", { name: "Finance", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Raise premium invoice" }),
@@ -2061,7 +2061,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
 
   await page.goto("/opportunities/opp-1");
   await expect(
-    page.getByRole("heading", { name: "Billing", exact: true }),
+    page.getByRole("heading", { name: "Finance", exact: true }),
   ).toBeVisible();
 
   // raise the invoice first

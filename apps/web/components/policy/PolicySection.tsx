@@ -26,7 +26,6 @@ import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
-import type { TranslationKey } from '../../lib/i18n/translations';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
 
 interface Props {
@@ -203,7 +202,7 @@ export function PolicySection({
           : t('policyLoadError'),
       );
     }
-  }, [opportunity.id]);
+  }, [opportunity.id, t]);
 
   useEffect(() => {
     void (async () => {

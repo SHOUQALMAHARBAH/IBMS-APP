@@ -72,7 +72,7 @@ export function CommissionSection({
           : t('commissionLoadError'),
       );
     }
-  }, [opportunityId]);
+  }, [opportunityId, t]);
 
   useEffect(() => {
     void (async () => {
