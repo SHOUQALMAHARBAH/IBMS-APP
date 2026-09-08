@@ -1,3 +1,10 @@
+import {
+  DOCUMENT_BASE_CSS,
+  escapeHtml,
+  formatDocumentDate,
+  type DocumentLanguage,
+} from '../document-generation/document-html.util';
+
 /** Part F item #7 — complaint acknowledgement, the first of the 6 named
  * document types built (chosen as the vertical slice: simplest real data,
  * lowest risk way to prove generation + bilingual layout + delivery works
@@ -14,8 +21,6 @@
  * date) are NOT stored in the template — they are real domain data, merged
  * in by this function around the boilerplate text, never string-replaced
  * into it. */
-
-export type AcknowledgementLanguage = 'AR' | 'EN' | 'DUAL';
 
 export interface ComplaintAcknowledgementData {
   complaintId: string;
@@ -45,26 +50,6 @@ function categoryLabel(category: string | null, lang: 'en' | 'ar'): string {
   return CATEGORY_LABELS[category]?.[lang] ?? category;
 }
 
-function formatDate(d: Date, lang: 'en' | 'ar'): string {
-  const locale = lang === 'ar' ? 'ar' : 'en-GB';
-  return d.toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-const SHARED_CSS = `
-  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 40px; color: #1a1a1a; }
-  section { margin-bottom: 0; }
-  h1 { font-size: 20px; margin-bottom: 4px; }
-  .meta { color: #555; font-size: 13px; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-  td, th { border: 1px solid #999; padding: 8px; text-align: start; font-size: 14px; }
-  p { line-height: 1.6; font-size: 14px; }
-  .page-break { page-break-before: always; }
-`;
-
 function renderSection(
   data: ComplaintAcknowledgementData,
   lang: 'en' | 'ar',
@@ -77,27 +62,25 @@ function renderSection(
       ? [
           ['رقم الشكوى', data.complaintId],
           ['حامل الوثيقة / العميل', data.customerLegalName],
-          ['تاريخ التسجيل', formatDate(data.createdAt, 'ar')],
+          ['تاريخ التسجيل', formatDocumentDate(data.createdAt, 'ar')],
           ['نوع الشكوى', categoryLabel(data.category, 'ar')],
           ['موضوع الشكوى', data.issue],
           ...(data.dueAt
-            ? ([['الرد المتوقع بحلول', formatDate(data.dueAt, 'ar')]] as [
-                string,
-                string,
-              ][])
+            ? ([
+                ['الرد المتوقع بحلول', formatDocumentDate(data.dueAt, 'ar')],
+              ] as [string, string][])
             : []),
         ]
       : [
           ['Complaint Reference', data.complaintId],
           ['Policyholder / Customer', data.customerLegalName],
-          ['Date Logged', formatDate(data.createdAt, 'en')],
+          ['Date Logged', formatDocumentDate(data.createdAt, 'en')],
           ['Category', categoryLabel(data.category, 'en')],
           ['Issue', data.issue],
           ...(data.dueAt
-            ? ([['Expected Response By', formatDate(data.dueAt, 'en')]] as [
-                string,
-                string,
-              ][])
+            ? ([
+                ['Expected Response By', formatDocumentDate(data.dueAt, 'en')],
+              ] as [string, string][])
             : []),
         ];
   const body = lang === 'ar' ? data.bodyAr : data.bodyEn;
@@ -105,7 +88,7 @@ function renderSection(
   return `
     <section dir="${dir}" lang="${lang}">
       <h1>${title}</h1>
-      <p class="meta">${formatDate(new Date(), lang)}</p>
+      <p class="meta">${formatDocumentDate(new Date(), lang)}</p>
       <table>
         ${rows.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}
       </table>
@@ -118,27 +101,9 @@ function renderSection(
   `;
 }
 
-/** Load-bearing, not defensive-by-habit: `data.issue` is customer-supplied
- * free text (`CreateComplaintDto.issue`) and this HTML is rendered inside a
- * REAL headless browser (`PdfRendererService`) — the first time this
- * codebase renders any user-influenced string inside an actual browser
- * engine. An unescaped `<script>`/`<iframe>` here would not just be a
- * cosmetic HTML-injection bug, it would EXECUTE inside that page context
- * (e.g. an `<iframe src="http://internal-host">` reachable from wherever
- * the api container runs) — every interpolated value in `renderSection`
- * goes through this first. */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 export function buildComplaintAcknowledgementHtml(
   data: ComplaintAcknowledgementData,
-  language: AcknowledgementLanguage,
+  language: DocumentLanguage,
 ): string {
   const sections =
     language === 'DUAL'
@@ -149,7 +114,9 @@ export function buildComplaintAcknowledgementHtml(
 <html>
 <head>
 <meta charset="utf-8">
-<style>${SHARED_CSS}</style>
+<style>${DOCUMENT_BASE_CSS}
+  section { margin-bottom: 0; }
+</style>
 </head>
 <body>${sections}</body>
 </html>`;

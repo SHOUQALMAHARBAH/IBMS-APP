@@ -1580,6 +1580,39 @@ test("builds the comparison matrix and shows the missing-insurer flag", async ({
   ).toBeVisible();
 });
 
+test("downloads a bilingual quotation-comparison PDF once a comparison exists", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+  // Registered AFTER mockRfqApi's own broader "comparison-matrices**"
+  // route — Playwright runs routes in reverse-registration order, so this
+  // more specific one wins for the document endpoint while the general
+  // one still handles build/read.
+  await page.route(
+    "http://localhost:4000/comparison-matrices/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
+
+  await page.goto("/rfqs/rfq-1");
+  await page.getByRole("button", { name: "Build comparison" }).click();
+  await expect(
+    page.getByRole("button", { name: "Rebuild comparison" }),
+  ).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download comparison (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("quotation-comparison-cm-1.pdf");
+});
+
 test("a non-Placement user sees the comparison but no build control", async ({
   page,
 }) => {

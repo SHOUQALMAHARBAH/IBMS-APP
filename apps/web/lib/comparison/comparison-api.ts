@@ -3,7 +3,7 @@
 // RFQ, (re)built from every current-version quotation; shortlisted insurers
 // with no quote to compare are flagged.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 import type { QuotationVersion } from '../quotation/quotation-api';
 
 export interface ComparisonRow {
@@ -54,4 +54,15 @@ export function buildComparison(
   input: BuildComparisonInput,
 ): Promise<ComparisonMatrix> {
   return apiPost('/comparison-matrices', input);
+}
+
+// Part F item #7 — bilingual quotation-comparison PDF. Omitting
+// `language` defaults server-side to the customer's own
+// languagePreference; 'DUAL' renders both, Arabic section first.
+export function downloadComparisonDocument(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/comparison-matrices/${id}/document${qs}`);
 }

@@ -3,10 +3,8 @@ import { ComplaintRepository } from '../../repositories/complaint.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { DocumentTemplateRepository } from '../../repositories/document-template.repository';
 import { PdfRendererService } from '../document-generation/pdf-renderer.service';
-import {
-  buildComplaintAcknowledgementHtml,
-  type AcknowledgementLanguage,
-} from './complaint-acknowledgement.template';
+import type { DocumentLanguage } from '../document-generation/document-html.util';
+import { buildComplaintAcknowledgementHtml } from './complaint-acknowledgement.template';
 
 const COMPLAINT_ACKNOWLEDGEMENT_TEMPLATE_TYPE = 'complaint_acknowledgement';
 
@@ -41,7 +39,7 @@ export class ComplaintAcknowledgementService {
 
   async generate(
     complaintId: string,
-    requestedLanguage: AcknowledgementLanguage | undefined,
+    requestedLanguage: DocumentLanguage | undefined,
   ): Promise<GeneratedDocument> {
     const complaint = await this.complaints.findById(complaintId);
     if (!complaint) {
@@ -58,7 +56,7 @@ export class ComplaintAcknowledgementService {
       COMPLAINT_ACKNOWLEDGEMENT_TEMPLATE_TYPE,
     );
 
-    const language: AcknowledgementLanguage =
+    const language: DocumentLanguage =
       requestedLanguage ?? customer.languagePreference;
 
     const html = buildComplaintAcknowledgementHtml(

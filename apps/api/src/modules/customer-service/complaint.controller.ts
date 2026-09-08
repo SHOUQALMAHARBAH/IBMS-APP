@@ -17,7 +17,7 @@ import { ComplaintActionDto } from './dto/complaint-action.dto';
 import { ResolveComplaintDto } from './dto/resolve-complaint.dto';
 import { EscalateComplaintDto } from './dto/escalate-complaint.dto';
 import { ListComplaintsQueryDto } from './dto/list-complaints-query.dto';
-import { GenerateComplaintAcknowledgementQueryDto } from './dto/generate-complaint-acknowledgement-query.dto';
+import { DocumentLanguageQueryDto } from '../document-generation/dto/document-language-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -77,7 +77,7 @@ export class ComplaintController {
   @Header('Content-Type', 'application/pdf')
   async acknowledgement(
     @Param('id') id: string,
-    @Query() query: GenerateComplaintAcknowledgementQueryDto,
+    @Query() query: DocumentLanguageQueryDto,
   ): Promise<StreamableFile> {
     const { buffer, fileName } = await this.acknowledgements.generate(
       id,

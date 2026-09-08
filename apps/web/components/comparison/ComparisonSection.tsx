@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   buildComparison,
+  downloadComparisonDocument,
   getComparisonForRfq,
   type ComparisonMatrix,
   type InsurerScoreInput,
@@ -102,6 +103,29 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
     }
   }
 
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass.
+  async function downloadDocument(id: string) {
+    setBuildError(null);
+    try {
+      const blob = await downloadComparisonDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `quotation-comparison-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setBuildError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the comparison document — try again.',
+      );
+    }
+  }
+
   function setScore(
     insurerId: string,
     key: keyof ScoreDraft,
@@ -145,6 +169,14 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
           <div style={{ ...comparisonPreStyle, opacity: 0.6, marginTop: '0.5rem' }}>
             Built {formatDateTime(matrix.builtAt, language)}
           </div>
+
+          <button
+            type="button"
+            onClick={() => void downloadDocument(matrix.id)}
+            style={{ margin: '0.5rem 0' }}
+          >
+            Download comparison (PDF)
+          </button>
 
           <div style={comparisonScrollStyle}>
             <table style={rfqTableStyle}>

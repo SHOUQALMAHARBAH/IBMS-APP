@@ -96,4 +96,30 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
       'فريقنا بدراسة الموضوع وإبقائكم على اطلاع بمستجداته.\n' +
       'نقدّر صبركم وثقتكم المستمرة بنا.',
   },
+  /**
+   * Part F item #7 — the second of `templateType`'s 6 real document types
+   * to get an actual seeded row. Editable boilerplate prose only; the
+   * per-comparison facts (customer, insurance line, the row table itself,
+   * missing/declined insurers) are real domain data merged in by
+   * `apps/api/src/modules/comparison/quotation-comparison.template.ts`,
+   * never stored here. `QuotationComparisonDocumentService` falls back to
+   * this exact wording in code when no row exists yet — kept identical so
+   * the seeded and fallback-default text never silently diverge.
+   */
+  {
+    templateType: 'quotation_comparison',
+    nameEn: 'Quotation Comparison',
+    nameAr: 'مقارنة عروض التأمين',
+    bodyEn:
+      'The following is a structured comparison of the quotations ' +
+      'received for this insurance requirement. Coverage, exclusions, ' +
+      'deductibles, limits, and insurer service quality have all been ' +
+      'considered alongside price — this comparison should never be ' +
+      'read on price alone.',
+    bodyAr:
+      'فيما يلي مقارنة منظّمة لعروض التأمين الواردة لهذا الطلب. تم النظر ' +
+      'في التغطية والاستثناءات والتحملات وحدود التغطية وجودة خدمة شركة ' +
+      'التأمين إلى جانب السعر — لا ينبغي قراءة هذه المقارنة بناءً على ' +
+      'السعر فقط.',
+  },
 ];
