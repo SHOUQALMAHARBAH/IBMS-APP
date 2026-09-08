@@ -2073,7 +2073,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
 
   // 1. record the receipt for the full total
   await page
-    .getByRole("button", { name: /Record receipt of JOD 115,350.000/ })
+    .getByRole("button", { name: "Record collection" })
     .click();
   await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
   await expect(page.getByText("JOD 115,350.000 (bank_transfer)")).toBeVisible();
