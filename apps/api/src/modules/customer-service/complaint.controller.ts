@@ -1,12 +1,23 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ComplaintService } from './complaint.service';
+import { ComplaintAcknowledgementService } from './complaint-acknowledgement.service';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
 import { AssignComplaintDto } from './dto/assign-complaint.dto';
 import { ComplaintActionDto } from './dto/complaint-action.dto';
 import { ResolveComplaintDto } from './dto/resolve-complaint.dto';
 import { EscalateComplaintDto } from './dto/escalate-complaint.dto';
 import { ListComplaintsQueryDto } from './dto/list-complaints-query.dto';
+import { GenerateComplaintAcknowledgementQueryDto } from './dto/generate-complaint-acknowledgement-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -29,7 +40,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('customer-service')
 @Controller('complaints')
 export class ComplaintController {
-  constructor(private readonly complaints: ComplaintService) {}
+  constructor(
+    private readonly complaints: ComplaintService,
+    private readonly acknowledgements: ComplaintAcknowledgementService,
+  ) {}
 
   @RequirePermissions('complaint.log')
   @Post()
@@ -50,6 +64,28 @@ export class ComplaintController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.complaints.get(id);
+  }
+
+  // Part F item #7 — bilingual complaint-acknowledgement PDF. Generated
+  // on demand and streamed back, not persisted (no object storage exists
+  // anywhere in this app to persist it into — a user-scoped decision to
+  // keep this item's scope to document generation itself). Same
+  // `complaint.log` permission as `get()` above — reading a complaint's
+  // acknowledgement is a read, not a new capability.
+  @RequirePermissions('complaint.log')
+  @Get(':id/acknowledgement')
+  @Header('Content-Type', 'application/pdf')
+  async acknowledgement(
+    @Param('id') id: string,
+    @Query() query: GenerateComplaintAcknowledgementQueryDto,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.acknowledgements.generate(
+      id,
+      query.language,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 
   @RequirePermissions('complaint.log')

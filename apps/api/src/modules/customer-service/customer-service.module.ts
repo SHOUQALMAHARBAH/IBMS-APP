@@ -4,6 +4,7 @@ import { ServiceRequestService } from './service-request.service';
 import { ServiceRequestRepository } from '../../repositories/service-request.repository';
 import { ComplaintController } from './complaint.controller';
 import { ComplaintService } from './complaint.service';
+import { ComplaintAcknowledgementService } from './complaint-acknowledgement.service';
 import { ComplaintRepository } from '../../repositories/complaint.repository';
 import { CommunicationController } from './communication.controller';
 import { CommunicationService } from './communication.service';
@@ -18,6 +19,8 @@ import { RetentionSweepScheduler } from './retention-sweep.scheduler';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { SlaModule } from '../sla/sla.module';
+import { CustomerModule } from '../customer/customer.module';
+import { DocumentGenerationModule } from '../document-generation/document-generation.module';
 
 /**
  * Domain E — Customer Service (backlog Part C #41–46).
@@ -56,13 +59,24 @@ import { SlaModule } from '../sla/sla.module';
  *   - SlaModule   -> SlaTimerService (the generic escalation engine —
  *     `service_request_fulfilment` / `complaint_resolution`, both DRAFTED).
  *     `@Global()`, but imported explicitly per the `RbacModule` precedent.
+ *   - CustomerModule -> CustomerRepository (the complaint's customer, for
+ *     legalName + languagePreference).
+ *   - DocumentGenerationModule -> PdfRendererService +
+ *     DocumentTemplateRepository (Part F item #7 — bilingual
+ *     complaint-acknowledgement PDF, `ComplaintAcknowledgementService`).
  *
  * `WorkflowTransitionService` (for `Complaint.status`) comes from the
  * `@Global()` `WorkflowModule`, so it is not imported here. The global
  * `PermissionsGuard` / `@CurrentUser` cover all five controllers.
  */
 @Module({
-  imports: [AuditModule, AuthModule, SlaModule],
+  imports: [
+    AuditModule,
+    AuthModule,
+    SlaModule,
+    CustomerModule,
+    DocumentGenerationModule,
+  ],
   controllers: [
     ServiceRequestController,
     ComplaintController,
@@ -74,6 +88,7 @@ import { SlaModule } from '../sla/sla.module';
     ServiceRequestService,
     ServiceRequestRepository,
     ComplaintService,
+    ComplaintAcknowledgementService,
     ComplaintRepository,
     CommunicationService,
     CommunicationRepository,

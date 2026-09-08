@@ -9,6 +9,7 @@ import {
   closeComplaint,
   COMPLAINT_CATEGORIES,
   createComplaint,
+  downloadComplaintAcknowledgement,
   escalateComplaint,
   listComplaints,
   resolveComplaint,
@@ -95,6 +96,31 @@ export default function ComplaintsPage() {
       await load();
     })();
   }, [user, load]);
+
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass
+  // (DUAL is reachable via the api directly, e.g. for a front-desk
+  // handout in both languages, but this list view keeps one button).
+  async function downloadAcknowledgement(id: string) {
+    setActionError(null);
+    try {
+      const blob = await downloadComplaintAcknowledgement(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `complaint-acknowledgement-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the acknowledgement — try again.',
+      );
+    }
+  }
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -236,6 +262,15 @@ export default function ComplaintsPage() {
                     <td style={cell}>{slaLabel(c)}</td>
                     <td style={cell}>{c.escalations.length || '—'}</td>
                     <td style={cell}>
+                      {canLog ? (
+                        <button
+                          type="button"
+                          onClick={() => void downloadAcknowledgement(c.id)}
+                          style={{ marginBottom: '0.4rem' }}
+                        >
+                          Download acknowledgement (PDF)
+                        </button>
+                      ) : null}
                       {c.isClosed ? (
                         <bdi>{c.resolution ?? '—'}</bdi>
                       ) : (

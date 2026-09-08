@@ -101,6 +101,32 @@ test("lists complaints with SLA + escalation state and the log form", async ({
   await expect(page.getByRole("button", { name: "Resolve" })).toBeVisible();
 });
 
+test("downloads a bilingual acknowledgement PDF for a permitted user", async ({
+  page,
+}) => {
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  await mockComplaints(page);
+  await page.route(
+    "http://localhost:4000/complaints/c-1/acknowledgement**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
+
+  await page.goto("/complaints");
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download acknowledgement (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    "complaint-acknowledgement-c-1.pdf",
+  );
+});
+
 test("a user without the permission sees a friendly message", async ({
   page,
 }) => {

@@ -70,4 +70,30 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
     bodyEn: PROPOSAL_FORM_SKELETON_EN('Life'),
     bodyAr: PROPOSAL_FORM_SKELETON_AR('على الحياة'),
   },
+  /**
+   * Part F item #7 — the first of `templateType`'s 6 real (non-proposal-
+   * form) document types to get an actual seeded row. Editable boilerplate
+   * prose only (Compliance/Customer Service can revise this without a code
+   * change) — the per-complaint facts (reference, dates, category, SLA due
+   * date) are real domain data merged in by
+   * `apps/api/src/modules/customer-service/complaint-acknowledgement.template.ts`,
+   * never stored here. `ComplaintAcknowledgementService` falls back to this
+   * exact wording in code when no row exists yet (a fresh environment
+   * before this seed has run) — kept identical so the seeded and
+   * fallback-default text never silently diverge.
+   */
+  {
+    templateType: 'complaint_acknowledgement',
+    nameEn: 'Complaint Acknowledgement',
+    nameAr: 'إشعار استلام شكوى',
+    bodyEn:
+      'Thank you for contacting us. We confirm that we have received your ' +
+      'complaint and that it has been logged for review. Our team will ' +
+      'investigate the matter and keep you informed of its progress.\n' +
+      'We appreciate your patience and your continued trust in us.',
+    bodyAr:
+      'شكراً لتواصلكم معنا. نؤكد استلام شكواكم وتسجيلها للمراجعة. سيقوم ' +
+      'فريقنا بدراسة الموضوع وإبقائكم على اطلاع بمستجداته.\n' +
+      'نقدّر صبركم وثقتكم المستمرة بنا.',
+  },
 ];
