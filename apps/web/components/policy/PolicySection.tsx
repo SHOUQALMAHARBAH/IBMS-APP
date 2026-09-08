@@ -26,6 +26,7 @@ import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
 
 interface Props {
@@ -156,7 +157,7 @@ export function PolicySection({
   canDeliver,
   onOpportunityChanged,
 }: Props) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -199,7 +200,7 @@ export function PolicySection({
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the policy — try again.',
+          : t('policyLoadError'),
       );
     }
   }, [opportunity.id]);
@@ -231,7 +232,7 @@ export function PolicySection({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not generate the schedule summary — try again.',
+          : t('policyScheduleDownloadError'),
       );
     }
   }
@@ -256,7 +257,7 @@ export function PolicySection({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not generate the certificate — try again.',
+          : t('policyCertificateDownloadError'),
       );
     }
   }
@@ -271,7 +272,7 @@ export function PolicySection({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'That action could not be completed — try again.',
+          : t('policyActionError'),
       );
     } finally {
       setBusy(false);
@@ -281,8 +282,8 @@ export function PolicySection({
   if (policy === undefined) {
     return (
       <section>
-        <h2 style={{ marginTop: '2.5rem' }}>Policy</h2>
-        <p>Loading…</p>
+        <h2 style={{ marginTop: '2.5rem' }}>{t('policySectionHeading')}</h2>
+        <p>{t('policyCommonLoading')}</p>
       </section>
     );
   }
@@ -300,11 +301,8 @@ export function PolicySection({
 
   return (
     <section>
-      <h2 style={{ marginTop: '2.5rem' }}>Policy</h2>
-      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
-        Placed once the client accepts; issuance records the insurer-issued
-        policy number, premium, coverage schedule and documents.
-      </p>
+      <h2 style={{ marginTop: '2.5rem' }}>{t('policySectionHeading')}</h2>
+      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('policyIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
