@@ -381,6 +381,34 @@ describe('buildReceivablesAgeing (Process 33)', () => {
     expect(report.rows.map((r) => r.customerId)).toEqual(['D', 'E', 'C']);
   });
 
+  it('breaks a fully-tied age/balance by Arabic-locale name order, not a naive one (Part F item #4)', () => {
+    // "إبراهيم" (Ibrahim) sorts BEFORE "أحمد" (Ahmad) under a genuine 'ar'
+    // collation, but AFTER it under 'en' (or an unspecified/codepoint-order
+    // comparison) — a real, empirically-verified divergence (Node's ICU),
+    // not an artificial fixture. Proves the code actually passes 'ar', not
+    // just that customer names happen to render correctly either way.
+    const report = buildReceivablesAgeing({
+      asOf,
+      invoices: [
+        inv({
+          id: 'f',
+          customerId: 'F',
+          customerLegalName: 'أحمد للتجارة',
+          totalAmount: '1000.000',
+          dueDate: due(-10),
+        }),
+        inv({
+          id: 'g',
+          customerId: 'G',
+          customerLegalName: 'إبراهيم للتأمين',
+          totalAmount: '1000.000',
+          dueDate: due(-10),
+        }),
+      ],
+    });
+    expect(report.rows.map((r) => r.customerId)).toEqual(['G', 'F']);
+  });
+
   it('is empty (zeroed totals) when nothing is outstanding', () => {
     const report = buildReceivablesAgeing({ asOf, invoices: [] });
     expect(report.rows).toEqual([]);

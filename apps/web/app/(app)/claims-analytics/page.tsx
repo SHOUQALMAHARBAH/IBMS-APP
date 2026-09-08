@@ -12,19 +12,14 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatMoney } from '../../../lib/i18n/format';
 
 const GROUP_LABEL: Record<LossRatioGroupBy, string> = {
   customer: 'Client',
   policy: 'Policy',
   line: 'Insurance line',
 };
-
-function money(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${v}`;
-}
 
 function ratioPct(v: string): string {
   const n = Number(v);
@@ -34,11 +29,11 @@ function ratioPct(v: string): string {
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
-  textAlign: 'right',
+  textAlign: 'end',
   fontWeight: 600,
   borderBottom: '2px solid #d1d5db',
 };
@@ -46,6 +41,7 @@ const headCellStyle: CSSProperties = {
 export default function ClaimsAnalyticsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [groupBy, setGroupBy] = useState<LossRatioGroupBy>('line');
   const [data, setData] = useState<LossRatioBreakdown | null>(null);
@@ -119,7 +115,7 @@ export default function ClaimsAnalyticsPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>
                     {GROUP_LABEL[data.groupBy]}
                   </th>
                   <th style={headCellStyle}>Loss ratio</th>
@@ -132,19 +128,21 @@ export default function ClaimsAnalyticsPage() {
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.key}>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>{r.label}</td>
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                      <bdi>{r.label}</bdi>
+                    </td>
                     <td style={cellStyle}>
                       {ratioPct(r.ratio)}
                       {r.ratioCapped ? ' (capped)' : ''}
                     </td>
-                    <td style={cellStyle}>{money(r.periodClaims)}</td>
-                    <td style={cellStyle}>{money(r.periodPremium)}</td>
+                    <td style={cellStyle}>{formatMoney(r.periodClaims, language)}</td>
+                    <td style={cellStyle}>{formatMoney(r.periodPremium, language)}</td>
                     <td style={cellStyle}>{r.claimCount}</td>
                     <td style={cellStyle}>{r.policyCount}</td>
                   </tr>
                 ))}
                 <tr>
-                  <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}>
+                  <td style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}>
                     Total
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
@@ -152,10 +150,10 @@ export default function ClaimsAnalyticsPage() {
                     {data.totals.ratioCapped ? ' (capped)' : ''}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {money(data.totals.periodClaims)}
+                    {formatMoney(data.totals.periodClaims, language)}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {money(data.totals.periodPremium)}
+                    {formatMoney(data.totals.periodPremium, language)}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {data.totals.claimCount}

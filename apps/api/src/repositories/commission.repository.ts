@@ -49,11 +49,16 @@ export class CommissionRepository {
       .then((n) => n > 0);
   }
 
-  listInsurers(): Promise<{ id: string; name: string }[]> {
-    return this.prisma.client.insurer.findMany({
+  async listInsurers(): Promise<{ id: string; name: string }[]> {
+    const insurers = await this.prisma.client.insurer.findMany({
       select: { id: true, name: true },
-      orderBy: { name: 'asc' },
     });
+    // Sorted in JS, not via Prisma `orderBy` (plain Postgres default
+    // collation) — Insurer.name is genuinely bilingual (Part F item #4), and
+    // a fixed 'ar' locale is the only way to get Arabic-aware ordering
+    // without a DB-level ICU collation migration. A small, unpaginated
+    // lookup list, so an in-memory sort is negligible cost.
+    return insurers.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }
 
   /** Every agreement for a pair, newest window first — the input to

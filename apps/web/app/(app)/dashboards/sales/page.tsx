@@ -94,6 +94,7 @@ export default function SalesDashboardPage() {
           Insurance line
           <input
             aria-label="Insurance line filter"
+            dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />

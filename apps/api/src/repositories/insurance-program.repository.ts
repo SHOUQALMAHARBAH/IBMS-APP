@@ -85,11 +85,45 @@ export class InsuranceProgramRepository {
     });
   }
 
-  /** Wipes a DRAFT program's lines ahead of a re-assembly (guarded by the
-   * service — only ever called while the program is DRAFT). */
-  deleteLines(insuranceProgramId: string): Promise<Prisma.BatchPayload> {
-    return this.prisma.client.insuranceProgramLine.deleteMany({
-      where: { insuranceProgramId },
+  /** Re-assembly's guard + wholesale lines rewrite, in ONE transaction
+   * (ibms-brain/meta/lex/race-safe-invariants.md — the
+   * `escalateAndCreateRetentionCase` shape, retention-case.repository.ts).
+   * The guard is a real `UPDATE ... WHERE id = ? AND status = 'DRAFT'`, not
+   * a `findUnique` read: Postgres takes a row lock on the InsuranceProgram
+   * row for that write and holds it until this transaction commits, so a
+   * concurrent finalize() — WorkflowTransitionService.transition()'s own
+   * status-conditional `updateMany` against the SAME row — either blocks
+   * behind this transaction or blocks this one. Whichever commits second
+   * re-evaluates its own status predicate against the row the other one
+   * just committed, so the loser always lands on a clean zero-row result
+   * instead of the open read-then-write window a separate re-read before an
+   * unconditional delete+create used to leave.
+   *
+   * The guard write also stamps `assembledByUserId` with the re-assembling
+   * officer — a real field update (who last (re)assembled the program),
+   * not a synthetic touch column, so it doubles as the lock's write target.
+   *
+   * Returns `null` when this call lost the race — the program was no
+   * longer DRAFT by the time the lock was acquired (a concurrent finalize()
+   * won). Returns the lines createMany BatchPayload on success. */
+  async reassembleLines(
+    insuranceProgramId: string,
+    reassembledByUserId: string,
+    lines: readonly InsuranceProgramLineInput[],
+  ): Promise<Prisma.BatchPayload | null> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const locked = await tx.insuranceProgram.updateMany({
+        where: { id: insuranceProgramId, status: 'DRAFT' },
+        data: { assembledByUserId: reassembledByUserId },
+      });
+      if (locked.count === 0) return null;
+
+      await tx.insuranceProgramLine.deleteMany({
+        where: { insuranceProgramId },
+      });
+      return tx.insuranceProgramLine.createMany({
+        data: lines.map((line) => ({ ...line, insuranceProgramId })),
+      });
     });
   }
 }

@@ -778,7 +778,8 @@ interface CustomerAgeingAcc {
  * `outstandingTotal` and the book-wide `totals` are pooled through
  * `sumMoney` (never an averaged or re-derived figure). Rows are ordered
  * worst-first: largest days-overdue, then largest outstanding balance, then
- * customer name (fixed `en` locale, deterministic across environments). Pure.
+ * customer name (fixed `ar` locale — Part F item #4, customerLegalName is
+ * genuinely bilingual — deterministic across environments). Pure.
  *
  * SINGLE-CURRENCY: bucket + `outstandingTotal` figures are pooled per customer
  * with no currency split, and `report.currency` is `'JOD'`. Every `Invoice`
@@ -846,7 +847,10 @@ export function buildReceivablesAgeing(input: {
       (a, b) =>
         b.oldestDaysOverdue - a.oldestDaysOverdue ||
         compareMoney(b.outstandingTotal, a.outstandingTotal) ||
-        a.customerLegalName.localeCompare(b.customerLegalName, 'en'),
+        // Part F item #4 — 'ar', not 'en': customerLegalName is genuinely
+        // bilingual (Customer.legalName), and a fixed locale (any fixed
+        // locale) keeps the tie-break order identical across environments.
+        a.customerLegalName.localeCompare(b.customerLegalName, 'ar'),
     );
 
   return {
@@ -1036,7 +1040,9 @@ export function buildInsurerPayables(input: {
       (a, b) =>
         b.oldestDaysOutstanding - a.oldestDaysOutstanding ||
         compareMoney(b.outstandingAmount, a.outstandingAmount) ||
-        a.insurerName.localeCompare(b.insurerName, 'en'),
+        // Part F item #4 — 'ar', not 'en': insurerName is genuinely
+        // bilingual (Insurer.name).
+        a.insurerName.localeCompare(b.insurerName, 'ar'),
     );
 
   const allOutstanding = input.obligations.map((o) =>
@@ -1229,7 +1235,9 @@ export function buildCommissionRollup(
       (a, b) =>
         compareMoney(b.outstanding, a.outstanding) ||
         compareMoney(b.earned, a.earned) ||
-        a.insurerName.localeCompare(b.insurerName, 'en'),
+        // Part F item #4 — 'ar', not 'en': insurerName is genuinely
+        // bilingual (Insurer.name).
+        a.insurerName.localeCompare(b.insurerName, 'ar'),
     );
 
   return { ...rollupFigures(book), byInsurer: byInsurerRows };
@@ -1324,7 +1332,10 @@ function groupProfitability(
     .sort(
       (a, b) =>
         compareMoney(a.netPosition, b.netPosition) ||
-        a.label.localeCompare(b.label, 'en'),
+        // Part F item #4 — 'ar', not 'en': label is `insuranceLine` for the
+        // `byLine` grouping (genuinely bilingual) or `customerType` for
+        // `bySegment` (a fixed English enum, unaffected by locale choice).
+        a.label.localeCompare(b.label, 'ar'),
     );
 }
 

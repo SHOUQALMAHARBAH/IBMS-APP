@@ -62,8 +62,24 @@ function assertDatabaseTls(): void {
   }
 }
 
+// TokenService/JwtStrategy fall back to a hardcoded dev-only secret
+// (jwtSecret() in common/crypto.util.ts) when JWT_ACCESS_SECRET is unset.
+// Fails fast at boot rather than letting every access/purpose token in
+// production silently get signed with that shared, publicly-known string.
+// Same NODE_ENV=production gate as assertDatabaseTls() above.
+function assertJwtSecretConfigured(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (!process.env.JWT_ACCESS_SECRET) {
+    throw new Error(
+      'JWT_ACCESS_SECRET must be set in production — refusing to sign ' +
+        'access tokens with the hardcoded development secret.',
+    );
+  }
+}
+
 async function bootstrap() {
   assertDatabaseTls();
+  assertJwtSecretConfigured();
   // bufferLogs: hold startup logs until the pino logger is wired in below,
   // so nothing bypasses the redacted/structured pipeline.
   const app = await NestFactory.create(AppModule, { bufferLogs: true });

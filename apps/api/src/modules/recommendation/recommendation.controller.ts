@@ -1,9 +1,20 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RecommendationService } from './recommendation.service';
+import { RecommendationReportDocumentService } from './recommendation-report-document.service';
 import { DraftRecommendationDto } from './dto/draft-recommendation.dto';
 import { DiscloseConflictOfInterestDto } from './dto/disclose-conflict-of-interest.dto';
 import { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dto';
+import { DocumentLanguageQueryDto } from '../document-generation/dto/document-language-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -17,7 +28,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('recommendations')
 @Controller('recommendations')
 export class RecommendationController {
-  constructor(private readonly recommendations: RecommendationService) {}
+  constructor(
+    private readonly recommendations: RecommendationService,
+    private readonly documents: RecommendationReportDocumentService,
+  ) {}
 
   @RequirePermissions('recommendation.draft')
   @Post()
@@ -41,6 +55,31 @@ export class RecommendationController {
   @Get(':id')
   get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.recommendations.get(id, user);
+  }
+
+  // Part F item #7 — bilingual recommendation-report PDF. Generated on
+  // demand and streamed back, not persisted (no object storage exists
+  // anywhere in this app). Same `recommendation.read` permission as
+  // get() above, PLUS a business-state gate (422) the service itself
+  // enforces — the SAME blockedFromSend check send() uses, a deliberate
+  // user-confirmed decision: this document must not be generatable
+  // while a required approval or COI disclosure is still outstanding.
+  @RequirePermissions('recommendation.read')
+  @Get(':id/document')
+  @Header('Content-Type', 'application/pdf')
+  async document(
+    @Param('id') id: string,
+    @Query() query: DocumentLanguageQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.documents.generate(
+      id,
+      query.language,
+      user,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 
   /** Senior-officer approval (maker/checker: never the drafter). Only valid

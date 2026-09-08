@@ -1361,9 +1361,13 @@ async function mockRfqApi(
       json: { ...RFQ.insurerSubmissions[0], status: body.toStatus, respondedAt: "2026-03-05T00:00:00.000Z" },
     });
   });
-  // Part D §5.1 touchpoint #4 — the RFQ detail page's consent-capture
-  // control reads this on mount; no test here exercises the control
-  // itself (see customers.spec.ts for that), so an empty, quiet list.
+  // Part D §5.1 touchpoint #4 (RFQ) and the claims touchpoint (both on
+  // pages this helper drives) each mount a consent-capture control that
+  // reads this on mount; the base mock here is an empty, quiet list —
+  // individual tests override it with route.fulfill precedence (most
+  // recently registered wins) when they need to exercise capture itself
+  // (see the dedicated "captures Claims consent..." test below, or
+  // customers.spec.ts for the onboarding/KYC touchpoint).
   await page.route("http://localhost:4000/consent-records**", (route) =>
     route.fulfill({ status: 200, json: [] }),
   );
@@ -1576,6 +1580,39 @@ test("builds the comparison matrix and shows the missing-insurer flag", async ({
   ).toBeVisible();
 });
 
+test("downloads a bilingual quotation-comparison PDF once a comparison exists", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+  // Registered AFTER mockRfqApi's own broader "comparison-matrices**"
+  // route — Playwright runs routes in reverse-registration order, so this
+  // more specific one wins for the document endpoint while the general
+  // one still handles build/read.
+  await page.route(
+    "http://localhost:4000/comparison-matrices/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
+
+  await page.goto("/rfqs/rfq-1");
+  await page.getByRole("button", { name: "Build comparison" }).click();
+  await expect(
+    page.getByRole("button", { name: "Rebuild comparison" }),
+  ).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download comparison (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("quotation-comparison-cm-1.pdf");
+});
+
 test("a non-Placement user sees the comparison but no build control", async ({
   page,
 }) => {
@@ -1605,6 +1642,19 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
       drafted = b;
     },
   });
+  // Registered AFTER mockRfqApi's own broader "recommendations**" route —
+  // Playwright runs routes in reverse-registration order, so this more
+  // specific one wins for the document endpoint while the general one
+  // still handles draft/approve/disclose/send/read.
+  await page.route(
+    "http://localhost:4000/recommendations/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
 
   // Capture a quote first so the recommendation form has something to pick.
   await page.goto("/rfqs/rfq-1");
@@ -1649,6 +1699,11 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
   await expect(
     page.getByRole("button", { name: "Send to client" }),
   ).toHaveCount(0);
+  // Part F item #7 — the download button is gated the same way: not
+  // shown at all while blockedFromSend is non-empty.
+  await expect(
+    page.getByRole("button", { name: "Download report (PDF)" }),
+  ).toHaveCount(0);
 
   // Approve, then disclose, then send.
   await page.getByRole("button", { name: "Approve" }).click();
@@ -1661,6 +1716,12 @@ test("drafts a broker recommendation and clears the approval + conflict-of-inter
 
   await page.getByRole("button", { name: "Send to client" }).click();
   await expect(page.getByText("sent to client")).toBeVisible();
+
+  // Part F item #7 — once unblocked, downloads a real bilingual PDF.
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download report (PDF)" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("recommendation-report-rec-1.pdf");
 });
 
 test("records a client decision and shows the route it takes", async ({
@@ -1705,15 +1766,52 @@ test("places a policy from an accepted opportunity and records its issuance", as
       issued = b;
     },
   });
+  // Registered AFTER mockRfqApi's own broader "policies**" route —
+  // Playwright runs routes in reverse-registration order, so these more
+  // specific ones win for the document endpoints while the general one
+  // still handles place/issuance/checking/delivery/read.
+  await page.route(
+    "http://localhost:4000/policies/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake"),
+      }),
+  );
+  await page.route(
+    "http://localhost:4000/policies/*/certificate**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake certificate"),
+      }),
+  );
 
   await page.goto("/opportunities/opp-1");
   await expect(page.getByRole("heading", { name: "Policy" })).toBeVisible();
+
+  // Part F item #7 — no coverage schedule yet, so neither download
+  // button appears (both the schedule summary and the certificate).
+  await expect(
+    page.getByRole("button", { name: "Download schedule summary (PDF)" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Download certificate (PDF)" }),
+  ).toHaveCount(0);
 
   await page.getByLabel("Inception date").fill("2026-10-01");
   await page.getByRole("button", { name: "Place policy" }).click();
 
   await expect.poll(() => placed?.inceptionDate).toBe("2026-10-01");
   await expect(page.getByText("PLACEMENT_CONFIRMED")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download schedule summary (PDF)" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Download certificate (PDF)" }),
+  ).toHaveCount(0);
 
   await page.getByLabel("Policy number").fill("POL-WEB-1");
   await page.getByLabel("Issued premium").fill("118500.000");
@@ -1723,6 +1821,26 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await expect.poll(() => issued?.issuedPremium).toBe("118500.000");
   await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
   await expect(page.getByText("POL-WEB-1")).toBeVisible();
+
+  // Part F item #7 — a schedule now exists, so both buttons appear and
+  // each produces a real bilingual PDF download.
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download schedule summary (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    "policy-schedule-summary-pol-1.pdf",
+  );
+
+  const certDownloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download certificate (PDF)" })
+    .click();
+  const certDownload = await certDownloadPromise;
+  expect(certDownload.suggestedFilename()).toBe(
+    "certificate-of-insurance-pol-1.pdf",
+  );
 });
 
 test("a Policy Checking Officer runs the QC check and sees a discrepancy block Delivery", async ({
@@ -1863,12 +1981,28 @@ test("raises a premium invoice from the Billing block — commission netted, tot
       created = b as typeof created;
     },
   });
+  // Part F item #7 — registered AFTER mockRfqApi's own broader
+  // "invoices**" route, so this more specific one wins for the document
+  // endpoint (same reverse-registration-order precedent the policy
+  // schedule-summary/certificate routes already use).
+  await page.route(
+    "http://localhost:4000/invoices/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake invoice"),
+      }),
+  );
 
   await page.goto("/opportunities/opp-1");
   await expect(
     page.getByRole("heading", { name: "Billing", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("No premium invoice yet")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download invoice (PDF)" }),
+  ).toHaveCount(0);
 
   await page.getByLabel("Tax amount").fill("9600.000");
   await page.getByLabel("Fees amount").fill("150.000");
@@ -1883,6 +2017,15 @@ test("raises a premium invoice from the Billing block — commission netted, tot
     page.getByText("JOD 115,350.000", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+
+  // Part F item #7 — an invoice now exists, so the download button
+  // appears and produces a real bilingual PDF download.
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download invoice (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("invoice-inv-1.pdf");
 });
 
 test("a non-Finance user sees no raise-invoice control on the Billing block", async ({
@@ -1987,6 +2130,52 @@ test("notifies a claim against an issued policy", async ({ page }) => {
   await expect(
     page.getByText("coverage version in force", { exact: false }),
   ).toBeVisible();
+});
+
+test("captures Claims consent from the opportunity detail screen (Part D §5.1, Claims touchpoint)", async ({
+  page,
+}) => {
+  await mockAuth(page, ["CLAIMS_OFFICER"]);
+  await mockRfqApi(page, {
+    opportunityStatus: "PLACEMENT",
+    seedIssuedPolicy: true,
+  });
+  let captured = false;
+  await page.route("http://localhost:4000/consent-records**", (route) => {
+    if (route.request().method() === "POST") {
+      captured = true;
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: "consent-claims-1",
+          customerId: "cust-1",
+          insuredPersonId: null,
+          leadId: null,
+          purpose: "CLAIMS",
+          isMarketing: false,
+          granted: true,
+          consentTextVersion: "claims-notice-v1",
+          grantedAt: "2026-11-15T00:00:00.000Z",
+          withdrawnAt: null,
+          isActive: true,
+          createdAt: "2026-11-15T00:00:00.000Z",
+        },
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      json: captured ? [{ id: "consent-claims-1", isActive: true }] : [],
+    });
+  });
+
+  await page.goto("/opportunities/opp-1");
+  await expect(
+    page.getByRole("heading", { name: "Claims consent" }),
+  ).toBeVisible();
+  await expect(page.getByText("No decision captured yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Grant" }).click();
+  await expect.poll(() => captured).toBe(true);
 });
 
 test("registers a NOTIFIED claim with the insurer and assigns the adjuster", async ({

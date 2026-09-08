@@ -20,7 +20,7 @@ import { pageStyle } from '../../../../components/lead/lead.styles';
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
@@ -158,7 +158,28 @@ export default function EmployeeDetailPage() {
       {employee ? (
         <>
           <section style={sectionStyle}>
-            <h2>{employee.fullName}</h2>
+            <h2>
+              <bdi>{employee.fullName}</bdi>
+            </h2>
+            {employee.givenName ? (
+              <p>
+                Given name: <bdi>{employee.givenName}</bdi>
+                {employee.fatherName ? (
+                  <>
+                    {' '}
+                    — Father&apos;s name: <bdi>{employee.fatherName}</bdi>
+                  </>
+                ) : null}
+                {employee.grandfatherName ? (
+                  <>
+                    {' '}
+                    — Grandfather&apos;s name: <bdi>{employee.grandfatherName}</bdi>
+                  </>
+                ) : null}
+                {' '}
+                — Family name: <bdi>{employee.familyName}</bdi>
+              </p>
+            ) : null}
             <p>National ID: {employee.nationalId}</p>
             <p>Position: {employee.position ?? '—'}</p>
             <p>Licensed role: {employee.licensedRole ?? '—'}</p>

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AuditAction, Prisma } from '@ibms/db';
+import type { AuditAction, AuditLogEntry, Prisma } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditAnomalyDetectionService } from './audit-anomaly-detection.service';
 
@@ -42,6 +42,40 @@ export class AuditService {
         isSensitiveDataAccess: input.isSensitiveDataAccess ?? false,
       },
     });
+    await this.anomalyDetection.evaluate(entry);
+  }
+
+  /**
+   * Writes the audit row through a caller-supplied `$transaction` client
+   * instead of the default one, so a caller can commit it atomically
+   * alongside another write in the SAME transaction (e.g.
+   * `WorkflowTransitionService.transition()` — a status write that commits
+   * with no audit row is exactly the silent, unrecoverable state
+   * ibms-brain/meta/lex/workflow-state-transitions.md's rationale warns
+   * against). Anomaly detection reads the persisted row and performs its
+   * own writes, so it must run AFTER the transaction actually commits —
+   * call `runAnomalyDetection` yourself once your `$transaction` resolves.
+   */
+  async recordInTransaction(
+    tx: Prisma.TransactionClient,
+    input: RecordAuditEntryInput,
+  ): Promise<AuditLogEntry> {
+    return tx.auditLogEntry.create({
+      data: {
+        userId: input.userId,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        beforeValue: input.beforeValue,
+        afterValue: input.afterValue,
+        isSensitiveDataAccess: input.isSensitiveDataAccess ?? false,
+      },
+    });
+  }
+
+  /** The other half of `recordInTransaction` — run once the transaction
+   *  that wrote `entry` has committed. Never throws (see `evaluate()`). */
+  async runAnomalyDetection(entry: AuditLogEntry): Promise<void> {
     await this.anomalyDetection.evaluate(entry);
   }
 

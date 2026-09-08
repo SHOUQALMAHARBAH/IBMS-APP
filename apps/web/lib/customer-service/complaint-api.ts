@@ -7,7 +7,7 @@
 //   - complaint.escalate (Manager, Compliance)
 //   - complaint.close     (Manager)
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 
 export interface ComplaintSla {
   timerId: string;
@@ -124,4 +124,15 @@ export function escalateComplaint(
 
 export function closeComplaint(id: string): Promise<Complaint> {
   return apiPost(`/complaints/${id}/close`, {});
+}
+
+// Part F item #7 — bilingual complaint-acknowledgement PDF. Omitting
+// `language` defaults server-side to the customer's own
+// languagePreference; 'DUAL' renders both, Arabic section first.
+export function downloadComplaintAcknowledgement(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/complaints/${id}/acknowledgement${qs}`);
 }

@@ -107,7 +107,8 @@ function makeDeps() {
 
 const INDIVIDUAL_DTO: CreateCustomerDto = {
   customerType: 'INDIVIDUAL',
-  legalName: 'Ahmad Test',
+  givenName: 'Ahmad',
+  familyName: 'Test',
   nationalId: '9901012345',
   contactPhone: '+962-7-9000-0000',
   contactEmail: 'ahmad@example.test',
@@ -328,7 +329,12 @@ describe('CustomerService', () => {
       await expect(
         service.addUbo(
           'cust-1',
-          { fullName: 'Someone', nationalId: '123', isPep: false },
+          {
+            givenName: 'Someone',
+            familyName: 'Person',
+            nationalId: '123',
+            isPep: false,
+          },
           makeUser({ id: 'sales-1' }),
         ),
       ).rejects.toThrow(NotFoundException);
@@ -345,7 +351,12 @@ describe('CustomerService', () => {
 
       await service.addUbo(
         'cust-1',
-        { fullName: 'Someone', nationalId: '9901012345', isPep: false },
+        {
+          givenName: 'Someone',
+          familyName: 'Person',
+          nationalId: '9901012345',
+          isPep: false,
+        },
         makeUser({ id: 'compliance-1', roles: ['COMPLIANCE_OFFICER'] }),
       );
 
@@ -363,7 +374,12 @@ describe('CustomerService', () => {
       await expect(
         service.addUbo(
           'cust-1',
-          { fullName: 'Someone', nationalId: '123', isPep: false },
+          {
+            givenName: 'Someone',
+            familyName: 'Person',
+            nationalId: '123',
+            isPep: false,
+          },
           makeUser({ id: 'sales-1' }),
         ),
       ).rejects.toThrow(UnprocessableEntityException);
@@ -380,7 +396,12 @@ describe('CustomerService', () => {
 
       const ubo = await service.addUbo(
         'cust-1',
-        { fullName: 'Someone', nationalId: '9901012345', isPep: true },
+        {
+          givenName: 'Someone',
+          familyName: 'Person',
+          nationalId: '9901012345',
+          isPep: true,
+        },
         makeUser({ id: 'sales-1' }),
       );
 

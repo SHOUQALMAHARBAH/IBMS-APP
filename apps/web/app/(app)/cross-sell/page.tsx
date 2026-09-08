@@ -20,6 +20,8 @@ import {
   crossSellCardStyle,
   crossSellPanelStyle,
 } from '../../../components/cross-sell/cross-sell.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate } from '../../../lib/i18n/format';
 
 const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 const CAN_SCAN_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
@@ -33,6 +35,7 @@ function OpportunityRow({
   canConvert: boolean;
   onChanged: (updated: CrossSellOpportunity) => void;
 }) {
+  const { language } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [reason, setReason] = useState('');
@@ -64,7 +67,7 @@ function OpportunityRow({
         <span style={crossSellBadgeStyle}>{opportunity.status}</span>
       </div>
       <div style={cardMetaStyle}>
-        Flagged {new Date(opportunity.detectedAt).toLocaleDateString()}
+        Flagged {formatDate(opportunity.detectedAt, language)}
       </div>
       {opportunity.status === 'DISMISSED' && opportunity.dismissReason ? (
         <div style={cardMetaStyle}>Reason: {opportunity.dismissReason}</div>

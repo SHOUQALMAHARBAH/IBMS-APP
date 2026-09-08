@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listCustomers, type Customer } from '../../../lib/customer/customer-api';
@@ -20,10 +20,16 @@ export default function CustomersPage() {
 
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Part F item #6 — bilingual full-text search (Arabic + English) over
+  // legalName. `search` is the input's live value; `searchTerm` is what was
+  // actually submitted and drives the fetch — a submit-triggered search,
+  // not search-as-you-type (this app has no debounce utility anywhere).
+  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(async (term: string) => {
     try {
-      const result = await listCustomers();
+      const result = await listCustomers(term ? { search: term } : {});
       setCustomers(result);
       setLoadError(null);
     } catch (err) {
@@ -37,6 +43,11 @@ export default function CustomersPage() {
     }
   }, []);
 
+  function onSearchSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSearchTerm(search);
+  }
+
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
@@ -44,9 +55,9 @@ export default function CustomersPage() {
   useEffect(() => {
     if (!user) return;
     void (async () => {
-      await loadCustomers();
+      await loadCustomers(searchTerm);
     })();
-  }, [user, loadCustomers]);
+  }, [user, searchTerm, loadCustomers]);
 
   if (isLoading || !user) return null;
 
@@ -66,6 +77,22 @@ export default function CustomersPage() {
         </button>
       ) : null}
 
+      <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
+        <label htmlFor="customer-search" style={{ marginInlineEnd: '0.5rem' }}>
+          Search
+        </label>
+        <input
+          id="customer-search"
+          dir="auto"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Name, in Arabic or English"
+        />
+        <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
+          Search
+        </button>
+      </form>
+
       {customers === null && !loadError ? <p>Loading…</p> : null}
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -74,18 +101,22 @@ export default function CustomersPage() {
       ) : null}
       {customers !== null && !loadError ? (
         customers.length === 0 ? (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>No customers yet.</p>
+          <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+            {searchTerm ? 'No customers match your search.' : 'No customers yet.'}
+          </p>
         ) : (
           <div style={listGridStyle}>
             {customers.map((customer) => (
               <button
                 key={customer.id}
                 type="button"
-                style={{ ...cardStyle, textAlign: 'left', width: '100%', cursor: 'pointer' }}
+                style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
                 aria-label={`View profile — ${customer.legalName}`}
                 onClick={() => router.push(`/customers/${customer.id}`)}
               >
-                <strong>{customer.legalName}</strong>
+                <strong>
+                  <bdi>{customer.legalName}</bdi>
+                </strong>
                 <div style={cardMetaStyle}>{customer.customerType}</div>
                 <div style={cardMetaStyle}>Status: {customer.status}</div>
               </button>

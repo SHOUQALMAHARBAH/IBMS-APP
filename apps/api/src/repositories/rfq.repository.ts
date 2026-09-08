@@ -265,10 +265,15 @@ export class RfqRepository {
    * #11 — "select an insurer shortlist"). Read-only — there is no Insurer
    * module yet (narrative Process 31). */
   async findSelectableInsurers(): Promise<SelectableInsurer[]> {
-    return this.prisma.client.insurer.findMany({
+    const insurers = await this.prisma.client.insurer.findMany({
       select: INSURER_IDENTITY_SELECT,
-      orderBy: { name: 'asc' },
     });
+    // Sorted in JS, not via Prisma `orderBy` (plain Postgres default
+    // collation) — Insurer.name is genuinely bilingual (Part F item #4), and
+    // a fixed 'ar' locale is the only way to get Arabic-aware ordering
+    // without a DB-level ICU collation migration. A small, unpaginated
+    // lookup list, so an in-memory sort is negligible cost.
+    return insurers.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }
 
   /** How many of `insurerIds` actually exist — the createRfq / addInsurers

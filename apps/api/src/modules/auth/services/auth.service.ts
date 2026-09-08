@@ -291,9 +291,18 @@ export class AuthService {
     const violations = this.passwords.validatePolicy(dto.newPassword);
     if (violations.length > 0) throw new BadRequestException(violations);
 
+    // Claim the token FIRST, before touching the password — this
+    // status-conditional write (not the `stored.usedAt` read above) is what
+    // actually closes the race between two concurrent resets presenting the
+    // same token; the loser gets the exact same rejection as an
+    // already-used token (race-safe-invariants.md).
+    const claimed = await this.passwordResetTokens.markUsed(stored.id);
+    if (!claimed) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
     const passwordHash = await this.passwords.hash(dto.newPassword);
     await this.users.updatePassword(stored.userId, passwordHash);
-    await this.passwordResetTokens.markUsed(stored.id);
     await this.sessions.revokeAllForUser(stored.userId, 'password_reset');
     await this.refreshTokens.revokeAllForUser(stored.userId);
     await this.audit.record({
@@ -438,6 +447,23 @@ export class AuthService {
       hardLogoutAfterIdleMinutes: config.hardLogoutAfterIdleMinutes,
       stepUpFresh,
     };
+  }
+
+  /**
+   * Part F — Bilingual UI, item #1: "a persistent per-user language
+   * preference." Every user manages their own — no maker/checker, no
+   * permission beyond being signed in (the same self-service shape as
+   * `updatePassword`/`setMfaEnabled`). Returns the fresh `me()` shape so the
+   * frontend can just re-render from one response, the same round-trip its
+   * own instant local UI flip already made optimistically.
+   */
+  async updateLanguagePreference(
+    userId: string,
+    sessionId: string,
+    languagePreference: 'AR' | 'EN',
+  ) {
+    await this.users.updateLanguagePreference(userId, languagePreference);
+    return this.me(userId, sessionId);
   }
 
   private mfaPolicySatisfied(user: User, roles: RoleName[]): boolean {

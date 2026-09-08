@@ -40,11 +40,13 @@ export interface TransitionParams<E extends WorkflowEntityType> {
  * `WORKFLOW_TRANSITIONS`, writes it, and records the TRANSITION
  * AuditLogEntry every direct write would silently skip.
  *
- * No domain module calls this yet — Policy/Claim/Opportunity/etc. services
- * don't exist in this repo yet (see CLAUDE.md "What's here today"). This is
- * the engine backlog item A.6 asks for, ready for those services to depend
- * on the moment they're built, instead of each reinventing (or skipping)
- * this validation independently.
+ * Called from every domain module that owns one of the eighteen workflow
+ * entities (Lead, KYCRecord, Customer, NeedsAssessment, InsuranceProgram,
+ * CrossSellOpportunity, UpSellRecommendation, Opportunity, RFQInsurer,
+ * Policy, Endorsement, Claim, Complaint, RenewalCase, Invoice,
+ * DataSubjectRequest, IncidentReport, DisposalBatch) — this is the engine
+ * backlog item A.6 asked for, so no service reinvents (or skips) this
+ * validation independently.
  */
 @Injectable()
 export class WorkflowTransitionService {
@@ -85,38 +87,58 @@ export class WorkflowTransitionService {
 
     // Conditional on the status observed above so a concurrent transition
     // landing between that read and this write loses the race explicitly
-    // (count 0 below) instead of being silently overwritten — this
-    // codebase has no established $transaction wrapper to serialize the
-    // read+write as one unit instead (see maker-checker.util.ts for the
-    // same "guard right at the write" philosophy applied elsewhere).
-    const result = await delegate.updateMany({
-      where: { id: entityId, status: fromStatus },
-      data: { status: toStatus, ...data },
-    });
-    if (result.count === 0) {
-      throw new ConflictException(
-        `${entityType} ${entityId}: status changed concurrently — expected ${String(fromStatus)}`,
-      );
-    }
+    // (count 0 below) instead of being silently overwritten (see
+    // maker-checker.util.ts for the same "guard right at the write"
+    // philosophy applied elsewhere). The write itself and its TRANSITION
+    // audit row are committed together in one `$transaction` — a status
+    // change that persists with no audit row (e.g. a transient failure on
+    // the second, separate round-trip) is exactly the silently-incomplete
+    // state ibms-brain/meta/lex/workflow-state-transitions.md's rationale
+    // warns is worse than an obviously broken record, since every timer/
+    // notification wired off `sideEffect` below would then also never run
+    // with nothing in the log to show why.
+    const { updated, auditEntry } = await this.prisma.client.$transaction(
+      async (tx) => {
+        const txDelegate = getWorkflowDelegate(tx, entityType);
+        const result = await txDelegate.updateMany({
+          where: { id: entityId, status: fromStatus },
+          data: { status: toStatus, ...data },
+        });
+        if (result.count === 0) {
+          throw new ConflictException(
+            `${entityType} ${entityId}: status changed concurrently — expected ${String(fromStatus)}`,
+          );
+        }
 
-    const updated = await delegate.findUnique({ where: { id: entityId } });
-    if (!updated) {
-      // Deleted between the update above and this read — vanishingly
-      // unlikely for these entities (none of the eleven support hard
-      // delete), but fail loudly rather than return a fabricated record.
-      throw new NotFoundException(
-        `${entityType} ${entityId} not found immediately after transition`,
-      );
-    }
+        const updatedRow = await txDelegate.findUnique({
+          where: { id: entityId },
+        });
+        if (!updatedRow) {
+          // Deleted between the update above and this read — vanishingly
+          // unlikely for these entities (none of the eleven support hard
+          // delete), but fail loudly rather than return a fabricated record.
+          throw new NotFoundException(
+            `${entityType} ${entityId} not found immediately after transition`,
+          );
+        }
 
-    await this.audit.record({
-      userId: actorUserId,
-      action: 'TRANSITION',
-      entityType,
-      entityId,
-      beforeValue: { status: fromStatus },
-      afterValue: { status: toStatus },
-    });
+        const entry = await this.audit.recordInTransaction(tx, {
+          userId: actorUserId,
+          action: 'TRANSITION',
+          entityType,
+          entityId,
+          beforeValue: { status: fromStatus },
+          afterValue: { status: toStatus },
+        });
+
+        return { updated: updatedRow, auditEntry: entry };
+      },
+    );
+
+    // Anomaly detection reads the persisted row and performs its own
+    // (best-effort, never-throwing) writes — it runs after the transaction
+    // above has actually committed, never inside it.
+    await this.audit.runAnomalyDetection(auditEntry);
 
     if (sideEffect) {
       try {

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { InvoiceController } from './invoice.controller';
 import { InvoiceService } from './invoice.service';
 import { CollectionService } from './collection.service';
+import { InvoiceDocumentService } from './invoice-document.service';
 import { ClientAccountingController } from './client-accounting.controller';
 import { ClientAccountingService } from './client-accounting.service';
 import { InsurerAccountingController } from './insurer-accounting.controller';
@@ -20,6 +21,8 @@ import { ProfitabilityPolicyRepository } from '../../repositories/profitability-
 import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
+import { CustomerModule } from '../customer/customer.module';
+import { DocumentGenerationModule } from '../document-generation/document-generation.module';
 
 /**
  * Process 31–32 — Premium Billing + Collection (backlog Part C #31–32, Domain
@@ -73,9 +76,29 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
  * policies grouped by line / customer segment). Computed on the fly; a
  * best-effort `READ` audit row (the profitability section touches
  * HIGHLY_CONFIDENTIAL `Claim` rows — the #30 precedent).
+ *
+ * `InvoiceDocumentService` (Part F item #7 — bilingual invoice PDF) needs
+ * two more imports beyond what #31-40 already required:
+ *   - CustomerModule           -> CustomerRepository (legalName,
+ *     languagePreference)
+ *   - DocumentGenerationModule -> PdfRendererService +
+ *     DocumentTemplateRepository (the same shared rendering infrastructure
+ *     every other item #7 document type uses)
+ * `Invoice` reads are gated on `client-accounting.read` alone — a flat,
+ * book-wide permission with no per-customer visibility scoping (unlike
+ * Policy/ComparisonMatrix/Recommendation), so no `getByIdWithCustomer`-style
+ * helper was needed here; `InvoiceDocumentService` reads
+ * `InvoiceRepository`/`CustomerRepository`/`PolicyRepository` (already
+ * available via `PolicyModule`) directly.
  */
 @Module({
-  imports: [AuditModule, PolicyModule, RecommendationModule],
+  imports: [
+    AuditModule,
+    PolicyModule,
+    RecommendationModule,
+    CustomerModule,
+    DocumentGenerationModule,
+  ],
   controllers: [
     InvoiceController,
     ClientAccountingController,
@@ -87,6 +110,7 @@ import { RecommendationModule } from '../recommendation/recommendation.module';
   providers: [
     InvoiceService,
     CollectionService,
+    InvoiceDocumentService,
     ClientAccountingService,
     InsurerAccountingService,
     PaymentChannelService,

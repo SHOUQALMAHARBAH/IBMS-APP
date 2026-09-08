@@ -19,7 +19,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
@@ -39,13 +39,18 @@ export default function VendorsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
+  // Part F item #6 — bilingual full-text search over name. Submit-triggered,
+  // matching customers/page.tsx's and prospects/page.tsx's own.
+  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (term: string) => {
     try {
-      setVendors(await listVendors());
+      setVendors(await listVendors(undefined, term || undefined));
       setLoadError(null);
     } catch (err) {
       setVendors(null);
@@ -59,12 +64,17 @@ export default function VendorsPage() {
     }
   }, []);
 
+  function onSearchSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSearchTerm(search);
+  }
+
   useEffect(() => {
     if (!user) return;
     void (async () => {
-      await load();
+      await load(searchTerm);
     })();
-  }, [user, load]);
+  }, [user, searchTerm, load]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -73,7 +83,7 @@ export default function VendorsPage() {
       await createVendor({ name, vendorType });
       setName('');
       setVendorType('other');
-      await load();
+      await load(searchTerm);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Could not create the vendor.');
     }
@@ -89,7 +99,7 @@ export default function VendorsPage() {
     try {
       await updateVendor(id, { name: editingName });
       setEditingId(null);
-      await load();
+      await load(searchTerm);
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Could not update the vendor.');
     }
@@ -108,6 +118,22 @@ export default function VendorsPage() {
         tiering, Data Processing Agreements, and termination.
       </p>
 
+      <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
+        <label htmlFor="vendor-search" style={{ marginInlineEnd: '0.5rem' }}>
+          Search
+        </label>
+        <input
+          id="vendor-search"
+          dir="auto"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Name, in Arabic or English"
+        />
+        <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
+          Search
+        </button>
+      </form>
+
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}
@@ -116,7 +142,9 @@ export default function VendorsPage() {
 
       {vendors ? (
         vendors.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No vendors recorded yet.</p>
+          <p style={{ opacity: 0.6 }}>
+            {searchTerm ? 'No vendors match your search.' : 'No vendors recorded yet.'}
+          </p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
             <thead>
@@ -133,11 +161,12 @@ export default function VendorsPage() {
                   <td style={cell}>
                     {editingId === vendor.id ? (
                       <input
+                        dir="auto"
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
                       />
                     ) : (
-                      vendor.name
+                      <bdi>{vendor.name}</bdi>
                     )}
                   </td>
                   <td style={cell}>{vendor.vendorType}</td>
@@ -169,7 +198,7 @@ export default function VendorsPage() {
         <h2>Record a new vendor</h2>
         <label style={labelStyle}>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
+          <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label style={labelStyle}>
           Type

@@ -23,6 +23,7 @@ import {
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { SessionService } from '../auth/services/session.service';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
+import { composeFullName } from '../../common/person-name.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   CreateEmployeeDto,
@@ -96,9 +97,22 @@ export class EmployeeService {
       { userId: actorUserId, entityType: 'Employee', entityId: id },
     );
 
+    // Part F item #4 — an Employee is always a real individual, so the 4
+    // national-ID-convention parts always apply.
+    const fullName = composeFullName({
+      givenName: dto.givenName,
+      fatherName: dto.fatherName,
+      grandfatherName: dto.grandfatherName,
+      familyName: dto.familyName,
+    });
+
     const employee = await this.employees.create({
       id,
-      fullName: dto.fullName,
+      fullName,
+      givenName: dto.givenName,
+      fatherName: dto.fatherName,
+      grandfatherName: dto.grandfatherName,
+      familyName: dto.familyName,
       nationalIdEnc: encrypted.nationalIdEnc,
       position: dto.position,
       hireDate,

@@ -290,6 +290,34 @@ describe('AccessRecertificationService', () => {
         service.decide('item-1', 'manager-1', 'revoked'),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('closes the double-decide race: a concurrent decide() that already claimed the item (recordDecision returns null) throws a clean ConflictException, not a silent overwrite', async () => {
+      const { service, mocks } = makeDeps();
+      // Both concurrent calls read the item BEFORE either has decided —
+      // the in-app `if (item.decision)` guard above cannot catch this
+      // interleaving, only the status-conditional updateMany can.
+      mocks.findItemById.mockResolvedValue({
+        id: 'item-1',
+        subjectUserId: 'sales-1',
+        reviewerUserId: 'manager-1',
+        decision: null,
+      });
+      mocks.recordDecision.mockResolvedValue(null);
+
+      await expect(
+        service.decide('item-1', 'manager-1', 'confirmed'),
+      ).rejects.toThrow(ConflictException);
+      expect(mocks.recordDecision).toHaveBeenCalledWith(
+        'item-1',
+        'manager-1',
+        'confirmed',
+      );
+      // The race was lost before any decision was recorded — role
+      // assignments must not have been touched.
+      expect(
+        mocks.revokeAllActiveRoleAssignmentsForUser,
+      ).not.toHaveBeenCalled();
+    });
   });
 
   describe('listItemsForReviewer', () => {

@@ -400,4 +400,117 @@ describe('Complaints Management (e2e) — backlog Part C #42', () => {
       ),
     ).toBe(true);
   });
+
+  // Part F item #7 — bilingual complaint-acknowledgement PDF. Proves a
+  // REAL PDF comes back (magic-byte check, not just a 200), that the
+  // customer's own languagePreference is the default, that an explicit
+  // ?language= overrides it, and that DUAL genuinely renders more content
+  // than a single-language document (a real byte-size proof, not just a
+  // status-code check).
+  it('generates a bilingual complaint-acknowledgement PDF, defaulting to the customer language and honoring an explicit override', async () => {
+    const app = await boot();
+    const sales = await makeUser(
+      app,
+      'cx-ack-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const noPerm = await makeUser(
+      app,
+      'cx-ack-none',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+
+    const arCustomer = await prisma.customer.create({
+      data: {
+        customerType: 'CORPORATE',
+        legalName: `Cx Ack AR Co ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+        languagePreference: 'AR',
+      },
+    });
+    const enCustomer = await prisma.customer.create({
+      data: {
+        customerType: 'CORPORATE',
+        legalName: `Cx Ack EN Co ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+        languagePreference: 'EN',
+      },
+    });
+
+    const arComplaint = await request(app.getHttpServer())
+      .post('/complaints')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerId: arCustomer.id,
+        issue: 'The settlement amount was never explained to me',
+        category: 'unanswered_claim',
+      })
+      .expect(201);
+    const arId = (arComplaint.body as ComplaintBody).id;
+
+    const enComplaint = await request(app.getHttpServer())
+      .post('/complaints')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerId: enCustomer.id,
+        issue: 'My renewal premium seems incorrect',
+        category: 'premium_dispute',
+      })
+      .expect(201);
+    const enId = (enComplaint.body as ComplaintBody).id;
+
+    // forbidden without complaint.log
+    await request(app.getHttpServer())
+      .get(`/complaints/${arId}/acknowledgement`)
+      .set(bearer(noPerm.accessToken))
+      .expect(403);
+
+    // unknown complaint -> 404
+    await request(app.getHttpServer())
+      .get('/complaints/11111111-1111-4111-8111-111111111111/acknowledgement')
+      .set(bearer(sales.accessToken))
+      .expect(404);
+
+    // default: AR customer -> a real PDF, no explicit language needed
+    const arDefault = await request(app.getHttpServer())
+      .get(`/complaints/${arId}/acknowledgement`)
+      .set(bearer(sales.accessToken))
+      .expect(200);
+    expect(arDefault.headers['content-type']).toContain('application/pdf');
+    const arBuffer = arDefault.body as Buffer;
+    expect(Buffer.isBuffer(arBuffer)).toBe(true);
+    expect(arBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // default: EN customer -> also a real PDF
+    const enDefault = await request(app.getHttpServer())
+      .get(`/complaints/${enId}/acknowledgement`)
+      .set(bearer(sales.accessToken))
+      .expect(200);
+    const enBuffer = enDefault.body as Buffer;
+    expect(enBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // explicit override: EN customer, but ask for AR anyway
+    const overridden = await request(app.getHttpServer())
+      .get(`/complaints/${enId}/acknowledgement?language=AR`)
+      .set(bearer(sales.accessToken))
+      .expect(200);
+    const overriddenBuffer = overridden.body as Buffer;
+    expect(overriddenBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // DUAL renders genuinely more content than either single-language
+    // document (two full sections, not one) — a real size proof.
+    const dual = await request(app.getHttpServer())
+      .get(`/complaints/${arId}/acknowledgement?language=DUAL`)
+      .set(bearer(sales.accessToken))
+      .expect(200);
+    const dualBuffer = dual.body as Buffer;
+    expect(dualBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(dualBuffer.length).toBeGreaterThan(arBuffer.length);
+
+    // an invalid language value 400s (class-validator @IsIn)
+    await request(app.getHttpServer())
+      .get(`/complaints/${arId}/acknowledgement?language=FR`)
+      .set(bearer(sales.accessToken))
+      .expect(400);
+  }, 30000);
 });

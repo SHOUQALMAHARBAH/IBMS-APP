@@ -10,6 +10,8 @@ import {
   type QuotationVersion,
 } from '../../lib/quotation/quotation-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDateTime, formatMoney } from '../../lib/i18n/format';
 import type { RfqInsurerSubmission } from '../../lib/rfq/rfq-api';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import {
@@ -91,18 +93,6 @@ function toTermsInput(form: FormState): QuotationTermsInput {
   };
 }
 
-function fmtMoney(value: string | null, currency: string): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
-
-function fmtDateTime(value: string): string {
-  return new Date(value).toLocaleString();
-}
-
 /** '+' for a strictly-positive money-delta string, '' otherwise (a negative
  * one already carries its own '-', zero needs no sign). String inspection —
  * no float round-trip. */
@@ -113,6 +103,7 @@ function deltaSign(delta: string): string {
 }
 
 export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
+  const { language } = useLanguage();
   const [chains, setChains] = useState<QuotationChain[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -249,19 +240,19 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 <div>
                   <span style={quoteTermLabelStyle}>Premium</span>
                   <span style={quoteTermValueStyle}>
-                    {fmtMoney(c.premium, c.currency)}
+                    {formatMoney(c.premium, language, c.currency)}
                   </span>
                 </div>
                 <div>
                   <span style={quoteTermLabelStyle}>Deductible</span>
                   <span style={quoteTermValueStyle}>
-                    {fmtMoney(c.deductible, c.currency)}
+                    {formatMoney(c.deductible, language, c.currency)}
                   </span>
                 </div>
                 <div>
                   <span style={quoteTermLabelStyle}>Liability limit</span>
                   <span style={quoteTermValueStyle}>
-                    {fmtMoney(c.liabilityLimit, c.currency)}
+                    {formatMoney(c.liabilityLimit, language, c.currency)}
                   </span>
                 </div>
                 <div>
@@ -356,7 +347,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                             <span style={{ opacity: 0.6 }}>v{v.versionNumber}</span>
                             {v.isCurrentVersion ? (
                               <span
-                                style={{ ...rfqBadgeStyle, marginLeft: '0.4rem' }}
+                                style={{ ...rfqBadgeStyle, marginInlineStart: '0.4rem' }}
                               >
                                 current
                               </span>
@@ -375,12 +366,12 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                             ) : null}
                           </td>
                           <td style={rfqCellStyle}>
-                            {fmtMoney(v.premium, v.currency)}
+                            {formatMoney(v.premium, language, v.currency)}
                           </td>
                           <td style={rfqCellStyle}>
                             {round?.premiumDeltaFromPrevious == null
                               ? '—'
-                              : `${deltaSign(round.premiumDeltaFromPrevious)}${fmtMoney(round.premiumDeltaFromPrevious, v.currency)}`}
+                              : `${deltaSign(round.premiumDeltaFromPrevious)}${formatMoney(round.premiumDeltaFromPrevious, language, v.currency)}`}
                           </td>
                           <td style={rfqCellStyle}>
                             {round && round.changedTermFields.length > 0
@@ -390,7 +381,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                                 : '—'}
                           </td>
                           <td style={rfqCellStyle}>
-                            {fmtDateTime(v.receivedAt)}
+                            {formatDateTime(v.receivedAt, language)}
                           </td>
                         </tr>
                       );

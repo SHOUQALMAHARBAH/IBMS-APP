@@ -110,12 +110,19 @@ async function buildOpportunity(
   ownerUserId: string,
   insurerCount: number,
   tag: string,
-): Promise<{ opportunityId: string; rfqId: string; insurerIds: string[] }> {
+  languagePreference?: 'AR' | 'EN',
+): Promise<{
+  opportunityId: string;
+  rfqId: string;
+  insurerIds: string[];
+  customerId: string;
+}> {
   const customer = await prisma.customer.create({
     data: {
       customerType: 'CORPORATE',
       legalName: `Rec E2E ${tag} ${Math.random().toString(36).slice(2, 8)}`,
       ownerUserId,
+      ...(languagePreference ? { languagePreference } : {}),
     },
   });
   const riskProfile = await prisma.riskProfile.create({
@@ -149,7 +156,12 @@ async function buildOpportunity(
     });
     insurerIds.push(insurer.id);
   }
-  return { opportunityId: opportunity.id, rfqId: rfq.id, insurerIds };
+  return {
+    opportunityId: opportunity.id,
+    rfqId: rfq.id,
+    insurerIds,
+    customerId: customer.id,
+  };
 }
 
 async function captureQuote(
@@ -440,4 +452,160 @@ describe('Broker Recommendation (e2e) — backlog Part C #16', () => {
       .set(bearer(placement.accessToken))
       .expect(201);
   });
+
+  // Part F item #7 — bilingual recommendation-report PDF. Proves the
+  // document endpoint inherits BOTH the existing visibility rule AND a
+  // NEW, deliberate, user-confirmed business-state gate: it must 422
+  // with the exact same blockedFromSend messages send() uses while a
+  // required approval or COI disclosure is still outstanding — a
+  // recommendation "retained as professional-indemnity evidence" must
+  // never leave the system as a document before it has actually cleared
+  // send()'s own maker/checker + COI safeguards.
+  it('generates a bilingual recommendation-report PDF only once send-blocking gates clear, and respects recommendation visibility', async () => {
+    const app = await boot();
+    const placement = await makeUser(
+      app,
+      'rec-doc-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+    const manager = await makeUser(
+      app,
+      'rec-doc-mgr',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const compliance = await makeUser(app, 'rec-doc-cmp', 'COMPLIANCE_OFFICER');
+    const otherSales = await makeUser(
+      app,
+      'rec-doc-sales-other',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const noPerm = await makeUser(app, 'rec-doc-none', 'CLAIMS_OFFICER');
+
+    const { opportunityId, rfqId, insurerIds } = await buildOpportunity(
+      placement.userId,
+      2,
+      'doc',
+      'AR',
+    );
+    const recommendedQuotationId = await captureQuote(
+      app,
+      placement.accessToken,
+      rfqId,
+      insurerIds[0],
+      '260000.000',
+      '17.5',
+    );
+    await captureQuote(
+      app,
+      placement.accessToken,
+      rfqId,
+      insurerIds[1],
+      '255000.000',
+      '10',
+    );
+    await request(app.getHttpServer())
+      .patch(`/opportunities/${opportunityId}/target-premium-threshold`)
+      .set(bearer(manager.accessToken))
+      .send({ targetPremiumThreshold: '250000.000' })
+      .expect(200);
+
+    const drafted = await request(app.getHttpServer())
+      .post('/recommendations')
+      .set(bearer(placement.accessToken))
+      .send({
+        opportunityId,
+        recommendedQuotationId,
+        rationale: 'Best overall balance despite the higher premium.',
+        rationaleFactors: FACTORS,
+      })
+      .expect(201);
+    const rec = drafted.body as RecommendationBody;
+    expect(rec.blockedFromSend.length).toBeGreaterThan(0);
+
+    // forbidden without recommendation.read
+    await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document`)
+      .set(bearer(noPerm.accessToken))
+      .expect(403);
+
+    // unknown recommendation -> 404
+    await request(app.getHttpServer())
+      .get('/recommendations/11111111-1111-4111-8111-111111111111/document')
+      .set(bearer(placement.accessToken))
+      .expect(404);
+
+    // a Sales Officer who does NOT own the customer -> 404, even though
+    // they hold recommendation.read — visibility, not just the flat
+    // permission, gates this.
+    await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document`)
+      .set(bearer(otherSales.accessToken))
+      .expect(404);
+
+    // still blocked (approval AND COI outstanding) -> 422, not a PDF
+    await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document`)
+      .set(bearer(placement.accessToken))
+      .expect(422);
+
+    // approve; still blocked on the COI disclosure alone -> 422
+    await request(app.getHttpServer())
+      .post(`/recommendations/${rec.id}/approve`)
+      .set(bearer(manager.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document`)
+      .set(bearer(placement.accessToken))
+      .expect(422);
+
+    // disclose; now genuinely unblocked
+    await request(app.getHttpServer())
+      .post(`/recommendations/${rec.id}/conflict-of-interest-disclosure`)
+      .set(bearer(compliance.accessToken))
+      .send({
+        disclosureText:
+          'Insurer A pays materially more commission than the comparable Insurer B quote; disclosed to the client in writing.',
+      })
+      .expect(201);
+
+    // default: AR customer -> a real PDF, no explicit language needed
+    const arDefault = await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document`)
+      .set(bearer(placement.accessToken))
+      .expect(200);
+    expect(arDefault.headers['content-type']).toContain('application/pdf');
+    const arBuffer = arDefault.body as Buffer;
+    expect(arBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // explicit override
+    const overridden = await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document?language=EN`)
+      .set(bearer(placement.accessToken))
+      .expect(200);
+    expect((overridden.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // DUAL renders genuinely more content than either single-language
+    // document (two full sections, not one) — a real size proof.
+    const dual = await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document?language=DUAL`)
+      .set(bearer(placement.accessToken))
+      .expect(200);
+    const dualBuffer = dual.body as Buffer;
+    expect(dualBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(dualBuffer.length).toBeGreaterThan(arBuffer.length);
+
+    // an invalid language value 400s (class-validator @IsIn)
+    await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document?language=FR`)
+      .set(bearer(placement.accessToken))
+      .expect(400);
+
+    // a cross-owner Manager can also reach it, regardless of ownership
+    await request(app.getHttpServer())
+      .get(`/recommendations/${rec.id}/document`)
+      .set(bearer(manager.accessToken))
+      .expect(200);
+  }, 45000);
 });

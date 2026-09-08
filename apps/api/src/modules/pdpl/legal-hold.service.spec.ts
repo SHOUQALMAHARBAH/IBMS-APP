@@ -113,10 +113,7 @@ describe('LegalHoldService.create', () => {
       repo: { customerExists: vi.fn().mockResolvedValue(false) },
     });
     await expect(
-      service.create(
-        { scope: 's', reason: 'r', customerId: 'nope' },
-        'u-dpo',
-      ),
+      service.create({ scope: 's', reason: 'r', customerId: 'nope' }, 'u-dpo'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 

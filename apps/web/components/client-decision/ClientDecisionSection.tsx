@@ -12,6 +12,8 @@ import {
 } from '../../lib/client-decision/client-decision-api';
 import type { OpportunityWithContext } from '../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDateTime } from '../../lib/i18n/format';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
@@ -35,6 +37,7 @@ export function ClientDecisionSection({
   canCapture,
   onOpportunityChanged,
 }: Props) {
+  const { language } = useLanguage();
   const [decision, setDecision] = useState<ClientDecision | null | undefined>(
     undefined,
   );
@@ -153,7 +156,7 @@ export function ClientDecisionSection({
             </p>
           ) : null}
           <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
-            Recorded {new Date(decision.decidedAt).toLocaleString()} · opportunity
+            Recorded {formatDateTime(decision.decidedAt, language)} · opportunity
             now {decision.opportunityStatus}
           </p>
         </div>

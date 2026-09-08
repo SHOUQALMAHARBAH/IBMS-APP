@@ -110,6 +110,36 @@ test("renders the prospects list and navigates to a profile on click", async ({ 
   await expect(page.getByText("Medical, Motor")).toBeVisible();
 });
 
+// Part F item #6 — bilingual full-text search. Proves the WIRING — the
+// real Postgres full-text-search behavior is proven by the api's own e2e
+// tests (prospect.e2e-spec.ts), not re-tested here against a mock.
+test("the search box re-fetches with a search querystring and renders the filtered result", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const OTHER_PROSPECT = { ...PROSPECT, id: "prospect-2", companyName: "Nour Trading" };
+  let lastUrl = "";
+  await page.route("http://localhost:4000/prospects**", (route) => {
+    lastUrl = route.request().url();
+    const url = new URL(lastUrl);
+    if (url.searchParams.get("search") === "Nour") {
+      return route.fulfill({ status: 200, json: [OTHER_PROSPECT] });
+    }
+    return route.fulfill({ status: 200, json: [PROSPECT, OTHER_PROSPECT] });
+  });
+
+  await page.goto("/prospects");
+  await expect(page.getByText("Ready Trading Co.")).toBeVisible();
+  await expect(page.getByText("Nour Trading")).toBeVisible();
+
+  await page.getByLabel("Search").fill("Nour");
+  await page.getByRole("button", { name: "Search" }).click();
+
+  await expect(page.getByText("Nour Trading")).toBeVisible();
+  await expect(page.getByText("Ready Trading Co.")).toHaveCount(0);
+  expect(new URL(lastUrl).searchParams.get("search")).toBe("Nour");
+});
+
 test("shows an empty state when there are no prospects yet", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("http://localhost:4000/prospects", (route) =>

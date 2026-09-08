@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@ibms/db';
 import type { Vendor } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { expandSearchTerms } from '../common/name-transliteration.config';
 
 export interface CreateVendorInput {
   name: string;
@@ -14,6 +16,9 @@ export interface UpdateVendorInput {
 
 export interface VendorFilter {
   vendorType?: string;
+  /** Part F item #6 — pre-resolved ids from a full-text search
+   * (searchIds()); undefined means no search filter is active. */
+  id?: string[];
 }
 
 /**
@@ -36,9 +41,33 @@ export class VendorRepository {
 
   findMany(filter: VendorFilter): Promise<Vendor[]> {
     return this.prisma.client.vendor.findMany({
-      where: { vendorType: filter.vendorType },
+      where: {
+        vendorType: filter.vendorType,
+        id: filter.id ? { in: filter.id } : undefined,
+      },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** Part F item #6 — bilingual full-text search over name. See
+   * CustomerRepository.searchIds()'s own comment for the full
+   * mechanism/safety rationale (identical here, including the Part F item
+   * #6 remainder fuzzy-transliteration-variant expansion). */
+  async searchIds(term: string): Promise<string[]> {
+    const terms = [term, ...expandSearchTerms(term)];
+    const rows = await this.prisma.client.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Vendor"
+      WHERE (${Prisma.join(
+        terms.map(
+          (t) => Prisma.sql`"searchVector" @@ (
+            websearch_to_tsquery('arabic', ${t}) ||
+            websearch_to_tsquery('english', ${t})
+          )`,
+        ),
+        ' OR ',
+      )})
+    `;
+    return rows.map((r) => r.id);
   }
 
   update(id: string, input: UpdateVendorInput): Promise<Vendor> {

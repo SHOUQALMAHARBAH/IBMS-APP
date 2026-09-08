@@ -12,24 +12,20 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate, formatMoney } from '../../../lib/i18n/format';
+import type { Language } from '../../../lib/i18n/translations';
 
-function money(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${v}`;
-}
-
-function oldest(daysOverdue: number, dueDate: string | null): string {
+function oldest(daysOverdue: number, dueDate: string | null, language: Language): string {
   if (daysOverdue > 0) return `${daysOverdue}d overdue`;
-  if (dueDate) return `due ${dueDate.slice(0, 10)}`;
+  if (dueDate) return `due ${formatDate(dueDate, language)}`;
   return '—';
 }
 
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
@@ -40,6 +36,7 @@ const headCellStyle: CSSProperties = {
 export default function ClientAccountingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<ReceivablesAgeingReport | null>(null);
@@ -110,7 +107,7 @@ export default function ClientAccountingPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Client</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Client</th>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <th key={k} style={headCellStyle}>
                       {AR_AGEING_BUCKET_LABEL[k]}
@@ -118,40 +115,40 @@ export default function ClientAccountingPage() {
                   ))}
                   <th style={headCellStyle}>Outstanding</th>
                   <th style={headCellStyle}>Invoices</th>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Oldest</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Oldest</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.customerId}>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
-                      {r.customerLegalName}
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                      <bdi>{r.customerLegalName}</bdi>
                     </td>
                     {AR_AGEING_BUCKET_KEYS.map((k) => (
                       <td key={k} style={cellStyle}>
-                        {money(r[k])}
+                        {formatMoney(r[k], language)}
                       </td>
                     ))}
-                    <td style={cellStyle}>{money(r.outstandingTotal)}</td>
+                    <td style={cellStyle}>{formatMoney(r.outstandingTotal, language)}</td>
                     <td style={cellStyle}>{r.invoiceCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
-                      {oldest(r.oldestDaysOverdue, r.oldestDueDate)}
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                      {oldest(r.oldestDaysOverdue, r.oldestDueDate, language)}
                     </td>
                   </tr>
                 ))}
                 <tr>
                   <td
-                    style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}
+                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
                   >
                     Total
                   </td>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <td key={k} style={{ ...cellStyle, fontWeight: 600 }}>
-                      {money(data.totals[k])}
+                      {formatMoney(data.totals[k], language)}
                     </td>
                   ))}
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {money(data.totals.outstandingTotal)}
+                    {formatMoney(data.totals.outstandingTotal, language)}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {data.totals.invoiceCount}

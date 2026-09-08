@@ -70,6 +70,34 @@ export function assertCoverageFigures(
   return value;
 }
 
+/** A single `limits`/`sumsInsured` entry, re-derived for DISPLAY (Part F
+ * item #7's policy-schedule-summary AND certificate-of-insurance
+ * documents — promoted here once the SECOND document type needed the
+ * exact same read, the same "promote on a second consumer" discipline
+ * `document-html.util.ts` itself follows). */
+export interface CoverageFigureEntry {
+  key: string;
+  value: string | number;
+}
+
+/** Re-derives {@link assertCoverageFigures}'s own shape from a stored
+ * `limits`/`sumsInsured` blob for display, tolerating (rather than
+ * throwing on) a differently-shaped value from an older or hand-edited
+ * row: an empty or malformed blob returns `[]`, not a 500. */
+export function coverageFigureEntries(
+  value: Prisma.JsonValue,
+): CoverageFigureEntry[] {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+  return Object.entries(value as Record<string, unknown>)
+    .filter(
+      (entry): entry is [string, string | number] =>
+        typeof entry[1] === 'string' || typeof entry[1] === 'number',
+    )
+    .map(([key, v]) => ({ key, value: v }));
+}
+
 /** The signed issued-minus-requested premium delta, fils-quantized through
  * `money.util.ts` — a negative value means the insurer issued cheaper than
  * quoted. `null` until the policy is issued. A `Policy` has one `currency`

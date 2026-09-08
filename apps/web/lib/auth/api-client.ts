@@ -68,11 +68,15 @@ async function parseErrorBody(res: Response): Promise<{ message?: string; code?:
   }
 }
 
-export async function apiFetch<T>(
+// Shared by apiFetch and apiFetchBlob: issues the request, retries exactly
+// once via a silent refresh on a 401, and throws ApiError on any other
+// non-OK response — everything both callers need before they diverge on
+// how to parse a successful body (.json() vs. .blob()).
+async function fetchWithRetry(
   path: string,
-  init: RequestInit = {},
-  options: { skipAuthRetry?: boolean } = {},
-): Promise<T> {
+  init: RequestInit,
+  options: { skipAuthRetry?: boolean },
+): Promise<Response> {
   let res = await rawFetch(path, init);
 
   if (res.status === 401 && !options.skipAuthRetry && path !== '/auth/refresh') {
@@ -85,8 +89,28 @@ export async function apiFetch<T>(
     const message = Array.isArray(body.message) ? body.message.join(', ') : (body.message ?? res.statusText);
     throw new ApiError(message, res.status, body.code);
   }
+  return res;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+  options: { skipAuthRetry?: boolean } = {},
+): Promise<T> {
+  const res = await fetchWithRetry(path, init, options);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+// Part F item #7 — the first binary (non-JSON) download this app makes.
+// Same 401-retry-once shape as apiFetch, resolving a Blob instead of a
+// JSON body — a generated PDF is never JSON.
+export async function apiFetchBlob(
+  path: string,
+  options: { skipAuthRetry?: boolean } = {},
+): Promise<Blob> {
+  const res = await fetchWithRetry(path, { method: 'GET' }, options);
+  return res.blob();
 }
 
 export function apiPost<T>(path: string, body?: unknown, options?: { skipAuthRetry?: boolean }): Promise<T> {

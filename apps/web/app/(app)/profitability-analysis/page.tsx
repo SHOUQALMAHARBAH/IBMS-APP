@@ -15,7 +15,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
@@ -39,7 +39,9 @@ function BreakdownTable({ rows }: { rows: ProfitabilityBreakdownRow[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.key}>
-            <td style={cell}>{row.key}</td>
+            <td style={cell}>
+              <bdi>{row.key}</bdi>
+            </td>
             <td style={cell}>{row.commissionIncomeJod}</td>
             <td style={cell}>{row.costToServeJod}</td>
             <td style={cell}>{row.netProfitabilityJod}</td>

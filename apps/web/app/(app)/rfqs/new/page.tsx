@@ -100,6 +100,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
       </div>
       <input
         id="insuranceLine"
+        dir="auto"
         value={insuranceLine}
         onChange={(e) => setInsuranceLine(e.target.value)}
         placeholder="Property All Risks"
@@ -124,7 +125,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
                   onChange={() => toggle(insurer.id)}
                 />
                 <span>
-                  {insurer.name}
+                  <bdi>{insurer.name}</bdi>
                   {insurer.financialStrengthRating
                     ? ` · ${insurer.financialStrengthRating}`
                     : ''}

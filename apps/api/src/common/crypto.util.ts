@@ -70,3 +70,20 @@ export function hashToken(rawToken: string): string {
 export function generateOpaqueToken(): string {
   return randomBytes(48).toString('hex');
 }
+
+/**
+ * JWT signing secret for access tokens and short-lived purpose tokens
+ * (TokenService, JwtStrategy) — one shared source of truth for the
+ * dev-only fallback instead of two independent copies of the same
+ * hardcoded string. Unlike {@link encryptionKey}, this does not throw when
+ * unset: `main.ts`'s `assertJwtSecretConfigured()` is what actually fails
+ * the boot if that happens in production (Part 10.2 — same
+ * `NODE_ENV=production` gate as `assertDatabaseTls()`), so by the time this
+ * runs in a real production process the env var is already guaranteed set.
+ */
+export function jwtSecret(): string {
+  return (
+    process.env.JWT_ACCESS_SECRET ??
+    'dev-insecure-secret-change-me-32chars-minimum'
+  );
+}

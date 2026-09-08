@@ -130,17 +130,27 @@ async function makeUser(
   return { accessToken, userId: user.id };
 }
 
-/** A COMPARISON_BUILT Opportunity with one RFQ + one shortlisted insurer. */
+/** A COMPARISON_BUILT Opportunity with one RFQ + one shortlisted insurer.
+ * `languagePreference` defaults to `'AR'` (the schema's own default and
+ * the 3 pre-existing call sites' implicit assumption) — optional and
+ * additive, so none of them need updating. */
 async function buildOpportunity(
   ownerUserId: string,
   tag: string,
-): Promise<{ opportunityId: string; rfqId: string; insurerId: string }> {
+  languagePreference: 'AR' | 'EN' = 'AR',
+): Promise<{
+  opportunityId: string;
+  rfqId: string;
+  insurerId: string;
+  customerId: string;
+}> {
   const rand = Math.random().toString(36).slice(2, 8);
   const customer = await prisma.customer.create({
     data: {
       customerType: 'CORPORATE',
       legalName: `Policy E2E ${tag} ${rand}`,
       ownerUserId,
+      languagePreference,
     },
   });
   const riskProfile = await prisma.riskProfile.create({
@@ -172,6 +182,7 @@ async function buildOpportunity(
     opportunityId: opportunity.id,
     rfqId: rfq.id,
     insurerId: insurer.id,
+    customerId: customer.id,
   };
 }
 
@@ -181,11 +192,10 @@ async function opportunityWithSentRecommendation(
   token: string,
   ownerUserId: string,
   tag: string,
-): Promise<{ opportunityId: string; insurerId: string }> {
-  const { opportunityId, rfqId, insurerId } = await buildOpportunity(
-    ownerUserId,
-    tag,
-  );
+  languagePreference: 'AR' | 'EN' = 'AR',
+): Promise<{ opportunityId: string; insurerId: string; customerId: string }> {
+  const { opportunityId, rfqId, insurerId, customerId } =
+    await buildOpportunity(ownerUserId, tag, languagePreference);
   const quote = await request(app.getHttpServer())
     .post('/quotations')
     .set(bearer(token))
@@ -210,7 +220,7 @@ async function opportunityWithSentRecommendation(
     .post(`/recommendations/${(drafted.body as { id: string }).id}/send`)
     .set(bearer(token))
     .expect(201);
-  return { opportunityId, insurerId };
+  return { opportunityId, insurerId, customerId };
 }
 
 /** ... plus a captured ACCEPT client decision, leaving the Opportunity ready
@@ -220,13 +230,16 @@ async function acceptedOpportunity(
   token: string,
   ownerUserId: string,
   tag: string,
-): Promise<{ opportunityId: string; insurerId: string }> {
-  const { opportunityId, insurerId } = await opportunityWithSentRecommendation(
-    app,
-    token,
-    ownerUserId,
-    tag,
-  );
+  languagePreference: 'AR' | 'EN' = 'AR',
+): Promise<{ opportunityId: string; insurerId: string; customerId: string }> {
+  const { opportunityId, insurerId, customerId } =
+    await opportunityWithSentRecommendation(
+      app,
+      token,
+      ownerUserId,
+      tag,
+      languagePreference,
+    );
   await request(app.getHttpServer())
     .post('/client-decisions')
     .set(bearer(token))
@@ -237,7 +250,7 @@ async function acceptedOpportunity(
       evidenceRef: `env-${tag}`,
     })
     .expect(201);
-  return { opportunityId, insurerId };
+  return { opportunityId, insurerId, customerId };
 }
 
 /** Place + issue a policy (with ISSUED_SCHEDULE coverage), leaving it at
@@ -247,12 +260,14 @@ async function issuedPolicy(
   token: string,
   ownerUserId: string,
   tag: string,
+  languagePreference: 'AR' | 'EN' = 'AR',
 ): Promise<string> {
   const { opportunityId } = await acceptedOpportunity(
     app,
     token,
     ownerUserId,
     tag,
+    languagePreference,
   );
   const placed = await request(app.getHttpServer())
     .post('/policies')
@@ -667,6 +682,332 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     });
     expect(transitionRows).toBe(5);
   });
+
+  it('generates a bilingual policy-schedule-summary PDF only once the policy is issued, respecting policy visibility, defaulting to the customer language, and honoring an explicit override', async () => {
+    const app = await boot();
+    const placement = await makeUser(
+      app,
+      'pol-doc-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+    const owningSales = await makeUser(
+      app,
+      'pol-doc-sales-owner',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const otherSales = await makeUser(
+      app,
+      'pol-doc-sales-other',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const manager = await makeUser(
+      app,
+      'pol-doc-mgr',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    // DATA_PROTECTION_OFFICER holds no policy.read grant at all (unlike
+    // CLAIMS_OFFICER, which this file's policy.read permission DOES
+    // grant — see packages/db/prisma/seed-data/permissions.ts).
+    const noPerm = await makeUser(
+      app,
+      'pol-doc-none',
+      'DATA_PROTECTION_OFFICER',
+    );
+
+    // A placed-but-not-yet-issued policy has no coverage schedule yet —
+    // the document endpoint 422s (a data-availability gate, not a
+    // visibility one).
+    const { opportunityId: blockedOpportunityId } = await acceptedOpportunity(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'doc-blocked',
+    );
+    const placedOnly = await request(app.getHttpServer())
+      .post('/policies')
+      .set(bearer(placement.accessToken))
+      .send({
+        opportunityId: blockedOpportunityId,
+        inceptionDate: '2026-10-01',
+      })
+      .expect(201);
+    const blockedPolicyId = (placedOnly.body as PolicyBody).id;
+    const blocked = await request(app.getHttpServer())
+      .get(`/policies/${blockedPolicyId}/document`)
+      .set(bearer(owningSales.accessToken))
+      .expect(422);
+    expect((blocked.body as { message: string }).message).toMatch(
+      /has not yet been issued/i,
+    );
+
+    const arPolicyId = await issuedPolicy(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'doc-ar',
+      'AR',
+    );
+    const enPolicyId = await issuedPolicy(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'doc-en',
+      'EN',
+    );
+
+    // forbidden without policy.read
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document`)
+      .set(bearer(noPerm.accessToken))
+      .expect(403);
+
+    // unknown policy -> 404
+    await request(app.getHttpServer())
+      .get('/policies/11111111-1111-4111-8111-111111111111/document')
+      .set(bearer(placement.accessToken))
+      .expect(404);
+
+    // a Sales Officer who does NOT own the customer -> 404, even though
+    // they hold policy.read — visibility, not just the flat permission,
+    // gates this (the whole point of routing through
+    // PolicyService.getByIdWithCustomer instead of the repository).
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document`)
+      .set(bearer(otherSales.accessToken))
+      .expect(404);
+
+    // a Manager (cross-owner visibility) CAN reach it regardless of
+    // ownership
+    const managerRes = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document`)
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    expect((managerRes.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // default: AR customer -> a real PDF, no explicit language needed
+    const arDefault = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect(arDefault.headers['content-type']).toContain('application/pdf');
+    const arBuffer = arDefault.body as Buffer;
+    expect(arBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // default: EN customer -> also a real PDF
+    const enDefault = await request(app.getHttpServer())
+      .get(`/policies/${enPolicyId}/document`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect((enDefault.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // explicit override: EN customer, but ask for AR anyway
+    const overridden = await request(app.getHttpServer())
+      .get(`/policies/${enPolicyId}/document?language=AR`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect((overridden.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // DUAL renders genuinely more content than either single-language
+    // document (two full sections, not one) — a real size proof.
+    const dual = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document?language=DUAL`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    const dualBuffer = dual.body as Buffer;
+    expect(dualBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(dualBuffer.length).toBeGreaterThan(arBuffer.length);
+
+    // an invalid language value 400s (class-validator @IsIn)
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document?language=FR`)
+      .set(bearer(owningSales.accessToken))
+      .expect(400);
+  }, 45000);
+
+  it('Part F item #7 — generates a bilingual certificate-of-insurance PDF, gated the same way as the schedule-summary document but with genuinely different content', async () => {
+    const app = await boot();
+    const placement = await makeUser(
+      app,
+      'pol-cert-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+    const owningSales = await makeUser(
+      app,
+      'pol-cert-sales-owner',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const otherSales = await makeUser(
+      app,
+      'pol-cert-sales-other',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const manager = await makeUser(
+      app,
+      'pol-cert-mgr',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const noPerm = await makeUser(
+      app,
+      'pol-cert-none',
+      'DATA_PROTECTION_OFFICER',
+    );
+
+    // a placed-but-not-yet-issued policy has no coverage to certify —
+    // same data-availability gate as the schedule-summary document
+    const { opportunityId: blockedOpportunityId } = await acceptedOpportunity(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'cert-blocked',
+    );
+    const placedOnly = await request(app.getHttpServer())
+      .post('/policies')
+      .set(bearer(placement.accessToken))
+      .send({
+        opportunityId: blockedOpportunityId,
+        inceptionDate: '2026-10-01',
+      })
+      .expect(201);
+    const blockedPolicyId = (placedOnly.body as PolicyBody).id;
+    const blocked = await request(app.getHttpServer())
+      .get(`/policies/${blockedPolicyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(422);
+    expect((blocked.body as { message: string }).message).toMatch(
+      /no coverage to certify/i,
+    );
+
+    const arPolicyId = await issuedPolicy(
+      app,
+      placement.accessToken,
+      owningSales.userId,
+      'cert-ar',
+      'AR',
+    );
+
+    // forbidden without policy.read
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate`)
+      .set(bearer(noPerm.accessToken))
+      .expect(403);
+
+    // unknown policy -> 404
+    await request(app.getHttpServer())
+      .get('/policies/11111111-1111-4111-8111-111111111111/certificate')
+      .set(bearer(placement.accessToken))
+      .expect(404);
+
+    // a Sales Officer who does NOT own the customer -> 404 (same
+    // visibility rule as the schedule-summary document)
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate`)
+      .set(bearer(otherSales.accessToken))
+      .expect(404);
+
+    // a Manager (cross-owner visibility) CAN reach it regardless of
+    // ownership
+    const managerRes = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate`)
+      .set(bearer(manager.accessToken))
+      .expect(200);
+    expect((managerRes.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // default: AR customer -> a real PDF
+    const arDefault = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect(arDefault.headers['content-type']).toContain('application/pdf');
+    const arBuffer = arDefault.body as Buffer;
+    expect(arBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // explicit override: AR customer, ask for EN anyway
+    const overridden = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate?language=EN`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect((overridden.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // DUAL renders genuinely more content than a single-language document
+    const dual = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate?language=DUAL`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    const dualBuffer = dual.body as Buffer;
+    expect(dualBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(dualBuffer.length).toBeGreaterThan(arBuffer.length);
+
+    // an invalid language value 400s (class-validator @IsIn)
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate?language=FR`)
+      .set(bearer(owningSales.accessToken))
+      .expect(400);
+
+    // the certificate is genuinely smaller than the schedule-summary
+    // document for the same policy — proof it is not the same content
+    // under a different heading (no premium/tax/named-perils/extensions
+    // breakdown)
+    const scheduleDoc = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document?language=EN`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    const certDoc = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate?language=EN`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+    expect((certDoc.body as Buffer).length).toBeLessThan(
+      (scheduleDoc.body as Buffer).length,
+    );
+
+    // a `@code-reviewer` BLOCKER fix, verified directly: a CANCELLED or
+    // EXPIRED policy — no exposed endpoint drives either transition yet,
+    // so set directly, the same established e2e pattern this suite uses
+    // to reach a state with no build endpoint (e.g. invoice.e2e-spec.ts
+    // backdating dueDate) — refuses with 422 rather than issuing a
+    // certificate that falsely attests coverage is "currently in force".
+    await prisma.policy.update({
+      where: { id: arPolicyId },
+      data: { status: 'CANCELLED' },
+    });
+    const cancelledCert = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(422);
+    expect((cancelledCert.body as { message: string }).message).toMatch(
+      /CANCELLED.*no longer in force/i,
+    );
+
+    await prisma.policy.update({
+      where: { id: arPolicyId },
+      data: { status: 'EXPIRED' },
+    });
+    const expiredCert = await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/certificate`)
+      .set(bearer(owningSales.accessToken))
+      .expect(422);
+    expect((expiredCert.body as { message: string }).message).toMatch(
+      /EXPIRED.*no longer in force/i,
+    );
+
+    // the schedule-summary document, by contrast, still renders a
+    // cancelled/expired policy's coverage as an "as at" historical
+    // snapshot — a DIFFERENT, deliberate gate than the certificate's,
+    // not an oversight (see certificate-of-insurance-document.service.ts).
+    await request(app.getHttpServer())
+      .get(`/policies/${arPolicyId}/document`)
+      .set(bearer(owningSales.accessToken))
+      .expect(200);
+  }, 45000);
 
   // Process 51 (backlog Part C #51's first checkbox) — "automatically block
   // new business issuance once the license lapses." `BrokerLicense` is a

@@ -500,9 +500,11 @@ export interface WorkflowDelegate {
   }): Promise<{ count: number }>;
 }
 
-/** Resolves the Prisma delegate backing a workflow entity's `status` column. */
+/** Resolves the Prisma delegate backing a workflow entity's `status` column.
+ *  Accepts either the top-level client or an interactive `$transaction`'s
+ *  `tx` callback client — both expose the same per-model delegates. */
 export function getWorkflowDelegate(
-  client: PrismaService['client'],
+  client: PrismaService['client'] | Prisma.TransactionClient,
   entityType: WorkflowEntityType,
 ): WorkflowDelegate {
   const delegates: Record<WorkflowEntityType, unknown> = {

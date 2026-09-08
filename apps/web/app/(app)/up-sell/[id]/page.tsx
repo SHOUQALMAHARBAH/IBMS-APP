@@ -26,6 +26,8 @@ import {
 } from '../../../../components/up-sell/up-sell.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDateTime } from '../../../../lib/i18n/format';
 
 const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
@@ -33,6 +35,7 @@ export default function UpSellRecommendationDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [recommendation, setRecommendation] =
     useState<UpSellRecommendation | null>(null);
@@ -158,14 +161,14 @@ export default function UpSellRecommendationDetailPage() {
             <div>
               <div style={profileFieldLabelStyle}>Flagged</div>
               <div style={profileFieldValueStyle}>
-                {new Date(recommendation.detectedAt).toLocaleString()}
+                {formatDateTime(recommendation.detectedAt, language)}
               </div>
             </div>
             {recommendation.resolvedAt ? (
               <div>
                 <div style={profileFieldLabelStyle}>Resolved</div>
                 <div style={profileFieldValueStyle}>
-                  {new Date(recommendation.resolvedAt).toLocaleString()}
+                  {formatDateTime(recommendation.resolvedAt, language)}
                 </div>
               </div>
             ) : null}

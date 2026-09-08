@@ -149,7 +149,8 @@ describe('Risk Assessment (e2e) — backlog Part C #6', () => {
       .set(bearer(salesToken))
       .send({
         customerType: 'INDIVIDUAL',
-        legalName: 'Risk Survey Subject',
+        givenName: 'Risk Survey',
+        familyName: 'Subject',
         nationalId: '9901010000',
         contactPhone: '+962-7-9000-1234',
         contactEmail: 'rp-subject@example.test',

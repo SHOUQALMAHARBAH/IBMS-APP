@@ -21,7 +21,7 @@ const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
   verticalAlign: 'top',
 };
 const headCellStyle: CSSProperties = {
@@ -183,11 +183,11 @@ export default function BankReconciliationPage() {
               <thead>
                 <tr>
                   <th style={headCellStyle}>Invoice</th>
-                  <th style={{ ...headCellStyle, textAlign: 'right' }}>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>
                     Statement
                   </th>
-                  <th style={{ ...headCellStyle, textAlign: 'right' }}>Broker</th>
-                  <th style={{ ...headCellStyle, textAlign: 'right' }}>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>Broker</th>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>
                     Variance
                   </th>
                   <th style={headCellStyle}>Status</th>
@@ -198,13 +198,13 @@ export default function BankReconciliationPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cellStyle}>{r.invoiceId ?? '—'}</td>
-                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                    <td style={{ ...cellStyle, textAlign: 'end' }}>
                       {r.insurerStatementAmount}
                     </td>
-                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                    <td style={{ ...cellStyle, textAlign: 'end' }}>
                       {r.brokerRecordAmount}
                     </td>
-                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                    <td style={{ ...cellStyle, textAlign: 'end' }}>
                       <strong>{r.varianceAmount}</strong>
                     </td>
                     <td style={cellStyle}>{r.status}</td>

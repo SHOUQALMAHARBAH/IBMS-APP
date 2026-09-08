@@ -3,7 +3,7 @@
 // Policy from an accepted Opportunity (inception date set at placement),
 // then records the insurer-issued policy/schedule/documents/premium invoice.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 
 export type PolicyStatus =
   | 'PLACEMENT_CONFIRMED'
@@ -201,4 +201,30 @@ export function acknowledgePolicyReceipt(
     `/policies/${encodeURIComponent(id)}/delivery/acknowledge-receipt`,
     acknowledgedAt ? { acknowledgedAt } : {},
   );
+}
+
+// Part F item #7 — bilingual policy-schedule-summary PDF. Omitting
+// `language` defaults server-side to the customer's own
+// languagePreference; 'DUAL' renders both, Arabic section first. The
+// api refuses (422) until the policy has been issued — mirrored here by
+// only showing the button once `schedules.length > 0` (see
+// PolicySection.tsx).
+export function downloadPolicyScheduleDocument(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/policies/${encodeURIComponent(id)}/document${qs}`);
+}
+
+// Part F item #7 — bilingual certificate-of-insurance PDF, the 6th and
+// final of the 6 named document types. Same defaulting/gating shape as
+// downloadPolicyScheduleDocument above, but a genuinely different content
+// endpoint (short proof-of-coverage, not the full schedule).
+export function downloadPolicyCertificateDocument(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/policies/${encodeURIComponent(id)}/certificate${qs}`);
 }

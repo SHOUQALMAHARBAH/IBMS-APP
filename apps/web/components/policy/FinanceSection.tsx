@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   createInvoice,
+  downloadInvoiceDocument,
   listInvoicesForPolicy,
   recordReceipt,
   recordRemittance,
@@ -17,6 +18,8 @@ import {
 import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDate, formatMoney } from '../../lib/i18n/format';
 
 interface Props {
   opportunityId: string;
@@ -26,14 +29,6 @@ interface Props {
   canCollect: boolean;
 }
 
-function money(value: string | null, currency = 'JOD'): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
-
 /** The section only makes sense once a policy exists with an issued premium —
  * #31 bills `Policy.issuedPremium`. */
 export function FinanceSection({
@@ -41,6 +36,7 @@ export function FinanceSection({
   canInvoice,
   canCollect,
 }: Props) {
+  const { language } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +77,30 @@ export function FinanceSection({
 
   const invoice = invoices[0] ?? null;
 
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass. The
+  // button is only rendered once an invoice exists (see below).
+  async function downloadDocument(id: string) {
+    setError(null);
+    try {
+      const blob = await downloadInvoiceDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the invoice — try again.',
+      );
+    }
+  }
+
   async function runStep(step: () => Promise<unknown>, failMsg: string) {
     setBusy(true);
     setError(null);
@@ -104,29 +124,29 @@ export function FinanceSection({
         <div style={quoteChainCardStyle}>
           <div style={quoteFieldStyle}>
             <span>Premium</span>
-            <strong>{money(invoice.premiumAmount, invoice.currency)}</strong>
+            <strong>{formatMoney(invoice.premiumAmount, language, invoice.currency)}</strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Tax</span>
-            <strong>{money(invoice.taxAmount, invoice.currency)}</strong>
+            <strong>{formatMoney(invoice.taxAmount, language, invoice.currency)}</strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Fees</span>
-            <strong>{money(invoice.feesAmount, invoice.currency)}</strong>
+            <strong>{formatMoney(invoice.feesAmount, language, invoice.currency)}</strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Less commission</span>
             <strong>
-              −{money(invoice.commissionDeducted, invoice.currency)}
+              −{formatMoney(invoice.commissionDeducted, language, invoice.currency)}
             </strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Total due</span>
-            <strong>{money(invoice.totalAmount, invoice.currency)}</strong>
+            <strong>{formatMoney(invoice.totalAmount, language, invoice.currency)}</strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Due date</span>
-            <strong>{new Date(invoice.dueDate).toLocaleDateString()}</strong>
+            <strong>{formatDate(invoice.dueDate, language)}</strong>
           </div>
           <div style={quoteFieldStyle}>
             <span>Status</span>
@@ -136,7 +156,7 @@ export function FinanceSection({
             <div style={quoteFieldStyle}>
               <span>Collected</span>
               <strong>
-                {money(invoice.receipt.amount, invoice.currency)}
+                {formatMoney(invoice.receipt.amount, language, invoice.currency)}
                 {invoice.receipt.method ? ` (${invoice.receipt.method})` : ''}
               </strong>
             </div>
@@ -145,18 +165,25 @@ export function FinanceSection({
             <div style={quoteFieldStyle}>
               <span>Remitted to insurer</span>
               <strong>
-                {money(invoice.remittance.amount, invoice.currency)}
+                {formatMoney(invoice.remittance.amount, language, invoice.currency)}
                 {invoice.remittance.remittedAt
-                  ? ` on ${new Date(invoice.remittance.remittedAt).toLocaleDateString()}`
+                  ? ` on ${formatDate(invoice.remittance.remittedAt, language)}`
                   : ''}
               </strong>
             </div>
           ) : null}
+          <button
+            type="button"
+            onClick={() => void downloadDocument(invoice.id)}
+            style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
+          >
+            Download invoice (PDF)
+          </button>
         </div>
       ) : (
         <p style={{ color: '#6b7280' }}>
           No premium invoice yet. Premium to bill:{' '}
-          {money(policy.issuedPremium, policy.currency)} (commission is netted
+          {formatMoney(policy.issuedPremium, language, policy.currency)} (commission is netted
           automatically from the placed quotation rate).
         </p>
       )}
@@ -243,7 +270,7 @@ export function FinanceSection({
             disabled={busy}
             style={buttonStyle}
           >
-            Record receipt of {money(invoice.totalAmount, invoice.currency)}
+            Record receipt of {formatMoney(invoice.totalAmount, language, invoice.currency)}
           </button>
         </div>
       ) : null}
@@ -276,7 +303,7 @@ export function FinanceSection({
           disabled={busy}
           style={{ ...buttonStyle, marginTop: '0.75rem' }}
         >
-          Remit {money(invoice.netRemittance, invoice.currency)} to insurer
+          Remit {formatMoney(invoice.netRemittance, language, invoice.currency)} to insurer
         </button>
       ) : null}
     </section>

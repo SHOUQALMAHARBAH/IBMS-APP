@@ -10,24 +10,24 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate, formatMoney } from '../../../lib/i18n/format';
+import type { Language } from '../../../lib/i18n/translations';
 
-function money(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${v}`;
-}
-
-function oldest(daysOutstanding: number, collectedAt: string | null): string {
+function oldest(
+  daysOutstanding: number,
+  collectedAt: string | null,
+  language: Language,
+): string {
   if (daysOutstanding >= 0 && collectedAt)
-    return `${daysOutstanding}d (since ${collectedAt.slice(0, 10)})`;
+    return `${daysOutstanding}d (since ${formatDate(collectedAt, language)})`;
   return '—';
 }
 
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
@@ -38,6 +38,7 @@ const headCellStyle: CSSProperties = {
 export default function InsurerAccountingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<InsurerPayablesReport | null>(null);
@@ -111,10 +112,10 @@ export default function InsurerAccountingPage() {
             <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Insurer</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Insurer</th>
                   <th style={headCellStyle}>Outstanding</th>
                   <th style={headCellStyle}>Invoices</th>
-                  <th style={{ ...headCellStyle, textAlign: 'left' }}>Oldest</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Oldest</th>
                   <th style={headCellStyle}>Remitted to date</th>
                   <th style={headCellStyle}>Remittances</th>
                 </tr>
@@ -122,33 +123,33 @@ export default function InsurerAccountingPage() {
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.insurerId}>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
-                      {r.insurerName}
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                      <bdi>{r.insurerName}</bdi>
                     </td>
-                    <td style={cellStyle}>{money(r.outstandingAmount)}</td>
+                    <td style={cellStyle}>{formatMoney(r.outstandingAmount, language)}</td>
                     <td style={cellStyle}>{r.outstandingCount}</td>
-                    <td style={{ ...cellStyle, textAlign: 'left' }}>
-                      {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt)}
+                    <td style={{ ...cellStyle, textAlign: 'start' }}>
+                      {oldest(r.oldestDaysOutstanding, r.oldestCollectedAt, language)}
                     </td>
-                    <td style={cellStyle}>{money(r.remittedAmount)}</td>
+                    <td style={cellStyle}>{formatMoney(r.remittedAmount, language)}</td>
                     <td style={cellStyle}>{r.remittedCount}</td>
                   </tr>
                 ))}
                 <tr>
                   <td
-                    style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}
+                    style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
                   >
                     Total
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {money(data.totals.outstandingAmount)}
+                    {formatMoney(data.totals.outstandingAmount, language)}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {data.totals.outstandingCount}
                   </td>
                   <td style={cellStyle} />
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
-                    {money(data.totals.remittedAmount)}
+                    {formatMoney(data.totals.remittedAmount, language)}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {data.totals.remittedCount}

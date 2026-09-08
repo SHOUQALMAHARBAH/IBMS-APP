@@ -1,8 +1,19 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { PolicyService } from './policy.service';
 import { PolicyCheckingService } from './policy-checking.service';
 import { PolicyDeliveryService } from './policy-delivery.service';
+import { PolicyScheduleSummaryDocumentService } from './policy-schedule-summary-document.service';
+import { CertificateOfInsuranceDocumentService } from './certificate-of-insurance-document.service';
 import { PlacePolicyDto } from './dto/place-policy.dto';
 import { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
@@ -10,6 +21,7 @@ import { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
 import { RecordPolicyDeliveryDto } from './dto/record-policy-delivery.dto';
 import { AcknowledgeReceiptDto } from './dto/acknowledge-receipt.dto';
 import { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
+import { DocumentLanguageQueryDto } from '../document-generation/dto/document-language-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -26,6 +38,8 @@ export class PolicyController {
     private readonly policies: PolicyService,
     private readonly policyChecking: PolicyCheckingService,
     private readonly policyDelivery: PolicyDeliveryService,
+    private readonly policyDocuments: PolicyScheduleSummaryDocumentService,
+    private readonly certificateDocuments: CertificateOfInsuranceDocumentService,
   ) {}
 
   @RequirePermissions('policy.create')
@@ -47,6 +61,55 @@ export class PolicyController {
   @Get(':id')
   get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.policies.get(id, user);
+  }
+
+  // Part F item #7 — bilingual policy-schedule-summary PDF. Generated on
+  // demand and streamed back, not persisted (no object storage exists
+  // anywhere in this app). Same `policy.read` permission and the SAME
+  // visibility rule as get() above — PolicyScheduleSummaryDocumentService
+  // .generate() goes through PolicyService.getByIdWithCustomer, never
+  // the repository directly. A 422 (not 403/404) means the policy is
+  // visible but not yet issued — there is no coverage schedule yet.
+  @RequirePermissions('policy.read')
+  @Get(':id/document')
+  @Header('Content-Type', 'application/pdf')
+  async document(
+    @Param('id') id: string,
+    @Query() query: DocumentLanguageQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.policyDocuments.generate(
+      id,
+      query.language,
+      user,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="${fileName}"`,
+    });
+  }
+
+  // Part F item #7 — bilingual certificate-of-insurance PDF, the 6th and
+  // final of the 6 named document types. Same permission, visibility read
+  // (PolicyService.getByIdWithCustomer) and `schedules.length === 0` ->
+  // 422 data-availability gate as document() above — a genuinely
+  // DIFFERENT content shape (short proof-of-coverage, no premium/tax
+  // figures), not the same schedule-summary content under a new heading.
+  @RequirePermissions('policy.read')
+  @Get(':id/certificate')
+  @Header('Content-Type', 'application/pdf')
+  async certificate(
+    @Param('id') id: string,
+    @Query() query: DocumentLanguageQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.certificateDocuments.generate(
+      id,
+      query.language,
+      user,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 
   /** Record the insurer-issued policy: number, issued premium, opening

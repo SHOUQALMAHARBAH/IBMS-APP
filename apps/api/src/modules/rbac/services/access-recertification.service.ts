@@ -214,7 +214,18 @@ export class AccessRecertificationService {
       throw new ConflictException('This item has already been decided');
     }
 
-    const decided = await this.repo.recordDecision(itemId, decision);
+    // The pre-check above is a friendly 409 for the common sequential case;
+    // this status-conditional write is what actually holds the line against
+    // two concurrent decide() calls both passing that check
+    // (race-safe-invariants.md).
+    const decided = await this.repo.recordDecision(
+      itemId,
+      reviewerUserId,
+      decision,
+    );
+    if (decided === null) {
+      throw new ConflictException('This item has already been decided');
+    }
     if (decision === 'revoked') {
       await this.repo.revokeAllActiveRoleAssignmentsForUser(item.subjectUserId);
     }

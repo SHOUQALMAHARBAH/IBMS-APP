@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   buildComparison,
+  downloadComparisonDocument,
   getComparisonForRfq,
   type ComparisonMatrix,
   type InsurerScoreInput,
 } from '../../lib/comparison/comparison-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatDateTime, formatMoney } from '../../lib/i18n/format';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqCellStyle, rfqTableStyle } from '../rfq/rfq.styles';
 import {
@@ -27,15 +30,8 @@ interface ScoreDraft {
   serviceScore: string;
 }
 
-function money(value: string | null, currency: string): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
-
 export function ComparisonSection({ rfqId, isPlacement }: Props) {
+  const { language } = useLanguage();
   const [matrix, setMatrix] = useState<ComparisonMatrix | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -107,6 +103,29 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
     }
   }
 
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass.
+  async function downloadDocument(id: string) {
+    setBuildError(null);
+    try {
+      const blob = await downloadComparisonDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `quotation-comparison-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setBuildError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the comparison document — try again.',
+      );
+    }
+  }
+
   function setScore(
     insurerId: string,
     key: keyof ScoreDraft,
@@ -148,8 +167,16 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       ) : (
         <>
           <div style={{ ...comparisonPreStyle, opacity: 0.6, marginTop: '0.5rem' }}>
-            Built {new Date(matrix.builtAt).toLocaleString()}
+            Built {formatDateTime(matrix.builtAt, language)}
           </div>
+
+          <button
+            type="button"
+            onClick={() => void downloadDocument(matrix.id)}
+            style={{ margin: '0.5rem 0' }}
+          >
+            Download comparison (PDF)
+          </button>
 
           <div style={comparisonScrollStyle}>
             <table style={rfqTableStyle}>
@@ -184,13 +211,13 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                         )}
                       </td>
                       <td style={rfqCellStyle}>
-                        {money(q.premium, q.currency)}
+                        {formatMoney(q.premium, language, q.currency)}
                       </td>
                       <td style={rfqCellStyle}>
-                        {money(q.deductible, q.currency)}
+                        {formatMoney(q.deductible, language, q.currency)}
                       </td>
                       <td style={rfqCellStyle}>
-                        {money(q.liabilityLimit, q.currency)}
+                        {formatMoney(q.liabilityLimit, language, q.currency)}
                       </td>
                       <td style={rfqCellStyle}>
                         {q.biPeriodMonths === null

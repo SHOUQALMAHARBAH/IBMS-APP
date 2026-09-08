@@ -21,11 +21,16 @@ export class PasswordResetTokenRepository {
     return this.prisma.client.passwordResetToken.create({ data });
   }
 
-  async markUsed(id: string): Promise<void> {
-    await this.prisma.client.passwordResetToken.update({
-      where: { id },
+  /** Status-conditional claim: only marks the token used if it hasn't been
+   * used yet — the real race backstop for `AuthService.resetPassword`'s
+   * "was this token already used?" check (race-safe-invariants.md).
+   * `false` when 0 rows matched (a concurrent reset already claimed it). */
+  async markUsed(id: string): Promise<boolean> {
+    const { count } = await this.prisma.client.passwordResetToken.updateMany({
+      where: { id, usedAt: null },
       data: { usedAt: new Date() },
     });
+    return count > 0;
   }
 
   async invalidateAllForUser(userId: string): Promise<void> {

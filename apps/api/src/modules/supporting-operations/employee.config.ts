@@ -31,6 +31,13 @@ import type {
 export interface MaskedEmployee {
   id: string;
   fullName: string;
+  /** Jordanian national-ID-convention name parts (Part F item #4) —
+   * populated for records created after this item shipped; historical
+   * records keep only `fullName`, null parts. */
+  givenName: string | null;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  familyName: string | null;
   nationalId: string;
   position: string | null;
   hireDate: string | null;
@@ -48,6 +55,10 @@ export interface MaskedEmployee {
 export interface EmployeeListRow {
   id: string;
   fullName: string;
+  givenName: string | null;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  familyName: string | null;
   position: string | null;
   hireDate: string | null;
   terminationDate: string | null;
@@ -63,6 +74,10 @@ export function toEmployeeListRow(employee: Employee): EmployeeListRow {
   return {
     id: employee.id,
     fullName: employee.fullName,
+    givenName: employee.givenName,
+    fatherName: employee.fatherName,
+    grandfatherName: employee.grandfatherName,
+    familyName: employee.familyName,
     position: employee.position,
     hireDate: employee.hireDate?.toISOString() ?? null,
     terminationDate: employee.terminationDate?.toISOString() ?? null,
@@ -80,6 +95,10 @@ export function toMaskedEmployee(
   return {
     id: employee.id,
     fullName: employee.fullName,
+    givenName: employee.givenName,
+    fatherName: employee.fatherName,
+    grandfatherName: employee.grandfatherName,
+    familyName: employee.familyName,
     nationalId: maskedNationalId,
     position: employee.position,
     hireDate: employee.hireDate?.toISOString() ?? null,

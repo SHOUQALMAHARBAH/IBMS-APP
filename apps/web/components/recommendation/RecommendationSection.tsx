@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   approveRecommendation,
   discloseConflictOfInterest,
+  downloadRecommendationDocument,
   draftRecommendation,
   listRecommendationsForOpportunity,
   sendRecommendation,
@@ -20,6 +21,8 @@ import {
   type OpportunityWithContext,
 } from '../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatMoney } from '../../lib/i18n/format';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
@@ -41,14 +44,6 @@ const EMPTY_FACTORS: RationaleFactors = {
   policyConditions: '',
 };
 
-function money(value: string | null, currency = 'JOD'): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `${currency} ${value}`;
-}
-
 export function RecommendationSection({
   opportunity,
   isPlacement,
@@ -56,6 +51,7 @@ export function RecommendationSection({
   isCompliance,
   onOpportunityChanged,
 }: Props) {
+  const { language } = useLanguage();
   const [rec, setRec] = useState<Recommendation | null | undefined>(undefined);
   const [chains, setChains] = useState<QuotationChain[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -92,6 +88,33 @@ export function RecommendationSection({
       await load();
     })();
   }, [load]);
+
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass.
+  // The button is only rendered once blockedFromSend is empty (see
+  // below), so this call should never actually hit the api's own 422 —
+  // the try/catch here is a safety net for a race (e.g. a threshold
+  // changing between render and click), not the expected path.
+  async function downloadDocument(id: string) {
+    setFormError(null);
+    try {
+      const blob = await downloadRecommendationDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recommendation-report-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setFormError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the recommendation report — try again.',
+      );
+    }
+  }
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -133,7 +156,7 @@ export function RecommendationSection({
           <label htmlFor="rec-threshold">
             Target premium threshold{' '}
             <span style={{ opacity: 0.6 }}>
-              (current: {money(opportunity.targetPremiumThreshold)})
+              (current: {formatMoney(opportunity.targetPremiumThreshold, language)})
             </span>
           </label>
           <input
@@ -200,7 +223,7 @@ export function RecommendationSection({
                 <option value="">Select the recommended quote…</option>
                 {currentQuotes.map((q) => (
                   <option key={q.id} value={q.id}>
-                    {q.insurer.name} — {money(q.premium, q.currency)}
+                    {q.insurer.name} — {formatMoney(q.premium, language, q.currency)}
                     {q.commissionRatePercent
                       ? ` · ${q.commissionRatePercent}% commission`
                       : ''}
@@ -281,8 +304,9 @@ export function RecommendationSection({
           </div>
           <p style={{ margin: '0.4rem 0' }}>
             {rec.recommendedQuotation.insuranceLine} ·{' '}
-            {money(
+            {formatMoney(
               rec.recommendedQuotation.premium,
+              language,
               rec.recommendedQuotation.currency,
             )}
             {rec.recommendedQuotation.commissionRatePercent
@@ -366,6 +390,15 @@ export function RecommendationSection({
                 }
               >
                 Send to client
+              </button>
+            ) : null}
+            {rec.blockedFromSend.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => void downloadDocument(rec.id)}
+                style={{ ...buttonStyle, width: 'auto' }}
+              >
+                Download report (PDF)
               </button>
             ) : null}
           </div>

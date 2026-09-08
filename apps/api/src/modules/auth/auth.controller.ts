@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Patch,
   Post,
   Put,
   Req,
@@ -36,6 +37,7 @@ import {
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { StepUpDto } from './dto/step-up.dto';
 import { SecurityConfigUpdateDto } from './dto/security-config-update.dto';
+import { UpdateLanguagePreferenceDto } from './dto/update-language-preference.dto';
 import type { AuthenticatedUser } from './auth.types';
 import type { IssuedSession } from './services/auth.service';
 
@@ -210,6 +212,24 @@ export class AuthController {
   })
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.auth.me(user.id, user.sessionId);
+  }
+
+  @SkipMfaRequired()
+  @Patch('me/language')
+  @ApiOkResponse({
+    description:
+      'The current authenticated user, with the new language preference applied.',
+    schema: meSchema,
+  })
+  updateLanguagePreference(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateLanguagePreferenceDto,
+  ) {
+    return this.auth.updateLanguagePreference(
+      user.id,
+      user.sessionId,
+      dto.languagePreference,
+    );
   }
 
   @SkipMfaRequired()

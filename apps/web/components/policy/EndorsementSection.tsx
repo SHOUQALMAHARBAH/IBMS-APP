@@ -24,6 +24,8 @@ import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import { formatMoney } from '../../lib/i18n/format';
 
 interface Props {
   opportunityId: string;
@@ -31,14 +33,6 @@ interface Props {
   canManage: boolean;
   /** Manager — approve a return-premium refund above the value threshold. */
   canApproveRefund: boolean;
-}
-
-function money(value: string | null): string {
-  if (value === null) return '—';
-  const n = Number(value);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${value}`;
 }
 
 /** The one action each endorsement status offers, given the caller's role. */
@@ -89,6 +83,7 @@ export function EndorsementSection({
   canManage,
   canApproveRefund,
 }: Props) {
+  const { language } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Endorsement[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -198,20 +193,20 @@ export function EndorsementSection({
                 <span style={rfqBadgeStyle}>{e.status}</span>
               </div>
               <p style={{ margin: '0.4rem 0' }}>
-                Premium adjustment {money(e.premiumAdjustment)}
+                Premium adjustment {formatMoney(e.premiumAdjustment, language)}
                 {e.commissionReversal
-                  ? ` · commission reversal ${money(e.commissionReversal.amount)}`
+                  ? ` · commission reversal ${formatMoney(e.commissionReversal.amount, language)}`
                   : ''}
               </p>
               {e.cancellation ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
                   Cancellation ({e.cancellation.basis}) · return premium{' '}
-                  {money(e.cancellation.returnPremium)}
+                  {formatMoney(e.cancellation.returnPremium, language)}
                 </p>
               ) : null}
               {e.refund ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                  Refund {money(e.refund.amount)} ·{' '}
+                  Refund {formatMoney(e.refund.amount, language)} ·{' '}
                   {e.refund.approvedByUserId
                     ? `approved by ${e.refund.approvedByUserId}`
                     : e.refund.needsApproval

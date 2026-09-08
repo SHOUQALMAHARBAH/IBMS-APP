@@ -19,6 +19,7 @@ interface MfaChallengeBody {
 interface MeBody {
   email: string;
   mfaEnabled: boolean;
+  languagePreference: 'AR' | 'EN';
 }
 interface ForgotPasswordBody {
   devResetToken?: string;
@@ -140,6 +141,43 @@ describe('Auth (e2e)', () => {
       await agent.post('/auth/refresh').expect(401);
     });
 
+    it('Part F #1 — a user changes their own persistent language preference, defaulting to AR and rejecting an invalid value', async () => {
+      const app = await boot();
+      const email = uniqueEmail('language-pref');
+      const { agent, accessToken } = await signupAndLogin(app, email);
+
+      const initial = await agent
+        .get('/auth/me')
+        .set(bearer(accessToken))
+        .expect(200);
+      expect((initial.body as MeBody).languagePreference).toBe('AR');
+
+      const updated = await agent
+        .patch('/auth/me/language')
+        .set(bearer(accessToken))
+        .send({ languagePreference: 'EN' })
+        .expect(200);
+      expect((updated.body as MeBody).languagePreference).toBe('EN');
+
+      // it's actually persisted, not just echoed back
+      const reread = await agent
+        .get('/auth/me')
+        .set(bearer(accessToken))
+        .expect(200);
+      expect((reread.body as MeBody).languagePreference).toBe('EN');
+
+      await agent
+        .patch('/auth/me/language')
+        .set(bearer(accessToken))
+        .send({ languagePreference: 'FR' })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .patch('/auth/me/language')
+        .send({ languagePreference: 'EN' })
+        .expect(401);
+    });
+
     it('rejects requests with no access token', async () => {
       const app = await boot();
       await request(app.getHttpServer()).get('/auth/me').expect(401);
@@ -256,6 +294,48 @@ describe('Auth (e2e)', () => {
         .post('/auth/reset-password')
         .send({ token: devResetToken, newPassword: 'Another-Passw0rd!' })
         .expect(400);
+    });
+
+    it('closes the double-use race: two concurrent resets presenting the same token — exactly one succeeds', async () => {
+      const app = await boot();
+      const email = uniqueEmail('reset-race');
+      await signup(app, email);
+
+      const forgot = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email })
+        .expect(200);
+      const devResetToken = (forgot.body as ForgotPasswordBody)
+        .devResetToken as string;
+
+      // Both requests read the token as "not yet used" before either
+      // claims it — only the status-conditional `markUsed` (not the
+      // `stored.usedAt` read in `resetPassword`) can close this race
+      // (race-safe-invariants.md).
+      const [a, b] = await Promise.all([
+        request(app.getHttpServer())
+          .post('/auth/reset-password')
+          .send({ token: devResetToken, newPassword: 'Racer-One-Passw0rd!' }),
+        request(app.getHttpServer())
+          .post('/auth/reset-password')
+          .send({ token: devResetToken, newPassword: 'Racer-Two-Passw0rd!' }),
+      ]);
+      const statuses = [a.status, b.status].sort();
+      expect(statuses).toEqual([200, 400]);
+
+      // Exactly one of the two candidate passwords actually took effect.
+      const winningPassword =
+        a.status === 200 ? 'Racer-One-Passw0rd!' : 'Racer-Two-Passw0rd!';
+      const losingPassword =
+        a.status === 200 ? 'Racer-Two-Passw0rd!' : 'Racer-One-Passw0rd!';
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: winningPassword })
+        .expect(200);
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: losingPassword })
+        .expect(401);
     });
 
     it('returns the same shape for an unknown email (no account enumeration)', async () => {

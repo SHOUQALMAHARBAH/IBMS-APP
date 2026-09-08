@@ -418,6 +418,129 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .expect(400);
   });
 
+  it('Part F item #7 — generates a bilingual invoice PDF on demand, gated on the flat client-accounting.read permission (no per-customer scoping)', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'invdoc-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'invdoc-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(
+      app,
+      'invdoc-fin',
+      'FINANCE_COLLECTIONS_OFFICER',
+    );
+    // client-accounting.read is also granted to MANAGER/EXEC/AUDITOR —
+    // exercised here to prove the permission is genuinely book-wide, not
+    // owner-scoped (unlike Policy/ComparisonMatrix/Recommendation's own
+    // document endpoints).
+    const auditor = await makeUser(app, 'invdoc-aud', 'EXTERNAL_AUDITOR');
+    const noPerm = await makeUser(
+      app,
+      'invdoc-none',
+      'DATA_PROTECTION_OFFICER',
+    );
+
+    const { policyId, customerId } = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'doc',
+    );
+    // AR is prisma's own default customer languagePreference — set
+    // explicitly so the default-language assertion below is not relying
+    // on an unstated default.
+    await prisma.customer.update({
+      where: { id: customerId },
+      data: { languagePreference: 'AR' },
+    });
+
+    const raised = await request(app.getHttpServer())
+      .post('/invoices')
+      .set(bearer(fin.accessToken))
+      .send({
+        policyId,
+        taxAmount: '9600.000',
+        feesAmount: '150.000',
+        dueDate: isoDaysAhead(30),
+      })
+      .expect(201);
+    const invoiceId = (raised.body as InvoiceBody).id;
+
+    // forbidden without client-accounting.read
+    await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document`)
+      .set(bearer(noPerm.accessToken))
+      .expect(403);
+
+    // unknown invoice -> 404
+    await request(app.getHttpServer())
+      .get('/invoices/11111111-1111-4111-8111-111111111111/document')
+      .set(bearer(fin.accessToken))
+      .expect(404);
+
+    // default: AR customer -> a real PDF, no explicit language needed
+    const arDefault = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect(arDefault.headers['content-type']).toContain('application/pdf');
+    const arBuffer = arDefault.body as Buffer;
+    expect(arBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    // an Auditor (book-wide client-accounting.read, no ownership relation
+    // to this customer at all) reaches it too — proving the permission is
+    // genuinely flat, not scoped
+    const auditorRes = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document`)
+      .set(bearer(auditor.accessToken))
+      .expect(200);
+    expect((auditorRes.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // explicit override: AR customer, ask for EN anyway
+    const overridden = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document?language=EN`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((overridden.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+
+    // DUAL renders genuinely more content than a single-language document
+    const dual = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document?language=DUAL`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const dualBuffer = dual.body as Buffer;
+    expect(dualBuffer.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(dualBuffer.length).toBeGreaterThan(arBuffer.length);
+
+    // an invalid language value 400s (class-validator @IsIn)
+    await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document?language=FR`)
+      .set(bearer(fin.accessToken))
+      .expect(400);
+
+    // collect the invoice, then the receipt appears on the document too
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .expect(201);
+    const withReceipt = await request(app.getHttpServer())
+      .get(`/invoices/${invoiceId}/document`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    expect((withReceipt.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+      '%PDF-',
+    );
+  }, 45000);
+
   it('is write-once: a byte-identical re-post resumes the same invoice, and any changed figure (or due date) is a 409', async () => {
     const app = await boot();
     const plc = await makeUser(
@@ -900,6 +1023,30 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
         label: 'x',
       })
       .expect(403);
+
+    // a full account/card number in the free-text label or bankName -> 400
+    // (the shared DTO guard — accountLast4 is the only governed bank fragment)
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'Client account 0123456789',
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(fin.accessToken))
+      .send({
+        ownerType: 'customer',
+        customerId,
+        channelType: 'bank_transfer',
+        label: 'Client — Cairo Amman JOD',
+        bankName: 'Cairo Amman Bank IBAN JO94CBJO0010000000000131000302',
+      })
+      .expect(400);
 
     // Finance adds an approved customer channel + an insurer channel
     const custChan = await request(app.getHttpServer())

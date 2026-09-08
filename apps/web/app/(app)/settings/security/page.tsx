@@ -7,10 +7,13 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { enrollTotp, logout, verifyTotpEnrollment, type MfaEnrollResponse } from '../../../../lib/auth/auth-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../../../../components/auth/auth-form.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDateTime } from '../../../../lib/i18n/format';
 
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const { user, isLoading, refreshUser, clearUser } = useAuth();
+  const { language } = useLanguage();
 
   const [enrollment, setEnrollment] = useState<MfaEnrollResponse | null>(null);
   const [code, setCode] = useState('');
@@ -117,7 +120,7 @@ export default function SecuritySettingsPage() {
         <h2>Session</h2>
         <p>Idle timeout: {user.idleTimeoutMinutes} minutes</p>
         <p>Automatic sign-out after: {user.hardLogoutAfterIdleMinutes} minutes idle</p>
-        {user.accessValidUntil ? <p>Your access to IBMS ends: {new Date(user.accessValidUntil).toLocaleString()}</p> : null}
+        {user.accessValidUntil ? <p>Your access to IBMS ends: {formatDateTime(user.accessValidUntil, language)}</p> : null}
       </section>
 
       <button type="button" onClick={() => void handleLogout()} style={{ ...buttonStyle, marginTop: '2rem' }}>

@@ -95,6 +95,16 @@ export class UserRepository {
     });
   }
 
+  updateLanguagePreference(
+    userId: string,
+    languagePreference: 'AR' | 'EN',
+  ): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id: userId },
+      data: { languagePreference },
+    });
+  }
+
   updatePassword(userId: string, passwordHash: string): Promise<User> {
     return this.prisma.client.user.update({
       where: { id: userId },

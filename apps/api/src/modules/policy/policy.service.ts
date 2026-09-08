@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { Policy, PolicyStatus } from '@ibms/db';
+import type { Customer, Policy, PolicyStatus } from '@ibms/db';
 import {
   PolicyRepository,
   type PolicyDocumentInput,
@@ -210,10 +210,15 @@ export class PolicyService {
     }
   }
 
+  /** Returns the fetched `Customer` (rather than `void`) so a caller that
+   * already needs the row — `getByIdWithCustomer()` below, for Part F
+   * item #7's document generation — does not re-fetch it a second time
+   * immediately after. The 3 pre-existing callers below this all ignore
+   * the return value; none is affected by the widened signature. */
   private async assertCustomerVisible(
     customerId: string,
     actor: AuthenticatedUser,
-  ): Promise<void> {
+  ): Promise<Customer> {
     const customer = await this.customers.findById(customerId);
     if (
       !customer ||
@@ -221,6 +226,7 @@ export class PolicyService {
     ) {
       throw new NotFoundException('Customer not found');
     }
+    return customer;
   }
 
   /** Loads an Opportunity and enforces the caller's visibility on its
@@ -293,6 +299,34 @@ export class PolicyService {
       throw new NotFoundException(label);
     }
     return policy;
+  }
+
+  /** Part F item #7 — the policy-schedule-summary document
+   * (`PolicyScheduleSummaryDocumentService`) needs both the raw
+   * `PolicyWithContext` (real `Prisma.Decimal`/schedule fields, not
+   * `toView()`'s already-formatted display strings) AND the `Customer`
+   * row (for `legalName` / `languagePreference`) behind the SAME
+   * visibility check `loadVisible()` already enforces. A new sibling
+   * method rather than widening `loadVisible()`'s own return shape —
+   * that method has other callers (`get()`, `place()`,
+   * `recordIssuance()`, `attachDocuments()`, plus the checking/delivery
+   * sub-services) that only want the policy, not the customer. */
+  async getByIdWithCustomer(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ policy: PolicyWithContext; customer: Customer }> {
+    const label = 'Policy not found';
+    const policy = await this.policies.findById(id);
+    if (!policy) {
+      throw new NotFoundException(label);
+    }
+    let customer: Customer;
+    try {
+      customer = await this.assertCustomerVisible(policy.customerId, actor);
+    } catch {
+      throw new NotFoundException(label);
+    }
+    return { policy, customer };
   }
 
   private toView(policy: PolicyWithContext): PolicyView {

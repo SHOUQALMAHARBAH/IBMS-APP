@@ -11,10 +11,13 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { listGridStyle } from '../../../components/needs-assessment/needs-assessment.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatDate } from '../../../lib/i18n/format';
 
 export default function NeedsAssessmentsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [assessments, setAssessments] = useState<NeedsAssessment[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -70,7 +73,7 @@ export default function NeedsAssessmentsPage() {
               <button
                 key={assessment.id}
                 type="button"
-                style={{ ...cardStyle, textAlign: 'left', width: '100%', cursor: 'pointer' }}
+                style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
                 aria-label={`View needs assessment ${assessment.id}`}
                 onClick={() => router.push(`/needs-assessments/${assessment.id}`)}
               >
@@ -80,7 +83,7 @@ export default function NeedsAssessmentsPage() {
                   {assessment.recommendedCoverageLines.length === 1 ? '' : 's'} recommended
                 </div>
                 <div style={cardMetaStyle}>
-                  Updated {new Date(assessment.updatedAt).toLocaleDateString()}
+                  Updated {formatDate(assessment.updatedAt, language)}
                 </div>
               </button>
             ))}

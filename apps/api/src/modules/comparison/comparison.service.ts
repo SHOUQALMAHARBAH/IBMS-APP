@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { OpportunityStatus } from '@ibms/db';
+import type { Customer, OpportunityStatus } from '@ibms/db';
 import {
   ComparisonRepository,
   type ComparisonWithRows,
@@ -111,10 +111,14 @@ export class ComparisonService {
     }
   }
 
+  /** Returns the Customer (not just a boolean) so a caller that also needs
+   * the row — `getByIdWithCustomer()`'s language/legalName lookup — is not
+   * forced into a second, redundant `findById` for the same id
+   * immediately after this one already fetched it. */
   private async assertCustomerVisible(
     customerId: string,
     actor: AuthenticatedUser,
-  ): Promise<void> {
+  ): Promise<Customer> {
     const customer = await this.customers.findById(customerId);
     if (
       !customer ||
@@ -122,6 +126,7 @@ export class ComparisonService {
     ) {
       throw new NotFoundException('Customer not found');
     }
+    return customer;
   }
 
   /** Loads an RFQ and enforces the caller's visibility on its Opportunity's
@@ -134,6 +139,8 @@ export class ComparisonService {
     rfq: RfqWithSubmissions;
     opportunityId: string;
     opportunityStatus: OpportunityStatus;
+    customerId: string;
+    customer: Customer;
   }> {
     const rfq = await this.rfqs.findRfqById(rfqId);
     if (!rfq) {
@@ -143,8 +150,12 @@ export class ComparisonService {
     if (!opportunity) {
       throw new NotFoundException(label);
     }
+    let customer: Customer;
     try {
-      await this.assertCustomerVisible(opportunity.customerId, actor);
+      customer = await this.assertCustomerVisible(
+        opportunity.customerId,
+        actor,
+      );
     } catch {
       throw new NotFoundException(label);
     }
@@ -152,6 +163,8 @@ export class ComparisonService {
       rfq,
       opportunityId: opportunity.id,
       opportunityStatus: opportunity.status,
+      customerId: opportunity.customerId,
+      customer,
     };
   }
 
@@ -298,5 +311,28 @@ export class ComparisonService {
       'Comparison matrix not found',
     );
     return this.toView(matrix, rfq);
+  }
+
+  /** Part F item #7 — quotation-comparison document generation. Same
+   * visibility rule as `getById` (the matrix inherits its RFQ's
+   * Opportunity's Customer's visibility) PLUS the resolved `Customer` row
+   * itself, for the document's language default and display name — a
+   * caller MUST go through this (not `ComparisonRepository` directly) so
+   * a Sales Officer cannot generate a document for a customer they do not
+   * own by knowing a comparison matrix id. */
+  async getByIdWithCustomer(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ view: ComparisonView; customer: Customer }> {
+    const matrix = await this.comparisons.findById(id);
+    if (!matrix) {
+      throw new NotFoundException('Comparison matrix not found');
+    }
+    const { rfq, customer } = await this.loadVisibleRfq(
+      matrix.rfqId,
+      actor,
+      'Comparison matrix not found',
+    );
+    return { view: this.toView(matrix, rfq), customer };
   }
 }

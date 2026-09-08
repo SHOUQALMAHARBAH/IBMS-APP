@@ -7,6 +7,12 @@ import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 export interface EmployeeListRow {
   id: string;
   fullName: string;
+  // Jordanian national-ID-convention name parts (Part F item #4) — null
+  // for a historical record created before this item shipped.
+  givenName: string | null;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  familyName: string | null;
   position: string | null;
   hireDate: string | null;
   terminationDate: string | null;
@@ -35,6 +41,10 @@ export interface AccessDeprovisioningChecklist {
 export interface EmployeeDetail {
   id: string;
   fullName: string;
+  givenName: string | null;
+  fatherName: string | null;
+  grandfatherName: string | null;
+  familyName: string | null;
   nationalId: string;
   position: string | null;
   hireDate: string | null;
@@ -49,7 +59,13 @@ export interface EmployeeDetail {
 }
 
 export interface CreateEmployeeInput {
-  fullName: string;
+  /** Jordanian national-ID-convention name parts (Part F item #4) — an
+   * Employee is always a real individual. `fullName` is computed
+   * server-side from these, not accepted directly. */
+  givenName: string;
+  fatherName?: string;
+  grandfatherName?: string;
+  familyName: string;
   nationalId: string;
   position?: string;
   hireDate: string;

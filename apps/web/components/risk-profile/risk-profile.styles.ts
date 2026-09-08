@@ -33,7 +33,7 @@ export const assetTableStyle: CSSProperties = {
 };
 
 export const assetCellStyle: CSSProperties = {
-  textAlign: 'left',
+  textAlign: 'start',
   padding: '0.5rem 0.6rem',
   borderBottom: '1px solid rgba(128,128,128,0.2)',
   verticalAlign: 'top',
@@ -55,7 +55,7 @@ export const assetFieldStyle: CSSProperties = { flex: '1 1 10rem' };
 export const siteCardStyle: CSSProperties = {
   display: 'block',
   width: '100%',
-  textAlign: 'left',
+  textAlign: 'start',
   padding: '1rem',
   border: '1px solid rgba(128,128,128,0.3)',
   borderRadius: '0.5rem',

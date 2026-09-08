@@ -69,7 +69,9 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
           return (
             <tr key={item.id}>
               <td style={queueCellStyle}>
-                <strong>{item.customer.legalName}</strong>
+                <strong>
+                  <bdi>{item.customer.legalName}</bdi>
+                </strong>
                 <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>{item.customer.customerType}</div>
               </td>
               <td style={queueCellStyle}>

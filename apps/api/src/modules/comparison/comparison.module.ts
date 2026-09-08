@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ComparisonController } from './comparison.controller';
 import { ComparisonService } from './comparison.service';
+import { QuotationComparisonDocumentService } from './quotation-comparison-document.service';
 import { ComparisonRepository } from '../../repositories/comparison.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -8,6 +9,7 @@ import { RfqModule } from '../rfq/rfq.module';
 import { QuotationModule } from '../quotation/quotation.module';
 import { OpportunityModule } from '../opportunity/opportunity.module';
 import { CustomerModule } from '../customer/customer.module';
+import { DocumentGenerationModule } from '../document-generation/document-generation.module';
 
 /** Process 14 — Quote Comparison (backlog Part C #14, Domain B).
  *
@@ -23,7 +25,10 @@ import { CustomerModule } from '../customer/customer.module';
  *   - OpportunityModule -> OpportunityRepository (the RFQ's Opportunity —
  *     for visibility and the COMPARISON_BUILT move)
  *   - CustomerModule    -> CustomerRepository (that Opportunity's Customer
- *     owner, for visibility) */
+ *     owner, for visibility)
+ *   - DocumentGenerationModule -> PdfRendererService +
+ *     DocumentTemplateRepository (Part F item #7 — bilingual
+ *     quotation-comparison PDF, `QuotationComparisonDocumentService`) */
 @Module({
   imports: [
     AuditModule,
@@ -32,8 +37,13 @@ import { CustomerModule } from '../customer/customer.module';
     QuotationModule,
     OpportunityModule,
     CustomerModule,
+    DocumentGenerationModule,
   ],
   controllers: [ComparisonController],
-  providers: [ComparisonService, ComparisonRepository],
+  providers: [
+    ComparisonService,
+    QuotationComparisonDocumentService,
+    ComparisonRepository,
+  ],
 })
 export class ComparisonModule {}

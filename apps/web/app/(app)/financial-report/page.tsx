@@ -10,18 +10,13 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
-
-function money(v: string): string {
-  const n = Number(v);
-  return Number.isFinite(n)
-    ? `JOD ${n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`
-    : `JOD ${v}`;
-}
+import { useLanguage } from '../../../lib/i18n/language-context';
+import { formatMoney } from '../../../lib/i18n/format';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'right',
+  textAlign: 'end',
 };
 const head: CSSProperties = {
   ...cell,
@@ -31,6 +26,7 @@ const head: CSSProperties = {
 const sectionStyle: CSSProperties = { margin: '1.5rem 0' };
 
 function Figure({ label, value }: { label: string; value: string }) {
+  const { language } = useLanguage();
   return (
     <div
       style={{
@@ -43,7 +39,9 @@ function Figure({ label, value }: { label: string; value: string }) {
       }}
     >
       <span style={{ opacity: 0.75 }}>{label}</span>
-      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{money(value)}</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {formatMoney(value, language)}
+      </span>
     </div>
   );
 }
@@ -51,6 +49,7 @@ function Figure({ label, value }: { label: string; value: string }) {
 export default function FinancialReportPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<FinancialReportSummary | null>(null);
@@ -173,7 +172,7 @@ export default function FinancialReportPage() {
                 >
                   <thead>
                     <tr>
-                      <th style={{ ...head, textAlign: 'left' }}>Insurer</th>
+                      <th style={{ ...head, textAlign: 'start' }}>Insurer</th>
                       <th style={head}>Earned</th>
                       <th style={head}>Paid</th>
                       <th style={head}>Outstanding</th>
@@ -183,13 +182,13 @@ export default function FinancialReportPage() {
                   <tbody>
                     {data.commission.byInsurer.map((r) => (
                       <tr key={r.insurerId}>
-                        <td style={{ ...cell, textAlign: 'left' }}>
-                          {r.insurerName}
+                        <td style={{ ...cell, textAlign: 'start' }}>
+                          <bdi>{r.insurerName}</bdi>
                         </td>
-                        <td style={cell}>{money(r.earned)}</td>
-                        <td style={cell}>{money(r.paid)}</td>
-                        <td style={cell}>{money(r.outstanding)}</td>
-                        <td style={cell}>{money(r.reversed)}</td>
+                        <td style={cell}>{formatMoney(r.earned, language)}</td>
+                        <td style={cell}>{formatMoney(r.paid, language)}</td>
+                        <td style={cell}>{formatMoney(r.outstanding, language)}</td>
+                        <td style={cell}>{formatMoney(r.reversed, language)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -222,6 +221,7 @@ function ProfitTable({
 }: {
   rows: FinancialReportSummary['profitability']['byLine'];
 }) {
+  const { language } = useLanguage();
   if (rows.length === 0)
     return <p style={{ opacity: 0.6 }}>No written policies.</p>;
   return (
@@ -229,7 +229,7 @@ function ProfitTable({
       <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
         <thead>
           <tr>
-            <th style={{ ...head, textAlign: 'left' }}>Group</th>
+            <th style={{ ...head, textAlign: 'start' }}>Group</th>
             <th style={head}>Premium written</th>
             <th style={head}>Claims paid</th>
             <th style={head}>Commission</th>
@@ -240,11 +240,13 @@ function ProfitTable({
         <tbody>
           {rows.map((r) => (
             <tr key={r.key}>
-              <td style={{ ...cell, textAlign: 'left' }}>{r.label}</td>
-              <td style={cell}>{money(r.premiumWritten)}</td>
-              <td style={cell}>{money(r.claimsPaid)}</td>
-              <td style={cell}>{money(r.commissionEarned)}</td>
-              <td style={cell}>{money(r.netPosition)}</td>
+              <td style={{ ...cell, textAlign: 'start' }}>
+                <bdi>{r.label}</bdi>
+              </td>
+              <td style={cell}>{formatMoney(r.premiumWritten, language)}</td>
+              <td style={cell}>{formatMoney(r.claimsPaid, language)}</td>
+              <td style={cell}>{formatMoney(r.commissionEarned, language)}</td>
+              <td style={cell}>{formatMoney(r.netPosition, language)}</td>
               <td style={cell}>{r.policyCount}</td>
             </tr>
           ))}

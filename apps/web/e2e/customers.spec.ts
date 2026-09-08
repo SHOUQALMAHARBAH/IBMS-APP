@@ -28,6 +28,10 @@ const CUSTOMER = {
   prospectId: null,
   customerType: "INDIVIDUAL",
   legalName: "Ahmad Al-Fulani",
+  givenName: "Ahmad",
+  fatherName: null,
+  grandfatherName: null,
+  familyName: "Al-Fulani",
   registrationNumber: null,
   taxRegistrationNumber: null,
   registeredAddress: null,
@@ -79,6 +83,37 @@ test("renders the customer list and navigates to a profile on click", async ({ p
   await expect(page).toHaveURL("/customers/cust-1");
   await expect(page.getByRole("heading", { name: "Ahmad Al-Fulani" })).toBeVisible();
   await expect(page.getByText("INDIVIDUAL — Status: PENDING_KYC")).toBeVisible();
+});
+
+// Part F item #6 — bilingual full-text search. Proves the WIRING (search
+// input -> correct querystring -> re-rendered list) — the real Postgres
+// full-text-search behavior itself is proven by the api's own e2e tests
+// (customer.e2e-spec.ts), not re-tested here against a mock.
+test("the search box re-fetches with a search querystring and renders the filtered result", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const OTHER_CUSTOMER = { ...CUSTOMER, id: "cust-2", legalName: "Sara Odeh", givenName: "Sara", familyName: "Odeh" };
+  let lastUrl = "";
+  await page.route("http://localhost:4000/customers**", (route) => {
+    lastUrl = route.request().url();
+    const url = new URL(lastUrl);
+    if (url.searchParams.get("search") === "Sara") {
+      return route.fulfill({ status: 200, json: [OTHER_CUSTOMER] });
+    }
+    return route.fulfill({ status: 200, json: [CUSTOMER, OTHER_CUSTOMER] });
+  });
+
+  await page.goto("/customers");
+  await expect(page.getByText("Ahmad Al-Fulani")).toBeVisible();
+  await expect(page.getByText("Sara Odeh")).toBeVisible();
+
+  await page.getByLabel("Search").fill("Sara");
+  await page.getByRole("button", { name: "Search" }).click();
+
+  await expect(page.getByText("Sara Odeh")).toBeVisible();
+  await expect(page.getByText("Ahmad Al-Fulani")).toHaveCount(0);
+  expect(new URL(lastUrl).searchParams.get("search")).toBe("Sara");
 });
 
 test("shows an empty state when there are no customers yet", async ({ page }) => {
@@ -144,7 +179,8 @@ test("the onboarding wizard walks an individual customer through profile -> docu
   await page.goto("/customers/new");
   await page.getByRole("button", { name: "Individual" }).click();
 
-  await page.getByLabel("Full name").fill("Ahmad Al-Fulani");
+  await page.getByLabel("Given name").fill("Ahmad");
+  await page.getByLabel("Family name").fill("Al-Fulani");
   await page.getByLabel("National ID").fill("9901012345");
   await page.getByLabel("Contact phone").fill("+962-7-9000-0000");
   await page.getByLabel("Contact email").fill("ahmad@example.test");

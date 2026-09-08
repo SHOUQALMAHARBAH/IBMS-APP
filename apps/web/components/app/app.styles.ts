@@ -13,7 +13,12 @@ export const shellStyle: CSSProperties = {
 
 export const sidebarStyle: CSSProperties = {
   flex: '0 0 15rem',
-  borderRight: '1px solid rgba(128,128,128,0.3)',
+  // Logical, not `borderRight` — `shellStyle`'s plain `flex-direction: row`
+  // already mirrors the sidebar to the opposite screen edge for free under
+  // `dir="rtl"` (Part F item #1's `<html dir>`); a physical `borderRight`
+  // would then land on the OUTER edge instead of the one touching
+  // `contentStyle`, which is what this separator is actually for.
+  borderInlineEnd: '1px solid rgba(128,128,128,0.3)',
   padding: '1.5rem 1rem',
   display: 'flex',
   flexDirection: 'column',

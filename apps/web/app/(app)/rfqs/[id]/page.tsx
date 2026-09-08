@@ -33,6 +33,9 @@ import {
 } from '../../../../components/rfq/rfq.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
+import type { Language } from '../../../../lib/i18n/translations';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
@@ -41,18 +44,15 @@ const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const COMM_CHANNELS = ['EMAIL', 'CALL', 'PORTAL', 'MEETING', 'OTHER'] as const;
 const COMM_DIRECTIONS: CommunicationDirection[] = ['INBOUND', 'OUTBOUND'];
 
-function fmt(value: string | null): string {
-  return value ? new Date(value).toLocaleDateString() : '—';
-}
-
-function fmtDateTime(value: string): string {
-  return new Date(value).toLocaleString();
+function fmt(value: string | null, language: Language): string {
+  return value ? formatDate(value, language) : '—';
 }
 
 export default function RfqDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
 
   const [rfq, setRfq] = useState<Rfq | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -225,7 +225,7 @@ export default function RfqDetailPage() {
         <>
           <h1>RFQ — {rfq.insuranceLine}</h1>
           <div style={cardMetaStyle}>
-            Issued {new Date(rfq.issuedAt).toLocaleDateString()} · follow-up
+            Issued {formatDate(rfq.issuedAt, language)} · follow-up
             threshold {rfq.followUpThresholdDays} business day
             {rfq.followUpThresholdDays === 1 ? '' : 's'}
           </div>
@@ -263,14 +263,16 @@ export default function RfqDetailPage() {
               <tbody>
                 {rfq.insurerSubmissions.map((submission) => (
                   <tr key={submission.id}>
-                    <td style={rfqCellStyle}>{submission.insurer.name}</td>
+                    <td style={rfqCellStyle}>
+                      <bdi>{submission.insurer.name}</bdi>
+                    </td>
                     <td style={rfqCellStyle}>
                       <span style={rfqBadgeStyle}>{submission.status}</span>
                     </td>
-                    <td style={rfqCellStyle}>{fmt(submission.sentAt)}</td>
-                    <td style={rfqCellStyle}>{fmt(submission.respondedAt)}</td>
+                    <td style={rfqCellStyle}>{fmt(submission.sentAt, language)}</td>
+                    <td style={rfqCellStyle}>{fmt(submission.respondedAt, language)}</td>
                     <td style={rfqCellStyle}>
-                      {fmt(submission.followUpAlertSentAt)}
+                      {fmt(submission.followUpAlertSentAt, language)}
                     </td>
                     {isPlacement ? (
                       <td style={rfqCellStyle}>
@@ -342,7 +344,9 @@ export default function RfqDetailPage() {
                                 })
                               }
                             />
-                            <span>{insurer.name}</span>
+                            <span>
+                              <bdi>{insurer.name}</bdi>
+                            </span>
                           </label>
                         ))}
                       {insurers.filter((i) => !shortlistedIds.has(i.id))
@@ -424,13 +428,13 @@ export default function RfqDetailPage() {
               <tbody>
                 {comms.map((c) => (
                   <tr key={c.id}>
-                    <td style={rfqCellStyle}>{fmtDateTime(c.sentAt)}</td>
+                    <td style={rfqCellStyle}>{formatDateTime(c.sentAt, language)}</td>
                     <td style={rfqCellStyle}>
                       <span style={rfqBadgeStyle}>{c.direction}</span>
                     </td>
                     <td style={rfqCellStyle}>{c.channel}</td>
                     <td style={rfqCellStyle}>
-                      {c.rfqInsurer?.insurer.name ?? 'Panel'}
+                      <bdi>{c.rfqInsurer?.insurer.name ?? 'Panel'}</bdi>
                     </td>
                     <td style={rfqCellStyle}>
                       {c.subject ? <strong>{c.subject}</strong> : null}

@@ -51,10 +51,13 @@ export interface Vendor {
   createdAt: string;
 }
 
-export function listVendors(vendorType?: string): Promise<Vendor[]> {
-  return apiGet(
-    vendorType ? `/vendors?vendorType=${encodeURIComponent(vendorType)}` : '/vendors',
-  );
+/** `search` — Part F item #6 — bilingual full-text search over name. */
+export function listVendors(vendorType?: string, search?: string): Promise<Vendor[]> {
+  const params = new URLSearchParams();
+  if (vendorType) params.set('vendorType', vendorType);
+  if (search) params.set('search', search);
+  const qs = params.toString();
+  return apiGet(`/vendors${qs ? `?${qs}` : ''}`);
 }
 
 export function getVendor(id: string): Promise<Vendor> {

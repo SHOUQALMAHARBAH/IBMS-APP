@@ -17,25 +17,35 @@ import { emptyStringToUndefined } from '../../../common/dto.util';
 /**
  * Enforces that the two customer forms stay mutually exclusive: an
  * INDIVIDUAL record never carries the corporate-only fields, and a
- * CORPORATE record never carries a personal `nationalId`. `@ValidateIf`
- * alone only makes the *required-for-this-type* fields optional for the
- * other type — it does not reject a value the other form should never send,
- * so without this a `{ customerType: 'CORPORATE', nationalId: '...' }` body
- * would sail through validation and `CustomerService.create()` would still
- * encrypt it into `nationalIdEnc`.
+ * CORPORATE record never carries a personal `nationalId` or the Part F
+ * item #4 national-ID-convention name parts (`legalName` is computed
+ * server-side for an individual, from those 4 parts — a client sending it
+ * directly would be stale the moment `CustomerService.create()` recomputes
+ * it). `@ValidateIf` alone only makes the *required-for-this-type* fields
+ * optional for the other type — it does not reject a value the other form
+ * should never send, so without this a `{ customerType: 'CORPORATE',
+ * nationalId: '...' }` body would sail through validation and
+ * `CustomerService.create()` would still encrypt it into `nationalIdEnc`.
  */
 @ValidatorConstraint({ name: 'customerTypeFieldCoherence' })
 class CustomerTypeFieldCoherence implements ValidatorConstraintInterface {
   validate(_value: unknown, args: ValidationArguments): boolean {
     const dto = args.object as CreateCustomerDto;
     if (dto.customerType === 'CORPORATE') {
-      return dto.nationalId === undefined || dto.nationalId === null;
+      return (
+        (dto.nationalId === undefined || dto.nationalId === null) &&
+        dto.givenName == null &&
+        dto.fatherName == null &&
+        dto.grandfatherName == null &&
+        dto.familyName == null
+      );
     }
     if (dto.customerType === 'INDIVIDUAL') {
       return (
         dto.registrationNumber == null &&
         dto.registeredAddress == null &&
-        dto.natureOfBusiness == null
+        dto.natureOfBusiness == null &&
+        dto.legalName == null
       );
     }
     return true;
@@ -44,8 +54,8 @@ class CustomerTypeFieldCoherence implements ValidatorConstraintInterface {
   defaultMessage(args: ValidationArguments): string {
     const dto = args.object as CreateCustomerDto;
     return dto.customerType === 'CORPORATE'
-      ? 'nationalId is only accepted on the INDIVIDUAL customer form'
-      : 'registrationNumber, registeredAddress and natureOfBusiness are only accepted on the CORPORATE customer form';
+      ? 'nationalId, givenName, fatherName, grandfatherName and familyName are only accepted on the INDIVIDUAL customer form'
+      : 'registrationNumber, registeredAddress, natureOfBusiness and legalName are only accepted on the CORPORATE customer form (an INDIVIDUAL legalName is computed server-side from givenName/fatherName/grandfatherName/familyName)';
   }
 }
 
@@ -61,10 +71,39 @@ export class CreateCustomerDto {
   @Validate(CustomerTypeFieldCoherence)
   customerType!: CustomerType;
 
-  /** Individual: full name. Corporate: registered legal name. */
+  /** Corporate: registered legal name. Individual: NOT accepted here —
+   * computed server-side from givenName/fatherName/grandfatherName/familyName
+   * (see CustomerTypeFieldCoherence above). */
+  @ValidateIf((o: CreateCustomerDto) => o.customerType === 'CORPORATE')
   @IsString()
   @Length(1, 300)
-  legalName!: string;
+  legalName?: string;
+
+  /** Individual only — Jordanian national-ID-convention name parts (Part F
+   * item #4). givenName/familyName are the two universally-present anchors
+   * of a name and so are required; fatherName/grandfatherName are optional
+   * — not every record has both on file. */
+  @ValidateIf((o: CreateCustomerDto) => o.customerType === 'INDIVIDUAL')
+  @IsString()
+  @Length(1, 150)
+  givenName?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 150)
+  fatherName?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 150)
+  grandfatherName?: string;
+
+  @ValidateIf((o: CreateCustomerDto) => o.customerType === 'INDIVIDUAL')
+  @IsString()
+  @Length(1, 150)
+  familyName?: string;
 
   @ValidateIf((o: CreateCustomerDto) => o.customerType === 'INDIVIDUAL')
   @IsString()

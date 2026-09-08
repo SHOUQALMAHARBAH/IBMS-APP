@@ -25,7 +25,7 @@ function pct(v: string): string {
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
   borderBottom: '1px solid #e5e7eb',
-  textAlign: 'left',
+  textAlign: 'start',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
@@ -219,8 +219,8 @@ export default function CommissionRatesPage() {
                 <tr>
                   <th style={headCellStyle}>Insurer</th>
                   <th style={headCellStyle}>Insurance line</th>
-                  <th style={{ ...headCellStyle, textAlign: 'right' }}>Rate</th>
-                  <th style={{ ...headCellStyle, textAlign: 'right' }}>VAT</th>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>Rate</th>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>VAT</th>
                   <th style={headCellStyle}>Effective from</th>
                   <th style={headCellStyle}>Effective to</th>
                   <th style={headCellStyle}>Status</th>
@@ -229,12 +229,16 @@ export default function CommissionRatesPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td style={cellStyle}>{r.insurerName}</td>
-                    <td style={cellStyle}>{r.insuranceLine}</td>
-                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                    <td style={cellStyle}>
+                      <bdi>{r.insurerName}</bdi>
+                    </td>
+                    <td style={cellStyle}>
+                      <bdi>{r.insuranceLine}</bdi>
+                    </td>
+                    <td style={{ ...cellStyle, textAlign: 'end' }}>
                       {pct(r.ratePercent)}
                     </td>
-                    <td style={{ ...cellStyle, textAlign: 'right' }}>
+                    <td style={{ ...cellStyle, textAlign: 'end' }}>
                       {pct(r.vatRatePercent)}
                     </td>
                     <td style={cellStyle}>{r.effectiveFrom.slice(0, 10)}</td>

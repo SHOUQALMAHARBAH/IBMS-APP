@@ -79,6 +79,13 @@ export class ComplianceDashboardService {
       action: 'READ',
       entityType: 'ComplianceDashboard',
       entityId: summary.generatedAt,
+      // Unconditional, not data-presence-gated (contrast Financial/Profitability's
+      // `claimCount > 0` conditional): every call aggregates KYCRecord, Complaint,
+      // DataSubjectRequest, and TransactionMonitoringAlert (AML) counts — all four
+      // named explicitly in sensitive-data-handling.md's trigger list — so there is
+      // no code path through this method that doesn't touch personal-data-bearing
+      // records, unlike a dashboard where the sensitive slice is optional.
+      isSensitiveDataAccess: true,
       afterValue: complianceDashboardAuditSnapshot(summary),
     });
 

@@ -25,16 +25,18 @@ function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdo
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Group</th>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Claims (JOD)</th>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Premium (JOD)</th>
-              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Ratio</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Group</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Claims (JOD)</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Premium (JOD)</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Ratio</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.key}>
-                <td style={{ padding: '0.25rem 0.5rem' }}>{r.label}</td>
+                <td style={{ padding: '0.25rem 0.5rem' }}>
+                  <bdi>{r.label}</bdi>
+                </td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.periodClaims}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>{r.periodPremium}</td>
                 <td style={{ padding: '0.25rem 0.5rem' }}>
@@ -126,6 +128,7 @@ export default function ClaimsDashboardPage() {
           Insurance line
           <input
             aria-label="Insurance line filter"
+            dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />

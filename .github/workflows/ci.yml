@@ -140,6 +140,13 @@ jobs:
       - name: Seed database (roles + permission grid)
         run: npm run db:seed
 
+      - name: Install Chromium for PdfRendererService (Part F item #7)
+        # apps/api depends on playwright-core (document generation) but has
+        # no browser of its own the way apps/web's Playwright install does
+        # — complaint.e2e-spec.ts's acknowledgement test launches a real
+        # browser and will fail without this.
+        run: npx playwright-core install --with-deps chromium
+
       - name: Integration tests
         run: npx turbo run test:e2e --filter=api...
 
