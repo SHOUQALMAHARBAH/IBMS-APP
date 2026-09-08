@@ -970,7 +970,10 @@ build actually is today:
   states are genuinely applicable per screen, including a populated capture
   of `/opportunities/[id]` showing all 4 of item #7's document-download
   buttons at once. The other ~75 app pages remain outside this item's own
-  confirmed scope — a documented, deliberate limit, not a gap.
+  confirmed scope — a documented, deliberate limit, not a gap. See § Known
+  gaps below ("Part F — Bilingual UI (Part 11) — known gaps, consolidated")
+  for the full audit against the literal backlog text, including how this
+  relates to Part G's own narrower core-screens requirement.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -7457,6 +7460,71 @@ narrows a gap.
   and item #7's real `Document` persistence gap is unrelated to any of
   the above. None of these are "finishing Part F" — each needs its own
   explicit, fresh user go-ahead; do not self-select any of them.
+
+**Part F — Bilingual UI (Part 11) — known gaps, consolidated (2026-09-08
+audit, re-checked against the literal backlog text, not just this repo's
+own paraphrase of it).** Nothing below is urgent — no correctness,
+security, or compliance defect, each is a deliberate, already-confirmed
+scoping decision — but is recorded here per this section's own "no
+oversight is silent" convention:
+
+- **Item #8's own backlog line literally says "every screen," not "every
+  screen items #1–7 touched."** What shipped
+  (`apps/web/e2e/four-state-screenshots.spec.ts`) covers ~8 screens tied
+  to Part F's own deliverables — a real, user-confirmed scope reduction
+  from the literal text, not an oversight. The full app has 84
+  `page.tsx` files; the other ~76 have no four-state screenshot evidence
+  at all. Revisit only on an explicit go-ahead — instrumenting the whole
+  app is a disproportionate undertaking for a single backlog bullet and
+  was rejected as the non-chosen option when this item was scoped.
+- **Part G's own final-verification checklist (a SEPARATE, later part,
+  not Part F) has a narrower, related requirement that is NOT met**:
+  "The core screens (Lead→Policy→Claim→Renewal) work in both Arabic and
+  English across all four states, with screenshots." What Part F item #8
+  built does not satisfy this — it captures one language per screen
+  (chosen to demonstrate RTL/bidi), not both languages per screen, and
+  does not cover a dedicated `/leads` screenshot at all. This is also
+  where Part G's own list is currently impossible to fully satisfy
+  regardless: **no dedicated "Renewal" screen or backend module exists
+  anywhere in this app** (confirmed via search — no frontend page, no
+  controller; "renewal" appears only incidentally in a few unrelated
+  modules' fields/comments). Building a real Renewal process is its own,
+  larger, unstarted piece of work, not a Part F or Part G documentation
+  gap.
+- **Item #7's generated documents are never persisted** — `Document`
+  (Process #70) is version/classification metadata tracking, not a real
+  object store, and this app has no real file storage anywhere for
+  anything, not just Part F. Worth flagging specifically because the
+  recommendation-report document is described in this app's own code
+  comments as "retained as professional-indemnity evidence," yet nothing
+  is actually retained — a generated PDF is reconstructable from live
+  data (stable, since nothing in this codebase mutates a `Recommendation`
+  after drafting), but there is no actual stored COPY of what was
+  historically sent to a client. Not a literal Part F backlog
+  requirement (the bullet only asks for generation + a dual-language
+  option, both met), but a real, pre-existing architectural gap adjacent
+  to genuine PI/audit-trail risk — worth a real object-storage decision
+  in a future session, not a quick fix bolted onto Part F.
+- **Item #5's "multi-currency support for reinsurance" is not built**,
+  and unlike the same bullet's Hijri-calendar half, the backlog text
+  does not mark this one optional. It remains unbuilt because there is
+  no reinsurance functionality anywhere in this app yet to support —
+  building currency-conversion display for a feature that doesn't exist
+  would be speculative. Revisit once/if a reinsurance module is ever
+  scoped.
+- **Item #6's `Insurer` search is out of scope for a reason outside Part
+  F's own control**: `Insurer` has no dedicated module, controller, or
+  web browse page anywhere in this app (only narrow lookups embedded in
+  RFQ/commission pickers) — the same class of gap item #4 hit with
+  `InsuredPerson`. Same-script typo tolerance (`pg_trgm`, available on
+  this Postgres install but not installed) was never literally named in
+  the item #6 backlog bullet at all — only "fuzzy matching for the
+  multiple valid transliterations of Arabic names" was, and that IS
+  built (a curated ~50-group synonym table, after a distance-based
+  fuzzy matcher was evaluated and empirically REJECTED for an
+  unacceptable false-positive rate — see
+  `ibms-brain/meta/context/bilingual-ui.md`'s "What item #6 remainder
+  covers" before re-attempting one).
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
