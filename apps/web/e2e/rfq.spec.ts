@@ -2007,7 +2007,7 @@ test("raises a premium invoice from the Billing block — commission netted, tot
   await page.getByLabel("Tax amount").fill("9600.000");
   await page.getByLabel("Fees amount").fill("150.000");
   await page.getByLabel("Due date").fill("2026-12-01");
-  await page.getByRole("button", { name: "Raise premium invoice" }).click();
+  await page.getByRole("button", { name: "Issue invoice" }).click();
 
   await expect.poll(() => created?.taxAmount).toBe("9600.000");
   await expect(page.getByText("−JOD 14,400.000")).toBeVisible();
@@ -2068,7 +2068,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await page.getByLabel("Tax amount").fill("9600.000");
   await page.getByLabel("Fees amount").fill("150.000");
   await page.getByLabel("Due date").fill("2026-12-01");
-  await page.getByRole("button", { name: "Raise premium invoice" }).click();
+  await page.getByRole("button", { name: "Issue invoice" }).click();
   await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
 
   // 1. record the receipt for the full total
