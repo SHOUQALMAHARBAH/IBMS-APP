@@ -1440,7 +1440,7 @@ test("opens an opportunity and lists its RFQs", async ({ page }) => {
   await page.getByRole("button", { name: /Opportunity opp-1/ }).click();
 
   await expect(page).toHaveURL("/opportunities/opp-1");
-  await expect(page.getByText("Status: NEEDS_CONFIRMED")).toBeVisible();
+  await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
   await expect(page.getByRole("button", { name: /Property All Risks/ })).toBeVisible();
 });
 
@@ -1496,7 +1496,7 @@ test("a non-Placement user sees the list but no create controls", async ({ page 
   await mockRfqApi(page);
 
   await page.goto("/opportunities/opp-1");
-  await expect(page.getByText("Status: NEEDS_CONFIRMED")).toBeVisible();
+  await expect(page.getByText("Status: Needs confirmed")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create RFQ for a line" })).toHaveCount(0);
 });
 
