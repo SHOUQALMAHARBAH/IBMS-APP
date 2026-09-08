@@ -18,6 +18,14 @@ import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
+import type { TranslationKey } from '../../lib/i18n/translations';
+
+const COMMISSION_STATUS_LABEL_KEY: Record<string, TranslationKey> = {
+  outstanding: 'commissionStatusDraft',
+  calculated: 'commissionStatusCalculated',
+  approved: 'commissionStatusApproved',
+  paid: 'financeBillingStatusPaid',
+};
 
 interface Props {
   opportunityId: string;
@@ -32,7 +40,7 @@ export function CommissionSection({
   canCalculate,
   canApproveOverride,
 }: Props) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [entry, setEntry] = useState<CommissionEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +69,7 @@ export function CommissionSection({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load commission — try again.',
+          : t('commissionLoadError'),
       );
     }
   }, [opportunityId]);
@@ -82,7 +90,7 @@ export function CommissionSection({
       await load();
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('commissionCreateError'),
       );
     } finally {
       setBusy(false);
@@ -91,7 +99,8 @@ export function CommissionSection({
 
   return (
     <section style={{ marginTop: '2rem' }}>
-      <h2>Commission</h2>
+      <h2>{t('commissionSectionHeading')}</h2>
+      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('commissionIntro')}</p>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
@@ -101,7 +110,7 @@ export function CommissionSection({
       {entry ? (
         <div style={quoteChainCardStyle}>
           <div style={quoteFieldStyle}>
-            <span>Governed amount</span>
+            <span>{t('commissionCalculatedLabel')}</span>
             <span>{formatMoney(entry.amount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
@@ -113,12 +122,12 @@ export function CommissionSection({
             <span>{formatMoney(entry.grossAmount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
-            <span>Effective amount</span>
+            <span>{t('commissionAmountLabel')}</span>
             <strong>{formatMoney(entry.effectiveAmount, language)}</strong>
           </div>
           <div style={quoteFieldStyle}>
-            <span>Status</span>
-            <span>{entry.status}</span>
+            <span>{t('commissionStatusLabel')}</span>
+            <span>{t(COMMISSION_STATUS_LABEL_KEY[entry.status] ?? 'commissionStatusDraft')}</span>
           </div>
           {entry.status === 'paid' ? (
             <div style={quoteFieldStyle}>
@@ -165,7 +174,7 @@ export function CommissionSection({
               disabled={busy}
               onClick={() => void run(() => approveCommissionOverride(entry.id))}
             >
-              Approve override
+              {t('commissionApproveButton')}
             </button>
           ) : null}
 
@@ -210,9 +219,7 @@ export function CommissionSection({
                 />
               </label>
               <button type="submit" style={buttonStyle} disabled={busy}>
-                {entry.isManualOverride
-                  ? 'Revise pending override'
-                  : 'Raise manual override'}
+                {busy ? t('commissionApprovingButton') : 'Raise manual override'}
               </button>
             </form>
           ) : null}
@@ -269,10 +276,10 @@ export function CommissionSection({
           disabled={busy}
           onClick={() => void run(() => calculateCommission(policy.id))}
         >
-          Calculate commission (governed rate)
+          {t('commissionCalculateButton')}
         </button>
       ) : (
-        <p style={{ opacity: 0.6 }}>No commission entry for this policy yet.</p>
+        <p style={{ opacity: 0.6 }}>{t('commissionNoneYet')}</p>
       )}
     </section>
   );
