@@ -920,9 +920,11 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — items #1-4 and #7 of 8 built (item #4 with one
-  narrow, documented exception; item #7 now COMPLETE) + items #5-6 PARTIALLY
-  built.** A working instant language switch + persistent per-user preference
+- **Part F — bilingual UI — COMPLETE.** All 8 named items either shipped or
+  were explicitly, deliberately scoped down by the user, with every deferred
+  edge documented (items #1-4, #7, and #8 fully built — item #4 with one
+  narrow exception; items #5-6 PARTIALLY built by explicit scoping decision).
+  A working instant language switch + persistent per-user preference
   exists (`PATCH /auth/me/language`, a `LanguageProvider` React context, a
   switcher in `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under
   `dir="rtl"` (nav/forms/tables via CSS logical properties + free flex/table
@@ -959,10 +961,16 @@ build actually is today:
   undocumented anywhere beyond their one-line backlog bullets. **Item #7's own
   persistence gap remains explicit, documented future work** — this app has
   no real object storage anywhere, so a generated document is not retrievable
-  later except by generating it again. Screens implement the loading / empty
-  / error / populated states, but the Part F rule of capturing a screenshot
-  of each state as evidence is not met (item #8, the only unbuilt item left
-  in the whole Part).
+  later except by generating it again. **Item #8 — four-state screenshot
+  evidence — is now built too**, scoped (a user-confirmed decision) to the
+  ~8 screens items #1-7 actually built/touched rather than the whole app's
+  84 pages: `apps/web/e2e/four-state-screenshots.spec.ts`, 10 tests
+  capturing plain PNG evidence (`page.screenshot()`, not a pixel-diff
+  `toHaveScreenshot()` baseline) of whichever loading/empty/error/populated
+  states are genuinely applicable per screen, including a populated capture
+  of `/opportunities/[id]` showing all 4 of item #7's document-download
+  buttons at once. The other ~75 app pages remain outside this item's own
+  confirmed scope — a documented, deliberate limit, not a gap.
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -7357,6 +7365,98 @@ narrows a gap.
   the fifth of the Part's 7 built-so-far items to CLOSE** — only item #8
   (the 4-state screenshot discipline, a verification overlay on #1-7, not
   a standalone build) remains unbuilt in the whole Part.
+
+**Part F — Bilingual UI (backlog Part 11) — item #8 of 8: four-state
+  (loading/empty/error/populated) screenshot evidence — CLOSES this item
+  AND ALL OF PART F.** Framed by the backlog's own item list as "a
+  verification DISCIPLINE overlay on 1-7, not a separate build item," not
+  a standalone feature. Two real scoping decisions, both confirmed with
+  the user via `AskUserQuestion` after a research pass established the
+  facts: **scope** is the ~8 screens items #1-7 actually built/touched,
+  not the whole app's 84 `page.tsx` files (only 13 commits were ever
+  tagged "Part F item #N" across items #1-7, touching mostly
+  document-generation infrastructure and global CSS/layout — treating
+  "applies to every screen" literally would have turned this into a
+  general app-wide QA screenshot sweep, disproportionate to a
+  bilingual-UI verification step); **mechanism** is plain
+  `page.screenshot()` PNG evidence, not Playwright's `toHaveScreenshot()`
+  visual regression (matches `verification-contract.md`'s own framing — "a
+  state with no screenshot is a state that is not implemented" reads as
+  proof of existence, not a pixel-diff test — and avoids a much bigger
+  ongoing maintenance cost from cross-platform font-rendering differences
+  on a bilingual RTL/LTR app).
+
+  Research established, before writing any code: no screenshot
+  infrastructure existed anywhere in this app (no `toHaveScreenshot`, no
+  screenshots directory, no `screenshot:` config in
+  `playwright.config.ts`); but the 4 states themselves largely already
+  exist in real code, not just as an aspiration — `customers/page.tsx`
+  and `leads/page.tsx` were checked directly and both have genuine,
+  distinct loading/empty/error/populated branches (an established house
+  convention), and 9 existing e2e spec files already assert on
+  empty/error text. This item captures evidence of states that already
+  work, not building missing UI.
+
+  **New `apps/web/e2e/four-state-screenshots.spec.ts`** — 10 tests across
+  8 screens, each capturing whichever states are genuinely applicable
+  (`verification-contract.md`'s own "only applicable states need to be
+  implemented" allowance — a detail page has no "empty" concept; two
+  screens render nothing visibly distinguishable while loading, so that
+  state was correctly skipped there rather than captured as an
+  indistinguishable blank screenshot): `/customers` and `/customers/[id]`
+  (items #3 bidi, #4 name split, #6 search — rendered in Arabic with a
+  real Arabic legal name and an Arabic UBO with split national-ID name
+  parts, so the screenshots themselves demonstrate RTL mirroring and bidi
+  isolation, not just an English page that happens to work);
+  `/watchlist-sync` (item #2 RTL layout — the same page
+  `rtl-layout.spec.ts` itself uses as its bounding-box proof, also
+  rendered in Arabic); `/complaints`, `/rfqs/[id]`, `/opportunities/[id]`
+  (item #7's 6 document types — the populated capture of
+  `/opportunities/[id]` shows all 4 of that page's own "Download..."
+  buttons simultaneously: recommendation, policy schedule, certificate,
+  invoice); `/prospects`, `/vendors` (item #6 search, each with a real
+  Arabic name). Screenshots save to
+  `test-results/four-state-screenshots/<screen>/<state>.png` — already
+  covered by the pre-existing `test-results/` gitignore entry, not
+  committed, the same treatment Playwright's own trace/report artifacts
+  already get.
+
+  **A genuine bug found and fixed in this item's own new test fixtures,
+  not in application code**: `GET /quotations?rfqId=` returns
+  `QuotationChain[]` (grouped per insurer, `{ current, versions, history
+  }`), never a flat `QuotationVersion[]` — the first draft of the
+  `/rfqs/[id]` test fed `QuotationsSection.tsx` the wrong shape, crashing
+  it (`chain.current` was `undefined`) in a way that surfaced as Chrome's
+  own native "This page couldn't load" error rather than a React error
+  boundary, making it look at first like an unrelated navigation/timing
+  bug. Found by attaching `page.on('pageerror', ...)`/`page.on('console',
+  ...)` listeners in a throwaway diagnostic spec rather than guessing —
+  `QuotationsSection.tsx` itself was already correct and worked exactly
+  as documented once fed the real `QuotationChain[]` shape.
+
+  **Verification**: +10 new Playwright tests → full web suite
+  **309/309 green** (a genuinely fresh full-suite run, not assumed
+  unaffected because the change was additive-only). `npm run
+  typecheck`/`lint`/`build` (web) clean. No backend files touched,
+  confirmed via `git diff --stat` (one new file). Several screenshots
+  were spot-checked visually (not just asserted present) — the
+  `/customers` populated capture genuinely shows the mirrored RTL
+  sidebar and the correctly-rendered Arabic legal name; the
+  `/opportunities/[id]` populated capture genuinely shows all 4 document
+  buttons at once.
+
+  **PART F (backlog Part 11) IS NOW COMPLETE** — all 8 named items
+  either shipped or were explicitly, deliberately scoped down by the
+  user, with every deferred edge documented in
+  `ibms-brain/meta/context/bilingual-ui.md`. Read that file's "What item
+  #8 covers"/"does NOT cover" sections before assuming further scope:
+  the other ~75 app pages and visual-regression/pixel-diff testing both
+  remain explicitly out of this item's own confirmed scope, item #5's
+  Hijri calendar/multi-currency and item #6's same-script typo
+  tolerance/`Insurer` search remain their own documented deferred work,
+  and item #7's real `Document` persistence gap is unrelated to any of
+  the above. None of these are "finishing Part F" — each needs its own
+  explicit, fresh user go-ahead; do not self-select any of them.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified
