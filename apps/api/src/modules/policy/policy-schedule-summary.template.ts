@@ -5,6 +5,7 @@ import {
   formatDocumentMoney,
   type DocumentLanguage,
 } from '../document-generation/document-html.util';
+import type { CoverageFigureEntry } from './policy.config';
 
 /** Part F item #7 — policy schedule summary, the 4th of the 6 named
  * document types (after complaint acknowledgement, quotation comparison,
@@ -45,10 +46,7 @@ import {
  * value degrades gracefully to `formatDocumentMoney`'s own escaped
  * raw-plus-currency-prefix fallback, not a crash). */
 
-export interface CoverageFigureEntry {
-  key: string;
-  value: string | number;
-}
+export type { CoverageFigureEntry };
 
 export interface PolicyScheduleSummaryData {
   policyId: string;

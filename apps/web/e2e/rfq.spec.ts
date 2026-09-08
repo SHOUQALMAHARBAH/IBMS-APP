@@ -1767,8 +1767,8 @@ test("places a policy from an accepted opportunity and records its issuance", as
     },
   });
   // Registered AFTER mockRfqApi's own broader "policies**" route —
-  // Playwright runs routes in reverse-registration order, so this more
-  // specific one wins for the document endpoint while the general one
+  // Playwright runs routes in reverse-registration order, so these more
+  // specific ones win for the document endpoints while the general one
   // still handles place/issuance/checking/delivery/read.
   await page.route(
     "http://localhost:4000/policies/*/document**",
@@ -1779,13 +1779,26 @@ test("places a policy from an accepted opportunity and records its issuance", as
         body: Buffer.from("%PDF-1.4 fake"),
       }),
   );
+  await page.route(
+    "http://localhost:4000/policies/*/certificate**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake certificate"),
+      }),
+  );
 
   await page.goto("/opportunities/opp-1");
   await expect(page.getByRole("heading", { name: "Policy" })).toBeVisible();
 
-  // Part F item #7 — no coverage schedule yet, so no download button.
+  // Part F item #7 — no coverage schedule yet, so neither download
+  // button appears (both the schedule summary and the certificate).
   await expect(
     page.getByRole("button", { name: "Download schedule summary (PDF)" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Download certificate (PDF)" }),
   ).toHaveCount(0);
 
   await page.getByLabel("Inception date").fill("2026-10-01");
@@ -1795,6 +1808,9 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await expect(page.getByText("PLACEMENT_CONFIRMED")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Download schedule summary (PDF)" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Download certificate (PDF)" }),
   ).toHaveCount(0);
 
   await page.getByLabel("Policy number").fill("POL-WEB-1");
@@ -1806,8 +1822,8 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
   await expect(page.getByText("POL-WEB-1")).toBeVisible();
 
-  // Part F item #7 — a schedule now exists, so the button appears and
-  // produces a real bilingual PDF download.
+  // Part F item #7 — a schedule now exists, so both buttons appear and
+  // each produces a real bilingual PDF download.
   const downloadPromise = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Download schedule summary (PDF)" })
@@ -1815,6 +1831,15 @@ test("places a policy from an accepted opportunity and records its issuance", as
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe(
     "policy-schedule-summary-pol-1.pdf",
+  );
+
+  const certDownloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download certificate (PDF)" })
+    .click();
+  const certDownload = await certDownloadPromise;
+  expect(certDownload.suggestedFilename()).toBe(
+    "certificate-of-insurance-pol-1.pdf",
   );
 });
 
@@ -1956,12 +1981,28 @@ test("raises a premium invoice from the Billing block — commission netted, tot
       created = b as typeof created;
     },
   });
+  // Part F item #7 — registered AFTER mockRfqApi's own broader
+  // "invoices**" route, so this more specific one wins for the document
+  // endpoint (same reverse-registration-order precedent the policy
+  // schedule-summary/certificate routes already use).
+  await page.route(
+    "http://localhost:4000/invoices/*/document**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: Buffer.from("%PDF-1.4 fake invoice"),
+      }),
+  );
 
   await page.goto("/opportunities/opp-1");
   await expect(
     page.getByRole("heading", { name: "Billing", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("No premium invoice yet")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download invoice (PDF)" }),
+  ).toHaveCount(0);
 
   await page.getByLabel("Tax amount").fill("9600.000");
   await page.getByLabel("Fees amount").fill("150.000");
@@ -1976,6 +2017,15 @@ test("raises a premium invoice from the Billing block — commission netted, tot
     page.getByText("JOD 115,350.000", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+
+  // Part F item #7 — an invoice now exists, so the download button
+  // appears and produces a real bilingual PDF download.
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download invoice (PDF)" })
+    .click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("invoice-inv-1.pdf");
 });
 
 test("a non-Finance user sees no raise-invoice control on the Billing block", async ({

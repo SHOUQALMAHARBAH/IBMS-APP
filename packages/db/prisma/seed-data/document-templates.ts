@@ -178,4 +178,58 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
       'ومبالغ التأمين والأخطار المسماة والامتدادات أدناه، والتواصل ' +
       'معنا فوراً في حال وجود أي تعارض مع متطلباتكم.',
   },
+  /**
+   * Part F item #7 — the fifth of `templateType`'s 6 real document types
+   * to get an actual seeded row. Editable boilerplate prose only; the
+   * per-invoice facts (customer, policy, premium/tax/fees/total, due
+   * date, status, the client's own collection receipt) are real domain
+   * data merged in by
+   * `apps/api/src/modules/finance/invoice-document.template.ts`, never
+   * stored here. Deliberately excludes commission/remittance figures — a
+   * flagged content decision, see that template's own header comment.
+   * `InvoiceDocumentService` falls back to this exact wording in code
+   * when no row exists yet — kept identical so the seeded and
+   * fallback-default text never silently diverge.
+   */
+  {
+    templateType: 'invoice',
+    nameEn: 'Premium Invoice',
+    nameAr: 'فاتورة قسط التأمين',
+    bodyEn:
+      'This is your invoice for the insurance premium below. Please ' +
+      'arrange payment by the due date shown. Contact us promptly if ' +
+      'you have any questions about this invoice.',
+    bodyAr:
+      'هذه فاتورتكم لقسط التأمين المبيّن أدناه. يرجى ترتيب السداد قبل ' +
+      'تاريخ الاستحقاق المذكور. يرجى التواصل معنا فوراً في حال وجود أي ' +
+      'استفسار بخصوص هذه الفاتورة.',
+  },
+  /**
+   * Part F item #7 — the sixth and final of `templateType`'s 6 real
+   * document types to get an actual seeded row. Editable boilerplate
+   * prose only; the per-policy facts (insured, policy number, insurer,
+   * insurance line, period, sum insured) are real domain data merged in
+   * by
+   * `apps/api/src/modules/policy/certificate-of-insurance.template.ts`,
+   * never stored here. A genuine Certificate of Insurance convention —
+   * deliberately NOT the same content as `policy_schedule_summary`
+   * (short proof-of-coverage, no premium/tax/commission figures at all).
+   * `CertificateOfInsuranceDocumentService` falls back to this exact
+   * wording in code when no row exists yet — kept identical so the
+   * seeded and fallback-default text never silently diverge.
+   */
+  {
+    templateType: 'certificate_of_insurance',
+    nameEn: 'Certificate of Insurance',
+    nameAr: 'شهادة تأمين',
+    bodyEn:
+      'This certificate is issued as a summary of coverage currently in ' +
+      'force and is not evidence of a contract of insurance — the ' +
+      'policy wording governs. Please contact us promptly if any detail ' +
+      'below does not match your requirements.',
+    bodyAr:
+      'تصدر هذه الشهادة كملخص للتغطية السارية حالياً وليست دليلاً على ' +
+      'عقد التأمين — تحكمها شروط الوثيقة. يرجى التواصل معنا فوراً في ' +
+      'حال وجود أي تعارض بين ما ورد أدناه ومتطلباتكم.',
+  },
 ];

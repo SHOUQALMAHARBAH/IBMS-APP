@@ -216,3 +216,15 @@ export function downloadPolicyScheduleDocument(
   const qs = language ? `?language=${language}` : '';
   return apiFetchBlob(`/policies/${encodeURIComponent(id)}/document${qs}`);
 }
+
+// Part F item #7 — bilingual certificate-of-insurance PDF, the 6th and
+// final of the 6 named document types. Same defaulting/gating shape as
+// downloadPolicyScheduleDocument above, but a genuinely different content
+// endpoint (short proof-of-coverage, not the full schedule).
+export function downloadPolicyCertificateDocument(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/policies/${encodeURIComponent(id)}/certificate${qs}`);
+}

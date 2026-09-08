@@ -4,7 +4,7 @@
 // drives it through the collection cycle — receipt (INVOICED → COLLECTED),
 // reconcile (COLLECTED → RECONCILED), remittance (RECONCILED → REMITTED) — #32.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 
 export type InvoiceStatus =
   | 'INVOICED'
@@ -93,4 +93,16 @@ export function reconcileInvoice(invoiceId: string): Promise<Invoice> {
  * `RECONCILED → REMITTED`. */
 export function recordRemittance(invoiceId: string): Promise<Invoice> {
   return apiPost(`/invoices/${invoiceId}/remittance`, {});
+}
+
+// Part F item #7 — bilingual invoice PDF, generated on demand. Omitting
+// `language` defaults to the customer's own `languagePreference` — mirrored
+// here by only showing the download button once an invoice exists (see
+// FinanceSection.tsx).
+export function downloadInvoiceDocument(
+  id: string,
+  language?: 'AR' | 'EN' | 'DUAL',
+): Promise<Blob> {
+  const qs = language ? `?language=${language}` : '';
+  return apiFetchBlob(`/invoices/${encodeURIComponent(id)}/document${qs}`);
 }

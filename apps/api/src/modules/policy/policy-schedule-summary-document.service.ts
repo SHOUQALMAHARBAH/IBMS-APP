@@ -1,14 +1,10 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
-import type { Prisma } from '@ibms/db';
 import { PolicyService } from './policy.service';
-import { premiumVariance } from './policy.config';
+import { coverageFigureEntries, premiumVariance } from './policy.config';
 import { DocumentTemplateRepository } from '../../repositories/document-template.repository';
 import { PdfRendererService } from '../document-generation/pdf-renderer.service';
 import type { DocumentLanguage } from '../document-generation/document-html.util';
-import {
-  buildPolicyScheduleSummaryHtml,
-  type CoverageFigureEntry,
-} from './policy-schedule-summary.template';
+import { buildPolicyScheduleSummaryHtml } from './policy-schedule-summary.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 const POLICY_SCHEDULE_SUMMARY_TEMPLATE_TYPE = 'policy_schedule_summary';
@@ -33,25 +29,6 @@ const FALLBACK_BODY_AR =
 export interface GeneratedDocument {
   buffer: Buffer;
   fileName: string;
-}
-
-/** A `limits`/`sumsInsured` blob is validated at write time
- * (`policy.config.ts#assertCoverageFigures`) to be a non-empty flat
- * object of string/number scalars — this just re-derives that same
- * shape for display, tolerating (rather than throwing on) a
- * differently-shaped value from an older or hand-edited row: an empty
- * or malformed blob renders as an empty table (via the template's own
- * `entries.length === 0` guard), not a 500. */
-function entriesOf(value: Prisma.JsonValue): CoverageFigureEntry[] {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return [];
-  }
-  return Object.entries(value as Record<string, unknown>)
-    .filter(
-      (entry): entry is [string, string | number] =>
-        typeof entry[1] === 'string' || typeof entry[1] === 'number',
-    )
-    .map(([key, v]) => ({ key, value: v }));
 }
 
 @Injectable()
@@ -113,8 +90,8 @@ export class PolicyScheduleSummaryDocumentService {
         currency: policy.currency,
         scheduleEffectiveFrom: schedule.effectiveFrom,
         scheduleEffectiveTo: schedule.effectiveTo,
-        limits: entriesOf(schedule.limits),
-        sumsInsured: entriesOf(schedule.sumsInsured),
+        limits: coverageFigureEntries(schedule.limits),
+        sumsInsured: coverageFigureEntries(schedule.sumsInsured),
         namedPerils: schedule.namedPerils,
         extensions: schedule.extensions,
         bodyEn: template?.bodyEn ?? FALLBACK_BODY_EN,

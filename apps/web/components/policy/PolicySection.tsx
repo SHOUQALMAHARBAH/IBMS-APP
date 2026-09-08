@@ -5,6 +5,7 @@ import {
   acknowledgePolicyReceipt,
   attachPolicyDocuments,
   checkPolicy,
+  downloadPolicyCertificateDocument,
   downloadPolicyScheduleDocument,
   listPoliciesForOpportunity,
   placePolicy,
@@ -231,6 +232,31 @@ export function PolicySection({
         err instanceof ApiError
           ? err.message
           : 'Could not generate the schedule summary — try again.',
+      );
+    }
+  }
+
+  // Part F item #7 — the certificate-of-insurance PDF, the 6th and final
+  // named document type. Same gating shape as downloadDocument above
+  // (button only rendered once schedules.length > 0), a genuinely
+  // different content endpoint.
+  async function downloadCertificate(id: string) {
+    setFormError(null);
+    try {
+      const blob = await downloadPolicyCertificateDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-of-insurance-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setFormError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the certificate — try again.',
       );
     }
   }
@@ -492,6 +518,18 @@ export function PolicySection({
                 style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
               >
                 Download schedule summary (PDF)
+              </button>
+              <button
+                type="button"
+                onClick={() => void downloadCertificate(policy.id)}
+                style={{
+                  ...buttonStyle,
+                  width: 'auto',
+                  marginTop: '0.4rem',
+                  marginInlineStart: '0.5rem',
+                }}
+              >
+                Download certificate (PDF)
               </button>
             </div>
           ) : null}

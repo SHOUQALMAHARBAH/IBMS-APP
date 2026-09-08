@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   createInvoice,
+  downloadInvoiceDocument,
   listInvoicesForPolicy,
   recordReceipt,
   recordRemittance,
@@ -76,6 +77,30 @@ export function FinanceSection({
 
   const invoice = invoices[0] ?? null;
 
+  // Part F item #7 — the customer's own languagePreference decides the
+  // document's language server-side; no picker here for a first pass. The
+  // button is only rendered once an invoice exists (see below).
+  async function downloadDocument(id: string) {
+    setError(null);
+    try {
+      const blob = await downloadInvoiceDocument(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not generate the invoice — try again.',
+      );
+    }
+  }
+
   async function runStep(step: () => Promise<unknown>, failMsg: string) {
     setBusy(true);
     setError(null);
@@ -147,6 +172,13 @@ export function FinanceSection({
               </strong>
             </div>
           ) : null}
+          <button
+            type="button"
+            onClick={() => void downloadDocument(invoice.id)}
+            style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
+          >
+            Download invoice (PDF)
+          </button>
         </div>
       ) : (
         <p style={{ color: '#6b7280' }}>

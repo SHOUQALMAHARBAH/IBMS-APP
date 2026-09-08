@@ -920,42 +920,49 @@ build actually is today:
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
-- **Part F — bilingual UI — begun, items #1-4 of 8 built (item #4 with one
-  narrow, documented exception) + items #5-6 PARTIALLY built.** A working instant
-  language switch + persistent per-user preference exists (`PATCH
-  /auth/me/language`, a `LanguageProvider` React context, a switcher in
-  `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under `dir="rtl"`
-  (nav/forms/tables via CSS logical properties + free flex/table mirroring; charts
-  N/A — none exist in this app yet); mixed-content fields (an Arabic legal name, an
-  Arabic insurance-line label next to a Latin policy number, a bilingual address) now
-  isolate correctly via native `<bdi>` elements and `dir="auto"` capture inputs;
-  name/label sorting for genuinely bilingual fields (customer/insurer names,
-  insurance-line labels) now uses Arabic-locale collation instead of a hardcoded
-  English one; Arabic keyboard input is confirmed unblocked everywhere (no
-  Latin-only validation anywhere in the app); individual customers, employees,
-  and corporate UBOs now capture their name in the Jordanian national-ID
-  convention (given/father's/grandfather's/family name) via a real schema
-  migration, with the existing display field kept as a computed value so every
-  downstream consumer keeps working unchanged; every money/date/datetime
-  value across the app now renders through one shared, locale-aware
+- **Part F — bilingual UI — items #1-4 and #7 of 8 built (item #4 with one
+  narrow, documented exception; item #7 now COMPLETE) + items #5-6 PARTIALLY
+  built.** A working instant language switch + persistent per-user preference
+  exists (`PATCH /auth/me/language`, a `LanguageProvider` React context, a
+  switcher in `AppNav`'s footer); every screen's LAYOUT genuinely mirrors under
+  `dir="rtl"` (nav/forms/tables via CSS logical properties + free flex/table
+  mirroring; charts N/A — none exist in this app yet); mixed-content fields (an
+  Arabic legal name, an Arabic insurance-line label next to a Latin policy
+  number, a bilingual address) now isolate correctly via native `<bdi>`
+  elements and `dir="auto"` capture inputs; name/label sorting for genuinely
+  bilingual fields (customer/insurer names, insurance-line labels) now uses
+  Arabic-locale collation instead of a hardcoded English one; Arabic keyboard
+  input is confirmed unblocked everywhere (no Latin-only validation anywhere
+  in the app); individual customers, employees, and corporate UBOs now
+  capture their name in the Jordanian national-ID convention (given/father's/
+  grandfather's/family name) via a real schema migration, with the existing
+  display field kept as a computed value so every downstream consumer keeps
+  working unchanged; every money/date/datetime value across the app now
+  renders through one shared, locale-aware
   `formatMoney`/`formatDate`/`formatDateTime` utility, driven by the same live
   language switcher (Western numerals preserved in Arabic via a deliberately
-  bare `'ar'` tag, not `'ar-JO'`); and Customers/Prospects/Vendors are now
+  bare `'ar'` tag, not `'ar-JO'`); Customers/Prospects/Vendors are now
   genuinely searchable in either Arabic or English (a real Postgres full-text
   search — the built-in `'arabic'` text-search config's own linguistic
-  stemming, not a plain substring match) — see § Part F below for the full
-  detail. **`InsuredPerson` name-splitting was deliberately excluded from item
-  #4** (that model has zero CRUD anywhere in this app yet — revisit once it
-  does); **item #5's other two sub-problems (Hijri calendar, multi-currency
-  for reinsurance) and item #6's own other two sub-problems (fuzzy
-  transliteration matching, same-script typo tolerance) all remain explicitly
+  stemming, not a plain substring match — plus a curated fuzzy-transliteration
+  synonym table for ~50 common Jordanian/Arab given-name spelling pairs); and
+  **all 6 named system-generated bilingual documents now exist** (complaint
+  acknowledgement, quotation comparison, recommendation report, policy
+  schedule summary, invoice, certificate of insurance — real headless-Chromium
+  HTML-to-PDF rendering, generated on demand, never persisted) — see § Part F
+  below for the full detail. **`InsuredPerson` name-splitting was deliberately
+  excluded from item #4** (that model has zero CRUD anywhere in this app yet —
+  revisit once it does); **item #5's other two sub-problems (Hijri calendar,
+  multi-currency for reinsurance) and item #6's own other two sub-problems
+  (same-script typo tolerance, `Insurer` search) all remain explicitly
   deferred as future work by user decision** — not attempted, and genuinely
-  undocumented anywhere beyond their one-line backlog bullets; `Insurer`
-  search was also excluded — no dedicated module or web list page exists for
-  it anywhere. Every screen's remaining TEXT is still **English-only**: no
-  system-generated bilingual documents. Screens implement the loading / empty
+  undocumented anywhere beyond their one-line backlog bullets. **Item #7's own
+  persistence gap remains explicit, documented future work** — this app has
+  no real object storage anywhere, so a generated document is not retrievable
+  later except by generating it again. Screens implement the loading / empty
   / error / populated states, but the Part F rule of capturing a screenshot
-  of each state as evidence is not met.
+  of each state as evidence is not met (item #8, the only unbuilt item left
+  in the whole Part).
 - **Part G — final verification checklist** — not run as a formal, evidence-attached
   gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
   status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
@@ -7261,6 +7268,95 @@ narrows a gap.
   work; wait for the user's explicit go-ahead before resuming any of
   them, starting item #7 (system-generated bilingual documents), or any
   other Part F item — do not self-select.
+
+  **Editorial note (2026-09-08):** this README narrative log went stale
+  for item #6 remainder (fuzzy transliteration matching) and all 6 of
+  item #7's document-type slices — none of those rounds added their own
+  entry here, even though `CLAUDE.md` § What's New and
+  `ibms-brain/meta/context/bilingual-ui.md` both stayed current
+  throughout. Only item #7's FINAL round (invoice + certificate, below)
+  resumes updating this file; the 5 missing entries in between (item #6
+  remainder, then complaint acknowledgement/quotation comparison/
+  recommendation report/policy schedule summary) are a real, documented
+  backfill gap — not attempted here, since fully reconstructing 4-5
+  prior sessions' own narrative from this session would be disproportionate
+  to this round's own change. See the two files above for the authoritative,
+  currently-accurate record of everything Part F has built.
+
+**Part F — Bilingual UI (backlog Part 11) — item #7 of 8: system-generated
+  bilingual documents — CLOSES this item (all 6 named document types now
+  built).** This round added the 5th and 6th (final) document types,
+  invoice and certificate of insurance, chosen together in one sitting.
+  **Invoice** (`GET /invoices/:id/document`, `client-accounting.read`):
+  the first item #7 document with a FLAT, book-wide visibility permission
+  rather than a scoped one (`InvoiceService`'s own header comment already
+  says "there is no per-owner visibility filter") — so
+  `InvoiceDocumentService` reads its repositories directly, no
+  `getByIdWithCustomer()`-style helper needed. Content deliberately
+  EXCLUDES `commissionDeducted`/`netRemittance`/the insurer `Remittance`
+  leg (internal broker-insurer economics), a decision confirmed with the
+  user via `AskUserQuestion` — mirrors the recommendation-report
+  document's earlier "internal governance metadata stays internal"
+  precedent. **Certificate of Insurance** (`GET /policies/:id/certificate`
+  — a SEPARATE endpoint from the pre-existing `GET /policies/:id/document`,
+  which stays the policy-schedule-summary document): reuses the schedule
+  summary's own `PolicyService.getByIdWithCustomer()` visibility read and
+  `schedules.length === 0 → 422` gate, but with genuinely shorter,
+  different content — a real Certificate-of-Insurance proof-of-coverage
+  convention (insured/policy number/insurer/line/period/a one-line
+  sum-insured summary), also `AskUserQuestion`-confirmed, deliberately not
+  the schedule summary's content under a new heading. A shared
+  `coverageFigureEntries()` helper was promoted (byte-identical
+  relocation) from a private function in
+  `policy-schedule-summary-document.service.ts` into `policy.config.ts`.
+
+  **A `@code-reviewer` pass found 1 real BLOCKER, fixed before this was
+  considered done**: the certificate made an unconditional, present-tense
+  "currently in force" attestation with no check on `policy.status`
+  anywhere — a `CANCELLED` or `EXPIRED` policy would still get a
+  certificate falsely claiming active coverage, and this document type
+  exists specifically to be handed to a third party (a landlord, a
+  regulator, a lender) to rely on as proof of that. Fixed by refusing
+  with 422 (the same shape the existing data-availability gate already
+  uses) for `CANCELLED`/`EXPIRED`, verified with a new e2e assertion. A
+  MINOR was also fixed: the invoice document was rendering the raw
+  internal `Invoice.status` collection-cycle enum verbatim, in tension
+  with that same document's own stated commission-exclusion decision;
+  replaced with a client-facing "Outstanding"/"Paid" label derived from
+  whether the client's own collection receipt exists.
+
+  **Verification**: +23 new api unit tests
+  (`invoice-document.template.spec.ts` +12,
+  `certificate-of-insurance.template.spec.ts` +11) → api unit
+  **2416/2417** (from 2394; the 1 failure is `app.controller.spec.ts`, a
+  pre-existing, zero-diff, fully-isolated failure unrelated to this
+  change); +2 new api e2e tests, each with multiple assertions (including
+  an `EXTERNAL_AUDITOR` proving the invoice endpoint's permission is
+  genuinely book-wide, and the new CANCELLED/EXPIRED 422 proof plus a
+  same-policy PDF-size comparison on the certificate) — targeted run of
+  the 2 directly-touched e2e files **16/16 green**; richer assertions
+  inside 2 pre-existing Playwright tests (no new test cases) — full
+  `rfq.spec.ts` **29/29 green**. Full api+web `typecheck`/`lint`/`build`
+  clean. **A genuine host-level disk-space crisis mid-session** (the C:
+  drive hit 0 bytes free — Docker Desktop's `docker_data.vhdx` had grown
+  to ~42GB and never auto-shrinks) plus a separate Docker Desktop
+  stuck-backend recurrence consumed significant session time and both
+  required the user's own hands-on fix; given that, plus this host's own
+  repeated prior failure to complete either full suite under sustained
+  memory pressure across every earlier item #7 round, **the full 63-file
+  api e2e suite and the full 60+-file web suite were NOT attempted fresh
+  this round** — the targeted evidence above stands in.
+
+  **No migration** — two new `invoice`/`certificate_of_insurance`
+  `DocumentTemplate` seed rows. Read
+  `ibms-brain/meta/context/bilingual-ui.md`'s "What item #7's invoice
+  slice covers"/"What item #7's certificate-of-insurance slice covers"
+  before assuming further scope: real persistence / a `Document` audit
+  trail for a generated file remains explicit, documented future work —
+  this app has no real object storage anywhere. **Part F item #7 is now
+  the fifth of the Part's 7 built-so-far items to CLOSE** — only item #8
+  (the 4-state screenshot discipline, a verification overlay on #1-7, not
+  a standalone build) remains unbuilt in the whole Part.
 
 **Part C #47 — KYC (Domain F, Process 47)** — **no build required.** The backlog line
   reads "#47 KYC — fully covered under #3–4", with no checkboxes of its own. Verified

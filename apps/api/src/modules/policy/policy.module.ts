@@ -4,6 +4,7 @@ import { PolicyService } from './policy.service';
 import { PolicyCheckingService } from './policy-checking.service';
 import { PolicyDeliveryService } from './policy-delivery.service';
 import { PolicyScheduleSummaryDocumentService } from './policy-schedule-summary-document.service';
+import { CertificateOfInsuranceDocumentService } from './certificate-of-insurance-document.service';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { PolicyCheckingRepository } from '../../repositories/policy-checking.repository';
 import { PolicyDeliveryRepository } from '../../repositories/policy-delivery.repository';
@@ -35,7 +36,12 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
  *   - CustomerModule        -> CustomerRepository (owner, for visibility)
  *   - DocumentGenerationModule -> PdfRendererService +
  *     DocumentTemplateRepository (Part F item #7 — bilingual
- *     policy-schedule-summary PDF, `PolicyScheduleSummaryDocumentService`)
+ *     policy-schedule-summary PDF, `PolicyScheduleSummaryDocumentService`,
+ *     and the certificate-of-insurance PDF,
+ *     `CertificateOfInsuranceDocumentService` — both reuse the SAME
+ *     `PolicyService.getByIdWithCustomer()` visibility read and
+ *     `schedules.length === 0` data-availability gate, deliberately
+ *     different CONTENT)
  *
  * `BrokerLicenseRepository` (Process 51, backlog Part C #51's first
  * checkbox — "automatically block new business issuance once the license
@@ -67,6 +73,7 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     PolicyDeliveryService,
     PolicyDeliveryRepository,
     PolicyScheduleSummaryDocumentService,
+    CertificateOfInsuranceDocumentService,
     BrokerLicenseRepository,
     PiPolicyRepository,
   ],

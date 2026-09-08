@@ -13,6 +13,7 @@ import { PolicyService } from './policy.service';
 import { PolicyCheckingService } from './policy-checking.service';
 import { PolicyDeliveryService } from './policy-delivery.service';
 import { PolicyScheduleSummaryDocumentService } from './policy-schedule-summary-document.service';
+import { CertificateOfInsuranceDocumentService } from './certificate-of-insurance-document.service';
 import { PlacePolicyDto } from './dto/place-policy.dto';
 import { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
@@ -38,6 +39,7 @@ export class PolicyController {
     private readonly policyChecking: PolicyCheckingService,
     private readonly policyDelivery: PolicyDeliveryService,
     private readonly policyDocuments: PolicyScheduleSummaryDocumentService,
+    private readonly certificateDocuments: CertificateOfInsuranceDocumentService,
   ) {}
 
   @RequirePermissions('policy.create')
@@ -77,6 +79,30 @@ export class PolicyController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<StreamableFile> {
     const { buffer, fileName } = await this.policyDocuments.generate(
+      id,
+      query.language,
+      user,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="${fileName}"`,
+    });
+  }
+
+  // Part F item #7 — bilingual certificate-of-insurance PDF, the 6th and
+  // final of the 6 named document types. Same permission, visibility read
+  // (PolicyService.getByIdWithCustomer) and `schedules.length === 0` ->
+  // 422 data-availability gate as document() above — a genuinely
+  // DIFFERENT content shape (short proof-of-coverage, no premium/tax
+  // figures), not the same schedule-summary content under a new heading.
+  @RequirePermissions('policy.read')
+  @Get(':id/certificate')
+  @Header('Content-Type', 'application/pdf')
+  async certificate(
+    @Param('id') id: string,
+    @Query() query: DocumentLanguageQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.certificateDocuments.generate(
       id,
       query.language,
       user,

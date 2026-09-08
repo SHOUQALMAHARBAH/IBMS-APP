@@ -1,11 +1,22 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { InvoiceService } from './invoice.service';
 import { CollectionService } from './collection.service';
+import { InvoiceDocumentService } from './invoice-document.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { ListInvoicesQueryDto } from './dto/list-invoices-query.dto';
 import { RecordReceiptDto } from './dto/record-receipt.dto';
 import { RecordRemittanceDto } from './dto/record-remittance.dto';
+import { DocumentLanguageQueryDto } from '../document-generation/dto/document-language-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -31,6 +42,7 @@ export class InvoiceController {
   constructor(
     private readonly invoices: InvoiceService,
     private readonly collection: CollectionService,
+    private readonly invoiceDocuments: InvoiceDocumentService,
   ) {}
 
   @RequirePermissions('invoice.create')
@@ -86,5 +98,28 @@ export class InvoiceController {
   @Get(':id')
   get(@Param('id') id: string) {
     return this.invoices.get(id);
+  }
+
+  // Part F item #7 — bilingual invoice PDF. Generated on demand and
+  // streamed back, not persisted (no object storage exists anywhere in
+  // this app). Same `client-accounting.read` permission as get() above —
+  // a flat, book-wide Finance permission with no per-customer visibility
+  // scoping beyond it (unlike Policy/ComparisonMatrix/Recommendation's
+  // own scoped document endpoints), confirmed by reading InvoiceService
+  // before building this.
+  @RequirePermissions('client-accounting.read')
+  @Get(':id/document')
+  @Header('Content-Type', 'application/pdf')
+  async document(
+    @Param('id') id: string,
+    @Query() query: DocumentLanguageQueryDto,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } = await this.invoiceDocuments.generate(
+      id,
+      query.language,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="${fileName}"`,
+    });
   }
 }
