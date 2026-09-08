@@ -34,6 +34,7 @@ import {
   quoteFieldStyle,
 } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
 import type { Language } from '../../lib/i18n/translations';
 
@@ -830,7 +831,7 @@ export function ClaimSection({
   canSecondApproveSettlement,
   canClose,
 }: Props) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Claim[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -859,7 +860,7 @@ export function ClaimSection({
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load claims — try again.',
+          : t('claimLoadError'),
       );
     }
   }, [opportunityId]);
@@ -902,7 +903,7 @@ export function ClaimSection({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'That claim could not be recorded — try again.',
+          : t('claimCreateError'),
       );
     } finally {
       setBusy(false);
@@ -918,30 +919,8 @@ export function ClaimSection({
 
   return (
     <section>
-      <h2 style={{ marginTop: '2.5rem' }}>Claims</h2>
-      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
-        A reported loss is recorded against the policy at status{' '}
-        <strong>NOTIFIED</strong>. Cover is validated against the coverage
-        schedule that was in force on the <em>exact loss date</em> — not the
-        current one — so a loss under a policy endorsed after the event resolves
-        to the version that actually applied then. A Claims Officer then
-        registers the claim with the insurer and assigns the loss adjuster
-        (<strong>REGISTERED</strong>), files the mandatory documentation
-        against a per-claim-type checklist (<strong>DOCUMENTATION_IN_PROGRESS</strong>),
-        tracks the adjuster&rsquo;s survey / investigation, submits the claim to
-        the insurer once the checklist is complete
-        (<strong>UNDER_ASSESSMENT</strong>) and records the verdict
-        (<strong>APPROVED</strong> / <strong>PARTIALLY_APPROVED</strong> /
-        <strong>DECLINED</strong>). A nightly job raises a follow-up alert on any
-        pre-verdict claim past its per-line insurer non-response threshold.
-        Finally the settlement is recorded as four distinct figures
-        (estimated / approved / deductible / net) — large or broker-processed
-        payments need a second approver, never the first
-        (<strong>SETTLED</strong>). The claim is then formally closed once the
-        client&rsquo;s receipt of the payment is confirmed (a declined claim
-        closes directly); closure triggers a Loss Ratio recompute for the
-        policy.
-      </p>
+      <h2 style={{ marginTop: '2.5rem' }}>{t('claimSectionHeading')}</h2>
+      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('claimIntro')}</p>
 
       {canFollowUp ? (
         <button
