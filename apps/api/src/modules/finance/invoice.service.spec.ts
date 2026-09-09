@@ -74,9 +74,7 @@ function makeDeps(over?: {
   };
   // Mock for new findEffectiveAgreement method (Fix #1)
   const commissions = {
-    findEffectiveAgreement: vi
-      .fn()
-      .mockResolvedValue(null), // Fall back to quoted rate
+    findEffectiveAgreement: vi.fn().mockResolvedValue(null), // Fall back to quoted rate
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new InvoiceService(

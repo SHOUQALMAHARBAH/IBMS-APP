@@ -34,5 +34,8 @@ import { AuditModule } from '../audit/audit.module';
     ComplianceDashboardRepository,
     AuditTrailRepository,
   ],
+  // Exported for `ExecutiveDashboardService` (#64), which rolls this
+  // dashboard up rather than re-deriving its figures from the same tables.
+  exports: [ComplianceDashboardService],
 })
 export class ComplianceDashboardModule {}

@@ -990,6 +990,49 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### 2026-09-09 — gap-closing pass (what changed, and what to re-read here)
+
+A pass over `IMPROVEMENTS.md` closed several long-standing gaps and found a
+number of defects that were not tracked anywhere. Entries further down this
+section that describe the following as open are **superseded**:
+
+- **A.2 — user provisioning now exists.** `POST /admin/users` + role
+  grant/revoke + activate/deactivate (`user.manage`,
+  SYSTEM_SECURITY_ADMINISTRATOR), plus an opt-in bootstrap administrator in
+  the seed (`BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`). Before
+  this, a production-seeded database had the full role catalogue, all 157
+  permissions, and no way to give anyone a role — sample users are seeded only
+  when `NODE_ENV !== 'production'` and signup grants none. Web:
+  `/settings/users`.
+- **Part 3.9 — the renewal module now exists.** `apps/api/src/modules/renewal/`
+  — a nightly lead-time sweep opens a `RenewalCase` per expiring ACTIVE policy
+  and walks it through `RenewalStatus`. This gives three already-shipped
+  features their missing producer: the per-`RenewalCase` `LossRatio` upsert
+  (#29), Process 46's retention sweep, and the `renewal_workflow_start` SLA
+  timer. Web: `/renewal-cases`.
+- **Process 64 — the Executive Dashboard now exists.**
+  `GET /dashboards/executive` (`dashboard.executive.view`, previously seeded
+  with no endpoint) rolls up the five sibling dashboards. Web:
+  `/dashboards/executive`.
+- **Process 32 — partial payments are built.** An invoice may be settled in
+  instalments; the invoice only walks `INVOICED → COLLECTED` on the one that
+  completes it. `Receipt.reference` is the idempotency key and a row lock on
+  the parent `Invoice` is the race gate (replacing the dropped
+  `Receipt.invoiceId @unique`). The #33 ageing report now buckets the
+  OUTSTANDING balance and #34 payables require FULL collection.
+- **Process 37 — refund disbursement is built.** `POST /refunds/:id/disburse`
+  stamps `paidAt` and books the client-funds `out` movement in one
+  transaction, refusing an unapproved at-threshold refund and one whose
+  endorsement never reached APPLIED.
+
+**Still open after this pass** (unchanged, and each still described below):
+real screening (A.3/#3-4), the remaining PDPL systems, the drafted/unsourced
+values, reporting SQL aggregation, standalone refund raise, and the
+over-payment → `Refund` bridge. The `test:security` gate now runs
+`scripts/audit-check.mjs`, which acknowledges exactly one advisory (`multer`,
+unreachable and unfixable — see `SECURITY_FIXES.md` § 3) and fails on anything
+else.
+
 **A.1 — Authentication & Session Management (Part 10.1)**
 
 - **Hardware-token MFA (WebAuthn) is not implemented — and Part 10.1's requirement that

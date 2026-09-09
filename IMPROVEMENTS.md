@@ -39,6 +39,83 @@ leaving a misleading document in place.
 done" · `P1` must be fixed before the system goes near production · `P2` tech
 debt / quality-of-life.
 
+**2026-09-09 — a "fix the gaps" pass ran against this file.** What it closed,
+what it found that was NOT in this file, and what it deliberately left:
+
+*Closed:* §3.1 (commission source of truth — and the DI bug that fix shipped
+with, below), §3.2 (refund disbursement, with the approval gate and the
+client-funds `out` movement the first attempt omitted), §3.4 (partial
+payments, application logic included), §10.2 (both `P2002` handlers), §3.6
+(the renewal module — see below), §1.6/§5.8 partially (the rate limiter is
+real, gated and no longer bypassable).
+
+*Found during that pass, not previously tracked, now fixed:*
+
+- `P0` **The API could not boot.** `InvoiceService` injected
+  `CommissionRepository` (added by the §3.1 fix) but `FinanceModule` never
+  provided it. Unit tests construct the service by hand with mocks, so they
+  passed; the failure only appears at module instantiation. Fixed by importing
+  `CommissionModule` (which exports the repository). Caught by a new e2e —
+  nothing else in the suite would have.
+- `P0` **`Receipt.invoiceId @unique` was dropped in the schema with no
+  application logic** — so the §2-recorded P0 ("two receipts per invoice
+  possible") was reinstated and `CollectionService.finishReceipt`'s `P2002`
+  branch became unreachable dead code. Fixed properly (see §3.4).
+- `P0` **…and the migration that dropped it never actually ran.** Migration
+  `20260909120000` used `ALTER TABLE "Receipt" DROP CONSTRAINT IF EXISTS
+  "Receipt_invoiceId_key"`. Prisma materialises a scalar `@unique` as a unique
+  **INDEX**, not a table CONSTRAINT, and `DROP CONSTRAINT IF EXISTS` silently
+  no-ops on an index name — so the index survived on every already-migrated
+  database (confirmed with `\d "Receipt"` on db-test).
+  The effect was a **schema/database divergence**, which is worse than either
+  state alone: `schema.prisma` had dropped the `@unique`, so a database
+  created FRESH from the schema had no protection at all, while every migrated
+  database still did. The same application code was therefore correct on one
+  and wrong on the other, and `db:migrate:status` reports "up to date" either
+  way because it compares migration HISTORY, not actual schema.
+  Caught by an e2e writing a second instalment (`P2002` on `invoiceId`), not
+  by reading the migration. Migration `20260909160000` now issues the
+  `DROP INDEX`. **Lesson for any future constraint removal here: assert the
+  post-state (`pg_indexes` / `\d`), never trust that the DDL matched the
+  object type Prisma created.**
+- `P0` **The rate limiter made the whole api e2e suite unrunnable.** All 63
+  `*.e2e-spec.ts` files sign up and log in repeatedly from 127.0.0.1 against
+  one static store with a 5-per-15-minutes budget. Now enforced in production
+  only (`RATE_LIMIT_ENABLED=true` forces it on), the same `NODE_ENV` gate the
+  rest of the security middleware uses.
+- `P1` **The rate limiter was trivially bypassable.** It trusted
+  `X-Forwarded-For` unconditionally — a client-supplied header — so rotating
+  it minted a fresh bucket per request. Now gated on `TRUST_PROXY_HEADERS`.
+- `P1` **`refund.disburse` was the one `@RequirePermissions` code not in the
+  seed grid**, so its endpoint returned 403 to every role. And had it been
+  reachable it checked no approval at all — an at/above-threshold refund could
+  be paid with nobody having approved it, a maker/checker bypass on real money
+  out. Both fixed; a cross-check of all 154 used codes against all 157 seeded
+  now shows zero unreachable endpoints.
+- `P1` **`user.manage` and `dashboard.executive.view` were seeded with no
+  endpoint.** The first meant a production-seeded database had the full role
+  catalogue, the full permission grid and no way to give anyone a role — see
+  §5.9. Both now have one.
+- `P2` `common/sanitization.util.ts` was dead code duplicating
+  `document-html.util.ts`'s `escapeHtml`. Deleted.
+- `P2` `SECURITY_FIXES.md` asserted fixes that did not exist in the tree.
+  Rewritten against verified evidence.
+- `P0` **Found in this pass's own self-review, before commit:** the first cut
+  of the partial-payments change moved the "is this invoice settled?" test out
+  of the SQL `where` and into a JS filter — which silently relocates `LIMIT` to
+  the wrong side of it. On a book with 5,900 settled and 100 outstanding
+  invoices, `orderBy createdAt asc` + `take 5000` would have returned 5,000
+  mostly-settled rows, discarded nearly all of them, and understated
+  receivables just as badly as the bug being fixed. `loadOutstandingReceivables`
+  and `loadInsurerObligations` are now raw SQL with a `HAVING` clause (see
+  §6.1), verified against real Postgres by cross-checking both against an
+  independent uncapped JS recomputation over db-test — exact match on both.
+
+*Deliberately left:* the drafted/unsourced values in §4 (they need a business
+decision, not a code change), real screening (§5.2), the remaining PDPL
+systems (§5.1), reporting SQL aggregation (§6.1). None of these are one-line
+changes and none should be guessed at.
+
 **Resolved since this file was first compiled** (kept here so the gap isn't
 rediscovered — see § 2 for the same convention applied to in-session bugs):
 
@@ -83,6 +160,44 @@ rediscovered — see § 2 for the same convention applied to in-session bugs):
      must then create its own fixtures — some already assume prior state).
   3. Raise the per-test timeout for those two specs and keep batching hot paths
      — a band-aid, not a fix.
+
+**2026-09-09 update — measured, and partly mitigated.** At 64 spec files
+db-test held **36,470 users** (it is never reset, and nothing truncates
+between runs). `rbac.e2e-spec.ts` took **557 seconds** for 6 tests and still
+failed 3 of them at a 180s timeout; the full suite ran 44 minutes and reported
+12 failures — every one a timeout, none an assertion. Verified by re-running
+the same specs with a longer timeout and watching them pass: the code is
+correct, the data volume is not.
+
+Two things were done, and only one of them is a fix:
+
+- `testTimeout` in `vitest-e2e.config.ts` raised 30s → 180s, with the
+  reasoning written into the file. A **mitigation**: a gate that goes red for
+  elapsed time rather than for a defect trains people to ignore it.
+- **db-test was reset and re-seeded** (36,470 → 12 users, with the user's
+  explicit consent — `prisma migrate reset` refuses without it). This is
+  operational hygiene, not a code fix, and the accumulation simply starts
+  again on the next run.
+
+**The reset is worth far more than the timeout bump — measured on the same
+suite, same machine, same commit:**
+
+| | accumulated db-test (36,470 users) | reset db-test (134 users) |
+|---|---|---|
+| Full suite | 311/323, **12 failed** | **322/323, 1 failed** |
+| Wall clock | 2,670 s (44 min) | **922 s (15 min)** |
+| `rbac.e2e-spec.ts` | 557 s, 3 failed | **10.4 s, 1 failed** |
+
+Every one of the 12 original failures was a timeout, none an assertion. The
+single remaining failure is the §1.2 TOTP flake, not a timeout — `rbac`
+passes 6/6 in isolation. So the suite's health was almost entirely a function
+of accumulated fixture data, which is exactly what §1.1 predicts.
+
+The root cause is unchanged and option 1 above is still the answer: per-file
+DB isolation. Until then, **reset db-test before relying on a full-suite
+number** — otherwise the suite measures months of accumulated fixtures rather
+than the change under test. Worth automating as a `pretest:e2e` step, which
+would remove the human judgement entirely.
 - **Also:** `rbac.e2e-spec.ts` still depends on
   `AccessRecertificationService`'s "first eligible reviewer" being a **stable
   ordering, not round-robin** (documented in README § Known gaps A.2). Fixing
@@ -100,6 +215,16 @@ rediscovered — see § 2 for the same convention applied to in-session bugs):
   have the test helper accept the server's `otplib` window/step and generate the
   code for the same tick, or use a longer `window` tolerance on the *test*
   verify call only. Do **not** widen the production TOTP window.
+- **2026-09-09 — still live, and now the ONLY full-suite failure.** On a reset
+  db-test the suite is 322/323; the one failure is this flake, in
+  `rbac.e2e-spec.ts`'s `enrollMfa` (`expected 200, got 400`), and that file
+  passes 6/6 in isolation immediately afterwards. Not fixed this pass for one
+  concrete reason: `enrollMfa` is **hand-duplicated in 62 of the 64 spec
+  files**, so any test-side fix is a 62-file mechanical change, and the
+  one-file alternative — widening the server's `otplib` window — is a change
+  to a production MFA control that this entry explicitly rules out. Extracting
+  the helper into `test/utils/` first (and having every spec import it) is the
+  prerequisite; do that, and the fix becomes a one-line change in one place.
 
 ### 1.3 `P1` — `read ECONNRESET` under load
 
@@ -193,18 +318,25 @@ by blast radius.
 - **Fix:** decide which is authoritative, rewire the other (or add a
   reconciliation view that flags divergence), and make #34/#40 consistent.
 
-### 3.2 `P1` — Refund lifecycle is incomplete
+### 3.2 `P1` — Refund lifecycle — PARTLY RESOLVED (2026-09-09)
 
-- `refund.raise` permission is **seeded but wired to no endpoint** — there is no
-  standalone / overpayment / goodwill refund-raise path; a `Refund` is only ever
-  auto-minted by a negative/cancellation `Endorsement` (#22).
-- `Refund.paidAt` is **never written** — there is no disbursement step (the
-  approve step just flips status; money never "goes out").
-- No **write-off** path (`money-decimal-jod.md` mentions write-offs; nothing
-  implements one).
-- **Fix:** `POST /refunds` (standalone raise, `refund.raise`), a
-  `POST /refunds/:id/disburse` that stamps `paidAt` + books the client-funds
-  ledger `out` movement, and a maker/checker write-off endpoint.
+- ~~`Refund.paidAt` is never written~~ — **built.** `POST /refunds/:id/disburse`
+  (`refund.disburse`, Finance) stamps `paidAt` and books the client-funds `out`
+  movement in ONE `$transaction`, with the stamp status-conditional on
+  `paidAt: null` so two concurrent disbursements cannot both pay out. Three
+  gates, all load-bearing: the approval requirement is **re-derived from the
+  live amount** (`refundNeedsApproval`), never trusted from the stored
+  `approvalThresholdMatrixLevel` snapshot — without that this endpoint is a
+  maker/checker bypass; the endorsement must actually have reached `APPLIED`
+  (paying a refund for an adjustment never made to the policy returns premium
+  the client is still being charged); and the ledger movement is transactional
+  with the stamp, the same guarantee the `in` side already had.
+- **Still open:** `refund.raise` remains seeded with no endpoint — a standalone
+  overpayment/goodwill refund needs `Refund.endorsementId` to become nullable,
+  since today every refund is anchored to the endorsement whose premium
+  adjustment created it. Still no **write-off** path.
+- **Fix (remaining):** the schema migration + `POST /refunds`, and a
+  maker/checker write-off endpoint.
 
 ### 3.3 `P1` — `PremiumTransaction` model is never written
 
@@ -215,15 +347,38 @@ by blast radius.
   or delete the model if `Invoice` + `ClientFundsLedgerEntry` +
   `CommissionLedgerEntry` are the real ledger.
 
-### 3.4 `P1` — No partial payments anywhere in the finance cycle
+### 3.4 `P1` — Partial payments — RESOLVED (2026-09-09)
 
-- #32 records **exactly one** `Receipt` per invoice for the **full**
-  `totalAmount` (a variance is a 422). #34/#33/#40 all assume "a receipt means
-  paid in full". A real broker takes instalments.
-- **Fix:** relax `Receipt.invoiceId @unique` to allow multiple partial receipts
-  summing to the total; update the ageing/payables/summary readers to sum
-  receipts instead of testing for existence; add an over-payment → `Refund`
-  bridge.
+An invoice may now be settled in instalments. What that took, beyond dropping
+the `@unique` (which on its own was a P0 regression — see the 2026-09-09 note
+at the top of this file):
+
+- **A replacement race gate.** `InvoiceRepository.recordReceiptWithLedger` now
+  takes `SELECT ... FOR UPDATE` on the parent `Invoice` before re-summing and
+  inserting, so concurrent instalments cannot both pass the "does this exceed
+  the invoiced total?" check. The old `P2002`-on-`invoiceId` backstop is gone
+  and this replaces it (`race-safe-invariants.md` — the write re-asserts the
+  condition, under serialisation).
+- **An idempotency key.** `Receipt.reference` + a partial `UNIQUE
+  (invoiceId, reference) WHERE reference IS NOT NULL` (migration
+  `20260909160000`). With instalments allowed, figures alone can no longer
+  distinguish a retried POST from a genuine second payment of the same amount.
+- **The readers.** `loadOutstandingReceivables` sums receipts and reports the
+  REMAINING balance instead of dropping an invoice the moment its first
+  instalment lands (which silently understated receivables by the unpaid
+  half); `buildReceivablesAgeing` buckets that outstanding figure;
+  `loadInsurerObligations` requires FULL collection before an invoice becomes
+  an obligation to the insurer (a half-collected invoice treated as fully owed
+  would remit the broker's own money).
+- **The invoice cycle.** Only the instalment that completes the invoice walks
+  `INVOICED → COLLECTED`. `reconcile` already re-derived the sum from live
+  rows, so it needed no change.
+- **`InvoiceView`** gained `receipts[]`, `collectedAmount`,
+  `outstandingAmount` and `fullyCollected`, all computed server-side.
+
+**Still open:** an over-payment is still a 422 pointing at Process 39, not an
+automatic `Refund` — the over-payment → `Refund` bridge needs the same
+`Refund.endorsementId` nullability §3.2 does.
 
 ### 3.5 `P1` — `ClientFundsLedgerEntry` has no balance / reconciliation surface
 
@@ -233,7 +388,38 @@ by blast radius.
 - **Fix:** `GET /client-funds/:customerId/statement` (running balance) and a
   book-wide "held vs. owed to insurers" reconciliation view.
 
-### 3.6 `P1` — The renewal module (Part 3.9) not existing now blocks THREE things
+### 3.6 ~~`P1` — The renewal module (Part 3.9) not existing blocks THREE things~~ — RESOLVED (2026-09-09)
+
+**Built.** `apps/api/src/modules/renewal/` — a nightly `@Cron` sweep (05:00
+UTC) plus on-demand `POST /renewal-cases/detect` opens a `RenewalCase` for
+every ACTIVE policy inside its lead-time window (`RenewalCase.policyId
+@unique` + `P2002` → counted skip is the race gate); `POST
+/renewal-cases/:id/transition` walks `RenewalStatus` through the engine, whose
+`WORKFLOW_TRANSITIONS.RenewalCase` map had existed since A.6 with no caller;
+`PATCH /renewal-cases/:id/flags` carries the two re-marketing triggers. Two
+new seeded permissions (`renewal.read`, `renewal.manage`). No migration —
+every model and enum already existed.
+
+All three dependents are now live: opening a case triggers
+`LossRatioService.recomputeForPolicy` (which had no `RenewalCase` parent to
+write to and took its logged no-op branch in every environment);
+`RetentionCaseService.runSweep` finally has rows to read; and
+`renewal_workflow_start` — one of only two `SLA_REGISTRY` entries with no
+caller anywhere, a Part G gate failure — now has one, with the due date
+counted BACK from expiry rather than forward from now.
+
+**Scope deliberately limited to the trigger and the lifecycle.** A renewal
+that goes to market re-uses the existing Opportunity → RFQ → Quotation →
+Comparison → Recommendation chain (`RenewalCase.opportunity` is already in the
+schema for exactly that). Building a parallel renewal-quotation stack would be
+the two-sources-of-truth mistake §3.1 already records once.
+
+**Still open:** the loss-ratio "period" is still all-time/paid-only — this
+module gives it a `RenewalCase` to hang off, but narrowing it to the policy
+year and adding earned-premium proration is a separate change. The original
+entry follows, for the record.
+
+### 3.6a (historical) — what the gap was
 
 - `LossRatioModule` upserts a `LossRatio` per `RenewalCase`, but every call is a
   **logged no-op** because the renewal module (`RenewalCase` producer) is not
@@ -387,6 +573,37 @@ system is used for anything.
   path and no retention enforcement**. This remains the single biggest
   compliance exposure — one of nine Part D systems is built.
 
+### 5.9 `P0` — RESOLVED (2026-09-09): no way to grant anyone a role
+
+A production seed produced a database with the 11-role catalogue, all 157
+permissions, and **not one user able to use any of it**:
+
+- `packages/db/prisma/seed.ts` seeds login-capable sample users **only when
+  `NODE_ENV !== 'production'`**.
+- `POST /auth/signup` is public and creates an account with **zero roles**.
+- `RbacController` is read-only; `user.manage` was seeded and wired to no
+  endpoint anywhere; `RoleRepository` had no assignment method.
+
+So there was no path — API or seed — from a fresh production database to any
+permission, and therefore to any of the 74 business processes.
+
+**Fixed** by `apps/api/src/modules/rbac/controllers/user-admin.controller.ts`
+(`POST /admin/users` provisions an account WITH its initial grants in one
+write; grant/revoke; activate/deactivate — all `user.manage` +
+SYSTEM_SECURITY_ADMINISTRATOR), plus an opt-in bootstrap administrator in the
+seed driven by `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` (deliberately
+env-driven, never a hardcoded default credential; the password is validated
+against the same Part 10.1 policy the login path enforces, shared from
+`@ibms/db` so the two cannot drift). Revoking stamps `revokedAt` rather than
+deleting the grant, and revoking the last active administrator is refused —
+nobody would be able to grant it back.
+
+Segregation of duties: single-actor, not maker/checker —
+`maker-checker-segregation.md` scopes that rule to KYC, policy checking,
+refunds, disposal and DSR closure. The compensating control is A.2's periodic
+access recertification, which explicitly does not exempt the administrator's
+own access.
+
 ### 5.2 `P0` — Screening is simulated
 
 - Customer onboarding (#3–4) does **simulated** sanctions/PEP screening. No real
@@ -458,6 +675,15 @@ system is used for anything.
 ---
 
 ## 6. Architecture & tech debt
+
+### 6.1 `P1` — Every reporting endpoint aggregates in memory — 2 of 4 DONE
+
+**2026-09-09:** #33's `loadOutstandingReceivables` and #34's
+`loadInsurerObligations` now aggregate in SQL (`GROUP BY` + `HAVING`), not in
+JS. That was forced rather than chosen: once partial payments made
+"outstanding" a cross-row SUM, a JS filter put `LIMIT` on the wrong side of it
+and silently truncated the report. The remaining two (#30 loss-ratio
+breakdown, #40 financial summary) are unchanged and still in-memory.
 
 ### 6.1 `P1` — Every reporting endpoint aggregates in memory
 

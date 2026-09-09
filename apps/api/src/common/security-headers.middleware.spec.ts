@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 describe('securityHeaders (Part 10.2 — mandatory TLS)', () => {
-  it('no-ops outside production', () => {
+  it('sets the baseline hardening headers but enforces no TLS outside production', () => {
     process.env.NODE_ENV = 'test';
     const req = { headers: {}, secure: false } as unknown as Request;
     const { res, setHeaderMock, statusMock } = mockRes();
@@ -45,8 +45,19 @@ describe('securityHeaders (Part 10.2 — mandatory TLS)', () => {
 
     securityHeaders()(req, res, next);
 
+    // The baseline headers are deliberately unconditional (defence in depth in
+    // every environment); only the HSTS header and the plain-HTTP rejection
+    // are production-gated, because dev/CI have no TLS terminator in front.
+    expect(setHeaderMock).toHaveBeenCalledWith(
+      'X-Content-Type-Options',
+      'nosniff',
+    );
+    expect(setHeaderMock).toHaveBeenCalledWith('X-Frame-Options', 'DENY');
+    expect(setHeaderMock).not.toHaveBeenCalledWith(
+      'Strict-Transport-Security',
+      expect.anything(),
+    );
     expect(next).toHaveBeenCalledOnce();
-    expect(setHeaderMock).not.toHaveBeenCalled();
     expect(statusMock).not.toHaveBeenCalled();
   });
 

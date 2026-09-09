@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -166,26 +167,44 @@ export class CustomerService {
       { userId: actorUserId, entityType: 'Customer', entityId: id },
     );
 
-    const customer = await this.customers.create({
-      id,
-      prospectId: dto.prospectId,
-      customerType: dto.customerType,
-      legalName,
-      givenName: isIndividual ? dto.givenName : undefined,
-      fatherName: isIndividual ? dto.fatherName : undefined,
-      grandfatherName: isIndividual ? dto.grandfatherName : undefined,
-      familyName: isIndividual ? dto.familyName : undefined,
-      registrationNumber: isIndividual ? undefined : dto.registrationNumber,
-      nationalIdEnc: encrypted.nationalIdEnc,
-      taxRegistrationNumber: dto.taxRegistrationNumber,
-      registeredAddress: isIndividual ? undefined : dto.registeredAddress,
-      natureOfBusiness: isIndividual ? undefined : dto.natureOfBusiness,
-      contactPhoneEnc: encrypted.contactPhoneEnc,
-      contactEmailEnc: encrypted.contactEmailEnc,
-      languagePreference: dto.languagePreference,
-      preferredContactChannel: dto.preferredContactChannel,
-      ownerUserId: actorUserId,
-    });
+    let customer: Customer;
+    try {
+      customer = await this.customers.create({
+        id,
+        prospectId: dto.prospectId,
+        customerType: dto.customerType,
+        legalName,
+        givenName: isIndividual ? dto.givenName : undefined,
+        fatherName: isIndividual ? dto.fatherName : undefined,
+        grandfatherName: isIndividual ? dto.grandfatherName : undefined,
+        familyName: isIndividual ? dto.familyName : undefined,
+        registrationNumber: isIndividual ? undefined : dto.registrationNumber,
+        nationalIdEnc: encrypted.nationalIdEnc,
+        taxRegistrationNumber: dto.taxRegistrationNumber,
+        registeredAddress: isIndividual ? undefined : dto.registeredAddress,
+        natureOfBusiness: isIndividual ? undefined : dto.natureOfBusiness,
+        contactPhoneEnc: encrypted.contactPhoneEnc,
+        contactEmailEnc: encrypted.contactEmailEnc,
+        languagePreference: dto.languagePreference,
+        preferredContactChannel: dto.preferredContactChannel,
+        ownerUserId: actorUserId,
+      });
+    } catch (err) {
+      // `Customer.prospectId @unique` — a concurrent (or retried) second
+      // conversion of the same Prospect. The DB constraint is the real
+      // invariant (race-safe-invariants.md); this only turns the resulting
+      // P2002 into the 409 every comparable create in this codebase returns,
+      // instead of an unhandled 500. Mirrors ProspectService.convert().
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `Prospect ${dto.prospectId} has already been converted to a Customer.`,
+        );
+      }
+      throw err;
+    }
 
     // Logged, not thrown — same "already-committed work must not become a
     // reported failure" philosophy as ProspectService.convert(). Never

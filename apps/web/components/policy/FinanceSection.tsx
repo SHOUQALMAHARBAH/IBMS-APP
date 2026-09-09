@@ -48,6 +48,11 @@ export function FinanceSection({
   const [receiptMethod, setReceiptMethod] = useState<string>(
     RECEIPT_METHOD_OPTIONS[0],
   );
+  // Process 32 — an invoice may be settled in instalments. Blank means "the
+  // whole outstanding balance", which is the common case and keeps the
+  // one-click full-payment flow intact.
+  const [instalmentAmount, setInstalmentAmount] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
 
   const load = useCallback(async () => {
     setError(null);
@@ -152,14 +157,44 @@ export function FinanceSection({
             <span>{t('financeStatusLabel')}</span>
             <strong>{invoice.status}</strong>
           </div>
-          {invoice.receipt ? (
-            <div style={quoteFieldStyle}>
-              <span>{t('financeCollectedLabel')}</span>
-              <strong>
-                {formatMoney(invoice.receipt.amount, language, invoice.currency)}
-                {invoice.receipt.method ? ` (${invoice.receipt.method})` : ''}
-              </strong>
-            </div>
+          {invoice.receipts.length > 0 ? (
+            <>
+              <div style={quoteFieldStyle}>
+                <span>{t('financeCollectedLabel')}</span>
+                <strong>
+                  {formatMoney(
+                    invoice.collectedAmount,
+                    language,
+                    invoice.currency,
+                  )}
+                </strong>
+              </div>
+              {!invoice.fullyCollected ? (
+                <div style={quoteFieldStyle}>
+                  <span>{t('financeOutstandingLabel')}</span>
+                  <strong>
+                    {formatMoney(
+                      invoice.outstandingAmount,
+                      language,
+                      invoice.currency,
+                    )}
+                  </strong>
+                </div>
+              ) : null}
+              {invoice.receipts.length > 1 ? (
+                <div style={quoteFieldStyle}>
+                  <span>{t('financeInstalmentsLabel')}</span>
+                  <strong>
+                    {invoice.receipts
+                      .map(
+                        (r) =>
+                          `${formatMoney(r.amount, language, invoice.currency)} · ${formatDate(r.receivedAt, language)}`,
+                      )
+                      .join(' | ')}
+                  </strong>
+                </div>
+              ) : null}
+            </>
           ) : null}
           {invoice.remittance ? (
             <div style={quoteFieldStyle}>
@@ -255,17 +290,40 @@ export function FinanceSection({
               ))}
             </select>
           </label>
+          <label>
+            {t('financeInstalmentAmountLabel')}
+            <input
+              value={instalmentAmount}
+              onChange={(e) => setInstalmentAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder={invoice.outstandingAmount}
+              style={{ width: '100%' }}
+            />
+          </label>
+          <label>
+            {t('financePaymentReferenceLabel')}
+            <input
+              value={paymentReference}
+              onChange={(e) => setPaymentReference(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </label>
           <button
             type="button"
             onClick={() =>
-              void runStep(
-                () =>
-                  recordReceipt(invoice.id, {
-                    amount: invoice.totalAmount,
-                    method: receiptMethod,
-                  }),
-                t('financeCreateError'),
-              )
+              void runStep(async () => {
+                const result = await recordReceipt(invoice.id, {
+                  // Blank = settle the whole remaining balance.
+                  amount: instalmentAmount.trim() || invoice.outstandingAmount,
+                  method: receiptMethod,
+                  ...(paymentReference.trim()
+                    ? { reference: paymentReference.trim() }
+                    : {}),
+                });
+                setInstalmentAmount('');
+                setPaymentReference('');
+                return result;
+              }, t('financeCreateError'))
             }
             disabled={busy}
             style={buttonStyle}

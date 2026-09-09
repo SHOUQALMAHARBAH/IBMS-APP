@@ -808,13 +808,25 @@ async function mockRfqApi(
       };
       opts.onCollectionStep?.({ step: "receipt", ...b });
       if (inv) {
-        inv.status = "COLLECTED";
-        inv.receipt = {
-          id: "rcpt-1",
+        const receipts = (inv.receipts ?? []) as Record<string, unknown>[];
+        receipts.push({
+          id: `rcpt-${receipts.length + 1}`,
           amount: b.amount,
           method: b.method ?? null,
           receivedAt: "2026-09-20T00:00:00.000Z",
-        };
+        });
+        const collected = receipts.reduce(
+          (sum, r) => sum + Number(r.amount as string),
+          0,
+        );
+        const total = Number(inv.totalAmount as string);
+        inv.receipts = receipts;
+        inv.receipt = receipts[receipts.length - 1];
+        inv.collectedAmount = collected.toFixed(3);
+        inv.outstandingAmount = Math.max(0, total - collected).toFixed(3);
+        inv.fullyCollected = collected >= total;
+        // Only the instalment that completes the invoice moves it on.
+        if (collected >= total) inv.status = "COLLECTED";
       }
       return route.fulfill({ status: 201, json: inv });
     }
@@ -868,7 +880,13 @@ async function mockRfqApi(
         status: "INVOICED",
         createdAt: "2026-09-16T00:00:00.000Z",
         netRemittance: (PREMIUM - COMMISSION).toFixed(3),
+        // Process 32 — an invoice may be settled in instalments, so the view
+        // carries the running totals alongside the receipt list.
+        receipts: [],
         receipt: null,
+        collectedAmount: "0.000",
+        outstandingAmount: (PREMIUM + tax + fees - COMMISSION).toFixed(3),
+        fullyCollected: false,
         remittance: null,
       };
       invoiceRows.push(row);
@@ -2071,12 +2089,24 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await page.getByRole("button", { name: "Issue invoice" }).click();
   await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
 
-  // 1. record the receipt for the full total
-  await page
-    .getByRole("button", { name: "Record collection" })
-    .click();
+  // 1a. Process 32 — a PART payment. The money is booked, but the invoice
+  //     stays INVOICED: only the instalment that completes it moves it on,
+  //     which is what keeps it on the #33 ageing report for the remainder.
+  await page.getByLabel("Instalment amount").fill("15,350.000".replace(",", ""));
+  await page.getByRole("button", { name: "Record collection" }).click();
+  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByText("JOD 15,350.000")).toBeVisible();
+  // The remaining balance is shown while the invoice is part-paid.
+  await expect(page.getByText("Outstanding balance")).toBeVisible();
+  await expect(page.getByText("JOD 100,000.000")).toBeVisible();
+
+  // 1b. the instalment that settles the rest — a blank amount means "the whole
+  //     outstanding balance", so this closes it out and drives the transition.
+  await page.getByRole("button", { name: "Record collection" }).click();
   await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
-  await expect(page.getByText("JOD 115,350.000 (bank_transfer)")).toBeVisible();
+  // Collected is now the pooled total of BOTH instalments.
+  await expect(page.getByText("JOD 115,350.000")).toBeVisible();
+  await expect(page.getByText("Outstanding balance")).toBeHidden();
 
   // 2. reconcile
   await page
@@ -2092,7 +2122,12 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await expect(page.getByText("Remitted to insurer")).toBeVisible();
   await expect(page.getByText(/JOD 105,600.000 on/)).toBeVisible();
 
-  expect(steps).toEqual(["receipt", "reconcile", "remittance"]);
+  expect(steps).toEqual([
+    "receipt",
+    "receipt",
+    "reconcile",
+    "remittance",
+  ]);
 });
 
 test("notifies a claim against an issued policy", async ({ page }) => {

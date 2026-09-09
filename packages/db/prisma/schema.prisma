@@ -1715,16 +1715,24 @@ model Invoice {
 }
 
 /// Process 32 — Invoice -> Collection -> Receipt -> Reconciliation ->
-/// Remittance cycle. `invoiceId` is `@unique`: #32 records exactly ONE
-/// full-payment receipt per invoice, and a read-then-create would let a
-/// concurrent / retried `POST /invoices/:id/receipt` double-book the client's
-/// premium into `ClientFundsLedgerEntry` (Part 7.3 — client funds must always
-/// be reconcilable). The engine transition alone is NOT the gate: a caller
-/// that lost the `INVOICED -> COLLECTED` race still reaches the artefact write
-/// before the winner's `$transaction` commits. `Receipt_invoiceId_key`
-/// (migration 20260902220000) is the real backstop; `P2002` -> resume/409.
-/// Partial-payment support (multiple receipts summing to the total) is a
-/// deferred refinement that would replace this constraint.
+/// Remittance cycle. An invoice may carry SEVERAL instalment receipts whose
+/// amounts sum to `Invoice.totalAmount` (migration
+/// 20260909120000_allow_partial_payments dropped the old
+/// `Receipt_invoiceId_key`); the invoice only leaves `INVOICED` once the
+/// running total reaches the invoiced amount.
+///
+/// Because `invoiceId` is no longer unique, TWO things replace what that
+/// constraint used to guarantee:
+///  * `CollectionService`/`InvoiceRepository.recordReceiptWithLedger` take a
+///    row lock on the parent `Invoice` before re-summing and inserting, so
+///    concurrent instalments cannot both pass the "does this exceed the
+///    invoiced total?" check (`race-safe-invariants.md` — the write
+///    re-asserts the condition, under serialisation).
+///  * `reference` (the payment/bank reference) carries a partial UNIQUE per
+///    invoice — `Receipt_invoiceId_reference_key`, migration
+///    20260909160000 — so a retried POST is idempotent rather than becoming
+///    a phantom second instalment. Figures alone can no longer distinguish a
+///    retry from a genuine second payment of the same amount.
 model Receipt {
   id               String          @id @default(uuid())
   invoiceId        String
@@ -1732,6 +1740,12 @@ model Receipt {
   amount           Decimal         @db.Decimal(18, 3)
   receivedAt       DateTime        @default(now())
   method           String? // bank_transfer | cheque | card | cash
+  /// Process 32 — the client's payment/bank reference for this instalment,
+  /// and the idempotency key for the collection endpoint. Optional: a cash
+  /// collection may genuinely have none, and NULLs are unconstrained by the
+  /// partial UNIQUE below (the same treatment every other nullable partial
+  /// UNIQUE in this schema gets).
+  reference        String?
   /// Process 38 — the approved customer PaymentChannel the money came in on
   /// (optional). When set, `method` is derived from the channel's `channelType`.
   paymentChannelId String?

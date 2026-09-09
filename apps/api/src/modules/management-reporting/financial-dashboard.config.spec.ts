@@ -22,6 +22,7 @@ describe('buildFinancialDashboardSummary', () => {
         customerId: 'cus-1',
         customerLegalName: 'Acme Ltd',
         totalAmount: d('1000.000'),
+        outstandingAmount: d('1000.000'),
         currency: 'JOD',
         dueDate: new Date('2026-08-15T00:00:00.000Z'),
       },

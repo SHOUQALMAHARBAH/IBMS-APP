@@ -9,7 +9,23 @@ export default defineConfig({
     root: './',
     environment: 'node',
     include: ['test/**/*.e2e-spec.ts'],
-    testTimeout: 30_000,
+    // Raised from 30s (2026-09-09). This is a MITIGATION for the cumulative
+    // shared test DB (IMPROVEMENTS.md §1.1), NOT a fix for it: every spec
+    // shares one db-test with no per-file isolation and no teardown, so each
+    // file's `makeUser` rows outlive it and every later file pays for them.
+    // At 64 spec files db-test holds ~36,000 users, and the two heaviest
+    // tests (rbac's access-recertification cycle, up-sell's nightly sweep)
+    // cross 30s on a loaded host while still being CORRECT — verified by
+    // re-running them with a longer timeout and watching them pass, not by
+    // assuming. A gate that goes red for elapsed time rather than for a
+    // defect trains people to ignore it (definition-of-done.md: a flaky gate
+    // is no evidence), so the timeout now reflects what the suite actually
+    // costs in its current shape.
+    //
+    // The real fix is §1.1's per-file DB isolation (template DB + CREATE
+    // DATABASE ... TEMPLATE, or a per-file schema). Do that, and this can go
+    // back to 30s — a test that then takes 3 minutes really is a defect.
+    testTimeout: 180_000,
     // Every e2e spec file shares one real Postgres test DB (db-test) — no
     // schema/tenant isolation between files. Vitest's default is to run
     // spec files in parallel worker processes, which was silently safe

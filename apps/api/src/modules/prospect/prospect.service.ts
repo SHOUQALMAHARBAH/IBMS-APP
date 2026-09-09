@@ -88,7 +88,10 @@ export class ProspectService {
         salesOwnerUserId: actorUserId,
       });
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
         throw new ConflictException(
           `Lead ${dto.leadId} has already been converted to a Prospect.`,
         );

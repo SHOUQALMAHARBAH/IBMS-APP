@@ -156,7 +156,11 @@ describe('deriveInvoiceView', () => {
       status: 'INVOICED',
       createdAt: '2026-09-02T10:00:00.000Z',
       netRemittance: '875.000', // 1000 premium − 125 commission
+      receipts: [],
       receipt: null,
+      collectedAmount: '0.000',
+      outstandingAmount: '1060.000',
+      fullyCollected: false,
       remittance: null,
     });
   });
@@ -285,6 +289,9 @@ describe('buildReceivablesAgeing (Process 33)', () => {
   ): OutstandingInvoiceRow => ({
     customerLegalName: `Cust ${over.customerId}`,
     currency: 'JOD',
+    // Ageing buckets the OUTSTANDING balance; unless a case is exercising a
+    // part payment it equals the invoiced total.
+    outstandingAmount: over.totalAmount,
     ...over,
   });
 

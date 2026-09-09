@@ -38,5 +38,8 @@ import { AuditModule } from '../audit/audit.module';
     FinancialReportRepository,
     ProfitabilityPolicyRepository,
   ],
+  // Exported for `ExecutiveDashboardService` (#64), which rolls this
+  // dashboard up rather than re-deriving its figures from the same tables.
+  exports: [FinancialDashboardService],
 })
 export class FinancialDashboardModule {}

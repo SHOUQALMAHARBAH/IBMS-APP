@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { HttpException, HttpStatus, ExecutionContext } from '@nestjs/common';
 import { RateLimitGuard } from './rate-limit.guard';
 import type { Request } from 'express';
@@ -7,8 +7,32 @@ import type { Request } from 'express';
 describe('RateLimitGuard', () => {
   let guard: RateLimitGuard;
 
+  // The guard no-ops outside production (see limiterEnabled() — a per-IP
+  // bucket is meaningless when every request comes from 127.0.0.1, and an
+  // enforced one makes the e2e suite unrunnable). These tests are about the
+  // limiting behaviour itself, so they opt in explicitly.
   beforeEach(() => {
+    process.env.RATE_LIMIT_ENABLED = 'true';
     guard = new RateLimitGuard(60000, 3);
+  });
+
+  afterEach(() => {
+    delete process.env.RATE_LIMIT_ENABLED;
+    delete process.env.TRUST_PROXY_HEADERS;
+  });
+
+  it('no-ops entirely when the limiter is not enabled for this environment', () => {
+    delete process.env.RATE_LIMIT_ENABLED;
+    const g = new RateLimitGuard(60000, 1);
+    const ctx = {
+      switchToHttp: () => ({
+        getRequest: () => ({ ip: '198.51.100.7', headers: {} }),
+      }),
+    } as unknown as ExecutionContext;
+    // Well past the limit of 1, and still allowed.
+    expect(g.canActivate(ctx)).toBe(true);
+    expect(g.canActivate(ctx)).toBe(true);
+    expect(g.canActivate(ctx)).toBe(true);
   });
 
   const mockRequest = (ip: string = '127.0.0.1'): Request =>
@@ -63,7 +87,30 @@ describe('RateLimitGuard', () => {
     expect(guard.canActivate(context2)).toBe(true);
   });
 
+  it('IGNORES x-forwarded-for unless the deployment opted into trusting a proxy', () => {
+    // Spoofing the header must NOT mint a fresh bucket, or the limiter is
+    // bypassable by anyone who can set a header.
+    delete process.env.TRUST_PROXY_HEADERS;
+    const ctx = (forwarded: string): ExecutionContext =>
+      ({
+        switchToHttp: () => ({
+          getRequest: () => ({
+            ip: '203.0.113.9',
+            headers: { 'x-forwarded-for': forwarded },
+          }),
+        }),
+      }) as unknown as ExecutionContext;
+
+    const g = new RateLimitGuard(60000, 2);
+    expect(g.canActivate(ctx('10.1.1.1'))).toBe(true);
+    expect(g.canActivate(ctx('10.2.2.2'))).toBe(true);
+    // Third request from the same real socket, third spoofed header — still
+    // the same bucket, so it is refused.
+    expect(() => g.canActivate(ctx('10.3.3.3'))).toThrow(HttpException);
+  });
+
   it('should extract first IP from x-forwarded-for header', () => {
+    process.env.TRUST_PROXY_HEADERS = 'true';
     const req1 = mockRequest() as any;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     req1.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.2';

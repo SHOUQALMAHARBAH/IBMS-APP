@@ -38,6 +38,7 @@ const NAV_ITEMS: { href: string; labelKey: TranslationKey }[] = [
   { href: '/up-sell', labelKey: 'navUpSell' },
   { href: '/crm', labelKey: 'navCrm' },
   { href: '/opportunities', labelKey: 'navRfqMarket' },
+  { href: '/renewal-cases', labelKey: 'navRenewalCases' },
   { href: '/claims-analytics', labelKey: 'navClaimsAnalytics' },
   { href: '/client-accounting', labelKey: 'navClientAccounting' },
   { href: '/insurer-accounting', labelKey: 'navInsurerAccounting' },
@@ -76,6 +77,7 @@ const NAV_ITEMS: { href: string; labelKey: TranslationKey }[] = [
   { href: '/dashboards/financial', labelKey: 'navFinancialDashboard' },
   { href: '/dashboards/compliance', labelKey: 'navComplianceDashboard' },
   { href: '/dashboards/insurer-employee-performance', labelKey: 'navInsurerEmployeePerformanceDashboard' },
+  { href: '/dashboards/executive', labelKey: 'navExecutiveDashboard' },
   { href: '/insurer-performance', labelKey: 'navInsurerPerformance' },
   { href: '/employee-performance', labelKey: 'navEmployeePerformance' },
   { href: '/portfolio-analysis', labelKey: 'navPortfolioAnalysis' },
@@ -88,6 +90,7 @@ const NAV_ITEMS: { href: string; labelKey: TranslationKey }[] = [
   { href: '/bcp-dr-plans', labelKey: 'navBcpDrPlans' },
   { href: '/knowledge-base', labelKey: 'navKnowledgeBase' },
   { href: '/access-recertification', labelKey: 'navAccessRecertification' },
+  { href: '/settings/users', labelKey: 'navUserAdmin' },
   { href: '/settings/security', labelKey: 'navSecurity' },
 ];
 

@@ -88,7 +88,13 @@ export default function PolicyDetailPage() {
 
   useEffect(() => {
     if (!user) return;
-    void load();
+    // Deferred through an async IIFE so the first `setIsLoading` inside
+    // `load` does not run synchronously in the effect body — the same
+    // shape every other data-loading screen here uses (see
+    // `app/(app)/customers/page.tsx`).
+    void (async () => {
+      await load();
+    })();
   }, [user, load]);
 
   if (isLoading || !user) return null;

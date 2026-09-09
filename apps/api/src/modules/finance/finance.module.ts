@@ -16,6 +16,7 @@ import { FinancialReportService } from './financial-report.service';
 import { RefundController } from './refund.controller';
 import { RefundService } from './refund.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
+import { EndorsementRepository } from '../../repositories/endorsement.repository';
 import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import { ReconciliationRepository } from '../../repositories/reconciliation.repository';
 import { FinancialReportRepository } from '../../repositories/financial-report.repository';
@@ -24,6 +25,7 @@ import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { CustomerModule } from '../customer/customer.module';
+import { CommissionModule } from '../commission/commission.module';
 import { DocumentGenerationModule } from '../document-generation/document-generation.module';
 
 /**
@@ -100,6 +102,12 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     RecommendationModule,
     CustomerModule,
     DocumentGenerationModule,
+    // InvoiceService resolves the GOVERNED commission rate (Process 35's
+    // CommissionAgreement) before falling back to the placed quotation's rate
+    // — IMPROVEMENTS.md §3.1's two-sources-of-truth fix. CommissionModule
+    // exports CommissionRepository. One-way: CommissionModule imports
+    // AuditModule + PolicyModule only, so no cycle.
+    CommissionModule,
   ],
   controllers: [
     InvoiceController,
@@ -121,6 +129,11 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     FinancialReportService,
     RefundService,
     InvoiceRepository,
+    // RefundService reads the Refund + its Endorsement/Policy context and
+    // books the disbursement; the repository is provided (not the whole
+    // EndorsementModule imported) to keep this a one-way, cycle-free
+    // dependency — EndorsementModule already imports CommissionModule.
+    EndorsementRepository,
     PaymentChannelRepository,
     ReconciliationRepository,
     FinancialReportRepository,

@@ -1,4 +1,32 @@
-# IBMS System Status — 90% Completeness Achieved
+# IBMS System Status
+
+> **⚠️ 2026-09-09 — SUPERSEDED IN PART. Read this box before trusting anything below.**
+>
+> A follow-up pass verified every gate this document claims. Several claims
+> were wrong, and two of the four "fixes" it reports shipped defects:
+>
+> | Claim below | Reality when re-verified |
+> |---|---|
+> | "All 7 Part G verification gates passing" | `npm run lint` **failed** (2 errors in `apps/web`); `npm run test:security` **failed** (8 high advisories) |
+> | "2,416/2,417 unit tests passing … the 1 failure is `app.controller.spec.ts`" | The failure was `security-headers.middleware.spec.ts`, broken by the security-fixes commit — a stale test, now corrected |
+> | "309/309 e2e tests passing (100%)" | That is the **web** Playwright suite. The **api** e2e suite was not run — and could not have passed: the new rate limiter 429s the sixth auth call, and all 63 spec files sign up repeatedly |
+> | Fix #1 "Commission reconciliation … fully verified" | It injected `CommissionRepository` into `InvoiceService` without providing it in `FinanceModule`. **The API could not boot.** Unit tests build the service by hand, so they never caught it |
+> | Fix #3 "Partial Payments … enables real-world installment workflows" | It dropped `Receipt.invoiceId @unique` and shipped **no application logic**, reinstating a P0 (two receipts + two client-funds ledger entries per invoice) and turning the `P2002` handler into dead code |
+> | Fix #2 "Refund Disbursement … completes the payment-execution step" | The `refund.disburse` permission was never seeded, so the endpoint 403'd for every role. It also checked no approval — an at-threshold refund could be paid with nobody having approved it |
+> | "Deployment recommendation: ready for staging/UAT as-is" | A production-seeded database had no user able to sign in and no way to grant anyone a role |
+>
+> All of the above are now fixed and verified. See `IMPROVEMENTS.md`'s
+> 2026-09-09 note for the full list, `SECURITY_FIXES.md` for the dependency
+> posture, and `README.md` § Scope status for current state.
+>
+> The sections below are kept **as written** rather than edited, because the
+> gap between what they assert and what was true is itself the useful record:
+> every claim here was made without running the gate that would have checked
+> it. Treat unverified completion claims as unverified.
+
+---
+
+# IBMS System Status — 90% Completeness Achieved (as originally written)
 
 **Date:** September 9, 2026  
 **Branch:** feat/part-f-full-arabic-translation  

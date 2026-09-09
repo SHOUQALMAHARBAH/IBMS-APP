@@ -128,20 +128,27 @@ export class InvoiceService {
     // ibms-brain/meta/context/finance-lifecycle.md.
     const premiumAmount = quantizeMoney(policy.issuedPremium);
 
-    // Commission rate resolution (3.1 P0 fix: use governed rate as source of
-    // truth). Process 35's CommissionAgreement (by insurer + line + effective
-    // date) is the authoritative rate. If no governed rate exists for this
-    // policy at invoice time, fall back to the placed quotation's rate
-    // (Recommendation.recommendedQuotation.commissionRatePercent).
-    let commissionRatePercent = await this.resolvePolicyCommissionRate(
+    // Commission rate resolution (IMPROVEMENTS.md §3.1 — two sources of truth
+    // for commission). Process 35's CommissionAgreement (by insurer + line +
+    // effective date) is the authoritative rate; the placed quotation's rate
+    // is the fallback for a policy written before any agreement existed.
+    //
+    // The resolution DATE is `inceptionDate ?? createdAt` — byte-identical to
+    // `CommissionLedgerService.calculate`. That identity is the point: if the
+    // two used different dates they could resolve different rate windows for
+    // the same policy, which is precisely the divergence this fix exists to
+    // close. (An earlier revision used `?? new Date()` here, which drifts from
+    // the ledger for any policy with no inception date, and is not even stable
+    // across two calls.)
+    const commissionRatePercent = await this.resolvePolicyCommissionRate(
       policy.insurerId,
       policy.insuranceLine,
-      policy.inceptionDate ?? new Date(),
+      policy.inceptionDate ?? policy.createdAt,
       policy.opportunityId,
     );
     if (commissionRatePercent == null) {
       throw new UnprocessableEntityException(
-        "No commission rate found for this policy — either set a commission agreement (Process 35) or capture the rate on the quotation (Process 13).",
+        'No commission rate found for this policy — either set a commission agreement (Process 35) or capture the rate on the quotation (Process 13).',
       );
     }
 

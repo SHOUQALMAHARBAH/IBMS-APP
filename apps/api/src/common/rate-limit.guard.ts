@@ -16,7 +16,31 @@ interface ClientStore {
  * SECURITY NOTE: This is a per-process, per-IP limiter. In a multi-process deployment,
  * use Redis or a distributed rate limiter to track across all servers. The entries are
  * cleaned up on access (lazy cleanup) to prevent unbounded memory growth.
+ *
+ * ENFORCED IN PRODUCTION ONLY — the same `NODE_ENV` gate `securityHeaders()`'s
+ * TLS enforcement, the secure-cookie flag and `ENABLE_DEV_RESET_TOKEN` already
+ * use. Two reasons, and the first is not merely convenience:
+ *
+ *   - In dev/CI every request genuinely originates from 127.0.0.1, so a
+ *     per-IP bucket lumps every user and every test together. It does not
+ *     approximate production behaviour; it just breaks. All 63 `*.e2e-spec.ts`
+ *     files sign up and log in repeatedly against one shared static store, so
+ *     an enforced 5-per-15-minutes limit makes the integration suite
+ *     unrunnable (verified: `429` on the sixth auth call).
+ *   - A limiter is a control on untrusted internet traffic. Local dev and the
+ *     CI container have no such traffic.
+ *
+ * `RATE_LIMIT_ENABLED=true` forces it on anywhere, which is how this file's
+ * own unit spec exercises the limiting behaviour, and how a staging
+ * environment can opt in without pretending to be production.
  */
+function limiterEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === 'production' ||
+    process.env.RATE_LIMIT_ENABLED === 'true'
+  );
+}
+
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private static readonly store = new Map<string, ClientStore>();
@@ -33,6 +57,8 @@ export class RateLimitGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
+    if (!limiterEnabled()) return true;
+
     const request = context.switchToHttp().getRequest<Request>();
     const clientIp = this.getClientIp(request);
     const now = Date.now();
@@ -66,13 +92,25 @@ export class RateLimitGuard implements CanActivate {
     return true;
   }
 
+  /**
+   * `x-forwarded-for` is CLIENT-SUPPLIED and trivially spoofable: an attacker
+   * rotating the header gets a fresh bucket on every request, which defeats
+   * the limiter entirely. It is therefore honoured ONLY when the deployment
+   * declares that a trusted reverse proxy sets it — `TRUST_PROXY_HEADERS=true`
+   * — the same "the deployment target decides" gate `securityHeaders()` and
+   * the secure-cookie flag already use. With no proxy in front (local dev, and
+   * any deployment that has not opted in) the socket address is the only
+   * value an attacker cannot choose.
+   */
   private getClientIp(request: Request): string {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (typeof forwardedFor === 'string') {
-      return forwardedFor.split(',')[0].trim();
-    }
-    if (Array.isArray(forwardedFor)) {
-      return forwardedFor[0].split(',')[0].trim();
+    if (process.env.TRUST_PROXY_HEADERS === 'true') {
+      const forwardedFor = request.headers['x-forwarded-for'];
+      if (typeof forwardedFor === 'string') {
+        return forwardedFor.split(',')[0].trim();
+      }
+      if (Array.isArray(forwardedFor)) {
+        return forwardedFor[0].split(',')[0].trim();
+      }
     }
     return request.ip ?? 'unknown';
   }

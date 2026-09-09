@@ -73,6 +73,9 @@ export const NAV = {
     navBcpDrPlans: 'خطط استمرارية الأعمال والتعافي من الكوارث',
     navKnowledgeBase: 'قاعدة المعرفة',
     navAccessRecertification: 'إعادة اعتماد الصلاحيات',
+    navRenewalCases: 'حالات التجديد',
+    navExecutiveDashboard: 'لوحة الإدارة التنفيذية',
+    navUserAdmin: 'المستخدمون والأدوار',
     navSecurity: 'الأمان',
   },
   EN: {
@@ -145,6 +148,9 @@ export const NAV = {
     navBcpDrPlans: 'BCP / DR plans',
     navKnowledgeBase: 'Knowledge base',
     navAccessRecertification: 'Access recertification',
+    navRenewalCases: 'Renewal cases',
+    navExecutiveDashboard: 'Executive Dashboard',
+    navUserAdmin: 'Users & roles',
     navSecurity: 'Security',
   },
 } as const;
