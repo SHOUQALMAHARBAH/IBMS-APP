@@ -20,7 +20,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
-    "test:security": "node scripts/audit-check.mjs",
+    "test:security": "npm audit --audit-level=high",
     "test:contract": "turbo run test:contract",
     "test:smoke": "bash scripts/smoke.sh api",
     "e2e": "turbo run e2e",
@@ -39,7 +39,6 @@
     "db:backup:drill": "bash scripts/backup-restore-drill.sh"
   },
   "devDependencies": {
-    "turbo": "2.10.11",
-    "vite": "^7.3.6"
+    "turbo": "2.10.11"
   }
 }

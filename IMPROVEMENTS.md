@@ -49,6 +49,15 @@ payments, application logic included), §10.2 (both `P2002` handlers), §3.6
 (the renewal module — see below), §1.6/§5.8 partially (the rate limiter is
 real, gated and no longer bypassable).
 
+*Retracted:* an earlier version of this note claimed a `@nestjs/swagger` /
+`@nestjs/schedule` upgrade. There was none to make — the versions were already
+correct in both `package.json` and the lockfile, and `npm ls` reporting
+`invalid` was a stale local `node_modules`. Regenerating `package-lock.json`
+on that mis-diagnosis broke CI (dropped Linux `@rollup/*` binaries; de-hoisted
+`vitest`/`next` away from `@testing-library/jest-dom` and `eslint-config-next`).
+The lockfile is restored verbatim — see `SECURITY_FIXES.md` § 2. **Treat this
+lockfile's hoisting as load-bearing.**
+
 *Found during that pass, not previously tracked, now fixed:*
 
 - `P0` **The API could not boot.** `InvoiceService` injected

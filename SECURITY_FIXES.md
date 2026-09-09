@@ -34,35 +34,46 @@ application, a `reviewBy` date, and the reasoning written down in the entry.
 
 ---
 
-## 2. Resolved — dependency alignment (2026-09-09)
+## 2. Dependency versions — no change was needed (2026-09-09)
 
-**Finding.** `npm ls` reported the dependency tree as `invalid`:
-`@nestjs/swagger@5.2.1` and `@nestjs/schedule@4.1.2` declare peer ranges of
-`@nestjs/core` `^8 || ^9 || ^10`, against an installed `@nestjs/core@11.2.3`.
-Both packages were several major versions behind the framework they plug into,
-and were the source of three high-severity advisories.
+**An earlier revision of this file claimed a `@nestjs/swagger` 5.2.1 → 11.4.7
+and `@nestjs/schedule` 4.1.2 → 6.1.3 upgrade. That was wrong, and it is
+retracted here.**
 
-**Fix.** Aligned both to the Nest 11 line — `@nestjs/swagger@^11.4.7`,
-`@nestjs/schedule@^6.1.3`. Deliberately NOT a jump to the Nest 12 family: that
-is a whole-framework major upgrade, and (see §3) it would clear nothing extra.
+What actually happened: `npm ls` reported the tree as `invalid` with swagger
+at 5.2.1 against a Nest 11 core. That was a **stale local `node_modules`**.
+Both `apps/api/package.json` and `package-lock.json` already specified 11.4.7
+and 6.1.3 and were in sync with each other; CI had been installing them
+correctly all along (`npm ci` — 930 packages, clean). The diagnosis confused a
+local working-copy problem for a repository problem.
 
-**Cleared by this change:**
+The `lodash`, `path-to-regexp` and `uuid` advisories attributed to that
+"upgrade" were therefore already absent from the tree before this session
+touched anything.
 
-| Package | Advisory | Reached us via |
-|---|---|---|
-| `lodash` | GHSA-r5fr-rjxr-66jc, GHSA-f23m-r3pf-42rh, GHSA-xxjr-mmjv-4gpg | `@nestjs/swagger@5` |
-| `path-to-regexp` | GHSA-9wv6-86v2-598j (ReDoS) | `@nestjs/swagger@5` |
-| `uuid` | GHSA-w5hq-g745-h8pq | `@nestjs/schedule@4` |
+**What the mistaken fix cost, and why the lockfile is now restored verbatim.**
+Acting on that diagnosis meant regenerating `package-lock.json`, which broke
+two things that had been silently load-bearing:
 
-Note that the app never imported `lodash`, `path-to-regexp` or `uuid`
-directly — they were transitive only. The previous revision of this file
-claimed a direct `_.template` call had been removed; there was never one.
+- npm writes only the **current platform's** optional dependencies on a fresh
+  resolve (npm/cli#4828), so the Linux `@rollup/*` binaries CI needs were
+  dropped — CI failed immediately with
+  `Cannot find module @rollup/rollup-linux-x64-gnu`.
+- The regenerated tree **de-hoisted** `vitest` and `next` out of the root
+  `node_modules` into per-workspace copies. `@testing-library/jest-dom` and
+  `eslint-config-next` both live at the root and resolve those by hoisting, so
+  the web unit tests and the web lint both broke — on any platform, not just
+  Windows.
 
-**Verified:** `npm audit` high/critical count went 9 → 6; `npm ls` reports a
-valid tree; api unit suite 2474/2474 green after the upgrade;
-`npm run build` green.
+Neither is visible without running `npm ci` on Linux. The lockfile has been
+restored byte-for-byte to its pre-session state.
 
----
+**Standing lesson:** this lockfile's hoisting layout is load-bearing and
+undeclared. Do not regenerate it casually. A deliberate refresh needs its own
+change, generated on Linux (or in a `node:20` container), verified with
+`npm ci && npm run test && npm run lint`, and probably wants the
+hoisting-critical packages declared explicitly so the layout stops being
+accidental.
 
 ## 3. Acknowledged — `multer` (unreachable, no upgrade path)
 

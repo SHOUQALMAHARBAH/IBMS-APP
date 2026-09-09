@@ -36,7 +36,6 @@
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
     "nestjs-pino": "^4.6.1",
-    "next": "16.3.4",
     "otplib": "12.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -77,6 +76,6 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
     "unplugin-swc": "1.5.2",
-    "vitest": "^5.0.0"
+    "vitest": "^3.2.7"
   }
 }
