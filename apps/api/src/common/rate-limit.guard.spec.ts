@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HttpException, HttpStatus, ExecutionContext } from '@nestjs/common';
 import { RateLimitGuard } from './rate-limit.guard';
@@ -63,12 +64,10 @@ describe('RateLimitGuard', () => {
   });
 
   it('should extract first IP from x-forwarded-for header', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const req1 = mockRequest() as any;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     req1.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.2';
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const req2 = mockRequest() as any;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     req2.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.3';
@@ -125,9 +124,7 @@ describe('RateLimitGuard', () => {
       guard.canActivate(context);
     } catch (error) {
       if (error instanceof HttpException) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const response = error.getResponse() as any;
-
         hasRetryAfter = response && 'retryAfter' in response;
       }
     }
