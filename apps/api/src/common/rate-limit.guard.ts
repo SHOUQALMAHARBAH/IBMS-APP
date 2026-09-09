@@ -2,32 +2,34 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { CanActivate, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 
-interface RateLimitConfig {
-  windowMs: number;
-  maxRequests: number;
-}
-
 interface ClientStore {
   count: number;
   resetTime: number;
 }
 
 /**
- * Simple in-memory rate limiter for high-risk endpoints (auth, password reset).
+ * Singleton in-memory rate limiter for high-risk endpoints (auth, password reset).
  * Tracks requests per IP address within a sliding window.
- * For production with multiple replicas, consider redis-based rate limiting.
+ * Shared globally to prevent endpoint-bypass attacks (login -> signup -> forgot-password bypass).
+ * For production with multiple replicas, use redis-based rate limiting instead.
+ *
+ * SECURITY NOTE: This is a per-process, per-IP limiter. In a multi-process deployment,
+ * use Redis or a distributed rate limiter to track across all servers. The entries are
+ * cleaned up on access (lazy cleanup) to prevent unbounded memory growth.
  */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
-  private store = new Map<string, ClientStore>();
-  private readonly windowMs: number = 15 * 60 * 1000; // 15 minutes
+  private static readonly store = new Map<string, ClientStore>();
+  private static readonly cleanupIntervalMs = 60 * 60 * 1000; // 1 hour
+  private static lastCleanup = Date.now();
+  private static readonly cleanupThresholdMs = 24 * 60 * 60 * 1000; // 1 day
+
+  private readonly windowMs: number = 15 * 60 * 1000;
   private readonly maxRequests: number = 5;
 
-  constructor(config?: RateLimitConfig) {
-    if (config) {
-      this.windowMs = config.windowMs;
-      this.maxRequests = config.maxRequests;
-    }
+  constructor(windowMs?: number, maxRequests?: number) {
+    if (windowMs !== undefined) this.windowMs = windowMs;
+    if (maxRequests !== undefined) this.maxRequests = maxRequests;
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -35,14 +37,16 @@ export class RateLimitGuard implements CanActivate {
     const clientIp = this.getClientIp(request);
     const now = Date.now();
 
-    let clientData = this.store.get(clientIp);
+    this.performCleanup(now);
+
+    let clientData = RateLimitGuard.store.get(clientIp);
 
     if (!clientData || now > clientData.resetTime) {
       clientData = {
         count: 0,
         resetTime: now + this.windowMs,
       };
-      this.store.set(clientIp, clientData);
+      RateLimitGuard.store.set(clientIp, clientData);
     }
 
     clientData.count++;
@@ -71,5 +75,24 @@ export class RateLimitGuard implements CanActivate {
       return forwardedFor[0].split(',')[0].trim();
     }
     return request.ip ?? 'unknown';
+  }
+
+  private performCleanup(now: number): void {
+    if (now - RateLimitGuard.lastCleanup < RateLimitGuard.cleanupIntervalMs) {
+      return;
+    }
+
+    RateLimitGuard.lastCleanup = now;
+    const expiredIps: string[] = [];
+
+    for (const [ip, data] of RateLimitGuard.store.entries()) {
+      if (now > data.resetTime + RateLimitGuard.cleanupThresholdMs) {
+        expiredIps.push(ip);
+      }
+    }
+
+    for (const ip of expiredIps) {
+      RateLimitGuard.store.delete(ip);
+    }
   }
 }

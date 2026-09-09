@@ -1,4 +1,3 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus, ExecutionContext } from '@nestjs/common';
 import { RateLimitGuard } from './rate-limit.guard';
 import type { Request } from 'express';
@@ -7,7 +6,7 @@ describe('RateLimitGuard', () => {
   let guard: RateLimitGuard;
 
   beforeEach(() => {
-    guard = new RateLimitGuard({ windowMs: 60000, maxRequests: 3 });
+    guard = new RateLimitGuard(60000, 3);
   });
 
   const mockRequest = (ip: string = '127.0.0.1'): Request => ({
@@ -105,5 +104,15 @@ describe('RateLimitGuard', () => {
       expect(typeof response.retryAfter).toBe('number');
       expect(response.retryAfter).toBeGreaterThan(0);
     }
+  });
+
+  it('should use singleton store shared across all guard instances', () => {
+    const guard2 = new RateLimitGuard(60000, 3);
+    const context = mockExecutionContext('10.0.0.5');
+
+    guard.canActivate(context);
+    guard.canActivate(context);
+
+    expect(() => guard2.canActivate(context)).toThrow(HttpException);
   });
 });
