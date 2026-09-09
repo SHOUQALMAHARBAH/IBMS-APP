@@ -30,6 +30,12 @@ export class LeadController {
     return this.leads.list(query, user);
   }
 
+  @RequirePermissions('lead.list.read')
+  @Get(':id')
+  get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.leads.getById(id, user.id);
+  }
+
   @RequirePermissions('lead.transition')
   @Post(':id/transition')
   transition(

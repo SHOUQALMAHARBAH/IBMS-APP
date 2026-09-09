@@ -69,6 +69,15 @@ export class LeadService {
     });
   }
 
+  async getById(id: string, actorUserId: string): Promise<Lead> {
+    const lead = await this.leads.findById(id);
+    const canViewAllOwners = true; // For now, allow viewing; will be enhanced in Phase 2
+    if (!lead || (!canViewAllOwners && lead.ownerUserId !== actorUserId)) {
+      throw new NotFoundException('Lead not found');
+    }
+    return lead;
+  }
+
   async transition(
     id: string,
     toStatus: LeadStatus,
