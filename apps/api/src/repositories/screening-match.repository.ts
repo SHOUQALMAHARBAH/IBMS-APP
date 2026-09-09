@@ -43,8 +43,10 @@ export class ScreeningMatchRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Record a candidate, or do nothing if this exact (KYC file, list entry,
-   * subject name) is already queued.
+   * Record a candidate, or do nothing if this (KYC file, list entry, CANONICAL
+   * subject name) is already queued. Canonical, not raw: re-casing or
+   * re-spacing a customer's legal name must not mint a second queue item that
+   * a prior `cleared` decision no longer suppresses.
    *
    * The `@@unique` is the invariant, not a preceding `findFirst` — the
    * 4-hourly recurring batch re-screens every active customer, so this is
@@ -60,21 +62,31 @@ export class ScreeningMatchRepository {
     kycRecordId: string;
     watchlistEntryId: string;
     subjectName: string;
+    subjectCanonical: string;
     matchType: string;
+    entrySource: string;
+    entrySourceRecordId: string | null;
+    entryFullName: string;
+    entryListProgram: string | null;
   }): Promise<void> {
     await this.prisma.client.screeningMatch.upsert({
       where: {
-        kycRecordId_watchlistEntryId_subjectName: {
+        kycRecordId_watchlistEntryId_subjectCanonical: {
           kycRecordId: input.kycRecordId,
           watchlistEntryId: input.watchlistEntryId,
-          subjectName: input.subjectName,
+          subjectCanonical: input.subjectCanonical,
         },
       },
       create: {
         kycRecordId: input.kycRecordId,
         watchlistEntryId: input.watchlistEntryId,
         subjectName: input.subjectName,
+        subjectCanonical: input.subjectCanonical,
         matchType: input.matchType,
+        entrySource: input.entrySource,
+        entrySourceRecordId: input.entrySourceRecordId,
+        entryFullName: input.entryFullName,
+        entryListProgram: input.entryListProgram,
       },
       update: {},
     });

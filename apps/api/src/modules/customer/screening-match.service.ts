@@ -32,6 +32,9 @@ export interface ScreeningMatchView {
   listSource: string;
   listEntryName: string;
   listEntryRemarks: string | null;
+  /** The matched entry has since been removed from the source list. The
+   * decision and its reason stand; the entry can no longer be re-checked. */
+  listEntryDelisted: boolean;
 }
 
 /**
@@ -126,10 +129,18 @@ export class ScreeningMatchService {
       );
     }
 
-    // The reason is kept verbatim: it is a business justification and the
-    // substance of the control, the same treatment `Refund.reason` and
-    // `CommissionLedgerEntry.overrideReason` get. The matched subject's name
-    // is NOT copied into the audit row — the match id resolves to it.
+    // The reason is the substance of the control, and it IS retained — on the
+    // `ScreeningMatch` row itself, durably and first-class, which is where a
+    // reviewer and a regulator both read it.
+    //
+    // It is deliberately NOT copied into the audit row as well. This is the
+    // one free-text field on a sanctions path, so it is exactly where a
+    // reviewer writes "our client is not the <name> on the SDN list" — i.e.
+    // it is a PII capture point by construction. `refund.service.ts` already
+    // states the same convention for the same reason ("never `reason` free
+    // text"). The audit row records THAT a reason was given and points at the
+    // entity holding it (`sensitive-data-handling.md` — log identifiers, not
+    // the sensitive value).
     await this.safeAudit({
       userId: actor.id,
       action: decision === 'confirmed' ? 'APPROVE' : 'REJECT',
@@ -140,8 +151,9 @@ export class ScreeningMatchService {
         status: decision,
         matchType: existing.matchType,
         watchlistEntryId: existing.watchlistEntryId,
-        listSource: existing.watchlistEntry.source,
-        reviewReason,
+        listSource: existing.entrySource,
+        reviewReasonRecorded: true,
+        reviewReasonLength: reviewReason.length,
         reviewedByUserId: actor.id,
       },
     });
@@ -177,10 +189,20 @@ function toView(row: ScreeningMatchWithContext): ScreeningMatchView {
     reviewedByUserId: row.reviewedByUserId,
     reviewedAt: row.reviewedAt?.toISOString() ?? null,
     reviewReason: row.reviewReason,
-    listSource: row.watchlistEntry.listProgram
-      ? `${row.watchlistEntry.source} (${row.watchlistEntry.listProgram})`
-      : row.watchlistEntry.source,
-    listEntryName: row.watchlistEntry.fullName,
-    listEntryRemarks: row.watchlistEntry.remarks,
+    // Read from the SNAPSHOT, never the relation. `pruneStale` deletes an
+    // entry as soon as the subject drops off the source list, and the FK is
+    // `SET NULL`, so a confirmed match rendered from the relation would decay
+    // into "(deleted)" — the compliance record has to still say what was
+    // matched and on which list.
+    listSource: row.entryListProgram
+      ? `${row.entrySource} (${row.entryListProgram})`
+      : row.entrySource,
+    listEntryName: row.entryFullName,
+    // `remarks` is NOT snapshotted (free text, and only ever contextual), so
+    // it is genuinely gone once the entry is pruned.
+    listEntryRemarks: row.watchlistEntry?.remarks ?? null,
+    /// True once the source list no longer carries this entry — the decision
+    /// stands, but it can no longer be re-checked against the live list.
+    listEntryDelisted: row.watchlistEntryId === null,
   };
 }

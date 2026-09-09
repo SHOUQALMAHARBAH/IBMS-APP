@@ -13,6 +13,11 @@ function matchRow(over: Record<string, unknown> = {}) {
     kycRecordId: 'kyc-1',
     watchlistEntryId: 'wl-1',
     subjectName: 'Ahmad Khalid Al Hashimi',
+    subjectCanonical: 'ahmad al hashimi khaled',
+    entrySource: 'OFAC_SDN',
+    entrySourceRecordId: '2674',
+    entryFullName: 'AHMAD AL HASHIMI',
+    entryListProgram: 'SDGT',
     matchType: 'fuzzy',
     status: 'pending',
     detectedAt: new Date('2026-09-09T00:00:00.000Z'),
@@ -97,24 +102,40 @@ describe('ScreeningMatchService.list', () => {
 });
 
 describe('ScreeningMatchService.decide', () => {
-  it('clears a false positive and keeps the reason verbatim in the audit trail', async () => {
+  it('clears a false positive and persists the reason verbatim ON THE MATCH', async () => {
     const deps = makeDeps();
-    await deps.service.decide(
-      'sm-1',
-      'cleared',
-      'Different date of birth and nationality; not the sanctioned individual.',
-      actor,
-    );
+    const reason =
+      'Different date of birth and nationality; not the sanctioned individual.';
+    await deps.service.decide('sm-1', 'cleared', reason, actor);
+    // The justification IS the control — it must survive intact, on the row
+    // itself, which is where a reviewer and a regulator read it.
     expect(deps.matches.recordDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'cleared',
         reviewedByUserId: 'compliance-1',
+        reviewReason: reason,
       }),
     );
-    // The justification IS the control — it must survive intact.
-    expect(JSON.stringify(deps.audit.record.mock.calls)).toContain(
-      'Different date of birth',
+  });
+
+  it('does NOT copy the free-text reason into the audit row', async () => {
+    // This is the one free-text field on a sanctions path, so it is exactly
+    // where a reviewer writes "our client is not the <name> on the SDN list".
+    // The audit row records that a reason exists and points at the entity —
+    // sensitive-data-handling.md, log identifiers not the sensitive value.
+    const deps = makeDeps();
+    await deps.service.decide(
+      'sm-1',
+      'cleared',
+      'Not the same person as Ahmad Al-Hashimi of Amman; DOB differs.',
+      actor,
     );
+    const serialised = JSON.stringify(deps.audit.record.mock.calls);
+    expect(serialised).not.toContain('Ahmad Al-Hashimi');
+    expect(serialised).not.toContain('DOB differs');
+    // ...but the audit row still records THAT a reason was given, so the
+    // decision is not indistinguishable from one made with no basis.
+    expect(serialised).toContain('reviewReasonRecorded');
   });
 
   it('records a confirm as an APPROVE and a clear as a REJECT', async () => {

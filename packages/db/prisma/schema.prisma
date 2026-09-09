@@ -2394,33 +2394,51 @@ model WatchlistEntry {
 /// HIGHLY_CONFIDENTIAL by content: it names a customer alongside a sanctions
 /// list entry. Reads are audit-logged with `isSensitiveDataAccess`.
 model ScreeningMatch {
-  id               String         @id @default(uuid())
-  kycRecordId      String
-  kycRecord        KYCRecord      @relation(fields: [kycRecordId], references: [id])
-  watchlistEntryId String
-  watchlistEntry   WatchlistEntry @relation(fields: [watchlistEntryId], references: [id], onDelete: Cascade)
+  id                  String          @id @default(uuid())
+  kycRecordId         String
+  kycRecord           KYCRecord       @relation(fields: [kycRecordId], references: [id])
+  /// Nullable, and `SET NULL` rather than `Cascade`: `pruneStale` deletes an
+  /// entry the moment it drops off the source list, and a CONFIRMED match —
+  /// the reviewer's id, the timestamp, the written reason — must outlive the
+  /// subject being de-listed. The snapshot fields below are what the queue
+  /// renders once this goes NULL.
+  watchlistEntryId    String?
+  watchlistEntry      WatchlistEntry? @relation(fields: [watchlistEntryId], references: [id], onDelete: SetNull)
+  /// Snapshot of the matched list entry, taken at detection. Denormalised on
+  /// purpose: the relation above can go NULL, and a compliance record that
+  /// renders as "(deleted)" is not a record.
+  entrySource         String
+  entrySourceRecordId String?
+  entryFullName       String
+  entryListProgram    String?
   /// The name that actually matched. NOT always the customer's own legal
   /// name — screening covers UBOs too, and the reviewer needs to know which
-  /// subject triggered it.
-  subjectName      String
+  /// subject triggered it. Display-only: see `subjectCanonical`.
+  subjectName         String
+  /// `canonicalNameTokens(subjectName).join(' ')` — what the match was
+  /// actually made on, and what the duplicate-suppression UNIQUE keys on.
+  /// Keying that on the RAW name meant re-casing or re-spacing a customer's
+  /// legal name minted a second queue item that a prior `cleared` decision
+  /// did not suppress.
+  subjectCanonical    String
   /// `exact` (identical after canonicalisation) or `fuzzy` (the entry's
   /// tokens are contained in the subject's). Surfaced so a reviewer can
   /// triage: an exact hit deserves more scrutiny than a subset one.
-  matchType        String
+  matchType           String
   /// `pending` | `cleared` | `confirmed`.
-  status           String         @default("pending")
-  detectedAt       DateTime       @default(now())
-  reviewedByUserId String?
-  reviewedAt       DateTime?
+  status              String          @default("pending")
+  detectedAt          DateTime        @default(now())
+  reviewedByUserId    String?
+  reviewedAt          DateTime?
   /// Mandatory when a decision is recorded — the business justification for
   /// clearing or confirming, kept verbatim (a justification, not personal
   /// data — the same treatment `Refund.reason` gets).
-  reviewReason     String?
+  reviewReason        String?
 
-  /// One open item per (KYC file, list entry, subject name): a re-screen of
-  /// the same customer must not manufacture a duplicate queue item every
-  /// four hours. The race backstop for the recurring batch.
-  @@unique([kycRecordId, watchlistEntryId, subjectName])
+  /// One open item per (KYC file, list entry, CANONICAL subject name): a
+  /// re-screen of the same customer must not manufacture a duplicate queue
+  /// item every four hours. The race backstop for the recurring batch.
+  @@unique([kycRecordId, watchlistEntryId, subjectCanonical])
   @@index([status])
   @@index([kycRecordId])
 }

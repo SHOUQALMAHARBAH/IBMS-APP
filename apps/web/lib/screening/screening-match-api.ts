@@ -1,11 +1,11 @@
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPost } from "../auth/api-client";
 
 // Process 49 — the sanctions match review queue. Fuzzy name matching
 // deliberately over-fires (transliteration variants, extra middle names), so
 // every candidate is adjudicated by a Compliance Officer. Nothing in the
 // system blocks a customer on a match; this queue is the decision point.
 
-export type ScreeningMatchStatus = 'pending' | 'cleared' | 'confirmed';
+export type ScreeningMatchStatus = "pending" | "cleared" | "confirmed";
 
 export interface ScreeningMatch {
   id: string;
@@ -29,16 +29,19 @@ export interface ScreeningMatch {
   listSource: string;
   listEntryName: string;
   listEntryRemarks: string | null;
+  /** The matched entry has since dropped off the source list. The decision
+   * and its written reason stand; the entry cannot be re-checked. */
+  listEntryDelisted: boolean;
 }
 
 export function listScreeningMatches(
-  status: ScreeningMatchStatus = 'pending',
+  status: ScreeningMatchStatus = "pending",
 ): Promise<ScreeningMatch[]> {
   return apiGet(`/screening/matches?status=${encodeURIComponent(status)}`);
 }
 
 export function getPendingMatchCount(): Promise<{ pending: number }> {
-  return apiGet('/screening/matches/pending-count');
+  return apiGet("/screening/matches/pending-count");
 }
 
 /** `cleared` = false positive. `confirmed` = a true match; the customer stays
@@ -47,7 +50,7 @@ export function getPendingMatchCount(): Promise<{ pending: number }> {
  * through. A recorded decision is final here. */
 export function reviewScreeningMatch(
   id: string,
-  decision: 'cleared' | 'confirmed',
+  decision: "cleared" | "confirmed",
   reviewReason: string,
 ): Promise<ScreeningMatch> {
   return apiPost(`/screening/matches/${encodeURIComponent(id)}/review`, {

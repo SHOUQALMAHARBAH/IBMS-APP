@@ -30,6 +30,13 @@ export interface ScreeningRunResult {
    * (the record's flag, which only ever escalates and is never cleared by a
    * later CLEAR re-scan). Used by the recurring batch for its hit counter. */
   newHit: boolean;
+  /** How many real-list entries were queued for review by this run. */
+  matchCandidates: number;
+  /** True when candidates for at least one subject name hit the per-name cap,
+   * so the review queue for this KYC file is INCOMPLETE. Surfaced rather than
+   * swallowed: a reviewer working a truncated queue has no other way to know
+   * that evidence was dropped. */
+  matchesTruncated: boolean;
 }
 
 export interface ScreeningBatchResult {
@@ -97,6 +104,7 @@ export class ScreeningService {
       .map((name) => matchesSampleWatchlist(name))
       .find((match) => match !== null);
     const real = await this.findRealWatchlistMatches(kycRecordId, subjectNames);
+    const { candidates: matchCandidates, truncated: matchesTruncated } = real;
     const hit: WatchlistHit | undefined = fixtureHit ?? real.hit ?? undefined;
     const anyHit = hit !== undefined;
 
@@ -193,16 +201,26 @@ export class ScreeningService {
       });
     }
 
-    return { results, riskLevel, isEdd: nextIsEdd, newHit: anyHit };
+    return {
+      results,
+      riskLevel,
+      isEdd: nextIsEdd,
+      newHit: anyHit,
+      matchCandidates,
+      matchesTruncated,
+    };
   }
 
   /**
    * The real (non-fixture) watchlist check against the synced
    * `WatchlistEntry` cache. Runs in every environment, production included.
    *
-   * Matching is CONTAINMENT, not equality (Process 49 fuzzy matching): an
-   * entry matches when every one of its canonical tokens appears in the
-   * subject's. The previous exact-equality version silently missed the two
+   * Matching is exact OR containment (Process 49) — see
+   * `WatchlistEntryRepository.findMatchCandidates` for the three ORed
+   * branches. Containment ADDS to exact matching, it never replaces it: an
+   * earlier version made containment the only rule and regressed every entry
+   * below the fuzzy token floor to CLEAR. The pure exact-equality version
+   * before that silently missed the two
    * commonest real shapes for this Jordan-based broker — a different
    * romanisation of the same Arabic name, and a four-part national-ID name
    * against a two/three-part list entry — and a missed sanctions match
@@ -264,7 +282,17 @@ export class ScreeningService {
           kycRecordId,
           watchlistEntryId: entry.id,
           subjectName: name,
+          // What the match was actually made on, and what the duplicate
+          // suppression keys on — the raw name would let a re-cased or
+          // re-spaced legal name mint a second item past a cleared decision.
+          subjectCanonical: subjectTokens.join(' '),
           matchType,
+          // Snapshot: `pruneStale` deletes the entry when the subject is
+          // de-listed, and a confirmed match has to outlive that.
+          entrySource: entry.source,
+          entrySourceRecordId: entry.sourceRecordId,
+          entryFullName: entry.fullName,
+          entryListProgram: entry.listProgram,
         });
 
         // First candidate wins for the ScreeningResult's own listSource; an

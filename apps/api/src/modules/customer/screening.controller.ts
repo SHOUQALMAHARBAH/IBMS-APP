@@ -2,7 +2,10 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ScreeningService } from './screening.service';
 import { ScreeningMatchService } from './screening-match.service';
-import { ReviewScreeningMatchDto } from './dto/review-screening-match.dto';
+import {
+  ListScreeningMatchesDto,
+  ReviewScreeningMatchDto,
+} from './dto/review-screening-match.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -34,11 +37,10 @@ export class ScreeningController {
   @Get('matches')
   listMatches(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('status') status?: string,
-    @Query('kycRecordId') kycRecordId?: string,
+    @Query() query: ListScreeningMatchesDto,
   ) {
     return this.matches.list(
-      { status: status ?? 'pending', kycRecordId },
+      { status: query.status ?? 'pending', kycRecordId: query.kycRecordId },
       user,
     );
   }
