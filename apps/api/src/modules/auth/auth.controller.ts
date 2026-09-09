@@ -22,7 +22,11 @@ import { SkipMfaRequired } from './decorators/skip-mfa-required.decorator';
 import { RequireRoles } from './decorators/require-roles.decorator';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
-import { AuthRateLimit, PasswordRateLimit, MfaRateLimit } from '../../common/rate-limit.decorator';
+import {
+  AuthRateLimit,
+  PasswordRateLimit,
+  MfaRateLimit,
+} from '../../common/rate-limit.decorator';
 import {
   clearRefreshTokenCookie,
   REFRESH_TOKEN_COOKIE,

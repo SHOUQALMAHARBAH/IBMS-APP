@@ -25,13 +25,14 @@
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
-    "bcryptjs": "^3.0.2"
+    "bcryptjs": "^3.0.2",
+    "next": "16.3.4"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
     "prisma": "6.19.3",
     "tsx": "^4.23.12",
     "typescript": "^5.7.3",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.0"
   }
 }

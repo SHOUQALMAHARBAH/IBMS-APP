@@ -20,9 +20,10 @@ interface MockRes {
 }
 
 function mockRes(): MockRes {
-  const setHeaderMock = vi.fn();
-  const jsonMock = vi.fn();
+  const setHeaderMock = vi.fn().mockReturnValue(undefined);
+  const jsonMock = vi.fn().mockReturnValue(undefined);
   const statusMock = vi.fn().mockReturnValue({ json: jsonMock });
+
   const res = {
     setHeader: setHeaderMock,
     status: statusMock,

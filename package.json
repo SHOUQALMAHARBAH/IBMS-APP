@@ -39,6 +39,7 @@
     "db:backup:drill": "bash scripts/backup-restore-drill.sh"
   },
   "devDependencies": {
-    "turbo": "2.10.11"
+    "turbo": "2.10.11",
+    "vite": "^7.3.6"
   }
 }

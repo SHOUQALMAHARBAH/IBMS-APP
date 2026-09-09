@@ -22,9 +22,8 @@ export function escapeHtml(text: string): string {
     '/': '&#x2F;',
   };
 
-  return text.replace(/[&<>"'\/]/g, (char) => htmlEscapes[char] || char);
+  return text.replace(/[&<>"'/]/g, (char) => htmlEscapes[char] || char);
 }
-
 
 /**
  * Validates that a value is valid JSON.
@@ -39,6 +38,7 @@ export function validateJsonString(
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const data = JSON.parse(str);
     return { valid: true, data };
   } catch {

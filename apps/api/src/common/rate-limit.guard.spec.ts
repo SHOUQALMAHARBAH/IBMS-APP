@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { HttpException, HttpStatus, ExecutionContext } from '@nestjs/common';
 import { RateLimitGuard } from './rate-limit.guard';
 import type { Request } from 'express';
@@ -10,10 +10,11 @@ describe('RateLimitGuard', () => {
     guard = new RateLimitGuard(60000, 3);
   });
 
-  const mockRequest = (ip: string = '127.0.0.1'): Request => ({
-    ip,
-    headers: {},
-  } as Request);
+  const mockRequest = (ip: string = '127.0.0.1'): Request =>
+    ({
+      ip,
+      headers: {},
+    }) as Request;
 
   const mockExecutionContext = (ip: string = '127.0.0.1'): ExecutionContext => {
     const context = {
@@ -62,10 +63,14 @@ describe('RateLimitGuard', () => {
   });
 
   it('should extract first IP from x-forwarded-for header', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const req1 = mockRequest() as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     req1.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.2';
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const req2 = mockRequest() as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     req2.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.3';
 
     const context1 = {
