@@ -1,3 +1,4 @@
+import { canonicalNameTokens } from './watchlist-match.config';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import type { WatchlistSource, WatchlistSyncRun } from '@ibms/db';
@@ -123,6 +124,11 @@ export class WatchlistSyncService {
       const withNormalizedName = parsed.map((record) => ({
         ...record,
         normalizedName: normalizeWatchlistName(record.fullName),
+        // Process 49 (fuzzy matching) — computed on the way in so screening
+        // never has to canonicalise 19,000 entries at query time. Recomputed
+        // on every sync, so improving the transliteration table takes effect
+        // for the whole list on the next run rather than needing a backfill.
+        canonicalTokens: canonicalNameTokens(record.fullName),
       }));
       const records = withNormalizedName.filter((r) => r.normalizedName !== '');
       const skippedEmpty = withNormalizedName.length - records.length;

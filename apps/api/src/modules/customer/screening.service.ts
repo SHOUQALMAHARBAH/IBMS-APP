@@ -5,12 +5,20 @@ import { CustomerRepository } from '../../repositories/customer.repository';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { AuditService } from '../audit/audit.service';
 import { matchesSampleWatchlist } from './sample-watchlist';
-import { normalizeWatchlistName } from '../compliance-risk/watchlist-sync.config';
+import {
+  canonicalNameTokens,
+  classifyMatch,
+  type WatchlistMatchType,
+} from '../compliance-risk/watchlist-match.config';
+import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 
 const SCREENING_TYPES = ['SANCTIONS', 'PEP', 'AML'] as const;
 
 interface WatchlistHit {
   listSource: string;
+  /** How the real-list candidate was found. Absent for a fixture hit, which
+   * is a literal substring match and has no canonical-token notion. */
+  matchType?: WatchlistMatchType;
 }
 
 export interface ScreeningRunResult {
@@ -56,6 +64,7 @@ export class ScreeningService {
     private readonly kycRecords: KycRecordRepository,
     private readonly customers: CustomerRepository,
     private readonly watchlistEntries: WatchlistEntryRepository,
+    private readonly screeningMatches: ScreeningMatchRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -83,8 +92,8 @@ export class ScreeningService {
     const fixtureHit = subjectNames
       .map((name) => matchesSampleWatchlist(name))
       .find((match) => match !== null);
-    const realHit = await this.findRealWatchlistHit(subjectNames);
-    const hit: WatchlistHit | undefined = fixtureHit ?? realHit ?? undefined;
+    const real = await this.findRealWatchlistMatches(kycRecordId, subjectNames);
+    const hit: WatchlistHit | undefined = fixtureHit ?? real.hit ?? undefined;
     const anyHit = hit !== undefined;
 
     for (const screeningType of SCREENING_TYPES) {
@@ -183,36 +192,73 @@ export class ScreeningService {
     return { results, riskLevel, isEdd: nextIsEdd, newHit: anyHit };
   }
 
-  /** The real (non-fixture) watchlist check — an exact match, per subject
-   * name, against the synced `WatchlistEntry` cache. Runs in every
-   * environment, including production. Returns the first hit across all
-   * subject names, or `undefined` if none.
+  /**
+   * The real (non-fixture) watchlist check against the synced
+   * `WatchlistEntry` cache. Runs in every environment, production included.
    *
-   * Skips a name that normalizes to `""` outright (a `@code-reviewer`
-   * BLOCKER on the first pass — see `WatchlistEntryRepository.
-   * findByNormalizedName`'s own comment for the full wildcard-collision
-   * scenario). The repository already refuses an empty `normalizedName`
-   * too, so this is belt-and-suspenders, not the only guard: skipping here
-   * additionally avoids a pointless DB round-trip for every subject whose
-   * name is entirely non-Latin-script, which for this Jordan-based broker
-   * (default `languagePreference: AR`) is not a rare case. */
-  private async findRealWatchlistHit(
+   * Matching is CONTAINMENT, not equality (Process 49 fuzzy matching): an
+   * entry matches when every one of its canonical tokens appears in the
+   * subject's. The previous exact-equality version silently missed the two
+   * commonest real shapes for this Jordan-based broker — a different
+   * romanisation of the same Arabic name, and a four-part national-ID name
+   * against a two/three-part list entry — and a missed sanctions match
+   * surfaces as CLEAR, which is the worst failure mode this control has.
+   *
+   * Every candidate becomes a `ScreeningMatch` for a human to work, and the
+   * screening result is a HIT so the existing HIGH-risk / EDD escalation
+   * still fires. Nothing here blocks or suspends the customer: fuzzy
+   * matching by construction produces false positives, so the decision is
+   * explicitly a person's, not the system's.
+   *
+   * A name with no usable characters yields no tokens and is skipped rather
+   * than queried — an empty token set is contained in nothing, but skipping
+   * avoids a pointless round trip for every subject whose name is entirely
+   * punctuation.
+   */
+  private async findRealWatchlistMatches(
+    kycRecordId: string,
     subjectNames: readonly string[],
-  ): Promise<WatchlistHit | undefined> {
+  ): Promise<{ hit: WatchlistHit | undefined; candidates: number }> {
+    let hit: WatchlistHit | undefined;
+    let candidates = 0;
+
     for (const name of subjectNames) {
-      const normalizedName = normalizeWatchlistName(name);
-      if (!normalizedName) continue;
-      const match =
-        await this.watchlistEntries.findByNormalizedName(normalizedName);
-      if (match) {
-        return {
-          listSource: match.listProgram
-            ? `${match.source} (${match.listProgram})`
-            : match.source,
-        };
+      const subjectTokens = canonicalNameTokens(name);
+      if (subjectTokens.length === 0) continue;
+
+      const entries =
+        await this.watchlistEntries.findContainedCandidates(subjectTokens);
+
+      for (const entry of entries) {
+        const matchType = classifyMatch(name, entry.fullName);
+        candidates += 1;
+
+        // The `@@unique(kycRecordId, watchlistEntryId, subjectName)` is the
+        // real guard, not a findFirst check: the 4-hourly recurring batch
+        // re-screens every active customer, and without it each pass would
+        // mint a duplicate queue item. A concurrent duplicate is a no-op.
+        await this.screeningMatches.recordCandidate({
+          kycRecordId,
+          watchlistEntryId: entry.id,
+          subjectName: name,
+          matchType,
+        });
+
+        // First candidate wins for the ScreeningResult's own listSource; an
+        // exact one is preferred over a fuzzy one so the headline result
+        // names the strongest evidence.
+        if (!hit || (matchType === 'exact' && hit.matchType !== 'exact')) {
+          hit = {
+            listSource: entry.listProgram
+              ? `${entry.source} (${entry.listProgram})`
+              : entry.source,
+            matchType,
+          };
+        }
       }
     }
-    return undefined;
+
+    return { hit, candidates };
   }
 
   /** Process 49 — "a recurring batch against updated lists" (backlog Part C

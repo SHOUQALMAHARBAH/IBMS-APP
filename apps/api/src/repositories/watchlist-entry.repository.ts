@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, WatchlistSource, WatchlistSyncRun } from '@ibms/db';
+import { Prisma } from '@ibms/db';
+import type {
+  WatchlistEntry,
+  WatchlistSource,
+  WatchlistSyncRun,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ParsedWatchlistRecord } from '../modules/compliance-risk/watchlist-sync.config';
+import { MIN_ENTRY_TOKENS_FOR_FUZZY } from '../modules/compliance-risk/watchlist-match.config';
 
 export interface WatchlistMatch {
   source: WatchlistSource;
@@ -11,6 +17,11 @@ export interface WatchlistMatch {
 }
 
 const WATCHLIST_UPSERT_CHUNK_SIZE = 100;
+
+/** Upper bound on candidates returned for one subject name. A real name
+ * yields a handful; a pathological one (many very common tokens) must not be
+ * able to pull thousands of rows into the review queue in one go. */
+const WATCHLIST_CANDIDATE_LIMIT = 50;
 
 /**
  * Process 49 — owns `WatchlistEntry` (the synced sanctions/PEP cache) and
@@ -129,7 +140,10 @@ export class WatchlistEntryRepository {
   async upsertMany(
     source: WatchlistSource,
     syncRunId: string,
-    records: readonly (ParsedWatchlistRecord & { normalizedName: string })[],
+    records: readonly (ParsedWatchlistRecord & {
+      normalizedName: string;
+      canonicalTokens: string[];
+    })[],
   ): Promise<void> {
     for (let i = 0; i < records.length; i += WATCHLIST_UPSERT_CHUNK_SIZE) {
       const chunk = records.slice(i, i + WATCHLIST_UPSERT_CHUNK_SIZE);
@@ -147,6 +161,7 @@ export class WatchlistEntryRepository {
               sourceRecordId: record.sourceRecordId,
               fullName: record.fullName,
               normalizedName: record.normalizedName,
+              canonicalTokens: record.canonicalTokens,
               listProgram: record.listProgram,
               remarks: record.remarks,
               syncRunId,
@@ -154,6 +169,7 @@ export class WatchlistEntryRepository {
             update: {
               fullName: record.fullName,
               normalizedName: record.normalizedName,
+              canonicalTokens: record.canonicalTokens,
               listProgram: record.listProgram,
               remarks: record.remarks,
               syncRunId,
@@ -162,6 +178,36 @@ export class WatchlistEntryRepository {
         ),
       );
     }
+  }
+
+  /**
+   * Process 49 (fuzzy matching) — every watchlist entry whose canonical token
+   * set is CONTAINED IN the subject's (`entry.canonicalTokens <@ subject`).
+   * That direction is the whole point: a subject with more names than the
+   * entry is a candidate, a subject with fewer is not.
+   *
+   * Raw SQL because Prisma cannot express the array-containment operator, and
+   * `<@` is what the GIN index on `canonicalTokens` answers — doing this by
+   * loading 19,000 entries and filtering in JS would work but would scan the
+   * whole table on every screening of every customer.
+   *
+   * `array_length >= MIN_ENTRY_TOKENS_FOR_FUZZY` keeps single-token entries
+   * out: subset-matching one token against a four-part name is a substring
+   * search over the whole list, not screening. Capped, because a pathological
+   * subject name must not be able to pull back thousands of rows.
+   */
+  async findContainedCandidates(
+    subjectTokens: readonly string[],
+  ): Promise<WatchlistEntry[]> {
+    if (subjectTokens.length === 0) return [];
+    return this.prisma.client.$queryRaw<WatchlistEntry[]>(Prisma.sql`
+      SELECT *
+      FROM "WatchlistEntry"
+      WHERE "canonicalTokens" <@ ${subjectTokens}
+        AND array_length("canonicalTokens", 1) >= ${MIN_ENTRY_TOKENS_FOR_FUZZY}
+      ORDER BY array_length("canonicalTokens", 1) DESC
+      LIMIT ${WATCHLIST_CANDIDATE_LIMIT}
+    `);
   }
 
   pruneStale(

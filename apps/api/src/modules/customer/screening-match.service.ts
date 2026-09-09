@@ -1,0 +1,186 @@
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  ScreeningMatchRepository,
+  type ScreeningMatchWithContext,
+} from '../../repositories/screening-match.repository';
+import { AuditService } from '../audit/audit.service';
+import type { RecordAuditEntryInput } from '../audit/audit.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
+
+export interface ScreeningMatchView {
+  id: string;
+  kycRecordId: string;
+  customerId: string;
+  customerLegalName: string;
+  customerStatus: string;
+  kycStatus: string;
+  isEdd: boolean;
+  /** The name that matched — not always the customer's own, since screening
+   * covers UBOs too. */
+  subjectName: string;
+  matchType: string;
+  status: string;
+  detectedAt: string;
+  reviewedByUserId: string | null;
+  reviewedAt: string | null;
+  reviewReason: string | null;
+  listSource: string;
+  listEntryName: string;
+  listEntryRemarks: string | null;
+}
+
+/**
+ * Process 49 — the sanctions match review queue.
+ *
+ * Fuzzy matching deliberately over-fires (see `watchlist-match.config.ts`),
+ * which is only a defensible trade if a person actually adjudicates the
+ * output. This service is that adjudication, and it is intentionally the ONLY
+ * thing in the system that can resolve a match: nothing auto-clears on a
+ * re-screen and nothing auto-blocks a customer.
+ *
+ * Two rules the endpoints enforce and the model comment records:
+ *
+ *  * **A reason is mandatory** on both outcomes. "Cleared" without a stated
+ *    basis is indistinguishable from "ignored", and this is the record a
+ *    regulator would ask to see.
+ *  * **Clearing never unwinds the escalation.** `KYCRecord.isEdd` and a HIGH
+ *    `RiskRating` only ever escalate in `ScreeningService` — a cleared false
+ *    positive leaves that trail intact. Unwinding it is a separate, deliberate
+ *    Compliance decision, not a side effect of closing a queue item.
+ */
+@Injectable()
+export class ScreeningMatchService {
+  private readonly logger = new Logger(ScreeningMatchService.name);
+
+  constructor(
+    private readonly matches: ScreeningMatchRepository,
+    private readonly audit: AuditService,
+  ) {}
+
+  async list(
+    filter: { status?: string; kycRecordId?: string },
+    actor: AuthenticatedUser,
+  ): Promise<ScreeningMatchView[]> {
+    const rows = await this.matches.findMany(filter);
+
+    // A queue row names a customer alongside a sanctions entry — Highly
+    // Confidential by content, so the read itself is logged (the
+    // `CrmService.get360View` / `ClaimService` precedent). Counts and filters
+    // only: never a customer name or a list entry in the audit row.
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'READ',
+      entityType: 'ScreeningMatch',
+      entityId: filter.kycRecordId ?? 'queue',
+      isSensitiveDataAccess: rows.length > 0,
+      afterValue: {
+        status: filter.status ?? 'all',
+        kycRecordId: filter.kycRecordId ?? null,
+        rowCount: rows.length,
+      },
+    });
+
+    return rows.map(toView);
+  }
+
+  async pendingCount(): Promise<{ pending: number }> {
+    return { pending: await this.matches.countPending() };
+  }
+
+  /** `cleared` = a false positive, the subject is not the sanctioned party.
+   * `confirmed` = a true match; the customer stays escalated and Compliance
+   * takes it forward outside this system (a filing decision is not automated
+   * here). Both require a written reason. */
+  async decide(
+    id: string,
+    decision: 'cleared' | 'confirmed',
+    reviewReason: string,
+    actor: AuthenticatedUser,
+  ): Promise<ScreeningMatchView> {
+    const existing = await this.matches.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Screening match ${id} not found.`);
+    }
+    if (existing.status !== 'pending') {
+      throw new ConflictException(
+        `Screening match ${id} was already ${existing.status} on ${existing.reviewedAt?.toISOString() ?? 'an earlier date'}. A recorded review decision is not overwritten — re-screen the customer if the position has changed.`,
+      );
+    }
+
+    const updated = await this.matches.recordDecision({
+      id,
+      status: decision,
+      reviewedByUserId: actor.id,
+      reviewReason,
+      reviewedAt: new Date(),
+    });
+    if (!updated) {
+      // 0 rows — another reviewer decided it between our read and our write.
+      throw new ConflictException(
+        `Screening match ${id} was reviewed concurrently by another user.`,
+      );
+    }
+
+    // The reason is kept verbatim: it is a business justification and the
+    // substance of the control, the same treatment `Refund.reason` and
+    // `CommissionLedgerEntry.overrideReason` get. The matched subject's name
+    // is NOT copied into the audit row — the match id resolves to it.
+    await this.safeAudit({
+      userId: actor.id,
+      action: decision === 'confirmed' ? 'APPROVE' : 'REJECT',
+      entityType: 'ScreeningMatch',
+      entityId: id,
+      beforeValue: { status: 'pending' },
+      afterValue: {
+        status: decision,
+        matchType: existing.matchType,
+        watchlistEntryId: existing.watchlistEntryId,
+        listSource: existing.watchlistEntry.source,
+        reviewReason,
+        reviewedByUserId: actor.id,
+      },
+    });
+
+    const refreshed = await this.matches.findById(id);
+    return toView(refreshed ?? { ...existing, ...updated });
+  }
+
+  private async safeAudit(input: RecordAuditEntryInput): Promise<void> {
+    try {
+      await this.audit.record(input);
+    } catch (err) {
+      this.logger.error(
+        `Screening-match audit (${input.action} ${input.entityId}) failed after the operation already committed: ${(err as Error).message}`,
+      );
+    }
+  }
+}
+
+function toView(row: ScreeningMatchWithContext): ScreeningMatchView {
+  return {
+    id: row.id,
+    kycRecordId: row.kycRecordId,
+    customerId: row.kycRecord.customerId,
+    customerLegalName: row.kycRecord.customer.legalName,
+    customerStatus: row.kycRecord.customer.status,
+    kycStatus: row.kycRecord.status,
+    isEdd: row.kycRecord.isEdd,
+    subjectName: row.subjectName,
+    matchType: row.matchType,
+    status: row.status,
+    detectedAt: row.detectedAt.toISOString(),
+    reviewedByUserId: row.reviewedByUserId,
+    reviewedAt: row.reviewedAt?.toISOString() ?? null,
+    reviewReason: row.reviewReason,
+    listSource: row.watchlistEntry.listProgram
+      ? `${row.watchlistEntry.source} (${row.watchlistEntry.listProgram})`
+      : row.watchlistEntry.source,
+    listEntryName: row.watchlistEntry.fullName,
+    listEntryRemarks: row.watchlistEntry.remarks,
+  };
+}

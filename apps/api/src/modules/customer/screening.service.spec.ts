@@ -4,6 +4,7 @@ import { ScreeningService } from './screening.service';
 import type { KycRecordRepository } from '../../repositories/kyc-record.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
+import type { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import type { AuditService } from '../audit/audit.service';
 
 interface ScreeningResultInput {
@@ -50,9 +51,18 @@ function makeDeps() {
   } as unknown as CustomerRepository;
 
   const findByNormalizedName = vi.fn().mockResolvedValue(null);
+  // Process 49 fuzzy matching: screening now asks for CONTAINMENT candidates
+  // (entry tokens ⊆ subject tokens), not one exact normalized-name row.
+  const findContainedCandidates = vi.fn().mockResolvedValue([]);
   const watchlistEntries = {
     findByNormalizedName,
+    findContainedCandidates,
   } as unknown as WatchlistEntryRepository;
+
+  const recordCandidate = vi.fn().mockResolvedValue(undefined);
+  const screeningMatches = {
+    recordCandidate,
+  } as unknown as ScreeningMatchRepository;
 
   const record = vi.fn().mockResolvedValue(undefined);
   const audit = { record } as unknown as AuditService;
@@ -62,10 +72,13 @@ function makeDeps() {
       kycRecords,
       customers,
       watchlistEntries,
+      screeningMatches,
       audit,
     ),
     mocks: {
       findById,
+      findContainedCandidates,
+      recordCandidate,
       createScreeningResult,
       upsertRiskRating,
       findRiskRatingByKycRecordId,
@@ -266,12 +279,15 @@ describe('ScreeningService', () => {
         id: 'cust-1',
         legalName: 'Perfectly Ordinary Trading Co.',
       });
-      mocks.findByNormalizedName.mockResolvedValue({
-        source: 'OFAC_SDN',
-        sourceRecordId: '2674',
-        fullName: 'ABBAS, Abu',
-        listProgram: 'SDGT',
-      });
+      mocks.findContainedCandidates.mockResolvedValue([
+        {
+          id: 'wl-1',
+          source: 'OFAC_SDN',
+          sourceRecordId: '2674',
+          fullName: 'Perfectly Ordinary Trading Co.',
+          listProgram: 'SDGT',
+        },
+      ]);
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
@@ -293,12 +309,15 @@ describe('ScreeningService', () => {
         id: 'cust-1',
         legalName: 'Perfectly Ordinary Trading Co.',
       });
-      mocks.findByNormalizedName.mockResolvedValue({
-        source: 'UN_CONSOLIDATED',
-        sourceRecordId: '6907993',
-        fullName: 'ERIC BADEGE',
-        listProgram: null,
-      });
+      mocks.findContainedCandidates.mockResolvedValue([
+        {
+          id: 'wl-2',
+          source: 'UN_CONSOLIDATED',
+          sourceRecordId: '6907993',
+          fullName: 'Perfectly Ordinary Trading Co.',
+          listProgram: null,
+        },
+      ]);
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
@@ -322,7 +341,7 @@ describe('ScreeningService', () => {
 
       await service.run('kyc-1', 'compliance-1');
 
-      expect(mocks.findByNormalizedName).toHaveBeenCalledTimes(2);
+      expect(mocks.findContainedCandidates).toHaveBeenCalledTimes(2);
     });
 
     // A @code-reviewer BLOCKER on the first pass: a name that normalizes to
@@ -341,7 +360,7 @@ describe('ScreeningService', () => {
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
-      expect(mocks.findByNormalizedName).not.toHaveBeenCalled();
+      expect(mocks.findContainedCandidates).not.toHaveBeenCalled();
       expect(outcome.newHit).toBe(false);
     });
   });
