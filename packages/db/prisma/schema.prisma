@@ -2342,9 +2342,14 @@ model WatchlistEntry {
   /// Screening asks "are ALL of this entry's tokens present in the subject's
   /// tokens?" — an array containment test (`<@`), which is why this is a
   /// scalar list with a GIN index rather than a second normalised string.
-  /// Populated on every sync; an entry written before this column existed
-  /// has `[]` and is simply never a fuzzy candidate until the next sync
-  /// rewrites it (exact matching on `normalizedName` still covers it).
+  /// Populated on every sync. An entry written before this column existed
+  /// carries `[]`, which the FUZZY branch cannot see at all — `array_length`
+  /// of an empty array is NULL, so `NULL >= 2` excludes the row. Two things
+  /// close that: such a row is still reachable by the EXACT branches of
+  /// `findMatchCandidates` (so no database ever goes wholly CLEAR — that is
+  /// what the `normalizedName` floor is for), and
+  /// `WatchlistEntryRepository.backfillCanonicalTokens` rewrites them at the
+  /// start of every sync rather than waiting for a fetch to succeed.
   canonicalTokens String[]
   matches         ScreeningMatch[]
 

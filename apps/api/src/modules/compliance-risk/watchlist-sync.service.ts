@@ -49,6 +49,26 @@ export class WatchlistSyncService {
    * calling this must not have one source's failure abort the other or
    * crash the cron tick. */
   async runSync(): Promise<WatchlistSyncOutcome[]> {
+    // Entries written before `canonicalTokens` existed carry `[]`, which the
+    // fuzzy branch of `findMatchCandidates` cannot see (array_length of an
+    // empty array is NULL). Rewriting them is idempotent and a no-op once
+    // done, so it runs before the fetch rather than depending on one
+    // succeeding — a failing source must not leave the cache half-matchable.
+    try {
+      const filled = await this.entries.backfillCanonicalTokens();
+      if (filled > 0) {
+        this.logger.log(
+          `Backfilled canonicalTokens for ${filled} watchlist entr${filled === 1 ? 'y' : 'ies'} written before the column existed.`,
+        );
+      }
+    } catch (err) {
+      // Never abort the sync for this — the exact branches still match, so a
+      // failed backfill degrades fuzzy coverage, it does not blind screening.
+      this.logger.error(
+        `canonicalTokens backfill failed; fuzzy matching stays degraded for pre-existing entries until this succeeds: ${(err as Error).message}`,
+      );
+    }
+
     const [ofacResult, unResult] = await Promise.all([
       this.syncSource('OFAC_SDN', () => this.ofac.fetchRaw(), parseOfacSdnCsv),
       this.syncSource(

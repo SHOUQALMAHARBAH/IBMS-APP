@@ -7,7 +7,10 @@ import type {
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ParsedWatchlistRecord } from '../modules/compliance-risk/watchlist-sync.config';
-import { MIN_ENTRY_TOKENS_FOR_FUZZY } from '../modules/compliance-risk/watchlist-match.config';
+import {
+  MIN_ENTRY_TOKENS_FOR_FUZZY,
+  canonicalNameTokens,
+} from '../modules/compliance-risk/watchlist-match.config';
 
 export interface WatchlistMatch {
   source: WatchlistSource;
@@ -178,6 +181,64 @@ export class WatchlistEntryRepository {
         ),
       );
     }
+  }
+
+  /**
+   * Process 49 — fill `canonicalTokens` for entries written before that column
+   * existed. Idempotent, and a cheap no-op once there are none.
+   *
+   * The column shipped `NOT NULL DEFAULT '{}'` with no backfill. `array_length`
+   * of an empty array is NULL, and `NULL >= 2` is NULL, so every such row is
+   * invisible to the FUZZY branch of `findMatchCandidates` — it would silently
+   * stop being a fuzzy candidate until a sync happened to rewrite it, which is
+   * up to 12 hours on the scheduler and indefinitely if a fetch fails or
+   * `WATCHLIST_MIN_ACCEPTABLE_RATIO` rejects the parse.
+   *
+   * (Those rows are still reachable by the EXACT branches, so no database ever
+   * goes fully CLEAR — that is what the `normalizedName` floor is for. This
+   * closes the remaining fuzzy-coverage window rather than a blackout.)
+   *
+   * The canonicalisation is TypeScript (a curated table plus a greedy phrase
+   * scan), not expressible in SQL, so this pages through in the application
+   * rather than living in the migration.
+   */
+  async backfillCanonicalTokens(): Promise<number> {
+    let filled = 0;
+    let cursor: string | undefined;
+
+    // Cursor-paged, NOT a repeated `where: {canonicalTokens: []}` scan. A name
+    // made only of punctuation canonicalises to `[]` and can never leave that
+    // filter, so a re-query loop would revisit it on every pass for ever and
+    // report a phantom backfill on every sync. The cursor advances past it.
+    for (;;) {
+      const batch = await this.prisma.client.watchlistEntry.findMany({
+        where: { canonicalTokens: { equals: [] } },
+        select: { id: true, fullName: true },
+        orderBy: { id: 'asc' },
+        take: WATCHLIST_UPSERT_CHUNK_SIZE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (batch.length === 0) break;
+      cursor = batch[batch.length - 1].id;
+
+      const fillable = batch
+        .map((entry) => ({
+          id: entry.id,
+          canonicalTokens: canonicalNameTokens(entry.fullName),
+        }))
+        .filter((entry) => entry.canonicalTokens.length > 0);
+
+      await Promise.all(
+        fillable.map((entry) =>
+          this.prisma.client.watchlistEntry.update({
+            where: { id: entry.id },
+            data: { canonicalTokens: entry.canonicalTokens },
+          }),
+        ),
+      );
+      filled += fillable.length;
+    }
+    return filled;
   }
 
   /**
