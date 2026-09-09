@@ -65,8 +65,27 @@ two things that had been silently load-bearing:
   the web unit tests and the web lint both broke — on any platform, not just
   Windows.
 
-Neither is visible without running `npm ci` on Linux. The lockfile has been
-restored byte-for-byte to its pre-session state.
+Neither is visible without running `npm ci`.
+
+**Restoring the old lockfile was not enough either**, and the reason matters:
+`371fdf5` (an earlier session) had bumped `apps/web` to `vitest ^5.0.0` /
+`next ^16.3.4` and added an unused `next` to `packages/db` — but never updated
+the lockfile, which still pinned `vitest 3.2.7` / `next 16.3.2`. The branch had
+therefore been carrying a package.json/lockfile mismatch since then, and
+`npm ci` fails on it with `Cannot read properties of null (reading 'edgesOut')`.
+
+So the lockfile genuinely had to be regenerated. It was, with the two hazards
+addressed at their root rather than worked around:
+
+- `next` removed from `packages/db` (a Prisma package imports nothing from
+  Next.js — verified by grep; it was an install into the wrong workspace), and
+- `eslint-config-next` moved from a pinned `16.3.2` to `^16.3.4` so it tracks
+  `next`.
+
+With the stray dependency gone and the versions aligned, npm co-locates
+`next` with `eslint-config-next` and hoists `vitest` to the root, and the
+Linux `@rollup/*` binaries are present. Verified from a clean `npm ci`:
+typecheck 6/6, lint 3/3, test 4/4 (2,512 tests), build 3/3, `test:security` OK.
 
 **Standing lesson:** this lockfile's hoisting layout is load-bearing and
 undeclared. Do not regenerate it casually. A deliberate refresh needs its own
