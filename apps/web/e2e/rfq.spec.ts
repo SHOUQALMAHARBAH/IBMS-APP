@@ -2104,8 +2104,11 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   //     outstanding balance", so this closes it out and drives the transition.
   await page.getByRole("button", { name: "Record collection" }).click();
   await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
-  // Collected is now the pooled total of BOTH instalments.
-  await expect(page.getByText("JOD 115,350.000")).toBeVisible();
+  // Collected is now the pooled total of BOTH instalments — which equals the
+  // invoiced total, so the figure legitimately appears TWICE ("Total due" and
+  // "Collected"). Asserting the count says exactly that, where a bare
+  // `toBeVisible()` would trip Playwright's strict mode on the ambiguity.
+  await expect(page.getByText("JOD 115,350.000")).toHaveCount(2);
   await expect(page.getByText("Outstanding balance")).toBeHidden();
 
   // 2. reconcile

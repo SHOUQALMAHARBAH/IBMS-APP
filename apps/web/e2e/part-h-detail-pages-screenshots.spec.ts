@@ -20,14 +20,14 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page) {
+async function mockAuth(page: Page, languagePreference: 'AR' | 'EN' = 'EN') {
   await page.route('**/auth/refresh', (route) =>
     route.fulfill({ status: 200, json: { accessToken: 'fake-access-token' } }),
   );
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ['sales', 'manager'] },
+      json: { ...ME_BASE, languagePreference, roles: ['sales', 'manager'] },
     }),
   );
 }
@@ -71,14 +71,14 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
   test('Lead detail page — English', async ({ page }) => {
     // Set English language before any navigation
     await page.addInitScript(() => {
-      localStorage.setItem('language', 'EN');
+      localStorage.setItem('ibms.languagePreference', 'EN');
     });
 
     // Mock auth endpoints first
     await mockAuth(page);
 
     // Mock lead detail endpoint
-    await page.route(`**/leads/lead-1`, (route) =>
+    await page.route('http://localhost:4000/leads/lead-1', (route) =>
       route.fulfill({ status: 200, json: LEAD_FIXTURE }),
     );
 
@@ -102,14 +102,14 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
   test('Lead detail page — Arabic', async ({ page }) => {
     // Set Arabic language before any navigation
     await page.addInitScript(() => {
-      localStorage.setItem('language', 'AR');
+      localStorage.setItem('ibms.languagePreference', 'AR');
     });
 
     // Mock auth endpoints
-    await mockAuth(page);
+    await mockAuth(page, 'AR');
 
     // Mock lead detail endpoint
-    await page.route(`**/leads/lead-1`, (route) =>
+    await page.route('http://localhost:4000/leads/lead-1', (route) =>
       route.fulfill({ status: 200, json: LEAD_FIXTURE }),
     );
 
@@ -133,14 +133,14 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
   test('Policy detail page — English', async ({ page }) => {
     // Set English language before any navigation
     await page.addInitScript(() => {
-      localStorage.setItem('language', 'EN');
+      localStorage.setItem('ibms.languagePreference', 'EN');
     });
 
     // Mock auth endpoints
     await mockAuth(page);
 
     // Mock policy detail endpoint
-    await page.route(`**/policies/policy-1`, (route) =>
+    await page.route('http://localhost:4000/policies/policy-1', (route) =>
       route.fulfill({ status: 200, json: POLICY_FIXTURE }),
     );
 
@@ -164,14 +164,14 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
   test('Policy detail page — Arabic', async ({ page }) => {
     // Set Arabic language before any navigation
     await page.addInitScript(() => {
-      localStorage.setItem('language', 'AR');
+      localStorage.setItem('ibms.languagePreference', 'AR');
     });
 
     // Mock auth endpoints
-    await mockAuth(page);
+    await mockAuth(page, 'AR');
 
     // Mock policy detail endpoint
-    await page.route(`**/policies/policy-1`, (route) =>
+    await page.route('http://localhost:4000/policies/policy-1', (route) =>
       route.fulfill({ status: 200, json: POLICY_FIXTURE }),
     );
 

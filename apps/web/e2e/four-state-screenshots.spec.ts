@@ -579,7 +579,13 @@ const INVOICE = {
   status: "INVOICED",
   createdAt: "2026-09-08T00:00:00.000Z",
   netRemittance: "104280.000",
+  // Process 32 — an invoice may be settled in instalments; the view carries
+  // the running totals alongside the receipt list.
+  receipts: [],
   receipt: null,
+  collectedAmount: "0.000",
+  outstandingAmount: "113910.000",
+  fullyCollected: false,
   remittance: null,
 };
 

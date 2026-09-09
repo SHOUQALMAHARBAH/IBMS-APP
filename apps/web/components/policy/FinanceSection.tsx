@@ -157,7 +157,7 @@ export function FinanceSection({
             <span>{t('financeStatusLabel')}</span>
             <strong>{invoice.status}</strong>
           </div>
-          {invoice.receipts.length > 0 ? (
+          {(invoice.receipts?.length ?? 0) > 0 ? (
             <>
               <div style={quoteFieldStyle}>
                 <span>{t('financeCollectedLabel')}</span>
@@ -181,11 +181,11 @@ export function FinanceSection({
                   </strong>
                 </div>
               ) : null}
-              {invoice.receipts.length > 1 ? (
+              {(invoice.receipts?.length ?? 0) > 1 ? (
                 <div style={quoteFieldStyle}>
                   <span>{t('financeInstalmentsLabel')}</span>
                   <strong>
-                    {invoice.receipts
+                    {(invoice.receipts ?? [])
                       .map(
                         (r) =>
                           `${formatMoney(r.amount, language, invoice.currency)} · ${formatDate(r.receivedAt, language)}`,
