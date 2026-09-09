@@ -152,7 +152,7 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
     ]);
     const view = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '115350.000', method: 'bank_transfer' },
+      { amount: '115350.000', method: 'bank_transfer', reference: 'REF-AUTO' },
       actor,
     );
     expect(deps.workflow.transition).toHaveBeenCalledWith(
@@ -195,7 +195,7 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
 
     const view = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '100000.000' },
+      { amount: '100000.000', reference: 'REF-AUTO' },
       actor,
     );
 
@@ -220,7 +220,11 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
       totalAmount: d('115350.000'),
     });
     await expect(
-      deps.service.recordReceipt('inv-1', { amount: '90000.000' }, actor),
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '90000.000', reference: 'REF-AUTO' },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.workflow.transition).not.toHaveBeenCalled();
   });
@@ -230,7 +234,11 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
       invoiceFixture({ status: 'INVOICED', receipts: [receiptFixture()] }),
     ]);
     await expect(
-      deps.service.recordReceipt('inv-1', { amount: '1.000' }, actor),
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '1.000', reference: 'REF-AUTO' },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
   });
@@ -292,7 +300,11 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
   it('422s a non-positive instalment', async () => {
     const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
     await expect(
-      deps.service.recordReceipt('inv-1', { amount: '0.000' }, actor),
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '0.000', reference: 'REF-AUTO' },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
   });
@@ -300,7 +312,11 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
   it('422s when the invoice is already past collection', async () => {
     const deps = makeDeps([invoiceFixture({ status: 'RECONCILED' })]);
     await expect(
-      deps.service.recordReceipt('inv-1', { amount: '115350.000' }, actor),
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', reference: 'REF-AUTO' },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
@@ -374,7 +390,7 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
     });
     const view = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '65350.000' },
+      { amount: '65350.000', reference: 'REF-AUTO' },
       actor,
     );
     expect(deps.invoices.recordReceiptWithLedger).toHaveBeenCalledTimes(1);
@@ -395,7 +411,7 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
     ]);
     const view = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '115350.000', method: 'bank_transfer' },
+      { amount: '115350.000', method: 'bank_transfer', reference: 'REF-AUTO' },
       actor,
     );
     // Already COLLECTED — nothing to transition.
@@ -410,7 +426,11 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
       undefined as unknown as InvoiceWithCycle,
     );
     await expect(
-      deps.service.recordReceipt('nope', { amount: '1.000' }, actor),
+      deps.service.recordReceipt(
+        'nope',
+        { amount: '1.000', reference: 'REF-AUTO' },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
@@ -426,6 +446,50 @@ describe('CollectionService.reconcile (Process 32)', () => {
       expect.objectContaining({ toStatus: 'RECONCILED' }),
     );
     expect(view.status).toBe('RECONCILED');
+  });
+
+  it('SELF-HEALS a fully-collected invoice stranded at INVOICED', async () => {
+    // recordReceipt commits the receipt and its client-money ledger row and
+    // then swallows a failed INVOICED -> COLLECTED transition, because the
+    // money record is already authoritative. Before this branch existed that
+    // stranded the invoice permanently: recordReceipt refused it ("already
+    // collected in full"), reconcile refused it (not COLLECTED), and no other
+    // caller transitions an Invoice to COLLECTED. The client's money was
+    // banked and the invoice could never be reconciled or remitted.
+    const deps = makeDeps([
+      // Fully paid, but still INVOICED — the stranded state.
+      invoiceFixture({ status: 'INVOICED', receipts: [receiptFixture()] }),
+      invoiceFixture({ status: 'COLLECTED', receipts: [receiptFixture()] }),
+      invoiceFixture({ status: 'RECONCILED', receipts: [receiptFixture()] }),
+    ]);
+
+    const view = await deps.service.reconcile('inv-1', actor);
+
+    expect(deps.workflow.transition).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ toStatus: 'COLLECTED' }),
+    );
+    expect(deps.workflow.transition).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ toStatus: 'RECONCILED' }),
+    );
+    expect(view.status).toBe('RECONCILED');
+  });
+
+  it('does NOT self-heal a PART-paid invoice — that is not a missed transition', async () => {
+    // Only an exact match to the invoiced total is a stranded transition. A
+    // part payment legitimately stays INVOICED, and healing it to COLLECTED
+    // would mark an unpaid balance as collected.
+    const deps = makeDeps([
+      invoiceFixture({
+        status: 'INVOICED',
+        receipts: [receiptFixture({ amount: d('1000.000') })],
+      }),
+    ]);
+    await expect(deps.service.reconcile('inv-1', actor)).rejects.toThrow(
+      /is INVOICED/,
+    );
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
   });
 
   it('is an idempotent no-op when already RECONCILED', async () => {
@@ -643,7 +707,7 @@ describe('CollectionService — Process 38 payment channels', () => {
     });
     await deps.service.recordReceipt(
       'inv-1',
-      { amount: '115350.000', paymentChannelId: 'pc-1' },
+      { amount: '115350.000', paymentChannelId: 'pc-1', reference: 'REF-AUTO' },
       actor,
     );
     const arg = deps.invoices.recordReceiptWithLedger.mock.calls[0]?.[0] as {
@@ -662,7 +726,11 @@ describe('CollectionService — Process 38 payment channels', () => {
     await expect(
       deps.service.recordReceipt(
         'inv-1',
-        { amount: '115350.000', paymentChannelId: 'pc-1' },
+        {
+          amount: '115350.000',
+          paymentChannelId: 'pc-1',
+          reference: 'REF-AUTO',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -707,7 +775,11 @@ describe('CollectionService — Process 38 payment channels', () => {
     await expect(
       deps.service.recordReceipt(
         'inv-1',
-        { amount: '115350.000', paymentChannelId: 'pc-1' },
+        {
+          amount: '115350.000',
+          paymentChannelId: 'pc-1',
+          reference: 'REF-AUTO',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -721,7 +793,11 @@ describe('CollectionService — Process 38 payment channels', () => {
     await expect(
       deps.service.recordReceipt(
         'inv-1',
-        { amount: '115350.000', paymentChannelId: 'pc-1' },
+        {
+          amount: '115350.000',
+          paymentChannelId: 'pc-1',
+          reference: 'REF-AUTO',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -733,7 +809,12 @@ describe('CollectionService — Process 38 payment channels', () => {
     await expect(
       deps.service.recordReceipt(
         'inv-1',
-        { amount: '115350.000', method: 'cheque', paymentChannelId: 'pc-1' },
+        {
+          amount: '115350.000',
+          method: 'cheque',
+          paymentChannelId: 'pc-1',
+          reference: 'REF-AUTO',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -745,7 +826,11 @@ describe('CollectionService — Process 38 payment channels', () => {
     await expect(
       deps.service.recordReceipt(
         'inv-1',
-        { amount: '115350.000', paymentChannelId: 'pc-x' },
+        {
+          amount: '115350.000',
+          paymentChannelId: 'pc-x',
+          reference: 'REF-AUTO',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);

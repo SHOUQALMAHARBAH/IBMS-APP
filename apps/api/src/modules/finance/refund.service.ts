@@ -90,6 +90,9 @@ export class RefundService {
       refundId,
       customerId: endorsement.policy.customerId,
       amount,
+      // Re-asserted in the conditional write, so a refund cannot be paid
+      // against an approval state that changed after the check above.
+      approvedByUserId: refund.approvedByUserId,
       paidAt,
       ledgerReference: `refund:${refundId}`,
     });
