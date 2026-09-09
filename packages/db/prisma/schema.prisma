@@ -1727,7 +1727,7 @@ model Invoice {
 /// deferred refinement that would replace this constraint.
 model Receipt {
   id               String          @id @default(uuid())
-  invoiceId        String          @unique
+  invoiceId        String
   invoice          Invoice         @relation(fields: [invoiceId], references: [id])
   amount           Decimal         @db.Decimal(18, 3)
   receivedAt       DateTime        @default(now())
@@ -1738,6 +1738,8 @@ model Receipt {
   paymentChannel   PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
 
   remittance Remittance?
+
+  @@index([invoiceId, receivedAt])
 }
 
 /// Process 32/34 — remittance to insurer per agreed arrangement (broker may
