@@ -181,33 +181,77 @@ export class WatchlistEntryRepository {
   }
 
   /**
-   * Process 49 (fuzzy matching) — every watchlist entry whose canonical token
-   * set is CONTAINED IN the subject's (`entry.canonicalTokens <@ subject`).
-   * That direction is the whole point: a subject with more names than the
-   * entry is a candidate, a subject with fewer is not.
+   * Process 49 — every watchlist entry that is a CANDIDATE for one subject
+   * name, by three ORed branches. Returns `truncated` when the cap bit.
    *
    * Raw SQL because Prisma cannot express the array-containment operator, and
    * `<@` is what the GIN index on `canonicalTokens` answers — doing this by
    * loading 19,000 entries and filtering in JS would work but would scan the
    * whole table on every screening of every customer.
    *
-   * `array_length >= MIN_ENTRY_TOKENS_FOR_FUZZY` keeps single-token entries
-   * out: subset-matching one token against a four-part name is a substring
-   * search over the whole list, not screening. Capped, because a pathological
-   * subject name must not be able to pull back thousands of rows.
+   * ## The three branches, and why the first two are not optional
+   *
+   *  1. `normalizedName = <subject's>` — the ORIGINAL exact matcher, kept as
+   *     a FLOOR. The first version of this feature deleted it and made
+   *     containment the only rule; a `@code-reviewer` pass proved that
+   *     regressed the control to CLEAR for every entry below the fuzzy floor
+   *     (a real UN entity is listed under the single token "ADF"). Whatever
+   *     the pre-change matcher found, this branch still finds. It is a single
+   *     indexed equality read, so it costs nothing to keep.
+   *  2. `canonicalTokens = <subject's>` — exact match AFTER transliteration
+   *     collapsing, which is how a single-token entry ("MOHAMMED") still
+   *     reaches a subject recorded in Arabic ("محمد"). Set equality, not
+   *     containment, so it cannot over-fire: the subject must be that name and
+   *     nothing else. Both sides are stored sorted and de-duplicated, so `=`
+   *     is a sound set comparison here.
+   *  3. `canonicalTokens <@ <subject's>` with `array_length >= MIN_ENTRY_TOKENS_FOR_FUZZY`
+   *     — the fuzzy subset rule. The floor keeps single-token entries out of
+   *     SUBSET matching (matching one token against a four-part name is a
+   *     substring search over the whole list, not screening); branches 1 and 2
+   *     are what keep those entries reachable at all.
+   *
+   * ## Why the cap reports itself
+   *
+   * `LIMIT` alone was a silent miss: with no tiebreaker on a non-unique
+   * `ORDER BY`, Postgres may return a DIFFERENT 50 rows on each execution, so
+   * a queue item could appear on one 4-hourly batch pass and vanish on the
+   * next. `"id" ASC` makes the page deterministic, and fetching one row past
+   * the cap tells the caller the truth instead of quietly dropping evidence a
+   * human was supposed to adjudicate.
    */
-  async findContainedCandidates(
-    subjectTokens: readonly string[],
-  ): Promise<WatchlistEntry[]> {
-    if (subjectTokens.length === 0) return [];
-    return this.prisma.client.$queryRaw<WatchlistEntry[]>(Prisma.sql`
+  async findMatchCandidates(input: {
+    subjectTokens: readonly string[];
+    normalizedName: string;
+  }): Promise<{ entries: WatchlistEntry[]; truncated: boolean }> {
+    const { subjectTokens, normalizedName } = input;
+    if (subjectTokens.length === 0 && !normalizedName) {
+      return { entries: [], truncated: false };
+    }
+
+    // An empty `normalizedName` must never match: `normalizeWatchlistName`
+    // reduces an all-non-Latin-script name to `""`, and any synced entry that
+    // also normalized to `""` would become a universal wildcard. The same
+    // guard `findByNormalizedName` has carried since its own review.
+    const exactName = normalizedName || null;
+
+    const rows = await this.prisma.client.$queryRaw<
+      WatchlistEntry[]
+    >(Prisma.sql`
       SELECT *
       FROM "WatchlistEntry"
-      WHERE "canonicalTokens" <@ ${subjectTokens}
-        AND array_length("canonicalTokens", 1) >= ${MIN_ENTRY_TOKENS_FOR_FUZZY}
-      ORDER BY array_length("canonicalTokens", 1) DESC
-      LIMIT ${WATCHLIST_CANDIDATE_LIMIT}
+      WHERE ("normalizedName" = ${exactName})
+         OR ("canonicalTokens" <@ ${subjectTokens}
+             AND ("canonicalTokens" @> ${subjectTokens}
+                  OR array_length("canonicalTokens", 1) >= ${MIN_ENTRY_TOKENS_FOR_FUZZY}))
+      ORDER BY array_length("canonicalTokens", 1) DESC, "id" ASC
+      LIMIT ${WATCHLIST_CANDIDATE_LIMIT + 1}
     `);
+
+    const truncated = rows.length > WATCHLIST_CANDIDATE_LIMIT;
+    return {
+      entries: truncated ? rows.slice(0, WATCHLIST_CANDIDATE_LIMIT) : rows,
+      truncated,
+    };
   }
 
   pruneStale(

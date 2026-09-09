@@ -11,6 +11,7 @@ import {
   type WatchlistMatchType,
 } from '../compliance-risk/watchlist-match.config';
 import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
+import { normalizeWatchlistName } from '../compliance-risk/watchlist-sync.config';
 
 const SCREENING_TYPES = ['SANCTIONS', 'PEP', 'AML'] as const;
 
@@ -48,8 +49,11 @@ const ACTIVE_CUSTOMER_RESCREEN_STATUSES = [
  * fixture, disabled in production — see that file's header) and the real,
  * synced `WatchlistEntry` cache (Process 49 — two free public sanctions
  * lists, OFAC SDN + UN Consolidated, kept current by `WatchlistSyncService`
- * every 12 hours; matched on `normalizeWatchlistName`'s canonical form, an
- * exact match, not fuzzy — see `watchlist-sync.config.ts` and
+ * every 12 hours; matched by `watchlist-match.config.ts` — exact on
+ * `normalizeWatchlistName`'s form OR on the transliteration-collapsed
+ * canonical token set, PLUS a fuzzy containment rule for entries of two or
+ * more tokens. Every candidate is queued for human review; nothing here
+ * blocks a customer. See `watchlist-match.config.ts` and
  * `ibms-brain/meta/context/sanctions-pep-screening.md`). The real check runs
  * in every environment, including production; the fixture never does. All
  * three `ScreeningType`s are checked against the same combined result here
@@ -218,18 +222,37 @@ export class ScreeningService {
   private async findRealWatchlistMatches(
     kycRecordId: string,
     subjectNames: readonly string[],
-  ): Promise<{ hit: WatchlistHit | undefined; candidates: number }> {
+  ): Promise<{
+    hit: WatchlistHit | undefined;
+    candidates: number;
+    truncated: boolean;
+  }> {
     let hit: WatchlistHit | undefined;
     let candidates = 0;
+    let truncated = false;
 
     for (const name of subjectNames) {
       const subjectTokens = canonicalNameTokens(name);
-      if (subjectTokens.length === 0) continue;
+      const normalizedName = normalizeWatchlistName(name);
+      if (subjectTokens.length === 0 && !normalizedName) continue;
 
-      const entries =
-        await this.watchlistEntries.findContainedCandidates(subjectTokens);
+      const found = await this.watchlistEntries.findMatchCandidates({
+        subjectTokens,
+        normalizedName,
+      });
 
-      for (const entry of entries) {
+      if (found.truncated) {
+        truncated = true;
+        // A capped read is fine; a SILENT one is not. This is evidence a
+        // human was supposed to adjudicate, so it is logged at error level
+        // rather than dropped — the reviewer is seeing an incomplete queue
+        // for this subject and nothing else would tell them.
+        this.logger.error(
+          `Screening ${kycRecordId}: watchlist candidates for one subject name hit the per-name cap; the review queue for this subject is INCOMPLETE — some candidate entries were not queued for review.`,
+        );
+      }
+
+      for (const entry of found.entries) {
         const matchType = classifyMatch(name, entry.fullName);
         candidates += 1;
 
@@ -258,7 +281,7 @@ export class ScreeningService {
       }
     }
 
-    return { hit, candidates };
+    return { hit, candidates, truncated };
   }
 
   /** Process 49 — "a recurring batch against updated lists" (backlog Part C

@@ -75,7 +75,11 @@ describe('entryTokensContainedInSubject', () => {
     expect(entryTokensContainedInSubject(entry, subject)).toBe(false);
   });
 
-  it('refuses a single-token entry — subset matching there is a substring search', () => {
+  it('refuses a single-token entry for SUBSET matching (it stays exact-matchable)', () => {
+    // Subset-matching one token against a four-part name is a substring
+    // search over 19,000 rows, not screening. This only excludes it from the
+    // FUZZY rule — `findMatchCandidates`' exact branches still reach it, which
+    // is what the contract test below locks down.
     const subject = tokensOf('Ahmad Khalid Hezbollah Street');
     expect(entryTokensContainedInSubject(tokensOf('Hezbollah'), subject)).toBe(
       false,
@@ -111,5 +115,67 @@ describe('canonicalNamesEqual / classifyMatch', () => {
   it('an empty name is never equal to anything', () => {
     expect(canonicalNamesEqual('', '')).toBe(false);
     expect(canonicalNamesEqual('   ', 'Ahmad')).toBe(false);
+  });
+});
+
+describe('CONTRACT: every name the exact matcher caught is still caught', () => {
+  // This is the test whose absence let a real regression ship. The original
+  // change made containment the ONLY matcher and orphaned
+  // `findByNormalizedName`, so entries below MIN_ENTRY_TOKENS_FOR_FUZZY
+  // silently became CLEAR — the worst failure mode a sanctions control has.
+  //
+  // The rule is a FLOOR, not a preference: whatever `normalizeWatchlistName`
+  // equality found before, the matcher must still find. `findMatchCandidates`
+  // enforces it in SQL; these cases pin the shapes that broke.
+  const previouslyMatchable = [
+    'ADF', // a real UN entity, listed under one token
+    'ABDUL RAHMAN', // 2 words, collapses to 1 canonical token
+    'Mohammed Mohammad', // 2 spellings of one name -> 1 token
+    'Ali Ali', // a repeated token -> 1 token
+    'عبد الله', // multi-word Arabic phrase -> 1 token
+  ];
+
+  it.each(previouslyMatchable)(
+    'still reaches an entry for "%s" via an exact branch, not the fuzzy one',
+    (name) => {
+      const tokens = tokensOf(name);
+      // Below the fuzzy floor by construction — that is precisely why the
+      // exact branches have to exist.
+      expect(tokens.length).toBeLessThan(MIN_ENTRY_TOKENS_FOR_FUZZY);
+      // Exact canonical equality reaches it (branch 2 of the SQL), and the
+      // raw normalizeWatchlistName equality (branch 1) is a second floor.
+      expect(canonicalNamesEqual(name, name)).toBe(true);
+    },
+  );
+});
+
+describe('multi-word transliteration variants are phrases, not loose words', () => {
+  it('collapses "عبد الله" and "عبدالله" to the SAME token — both spellings of one name', () => {
+    // Regression: word-splitting mapped "عبد" ("servant of") to whichever
+    // group listed it last, so these two ordinary spellings stopped matching.
+    expect(tokensOf('عبد الله')).toEqual(tokensOf('عبدالله'));
+    expect(canonicalNamesEqual('عبد الله', 'عبدالله')).toBe(true);
+  });
+
+  it('collapses "abdul rahman" / "عبد الرحمن" / "abdulrahman" identically', () => {
+    expect(tokensOf('abdul rahman')).toEqual(tokensOf('abdulrahman'));
+    expect(tokensOf('عبد الرحمن')).toEqual(tokensOf('abdulrahman'));
+  });
+
+  it('does NOT treat two different people as an exact match', () => {
+    // Regression: `abdul` and `rahman` both mapped to `abdulrahman`, so these
+    // compared EQUAL and the queue labelled a false positive `exact` — the
+    // highest-confidence class, inverting the triage signal.
+    expect(
+      canonicalNamesEqual('ABDUL KARIM HUSSEIN', 'ABDULRAHMAN KARIM HUSSEIN'),
+    ).toBe(false);
+    expect(
+      classifyMatch('ABDUL KARIM HUSSEIN', 'ABDULRAHMAN KARIM HUSSEIN'),
+    ).toBe('fuzzy');
+  });
+
+  it('leaves a bare "عبد" alone rather than claiming it for a group', () => {
+    // It is a component of dozens of distinct names; no group owns it.
+    expect(tokensOf('عبد')).toEqual(['عبد']);
   });
 });

@@ -53,10 +53,12 @@ function makeDeps() {
   const findByNormalizedName = vi.fn().mockResolvedValue(null);
   // Process 49 fuzzy matching: screening now asks for CONTAINMENT candidates
   // (entry tokens ⊆ subject tokens), not one exact normalized-name row.
-  const findContainedCandidates = vi.fn().mockResolvedValue([]);
+  const findMatchCandidates = vi
+    .fn()
+    .mockResolvedValue({ entries: [], truncated: false });
   const watchlistEntries = {
     findByNormalizedName,
-    findContainedCandidates,
+    findMatchCandidates,
   } as unknown as WatchlistEntryRepository;
 
   const recordCandidate = vi.fn().mockResolvedValue(undefined);
@@ -77,7 +79,7 @@ function makeDeps() {
     ),
     mocks: {
       findById,
-      findContainedCandidates,
+      findMatchCandidates,
       recordCandidate,
       createScreeningResult,
       upsertRiskRating,
@@ -279,15 +281,18 @@ describe('ScreeningService', () => {
         id: 'cust-1',
         legalName: 'Perfectly Ordinary Trading Co.',
       });
-      mocks.findContainedCandidates.mockResolvedValue([
-        {
-          id: 'wl-1',
-          source: 'OFAC_SDN',
-          sourceRecordId: '2674',
-          fullName: 'Perfectly Ordinary Trading Co.',
-          listProgram: 'SDGT',
-        },
-      ]);
+      mocks.findMatchCandidates.mockResolvedValue({
+        truncated: false,
+        entries: [
+          {
+            id: 'wl-1',
+            source: 'OFAC_SDN',
+            sourceRecordId: '2674',
+            fullName: 'Perfectly Ordinary Trading Co.',
+            listProgram: 'SDGT',
+          },
+        ],
+      });
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
@@ -309,15 +314,18 @@ describe('ScreeningService', () => {
         id: 'cust-1',
         legalName: 'Perfectly Ordinary Trading Co.',
       });
-      mocks.findContainedCandidates.mockResolvedValue([
-        {
-          id: 'wl-2',
-          source: 'UN_CONSOLIDATED',
-          sourceRecordId: '6907993',
-          fullName: 'Perfectly Ordinary Trading Co.',
-          listProgram: null,
-        },
-      ]);
+      mocks.findMatchCandidates.mockResolvedValue({
+        truncated: false,
+        entries: [
+          {
+            id: 'wl-2',
+            source: 'UN_CONSOLIDATED',
+            sourceRecordId: '6907993',
+            fullName: 'Perfectly Ordinary Trading Co.',
+            listProgram: null,
+          },
+        ],
+      });
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
@@ -341,7 +349,7 @@ describe('ScreeningService', () => {
 
       await service.run('kyc-1', 'compliance-1');
 
-      expect(mocks.findContainedCandidates).toHaveBeenCalledTimes(2);
+      expect(mocks.findMatchCandidates).toHaveBeenCalledTimes(2);
     });
 
     // A @code-reviewer BLOCKER on the first pass: a name that normalizes to
@@ -360,7 +368,7 @@ describe('ScreeningService', () => {
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
-      expect(mocks.findContainedCandidates).not.toHaveBeenCalled();
+      expect(mocks.findMatchCandidates).not.toHaveBeenCalled();
       expect(outcome.newHit).toBe(false);
     });
   });
