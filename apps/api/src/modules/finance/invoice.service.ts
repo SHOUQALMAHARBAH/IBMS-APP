@@ -13,6 +13,7 @@ import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
 import { RecommendationRepository } from '../../repositories/recommendation.repository';
+import { CommissionRepository } from '../../repositories/commission.repository';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
   compareMoney,
@@ -104,6 +105,7 @@ export class InvoiceService {
     private readonly invoices: InvoiceRepository,
     private readonly policies: PolicyRepository,
     private readonly recommendations: RecommendationRepository,
+    private readonly commissions: CommissionRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -126,22 +128,20 @@ export class InvoiceService {
     // ibms-brain/meta/context/finance-lifecycle.md.
     const premiumAmount = quantizeMoney(policy.issuedPremium);
 
-    // Commission is auto-derived from the rate the policy was placed at
-    // (Recommendation.recommendedQuotation.commissionRatePercent) — the same
-    // path #22 uses. A policy whose quotation captured no rate cannot be
-    // billed "net of commission". NOTE (tracked, README § Known gaps #31):
-    // there is no Policy -> Quotation link, so a post-recommendation
-    // negotiation round (#15) that produced a newer quotation version with a
-    // different rate would leave this netting the recommended-quote's rate;
-    // Process 35's CommissionAgreement (by insurer + line) replaces this.
-    const recommendation = await this.recommendations.findByOpportunityId(
+    // Commission rate resolution (3.1 P0 fix: use governed rate as source of
+    // truth). Process 35's CommissionAgreement (by insurer + line + effective
+    // date) is the authoritative rate. If no governed rate exists for this
+    // policy at invoice time, fall back to the placed quotation's rate
+    // (Recommendation.recommendedQuotation.commissionRatePercent).
+    let commissionRatePercent = await this.resolvePolicyCommissionRate(
+      policy.insurerId,
+      policy.insuranceLine,
+      policy.inceptionDate ?? new Date(),
       policy.opportunityId,
     );
-    const commissionRatePercent =
-      recommendation?.recommendedQuotation.commissionRatePercent;
     if (commissionRatePercent == null) {
       throw new UnprocessableEntityException(
-        "This policy's quotation captured no commission rate — the invoice cannot be netted of commission. Capture the rate on the quotation first (Process 13).",
+        "No commission rate found for this policy — either set a commission agreement (Process 35) or capture the rate on the quotation (Process 13).",
       );
     }
 
@@ -282,6 +282,31 @@ export class InvoiceService {
       ? await this.invoices.findManyByPolicyId(query.policyId)
       : await this.invoices.findManyByCustomerId(query.customerId as string);
     return rows.map(deriveInvoiceView);
+  }
+
+  /** Resolve the commission rate for an invoice: prefer the governed
+   * CommissionAgreement rate (Process 35) as the source of truth, fall back
+   * to the placed quotation's rate (Process 13) if no agreement exists. */
+  private async resolvePolicyCommissionRate(
+    insurerId: string,
+    insuranceLine: string,
+    inceptionDate: Date,
+    opportunityId: string,
+  ): Promise<Prisma.Decimal | null> {
+    // Try governed rate first (source of truth for commission)
+    const agreement = await this.commissions.findEffectiveAgreement(
+      insurerId,
+      insuranceLine,
+      inceptionDate,
+    );
+    if (agreement) {
+      return agreement.ratePercent;
+    }
+
+    // Fall back to quotation rate if no governed agreement exists
+    const recommendation =
+      await this.recommendations.findByOpportunityId(opportunityId);
+    return recommendation?.recommendedQuotation.commissionRatePercent ?? null;
   }
 
   /** Audit failures never fail the request — the write has already committed
