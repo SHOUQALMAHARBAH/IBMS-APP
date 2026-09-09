@@ -10,6 +10,7 @@ import { InvoiceService } from './invoice.service';
 import type { InvoiceRepository } from '../../repositories/invoice.repository';
 import type { PolicyRepository } from '../../repositories/policy.repository';
 import type { RecommendationRepository } from '../../repositories/recommendation.repository';
+import type { CommissionRepository } from '../../repositories/commission.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -71,14 +72,21 @@ function makeDeps(over?: {
           : { recommendedQuotation: { commissionRatePercent: over.rate } },
       ),
   };
+  // Mock for new findEffectiveAgreement method (Fix #1)
+  const commissions = {
+    findEffectiveAgreement: vi
+      .fn()
+      .mockResolvedValue(null), // Fall back to quoted rate
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const service = new InvoiceService(
     invoices as unknown as InvoiceRepository,
     policies as unknown as PolicyRepository,
     recommendations as unknown as RecommendationRepository,
+    commissions as unknown as CommissionRepository,
     audit as unknown as AuditService,
   );
-  return { service, invoices, policies, recommendations, audit };
+  return { service, invoices, policies, recommendations, commissions, audit };
 }
 
 const dto = () => ({
