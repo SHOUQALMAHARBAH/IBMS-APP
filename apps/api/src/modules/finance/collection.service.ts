@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { PaymentChannel } from '@ibms/db';
+import type { ClientFundsLedgerEntry, PaymentChannel, Receipt } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import {
@@ -169,35 +169,58 @@ export class CollectionService {
     dto: RecordReceiptDto,
     actor: AuthenticatedUser,
   ): Promise<InvoiceView> {
-    let invoice = await this.loadInvoice(invoiceId);
+    const invoice = await this.loadInvoice(invoiceId);
     const amount = quantizeMoney(dto.amount);
     // Load-only (404 on an unknown id) — the usability checks come after the
-    // write-once resume, so a retry after the channel was disabled still resumes.
+    // idempotent resume, so a retry after the channel was disabled still resumes.
     const channel = await this.loadChannel(dto.paymentChannelId);
     const paymentChannelId = channel?.id ?? null;
     const method = this.receiptMethodFor(channel, dto.method ?? null);
+    const reference = dto.reference ?? null;
     const receivedAt = dto.receivedAt
       ? parseHistoricalInstant(dto.receivedAt, 'receivedAt')
       : new Date();
 
-    const existingReceipt = invoice.receipts[0];
-    if (existingReceipt) {
-      // A receipt exists => the INVOICED -> COLLECTED transition already
-      // committed. A byte-identical re-post is an idempotent no-op; any
-      // different amount / method / channel is a 409 (recorded once — no amend
-      // path).
-      const same =
-        compareMoney(existingReceipt.amount, amount) === 0 &&
-        (existingReceipt.method ?? null) === method &&
-        (existingReceipt.paymentChannelId ?? null) === paymentChannelId;
-      if (!same) {
-        throw new ConflictException(
-          `Invoice ${invoiceId} already has a collection receipt (${formatMoney(
-            existingReceipt.amount,
-          )}). Receipts are recorded once — a correction is not yet supported.`,
-        );
+    // Idempotent retry. With instalments allowed, figures alone can no longer
+    // tell a retry from a genuine second payment of the same amount, so the
+    // client's payment `reference` is the key (partial UNIQUE per invoice).
+    if (reference !== null) {
+      const already = invoice.receipts.find((r) => r.reference === reference);
+      if (already) {
+        const same =
+          compareMoney(already.amount, amount) === 0 &&
+          (already.method ?? null) === method &&
+          (already.paymentChannelId ?? null) === paymentChannelId;
+        if (!same) {
+          throw new ConflictException(
+            `Invoice ${invoiceId} already has a receipt with reference "${reference}" for ${formatMoney(
+              already.amount,
+            )}. A receipt is recorded once — a correction is not yet supported.`,
+          );
+        }
+        return deriveInvoiceView(invoice);
       }
-      return deriveInvoiceView(invoice);
+    }
+
+    if (invoice.status !== 'INVOICED' && invoice.status !== 'COLLECTED') {
+      throw new UnprocessableEntityException(
+        `Invoice ${invoiceId} is ${invoice.status}; a collection receipt is recorded while it is INVOICED.`,
+      );
+    }
+
+    const collectedSoFar = sumMoney(invoice.receipts.map((r) => r.amount));
+    if (compareMoney(collectedSoFar, invoice.totalAmount) >= 0) {
+      throw new UnprocessableEntityException(
+        `Invoice ${invoiceId} is already collected in full (${formatMoney(
+          collectedSoFar,
+        )} of ${formatMoney(invoice.totalAmount)}). An over payment is a variance — record it through Process 39, not here.`,
+      );
+    }
+
+    if (compareMoney(amount, '0') <= 0) {
+      throw new UnprocessableEntityException(
+        `amount (${formatMoney(amount)}) must be greater than zero.`,
+      );
     }
 
     // A NEW receipt — the supplied channel must be usable now.
@@ -205,120 +228,34 @@ export class CollectionService {
       this.assertReceiptChannelUsable(channel, invoice, dto.method ?? null);
     }
 
-    // No receipt yet. The exact-amount rule is the loud "never a silent
-    // write-off" gate (money-decimal-jod.md) — checked before the transition.
-    if (compareMoney(amount, invoice.totalAmount) !== 0) {
-      throw new UnprocessableEntityException(
-        `amount (${formatMoney(amount)}) must equal the invoiced total (${formatMoney(
-          invoice.totalAmount,
-        )}). A partial or over payment is a variance — record it through Process 39, not here.`,
-      );
-    }
-
-    if (invoice.status === 'INVOICED') {
-      try {
-        await this.workflow.transition({
-          entityType: 'Invoice',
-          entityId: invoiceId,
-          toStatus: 'COLLECTED',
-          actorUserId: actor.id,
-        });
-      } catch (err) {
-        // INVOICED -> COLLECTED is a legal edge and the invoice was INVOICED a
-        // moment ago, so the only failures are a concurrent receipt winning
-        // the race (0-rows ConflictException, or the engine's "already in
-        // status COLLECTED"). Reload and handle it as an already-collected
-        // invoice.
-        invoice = await this.loadInvoice(invoiceId);
-        if (invoice.status === 'INVOICED') throw err;
-        return this.finishReceipt(
-          invoice,
-          amount,
-          method,
-          paymentChannelId,
-          receivedAt,
-          actor,
-        );
-      }
-      invoice = await this.loadInvoice(invoiceId);
-      return this.finishReceipt(
-        invoice,
-        amount,
-        method,
-        paymentChannelId,
-        receivedAt,
-        actor,
-      );
-    }
-
-    if (invoice.status === 'COLLECTED') {
-      // Crash-recovery re-entry: the transition committed but the receipt
-      // write did not. Resume it without re-transitioning.
-      this.logger.warn(
-        `Invoice ${invoiceId}: resuming a partially-completed receipt (status COLLECTED, no receipt row).`,
-      );
-      return this.finishReceipt(
-        invoice,
-        amount,
-        method,
-        paymentChannelId,
-        receivedAt,
-        actor,
-      );
-    }
-
-    throw new UnprocessableEntityException(
-      `Invoice ${invoiceId} is ${invoice.status}; a collection receipt is recorded while it is INVOICED.`,
-    );
-  }
-
-  private async finishReceipt(
-    invoice: InvoiceWithCycle,
-    amount: Prisma.Decimal,
-    method: string | null,
-    paymentChannelId: string | null,
-    receivedAt: Date,
-    actor: AuthenticatedUser,
-  ): Promise<InvoiceView> {
-    if (invoice.receipts[0]) {
-      // Another concurrent caller wrote the receipt between our transition and
-      // here — byte-identical is fine, anything else is a 409.
-      const existing = invoice.receipts[0];
-      const same =
-        compareMoney(existing.amount, amount) === 0 &&
-        (existing.method ?? null) === method &&
-        (existing.paymentChannelId ?? null) === paymentChannelId;
-      if (!same) {
-        throw new ConflictException(
-          `Invoice ${invoice.id} already has a collection receipt (created concurrently with different figures).`,
-        );
-      }
-      return deriveInvoiceView(invoice);
-    }
-
-    let created: Awaited<
+    // The write itself re-derives the running total under a row lock on the
+    // parent Invoice and refuses an overshoot there, so this pre-check is a
+    // friendly early 422, not the gate (race-safe-invariants.md — the gate is
+    // the serialised write).
+    let written: Awaited<
       ReturnType<InvoiceRepository['recordReceiptWithLedger']>
     >;
     try {
-      created = await this.invoices.recordReceiptWithLedger({
+      written = await this.invoices.recordReceiptWithLedger({
         invoiceId: invoice.id,
         customerId: invoice.customerId,
         amount,
         method,
+        reference,
         paymentChannelId,
         receivedAt,
         ledgerReference: `invoice:${invoice.id}`,
       });
     } catch (err) {
-      if (isUniqueViolation(err)) {
-        // `Receipt.invoiceId @unique` fired — a concurrent caller's receipt
-        // committed between our `receipts[0]` read above and this write (it
-        // lost the transition race but still reached here before we did). A
-        // byte-identical race is an idempotent resume; a genuinely different
-        // amount / method / channel is a 409. This is the "the write re-asserts
-        // the condition" half of race-safe-invariants.md.
+      // `Receipt_invoiceId_reference_key` fired — the retry this reference
+      // exists to make safe raced itself, and the winner's row committed
+      // between our idempotency read above and this write. Resolve it exactly
+      // as the read would have: byte-identical is an idempotent resume,
+      // anything else is a 409. This is the "the write re-asserts the
+      // condition" half of race-safe-invariants.md.
+      if (isUniqueViolation(err) && reference !== null) {
         const now = await this.loadInvoice(invoice.id);
-        const landed = now.receipts[0];
+        const landed = now.receipts.find((r) => r.reference === reference);
         if (
           landed &&
           compareMoney(landed.amount, amount) === 0 &&
@@ -328,42 +265,91 @@ export class CollectionService {
           return deriveInvoiceView(now);
         }
         throw new ConflictException(
-          `Invoice ${invoice.id} already has a collection receipt with different figures (created concurrently).`,
+          `Invoice ${invoice.id} already has a receipt with reference "${reference}" (created concurrently with different figures).`,
         );
       }
       throw err;
     }
 
+    if (written.outcome === 'exceeds_total') {
+      throw new UnprocessableEntityException(
+        `amount (${formatMoney(amount)}) would take the collected total to more than the invoiced total (${formatMoney(
+          written.collectedBefore,
+        )} already collected of ${formatMoney(
+          written.totalAmount,
+        )}). An over payment is a variance — record it through Process 39, not here.`,
+      );
+    }
+
+    await this.auditReceipt(
+      invoice,
+      written.receipt,
+      written.ledgerEntry,
+      actor,
+    );
+
+    // Only the instalment that COMPLETES the invoice moves it on. A part
+    // payment leaves it INVOICED, which is what keeps it on the #33 ageing
+    // report (for its remaining balance) and off the #34 payables report.
+    if (written.fullyCollected && invoice.status === 'INVOICED') {
+      try {
+        await this.workflow.transition({
+          entityType: 'Invoice',
+          entityId: invoiceId,
+          toStatus: 'COLLECTED',
+          actorUserId: actor.id,
+        });
+      } catch (err) {
+        // The receipt and its ledger row have committed — they are the
+        // authoritative money record. A concurrent final instalment may have
+        // already walked the invoice to COLLECTED; either way the status
+        // self-heals on the next call (`reconcile` re-derives the sum from
+        // live rows regardless). Logged, never thrown.
+        this.logger.warn(
+          `Invoice ${invoiceId}: receipt ${written.receipt.id} committed but the INVOICED -> COLLECTED transition did not apply: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return deriveInvoiceView(await this.loadInvoice(invoiceId));
+  }
+
+  /** Best-effort audit of a committed instalment: the receipt and its
+   * client-funds movement, money as fixed 3dp strings, no free text. */
+  private async auditReceipt(
+    invoice: InvoiceWithCycle,
+    receipt: Receipt,
+    ledgerEntry: ClientFundsLedgerEntry,
+    actor: AuthenticatedUser,
+  ): Promise<void> {
     await this.safeAudit({
       userId: actor.id,
       action: 'CREATE',
       entityType: 'Receipt',
-      entityId: created.receipt.id,
+      entityId: receipt.id,
       afterValue: receiptAuditSnapshot({
-        receiptId: created.receipt.id,
+        receiptId: receipt.id,
         invoiceId: invoice.id,
         customerId: invoice.customerId,
-        amount: created.receipt.amount,
-        method: created.receipt.method,
-        paymentChannelId: created.receipt.paymentChannelId,
-        receivedAt: created.receipt.receivedAt,
+        amount: receipt.amount,
+        method: receipt.method,
+        paymentChannelId: receipt.paymentChannelId,
+        receivedAt: receipt.receivedAt,
       }),
     });
     await this.safeAudit({
       userId: actor.id,
       action: 'CREATE',
       entityType: 'ClientFundsLedgerEntry',
-      entityId: created.ledgerEntry.id,
+      entityId: ledgerEntry.id,
       afterValue: clientFundsLedgerAuditSnapshot({
-        entryId: created.ledgerEntry.id,
-        customerId: created.ledgerEntry.customerId,
-        amount: created.ledgerEntry.amount,
-        direction: created.ledgerEntry.direction,
-        reference: created.ledgerEntry.reference,
+        entryId: ledgerEntry.id,
+        customerId: ledgerEntry.customerId,
+        amount: ledgerEntry.amount,
+        direction: ledgerEntry.direction,
+        reference: ledgerEntry.reference,
       }),
     });
-
-    return deriveInvoiceView(await this.loadInvoice(invoice.id));
   }
 
   // --- 2. Reconciliation (COLLECTED -> RECONCILED) -----------------------
@@ -446,6 +432,13 @@ export class CollectionService {
       );
     }
 
+    // The Remittance hangs off ONE receipt (`Remittance.receiptId @unique` is
+    // what keeps it to one per invoice). With instalments an invoice can have
+    // several, so the anchor is fixed deliberately at the FIRST one
+    // (`receipts` arrives ordered `receivedAt asc`) — arbitrary but stable, so
+    // a retry always resolves to the same row. Reaching here at all means the
+    // invoice is RECONCILED, which `reconcile()` only grants once the
+    // instalments sum to the invoiced total.
     const receipt = invoice.receipts[0];
     if (!receipt) {
       throw new UnprocessableEntityException(

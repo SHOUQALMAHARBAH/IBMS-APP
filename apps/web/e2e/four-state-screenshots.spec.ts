@@ -98,7 +98,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
   const g = gate([CUSTOMER_AR]);
   await page.route("http://localhost:4000/customers", g.route);
   await page.goto("/customers");
-  await expect(page.getByText("Loading…")).toBeVisible();
+  await expect(page.getByText("جارٍ التحميل…")).toBeVisible();
   await capture(page, "customers", "loading");
   g.resolve();
   await expect(page.getByText("شركة الأفق للتأمين")).toBeVisible();
@@ -110,7 +110,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
     route.fulfill({ status: 200, json: [] }),
   );
   await page.goto(page.url());
-  await expect(page.getByText("No customers yet.")).toBeVisible();
+  await expect(page.getByText("لا يوجد عملاء بعد.")).toBeVisible();
   await capture(page, "customers", "empty");
   await page.unroute("http://localhost:4000/customers");
 
@@ -524,16 +524,6 @@ const RECOMMENDATION = {
   blockedFromSend: [],
 };
 
-const CLIENT_DECISION = {
-  id: "cd-1",
-  opportunityId: "opp-1",
-  decision: "ACCEPT",
-  evidenceType: "e-signature",
-  evidenceRef: "env-1",
-  notes: null,
-  decidedAt: "2026-09-06T00:00:00.000Z",
-};
-
 const POLICY = {
   id: "pol-1",
   opportunityId: "opp-1",
@@ -589,7 +579,13 @@ const INVOICE = {
   status: "INVOICED",
   createdAt: "2026-09-08T00:00:00.000Z",
   netRemittance: "104280.000",
+  // Process 32 — an invoice may be settled in instalments; the view carries
+  // the running totals alongside the receipt list.
+  receipts: [],
   receipt: null,
+  collectedAmount: "0.000",
+  outstandingAmount: "113910.000",
+  fullyCollected: false,
   remittance: null,
 };
 

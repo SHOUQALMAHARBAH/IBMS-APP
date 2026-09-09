@@ -6,6 +6,7 @@ import { useAuth } from '../../../lib/auth/auth-context';
 import {
   listOpportunities,
   type Opportunity,
+  type OpportunityStatus,
 } from '../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
@@ -13,10 +14,24 @@ import { cardMetaStyle, pageStyle } from '../../../components/lead/lead.styles';
 import { rfqBadgeStyle, rfqCardStyle } from '../../../components/rfq/rfq.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import type { TranslationKey } from '../../../lib/i18n/translations';
+
+const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
+  NEEDS_CONFIRMED: 'oppStatusNeedsConfirmed',
+  RFQ_ISSUED: 'oppStatusRfqIssued',
+  QUOTES_RECEIVED: 'oppStatusQuotesReceived',
+  COMPARISON_BUILT: 'oppStatusComparisonBuilt',
+  RECOMMENDATION_DRAFTED: 'oppStatusRecommendationDrafted',
+  SENT_TO_CLIENT: 'oppStatusSentToClient',
+  CLIENT_DECISION: 'oppStatusClientDecision',
+  PLACEMENT: 'oppStatusPlacement',
+  RENEGOTIATE: 'oppStatusRenegotiate',
+  CLOSED_LOST: 'oppStatusClosedLost',
+};
 
 function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [opportunities, setOpportunities] = useState<Opportunity[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -27,15 +42,15 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the opportunity.read permission, so there's nothing to show here."
+          ? t('oppListNoPermission')
           : err instanceof ApiError && err.status === 404
-            ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+            ? t('oppCustomerNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load opportunities — try again.',
+              : t('oppListLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
@@ -50,14 +65,11 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!opportunities) return <p>Loading…</p>;
+  if (!opportunities) return <p>{t('commonLoading')}</p>;
 
   if (opportunities.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-        No opportunities for this customer yet. Open a finalized insurance
-        program and choose &ldquo;Take to market&rdquo; to create one.
-      </p>
+      <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('oppListNoneYet')}</p>
     );
   }
 
@@ -78,12 +90,14 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
               flexWrap: 'wrap',
             }}
           >
-            <strong>Opportunity {opportunity.id.slice(0, 8)}</strong>
-            <span style={rfqBadgeStyle}>{opportunity.status}</span>
+            <strong>{t('oppCardHeading', { id: opportunity.id.slice(0, 8) })}</strong>
+            <span style={rfqBadgeStyle}>{t(OPPORTUNITY_STATUS_LABEL_KEY[opportunity.status])}</span>
           </div>
           <div style={cardMetaStyle}>
-            {opportunity.isRenewal ? 'Renewal' : 'New business'} · created{' '}
-            {formatDate(opportunity.createdAt, language)}
+            {t('oppCreatedMeta', {
+              type: t(opportunity.isRenewal ? 'oppRenewal' : 'oppNewBusiness'),
+              date: formatDate(opportunity.createdAt, language),
+            })}
           </div>
         </button>
       ))}
@@ -94,20 +108,21 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
 function OpportunitiesFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
+        {t('oppNoCustomerSelectedPrefix')}{' '}
         <button
           type="button"
           onClick={() => router.push('/customers')}
           style={{ textDecoration: 'underline', cursor: 'pointer' }}
         >
-          Customers
+          {t('navCustomers')}
         </button>{' '}
-        and reach its opportunities from a finalized insurance program.
+        {t('oppNoCustomerSelectedSuffix')}
       </p>
     );
   }
@@ -118,6 +133,7 @@ function OpportunitiesFlow() {
 export default function OpportunitiesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -127,12 +143,8 @@ export default function OpportunitiesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>RFQ / market</h1>
-      <p style={{ opacity: 0.8 }}>
-        Process 11 — a finalized insurance program is taken to market as an
-        Opportunity. Open one to raise an RFQ per insurance line and send it to
-        a shortlist of insurers.
-      </p>
+      <h1>{t('oppListHeading')}</h1>
+      <p style={{ opacity: 0.8 }}>{t('oppListIntro')}</p>
       <Suspense fallback={null}>
         <OpportunitiesFlow />
       </Suspense>

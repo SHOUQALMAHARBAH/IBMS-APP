@@ -47,6 +47,13 @@ import { SecurityConfigRepository } from '../../repositories/security-config.rep
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: StepUpGuard },
   ],
-  exports: [SessionService, SecurityConfigService, UserRepository],
+  exports: [
+    SessionService,
+    SecurityConfigService,
+    UserRepository,
+    // RbacModule's UserAdminService hashes the provisioned account's password
+    // with the same Part 10.1 policy + bcrypt cost signup and reset use.
+    PasswordService,
+  ],
 })
 export class AuthModule {}

@@ -33,5 +33,8 @@ import { AuditModule } from '../audit/audit.module';
     ClaimsDashboardRepository,
     LossRatioRepository,
   ],
+  // Exported for `ExecutiveDashboardService` (#64), which rolls this
+  // dashboard up rather than re-deriving its figures from the same tables.
+  exports: [ClaimsDashboardService],
 })
 export class ClaimsDashboardModule {}

@@ -25,5 +25,8 @@ import { AuditModule } from '../audit/audit.module';
   imports: [AuditModule],
   controllers: [SalesDashboardController],
   providers: [SalesDashboardService, SalesDashboardRepository],
+  // Exported for `ExecutiveDashboardService` (#64), which rolls this
+  // dashboard up rather than re-deriving its figures from the same tables.
+  exports: [SalesDashboardService],
 })
 export class SalesDashboardModule {}

@@ -60,6 +60,16 @@ interface InvoiceBody {
     method: string | null;
     paymentChannelId: string | null;
   } | null;
+  // Process 32 — an invoice may be settled in instalments.
+  receipts: {
+    id: string;
+    amount: string;
+    method: string | null;
+    paymentChannelId: string | null;
+  }[];
+  collectedAmount: string;
+  outstandingAmount: string;
+  fullyCollected: boolean;
   remittance: {
     id: string;
     amount: string;
@@ -653,31 +663,78 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .send({})
       .expect(422);
 
-    // a short payment is a 422 — never a silent write-off
-    await request(app.getHttpServer())
+    // 1a. A SHORT payment is a legitimate instalment (partial payments,
+    //     IMPROVEMENTS.md §3.4) — the money is booked but the invoice stays
+    //     INVOICED, which is what keeps it on the #33 ageing report for the
+    //     remaining balance and off the #34 payables report.
+    const partial = await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
       .send({ amount: '100000.000', method: 'bank_transfer' })
+      .expect(201);
+    expect((partial.body as InvoiceBody).status).toBe('INVOICED');
+    expect((partial.body as InvoiceBody).collectedAmount).toBe('100000.000');
+    expect((partial.body as InvoiceBody).outstandingAmount).toBe('15350.000');
+    expect((partial.body as InvoiceBody).fullyCollected).toBe(false);
+
+    // An OVER payment is still a 422 — never a silent write-off. 15,350 is
+    // outstanding, so 20,000 would overshoot the invoiced total.
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '20000.000', method: 'bank_transfer' })
       .expect(422);
 
-    // 1. collection receipt -> COLLECTED
+    // 1b. the instalment that settles the balance -> COLLECTED. It carries a
+    //     payment `reference`, which is what makes a retry of THIS call
+    //     idempotent (asserted below).
     const collected = await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .send({
+        amount: '15350.000',
+        method: 'bank_transfer',
+        reference: 'BANK-REF-FINAL',
+      })
       .expect(201);
     expect((collected.body as InvoiceBody).status).toBe('COLLECTED');
-    expect((collected.body as InvoiceBody).receipt?.amount).toBe('115350.000');
+    expect((collected.body as InvoiceBody).collectedAmount).toBe('115350.000');
+    expect((collected.body as InvoiceBody).outstandingAmount).toBe('0.000');
+    expect((collected.body as InvoiceBody).fullyCollected).toBe(true);
+    expect((collected.body as InvoiceBody).receipts).toHaveLength(2);
 
-    // idempotent: a byte-identical re-post resumes the same receipt
+    // A further receipt on a settled invoice is an over payment -> 422.
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '1.000', method: 'bank_transfer' })
+      .expect(422);
+
+    // Idempotent RETRY: the same payment reference resumes the same receipt
+    // rather than booking a second instalment. Since an invoice may legitimately
+    // take several receipts of the same amount, the reference — not the figures
+    // — is what distinguishes a retry from a genuine second payment.
     const collectedAgain = await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .send({
+        amount: '15350.000',
+        method: 'bank_transfer',
+        reference: 'BANK-REF-FINAL',
+      })
       .expect(201);
+    expect((collectedAgain.body as InvoiceBody).receipts).toHaveLength(2);
     expect((collectedAgain.body as InvoiceBody).receipt?.id).toBe(
       (collected.body as InvoiceBody).receipt?.id,
     );
+
+    // The same reference with a DIFFERENT amount is a 409 — a recorded receipt
+    // is never amended.
+    await request(app.getHttpServer())
+      .post(`/invoices/${invoiceId}/receipt`)
+      .set(bearer(fin.accessToken))
+      .send({ amount: '99.000', reference: 'BANK-REF-FINAL' })
+      .expect(409);
 
     // 2. reconcile -> RECONCILED (idempotent)
     const reconciled = await request(app.getHttpServer())
@@ -716,19 +773,29 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     });
     expect(transitions).toHaveLength(3);
 
-    // exactly one Receipt on the invoice — the UNIQUE backstop held
-    expect(await prisma.receipt.count({ where: { invoiceId } })).toBe(1);
+    // TWO receipts — the two instalments above — and no more. The retries and
+    // the over-payment attempts each booked nothing: with `Receipt.invoiceId`
+    // no longer UNIQUE, this count is the real evidence that the serialised
+    // write + the reference idempotency key hold the line.
+    expect(await prisma.receipt.count({ where: { invoiceId } })).toBe(2);
 
-    // one "in" ledger entry at the collected total, one "out" at the remittance
+    // One "in" ledger entry PER INSTALMENT, one "out" at the remittance —
+    // client money is booked exactly once per movement (Part 7.3).
     const ledger = await prisma.clientFundsLedgerEntry.findMany({
       where: { customerId, reference: `invoice:${invoiceId}` },
       orderBy: { recordedAt: 'asc' },
     });
-    expect(ledger).toHaveLength(2);
+    expect(ledger).toHaveLength(3);
     expect(ledger[0]?.direction).toBe('in');
-    expect(ledger[0]?.amount.toString()).toBe('115350');
-    expect(ledger[1]?.direction).toBe('out');
-    expect(ledger[1]?.amount.toString()).toBe('105600');
+    expect(ledger[0]?.amount.toString()).toBe('100000');
+    expect(ledger[1]?.direction).toBe('in');
+    expect(ledger[1]?.amount.toString()).toBe('15350');
+    // The two instalments sum to the invoiced total, nothing double-booked.
+    expect(
+      Number(ledger[0]?.amount ?? 0) + Number(ledger[1]?.amount ?? 0),
+    ).toBe(115350);
+    expect(ledger[2]?.direction).toBe('out');
+    expect(ledger[2]?.amount.toString()).toBe('105600');
   });
 
   it('serves the client accounts-receivable / ageing report — outstanding while unpaid, bucketed by dueDate vs asOf, gone once collected (Part C #33)', async () => {
@@ -1140,7 +1207,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     const collected = await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', paymentChannelId: custChanId })
+      .send({
+        amount: '115350.000',
+        paymentChannelId: custChanId,
+        reference: 'BANK-REF-1',
+      })
       .expect(201);
     expect((collected.body as InvoiceBody).receipt?.paymentChannelId).toBe(
       custChanId,
@@ -1149,17 +1220,24 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       'bank_transfer',
     );
 
-    // a re-post with a DIFFERENT channel -> 409
+    // Since partial payments landed, the figures alone can no longer tell a
+    // retry from a genuine second instalment, so the client's payment
+    // `reference` is the idempotency key. Same reference + DIFFERENT channel
+    // -> 409 (a recorded receipt is not amended).
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000' })
+      .send({ amount: '115350.000', reference: 'BANK-REF-1' })
       .expect(409);
-    // byte-identical re-post -> resume
+    // byte-identical re-post on the same reference -> idempotent resume
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', paymentChannelId: custChanId })
+      .send({
+        amount: '115350.000',
+        paymentChannelId: custChanId,
+        reference: 'BANK-REF-1',
+      })
       .expect(201);
 
     await request(app.getHttpServer())

@@ -119,6 +119,30 @@ export class CommissionRepository {
     });
   }
 
+  /** The agreement effective at a specific date for a pair (or null) — used
+   * during invoice creation to determine the governed commission rate at the
+   * time of billing. Returns the most-recent agreement whose effectiveFrom is
+   * before-or-at the given date and whose effectiveTo is after the date (or
+   * null if still open). */
+  findEffectiveAgreement(
+    insurerId: string,
+    insuranceLine: string,
+    asOfDate: Date,
+  ): Promise<CommissionAgreement | null> {
+    return this.prisma.client.commissionAgreement.findFirst({
+      where: {
+        insurerId,
+        insuranceLine: { equals: insuranceLine.trim(), mode: 'insensitive' },
+        effectiveFrom: { lte: asOfDate },
+        OR: [
+          { effectiveTo: null }, // Open agreement
+          { effectiveTo: { gt: asOfDate } }, // Closed but still in effect
+        ],
+      },
+      orderBy: { effectiveFrom: 'desc' }, // Most recent first
+    });
+  }
+
   /**
    * Open a new governed rate window for a pair, closing the prior open one (if
    * any) at the new window's `effectiveFrom` — both in ONE `$transaction` (a

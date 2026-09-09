@@ -52,7 +52,16 @@ export interface Invoice {
   createdAt: string;
   /** premium − commission — the net owed to the insurer, computed server-side. */
   netRemittance: string;
+  /** Process 32 — every instalment recorded against this invoice, oldest
+   * first. An invoice may be settled in parts. */
+  receipts: InvoiceReceipt[];
+  /** The most recent instalment (or null). */
   receipt: InvoiceReceipt | null;
+  /** Σ of every instalment so far, computed server-side. */
+  collectedAmount: string;
+  /** `totalAmount − collectedAmount`; `0.000` once settled. */
+  outstandingAmount: string;
+  fullyCollected: boolean;
   remittance: InvoiceRemittance | null;
 }
 
@@ -74,11 +83,14 @@ export function createInvoice(input: CreateInvoiceInput): Promise<Invoice> {
   return apiPost('/invoices', input);
 }
 
-/** Process 32 — record the client's collection receipt for the full invoiced
- * total. Drives `INVOICED → COLLECTED`. */
+/** Process 32 — record one collection instalment. `amount` may be less than
+ * the invoiced total; the invoice walks `INVOICED → COLLECTED` only on the
+ * instalment that completes it. `reference` (the client's payment/bank
+ * reference) is the idempotency key — supply it so a retried submit resumes
+ * instead of booking a second instalment. */
 export function recordReceipt(
   invoiceId: string,
-  input: { amount: string; method?: string },
+  input: { amount: string; method?: string; reference?: string },
 ): Promise<Invoice> {
   return apiPost(`/invoices/${invoiceId}/receipt`, input);
 }

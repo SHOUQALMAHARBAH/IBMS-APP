@@ -15,7 +15,7 @@
     "test:a11y": "playwright test --grep @a11y"
   },
   "dependencies": {
-    "next": "16.3.2",
+    "next": "^16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -30,9 +30,9 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "^16.3.4",
     "jsdom": "^25.0.1",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.0"
   }
 }

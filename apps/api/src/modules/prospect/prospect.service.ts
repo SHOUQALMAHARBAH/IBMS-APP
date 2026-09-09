@@ -1,9 +1,11 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { Prisma } from '@ibms/db';
 import type { Prospect } from '@ibms/db';
 import { ProspectRepository } from '../../repositories/prospect.repository';
 import { LeadRepository } from '../../repositories/lead.repository';
@@ -68,21 +70,34 @@ export class ProspectService {
       );
     }
 
-    const prospect = await this.prospects.create({
-      leadId: dto.leadId,
-      companyName: dto.companyName,
-      sector: dto.sector,
-      activity: dto.activity,
-      employeeCount: dto.employeeCount,
-      businessSize: dto.businessSize,
-      location: dto.location,
-      contactPerson: dto.contactPerson,
-      productsOfInterest: dto.productsOfInterest ?? [],
-      expectedPremium: dto.expectedPremium
-        ? quantizeMoney(dto.expectedPremium)
-        : undefined,
-      salesOwnerUserId: actorUserId,
-    });
+    let prospect: Prospect;
+    try {
+      prospect = await this.prospects.create({
+        leadId: dto.leadId,
+        companyName: dto.companyName,
+        sector: dto.sector,
+        activity: dto.activity,
+        employeeCount: dto.employeeCount,
+        businessSize: dto.businessSize,
+        location: dto.location,
+        contactPerson: dto.contactPerson,
+        productsOfInterest: dto.productsOfInterest ?? [],
+        expectedPremium: dto.expectedPremium
+          ? quantizeMoney(dto.expectedPremium)
+          : undefined,
+        salesOwnerUserId: actorUserId,
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `Lead ${dto.leadId} has already been converted to a Prospect.`,
+        );
+      }
+      throw err;
+    }
 
     await this.workflow.transition({
       entityType: 'Lead',

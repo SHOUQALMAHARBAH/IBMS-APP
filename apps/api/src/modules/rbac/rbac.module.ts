@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { RbacController } from './controllers/rbac.controller';
 import { AccessRecertificationController } from './controllers/access-recertification.controller';
+import { UserAdminController } from './controllers/user-admin.controller';
 import { PermissionsService } from './services/permissions.service';
+import { UserAdminService } from './services/user-admin.service';
 import { AccessRecertificationService } from './services/access-recertification.service';
 import { AccessRecertificationScheduler } from './services/access-recertification.scheduler';
 import { PermissionsGuard } from './guards/permissions.guard';
@@ -20,9 +22,14 @@ import { SlaModule } from '../sla/sla.module';
   // than re-provided. SlaModule exports SlaTimerService — AccessRecertification
   // Service.startCycle() starts a quarterly_access_review timer (backlog A.8).
   imports: [AuditModule, AuthModule, SlaModule],
-  controllers: [RbacController, AccessRecertificationController],
+  controllers: [
+    RbacController,
+    AccessRecertificationController,
+    UserAdminController,
+  ],
   providers: [
     PermissionsService,
+    UserAdminService,
     AccessRecertificationService,
     AccessRecertificationScheduler,
     RoleRepository,

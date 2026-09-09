@@ -31,7 +31,7 @@ interface ScoreDraft {
 }
 
 export function ComparisonSection({ rfqId, isPlacement }: Props) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [matrix, setMatrix] = useState<ComparisonMatrix | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -62,13 +62,13 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
         setLoadError(
           err instanceof ApiError
             ? err.message
-            : 'Could not load the comparison — try again.',
+            : t('comparisonLoadError'),
         );
       }
     } finally {
       setLoaded(true);
     }
-  }, [rfqId]);
+  }, [rfqId, t]);
 
   useEffect(() => {
     void (async () => {
@@ -96,7 +96,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       setBuildError(
         err instanceof ApiError
           ? err.message
-          : 'Could not build the comparison — try again.',
+          : t('comparisonBuildError'),
       );
     } finally {
       setBusy(false);
@@ -121,7 +121,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       setBuildError(
         err instanceof ApiError
           ? err.message
-          : 'Could not generate the comparison document — try again.',
+          : t('comparisonDownloadError'),
       );
     }
   }
@@ -142,12 +142,8 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
 
   return (
     <section>
-      <h2 style={{ marginTop: '2.5rem' }}>Comparison</h2>
-      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
-        Built from every current-version quotation — price alongside coverage,
-        exclusions, deductibles, limits, and (optional) insurer quality /
-        service scores. Never price alone.
-      </p>
+      <h2 style={{ marginTop: '2.5rem' }}>{t('comparisonHeading')}</h2>
+      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('comparisonIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -156,18 +152,16 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       ) : null}
 
       {!loaded ? (
-        <p>Loading…</p>
+        <p>{t('commonLoading')}</p>
       ) : matrix === null ? (
         <p style={{ opacity: 0.6 }}>
-          No comparison built yet.
-          {isPlacement
-            ? ' Capture at least one quotation, then build the matrix.'
-            : ''}
+          {t('comparisonNoneYet')}
+          {isPlacement ? t('comparisonNoneYetPlacementHint') : ''}
         </p>
       ) : (
         <>
           <div style={{ ...comparisonPreStyle, opacity: 0.6, marginTop: '0.5rem' }}>
-            Built {formatDateTime(matrix.builtAt, language)}
+            {t('comparisonBuiltAt', { date: formatDateTime(matrix.builtAt, language) })}
           </div>
 
           <button
@@ -175,22 +169,22 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
             onClick={() => void downloadDocument(matrix.id)}
             style={{ margin: '0.5rem 0' }}
           >
-            Download comparison (PDF)
+            {t('comparisonDownloadButton')}
           </button>
 
           <div style={comparisonScrollStyle}>
             <table style={rfqTableStyle}>
               <thead>
                 <tr>
-                  <th style={rfqCellStyle}>Insurer</th>
-                  <th style={rfqCellStyle}>Premium</th>
-                  <th style={rfqCellStyle}>Deductible</th>
-                  <th style={rfqCellStyle}>Liability limit</th>
-                  <th style={rfqCellStyle}>BI period</th>
-                  <th style={rfqCellStyle}>Commission %</th>
-                  <th style={rfqCellStyle}>Quality</th>
-                  <th style={rfqCellStyle}>Service</th>
-                  <th style={rfqCellStyle}>Exclusions / conditions</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnInsurer')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnPremium')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnDeductible')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnLiabilityLimit')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnBiPeriod')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnCommissionPercent')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnQuality')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnService')}</th>
+                  <th style={rfqCellStyle}>{t('comparisonColumnExclusionsConditions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,10 +197,10 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                         {q.isCurrentVersion ? null : (
                           <span
                             style={{ opacity: 0.6, fontSize: '0.78rem' }}
-                            title="This quotation was revised after the matrix was built — rebuild to refresh."
+                            title={t('comparisonSupersededTitle')}
                           >
                             {' '}
-                            · superseded
+                            · {t('comparisonSupersededSuffix')}
                           </span>
                         )}
                       </td>
@@ -222,7 +216,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                       <td style={rfqCellStyle}>
                         {q.biPeriodMonths === null
                           ? '—'
-                          : `${q.biPeriodMonths} mo`}
+                          : t('comparisonBiPeriodAbbrev', { months: q.biPeriodMonths })}
                       </td>
                       <td style={rfqCellStyle}>
                         {q.commissionRatePercent === null
@@ -249,7 +243,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
 
           {matrix.missingInsurers.length > 0 ? (
             <div style={comparisonCalloutStyle}>
-              <strong>No quote to compare:</strong>{' '}
+              <strong>{t('comparisonMissingInsurersLabel')}</strong>{' '}
               {matrix.missingInsurers
                 .map((i) => `${i.name}${i.status ? ` (${i.status})` : ''}`)
                 .join(', ')}
@@ -257,7 +251,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
           ) : null}
           {matrix.declinedInsurers.length > 0 ? (
             <div style={comparisonCalloutStyle}>
-              <strong>Declined:</strong>{' '}
+              <strong>{t('comparisonDeclinedInsurersLabel')}</strong>{' '}
               {matrix.declinedInsurers.map((i) => i.name).join(', ')}
             </div>
           ) : null}
@@ -274,11 +268,11 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
         <div style={{ marginTop: '1.25rem' }}>
           {matrix && matrix.rows.length > 0 ? (
             <>
-              <strong>Insurer quality / service scores (0–100, optional)</strong>
+              <strong>{t('comparisonScoresHeading')}</strong>
               <div style={comparisonScoreGridStyle}>
-                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>Insurer</span>
-                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>Quality</span>
-                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>Service</span>
+                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t('comparisonScoreColumnInsurer')}</span>
+                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t('comparisonScoreColumnQuality')}</span>
+                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t('comparisonScoreColumnService')}</span>
                 {matrix.rows.map((row) => {
                   const insurerId = row.quotation.insurerId;
                   const draft = scores[insurerId] ?? {
@@ -292,6 +286,8 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                       insurerId={insurerId}
                       draft={draft}
                       onChange={setScore}
+                      qualityAriaLabel={t('comparisonQualityScoreAria', { name: row.quotation.insurer.name })}
+                      serviceAriaLabel={t('comparisonServiceScoreAria', { name: row.quotation.insurer.name })}
                     />
                   );
                 })}
@@ -305,10 +301,10 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
             onClick={() => void runBuild()}
           >
             {busy
-              ? 'Building…'
+              ? t('comparisonBuildingButton')
               : matrix
-                ? 'Rebuild comparison'
-                : 'Build comparison'}
+                ? t('comparisonRebuildButton')
+                : t('comparisonBuildButton')}
           </button>
         </div>
       ) : null}
@@ -321,17 +317,21 @@ function ScoreRow({
   insurerId,
   draft,
   onChange,
+  qualityAriaLabel,
+  serviceAriaLabel,
 }: {
   name: string;
   insurerId: string;
   draft: ScoreDraft;
   onChange: (id: string, key: keyof ScoreDraft, value: string) => void;
+  qualityAriaLabel: string;
+  serviceAriaLabel: string;
 }) {
   return (
     <>
       <span>{name}</span>
       <input
-        aria-label={`Quality score for ${name}`}
+        aria-label={qualityAriaLabel}
         value={draft.insurerQualityScore}
         inputMode="decimal"
         onChange={(e) =>
@@ -339,7 +339,7 @@ function ScoreRow({
         }
       />
       <input
-        aria-label={`Service score for ${name}`}
+        aria-label={serviceAriaLabel}
         value={draft.serviceScore}
         inputMode="decimal"
         onChange={(e) => onChange(insurerId, 'serviceScore', e.target.value)}

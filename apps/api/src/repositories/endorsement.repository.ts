@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
   Cancellation,
+  ClientFundsLedgerEntry,
   Endorsement,
   EndorsementType,
   Prisma,
@@ -200,5 +201,44 @@ export class EndorsementRepository {
     });
     if (count === 0) return null;
     return this.prisma.client.refund.findUniqueOrThrow({ where: { id } });
+  }
+
+  /** Stamp `Refund.paidAt` AND book the matching `out`
+   * `ClientFundsLedgerEntry` in ONE `$transaction`, so a disbursement can
+   * never exist without its client-money movement (the same guarantee
+   * `InvoiceRepository.recordReceiptWithLedger` gives the `in` side — Part
+   * 7.3 client-money segregation).
+   *
+   * The stamp is a status-conditional `updateMany` on `paidAt: null`
+   * (`race-safe-invariants.md`) — two concurrent disbursements cannot both
+   * pay out, the loser matches 0 rows and the transaction is abandoned
+   * before the ledger row is written. */
+  async recordRefundDisbursement(input: {
+    refundId: string;
+    customerId: string;
+    amount: Prisma.Decimal;
+    paidAt: Date;
+    ledgerReference: string;
+  }): Promise<{ refund: Refund; ledgerEntry: ClientFundsLedgerEntry } | null> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const { count } = await tx.refund.updateMany({
+        where: { id: input.refundId, paidAt: null },
+        data: { paidAt: input.paidAt },
+      });
+      if (count === 0) return null;
+
+      const ledgerEntry = await tx.clientFundsLedgerEntry.create({
+        data: {
+          customerId: input.customerId,
+          amount: input.amount,
+          direction: 'out',
+          reference: input.ledgerReference,
+        },
+      });
+      const refund = await tx.refund.findUniqueOrThrow({
+        where: { id: input.refundId },
+      });
+      return { refund, ledgerEntry };
+    });
   }
 }

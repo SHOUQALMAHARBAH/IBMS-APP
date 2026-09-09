@@ -24,17 +24,34 @@ import {
 import { repeatableRowStyle } from '../../../../components/customer/customer.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../../lib/i18n/translations';
+import type { CustomerStatus, CustomerType } from '../../../../lib/customer/customer-api';
+
+const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
+  INDIVIDUAL: 'customerTypeIndividual',
+  CORPORATE: 'customerTypeCorporate',
+};
+
+const STATUS_LABEL_KEY: Record<CustomerStatus, TranslationKey> = {
+  PENDING_KYC: 'customerStatusPendingKyc',
+  ACTIVE: 'customerStatusActive',
+  SUSPENDED: 'customerStatusSuspended',
+  CLOSED: 'customerStatusClosed',
+};
 
 function ProfileField({
   label,
   value,
   revealed,
   onReveal,
+  revealLabel,
 }: {
   label: string;
   value: string | null | undefined;
   revealed?: string;
   onReveal?: () => void;
+  revealLabel: string;
 }) {
   return (
     <div>
@@ -47,7 +64,7 @@ function ProfileField({
             style={{ ...smallButtonStyle, marginInlineStart: '0.5rem' }}
             onClick={onReveal}
           >
-            Reveal
+            {revealLabel}
           </button>
         ) : null}
       </div>
@@ -59,6 +76,7 @@ export default function CustomerProfilePage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [ubos, setUbos] = useState<Ubo[]>([]);
@@ -81,13 +99,13 @@ export default function CustomerProfilePage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+          ? t('customerProfileNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this customer — try again.',
+            : t('commonTryAgain'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -103,7 +121,7 @@ export default function CustomerProfilePage() {
   async function handleReveal(field: RevealableField) {
     setRevealError(null);
     if (!revealReason.trim()) {
-      setRevealError('A written justification is required to reveal this field.');
+      setRevealError(t('customerRevealJustificationRequired'));
       return;
     }
     try {
@@ -112,7 +130,7 @@ export default function CustomerProfilePage() {
       setRevealTarget(null);
       setRevealReason('');
     } catch (err) {
-      setRevealError(err instanceof ApiError ? err.message : 'Could not reveal this field — try again.');
+      setRevealError(err instanceof ApiError ? err.message : t('customerRevealError'));
     }
   }
 
@@ -154,7 +172,7 @@ export default function CustomerProfilePage() {
   return (
     <main style={pageStyle}>
       <button type="button" onClick={() => router.push('/customers')} style={{ cursor: 'pointer' }}>
-        ← All customers
+        {t('customerProfileBackButton')}
       </button>
 
       {loadError ? (
@@ -169,13 +187,16 @@ export default function CustomerProfilePage() {
             <bdi>{customer.legalName}</bdi>
           </h1>
           <p style={{ opacity: 0.8 }}>
-            {customer.customerType} — Status: {customer.status}
+            {t('customerProfileTypeStatusLine', {
+              type: t(TYPE_LABEL_KEY[customer.customerType]),
+              status: t(STATUS_LABEL_KEY[customer.status]),
+            })}
           </p>
 
           <ConsentCaptureWidget
             customerId={customer.id}
             purpose="KYC_AML"
-            label="Onboarding / KYC consent"
+            label={t('customerConsentLabel')}
             defaultConsentTextVersion="kyc-notice-v1"
           />
           <PrivacyNoticeDisplay
@@ -185,35 +206,70 @@ export default function CustomerProfilePage() {
 
           <div style={profileGridStyle}>
             <ProfileField
-              label="National ID"
+              label={t('customerFieldNationalId')}
               value={customer.nationalId}
               revealed={revealed.nationalId}
               onReveal={
                 customer.nationalId ? () => setRevealTarget('nationalId') : undefined
               }
+              revealLabel={t('customerProfileFieldReveal')}
             />
             <ProfileField
-              label="Contact phone"
+              label={t('customerFieldContactPhone')}
               value={customer.contactPhone}
               revealed={revealed.contactPhone}
               onReveal={() => setRevealTarget('contactPhone')}
+              revealLabel={t('customerProfileFieldReveal')}
             />
             <ProfileField
-              label="Contact email"
+              label={t('customerFieldContactEmail')}
               value={customer.contactEmail}
               revealed={revealed.contactEmail}
               onReveal={() => setRevealTarget('contactEmail')}
+              revealLabel={t('customerProfileFieldReveal')}
             />
-            <ProfileField label="Registration number" value={customer.registrationNumber} />
-            <ProfileField label="Registered address" value={customer.registeredAddress} />
-            <ProfileField label="Nature of business" value={customer.natureOfBusiness} />
-            <ProfileField label="Language preference" value={customer.languagePreference} />
+            <ProfileField
+              label={t('customerFieldRegistrationNumber')}
+              value={customer.registrationNumber}
+              revealLabel={t('customerProfileFieldReveal')}
+            />
+            <ProfileField
+              label={t('customerFieldRegisteredAddress')}
+              value={customer.registeredAddress}
+              revealLabel={t('customerProfileFieldReveal')}
+            />
+            <ProfileField
+              label={t('customerFieldNatureOfBusiness')}
+              value={customer.natureOfBusiness}
+              revealLabel={t('customerProfileFieldReveal')}
+            />
+            <ProfileField
+              label={t('customerFieldLanguagePreference')}
+              value={customer.languagePreference}
+              revealLabel={t('customerProfileFieldReveal')}
+            />
             {customer.customerType === 'INDIVIDUAL' ? (
               <>
-                <ProfileField label="Given name" value={customer.givenName} />
-                <ProfileField label="Father's name" value={customer.fatherName} />
-                <ProfileField label="Grandfather's name" value={customer.grandfatherName} />
-                <ProfileField label="Family name" value={customer.familyName} />
+                <ProfileField
+                  label={t('customerFieldGivenName')}
+                  value={customer.givenName}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldFatherName')}
+                  value={customer.fatherName}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldGrandfatherName')}
+                  value={customer.grandfatherName}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
+                <ProfileField
+                  label={t('customerFieldFamilyName')}
+                  value={customer.familyName}
+                  revealLabel={t('customerProfileFieldReveal')}
+                />
               </>
             ) : null}
           </div>
@@ -221,7 +277,7 @@ export default function CustomerProfilePage() {
           {revealTarget ? (
             <div style={repeatableRowStyle}>
               <label htmlFor="reveal-reason">
-                Justification for revealing {revealTarget} (Part 10.6, logged)
+                {t('customerRevealJustificationLabel', { field: revealTarget })}
               </label>
               <input
                 id="reveal-reason"
@@ -234,7 +290,7 @@ export default function CustomerProfilePage() {
                 style={{ ...smallButtonStyle, marginTop: '0.5rem' }}
                 onClick={() => void handleReveal(revealTarget)}
               >
-                Confirm reveal
+                {t('customerRevealConfirmButton')}
               </button>
               {revealError ? (
                 <p role="alert" style={{ ...errorStyle, marginTop: '0.4rem' }}>
@@ -246,23 +302,23 @@ export default function CustomerProfilePage() {
 
           {customer.customerType === 'CORPORATE' ? (
             <section style={{ marginTop: '2rem' }}>
-              <h2>Ultimate Beneficial Owners</h2>
-              {ubos.length === 0 ? <p style={{ opacity: 0.6 }}>None recorded.</p> : null}
+              <h2>{t('customerUbosHeading')}</h2>
+              {ubos.length === 0 ? <p style={{ opacity: 0.6 }}>{t('customerUbosNone')}</p> : null}
               {ubos.map((u) => (
                 <div key={u.id} style={repeatableRowStyle}>
                   <strong>
                     <bdi>{u.fullName}</bdi>
                   </strong>
                   {u.ownershipPercent ? <span> — {u.ownershipPercent}%</span> : null}
-                  {u.isPep ? <span> — PEP</span> : null}
+                  {u.isPep ? <span> — {t('customerUboPep')}</span> : null}
                 </div>
               ))}
             </section>
           ) : null}
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Documents</h2>
-            {documents.length === 0 ? <p style={{ opacity: 0.6 }}>None attached.</p> : null}
+            <h2>{t('customerDocumentsHeading')}</h2>
+            {documents.length === 0 ? <p style={{ opacity: 0.6 }}>{t('customerDocumentsNone')}</p> : null}
             {documents.map((d) => (
               <div key={d.id} style={repeatableRowStyle}>
                 <strong>{d.fileName}</strong> — {d.classification}
@@ -271,11 +327,8 @@ export default function CustomerProfilePage() {
           </section>
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Needs assessment</h2>
-            <p style={{ opacity: 0.8 }}>
-              Process 5 — a structured risk questionnaire that recommends a coverage list,
-              reviewed and approved before it feeds an opportunity or RFQ.
-            </p>
+            <h2>{t('customerNeedsAssessmentHeading')}</h2>
+            <p style={{ opacity: 0.8 }}>{t('customerNeedsAssessmentIntro')}</p>
             {canStartNeedsAssessment ? (
               <button
                 type="button"
@@ -284,22 +337,16 @@ export default function CustomerProfilePage() {
                   router.push(`/needs-assessments/new?customerId=${customer.id}`)
                 }
               >
-                Start a needs assessment
+                {t('customerNeedsAssessmentStartButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>
-                You don&apos;t hold the needs-assessment.create permission.
-              </p>
+              <p style={{ opacity: 0.6 }}>{t('customerNeedsAssessmentNoPermission')}</p>
             )}
           </section>
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Risk survey</h2>
-            <p style={{ opacity: 0.8 }}>
-              Process 6 — the detailed asset survey per location (building / equipment /
-              stock / annual profit / fleet), deriving the Sum Insured and indemnity
-              period, consolidated across sites.
-            </p>
+            <h2>{t('customerRiskSurveyHeading')}</h2>
+            <p style={{ opacity: 0.8 }}>{t('customerRiskSurveyIntro')}</p>
             {canOpenRiskSurvey ? (
               <button
                 type="button"
@@ -308,22 +355,16 @@ export default function CustomerProfilePage() {
                   router.push(`/risk-profiles?customerId=${customer.id}`)
                 }
               >
-                Open the risk survey
+                {t('customerRiskSurveyOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>
-                You don&apos;t hold the risk-profile.read permission.
-              </p>
+              <p style={{ opacity: 0.6 }}>{t('customerRiskSurveyNoPermission')}</p>
             )}
           </section>
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Insurance program</h2>
-            <p style={{ opacity: 0.8 }}>
-              Process 7 — a multi-line Insurance Program assembled from an approved
-              needs assessment&apos;s coverage list and the risk survey&apos;s derived
-              Sum Insured, then finalized to feed an RFQ.
-            </p>
+            <h2>{t('customerInsuranceProgramHeading')}</h2>
+            <p style={{ opacity: 0.8 }}>{t('customerInsuranceProgramIntro')}</p>
             {canOpenInsuranceProgram ? (
               <button
                 type="button"
@@ -332,22 +373,16 @@ export default function CustomerProfilePage() {
                   router.push(`/insurance-programs?customerId=${customer.id}`)
                 }
               >
-                Open the insurance program
+                {t('customerInsuranceProgramOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>
-                You don&apos;t hold the program.read permission.
-              </p>
+              <p style={{ opacity: 0.6 }}>{t('customerInsuranceProgramNoPermission')}</p>
             )}
           </section>
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Cross-sell</h2>
-            <p style={{ opacity: 0.8 }}>
-              Process 8 — a nightly scan compares this customer&apos;s in-force
-              policy lines against a benchmark line list and flags the gaps as
-              cross-sell opportunities to convert or dismiss.
-            </p>
+            <h2>{t('customerCrossSellHeading')}</h2>
+            <p style={{ opacity: 0.8 }}>{t('customerCrossSellIntro')}</p>
             {canOpenCrossSell ? (
               <button
                 type="button"
@@ -356,22 +391,16 @@ export default function CustomerProfilePage() {
                   router.push(`/cross-sell?customerId=${customer.id}`)
                 }
               >
-                Open cross-sell opportunities
+                {t('customerCrossSellOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>
-                You don&apos;t hold the cross-sell.read permission.
-              </p>
+              <p style={{ opacity: 0.6 }}>{t('customerCrossSellNoPermission')}</p>
             )}
           </section>
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Up-sell</h2>
-            <p style={{ opacity: 0.8 }}>
-              Process 9 — a nightly job compares this customer&apos;s designed
-              property Sum Insured against the current value of their surveyed
-              assets and proposes an increase where the gap is material.
-            </p>
+            <h2>{t('customerUpSellHeading')}</h2>
+            <p style={{ opacity: 0.8 }}>{t('customerUpSellIntro')}</p>
             {canOpenUpSell ? (
               <button
                 type="button"
@@ -380,34 +409,26 @@ export default function CustomerProfilePage() {
                   router.push(`/up-sell?customerId=${customer.id}`)
                 }
               >
-                Open up-sell recommendations
+                {t('customerUpSellOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>
-                You don&apos;t hold the up-sell.read permission.
-              </p>
+              <p style={{ opacity: 0.6 }}>{t('customerUpSellNoPermission')}</p>
             )}
           </section>
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Relationship (CRM)</h2>
-            <p style={{ opacity: 0.8 }}>
-              Process 10 — log every customer touchpoint and see the 360°
-              timeline (interactions today, plus policies, claims and
-              complaints once those modules exist).
-            </p>
+            <h2>{t('customerCrmHeading')}</h2>
+            <p style={{ opacity: 0.8 }}>{t('customerCrmIntro')}</p>
             {canOpenCrm ? (
               <button
                 type="button"
                 style={{ cursor: 'pointer' }}
                 onClick={() => router.push(`/crm?customerId=${customer.id}`)}
               >
-                Open the relationship timeline
+                {t('customerCrmOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>
-                You don&apos;t hold the customer.360-view.read permission.
-              </p>
+              <p style={{ opacity: 0.6 }}>{t('customerCrmNoPermission')}</p>
             )}
           </section>
         </>

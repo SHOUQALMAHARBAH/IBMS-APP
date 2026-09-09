@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import {
   transitionLead,
   LEAD_NEXT_STATUSES,
-  LEAD_STATUS_LABEL,
   LEAD_STATUSES,
   type Lead,
+  type LeadSource,
   type LeadStatus,
 } from '../../lib/lead/lead-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { errorStyle } from '../auth/auth-form.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import {
   boardStyle,
   cardActionsStyle,
@@ -23,13 +25,34 @@ import {
   smallButtonStyle,
 } from './lead.styles';
 
+// Keyed by the current status a column/badge represents.
+const STATUS_LABEL_KEY: Record<LeadStatus, TranslationKey> = {
+  NEW: 'leadStatusNew',
+  CONTACTED: 'leadStatusContacted',
+  QUALIFIED: 'leadStatusQualified',
+  CONVERTED_TO_PROSPECT: 'leadStatusConvertedToProspect',
+  DISQUALIFIED: 'leadStatusDisqualified',
+};
+
 // Keyed by the TARGET status a button moves a lead to, not the current one.
-const MOVE_TO_LABEL: Record<LeadStatus, string> = {
-  NEW: 'New',
-  CONTACTED: 'Mark contacted',
-  QUALIFIED: 'Mark qualified',
-  CONVERTED_TO_PROSPECT: 'Convert to prospect',
-  DISQUALIFIED: 'Disqualify',
+const MOVE_TO_LABEL_KEY: Record<LeadStatus, TranslationKey> = {
+  NEW: 'leadMoveToNew',
+  CONTACTED: 'leadMoveToContacted',
+  QUALIFIED: 'leadMoveToQualified',
+  CONVERTED_TO_PROSPECT: 'leadMoveToConvertedToProspect',
+  DISQUALIFIED: 'leadMoveToDisqualified',
+};
+
+const SOURCE_LABEL_KEY: Record<LeadSource, TranslationKey> = {
+  referral: 'leadSourceReferral',
+  website: 'leadSourceWebsite',
+  social_media: 'leadSourceSocialMedia',
+  campaign: 'leadSourceCampaign',
+  tender: 'leadSourceTender',
+  bank_partner: 'leadSourceBankPartner',
+  strategic_partner: 'leadSourceStrategicPartner',
+  ex_customer: 'leadSourceExCustomer',
+  renewal: 'leadSourceRenewal',
 };
 
 interface LeadPipelineBoardProps {
@@ -40,6 +63,7 @@ interface LeadPipelineBoardProps {
 
 export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: LeadPipelineBoardProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -60,7 +84,7 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
       const result = await transitionLead(lead.id, toStatus);
       onLeadTransitioned(result);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not update this lead — try again.';
+      const message = err instanceof ApiError ? err.message : t('leadsUpdateError');
       setErrors((prev) => ({ ...prev, [lead.id]: message }));
     } finally {
       setTransitioningId(null);
@@ -68,7 +92,7 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
   }
 
   if (leads.length === 0) {
-    return <p style={emptyColumnStyle}>No leads yet — add one above to start your pipeline.</p>;
+    return <p style={emptyColumnStyle}>{t('leadsNoneYet')}</p>;
   }
 
   return (
@@ -78,10 +102,10 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
         return (
           <div key={status} style={columnStyle}>
             <div style={columnHeaderStyle}>
-              <span>{LEAD_STATUS_LABEL[status]}</span>
+              <span>{t(STATUS_LABEL_KEY[status])}</span>
               <span>{columnLeads.length}</span>
             </div>
-            {columnLeads.length === 0 ? <p style={emptyColumnStyle}>Empty</p> : null}
+            {columnLeads.length === 0 ? <p style={emptyColumnStyle}>{t('leadsColumnEmpty')}</p> : null}
             {columnLeads.map((lead) => {
               const isOwner = lead.ownerUserId === currentUserId;
               const nextStatuses = LEAD_NEXT_STATUSES[lead.status];
@@ -89,7 +113,7 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
               return (
                 <article key={lead.id} style={cardStyle} aria-label={`Lead: ${lead.fullName}`}>
                   <strong>{lead.fullName}</strong>
-                  <div style={cardMetaStyle}>{lead.source.replaceAll('_', ' ')}</div>
+                  <div style={cardMetaStyle}>{t(SOURCE_LABEL_KEY[lead.source])}</div>
                   {lead.contactPhone ? <div style={cardMetaStyle}>{lead.contactPhone}</div> : null}
                   {lead.contactEmail ? <div style={cardMetaStyle}>{lead.contactEmail}</div> : null}
                   {isOwner && nextStatuses.length > 0 ? (
@@ -107,10 +131,10 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
                             // Lead that transitioned to a different status in
                             // the background.
                             disabled={isTransitioning}
-                            aria-label={`${MOVE_TO_LABEL[next]} — ${lead.fullName}`}
+                            aria-label={`${t(MOVE_TO_LABEL_KEY[next])} — ${lead.fullName}`}
                             onClick={() => goToProspectConversion(lead)}
                           >
-                            {MOVE_TO_LABEL[next]}
+                            {t(MOVE_TO_LABEL_KEY[next])}
                           </button>
                         ) : (
                           <button
@@ -118,10 +142,10 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
                             type="button"
                             style={smallButtonStyle}
                             disabled={isTransitioning}
-                            aria-label={`${MOVE_TO_LABEL[next]} — ${lead.fullName}`}
+                            aria-label={`${t(MOVE_TO_LABEL_KEY[next])} — ${lead.fullName}`}
                             onClick={() => void handleTransition(lead, next)}
                           >
-                            {MOVE_TO_LABEL[next]}
+                            {t(MOVE_TO_LABEL_KEY[next])}
                           </button>
                         ),
                       )}

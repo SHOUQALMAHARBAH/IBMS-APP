@@ -23,6 +23,11 @@ import { RequireRoles } from './decorators/require-roles.decorator';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import {
+  AuthRateLimit,
+  PasswordRateLimit,
+  MfaRateLimit,
+} from '../../common/rate-limit.decorator';
+import {
   clearRefreshTokenCookie,
   REFRESH_TOKEN_COOKIE,
   setRefreshTokenCookie,
@@ -85,6 +90,7 @@ export class AuthController {
 
   @Public()
   @Post('signup')
+  @AuthRateLimit()
   signup(@Body() dto: SignupDto) {
     return this.auth.signup(dto);
   }
@@ -92,6 +98,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
+  @AuthRateLimit()
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
@@ -105,6 +112,7 @@ export class AuthController {
   @Public()
   @Post('mfa/totp/challenge/verify')
   @HttpCode(200)
+  @MfaRateLimit()
   async verifyMfaChallenge(
     @Body() dto: MfaChallengeVerifyDto,
     @Req() req: Request,
@@ -152,6 +160,7 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(200)
+  @PasswordRateLimit()
   async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
     const result = await this.auth.forgotPassword(dto, req.ip);
     return {
@@ -163,6 +172,7 @@ export class AuthController {
   @Public()
   @Post('reset-password')
   @HttpCode(200)
+  @PasswordRateLimit()
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.auth.resetPassword(dto);
     return { ok: true };

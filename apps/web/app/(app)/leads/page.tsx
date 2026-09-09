@@ -9,6 +9,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { LeadIntakeForm } from '../../../components/lead/LeadIntakeForm';
 import { LeadPipelineBoard } from '../../../components/lead/LeadPipelineBoard';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 // Roles the seeded permission grid grants `lead.create` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
@@ -19,6 +20,7 @@ const CAN_CREATE_LEAD_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 export default function LeadsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   const [leads, setLeads] = useState<Lead[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -31,13 +33,13 @@ export default function LeadsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the lead.list.read permission, so there's nothing to show here."
+          ? t('leadsNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the lead pipeline — try again.',
+            : t('commonTryAgain'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -70,17 +72,14 @@ export default function LeadsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Leads</h1>
-      <p style={{ opacity: 0.8 }}>
-        Process 1 — capture a lead from any acquisition source and move it through the pipeline
-        (New → Contacted → Qualified → Converted to prospect, or Disqualified at any stage).
-      </p>
+      <h1>{t('leadsHeading')}</h1>
+      <p style={{ opacity: 0.8 }}>{t('leadsProcessIntro')}</p>
 
       {canCreateLead ? <LeadIntakeForm onLeadCreated={handleLeadCreated} /> : null}
 
       <section style={{ marginTop: '2rem' }}>
-        <h2>Pipeline</h2>
-        {leads === null && !loadError ? <p>Loading…</p> : null}
+        <h2>{t('leadsPipelineHeading')}</h2>
+        {leads === null && !loadError ? <p>{t('commonLoading')}</p> : null}
         {loadError ? (
           <p role="alert" style={errorStyle}>
             {loadError}

@@ -1,9 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, RoleName } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { ROLES } from './seed-data/roles';
 import { PERMISSIONS } from './seed-data/permissions';
 import { RETENTION_SCHEDULE } from './seed-data/retention-schedule';
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from './seed-data/sample-users';
+import { validatePasswordPolicy } from '../src/password-policy';
 import { SAMPLE_INSURERS } from './seed-data/insurers';
 import { DOCUMENT_TEMPLATES } from './seed-data/document-templates';
 
@@ -43,6 +44,78 @@ async function ensureSystemAccount(): Promise<void> {
     },
   });
   console.log('Seeded system service account.');
+}
+
+/**
+ * Backlog A.2 — the BOOTSTRAP ADMINISTRATOR.
+ *
+ * `ensureSampleUsers()` below seats one login-capable account per role, but
+ * it is gated on `NODE_ENV !== 'production'`. A production seed therefore
+ * produced a database with the full 11-role catalogue and permission grid and
+ * NOT ONE user able to use it — and since role assignment is itself gated by
+ * `user.manage` (SYSTEM_SECURITY_ADMINISTRATOR only), there was no way in.
+ *
+ * This closes that: when `BOOTSTRAP_ADMIN_EMAIL` and
+ * `BOOTSTRAP_ADMIN_PASSWORD` are both set, seed a single
+ * SYSTEM_SECURITY_ADMINISTRATOR who can then provision everyone else through
+ * `POST /admin/users`. Deliberately opt-in via environment rather than a
+ * hardcoded default account — a well-known admin credential shipped in a
+ * repo is exactly the finding `sensitive-data-handling.md` exists to prevent.
+ *
+ * Idempotent: an existing account keeps its current password (this never
+ * resets a live credential), it only ensures the role grant is in place.
+ */
+async function ensureBootstrapAdmin(
+  roleIdByName: Map<string, string>,
+): Promise<void> {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim();
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  if (!email || !password) {
+    if (!SEED_SAMPLE_DATA) {
+      console.warn(
+        'No BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD set and sample users are skipped outside dev — this database will have NO user able to sign in. Set both and re-run `npm run db:seed`.',
+      );
+    }
+    return;
+  }
+
+  const violations = validatePasswordPolicy(password);
+  if (violations.length > 0) {
+    throw new Error(
+      `BOOTSTRAP_ADMIN_PASSWORD does not satisfy the Part 10.1 password policy: ${violations.join('; ')}`,
+    );
+  }
+
+  const roleId = roleIdByName.get(RoleName.SYSTEM_SECURITY_ADMINISTRATOR);
+  if (!roleId) {
+    throw new Error(
+      'SYSTEM_SECURITY_ADMINISTRATOR role was not seeded — is it missing from seed-data/roles.ts?',
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const existing = await prisma.user.findUnique({ where: { email } });
+  const user = existing
+    ? existing
+    : await prisma.user.create({
+        data: {
+          fullName: 'IBMS Bootstrap Administrator',
+          email,
+          passwordHash,
+          passwordUpdatedAt: new Date(),
+        },
+      });
+
+  await prisma.userRoleAssignment.upsert({
+    where: { userId_roleId: { userId: user.id, roleId } },
+    update: { revokedAt: null },
+    create: { userId: user.id, roleId },
+  });
+  console.log(
+    existing
+      ? `Bootstrap administrator ${email} already exists — role grant confirmed, password left unchanged.`
+      : `Seeded bootstrap administrator ${email}.`,
+  );
 }
 
 /**
@@ -222,6 +295,10 @@ async function main() {
   } else {
     console.log('NODE_ENV=production — skipping sample insurers/users.');
   }
+
+  // Runs in EVERY environment: in dev it is an optional extra alongside the
+  // sample users, in production it is the only way anyone gets in at all.
+  await ensureBootstrapAdmin(roleIdByName);
 }
 
 main()

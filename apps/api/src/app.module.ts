@@ -38,6 +38,7 @@ import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
 import { AuditTrailModule } from './modules/audit-trail/audit-trail.module';
+import { RenewalModule } from './modules/renewal/renewal.module';
 import { KpiDashboardModule } from './modules/management-reporting/kpi-dashboard.module';
 import { SalesPerformanceModule } from './modules/management-reporting/sales-performance.module';
 import { SalesDashboardModule } from './modules/management-reporting/sales-dashboard.module';
@@ -45,6 +46,7 @@ import { PolicyDashboardModule } from './modules/management-reporting/policy-das
 import { ClaimsDashboardModule } from './modules/management-reporting/claims-dashboard.module';
 import { FinancialDashboardModule } from './modules/management-reporting/financial-dashboard.module';
 import { ComplianceDashboardModule } from './modules/management-reporting/compliance-dashboard.module';
+import { ExecutiveDashboardModule } from './modules/management-reporting/executive-dashboard.module';
 import { InsurerPerformanceModule } from './modules/management-reporting/insurer-performance.module';
 import { EmployeePerformanceModule } from './modules/management-reporting/employee-performance.module';
 import { PortfolioAnalysisModule } from './modules/management-reporting/portfolio-analysis.module';
@@ -294,6 +296,13 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // Process 58 — opens Domain G (Management). A read-only aggregation
     // over every domain built so far; owns none of the tables it reads.
     // kpi-dashboard.view / Branch-Department Manager, Executive Management.
+    // Part 3.9 — Renewal Management. Opens a RenewalCase at the configurable
+    // lead time before expiry (nightly sweep + on-demand), walks it through
+    // RenewalStatus via the engine, and thereby gives THREE already-shipped
+    // features their missing producer: the per-RenewalCase LossRatio upsert
+    // (#29), Process 46's retention sweep, and the renewal_workflow_start SLA
+    // timer (backlog A.8). See IMPROVEMENTS.md §3.6.
+    RenewalModule,
     KpiDashboardModule,
     // Process 59 — a SalesTarget quota per employee/team for a period,
     // resolved live against Lead/Prospect actuals. sales-target.manage
@@ -332,6 +341,12 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // sections, each reading a different existing table directly — see
     // compliance-dashboard.config.ts.
     ComplianceDashboardModule,
+    // Process 64 — Part E's SIXTH and last named dashboard: the executive
+    // roll-up. `dashboard.executive.view` had been seeded since the original
+    // RBAC grid with no endpoint behind it; this composes the five dashboards
+    // above rather than re-deriving their figures (executive-dashboard.
+    // service.ts explains why that narrow exception is deliberate).
+    ExecutiveDashboardModule,
     // Process 60 — InsurerPerformanceScore (pre-existing core schema) and
     // InsurerSlaAgreement (dormant) get their first real consumer: a
     // monthly job scoring quote-response speed/claims service/price/

@@ -56,6 +56,7 @@ function receiptFixture(over?: Partial<ReceiptFixture>): ReceiptFixture {
     invoiceId: 'inv-1',
     amount: d('115350.000'),
     method: 'bank_transfer',
+    reference: null,
     paymentChannelId: null,
     receivedAt: new Date('2026-09-20T00:00:00.000Z'),
     remittance: null,
@@ -91,6 +92,7 @@ function makeDeps(sequence: InvoiceWithCycle[]) {
       Promise.resolve(sequence[Math.min(i++, sequence.length - 1)]),
     ),
     recordReceiptWithLedger: vi.fn().mockResolvedValue({
+      outcome: 'recorded',
       receipt: receiptFixture(),
       ledgerEntry: {
         id: 'led-in-1',
@@ -100,6 +102,8 @@ function makeDeps(sequence: InvoiceWithCycle[]) {
         reference: 'invoice:inv-1',
         recordedAt: new Date(),
       },
+      collectedAfter: d('115350.000'),
+      fullyCollected: true,
     }),
     recordRemittanceWithLedger: vi.fn().mockResolvedValue({
       remittance: {
@@ -144,7 +148,6 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
   it('drives INVOICED -> COLLECTED, records the receipt + an "in" ledger entry, and audits', async () => {
     const deps = makeDeps([
       invoiceFixture({ status: 'INVOICED' }),
-      invoiceFixture({ status: 'COLLECTED' }),
       invoiceFixture({ status: 'COLLECTED', receipts: [receiptFixture()] }),
     ]);
     const view = await deps.service.recordReceipt(
@@ -167,67 +170,80 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
     expect(view.receipt?.amount).toBe('115350.000');
   });
 
-  it('422s when the amount does not equal the invoiced total (a variance is Process 39)', async () => {
-    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
-    await expect(
-      deps.service.recordReceipt('inv-1', { amount: '100000.000' }, actor),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(deps.workflow.transition).not.toHaveBeenCalled();
-  });
-
-  it('422s when the invoice is already past collection', async () => {
-    const deps = makeDeps([invoiceFixture({ status: 'RECONCILED' })]);
-    await expect(
-      deps.service.recordReceipt('inv-1', { amount: '115350.000' }, actor),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
-  });
-
-  it('is idempotent: a byte-identical re-post of an existing receipt returns the view without re-transitioning', async () => {
+  it('records a PART payment without transitioning — the invoice stays INVOICED until it is whole', async () => {
     const deps = makeDeps([
-      invoiceFixture({ status: 'COLLECTED', receipts: [receiptFixture()] }),
+      invoiceFixture({ status: 'INVOICED' }),
+      invoiceFixture({
+        status: 'INVOICED',
+        receipts: [receiptFixture({ amount: d('100000.000') })],
+      }),
     ]);
+    deps.invoices.recordReceiptWithLedger.mockResolvedValueOnce({
+      outcome: 'recorded',
+      receipt: receiptFixture({ amount: d('100000.000') }),
+      ledgerEntry: {
+        id: 'led-in-1',
+        customerId: 'cust-1',
+        amount: d('100000.000'),
+        direction: 'in',
+        reference: 'invoice:inv-1',
+        recordedAt: new Date(),
+      },
+      collectedAfter: d('100000.000'),
+      fullyCollected: false,
+    });
+
     const view = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '115350.000', method: 'bank_transfer' },
+      { amount: '100000.000' },
       actor,
     );
-    expect(view.status).toBe('COLLECTED');
+
+    expect(deps.invoices.recordReceiptWithLedger).toHaveBeenCalledTimes(1);
+    // The money is booked, but the cycle has not moved on — which is what
+    // keeps the invoice on the #33 ageing report for its remaining balance
+    // and off the #34 insurer-payables report.
     expect(deps.workflow.transition).not.toHaveBeenCalled();
+    expect(view.status).toBe('INVOICED');
+  });
+
+  it('422s an instalment that would take the running total past the invoiced amount', async () => {
+    const deps = makeDeps([
+      invoiceFixture({
+        status: 'INVOICED',
+        receipts: [receiptFixture({ amount: d('100000.000') })],
+      }),
+    ]);
+    deps.invoices.recordReceiptWithLedger.mockResolvedValueOnce({
+      outcome: 'exceeds_total',
+      collectedBefore: d('100000.000'),
+      totalAmount: d('115350.000'),
+    });
+    await expect(
+      deps.service.recordReceipt('inv-1', { amount: '90000.000' }, actor),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('422s a further receipt once the invoice is collected in full', async () => {
+    const deps = makeDeps([
+      invoiceFixture({ status: 'INVOICED', receipts: [receiptFixture()] }),
+    ]);
+    await expect(
+      deps.service.recordReceipt('inv-1', { amount: '1.000' }, actor),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
   });
 
-  it('409s when a receipt already exists with a different amount', async () => {
-    const deps = makeDeps([
-      invoiceFixture({
-        status: 'COLLECTED',
-        receipts: [receiptFixture({ amount: d('999.000') })],
-      }),
-    ]);
-    await expect(
-      deps.service.recordReceipt('inv-1', { amount: '115350.000' }, actor),
-    ).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('resumes a crash between the transition and the receipt write (COLLECTED, no receipt) without re-transitioning', async () => {
-    const deps = makeDeps([
-      invoiceFixture({ status: 'COLLECTED' }),
-      invoiceFixture({ status: 'COLLECTED', receipts: [receiptFixture()] }),
-    ]);
-    const view = await deps.service.recordReceipt(
-      'inv-1',
-      { amount: '115350.000', method: 'bank_transfer' },
-      actor,
-    );
-    expect(deps.workflow.transition).not.toHaveBeenCalled();
-    expect(deps.invoices.recordReceiptWithLedger).toHaveBeenCalledTimes(1);
-    expect(view.status).toBe('COLLECTED');
-  });
-
-  it('a lost P2002 race on the Receipt.invoiceId UNIQUE resumes when the landed receipt is byte-identical', async () => {
+  it('resumes when the reference-collision race fires at the write (P2002)', async () => {
+    // The retry this reference exists to make safe raced itself: the winner's
+    // row committed between our idempotency read and our write.
     const deps = makeDeps([
       invoiceFixture({ status: 'INVOICED' }),
-      invoiceFixture({ status: 'COLLECTED' }), // post-transition reload, no receipt yet
-      invoiceFixture({ status: 'COLLECTED', receipts: [receiptFixture()] }), // the winner's row landed
+      invoiceFixture({
+        status: 'COLLECTED',
+        receipts: [receiptFixture({ reference: 'BANK-REF-9' })],
+      }),
     ]);
     deps.invoices.recordReceiptWithLedger.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError('unique', {
@@ -237,20 +253,25 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
     );
     const view = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '115350.000', method: 'bank_transfer' },
+      {
+        amount: '115350.000',
+        method: 'bank_transfer',
+        reference: 'BANK-REF-9',
+      },
       actor,
     );
     expect(view.status).toBe('COLLECTED');
-    expect(view.receipt?.amount).toBe('115350.000');
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
   });
 
-  it('a lost P2002 race whose landed receipt differs is a 409', async () => {
+  it('409s when the concurrently-landed reference carries different figures', async () => {
     const deps = makeDeps([
       invoiceFixture({ status: 'INVOICED' }),
-      invoiceFixture({ status: 'COLLECTED' }),
       invoiceFixture({
-        status: 'COLLECTED',
-        receipts: [receiptFixture({ amount: d('999.000') })],
+        status: 'INVOICED',
+        receipts: [
+          receiptFixture({ amount: d('999.000'), reference: 'BANK-REF-9' }),
+        ],
       }),
     ]);
     deps.invoices.recordReceiptWithLedger.mockRejectedValueOnce(
@@ -262,10 +283,125 @@ describe('CollectionService.recordReceipt (Process 32)', () => {
     await expect(
       deps.service.recordReceipt(
         'inv-1',
-        { amount: '115350.000', method: 'bank_transfer' },
+        { amount: '115350.000', reference: 'BANK-REF-9' },
         actor,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('422s a non-positive instalment', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'INVOICED' })]);
+    await expect(
+      deps.service.recordReceipt('inv-1', { amount: '0.000' }, actor),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('422s when the invoice is already past collection', async () => {
+    const deps = makeDeps([invoiceFixture({ status: 'RECONCILED' })]);
+    await expect(
+      deps.service.recordReceipt('inv-1', { amount: '115350.000' }, actor),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('is idempotent on the payment reference: an identical retry returns the view without a second receipt', async () => {
+    const deps = makeDeps([
+      invoiceFixture({
+        status: 'COLLECTED',
+        receipts: [receiptFixture({ reference: 'BANK-REF-9' })],
+      }),
+    ]);
+    const view = await deps.service.recordReceipt(
+      'inv-1',
+      {
+        amount: '115350.000',
+        method: 'bank_transfer',
+        reference: 'BANK-REF-9',
+      },
+      actor,
+    );
+    expect(view.status).toBe('COLLECTED');
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
+    expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('409s when the same payment reference comes back with different figures', async () => {
+    const deps = makeDeps([
+      invoiceFixture({
+        status: 'INVOICED',
+        receipts: [
+          receiptFixture({ amount: d('999.000'), reference: 'BANK-REF-9' }),
+        ],
+      }),
+    ]);
+    await expect(
+      deps.service.recordReceipt(
+        'inv-1',
+        { amount: '115350.000', reference: 'BANK-REF-9' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(deps.invoices.recordReceiptWithLedger).not.toHaveBeenCalled();
+  });
+
+  it('treats an unreferenced repeat as a genuine second instalment, not a retry', async () => {
+    const deps = makeDeps([
+      invoiceFixture({
+        status: 'INVOICED',
+        receipts: [receiptFixture({ amount: d('50000.000') })],
+      }),
+      invoiceFixture({
+        status: 'COLLECTED',
+        receipts: [
+          receiptFixture({ amount: d('50000.000') }),
+          receiptFixture({ id: 'rcpt-2', amount: d('65350.000') }),
+        ],
+      }),
+    ]);
+    deps.invoices.recordReceiptWithLedger.mockResolvedValueOnce({
+      outcome: 'recorded',
+      receipt: receiptFixture({ id: 'rcpt-2', amount: d('65350.000') }),
+      ledgerEntry: {
+        id: 'led-in-2',
+        customerId: 'cust-1',
+        amount: d('65350.000'),
+        direction: 'in',
+        reference: 'invoice:inv-1',
+        recordedAt: new Date(),
+      },
+      collectedAfter: d('115350.000'),
+      fullyCollected: true,
+    });
+    const view = await deps.service.recordReceipt(
+      'inv-1',
+      { amount: '65350.000' },
+      actor,
+    );
+    expect(deps.invoices.recordReceiptWithLedger).toHaveBeenCalledTimes(1);
+    // The instalment that completes the invoice is the one that moves it on.
+    expect(deps.workflow.transition).toHaveBeenCalledWith(
+      expect.objectContaining({ toStatus: 'COLLECTED' }),
+    );
+    expect(view.status).toBe('COLLECTED');
+  });
+
+  it('still records an instalment against an invoice already walked to COLLECTED (crash recovery)', async () => {
+    // The receipt + ledger write now happens BEFORE the transition, so this
+    // is the reverse seam from #32's original ordering: a COLLECTED invoice
+    // with no receipt row can only come from a partially-applied older write.
+    const deps = makeDeps([
+      invoiceFixture({ status: 'COLLECTED' }),
+      invoiceFixture({ status: 'COLLECTED', receipts: [receiptFixture()] }),
+    ]);
+    const view = await deps.service.recordReceipt(
+      'inv-1',
+      { amount: '115350.000', method: 'bank_transfer' },
+      actor,
+    );
+    // Already COLLECTED — nothing to transition.
+    expect(deps.workflow.transition).not.toHaveBeenCalled();
+    expect(deps.invoices.recordReceiptWithLedger).toHaveBeenCalledTimes(1);
+    expect(view.status).toBe('COLLECTED');
   });
 
   it('404s an unknown invoice', async () => {
@@ -538,7 +674,11 @@ describe('CollectionService — Process 38 payment channels', () => {
       invoiceFixture({
         status: 'COLLECTED',
         receipts: [
-          receiptFixture({ paymentChannelId: 'pc-1', method: 'bank_transfer' }),
+          receiptFixture({
+            paymentChannelId: 'pc-1',
+            method: 'bank_transfer',
+            reference: 'BANK-REF-9',
+          }),
         ],
       }),
     ]);
@@ -548,7 +688,11 @@ describe('CollectionService — Process 38 payment channels', () => {
     );
     const v = await deps.service.recordReceipt(
       'inv-1',
-      { amount: '115350.000', paymentChannelId: 'pc-1' },
+      {
+        amount: '115350.000',
+        paymentChannelId: 'pc-1',
+        reference: 'BANK-REF-9',
+      },
       actor,
     );
     expect(v.status).toBe('COLLECTED'); // resumed, not 422

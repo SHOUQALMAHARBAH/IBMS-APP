@@ -35,7 +35,7 @@ import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCapture
 import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
-import type { Language } from '../../../../lib/i18n/translations';
+import type { Language, TranslationKey } from '../../../../lib/i18n/translations';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
@@ -43,6 +43,27 @@ const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 // InteractionChannel enum; this is the practical subset for placement work.
 const COMM_CHANNELS = ['EMAIL', 'CALL', 'PORTAL', 'MEETING', 'OTHER'] as const;
 const COMM_DIRECTIONS: CommunicationDirection[] = ['INBOUND', 'OUTBOUND'];
+
+const RFQ_INSURER_STATUS_LABEL_KEY: Record<RfqInsurerStatus, TranslationKey> = {
+  SENT: 'rfqInsurerStatusSent',
+  VIEWED: 'rfqInsurerStatusViewed',
+  QUOTED: 'rfqInsurerStatusQuoted',
+  DECLINED: 'rfqInsurerStatusDeclined',
+  NO_RESPONSE: 'rfqInsurerStatusNoResponse',
+};
+
+const COMM_DIRECTION_BADGE_LABEL_KEY: Record<CommunicationDirection, TranslationKey> = {
+  INBOUND: 'commDirectionInboundBadge',
+  OUTBOUND: 'commDirectionOutboundBadge',
+};
+
+const COMM_CHANNEL_LABEL_KEY: Record<(typeof COMM_CHANNELS)[number], TranslationKey> = {
+  EMAIL: 'commChannelEmail',
+  CALL: 'commChannelCall',
+  PORTAL: 'commChannelPortal',
+  MEETING: 'commChannelMeeting',
+  OTHER: 'commChannelOther',
+};
 
 function fmt(value: string | null, language: Language): string {
   return value ? formatDate(value, language) : '—';
@@ -52,7 +73,7 @@ export default function RfqDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [rfq, setRfq] = useState<Rfq | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -82,13 +103,13 @@ export default function RfqDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This RFQ could not be found — it may not exist, or you may not have access to it.'
+          ? t('rfqDetailNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this RFQ — try again.',
+            : t('rfqDetailLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   const loadComms = useCallback(async () => {
     try {
@@ -98,10 +119,10 @@ export default function RfqDetailPage() {
       setCommsError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the correspondence log — try again.',
+          : t('rfqDetailCommsLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -125,7 +146,7 @@ export default function RfqDetailPage() {
       setRowError(
         err instanceof ApiError
           ? err.message
-          : 'Could not update the insurer status — try again.',
+          : t('rfqUpdateStatusError'),
       );
     } finally {
       setBusyRow(null);
@@ -142,7 +163,7 @@ export default function RfqDetailPage() {
       setAddError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the insurer list — try again.',
+          : t('rfqAddInsurersLoadError'),
       );
     }
   }
@@ -160,7 +181,7 @@ export default function RfqDetailPage() {
       setAddError(
         err instanceof ApiError
           ? err.message
-          : 'Could not add insurers — try again.',
+          : t('rfqAddInsurersError'),
       );
     } finally {
       setAddBusy(false);
@@ -187,7 +208,7 @@ export default function RfqDetailPage() {
       setCommError(
         err instanceof ApiError
           ? err.message
-          : 'Could not log the exchange — try again.',
+          : t('rfqLogExchangeError'),
       );
     } finally {
       setCommBusy(false);
@@ -212,7 +233,7 @@ export default function RfqDetailPage() {
         }
         style={{ cursor: 'pointer' }}
       >
-        ← Back to the opportunity
+        {t('rfqDetailBackButton')}
       </button>
 
       {loadError ? (
@@ -223,17 +244,18 @@ export default function RfqDetailPage() {
 
       {rfq ? (
         <>
-          <h1>RFQ — {rfq.insuranceLine}</h1>
+          <h1>{t('rfqDetailHeading', { line: rfq.insuranceLine })}</h1>
           <div style={cardMetaStyle}>
-            Issued {formatDate(rfq.issuedAt, language)} · follow-up
-            threshold {rfq.followUpThresholdDays} business day
-            {rfq.followUpThresholdDays === 1 ? '' : 's'}
+            {t(
+              rfq.followUpThresholdDays === 1 ? 'rfqFollowUpThresholdOne' : 'rfqFollowUpThresholdOther',
+              { date: formatDate(rfq.issuedAt, language), count: rfq.followUpThresholdDays },
+            )}
           </div>
 
           <ConsentCaptureWidget
             customerId={rfq.opportunity.customerId}
             purpose="SHARING_WITH_INSURER"
-            label="RFQ / market placement consent"
+            label={t('rfqConsentLabel')}
             defaultConsentTextVersion="market-placement-notice-v1"
           />
           <PrivacyNoticeDisplay
@@ -241,23 +263,22 @@ export default function RfqDetailPage() {
             canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
           />
 
-          <h2 style={{ marginTop: '2rem' }}>Insurer submissions</h2>
+          <h2 style={{ marginTop: '2rem' }}>{t('rfqSubmissionsHeading')}</h2>
           <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-            A status of <code>NO_RESPONSE</code> may be set by the nightly
-            follow-up sweep once the threshold above has lapsed.
+            {t('rfqSubmissionsHint')}
           </p>
           {rfq.insurerSubmissions.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>No insurers on this RFQ.</p>
+            <p style={{ opacity: 0.6 }}>{t('rfqSubmissionsNone')}</p>
           ) : (
             <table style={rfqTableStyle}>
               <thead>
                 <tr>
-                  <th style={rfqCellStyle}>Insurer</th>
-                  <th style={rfqCellStyle}>Status</th>
-                  <th style={rfqCellStyle}>Sent</th>
-                  <th style={rfqCellStyle}>Responded</th>
-                  <th style={rfqCellStyle}>Follow-up alert</th>
-                  {isPlacement ? <th style={rfqCellStyle}>Set status</th> : null}
+                  <th style={rfqCellStyle}>{t('rfqColumnInsurer')}</th>
+                  <th style={rfqCellStyle}>{t('commonStatus')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnSent')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnResponded')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnFollowUpAlert')}</th>
+                  {isPlacement ? <th style={rfqCellStyle}>{t('rfqColumnSetStatus')}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -267,7 +288,7 @@ export default function RfqDetailPage() {
                       <bdi>{submission.insurer.name}</bdi>
                     </td>
                     <td style={rfqCellStyle}>
-                      <span style={rfqBadgeStyle}>{submission.status}</span>
+                      <span style={rfqBadgeStyle}>{t(RFQ_INSURER_STATUS_LABEL_KEY[submission.status])}</span>
                     </td>
                     <td style={rfqCellStyle}>{fmt(submission.sentAt, language)}</td>
                     <td style={rfqCellStyle}>{fmt(submission.respondedAt, language)}</td>
@@ -277,7 +298,7 @@ export default function RfqDetailPage() {
                     {isPlacement ? (
                       <td style={rfqCellStyle}>
                         <select
-                          aria-label={`Set status for ${submission.insurer.name}`}
+                          aria-label={t('rfqSetStatusAria', { name: submission.insurer.name })}
                           disabled={busyRow === submission.id}
                           value=""
                           onChange={(e) => {
@@ -288,7 +309,7 @@ export default function RfqDetailPage() {
                           <option value="">—</option>
                           {RFQ_INSURER_TARGET_STATUSES.map((status) => (
                             <option key={status} value={status}>
-                              {status}
+                              {t(RFQ_INSURER_STATUS_LABEL_KEY[status])}
                             </option>
                           ))}
                         </select>
@@ -310,14 +331,14 @@ export default function RfqDetailPage() {
             <div style={rfqActionsStyle}>
               {adding ? (
                 <div style={{ width: '100%' }}>
-                  <strong>Add insurers to the shortlist</strong>
+                  <strong>{t('rfqAddInsurersHeading')}</strong>
                   {addError ? (
                     <p role="alert" style={errorStyle}>
                       {addError}
                     </p>
                   ) : null}
                   {insurers === null ? (
-                    <p>Loading…</p>
+                    <p>{t('commonLoading')}</p>
                   ) : (
                     <div style={insurerPickerStyle}>
                       {insurers
@@ -352,7 +373,7 @@ export default function RfqDetailPage() {
                       {insurers.filter((i) => !shortlistedIds.has(i.id))
                         .length === 0 ? (
                         <span style={{ opacity: 0.6 }}>
-                          Every insurer on file is already on this RFQ.
+                          {t('rfqAllInsurersAlreadyOnRfq')}
                         </span>
                       ) : null}
                     </div>
@@ -364,7 +385,7 @@ export default function RfqDetailPage() {
                       style={{ ...buttonStyle, width: 'auto' }}
                       onClick={() => void submitAdd()}
                     >
-                      {addBusy ? 'Adding…' : 'Add selected'}
+                      {addBusy ? t('rfqAddingButton') : t('rfqAddSelectedButton')}
                     </button>
                     <button
                       type="button"
@@ -374,7 +395,7 @@ export default function RfqDetailPage() {
                         setToAdd(new Set());
                       }}
                     >
-                      Cancel
+                      {t('commonCancel')}
                     </button>
                   </div>
                 </div>
@@ -384,7 +405,7 @@ export default function RfqDetailPage() {
                   style={{ ...buttonStyle, width: 'auto' }}
                   onClick={() => void openAdd()}
                 >
-                  Add insurers…
+                  {t('rfqAddInsurersButton')}
                 </button>
               )}
             </div>
@@ -398,11 +419,8 @@ export default function RfqDetailPage() {
 
           <ComparisonSection rfqId={rfq.id} isPlacement={isPlacement} />
 
-          <h2 style={{ marginTop: '2.5rem' }}>Correspondence</h2>
-          <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
-            Insurer queries during the market phase, and the answers /
-            additional information supplied.
-          </p>
+          <h2 style={{ marginTop: '2.5rem' }}>{t('rfqCorrespondenceHeading')}</h2>
+          <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('rfqCorrespondenceIntro')}</p>
 
           {commsError ? (
             <p role="alert" style={errorStyle}>
@@ -411,18 +429,18 @@ export default function RfqDetailPage() {
           ) : null}
 
           {comms === null ? (
-            <p>Loading…</p>
+            <p>{t('commonLoading')}</p>
           ) : comms.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>Nothing logged yet.</p>
+            <p style={{ opacity: 0.6 }}>{t('rfqCorrespondenceNone')}</p>
           ) : (
             <table style={rfqTableStyle}>
               <thead>
                 <tr>
-                  <th style={rfqCellStyle}>When</th>
-                  <th style={rfqCellStyle}>Direction</th>
-                  <th style={rfqCellStyle}>Channel</th>
-                  <th style={rfqCellStyle}>Insurer</th>
-                  <th style={rfqCellStyle}>Exchange</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnWhen')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnDirection')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnChannel')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnInsurer')}</th>
+                  <th style={rfqCellStyle}>{t('rfqColumnExchange')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -430,11 +448,15 @@ export default function RfqDetailPage() {
                   <tr key={c.id}>
                     <td style={rfqCellStyle}>{formatDateTime(c.sentAt, language)}</td>
                     <td style={rfqCellStyle}>
-                      <span style={rfqBadgeStyle}>{c.direction}</span>
+                      <span style={rfqBadgeStyle}>{t(COMM_DIRECTION_BADGE_LABEL_KEY[c.direction])}</span>
                     </td>
-                    <td style={rfqCellStyle}>{c.channel}</td>
                     <td style={rfqCellStyle}>
-                      <bdi>{c.rfqInsurer?.insurer.name ?? 'Panel'}</bdi>
+                      {c.channel in COMM_CHANNEL_LABEL_KEY
+                        ? t(COMM_CHANNEL_LABEL_KEY[c.channel as keyof typeof COMM_CHANNEL_LABEL_KEY])
+                        : c.channel}
+                    </td>
+                    <td style={rfqCellStyle}>
+                      <bdi>{c.rfqInsurer?.insurer.name ?? t('rfqPanelWide')}</bdi>
                     </td>
                     <td style={rfqCellStyle}>
                       {c.subject ? <strong>{c.subject}</strong> : null}
@@ -448,14 +470,14 @@ export default function RfqDetailPage() {
 
           {isPlacement ? (
             <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
-              <strong>Log an exchange</strong>
+              <strong>{t('rfqLogExchangeHeading')}</strong>
               {commError ? (
                 <p role="alert" style={errorStyle}>
                   {commError}
                 </p>
               ) : null}
               <div style={rfqFieldStyle}>
-                <label htmlFor="comm-direction">Direction</label>
+                <label htmlFor="comm-direction">{t('rfqDirectionLabel')}</label>
                 <select
                   id="comm-direction"
                   value={direction}
@@ -466,14 +488,14 @@ export default function RfqDetailPage() {
                   {COMM_DIRECTIONS.map((d) => (
                     <option key={d} value={d}>
                       {d === 'INBOUND'
-                        ? 'INBOUND — insurer asked us'
-                        : 'OUTBOUND — we answered / sent info'}
+                        ? t('rfqDirectionInboundOption')
+                        : t('rfqDirectionOutboundOption')}
                     </option>
                   ))}
                 </select>
               </div>
               <div style={rfqFieldStyle}>
-                <label htmlFor="comm-channel">Channel</label>
+                <label htmlFor="comm-channel">{t('rfqChannelLabel')}</label>
                 <select
                   id="comm-channel"
                   value={channel}
@@ -481,19 +503,19 @@ export default function RfqDetailPage() {
                 >
                   {COMM_CHANNELS.map((ch) => (
                     <option key={ch} value={ch}>
-                      {ch}
+                      {t(COMM_CHANNEL_LABEL_KEY[ch])}
                     </option>
                   ))}
                 </select>
               </div>
               <div style={rfqFieldStyle}>
-                <label htmlFor="comm-insurer">Insurer (optional)</label>
+                <label htmlFor="comm-insurer">{t('rfqCommInsurerLabel')}</label>
                 <select
                   id="comm-insurer"
                   value={commInsurerId}
                   onChange={(e) => setCommInsurerId(e.target.value)}
                 >
-                  <option value="">Whole panel</option>
+                  <option value="">{t('rfqCommInsurerWholePanel')}</option>
                   {rfq.insurerSubmissions.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.insurer.name}
@@ -502,7 +524,7 @@ export default function RfqDetailPage() {
                 </select>
               </div>
               <div style={rfqFieldStyle}>
-                <label htmlFor="comm-subject">Subject (optional)</label>
+                <label htmlFor="comm-subject">{t('rfqCommSubjectLabel')}</label>
                 <input
                   id="comm-subject"
                   value={subject}
@@ -511,7 +533,7 @@ export default function RfqDetailPage() {
                 />
               </div>
               <div style={rfqFieldStyle}>
-                <label htmlFor="comm-body">Exchange</label>
+                <label htmlFor="comm-body">{t('rfqCommBodyLabel')}</label>
                 <textarea
                   id="comm-body"
                   value={body}
@@ -526,7 +548,7 @@ export default function RfqDetailPage() {
                 style={{ ...buttonStyle, width: 'auto' }}
                 onClick={() => void submitComm()}
               >
-                {commBusy ? 'Logging…' : 'Log exchange'}
+                {commBusy ? t('rfqLoggingButton') : t('rfqLogExchangeButton')}
               </button>
             </div>
           ) : null}

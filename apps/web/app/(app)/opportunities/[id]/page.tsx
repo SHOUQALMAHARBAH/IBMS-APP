@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   getOpportunity,
+  type OpportunityStatus,
   type OpportunityWithContext,
 } from '../../../../lib/opportunity/opportunity-api';
-import { listRfqs, type Rfq } from '../../../../lib/rfq/rfq-api';
+import { listRfqs, type Rfq, type RfqInsurerStatus } from '../../../../lib/rfq/rfq-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { cardMetaStyle, pageStyle } from '../../../../components/lead/lead.styles';
@@ -26,6 +27,7 @@ import { CommissionSection } from '../../../../components/policy/CommissionSecti
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate } from '../../../../lib/i18n/format';
+import type { TranslationKey } from '../../../../lib/i18n/translations';
 
 const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
@@ -35,20 +37,43 @@ const POLICY_CHECK_ROLE = 'POLICY_CHECKING_OFFICER';
 const CLAIMS_ROLE = 'CLAIMS_OFFICER';
 const FINANCE_ROLE = 'FINANCE_COLLECTIONS_OFFICER';
 
-function statusBreakdown(rfq: Rfq): string {
-  if (rfq.insurerSubmissions.length === 0) return 'no insurers yet';
-  const counts = new Map<string, number>();
+const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
+  NEEDS_CONFIRMED: 'oppStatusNeedsConfirmed',
+  RFQ_ISSUED: 'oppStatusRfqIssued',
+  QUOTES_RECEIVED: 'oppStatusQuotesReceived',
+  COMPARISON_BUILT: 'oppStatusComparisonBuilt',
+  RECOMMENDATION_DRAFTED: 'oppStatusRecommendationDrafted',
+  SENT_TO_CLIENT: 'oppStatusSentToClient',
+  CLIENT_DECISION: 'oppStatusClientDecision',
+  PLACEMENT: 'oppStatusPlacement',
+  RENEGOTIATE: 'oppStatusRenegotiate',
+  CLOSED_LOST: 'oppStatusClosedLost',
+};
+
+const RFQ_INSURER_STATUS_LABEL_KEY: Record<RfqInsurerStatus, TranslationKey> = {
+  SENT: 'rfqInsurerStatusSent',
+  VIEWED: 'rfqInsurerStatusViewed',
+  QUOTED: 'rfqInsurerStatusQuoted',
+  DECLINED: 'rfqInsurerStatusDeclined',
+  NO_RESPONSE: 'rfqInsurerStatusNoResponse',
+};
+
+function statusBreakdown(rfq: Rfq, t: (key: TranslationKey) => string): string {
+  if (rfq.insurerSubmissions.length === 0) return t('oppRfqNoInsurersYet');
+  const counts = new Map<RfqInsurerStatus, number>();
   for (const s of rfq.insurerSubmissions) {
     counts.set(s.status, (counts.get(s.status) ?? 0) + 1);
   }
-  return [...counts.entries()].map(([k, v]) => `${v} ${k}`).join(' · ');
+  return [...counts.entries()]
+    .map(([k, v]) => `${v} ${t(RFQ_INSURER_STATUS_LABEL_KEY[k])}`)
+    .join(' · ');
 }
 
 export default function OpportunityDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [opportunity, setOpportunity] = useState<OpportunityWithContext | null>(
     null,
@@ -71,13 +96,13 @@ export default function OpportunityDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This opportunity could not be found — it may not exist, or you may not have access to it.'
+          ? t('oppDetailNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this opportunity — try again.',
+            : t('oppDetailLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -113,7 +138,7 @@ export default function OpportunityDetailPage() {
         }
         style={{ cursor: 'pointer' }}
       >
-        ← All opportunities
+        {t('oppDetailBackButton')}
       </button>
 
       {loadError ? (
@@ -124,11 +149,13 @@ export default function OpportunityDetailPage() {
 
       {opportunity ? (
         <>
-          <h1>Opportunity {opportunity.id.slice(0, 8)}</h1>
-          <p style={{ opacity: 0.8 }}>Status: {opportunity.status}</p>
+          <h1>{t('oppDetailHeading', { id: opportunity.id.slice(0, 8) })}</h1>
+          <p style={{ opacity: 0.8 }}>
+            {t('oppDetailStatusLine', { status: t(OPPORTUNITY_STATUS_LABEL_KEY[opportunity.status]) })}
+          </p>
           {opportunity.context.insuranceProgramId ? (
             <div style={cardMetaStyle}>
-              From insurance program{' '}
+              {t('oppDetailFromProgramPrefix')}{' '}
               <button
                 type="button"
                 style={{
@@ -160,19 +187,16 @@ export default function OpportunityDetailPage() {
                   router.push(`/rfqs/new?opportunityId=${opportunity.id}`)
                 }
               >
-                Create RFQ for a line
+                {t('oppCreateRfqButton')}
               </button>
             ) : null}
           </div>
 
-          <h2 style={{ marginTop: '2rem' }}>RFQs</h2>
+          <h2 style={{ marginTop: '2rem' }}>{t('oppRfqsHeading')}</h2>
           {rfqs === null ? (
-            <p>Loading…</p>
+            <p>{t('commonLoading')}</p>
           ) : rfqs.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>
-              No RFQs yet. Create one per insurance line and send it to a
-              shortlist of insurers.
-            </p>
+            <p style={{ opacity: 0.6 }}>{t('oppRfqsNone')}</p>
           ) : (
             <div style={{ marginTop: '1rem' }}>
               {rfqs.map((rfq) => (
@@ -194,13 +218,17 @@ export default function OpportunityDetailPage() {
                       <bdi>{rfq.insuranceLine}</bdi>
                     </strong>
                     <span style={rfqBadgeStyle}>
-                      {rfq.insurerSubmissions.length} insurer
-                      {rfq.insurerSubmissions.length === 1 ? '' : 's'}
+                      {t(
+                        rfq.insurerSubmissions.length === 1 ? 'rfqInsurerCountOne' : 'rfqInsurerCountOther',
+                        { count: rfq.insurerSubmissions.length },
+                      )}
                     </span>
                   </div>
                   <div style={cardMetaStyle}>
-                    Issued {formatDate(rfq.issuedAt, language)} ·{' '}
-                    {statusBreakdown(rfq)}
+                    {t('oppRfqIssuedMeta', {
+                      date: formatDate(rfq.issuedAt, language),
+                      breakdown: statusBreakdown(rfq, t),
+                    })}
                   </div>
                 </button>
               ))}
@@ -250,7 +278,7 @@ export default function OpportunityDetailPage() {
           <ConsentCaptureWidget
             customerId={opportunity.customerId}
             purpose="CLAIMS"
-            label="Claims consent"
+            label={t('oppClaimsConsentLabel')}
             defaultConsentTextVersion="claims-notice-v1"
           />
 

@@ -437,9 +437,22 @@ export interface InvoiceView {
   /** Process 32 — `premiumAmount − commissionDeducted`, the net premium the
    * broker owes the insurer. Computed here so the UI never does money math. */
   netRemittance: string;
-  /** Process 32 — the client's collection receipt (or null). #32 records at
-   * most one, for the full invoiced total. */
+  /** Process 32 — every instalment receipt against this invoice, oldest
+   * first. An invoice may be settled in parts. */
+  receipts: InvoiceReceiptView[];
+  /** Process 32 — the MOST RECENT instalment (or null). Kept alongside
+   * `receipts` so a caller that only wants "was anything collected, and
+   * when" does not have to index the array. */
   receipt: InvoiceReceiptView | null;
+  /** Process 32 — Σ of every instalment recorded so far. Computed here so the
+   * UI never does money math. */
+  collectedAmount: string;
+  /** Process 32 — `totalAmount − collectedAmount`; `0.000` once settled. This
+   * is the figure the #33 ageing report buckets. */
+  outstandingAmount: string;
+  /** True once `collectedAmount` reaches `totalAmount` — the condition that
+   * lets the invoice leave `INVOICED`. */
+  fullyCollected: boolean;
   /** Process 32 — the net-premium remittance to the insurer (or null). */
   remittance: InvoiceRemittanceView | null;
 }
@@ -478,8 +491,22 @@ export interface InvoiceRow {
 }
 
 export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
-  const receipt =
-    row.receipts && row.receipts.length > 0 ? row.receipts[0] : null;
+  const receipts = row.receipts ?? [];
+  // Most recent instalment. `receipts` arrives ordered `receivedAt asc`
+  // (INVOICE_CYCLE_INCLUDE), so the last element is the latest payment — and,
+  // once the invoice is settled, the one that completed it.
+  const latest = receipts.length > 0 ? receipts[receipts.length - 1] : null;
+  // The Remittance hangs off ONE receipt (`Remittance.receiptId @unique`,
+  // which is what keeps it to one per invoice); with instalments it is no
+  // longer safe to assume which, so find it rather than index.
+  const remitted = receipts.find((r) => r.remittance)?.remittance ?? null;
+  const collected = sumMoney(receipts.map((r) => r.amount));
+  const outstandingRaw = subtractMoney(row.totalAmount, collected);
+  // Never surface a negative balance: the write path caps collection at the
+  // invoiced total, so this can only be legacy data.
+  const outstanding = outstandingRaw.lessThan(0)
+    ? quantizeMoney('0')
+    : outstandingRaw;
   return {
     id: row.id,
     policyId: row.policyId,
@@ -497,22 +524,33 @@ export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
     netRemittance: formatMoney(
       computeRemittanceAmount(row.premiumAmount, row.commissionDeducted),
     ),
-    receipt: receipt
+    receipts: receipts.map((r) => ({
+      id: r.id,
+      amount: formatMoney(r.amount),
+      method: r.method,
+      paymentChannelId: r.paymentChannelId,
+      receivedAt: r.receivedAt.toISOString(),
+    })),
+    receipt: latest
       ? {
-          id: receipt.id,
-          amount: formatMoney(receipt.amount),
-          method: receipt.method,
-          paymentChannelId: receipt.paymentChannelId,
-          receivedAt: receipt.receivedAt.toISOString(),
+          id: latest.id,
+          amount: formatMoney(latest.amount),
+          method: latest.method,
+          paymentChannelId: latest.paymentChannelId,
+          receivedAt: latest.receivedAt.toISOString(),
         }
       : null,
-    remittance: receipt?.remittance
+    collectedAmount: formatMoney(collected),
+    outstandingAmount: formatMoney(outstanding),
+    fullyCollected:
+      receipts.length > 0 && compareMoney(collected, row.totalAmount) >= 0,
+    remittance: remitted
       ? {
-          id: receipt.remittance.id,
-          amount: formatMoney(receipt.remittance.amount),
-          insurerId: receipt.remittance.insurerId,
-          paymentChannelId: receipt.remittance.paymentChannelId,
-          remittedAt: receipt.remittance.remittedAt?.toISOString() ?? null,
+          id: remitted.id,
+          amount: formatMoney(remitted.amount),
+          insurerId: remitted.insurerId,
+          paymentChannelId: remitted.paymentChannelId,
+          remittedAt: remitted.remittedAt?.toISOString() ?? null,
         }
       : null,
   };
@@ -701,6 +739,11 @@ export interface OutstandingInvoiceRow {
   customerId: string;
   customerLegalName: string;
   totalAmount: Prisma.Decimal | string;
+  /** The balance still owed as at the report date — `totalAmount` minus the
+   * instalment receipts recorded by then. Ageing buckets the OUTSTANDING
+   * figure, not the invoiced one: since partial payments landed, a half-paid
+   * invoice ages only for what is still owed. */
+  outstandingAmount: Prisma.Decimal | string;
   currency: string;
   dueDate: Date;
 }
@@ -801,7 +844,7 @@ export function buildReceivablesAgeing(input: {
   for (const inv of input.invoices) {
     const days = daysOverdue(inv.dueDate, input.asOf);
     const key = ageingBucketFor(days);
-    const amount = quantizeMoney(inv.totalAmount);
+    const amount = quantizeMoney(inv.outstandingAmount);
 
     let acc = byCustomer.get(inv.customerId);
     if (!acc) {

@@ -25,6 +25,8 @@ const outstanding = (
   customerId,
   customerLegalName: `Customer ${customerId}`,
   totalAmount: new Prisma.Decimal(totalAmount),
+  // No instalment recorded — the whole invoice is still owed.
+  outstandingAmount: new Prisma.Decimal(totalAmount),
   currency: 'JOD',
   dueDate,
 });

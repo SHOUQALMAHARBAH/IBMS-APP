@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import {
   approveKyc,
-  KYC_STATUS_LABEL,
   rejectKyc,
   runScreening,
   triggerEdd,
   type KycQueueRecord,
   type KycRecord,
+  type KycStatus,
 } from '../../lib/kyc/kyc-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import { errorStyle } from '../auth/auth-form.styles';
 import { smallButtonStyle } from '../lead/lead.styles';
 import { badgeStyle, queueCellStyle, queueTableStyle } from './customer.styles';
@@ -31,7 +33,24 @@ const STATUS_TONE: Record<KycRecord['status'], 'neutral' | 'warn' | 'good' | 'ba
   PERIODIC_REVIEW_DUE: 'warn',
 };
 
+const STATUS_LABEL_KEY: Record<KycStatus, TranslationKey> = {
+  DRAFT: 'kycStatusDraft',
+  SUBMITTED: 'kycStatusSubmitted',
+  SCREENING: 'kycStatusScreening',
+  EDD: 'kycStatusEdd',
+  COMPLIANCE_REVIEW: 'kycStatusComplianceReview',
+  APPROVED: 'kycStatusApproved',
+  REJECTED: 'kycStatusRejected',
+  PERIODIC_REVIEW_DUE: 'kycStatusPeriodicReviewDue',
+};
+
+const TYPE_LABEL_KEY: Record<'INDIVIDUAL' | 'CORPORATE', TranslationKey> = {
+  INDIVIDUAL: 'customerTypeIndividual',
+  CORPORATE: 'customerTypeCorporate',
+};
+
 export function KycQueue({ items, onItemChanged }: KycQueueProps) {
+  const { t } = useLanguage();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
@@ -43,7 +62,7 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
       const updated = await action();
       onItemChanged(updated);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Action failed — try again.';
+      const message = err instanceof ApiError ? err.message : t('kycQueueActionFailed');
       setErrors((prev) => ({ ...prev, [id]: message }));
     } finally {
       setBusyId(null);
@@ -51,16 +70,16 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
   }
 
   if (items.length === 0) {
-    return <p style={{ opacity: 0.6 }}>Nothing in the KYC queue right now.</p>;
+    return <p style={{ opacity: 0.6 }}>{t('kycQueueEmpty')}</p>;
   }
 
   return (
     <table style={queueTableStyle}>
       <thead>
         <tr>
-          <th style={queueCellStyle}>Customer</th>
-          <th style={queueCellStyle}>Status</th>
-          <th style={queueCellStyle}>Actions</th>
+          <th style={queueCellStyle}>{t('kycQueueColumnCustomer')}</th>
+          <th style={queueCellStyle}>{t('commonStatus')}</th>
+          <th style={queueCellStyle}>{t('commonActions')}</th>
         </tr>
       </thead>
       <tbody>
@@ -72,12 +91,14 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                 <strong>
                   <bdi>{item.customer.legalName}</bdi>
                 </strong>
-                <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>{item.customer.customerType}</div>
+                <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                  {t(TYPE_LABEL_KEY[item.customer.customerType])}
+                </div>
               </td>
               <td style={queueCellStyle}>
-                <span style={badgeStyle(STATUS_TONE[item.status])}>{KYC_STATUS_LABEL[item.status]}</span>
+                <span style={badgeStyle(STATUS_TONE[item.status])}>{t(STATUS_LABEL_KEY[item.status])}</span>
                 {item.isEdd ? (
-                  <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>High-risk screening result</div>
+                  <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>{t('kycQueueHighRiskResult')}</div>
                 ) : null}
               </td>
               <td style={queueCellStyle}>
@@ -88,7 +109,7 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                     disabled={isBusy}
                     onClick={() => void run(item.id, () => runScreening(item.id))}
                   >
-                    Run screening
+                    {t('kycQueueRunScreeningButton')}
                   </button>
                 ) : null}
                 {item.status === 'SCREENING' && item.isEdd ? (
@@ -98,7 +119,7 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                     disabled={isBusy}
                     onClick={() => void run(item.id, () => triggerEdd(item.id))}
                   >
-                    Enter enhanced due diligence
+                    {t('kycQueueEnterEddButton')}
                   </button>
                 ) : null}
                 {(item.status === 'SCREENING' && !item.isEdd) || item.status === 'EDD' ? (
@@ -109,10 +130,10 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                       disabled={isBusy}
                       onClick={() => void run(item.id, () => approveKyc(item.id))}
                     >
-                      Approve
+                      {t('kycQueueApproveButton')}
                     </button>
                     <input
-                      placeholder="Rejection reason"
+                      placeholder={t('kycQueueRejectReasonPlaceholder')}
                       value={rejectReason[item.id] ?? ''}
                       onChange={(e) => setRejectReason((prev) => ({ ...prev, [item.id]: e.target.value }))}
                       style={{ fontSize: '0.8rem', padding: '0.25rem' }}
@@ -123,7 +144,7 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
                       disabled={isBusy || !rejectReason[item.id]?.trim()}
                       onClick={() => void run(item.id, () => rejectKyc(item.id, rejectReason[item.id]))}
                     >
-                      Reject
+                      {t('kycQueueRejectButton')}
                     </button>
                   </div>
                 ) : null}

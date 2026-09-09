@@ -83,7 +83,7 @@ export function EndorsementSection({
   canManage,
   canApproveRefund,
 }: Props) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
   const [rows, setRows] = useState<Endorsement[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -115,10 +115,10 @@ export function EndorsementSection({
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load endorsements — try again.',
+          : t('endorsementLoadError'),
       );
     }
-  }, [opportunityId]);
+  }, [opportunityId, t]);
 
   useEffect(() => {
     void (async () => {
@@ -136,7 +136,7 @@ export function EndorsementSection({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'That action could not be completed — try again.',
+          : t('endorsementActionError'),
       );
     } finally {
       setBusy(false);
@@ -152,14 +152,8 @@ export function EndorsementSection({
 
   return (
     <section>
-      <h2 style={{ marginTop: '2.5rem' }}>Endorsements</h2>
-      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>
-        Mid-term amendments and cancellations. A negative (return-premium)
-        endorsement auto-creates the tied commission reversal; a refund at or
-        above the value threshold needs a separate manager approval. Applying an
-        endorsement opens a new coverage-schedule version — the prior version is
-        never overwritten.
-      </p>
+      <h2 style={{ marginTop: '2.5rem' }}>{t('endorsementSectionHeading')}</h2>
+      <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{t('endorsementIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -173,7 +167,7 @@ export function EndorsementSection({
       ) : null}
 
       {rows.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>No endorsements yet.</p>
+        <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('endorsementNoneYet')}</p>
       ) : (
         rows.map((e) => {
           const action = nextAction(e, canManage, canApproveRefund);
@@ -236,7 +230,7 @@ export function EndorsementSection({
 
       {canRaise ? (
         <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
-          <strong>Request an endorsement</strong>
+          <strong>{t('endorsementRequestHeading')}</strong>
           <div style={quoteFieldStyle}>
             <label htmlFor="end-type">Type</label>
             <select

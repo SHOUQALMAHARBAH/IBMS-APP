@@ -140,6 +140,11 @@ const insuranceOperations: PermissionSeed[] = [
   // on hand). The structural control is assertDifferentActors + the
   // Refund_maker_checker_distinct CHECK — never the raiser.
   { code: 'refund.approve', module: 'insurance-operations', description: 'Approve a refund at or above the configurable value threshold (maker/checker: never the raiser)', roles: [MANAGER, FINANCE] },
+  // The payment-execution step (POST /refunds/:id/disburse) — a distinct
+  // permission from refund.approve so the approver and the person who moves
+  // the money need not be the same person, and so Finance can execute a
+  // Manager-approved refund without holding the approval right itself.
+  { code: 'refund.disburse', module: 'insurance-operations', description: 'Disburse an approved refund (stamp paidAt and book the client-funds out movement)', roles: [FINANCE] },
   { code: 'commission-reversal.create', module: 'insurance-operations', description: 'Record a commission reversal tied 1:1 to a negative premium adjustment', roles: [FINANCE] },
 ];
 
@@ -192,6 +197,11 @@ const customerService: PermissionSeed[] = [
   { code: 'communication.send', module: 'customer-service', description: 'Send a logged customer communication (channel/consent-checked)', roles: [SALES, PLACEMENT, CLAIMS, FINANCE] },
   { code: 'feedback.log', module: 'customer-service', description: 'Log customer feedback', roles: [SALES] },
   { code: 'retention-case.manage', module: 'customer-service', description: 'Manage a retention case opened on renewal inactivity/lapse risk', roles: [SALES, MANAGER] },
+  // Part 3.9 — Renewal Management. Sales owns the renewal conversation and
+  // Placement re-markets it; both walk the case. Read is widened to the two
+  // cross-book reporting roles, matching every other lifecycle read here.
+  { code: 'renewal.read', module: 'insurance-operations', description: 'List/read renewal cases, their lead-time window and loss ratio', roles: [SALES, PLACEMENT, MANAGER, EXEC] },
+  { code: 'renewal.manage', module: 'insurance-operations', description: 'Run the renewal lead-time sweep, walk a renewal case through RenewalStatus, and set its re-marketing triggers', roles: [SALES, PLACEMENT, MANAGER] },
 ];
 
 // ----------------------------------------------------------------------

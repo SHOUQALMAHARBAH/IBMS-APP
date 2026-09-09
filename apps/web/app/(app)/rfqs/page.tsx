@@ -17,7 +17,7 @@ function RfqList({
   scope: { opportunityId: string } | { customerId: string };
 }) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [rfqs, setRfqs] = useState<Rfq[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -30,12 +30,12 @@ function RfqList({
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the rfq.read permission, so there's nothing to show here."
+          ? t('rfqListNoPermission')
           : err instanceof ApiError && err.status === 404
-            ? 'That parent could not be found — it may not exist, or you may not have access to it.'
+            ? t('rfqListParentNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load RFQs — try again.',
+              : t('rfqListLoadError'),
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,9 +54,9 @@ function RfqList({
       </p>
     );
   }
-  if (!rfqs) return <p>Loading…</p>;
+  if (!rfqs) return <p>{t('commonLoading')}</p>;
   if (rfqs.length === 0) {
-    return <p style={{ opacity: 0.6, marginTop: '1rem' }}>No RFQs.</p>;
+    return <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('rfqListNone')}</p>;
   }
 
   return (
@@ -80,12 +80,14 @@ function RfqList({
               <bdi>{rfq.insuranceLine}</bdi>
             </strong>
             <span style={rfqBadgeStyle}>
-              {rfq.insurerSubmissions.length} insurer
-              {rfq.insurerSubmissions.length === 1 ? '' : 's'}
+              {t(
+                rfq.insurerSubmissions.length === 1 ? 'rfqInsurerCountOne' : 'rfqInsurerCountOther',
+                { count: rfq.insurerSubmissions.length },
+              )}
             </span>
           </div>
           <div style={cardMetaStyle}>
-            Issued {formatDate(rfq.issuedAt, language)}
+            {t('rfqListIssuedMeta', { date: formatDate(rfq.issuedAt, language) })}
           </div>
         </button>
       ))}
@@ -96,6 +98,7 @@ function RfqList({
 function RfqsFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const opportunityId = searchParams.get('opportunityId') ?? '';
   const customerId = searchParams.get('customerId') ?? '';
 
@@ -104,13 +107,13 @@ function RfqsFlow() {
 
   return (
     <p role="alert" style={errorStyle}>
-      No opportunity or customer selected — open one from{' '}
+      {t('rfqListNoParentPrefix')}{' '}
       <button
         type="button"
         onClick={() => router.push('/opportunities')}
         style={{ textDecoration: 'underline', cursor: 'pointer' }}
       >
-        RFQ / market
+        {t('rfqListNoParentLinkLabel')}
       </button>
       .
     </p>
@@ -120,6 +123,7 @@ function RfqsFlow() {
 export default function RfqsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -129,7 +133,7 @@ export default function RfqsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>RFQs</h1>
+      <h1>{t('rfqListHeading')}</h1>
       <Suspense fallback={null}>
         <RfqsFlow />
       </Suspense>
