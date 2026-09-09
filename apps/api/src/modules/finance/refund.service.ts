@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -8,7 +7,7 @@ import {
 import { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { formatMoney } from '../../common/money.util';
 
@@ -77,11 +76,11 @@ export class RefundService {
         reason: updated.reason,
         raisedByUserId: updated.raisedByUserId,
         approvedByUserId: updated.approvedByUserId,
-        paidAt: updated.paidAt ? updated.paidAt.toISOString() : null,
+        paidAt: now.toISOString(),
       },
     });
 
-    return { id: updated.id, paidAt: updated.paidAt.toISOString() };
+    return { id: updated.id, paidAt: now.toISOString() };
   }
 
   /** Audit failures never fail the request — the write has already committed
