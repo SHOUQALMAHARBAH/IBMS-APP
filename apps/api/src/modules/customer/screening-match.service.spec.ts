@@ -3,6 +3,8 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ScreeningMatchService } from './screening-match.service';
 import type { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 const actor = { id: 'compliance-1' } as AuthenticatedUser;
@@ -52,11 +54,15 @@ function makeDeps(over: Record<string, unknown> = {}) {
     ...(over.matches as object),
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  const kycRecords = { update: vi.fn().mockResolvedValue({}) };
+  const sla = { resolve: vi.fn().mockResolvedValue({ count: 1 }) };
   const service = new ScreeningMatchService(
     matches as unknown as ScreeningMatchRepository,
+    kycRecords as unknown as KycRecordRepository,
+    sla as unknown as SlaTimerService,
     audit as unknown as AuditService,
   );
-  return { service, matches, audit };
+  return { service, matches, audit, kycRecords, sla };
 }
 
 describe('ScreeningMatchService.list', () => {
@@ -210,5 +216,63 @@ describe('ScreeningMatchService.decide', () => {
         actor,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('ScreeningMatchService — a decision has consequences', () => {
+  it('resolves the review SLA timer on EITHER outcome', async () => {
+    for (const decision of ['cleared', 'confirmed'] as const) {
+      const deps = makeDeps();
+      await deps.service.decide('sm-1', decision, 'A stated basis.', actor);
+      expect(deps.sla.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: 'ScreeningMatch',
+          entityId: 'sm-1',
+          workflowName: 'sanctions_match_review',
+        }),
+      );
+    }
+  });
+
+  it('forces the KYC file back into review when a match is CONFIRMED', async () => {
+    // "Never auto-block" is deliberate and stands. But before this, confirming
+    // a TRUE sanctions hit left KYCRecord, Customer, isEdd and RiskRating
+    // byte-identical to clearing it — adjudicating a real match changed
+    // nothing observable. Expiring nextReviewDueAt puts it back in front of
+    // Compliance via the re-KYC sweep that already exists.
+    const deps = makeDeps();
+    await deps.service.decide(
+      'sm-1',
+      'confirmed',
+      'Same individual; DOB and passport match.',
+      actor,
+    );
+    const [kycId, patch] = deps.kycRecords.update.mock.calls[0] as [
+      string,
+      { nextReviewDueAt: Date },
+    ];
+    expect(kycId).toBe('kyc-1');
+    expect(patch.nextReviewDueAt).toBeInstanceOf(Date);
+  });
+
+  it('does NOT touch the KYC file when a match is cleared as a false positive', async () => {
+    const deps = makeDeps();
+    await deps.service.decide(
+      'sm-1',
+      'cleared',
+      'Common name coincidence; different nationality.',
+      actor,
+    );
+    expect(deps.kycRecords.update).not.toHaveBeenCalled();
+  });
+
+  it('never lets a failed side effect undo a committed decision', async () => {
+    const deps = makeDeps();
+    deps.sla.resolve.mockRejectedValue(new Error('sla down'));
+    deps.kycRecords.update.mockRejectedValue(new Error('db down'));
+    await expect(
+      deps.service.decide('sm-1', 'confirmed', 'A stated basis.', actor),
+    ).resolves.toBeDefined();
+    expect(deps.matches.recordDecision).toHaveBeenCalled();
   });
 });

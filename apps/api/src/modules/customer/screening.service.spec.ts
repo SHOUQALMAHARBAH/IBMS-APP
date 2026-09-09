@@ -5,6 +5,7 @@ import type { KycRecordRepository } from '../../repositories/kyc-record.reposito
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import type { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
+import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuditService } from '../audit/audit.service';
 
 interface ScreeningResultInput {
@@ -61,10 +62,18 @@ function makeDeps() {
     findMatchCandidates,
   } as unknown as WatchlistEntryRepository;
 
-  const recordCandidate = vi.fn().mockResolvedValue(undefined);
+  const recordCandidate = vi
+    .fn()
+    .mockResolvedValue({ id: 'sm-1', created: true });
   const screeningMatches = {
     recordCandidate,
   } as unknown as ScreeningMatchRepository;
+
+  const startTimer = vi.fn().mockResolvedValue([]);
+  const computeDueAt = vi
+    .fn()
+    .mockReturnValue(new Date('2026-09-14T00:00:00Z'));
+  const sla = { startTimer, computeDueAt } as unknown as SlaTimerService;
 
   const record = vi.fn().mockResolvedValue(undefined);
   const audit = { record } as unknown as AuditService;
@@ -75,12 +84,14 @@ function makeDeps() {
       customers,
       watchlistEntries,
       screeningMatches,
+      sla,
       audit,
     ),
     mocks: {
       findById,
       findMatchCandidates,
       recordCandidate,
+      startTimer,
       createScreeningResult,
       upsertRiskRating,
       findRiskRatingByKycRecordId,

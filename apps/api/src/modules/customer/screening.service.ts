@@ -12,6 +12,10 @@ import {
 } from '../compliance-risk/watchlist-match.config';
 import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import { normalizeWatchlistName } from '../compliance-risk/watchlist-sync.config';
+import { SlaTimerService } from '../sla/sla-timer.service';
+
+/** Registry workflow for adjudicating a queued sanctions match. */
+const SANCTIONS_MATCH_REVIEW_WORKFLOW = 'sanctions_match_review';
 
 const SCREENING_TYPES = ['SANCTIONS', 'PEP', 'AML'] as const;
 
@@ -76,6 +80,7 @@ export class ScreeningService {
     private readonly customers: CustomerRepository,
     private readonly watchlistEntries: WatchlistEntryRepository,
     private readonly screeningMatches: ScreeningMatchRepository,
+    private readonly sla: SlaTimerService,
     private readonly audit: AuditService,
   ) {}
 
@@ -103,7 +108,11 @@ export class ScreeningService {
     const fixtureHit = subjectNames
       .map((name) => matchesSampleWatchlist(name))
       .find((match) => match !== null);
-    const real = await this.findRealWatchlistMatches(kycRecordId, subjectNames);
+    const real = await this.findRealWatchlistMatches(
+      kycRecordId,
+      subjectNames,
+      actorUserId,
+    );
     const { candidates: matchCandidates, truncated: matchesTruncated } = real;
     const hit: WatchlistHit | undefined = fixtureHit ?? real.hit ?? undefined;
     const anyHit = hit !== undefined;
@@ -240,6 +249,7 @@ export class ScreeningService {
   private async findRealWatchlistMatches(
     kycRecordId: string,
     subjectNames: readonly string[],
+    actorUserId: string,
   ): Promise<{
     hit: WatchlistHit | undefined;
     candidates: number;
@@ -278,7 +288,7 @@ export class ScreeningService {
         // real guard, not a findFirst check: the 4-hourly recurring batch
         // re-screens every active customer, and without it each pass would
         // mint a duplicate queue item. A concurrent duplicate is a no-op.
-        await this.screeningMatches.recordCandidate({
+        const recorded = await this.screeningMatches.recordCandidate({
           kycRecordId,
           watchlistEntryId: entry.id,
           subjectName: name,
@@ -294,6 +304,35 @@ export class ScreeningService {
           entryFullName: entry.fullName,
           entryListProgram: entry.listProgram,
         });
+
+        // A NEW pending item starts a tracked deadline. Fuzzy matching only
+        // works as a control because a person adjudicates the output, and
+        // without a deadline "a person decides" quietly becomes "a pending
+        // row nobody owns". Only on creation: the 4-hourly batch re-screens
+        // the same customer, and re-arming the timer each pass would mean the
+        // item was never actually late.
+        //
+        // Best-effort, like KycService's own screening timer: the match is
+        // already durably queued, and a missing timer must not turn a
+        // successful screening run into a failure.
+        if (recorded.created) {
+          try {
+            await this.sla.startTimer({
+              entityType: 'ScreeningMatch',
+              entityId: recorded.id,
+              workflowName: SANCTIONS_MATCH_REVIEW_WORKFLOW,
+              dueAt: this.sla.computeDueAt(
+                SANCTIONS_MATCH_REVIEW_WORKFLOW,
+                new Date(),
+              ),
+              actorUserId,
+            });
+          } catch (err) {
+            this.logger.error(
+              `ScreeningMatch ${recorded.id}: queued, but its ${SANCTIONS_MATCH_REVIEW_WORKFLOW} SLA timer failed to start: ${(err as Error).message}`,
+            );
+          }
+        }
 
         // First candidate wins for the ScreeningResult's own listSource; an
         // exact one is preferred over a fuzzy one so the headline result

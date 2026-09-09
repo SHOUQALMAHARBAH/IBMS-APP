@@ -11,6 +11,11 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { SlaTimerService } from '../sla/sla-timer.service';
+import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+
+/** Registry workflow for adjudicating a queued sanctions match. */
+const SANCTIONS_MATCH_REVIEW_WORKFLOW = 'sanctions_match_review';
 
 export interface ScreeningMatchView {
   id: string;
@@ -62,6 +67,8 @@ export class ScreeningMatchService {
 
   constructor(
     private readonly matches: ScreeningMatchRepository,
+    private readonly kycRecords: KycRecordRepository,
+    private readonly sla: SlaTimerService,
     private readonly audit: AuditService,
   ) {}
 
@@ -157,6 +164,55 @@ export class ScreeningMatchService {
         reviewedByUserId: actor.id,
       },
     });
+
+    // The deadline is met by a DECISION, either way — a cleared false positive
+    // is as much a completed adjudication as a confirmed hit.
+    try {
+      await this.sla.resolve({
+        entityType: 'ScreeningMatch',
+        entityId: id,
+        workflowName: SANCTIONS_MATCH_REVIEW_WORKFLOW,
+        actorUserId: actor.id,
+      });
+    } catch (err) {
+      this.logger.error(
+        `ScreeningMatch ${id}: decision committed but its SLA timer was not resolved: ${(err as Error).message}`,
+      );
+    }
+
+    // A CONFIRMED match must DO something. "Never auto-block" is a deliberate
+    // product decision and it stands — but it is not the same as "no effect",
+    // and before this the confirmed branch left KYCRecord, Customer, isEdd and
+    // RiskRating byte-identical to what clearing left, so adjudicating a TRUE
+    // sanctions hit changed nothing observable in the system.
+    //
+    // The effect is the lightest one that is real and already wired: force the
+    // KYC file back into review by expiring `nextReviewDueAt`, which
+    // `findDueForPeriodicReview` (the existing re-KYC sweep) already reads. No
+    // new sweep, no new status, and no direct `status` write —
+    // workflow-state-transitions.md owns that column.
+    if (decision === 'confirmed') {
+      try {
+        await this.kycRecords.update(existing.kycRecordId, {
+          nextReviewDueAt: new Date(),
+        });
+        await this.safeAudit({
+          userId: actor.id,
+          action: 'UPDATE',
+          entityType: 'KYCRecord',
+          entityId: existing.kycRecordId,
+          afterValue: {
+            nextReviewDueAt: 'now',
+            reason: 'confirmed_sanctions_match',
+            screeningMatchId: id,
+          },
+        });
+      } catch (err) {
+        this.logger.error(
+          `ScreeningMatch ${id}: confirmed, but forcing KYCRecord ${existing.kycRecordId} back into review failed: ${(err as Error).message}`,
+        );
+      }
+    }
 
     const refreshed = await this.matches.findById(id);
     return toView(refreshed ?? { ...existing, ...updated });

@@ -37,6 +37,10 @@ const EXPECTED_NON_PDPL_WORKFLOW_NAMES = [
   'kyc_edd_review',
   'service_request_fulfilment',
   'complaint_resolution',
+  // Backlog Part C #49 — adjudicating a queued sanctions match. DRAFT and
+  // UNSOURCED like the two KYC rows: nothing in pdpl-sla-timers.md or
+  // kyc-aml-sla-timers.md names a turnaround for this.
+  'sanctions_match_review',
 ].sort();
 
 describe('SLA_REGISTRY', () => {

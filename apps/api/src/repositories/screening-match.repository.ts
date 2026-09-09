@@ -68,8 +68,19 @@ export class ScreeningMatchRepository {
     entrySourceRecordId: string | null;
     entryFullName: string;
     entryListProgram: string | null;
-  }): Promise<void> {
-    await this.prisma.client.screeningMatch.upsert({
+  }): Promise<{ id: string; created: boolean }> {
+    const before = await this.prisma.client.screeningMatch.findUnique({
+      where: {
+        kycRecordId_watchlistEntryId_subjectCanonical: {
+          kycRecordId: input.kycRecordId,
+          watchlistEntryId: input.watchlistEntryId,
+          subjectCanonical: input.subjectCanonical,
+        },
+      },
+      select: { id: true },
+    });
+
+    const row = await this.prisma.client.screeningMatch.upsert({
       where: {
         kycRecordId_watchlistEntryId_subjectCanonical: {
           kycRecordId: input.kycRecordId,
@@ -89,7 +100,16 @@ export class ScreeningMatchRepository {
         entryListProgram: input.entryListProgram,
       },
       update: {},
+      select: { id: true },
     });
+
+    // `created` drives the SLA timer, so it must not fire for a re-screen of
+    // a match that is already queued — the 4-hourly batch would otherwise
+    // start a fresh deadline every four hours for the same pending item. A
+    // concurrent duplicate resolves to `created: false` here, which is the
+    // safe direction: a missing timer is visible in the queue, a storm of
+    // them is not.
+    return { id: row.id, created: before === null };
   }
 
   findMany(filter: {
