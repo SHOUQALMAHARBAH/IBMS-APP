@@ -125,7 +125,9 @@ describe('RateLimitGuard', () => {
       guard.canActivate(context);
     } catch (error) {
       if (error instanceof HttpException) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const response = error.getResponse() as any;
+
         hasRetryAfter = response && 'retryAfter' in response;
       }
     }
