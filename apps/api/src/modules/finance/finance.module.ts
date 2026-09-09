@@ -13,6 +13,8 @@ import { ReconciliationController } from './reconciliation.controller';
 import { ReconciliationService } from './reconciliation.service';
 import { FinancialReportController } from './financial-report.controller';
 import { FinancialReportService } from './financial-report.service';
+import { RefundController } from './refund.controller';
+import { RefundService } from './refund.service';
 import { InvoiceRepository } from '../../repositories/invoice.repository';
 import { PaymentChannelRepository } from '../../repositories/payment-channel.repository';
 import { ReconciliationRepository } from '../../repositories/reconciliation.repository';
@@ -106,6 +108,7 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     PaymentChannelController,
     ReconciliationController,
     FinancialReportController,
+    RefundController,
   ],
   providers: [
     InvoiceService,
@@ -116,6 +119,7 @@ import { DocumentGenerationModule } from '../document-generation/document-genera
     PaymentChannelService,
     ReconciliationService,
     FinancialReportService,
+    RefundService,
     InvoiceRepository,
     PaymentChannelRepository,
     ReconciliationRepository,
