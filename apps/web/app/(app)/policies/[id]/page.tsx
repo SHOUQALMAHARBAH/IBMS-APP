@@ -22,10 +22,24 @@ interface PolicyDetail {
     id: string;
     recommendedQuotation?: {
       premium: string;
+      insurer?: { name: string };
+      deductible?: string;
+      commission?: string;
     };
   };
   createdAt: string;
+  updatedAt: string;
 }
+
+const STATUS_KEY_MAP: Record<string, string> = {
+  PLACEMENT_REQUESTED: 'policyStatusPlacementRequested',
+  PLACEMENT_CONFIRMED: 'policyStatusPlacementConfirmed',
+  ISSUED: 'policyStatusIssued',
+  CHECKED: 'policyStatusChecked',
+  DELIVERED: 'policyStatusDelivered',
+  CANCELLED: 'policyStatusCancelled',
+  EXPIRED: 'policyStatusExpired',
+};
 
 export default function PolicyDetailPage() {
   const router = useRouter();
@@ -54,7 +68,7 @@ export default function PolicyDetailPage() {
     } finally {
       setIsLoading2(false);
     }
-  }, [params.id, t]);
+  }, [params.id]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -70,7 +84,7 @@ export default function PolicyDetailPage() {
   if (isLoading2) {
     return (
       <div style={pageStyle}>
-        <p>Loading...</p>
+        <p>{t('commonLoading')}</p>
       </div>
     );
   }
@@ -84,7 +98,7 @@ export default function PolicyDetailPage() {
           style={smallButtonStyle}
           onClick={() => router.push('/opportunities')}
         >
-          Back to Opportunities
+          {t('commonBack')}
         </button>
       </div>
     );
@@ -93,56 +107,124 @@ export default function PolicyDetailPage() {
   if (!policy) {
     return (
       <div style={pageStyle}>
-        <p>Not found</p>
+        <p>{t('commonNotFound')}</p>
       </div>
     );
   }
 
+  const statusKey = STATUS_KEY_MAP[policy.status] || policy.status;
+  const displayStatus = statusKey.startsWith('policy') ? t(statusKey as any) : policy.status;
+
   return (
     <div style={pageStyle}>
-      <h1>Policy Details</h1>
-      <div style={profileGridStyle}>
-        <div>
-          <div style={profileFieldLabelStyle}>Policy Number</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{policy.policyNumber ?? '—'}</bdi>
-          </div>
-        </div>
-        <div>
-          <div style={profileFieldLabelStyle}>Status</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{policy.status}</bdi>
-          </div>
-        </div>
-        <div>
-          <div style={profileFieldLabelStyle}>Inception Date</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{new Date(policy.inceptionDate).toLocaleDateString()}</bdi>
-          </div>
-        </div>
-        {policy.customer && (
+      <h1 style={{ marginBottom: '1.5rem' }}>
+        {t('policySectionHeading')} {policy.policyNumber && `— ${policy.policyNumber}`}
+      </h1>
+
+      {/* Core Policy Information */}
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
+          {t('commonDetails')}
+        </h2>
+        <div style={profileGridStyle}>
+          {policy.policyNumber && (
+            <div>
+              <div style={profileFieldLabelStyle}>{t('policyNumber')}</div>
+              <div style={profileFieldValueStyle}>
+                <bdi dir="ltr">{policy.policyNumber}</bdi>
+              </div>
+            </div>
+          )}
+
           <div>
-            <div style={profileFieldLabelStyle}>Customer</div>
+            <div style={profileFieldLabelStyle}>{t('commonStatus')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{policy.customer.legalName}</bdi>
+              <bdi>{displayStatus}</bdi>
             </div>
           </div>
-        )}
-        {policy.recommendation?.recommendedQuotation?.premium && (
+
           <div>
-            <div style={profileFieldLabelStyle}>Premium</div>
+            <div style={profileFieldLabelStyle}>{t('policyInceptionDate')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{policy.recommendation.recommendedQuotation.premium}</bdi>
+              <bdi>{new Date(policy.inceptionDate).toLocaleDateString()}</bdi>
             </div>
           </div>
-        )}
+
+          {policy.customer && (
+            <div>
+              <div style={profileFieldLabelStyle}>{t('customerLabel')}</div>
+              <div style={profileFieldValueStyle}>
+                <bdi>{policy.customer.legalName}</bdi>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div style={profileFieldLabelStyle}>{t('commonCreatedAt')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>{new Date(policy.createdAt).toLocaleDateString()}</bdi>
+            </div>
+          </div>
+
+          <div>
+            <div style={profileFieldLabelStyle}>{t('commonUpdatedAt')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>{new Date(policy.updatedAt).toLocaleDateString()}</bdi>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Recommendation & Commercial Terms */}
+      {policy.recommendation?.recommendedQuotation && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
+            {t('policyCommercialTerms')}
+          </h2>
+          <div style={profileGridStyle}>
+            {policy.recommendation.recommendedQuotation.insurer && (
+              <div>
+                <div style={profileFieldLabelStyle}>{t('commonInsurer')}</div>
+                <div style={profileFieldValueStyle}>
+                  <bdi>{policy.recommendation.recommendedQuotation.insurer.name}</bdi>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <div style={profileFieldLabelStyle}>{t('policyPremium')}</div>
+              <div style={profileFieldValueStyle}>
+                <bdi>{policy.recommendation.recommendedQuotation.premium}</bdi>
+              </div>
+            </div>
+
+            {policy.recommendation.recommendedQuotation.deductible && (
+              <div>
+                <div style={profileFieldLabelStyle}>{t('policyDeductible')}</div>
+                <div style={profileFieldValueStyle}>
+                  <bdi>{policy.recommendation.recommendedQuotation.deductible}</bdi>
+                </div>
+              </div>
+            )}
+
+            {policy.recommendation.recommendedQuotation.commission && (
+              <div>
+                <div style={profileFieldLabelStyle}>{t('policyCommission')}</div>
+                <div style={profileFieldValueStyle}>
+                  <bdi>{policy.recommendation.recommendedQuotation.commission}</bdi>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <button
         type="button"
         style={smallButtonStyle}
         onClick={() => router.push('/opportunities')}
       >
-        Back to Opportunities
+        {t('commonBack')}
       </button>
     </div>
   );

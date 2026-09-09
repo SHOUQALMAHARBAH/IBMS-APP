@@ -21,6 +21,13 @@ interface LeadDetail {
   updatedAt: string;
 }
 
+const STATUS_KEY_MAP: Record<string, string> = {
+  NEW: 'leadStatusNew',
+  CONTACTED: 'leadStatusContacted',
+  QUALIFIED: 'leadStatusQualified',
+  CONVERTED_TO_PROSPECT: 'leadStatusConvertedToProspect',
+};
+
 export default function LeadDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -48,7 +55,7 @@ export default function LeadDetailPage() {
     } finally {
       setIsLoading2(false);
     }
-  }, [params.id, t]);
+  }, [params.id]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -64,7 +71,7 @@ export default function LeadDetailPage() {
   if (isLoading2) {
     return (
       <div style={pageStyle}>
-        <p>Loading...</p>
+        <p>{t('commonLoading')}</p>
       </div>
     );
   }
@@ -78,7 +85,7 @@ export default function LeadDetailPage() {
           style={smallButtonStyle}
           onClick={() => router.push('/leads')}
         >
-          Back to Leads
+          {t('commonBack')}
         </button>
       </div>
     );
@@ -87,62 +94,93 @@ export default function LeadDetailPage() {
   if (!lead) {
     return (
       <div style={pageStyle}>
-        <p>Not found</p>
+        <p>{t('commonNotFound')}</p>
       </div>
     );
   }
 
+  const statusKey = STATUS_KEY_MAP[lead.status] || lead.status;
+  const displayStatus = statusKey.startsWith('lead') ? t(statusKey as any) : lead.status;
+
   return (
     <div style={pageStyle}>
-      <h1>Lead Details</h1>
-      <div style={profileGridStyle}>
-        <div>
-          <div style={profileFieldLabelStyle}>Full Name</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{lead.fullName}</bdi>
-          </div>
-        </div>
-        <div>
-          <div style={profileFieldLabelStyle}>Status</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{lead.status}</bdi>
-          </div>
-        </div>
-        <div>
-          <div style={profileFieldLabelStyle}>Source</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{lead.source}</bdi>
-          </div>
-        </div>
-        {lead.contactPhone && (
+      <h1 style={{ marginBottom: '1.5rem' }}>
+        {t('leadsHeading')} — <bdi>{lead.fullName}</bdi>
+      </h1>
+
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
+          {t('commonDetails')}
+        </h2>
+        <div style={profileGridStyle}>
           <div>
-            <div style={profileFieldLabelStyle}>Phone</div>
+            <div style={profileFieldLabelStyle}>{t('commonFullName')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.contactPhone}</bdi>
+              <bdi>{lead.fullName}</bdi>
             </div>
           </div>
-        )}
-        {lead.contactEmail && (
+
           <div>
-            <div style={profileFieldLabelStyle}>Email</div>
+            <div style={profileFieldLabelStyle}>{t('commonStatus')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.contactEmail}</bdi>
+              <bdi>{displayStatus}</bdi>
             </div>
           </div>
-        )}
-        <div>
-          <div style={profileFieldLabelStyle}>Marketing Consent</div>
-          <div style={profileFieldValueStyle}>
-            <bdi>{lead.marketingConsentGranted ? 'Yes' : 'No'}</bdi>
+
+          <div>
+            <div style={profileFieldLabelStyle}>{t('leadsSourceLabel')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>{lead.source}</bdi>
+            </div>
+          </div>
+
+          {lead.contactPhone && (
+            <div>
+              <div style={profileFieldLabelStyle}>{t('commonPhone')}</div>
+              <div style={profileFieldValueStyle}>
+                <bdi dir="ltr">{lead.contactPhone}</bdi>
+              </div>
+            </div>
+          )}
+
+          {lead.contactEmail && (
+            <div>
+              <div style={profileFieldLabelStyle}>{t('commonEmail')}</div>
+              <div style={profileFieldValueStyle}>
+                <bdi dir="ltr">{lead.contactEmail}</bdi>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div style={profileFieldLabelStyle}>{t('leadsMarketingConsent')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>{lead.marketingConsentGranted ? t('commonYes') : t('commonNo')}</bdi>
+            </div>
+          </div>
+
+          <div>
+            <div style={profileFieldLabelStyle}>{t('commonCreatedAt')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>{new Date(lead.createdAt).toLocaleDateString()}</bdi>
+            </div>
+          </div>
+
+          <div>
+            <div style={profileFieldLabelStyle}>{t('commonUpdatedAt')}</div>
+            <div style={profileFieldValueStyle}>
+              <bdi>{new Date(lead.updatedAt).toLocaleDateString()}</bdi>
+            </div>
           </div>
         </div>
       </div>
+
       <button
         type="button"
         style={smallButtonStyle}
         onClick={() => router.push('/leads')}
       >
-        Back to Leads
+        {t('commonBack')}
       </button>
     </div>
   );
