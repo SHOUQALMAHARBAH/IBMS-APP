@@ -27,19 +27,43 @@ const TLS_EXEMPT_PATHS = new Set(['/health', '/health/db']);
 
 export function securityHeaders() {
   return (req: Request, res: Response, next: NextFunction): void => {
+    // Part 10.2 — mandatory security headers in all environments.
+    // Protects against MIME sniffing, clickjacking, and other common attacks.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    // CSP policy: restrict scripts to same-origin only.
+    // This API does not serve HTML/JS to browsers, but the header is set
+    // as defense-in-depth in case of misconfiguration.
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; script-src 'self'; style-src 'self'",
+    );
+
+    // Permissions policy (formerly Feature Policy): restrict browser features.
+    res.setHeader(
+      'Permissions-Policy',
+      'geolocation=(), microphone=(), camera=(), payment=(), usb=()',
+    );
+
     if (process.env.NODE_ENV !== 'production') {
       next();
       return;
     }
+
+    // TLS enforcement in production only — see comment in main.ts.
     res.setHeader(
       'Strict-Transport-Security',
       'max-age=31536000; includeSubDomains; preload',
     );
-    res.setHeader('X-Content-Type-Options', 'nosniff');
+
     if (TLS_EXEMPT_PATHS.has(req.path)) {
       next();
       return;
     }
+
     const forwardedProto = req.headers['x-forwarded-proto'];
     const proto = Array.isArray(forwardedProto)
       ? forwardedProto[0]
