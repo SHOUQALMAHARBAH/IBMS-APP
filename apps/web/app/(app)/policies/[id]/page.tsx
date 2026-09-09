@@ -31,25 +31,37 @@ interface PolicyDetail {
   updatedAt: string;
 }
 
-const STATUS_KEY_MAP: Record<string, string> = {
-  PLACEMENT_REQUESTED: 'policyStatusPlacementRequested',
-  PLACEMENT_CONFIRMED: 'policyStatusPlacementConfirmed',
-  ISSUED: 'policyStatusIssued',
-  CHECKED: 'policyStatusChecked',
-  DELIVERED: 'policyStatusDelivered',
-  CANCELLED: 'policyStatusCancelled',
-  EXPIRED: 'policyStatusExpired',
+const STATUS_LABEL_MAP: Record<string, string> = {
+  PLACEMENT_REQUESTED: 'Placement Requested',
+  PLACEMENT_CONFIRMED: 'Placement Confirmed',
+  ISSUED: 'Issued',
+  CHECKED: 'Checked',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+  EXPIRED: 'Expired',
+};
+
+const STATUS_LABEL_MAP_AR: Record<string, string> = {
+  PLACEMENT_REQUESTED: 'طلب وضع',
+  PLACEMENT_CONFIRMED: 'وضع مؤكد',
+  ISSUED: 'صادر',
+  CHECKED: 'تم الفحص',
+  DELIVERED: 'تم التسليم',
+  CANCELLED: 'ملغي',
+  EXPIRED: 'منتهي الصلاحية',
 };
 
 export default function PolicyDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language } = useLanguage();
 
   const [policy, setPolicy] = useState<PolicyDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading2, setIsLoading2] = useState(true);
+
+  const isArabic = language === 'AR';
 
   const load = useCallback(async () => {
     try {
@@ -60,15 +72,15 @@ export default function PolicyDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
-          ? 'Not found'
+          ? (isArabic ? 'غير موجود' : 'Not found')
           : err instanceof ApiError
             ? err.message
-            : 'Please try again',
+            : (isArabic ? 'يرجى المحاولة مرة أخرى' : 'Please try again'),
       );
     } finally {
       setIsLoading2(false);
     }
-  }, [params.id]);
+  }, [params.id, isArabic]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -84,7 +96,7 @@ export default function PolicyDetailPage() {
   if (isLoading2) {
     return (
       <div style={pageStyle}>
-        <p>{t('commonLoading')}</p>
+        <p>{isArabic ? 'جاري التحميل...' : 'Loading...'}</p>
       </div>
     );
   }
@@ -98,7 +110,7 @@ export default function PolicyDetailPage() {
           style={smallButtonStyle}
           onClick={() => router.push('/opportunities')}
         >
-          {t('commonBack')}
+          {isArabic ? 'العودة إلى القائمة' : 'Back to List'}
         </button>
       </div>
     );
@@ -107,29 +119,29 @@ export default function PolicyDetailPage() {
   if (!policy) {
     return (
       <div style={pageStyle}>
-        <p>{t('commonNotFound')}</p>
+        <p>{isArabic ? 'غير موجود' : 'Not found'}</p>
       </div>
     );
   }
 
-  const statusKey = STATUS_KEY_MAP[policy.status] || policy.status;
-  const displayStatus = statusKey.startsWith('policy') ? t(statusKey as any) : policy.status;
+  const statusLabels = isArabic ? STATUS_LABEL_MAP_AR : STATUS_LABEL_MAP;
+  const displayStatus = statusLabels[policy.status] || policy.status;
 
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: '1.5rem' }}>
-        {t('policySectionHeading')} {policy.policyNumber && `— ${policy.policyNumber}`}
+        {isArabic ? 'تفاصيل الوثيقة' : 'Policy Details'} {policy.policyNumber && `— ${policy.policyNumber}`}
       </h1>
 
       {/* Core Policy Information */}
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-          {t('commonDetails')}
+          {isArabic ? 'المعلومات الأساسية' : 'Basic Information'}
         </h2>
         <div style={profileGridStyle}>
           {policy.policyNumber && (
             <div>
-              <div style={profileFieldLabelStyle}>{t('policyNumber')}</div>
+              <div style={profileFieldLabelStyle}>{isArabic ? 'رقم الوثيقة' : 'Policy Number'}</div>
               <div style={profileFieldValueStyle}>
                 <bdi dir="ltr">{policy.policyNumber}</bdi>
               </div>
@@ -137,22 +149,22 @@ export default function PolicyDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonStatus')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'الحالة' : 'Status'}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{displayStatus}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('policyInceptionDate')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'تاريخ البداية' : 'Inception Date'}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.inceptionDate).toLocaleDateString()}</bdi>
+              <bdi>{new Date(policy.inceptionDate).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
             </div>
           </div>
 
           {policy.customer && (
             <div>
-              <div style={profileFieldLabelStyle}>{t('customerLabel')}</div>
+              <div style={profileFieldLabelStyle}>{isArabic ? 'العميل' : 'Customer'}</div>
               <div style={profileFieldValueStyle}>
                 <bdi>{policy.customer.legalName}</bdi>
               </div>
@@ -160,16 +172,16 @@ export default function PolicyDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonCreatedAt')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'تاريخ الإنشاء' : 'Created'}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.createdAt).toLocaleDateString()}</bdi>
+              <bdi>{new Date(policy.createdAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonUpdatedAt')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'آخر تحديث' : 'Updated'}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.updatedAt).toLocaleDateString()}</bdi>
+              <bdi>{new Date(policy.updatedAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
             </div>
           </div>
         </div>
@@ -179,12 +191,12 @@ export default function PolicyDetailPage() {
       {policy.recommendation?.recommendedQuotation && (
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-            {t('policyCommercialTerms')}
+            {isArabic ? 'الشروط التجارية' : 'Commercial Terms'}
           </h2>
           <div style={profileGridStyle}>
             {policy.recommendation.recommendedQuotation.insurer && (
               <div>
-                <div style={profileFieldLabelStyle}>{t('commonInsurer')}</div>
+                <div style={profileFieldLabelStyle}>{isArabic ? 'شركة التأمين' : 'Insurer'}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>{policy.recommendation.recommendedQuotation.insurer.name}</bdi>
                 </div>
@@ -192,7 +204,7 @@ export default function PolicyDetailPage() {
             )}
 
             <div>
-              <div style={profileFieldLabelStyle}>{t('policyPremium')}</div>
+              <div style={profileFieldLabelStyle}>{isArabic ? 'القسط' : 'Premium'}</div>
               <div style={profileFieldValueStyle}>
                 <bdi>{policy.recommendation.recommendedQuotation.premium}</bdi>
               </div>
@@ -200,7 +212,7 @@ export default function PolicyDetailPage() {
 
             {policy.recommendation.recommendedQuotation.deductible && (
               <div>
-                <div style={profileFieldLabelStyle}>{t('policyDeductible')}</div>
+                <div style={profileFieldLabelStyle}>{isArabic ? 'الخصم' : 'Deductible'}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>{policy.recommendation.recommendedQuotation.deductible}</bdi>
                 </div>
@@ -209,7 +221,7 @@ export default function PolicyDetailPage() {
 
             {policy.recommendation.recommendedQuotation.commission && (
               <div>
-                <div style={profileFieldLabelStyle}>{t('policyCommission')}</div>
+                <div style={profileFieldLabelStyle}>{isArabic ? 'العمولة' : 'Commission'}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>{policy.recommendation.recommendedQuotation.commission}</bdi>
                 </div>
@@ -224,7 +236,7 @@ export default function PolicyDetailPage() {
         style={smallButtonStyle}
         onClick={() => router.push('/opportunities')}
       >
-        {t('commonBack')}
+        {isArabic ? 'العودة' : 'Back'}
       </button>
     </div>
   );

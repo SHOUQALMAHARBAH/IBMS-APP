@@ -21,22 +21,31 @@ interface LeadDetail {
   updatedAt: string;
 }
 
-const STATUS_KEY_MAP: Record<string, string> = {
-  NEW: 'leadStatusNew',
-  CONTACTED: 'leadStatusContacted',
-  QUALIFIED: 'leadStatusQualified',
-  CONVERTED_TO_PROSPECT: 'leadStatusConvertedToProspect',
+const STATUS_LABEL_MAP: Record<string, string> = {
+  NEW: 'New',
+  CONTACTED: 'Contacted',
+  QUALIFIED: 'Qualified',
+  CONVERTED_TO_PROSPECT: 'Converted',
+};
+
+const STATUS_LABEL_MAP_AR: Record<string, string> = {
+  NEW: 'جديد',
+  CONTACTED: 'تم التواصل',
+  QUALIFIED: 'مؤهل',
+  CONVERTED_TO_PROSPECT: 'تم التحويل',
 };
 
 export default function LeadDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { language } = useLanguage();
 
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading2, setIsLoading2] = useState(true);
+
+  const isArabic = language === 'AR';
 
   const load = useCallback(async () => {
     try {
@@ -47,15 +56,15 @@ export default function LeadDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
-          ? 'Not found'
+          ? (isArabic ? 'غير موجود' : 'Not found')
           : err instanceof ApiError
             ? err.message
-            : 'Please try again',
+            : (isArabic ? 'يرجى المحاولة مرة أخرى' : 'Please try again'),
       );
     } finally {
       setIsLoading2(false);
     }
-  }, [params.id]);
+  }, [params.id, isArabic]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -71,7 +80,7 @@ export default function LeadDetailPage() {
   if (isLoading2) {
     return (
       <div style={pageStyle}>
-        <p>{t('commonLoading')}</p>
+        <p>{isArabic ? 'جاري التحميل...' : 'Loading...'}</p>
       </div>
     );
   }
@@ -85,7 +94,7 @@ export default function LeadDetailPage() {
           style={smallButtonStyle}
           onClick={() => router.push('/leads')}
         >
-          {t('commonBack')}
+          {isArabic ? 'العودة إلى القائمة' : 'Back to List'}
         </button>
       </div>
     );
@@ -94,41 +103,41 @@ export default function LeadDetailPage() {
   if (!lead) {
     return (
       <div style={pageStyle}>
-        <p>{t('commonNotFound')}</p>
+        <p>{isArabic ? 'غير موجود' : 'Not found'}</p>
       </div>
     );
   }
 
-  const statusKey = STATUS_KEY_MAP[lead.status] || lead.status;
-  const displayStatus = statusKey.startsWith('lead') ? t(statusKey as any) : lead.status;
+  const statusLabels = isArabic ? STATUS_LABEL_MAP_AR : STATUS_LABEL_MAP;
+  const displayStatus = statusLabels[lead.status] || lead.status;
 
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: '1.5rem' }}>
-        {t('leadsHeading')} — <bdi>{lead.fullName}</bdi>
+        {isArabic ? 'تفاصيل العميل المرتقب' : 'Lead Details'} — <bdi>{lead.fullName}</bdi>
       </h1>
 
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-          {t('commonDetails')}
+          {isArabic ? 'المعلومات الأساسية' : 'Basic Information'}
         </h2>
         <div style={profileGridStyle}>
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonFullName')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'الاسم الكامل' : 'Full Name'}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{lead.fullName}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonStatus')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'الحالة' : 'Status'}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{displayStatus}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('leadsSourceLabel')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'المصدر' : 'Source'}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{lead.source}</bdi>
             </div>
@@ -136,7 +145,7 @@ export default function LeadDetailPage() {
 
           {lead.contactPhone && (
             <div>
-              <div style={profileFieldLabelStyle}>{t('commonPhone')}</div>
+              <div style={profileFieldLabelStyle}>{isArabic ? 'الهاتف' : 'Phone'}</div>
               <div style={profileFieldValueStyle}>
                 <bdi dir="ltr">{lead.contactPhone}</bdi>
               </div>
@@ -145,7 +154,7 @@ export default function LeadDetailPage() {
 
           {lead.contactEmail && (
             <div>
-              <div style={profileFieldLabelStyle}>{t('commonEmail')}</div>
+              <div style={profileFieldLabelStyle}>{isArabic ? 'البريد الإلكتروني' : 'Email'}</div>
               <div style={profileFieldValueStyle}>
                 <bdi dir="ltr">{lead.contactEmail}</bdi>
               </div>
@@ -153,23 +162,23 @@ export default function LeadDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('leadsMarketingConsent')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'موافقة التسويق' : 'Marketing Consent'}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.marketingConsentGranted ? t('commonYes') : t('commonNo')}</bdi>
+              <bdi>{lead.marketingConsentGranted ? (isArabic ? 'نعم' : 'Yes') : (isArabic ? 'لا' : 'No')}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonCreatedAt')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'تاريخ الإنشاء' : 'Created'}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(lead.createdAt).toLocaleDateString()}</bdi>
+              <bdi>{new Date(lead.createdAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{t('commonUpdatedAt')}</div>
+            <div style={profileFieldLabelStyle}>{isArabic ? 'آخر تحديث' : 'Updated'}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(lead.updatedAt).toLocaleDateString()}</bdi>
+              <bdi>{new Date(lead.updatedAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
             </div>
           </div>
         </div>
@@ -180,7 +189,7 @@ export default function LeadDetailPage() {
         style={smallButtonStyle}
         onClick={() => router.push('/leads')}
       >
-        {t('commonBack')}
+        {isArabic ? 'العودة' : 'Back'}
       </button>
     </div>
   );
