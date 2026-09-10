@@ -23,6 +23,11 @@ function matchRow(over: Record<string, unknown> = {}) {
     entryListProgram: 'SDGT',
     matchType: 'fuzzy',
     status: 'pending',
+    // Part B §16 — a decision may only be recorded on a case somebody picked
+    // up, so the fixture for the decision path is a case UNDER REVIEW. The
+    // refusal from OPEN is covered on its own, at the e2e level, against the
+    // real transition table.
+    caseStatus: 'UNDER_REVIEW',
     detectedAt: new Date('2026-09-09T00:00:00.000Z'),
     reviewedByUserId: null,
     reviewedAt: null,

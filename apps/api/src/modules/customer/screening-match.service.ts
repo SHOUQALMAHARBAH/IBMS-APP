@@ -3,7 +3,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import { canDecide } from './screening-case.config';
 import {
   ScreeningMatchRepository,
   type ScreeningMatchWithContext,
@@ -130,6 +132,16 @@ export class ScreeningMatchService {
     if (existing.status !== 'pending') {
       throw new ConflictException(
         `Screening match ${id} was already ${existing.status} on ${existing.reviewedAt?.toISOString() ?? 'an earlier date'}. A recorded review decision is not overwritten — re-screen the customer if the position has changed.`,
+      );
+    }
+
+    // Part B §16 — a decision may only be recorded on a case somebody actually
+    // picked up. Deciding straight from OPEN is the rubber-stamp this queue
+    // exists to prevent: it produces a cleared sanctions match with nobody
+    // having been assigned, nobody having started, and no working record.
+    if (!canDecide(existing.caseStatus)) {
+      throw new UnprocessableEntityException(
+        `Screening case ${id} is ${existing.caseStatus}. Assign it and start the review before recording a decision — a decision on a case nobody picked up is not a review.`,
       );
     }
 

@@ -170,6 +170,15 @@ export class ScreeningMatchRepository {
         reviewedByUserId: input.reviewedByUserId,
         reviewReason: input.reviewReason,
         reviewedAt: input.reviewedAt,
+        // Part B §16 — a decision CLOSES the case, in the same write. Two
+        // database CHECKs make the pair inseparable: a CLOSED case must carry
+        // a decision and a written reason, and a decided match must be CLOSED.
+        // Without the second, a confirmed sanctions match could still show as
+        // open work in the queue while the screening hold already treated it
+        // as confirmed.
+        caseStatus: 'CLOSED',
+        closedAt: input.reviewedAt,
+        closedByUserId: input.reviewedByUserId,
       },
     });
     if (count === 0) return null;

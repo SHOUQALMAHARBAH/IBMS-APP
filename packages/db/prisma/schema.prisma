@@ -2616,8 +2616,40 @@ model ScreeningMatch {
   /// tokens are contained in the subject's). Surfaced so a reviewer can
   /// triage: an exact hit deserves more scrutiny than a subset one.
   matchType          String
-  /// `pending` | `cleared` | `confirmed`.
+  /// The DECISION: `pending` | `cleared` | `confirmed`.
+  ///
+  /// Distinct from `caseStatus` below, which is the WORKFLOW state, and they
+  /// answer different questions. "Has anyone looked at this yet?" is workflow;
+  /// "was it a real match?" is the decision. Collapsing them would make
+  /// "assigned but not yet decided" unrepresentable.
   status             String                 @default("pending")
+
+  /// Part B §16 — the case workflow.
+  ///
+  ///   OPEN          detected, nobody owns it
+  ///   ASSIGNED      a named reviewer owns it
+  ///   UNDER_REVIEW  that reviewer has started work
+  ///   ESCALATED     raised to someone else, with a written reason
+  ///   CLOSED        a decision was recorded; terminal
+  ///
+  /// A decision may only be recorded from UNDER_REVIEW or ESCALATED — not from
+  /// OPEN. Deciding a case nobody ever picked up is exactly the rubber-stamp
+  /// this queue exists to prevent, so the transition table makes it
+  /// unreachable rather than discouraged.
+  caseStatus         ScreeningCaseStatus    @default(OPEN)
+  assignedToUserId   String?
+  assignedByUserId   String?
+  assignedAt         DateTime?
+  reviewStartedAt    DateTime?
+  escalatedToUserId  String?
+  escalatedAt        DateTime?
+  /// Mandatory when escalating — enforced in the database.
+  escalationReason   String?
+  closedAt           DateTime?
+  closedByUserId     String?
+
+  notes              ScreeningCaseNote[]
+
   detectedAt         DateTime               @default(now())
   reviewedByUserId   String?
   reviewedAt         DateTime?
@@ -2632,6 +2664,40 @@ model ScreeningMatch {
   @@unique([kycRecordId, watchlistEntryId, subjectCanonical])
   @@index([status])
   @@index([kycRecordId])
+  /// The "my queue" read.
+  @@index([assignedToUserId, caseStatus])
+  @@index([caseStatus])
+}
+
+/// Part B §16 — a note on a screening case.
+///
+/// Separate from `reviewReason`, deliberately: that field is the JUSTIFICATION
+/// for the final decision and is written once, at closure. These are the
+/// working record — what was checked, who was contacted, what a document said —
+/// and there are many of them over a case's life.
+///
+/// Append-only. A case note that can be edited is not evidence of what the
+/// reviewer knew at the time, which is the only reason to keep one.
+model ScreeningCaseNote {
+  id               String         @id @default(uuid())
+  screeningMatchId String
+  screeningMatch   ScreeningMatch @relation(fields: [screeningMatchId], references: [id], onDelete: Cascade)
+  /// Free text by a reviewer about a screening finding. It may name the
+  /// subject, so it inherits the match's own Highly Confidential handling and
+  /// is never copied into an audit payload.
+  note             String
+  authorUserId     String
+  createdAt        DateTime       @default(now())
+
+  @@index([screeningMatchId, createdAt])
+}
+
+enum ScreeningCaseStatus {
+  OPEN
+  ASSIGNED
+  UNDER_REVIEW
+  ESCALATED
+  CLOSED
 }
 
 model WatchlistSyncRun {

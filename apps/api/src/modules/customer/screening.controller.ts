@@ -3,6 +3,12 @@ import { ApiTags } from '@nestjs/swagger';
 import { ScreeningService } from './screening.service';
 import { ScreeningMatchService } from './screening-match.service';
 import { ScreeningOperationsService } from './screening-operations.service';
+import { ScreeningCaseService } from './screening-case.service';
+import {
+  AddScreeningCaseNoteDto,
+  AssignScreeningCaseDto,
+  EscalateScreeningCaseDto,
+} from './dto/screening-case.dto';
 import { ScreeningOverviewQueryDto } from './dto/screening-overview-query.dto';
 import {
   ListScreeningMatchesDto,
@@ -26,6 +32,7 @@ export class ScreeningController {
     private readonly screening: ScreeningService,
     private readonly matches: ScreeningMatchService,
     private readonly operations: ScreeningOperationsService,
+    private readonly cases: ScreeningCaseService,
   ) {}
 
   /**
@@ -84,5 +91,55 @@ export class ScreeningController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.matches.decide(id, dto.decision, dto.reviewReason, user);
+  }
+
+  /**
+   * Part B §16 — the case workflow around a match.
+   *
+   * All gated on `sanctions-pep.screen`, the same permission that lets a user
+   * see the queue at all. Deliberately not a second permission: every action
+   * here is part of one person's work on one case, and splitting them would
+   * produce a reviewer who can start a case but not finish it.
+   */
+  @RequirePermissions('sanctions-pep.screen')
+  @Get('matches/:id/case')
+  getCase(@Param('id') id: string) {
+    return this.cases.get(id);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/assign')
+  assignCase(
+    @Param('id') id: string,
+    @Body() dto: AssignScreeningCaseDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cases.assign(id, dto.assigneeUserId, user);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/start-review')
+  startReview(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.cases.startReview(id, user);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/escalate')
+  escalateCase(
+    @Param('id') id: string,
+    @Body() dto: EscalateScreeningCaseDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cases.escalate(id, dto.toUserId, dto.reason, user);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/notes')
+  addCaseNote(
+    @Param('id') id: string,
+    @Body() dto: AddScreeningCaseNoteDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cases.addNote(id, dto.note, user);
   }
 }
