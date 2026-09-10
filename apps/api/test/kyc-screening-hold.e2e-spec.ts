@@ -134,10 +134,11 @@ async function makeUser(
  * otherwise be left dangling into other specs.
  */
 async function emptyWatchlistCache(): Promise<void> {
-  await prisma.screeningMatch.updateMany({
-    where: { watchlistEntryId: { not: null } },
-    data: { watchlistEntryId: null },
-  });
+  // Just the entries. An earlier version also nulled `watchlistEntryId` on
+  // every ScreeningMatch first — redundant, because the relation is already
+  // `onDelete: SetNull` (a CONFIRMED match deliberately outlives the subject
+  // being de-listed), and actively harmful on this shared cumulative test DB:
+  // it wrote to rows belonging to other spec files.
   await prisma.watchlistEntry.deleteMany({});
 }
 
