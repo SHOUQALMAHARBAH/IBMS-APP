@@ -184,7 +184,7 @@ export class KycService {
     // have a row to escalate for this file until it is re-run.
     const workflowName = slaWorkflowName(isEdd);
     try {
-      const dueAt = this.sla.computeDueAt(workflowName, new Date());
+      const dueAt = await this.sla.computeDueAt(workflowName, new Date());
       await this.sla.startTimer({
         entityType: 'KYCRecord',
         entityId: id,

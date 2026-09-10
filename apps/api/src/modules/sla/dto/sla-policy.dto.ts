@@ -318,3 +318,26 @@ export class PauseSlaTimerDto {
   })
   reason!: string;
 }
+
+/** The source/citation fields ONLY, behind `sla.policy.regulatory`. Split from
+ * `UpdateSlaPolicyDto` so the authority to declare an SLA legally required is
+ * a different route, not a different branch inside one handler. */
+export class UpdateSlaPolicySourceDto {
+  @IsIn([...SLA_SOURCE_TYPES])
+  sourceType!: (typeof SLA_SOURCE_TYPES)[number];
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @Length(1, 300)
+  sourceReference?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @Length(1, 300)
+  sourceDocument?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @Length(1, 300)
+  sourceSection?: string;
+}

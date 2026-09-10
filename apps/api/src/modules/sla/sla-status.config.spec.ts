@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   addBusinessDays,
+  addWorkingMinutes,
   applyDuration,
   isBusinessDay,
+  parseTimeOfDay,
   utcDateKey,
 } from '../../common/business-days.util';
 import {
@@ -13,6 +15,7 @@ import {
   remainingMs,
   slaStatus,
   toSlaDuration,
+  workingWindowFor,
 } from './sla-status.config';
 
 const JAN = (day: number, hour = 9) =>
@@ -173,5 +176,105 @@ describe('pause / resume arithmetic', () => {
     expect(remainingMs(timer({ pausedAt: JAN(5) }), JAN(9))).toBeNull();
     expect(remainingMs(timer(), JAN(9))).toBeGreaterThan(0);
     expect(remainingMs(timer(), JAN(11))).toBeLessThan(0);
+  });
+});
+
+describe('working hours — an SLA measured in hours respects the office day', () => {
+  // A 4-hour SLA raised at 15:00 Thursday with an 08:00-16:00 window is NOT
+  // due at 19:00 Thursday (the office is shut) and NOT at 19:00 Sunday (that
+  // is 4 CALENDAR hours later on a working day). It is due at 11:00 Sunday:
+  // one working hour on Thursday, three on Sunday. Treating working hours as
+  // decoration silently sets a deadline nobody could have met.
+  const window = { startMinute: 8 * 60, endMinute: 16 * 60, timezone: 'UTC' };
+
+  it('carries the remainder into the next working day', () => {
+    const thursday15 = new Date(Date.UTC(2027, 0, 7, 15, 0, 0));
+    const due = addWorkingMinutes(thursday15, 4 * 60, window);
+    // Fri/Sat are Jordan's weekend, so the next working day is Sunday.
+    expect(due.toISOString()).toBe('2027-01-10T11:00:00.000Z');
+  });
+
+  it('finishes the same day when the window can absorb it', () => {
+    const sunday9 = new Date(Date.UTC(2027, 0, 10, 9, 0, 0));
+    expect(addWorkingMinutes(sunday9, 2 * 60, window).toISOString()).toBe(
+      '2027-01-10T11:00:00.000Z',
+    );
+  });
+
+  it('starts the clock at opening time when raised before the window', () => {
+    const sunday6 = new Date(Date.UTC(2027, 0, 10, 6, 0, 0));
+    expect(addWorkingMinutes(sunday6, 60, window).toISOString()).toBe(
+      '2027-01-10T09:00:00.000Z',
+    );
+  });
+
+  it('rolls to the next working day when raised after closing', () => {
+    const sunday18 = new Date(Date.UTC(2027, 0, 10, 18, 0, 0));
+    expect(addWorkingMinutes(sunday18, 60, window).toISOString()).toBe(
+      '2027-01-11T09:00:00.000Z',
+    );
+  });
+
+  it('skips holidays as well as the weekend', () => {
+    const thursday15 = new Date(Date.UTC(2027, 0, 7, 15, 0, 0));
+    const due = addWorkingMinutes(thursday15, 4 * 60, window, {
+      holidays: new Set(['2027-01-10']),
+    });
+    expect(due.toISOString()).toBe('2027-01-11T11:00:00.000Z');
+  });
+
+  it('a policy with NO window keeps plain elapsed time', () => {
+    // Right for a round-the-clock clock such as breach containment.
+    expect(
+      workingWindowFor({
+        workingHoursStart: null,
+        workingHoursEnd: null,
+        timezone: 'Asia/Amman',
+        calendarType: 'JORDAN_STANDARD',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('a CONTINUOUS_24_7 policy never gets a window, even if the columns are set', () => {
+    // "Runs around the clock" and "office hours only" are contradictory; the
+    // calendar is the more explicit statement of intent.
+    expect(
+      workingWindowFor({
+        workingHoursStart: '08:00',
+        workingHoursEnd: '16:00',
+        timezone: 'Asia/Amman',
+        calendarType: 'CONTINUOUS_24_7',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('a malformed or inverted window degrades to no window, never a wrong deadline', () => {
+    expect(parseTimeOfDay('25:00')).toBeNull();
+    expect(parseTimeOfDay('nonsense')).toBeNull();
+    expect(
+      workingWindowFor({
+        workingHoursStart: '16:00',
+        workingHoursEnd: '08:00',
+        timezone: 'Asia/Amman',
+        calendarType: 'JORDAN_STANDARD',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('computePolicyDueAt applies the window end to end', () => {
+    const due = computePolicyDueAt(
+      {
+        durationValue: 4,
+        durationUnit: 'HOURS',
+        calendarType: 'JORDAN_STANDARD',
+        customWeekendDays: [],
+        workingHoursStart: '08:00',
+        workingHoursEnd: '16:00',
+        timezone: 'UTC',
+      },
+      new Date(Date.UTC(2027, 0, 7, 15, 0, 0)),
+      new Set(),
+    );
+    expect(due.toISOString()).toBe('2027-01-10T11:00:00.000Z');
   });
 });

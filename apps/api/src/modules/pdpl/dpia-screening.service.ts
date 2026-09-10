@@ -40,7 +40,7 @@ export class DpiaScreeningService {
     const now = new Date();
     const dpoReviewDueAt =
       outcome === 'DPO_REVIEW_REQUIRED'
-        ? this.slaTimer.computeDueAt(DPIA_REVIEW_SLA_WORKFLOW, now)
+        ? await this.slaTimer.computeDueAt(DPIA_REVIEW_SLA_WORKFLOW, now)
         : null;
 
     const row = await this.repo.create({

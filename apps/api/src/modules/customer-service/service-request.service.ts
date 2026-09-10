@@ -118,7 +118,7 @@ export class ServiceRequestService {
     actorUserId: string,
   ): Promise<void> {
     try {
-      const dueAt = this.slaTimer.computeDueAt(
+      const dueAt = await this.slaTimer.computeDueAt(
         SERVICE_REQUEST_SLA_WORKFLOW,
         new Date(),
       );

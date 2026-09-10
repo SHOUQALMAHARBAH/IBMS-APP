@@ -69,9 +69,12 @@ export function getSlaPolicy(id: string): Promise<SlaPolicy> {
   return apiGet(`/sla/policies/${encodeURIComponent(id)}`);
 }
 
-/** Duration/calendar/escalation edits need `sla.policy.manage`. Changing
- * `sourceType` or the citation additionally needs `sla.policy.regulatory` —
- * the API returns 422 explaining that, rather than silently ignoring it. */
+/** Duration/calendar/escalation edits. Needs `sla.policy.manage`.
+ *
+ * Deliberately CANNOT change the source/citation — that is a different route
+ * behind `sla.policy.regulatory` (see `updateSlaPolicySource`), because
+ * "shorten this deadline" and "declare this deadline legally required" are
+ * different decisions. */
 export function updateSlaPolicy(
   id: string,
   patch: Partial<
@@ -83,10 +86,6 @@ export function updateSlaPolicy(
       | "durationUnit"
       | "calendarType"
       | "timezone"
-      | "sourceType"
-      | "sourceReference"
-      | "sourceDocument"
-      | "sourceSection"
       | "escalationEnabled"
       | "warningThreshold"
     >
@@ -110,4 +109,19 @@ export function durationUnitKey(unit: SlaDurationUnit): string {
     .split("_")
     .map((p) => p.charAt(0) + p.slice(1).toLowerCase())
     .join("")}`;
+}
+
+/** Change what the system CLAIMS about an SLA's legal force. Needs
+ * `sla.policy.regulatory` on top of `sla.policy.manage`. `REGULATORY` still
+ * requires a named instrument — a 422, not a silent downgrade. */
+export function updateSlaPolicySource(
+  id: string,
+  source: {
+    sourceType: SlaSourceType;
+    sourceReference?: string;
+    sourceDocument?: string;
+    sourceSection?: string;
+  },
+): Promise<SlaPolicy> {
+  return apiPatch(`/sla/policies/${encodeURIComponent(id)}/source`, source);
 }

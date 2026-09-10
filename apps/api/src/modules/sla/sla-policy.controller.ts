@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SlaPolicyService } from './sla-policy.service';
-import { PermissionsService } from '../rbac/services/permissions.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -17,11 +16,8 @@ import {
   CreateSlaPolicyDto,
   ListSlaPoliciesDto,
   UpdateSlaPolicyDto,
+  UpdateSlaPolicySourceDto,
 } from './dto/sla-policy.dto';
-
-/** Changing an SLA's stated legal force is controlled separately from changing
- * its duration — see `SlaPolicyService.update`. */
-const REGULATORY_METADATA_PERMISSION = 'sla.policy.regulatory';
 
 /**
  * Configurable SLA policies (task Part A).
@@ -34,10 +30,7 @@ const REGULATORY_METADATA_PERMISSION = 'sla.policy.regulatory';
 @ApiTags('sla')
 @Controller('sla/policies')
 export class SlaPolicyController {
-  constructor(
-    private readonly policies: SlaPolicyService,
-    private readonly permissions: PermissionsService,
-  ) {}
+  constructor(private readonly policies: SlaPolicyService) {}
 
   @RequirePermissions('sla.policy.read')
   @Get()
@@ -64,25 +57,40 @@ export class SlaPolicyController {
   }
 
   /**
-   * Edit a policy. Whether the caller may touch the source/citation fields is
-   * resolved here and passed down, rather than the service reaching for a
-   * guard — the same way `PermissionsGuard` resolves codes, so there is one
-   * notion of "holds this permission".
+   * Edit a policy's duration, calendar and escalation settings.
+   *
+   * Deliberately CANNOT touch the source/citation fields — those live on
+   * `PATCH :id/source` behind their own permission. Making the permission
+   * boundary a ROUTE boundary is how the rest of this codebase expresses
+   * "these two things need different authority", and it keeps the check in the
+   * guard rather than duplicated in a service argument.
    */
   @RequirePermissions('sla.policy.manage')
   @Patch(':id')
-  async update(
+  update(
     @Param('id') id: string,
     @Body() dto: UpdateSlaPolicyDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const granted = await this.permissions.getCodesForRoles(user.roles);
-    return this.policies.update(
-      id,
-      dto,
-      user,
-      granted.has(REGULATORY_METADATA_PERMISSION),
-    );
+    return this.policies.update(id, dto, user, false);
+  }
+
+  /**
+   * Change what the system CLAIMS about this SLA's legal force.
+   *
+   * Separate from the edit above because "shorten this deadline" and "declare
+   * this deadline legally required" are different decisions with different
+   * consequences. `REGULATORY` still requires a named instrument — refused by
+   * the service AND by a DB CHECK.
+   */
+  @RequirePermissions('sla.policy.regulatory')
+  @Patch(':id/source')
+  updateSource(
+    @Param('id') id: string,
+    @Body() dto: UpdateSlaPolicySourceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.policies.update(id, dto, user, true);
   }
 
   @RequirePermissions('sla.policy.manage')

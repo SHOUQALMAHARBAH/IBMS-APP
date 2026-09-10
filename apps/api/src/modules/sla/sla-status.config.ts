@@ -4,7 +4,12 @@ import type {
   SlaDuration,
   SlaDurationUnit,
 } from '../../common/business-days.util';
-import { applyDuration, utcDateKey } from '../../common/business-days.util';
+import {
+  applyDuration,
+  parseTimeOfDay,
+  utcDateKey,
+  type WorkingWindow,
+} from '../../common/business-days.util';
 
 /**
  * The lifecycle of one SLA instance, and the pure math behind it.
@@ -38,8 +43,37 @@ export function toSlaDuration(
   value: number,
   unit: PrismaSlaDurationUnit,
   businessDayOptions?: BusinessDayOptions,
+  workingWindow?: WorkingWindow,
 ): SlaDuration {
-  return { value, unit: UNIT_BY_PRISMA[unit], businessDayOptions };
+  return {
+    value,
+    unit: UNIT_BY_PRISMA[unit],
+    businessDayOptions,
+    workingWindow,
+  };
+}
+
+/**
+ * The policy's working-hours window, or `undefined` when it does not define
+ * one (in which case MINUTES/HOURS are plain elapsed time — right for a
+ * round-the-clock clock like breach containment).
+ *
+ * A CONTINUOUS_24_7 policy never has a window even if the columns are filled:
+ * "runs around the clock" and "only during office hours" are contradictory,
+ * and the calendar is the more explicit statement of intent.
+ */
+export function workingWindowFor(policy: {
+  workingHoursStart: string | null;
+  workingHoursEnd: string | null;
+  timezone: string;
+  calendarType: 'JORDAN_STANDARD' | 'CONTINUOUS_24_7' | 'CUSTOM';
+}): WorkingWindow | undefined {
+  if (policy.calendarType === 'CONTINUOUS_24_7') return undefined;
+  const startMinute = parseTimeOfDay(policy.workingHoursStart);
+  const endMinute = parseTimeOfDay(policy.workingHoursEnd);
+  if (startMinute === null || endMinute === null) return undefined;
+  if (endMinute <= startMinute) return undefined;
+  return { startMinute, endMinute, timezone: policy.timezone };
 }
 
 /** Turns `SlaHoliday` rows into the set `business-days.util` expects. */
@@ -128,6 +162,9 @@ export function computePolicyDueAt(
     durationUnit: PrismaSlaDurationUnit;
     calendarType: 'JORDAN_STANDARD' | 'CONTINUOUS_24_7' | 'CUSTOM';
     customWeekendDays: number[];
+    workingHoursStart?: string | null;
+    workingHoursEnd?: string | null;
+    timezone?: string;
   },
   startedAt: Date,
   holidays: ReadonlySet<string>,
@@ -138,6 +175,12 @@ export function computePolicyDueAt(
       policy.durationValue,
       policy.durationUnit,
       businessDayOptionsFor(policy, holidays),
+      workingWindowFor({
+        workingHoursStart: policy.workingHoursStart ?? null,
+        workingHoursEnd: policy.workingHoursEnd ?? null,
+        timezone: policy.timezone ?? 'Asia/Amman',
+        calendarType: policy.calendarType,
+      }),
     ),
   );
 }

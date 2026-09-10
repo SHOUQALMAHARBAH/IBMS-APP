@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { UserRepository } from '../../repositories/user.repository';
 import { applyDuration } from '../../common/business-days.util';
+import type { SlaDurationUnit as SlaDurationUnitName } from '../../common/business-days.util';
 import { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
 import {
   computePolicyDueAt,
@@ -112,7 +113,36 @@ export class SlaTimerService {
    * callers with no domain-specific due-date rule of their own; callers
    * that do have one (most of the 14) should compute `dueAt` themselves and
    * pass it straight to `startTimer()` instead. */
-  computeDueAt(
+  /**
+   * The due date for a workflow, FROM THE CONFIGURED POLICY.
+   *
+   * This is the integration point that makes SLAs actually configurable:
+   * thirteen services already call it, so making it policy-aware makes every
+   * one of them read the database instead of a compile-time constant, without
+   * changing what any of them decide.
+   *
+   * ASYNC on purpose. A cached synchronous read was the tempting alternative
+   * (`PermissionsService` caches the permission grid for 60s), but a stale
+   * permission grid costs someone a retry and a stale SLA silently computes
+   * the WRONG STATUTORY DEADLINE for up to the TTL. A compliance deadline is
+   * not a good place to trade correctness for a saved round trip.
+   *
+   * Falls back to `SLA_REGISTRY` when no policy is configured, so an
+   * un-seeded database behaves exactly as it did before.
+   */
+  async computeDueAt(
+    workflowName: string,
+    baseDate: Date,
+    options?: { regulatoryChannel?: boolean; workflowState?: string | null },
+  ): Promise<Date> {
+    const { dueAt } = await this.resolveDueAt(workflowName, baseDate, options);
+    return dueAt;
+  }
+
+  /** The registry-only computation, kept synchronous for the fallback path
+   * and for callers that genuinely want the compile-time default (the seed
+   * baseline, and tests that assert the default has not moved). */
+  computeDueAtFromRegistry(
     workflowName: string,
     baseDate: Date,
     options?: { regulatoryChannel?: boolean },
@@ -154,10 +184,26 @@ export class SlaTimerService {
     );
     if (!policy) {
       return {
-        dueAt: this.computeDueAt(workflowName, baseDate, options),
+        dueAt: this.computeDueAtFromRegistry(workflowName, baseDate, options),
         policy: null,
       };
     }
+
+    // M08's regulatory-channel fast track is a REGISTRY concept (a second
+    // duration on one entry) that the policy table does not model — a policy
+    // is one duration. Until it does, the fast track keeps its registry
+    // value rather than silently being served the standard one, which would
+    // LENGTHEN a deadline that exists to be shorter.
+    if (options?.regulatoryChannel) {
+      const entry = getSlaRegistryEntry(workflowName);
+      if (entry.regulatoryChannelDuration) {
+        return {
+          dueAt: applyDuration(baseDate, entry.regulatoryChannelDuration),
+          policy,
+        };
+      }
+    }
+
     const holidays = holidaySet(await this.policies.findHolidays());
     return { dueAt: computePolicyDueAt(policy, baseDate, holidays), policy };
   }
@@ -167,14 +213,39 @@ export class SlaTimerService {
    * stage's (signed) `offset`. Returns the created rows in stage order. */
   async startTimer(params: StartSlaTimerParams): Promise<SlaTimer[]> {
     const { entityType, entityId, workflowName, dueAt, actorUserId } = params;
-    const entry = getSlaRegistryEntry(workflowName);
-    const stages = entry.escalationStages;
+
+    // Escalation stages come from the CONFIGURED policy when one exists,
+    // falling back to the registry otherwise. Without this the stages stayed a
+    // compile-time constant even though the table modelled them — the feature
+    // would have looked configurable and quietly not been.
+    const policy = await this.policies.findActiveFor(workflowName, null);
+    const stages: readonly {
+      offset: { value: number; unit: SlaDurationUnitName };
+      escalateTo: string | null;
+    }[] = policy
+      ? policyStages(policy)
+      : getSlaRegistryEntry(workflowName).escalationStages;
+
+    // `escalationEnabled: false` keeps the DEADLINE tracked (a queryable,
+    // sweep-checked row is the whole point of the registry) while suppressing
+    // the stages that notify somebody. Turning escalation off must not turn
+    // the SLA off.
+    const effectiveStages =
+      policy && !policy.escalationEnabled
+        ? [
+            {
+              offset: { value: 0, unit: 'calendarDays' as const },
+              escalateTo: null,
+            },
+          ]
+        : stages;
+
     const created: SlaTimer[] = [];
 
-    for (let i = 0; i < stages.length; i++) {
-      const stage = stages[i];
+    for (let i = 0; i < effectiveStages.length; i++) {
+      const stage = effectiveStages[i];
       const stageWorkflowName =
-        stages.length === 1
+        effectiveStages.length === 1
           ? workflowName
           : `${workflowName}::${(stage.escalateTo ?? `stage${i}`).toLowerCase()}`;
       const stageDueAt = applyDuration(dueAt, stage.offset);
@@ -186,6 +257,10 @@ export class SlaTimerService {
           workflowName: stageWorkflowName,
           dueAt: stageDueAt,
           escalatedTo: stage.escalateTo,
+          // Which policy set this deadline. Recorded per timer so a HISTORICAL
+          // one can still answer "was this regulatory or internal?" even after
+          // the policy is later edited.
+          slaPolicyId: policy?.id ?? null,
         },
       });
       await this.audit.record({
@@ -463,4 +538,37 @@ export class SlaTimerService {
 
     return escalated;
   }
+}
+
+/** Projects a policy's escalation rows into the shape `applyDuration` wants.
+ * The DB spells units `BUSINESS_DAYS`; the date util spells them
+ * `businessDays`, and the two vocabularies exist because the util predates the
+ * table and serves callers that never touch a policy. */
+function policyStages(policy: {
+  escalations: {
+    stageOrder: number;
+    offsetValue: number;
+    offsetUnit: string;
+    escalateTo: string | null;
+  }[];
+}): {
+  offset: { value: number; unit: SlaDurationUnitName };
+  escalateTo: string | null;
+}[] {
+  const UNIT: Record<string, SlaDurationUnitName> = {
+    MINUTES: 'minutes',
+    HOURS: 'hours',
+    BUSINESS_DAYS: 'businessDays',
+    CALENDAR_DAYS: 'calendarDays',
+    MONTHS: 'months',
+  };
+  return [...policy.escalations]
+    .sort((a, b) => a.stageOrder - b.stageOrder)
+    .map((e) => ({
+      offset: {
+        value: e.offsetValue,
+        unit: UNIT[e.offsetUnit] ?? 'calendarDays',
+      },
+      escalateTo: e.escalateTo,
+    }));
 }

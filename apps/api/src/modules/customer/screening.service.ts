@@ -374,7 +374,7 @@ export class ScreeningService {
               entityType: 'ScreeningMatch',
               entityId: recorded.id,
               workflowName: SANCTIONS_MATCH_REVIEW_WORKFLOW,
-              dueAt: this.sla.computeDueAt(
+              dueAt: await this.sla.computeDueAt(
                 SANCTIONS_MATCH_REVIEW_WORKFLOW,
                 new Date(),
               ),
