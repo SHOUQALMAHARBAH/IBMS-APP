@@ -1,4 +1,6 @@
+import { capability } from './screening-provider.types';
 import type {
+  CapabilityState,
   ProviderHealth,
   ProviderScreeningResult,
   ScreeningProvider,
@@ -70,16 +72,39 @@ export class NotConfiguredProvider implements ScreeningProvider {
     return Promise.resolve(subjects.map(() => this.result(correlationId)));
   }
 
+  /** Nothing is configured, so nothing is operational. `supported` still
+   * reports what the SELECTED adapter would offer once configured, so an
+   * operator can see what they are missing rather than a blank table. */
+  capabilities(): CapabilityState[] {
+    const note = `Not configured${this.missing.length > 0 ? ` — missing ${this.missing.join(', ')}` : ''}.`;
+    return (
+      [
+        'SANCTIONS',
+        'PEP',
+        'WATCHLIST',
+        'ADVERSE_MEDIA',
+        'INDIVIDUAL',
+        'ENTITY',
+        'BATCH',
+        'ONGOING_MONITORING',
+        'WEBHOOKS',
+      ] as const
+    ).map((cap) => capability(cap, true, false, false, note));
+  }
+
   getProviderHealth(): Promise<ProviderHealth> {
     return Promise.resolve({
       provider: this.kind,
       providerName: this.name,
       status: 'NOT_CONFIGURED',
+      state: 'NOT_CONFIGURED',
       detail:
         this.missing.length > 0
           ? `Missing configuration: ${this.missing.join(', ')}. Compliance review is required before the applicable workflow can proceed.`
           : 'No automated screening provider is configured. Compliance review is required before the applicable workflow can proceed.',
       checkedAt: new Date().toISOString(),
+      capabilities: this.capabilities(),
+      authenticationValid: null,
     });
   }
 }

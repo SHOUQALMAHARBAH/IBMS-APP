@@ -60,25 +60,21 @@ export class ScreeningConfigController {
       thresholdProblems: config.thresholdProblems,
       sendIdentifiers: config.sendIdentifiers,
       /**
-       * What this provider can and cannot answer.
-       *
-       * Stated explicitly because the backlog asks for "sanctions/PEP/AML" and
-       * the built-in cache covers only sanctions. A health screen that implied
-       * PEP coverage the deployment does not have would be worse than no
-       * screen at all.
+       * What this provider can and cannot answer, from the provider itself
+       * (task §26). Replaces a hand-rolled coverage block that hard-coded
+       * "built_in means no PEP" in the controller — the adapter is the only
+       * thing that actually knows, and duplicating the judgement here is how
+       * the two drift apart.
        */
-      coverage:
-        health.provider === 'built_in'
-          ? {
-              sanctions: true,
-              pep: false,
-              note: 'OFAC SDN + UN Consolidated are SANCTIONS lists. No PEP source is configured — PEP screening requires a commercial provider or an on-premise dataset that includes PEP data.',
-            }
-          : {
-              sanctions: true,
-              pep: true,
-              note: 'Coverage depends on the datasets this provider is configured to search. Verify against the provider’s own documentation before relying on PEP coverage.',
-            },
+      capabilities: health.capabilities,
+      /** A flat convenience for the dashboard: is PEP screening genuinely
+       * OPERATIONAL right now? Not "supported", not "configured". */
+      pepOperational: health.capabilities.some(
+        (c) => c.capability === 'PEP' && c.operational,
+      ),
+      sanctionsOperational: health.capabilities.some(
+        (c) => c.capability === 'SANCTIONS' && c.operational,
+      ),
     };
   }
 }

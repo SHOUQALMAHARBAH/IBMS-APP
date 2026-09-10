@@ -4,11 +4,13 @@ import type {
   ProviderCandidate,
   ProviderHealth,
   ProviderScreeningResult,
-  ScreeningListType,
   ScreeningProviderKind,
   ScreeningSubject,
 } from './screening-provider.types';
 import type { ScreeningProviderConfig } from './screening-provider.config';
+import { classifyList } from './list-classification.config';
+import { capability } from './screening-provider.types';
+import type { CapabilityState } from './screening-provider.types';
 
 /**
  * On-premise screening engine adapter (yente / OpenSanctions).
@@ -152,7 +154,10 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
           : result.schema === 'Person'
             ? 'individual'
             : 'unknown',
-      listType: listTypeFor(result, datasets),
+      listType: classifyList({
+        topics: topicsOf(result),
+        datasets,
+      }).listType,
       // Provider-native score, clamped. A provider that stops returning one
       // must not silently become "0" (never matches) or "1" (always matches).
       score:
@@ -164,6 +169,80 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
       remarks: null,
       pepPosition: pepPositionFrom(result),
     };
+  }
+
+  /**
+   * What a local engine offers.
+   *
+   * `configured` for PEP is deliberately tied to the DATASET the deployment
+   * points at: an OpenSanctions deployment restricted to sanctions collections
+   * has no PEP data, and the engine being reachable does not change that. The
+   * note says coverage must be verified against the engine's own dataset
+   * listing rather than asserted from the fact that it answered.
+   */
+  capabilities(reachable = true): CapabilityState[] {
+    const dataset = this.dataset;
+    const sanctionsOnly = /sanction/i.test(dataset);
+    const pepConfigured = !sanctionsOnly;
+    return [
+      capability(
+        'SANCTIONS',
+        true,
+        true,
+        reachable,
+        'Dataset "' + dataset + '".',
+      ),
+      capability(
+        'PEP',
+        true,
+        pepConfigured,
+        pepConfigured && reachable,
+        pepConfigured
+          ? 'Depends on whether dataset "' +
+              dataset +
+              '" actually ingested PEP collections — verify against the engine dataset listing before relying on it.'
+          : 'Dataset "' +
+              dataset +
+              '" is scoped to sanctions; no PEP data is searched.',
+      ),
+      capability(
+        'WATCHLIST',
+        true,
+        true,
+        reachable,
+        'Dataset "' + dataset + '".',
+      ),
+      capability(
+        'ADVERSE_MEDIA',
+        false,
+        false,
+        false,
+        'Not provided by this engine.',
+      ),
+      capability('INDIVIDUAL', true, true, reachable, 'Person schema.'),
+      capability('ENTITY', true, true, reachable, 'Organization schema.'),
+      capability(
+        'BATCH',
+        true,
+        true,
+        reachable,
+        'Fanned out sequentially to respect the engine.',
+      ),
+      capability(
+        'ONGOING_MONITORING',
+        true,
+        true,
+        reachable,
+        'Via the re-screening scheduler, not a provider push.',
+      ),
+      capability(
+        'WEBHOOKS',
+        false,
+        false,
+        false,
+        'The engine does not push events.',
+      ),
+    ];
   }
 
   async getProviderHealth(): Promise<ProviderHealth> {
@@ -178,8 +257,11 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
       return {
         ...common,
         status: 'UNAVAILABLE',
+        state: 'FAILED',
         detail:
           'Circuit breaker is open after repeated failures. Screening reports SCREENING_FAILED, not NO_MATCH, while it recovers.',
+        capabilities: this.capabilities(false),
+        authenticationValid: null,
       };
     }
 
@@ -195,16 +277,24 @@ export class OnPremiseScreeningProvider extends BaseScreeningProvider {
       return {
         ...common,
         status: 'HEALTHY',
+        state: 'HEALTHY',
         detail:
           `Screening engine reachable at ${this.config.baseUrl} (dataset "${this.dataset}"). ${text.slice(0, 80)}`.trim(),
         datasetVersion: this.dataset,
+        capabilities: this.capabilities(true),
+        // The local engine is unauthenticated by design (it runs inside the
+        // broker's own network), so there is no credential to validate.
+        authenticationValid: null,
       };
     } catch (err) {
       this.recordFailure();
       return {
         ...common,
         status: 'UNAVAILABLE',
+        state: 'UNAVAILABLE',
         detail: `Screening engine unreachable at ${this.config.baseUrl}: ${(err as Error).message}`,
+        capabilities: this.capabilities(false),
+        authenticationValid: null,
       };
     }
   }
@@ -226,60 +316,6 @@ interface YenteMatchResponse {
   responses?: Record<string, { results?: YenteResult[] }>;
 }
 
-/**
- * Which list a result came from.
- *
- * `properties.topics` is AUTHORITATIVE where present — OpenSanctions tags an
- * entity `sanction` or `role.pep` explicitly, and that is the provider's own
- * statement rather than our inference.
- *
- * The dataset-name check below it is a HEURISTIC and is written as one. It
- * exists because a real dataset name is often unambiguous to a human while
- * containing none of the obvious words: `us_ofac_sdn` and `eu_fsf` are both
- * sanctions lists and neither contains "sanction". Substring-matching for that
- * word alone silently reported OFAC hits as a generic WATCHLIST, which
- * understates a sanctions match — the direction that matters.
- *
- * An unrecognised dataset is WATCHLIST. Never PEP: calling somebody
- * politically exposed when the data does not say so is fabricating a
- * determination with real consequences for that person.
- */
-const SANCTIONS_DATASET_MARKERS = [
-  'sanction',
-  'ofac',
-  'sdn',
-  'fsf', // EU Financial Sanctions Files
-  'consolidated',
-  'sectoral',
-  'debarment',
-];
-const PEP_DATASET_MARKERS = ['pep', 'politician', 'peps'];
-
-function listTypeFor(
-  result: YenteResult,
-  datasets: string[],
-): ScreeningListType {
-  const topics = Array.isArray(
-    (result.properties as { topics?: unknown })?.topics,
-  )
-    ? (result.properties as { topics: unknown[] }).topics.filter(
-        (t): t is string => typeof t === 'string',
-      )
-    : [];
-
-  // Provider's own classification wins.
-  const topicText = topics.join(' ').toLowerCase();
-  if (topicText.includes('sanction')) return 'SANCTIONS';
-  if (topicText.includes('pep') || topicText.includes('role.pep')) return 'PEP';
-
-  const datasetText = datasets.join(' ').toLowerCase();
-  if (SANCTIONS_DATASET_MARKERS.some((m) => datasetText.includes(m))) {
-    return 'SANCTIONS';
-  }
-  if (PEP_DATASET_MARKERS.some((m) => datasetText.includes(m))) return 'PEP';
-  return 'WATCHLIST';
-}
-
 function matchedAttributesFrom(result: YenteResult): MatchedAttribute[] {
   const props = result.properties ?? {};
   const matched: MatchedAttribute[] = ['name'];
@@ -298,4 +334,14 @@ function pepPositionFrom(result: YenteResult): string | null {
     return position[0];
   }
   return null;
+}
+
+/** Topic tags the provider attached, if any. Defensive: an absent or
+ * malformed `topics` is no topics, never a guess. */
+function topicsOf(result: YenteResult): string[] {
+  const topics = (result.properties as { topics?: unknown } | undefined)
+    ?.topics;
+  return Array.isArray(topics)
+    ? topics.filter((t): t is string => typeof t === 'string')
+    : [];
 }

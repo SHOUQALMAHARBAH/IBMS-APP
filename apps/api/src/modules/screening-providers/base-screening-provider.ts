@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type {
+  CapabilityState,
   ProviderHealth,
   ProviderScreeningResult,
   ScreeningProvider,
@@ -45,6 +46,10 @@ export abstract class BaseScreeningProvider implements ScreeningProvider {
   ): Promise<ProviderScreeningResult>;
 
   abstract getProviderHealth(): Promise<ProviderHealth>;
+
+  /** Every adapter must declare what it can do — there is no sensible default,
+   * and a wrong default here would be a claim about coverage. */
+  abstract capabilities(operational?: boolean): CapabilityState[];
 
   /**
    * Default batch: sequential fan-out.

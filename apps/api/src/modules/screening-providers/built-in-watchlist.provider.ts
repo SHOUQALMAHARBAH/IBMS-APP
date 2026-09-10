@@ -18,6 +18,8 @@ import {
   readScreeningConfig,
   type ScreeningProviderConfig,
 } from './screening-provider.config';
+import { capability } from './screening-provider.types';
+import type { CapabilityState } from './screening-provider.types';
 
 /**
  * The provider this deployment actually runs today: the locally synced OFAC
@@ -205,6 +207,66 @@ export class BuiltInWatchlistProvider implements ScreeningProvider {
     return `local-${newest.startedAt.toISOString()}`;
   }
 
+  /**
+   * OFAC SDN and the UN Consolidated List are SANCTIONS lists.
+   *
+   * `PEP: supported=false` is the honest answer and the most important row in
+   * this table — the backlog asks for "sanctions/PEP/AML", and a deployment
+   * running only this provider has NO PEP coverage. Reporting otherwise would
+   * be the fabrication the task forbids.
+   */
+  capabilities(hasData = true): CapabilityState[] {
+    return [
+      capability(
+        'SANCTIONS',
+        true,
+        true,
+        hasData,
+        hasData
+          ? 'OFAC SDN + UN Consolidated, synced locally.'
+          : 'Configured, but the local cache is empty — the sync has never completed.',
+      ),
+      capability(
+        'PEP',
+        false,
+        false,
+        false,
+        'This provider has NO PEP data. PEP screening requires a commercial provider or an on-premise dataset that includes PEP data.',
+      ),
+      capability(
+        'WATCHLIST',
+        false,
+        false,
+        false,
+        'Only sanctions lists are synced.',
+      ),
+      capability('ADVERSE_MEDIA', false, false, false, 'Not available.'),
+      capability('INDIVIDUAL', true, true, hasData, 'Names are matched.'),
+      capability('ENTITY', true, true, hasData, 'Legal names are matched.'),
+      capability(
+        'BATCH',
+        true,
+        true,
+        hasData,
+        'Batched locally; no external rate limit applies.',
+      ),
+      capability(
+        'ONGOING_MONITORING',
+        true,
+        true,
+        hasData,
+        'The 4-hourly re-screening batch plus re-screening on list update.',
+      ),
+      capability(
+        'WEBHOOKS',
+        false,
+        false,
+        false,
+        'Not applicable to a local cache.',
+      ),
+    ];
+  }
+
   async getProviderHealth(): Promise<ProviderHealth> {
     const checkedAt = new Date().toISOString();
     const runs = await this.entries.findLatestSyncRuns();
@@ -216,9 +278,15 @@ export class BuiltInWatchlistProvider implements ScreeningProvider {
         provider: this.kind,
         providerName: this.name,
         status: 'UNAVAILABLE',
+        // CONFIGURED, not NOT_CONFIGURED: the provider is set up correctly and
+        // simply has no data yet. Conflating the two would send an operator
+        // looking for a missing setting that is not missing.
+        state: 'CONFIGURED',
         detail:
           'The local sanctions cache is empty — the watchlist sync has never completed successfully. No customer can be screened against a real list until it does.',
         checkedAt,
+        capabilities: this.capabilities(false),
+        authenticationValid: null,
       };
     }
 
@@ -232,6 +300,7 @@ export class BuiltInWatchlistProvider implements ScreeningProvider {
       provider: this.kind,
       providerName: this.name,
       status: ageHours > staleAfter ? 'DEGRADED' : 'HEALTHY',
+      state: ageHours > staleAfter ? 'DEGRADED' : 'HEALTHY',
       detail:
         ageHours > staleAfter
           ? `The sanctions cache was last refreshed ${Math.floor(ageHours)}h ago, beyond the ${staleAfter}h staleness tolerance. Sanctions lists change; screening against this data is not current. Covers SANCTIONS only — no PEP source is configured.`
@@ -239,6 +308,10 @@ export class BuiltInWatchlistProvider implements ScreeningProvider {
       datasetVersion: `local-${newest.startedAt.toISOString()}`,
       datasetUpdatedAt: newest.startedAt.toISOString(),
       checkedAt,
+      capabilities: this.capabilities(true),
+      // The local cache needs no credentials, so "is authentication valid?"
+      // has no answer here — null rather than a misleading `true`.
+      authenticationValid: null,
     };
   }
 }

@@ -23,9 +23,36 @@ export interface ScreeningHealth {
   missing: string[];
   thresholdProblems: string[];
   sendIdentifiers: boolean;
-  /** What this provider can actually answer. `pep: false` on the built-in
-   * cache is a fact about coverage, not a bug. */
-  coverage: { sanctions: boolean; pep: boolean; note: string };
+  /** The provider's lifecycle state — richer than `status`: distinguishes
+   * "never configured" from "configured and currently failing". */
+  state:
+    | "NOT_CONFIGURED"
+    | "CONFIGURED"
+    | "HEALTHY"
+    | "DEGRADED"
+    | "UNAVAILABLE"
+    | "FAILED";
+  /** Whether credentials were accepted. `null` when the provider needs none. */
+  authenticationValid?: boolean | null;
+  /**
+   * What the provider can do, reported BY the provider.
+   *
+   * Three separate flags, because conflating them is how a system claims PEP
+   * coverage it does not have:
+   *   supported   — the adapter implements it
+   *   configured  — this deployment supplied what it needs
+   *   operational — it works right now
+   */
+  capabilities: {
+    capability: string;
+    supported: boolean;
+    configured: boolean;
+    operational: boolean;
+    note: string;
+  }[];
+  /** Is PEP screening genuinely OPERATIONAL — not merely supported. */
+  pepOperational: boolean;
+  sanctionsOperational: boolean;
 }
 
 export interface ScreeningConfig {

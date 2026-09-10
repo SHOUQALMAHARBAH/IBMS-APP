@@ -29,6 +29,20 @@ const card: CSSProperties = {
   maxWidth: "46rem",
 };
 
+const headCell: CSSProperties = {
+  padding: "0.35rem 0.7rem",
+  textAlign: "start",
+  fontWeight: 600,
+  borderBottom: "2px solid #d1d5db",
+};
+
+const bodyCell: CSSProperties = {
+  padding: "0.35rem 0.7rem",
+  textAlign: "start",
+  verticalAlign: "top",
+  borderBottom: "1px solid #f3f4f6",
+};
+
 const row: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -156,8 +170,28 @@ export default function ScreeningHealthPage() {
               </span>
             </div>
             <div style={row}>
+              <span>{isArabic ? "الحالة التفصيلية" : "State"}</span>
+              <span data-state={health.state}>{health.state}</span>
+            </div>
+            <div style={row}>
               <span>{isArabic ? "النوع" : "Type"}</span>
               <span>{providerLabel(health.provider)}</span>
+            </div>
+            <div style={row}>
+              <span>{isArabic ? "المصادقة" : "Authentication"}</span>
+              <span data-auth={String(health.authenticationValid)}>
+                {health.authenticationValid === true
+                  ? isArabic
+                    ? "مقبولة"
+                    : "Accepted"
+                  : health.authenticationValid === false
+                    ? isArabic
+                      ? "مرفوضة"
+                      : "Rejected"
+                    : isArabic
+                      ? "لا تنطبق"
+                      : "Not applicable"}
+              </span>
             </div>
             <div style={row}>
               <span>{isArabic ? "الاسم" : "Name"}</span>
@@ -176,35 +210,65 @@ export default function ScreeningHealthPage() {
 
           <section style={card}>
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "التغطية" : "Coverage"}
+              {isArabic ? "القدرات والتغطية" : "Capabilities"}
             </h2>
-            <div style={row}>
-              <span>{isArabic ? "العقوبات" : "Sanctions"}</span>
-              <span data-coverage-sanctions={String(health.coverage.sanctions)}>
-                {health.coverage.sanctions
-                  ? isArabic
-                    ? "مُغطّى"
-                    : "Covered"
-                  : isArabic
-                    ? "غير مُغطّى"
-                    : "Not covered"}
-              </span>
-            </div>
-            <div style={row}>
-              <span>{isArabic ? "الأشخاص السياسيون (PEP)" : "PEP"}</span>
-              <span data-coverage-pep={String(health.coverage.pep)}>
-                {health.coverage.pep
-                  ? isArabic
-                    ? "مُغطّى"
-                    : "Covered"
-                  : isArabic
-                    ? "غير مُغطّى"
-                    : "Not covered"}
-              </span>
-            </div>
-            <p style={{ marginBottom: 0, opacity: 0.85 }}>
-              {health.coverage.note}
+            <p style={{ opacity: 0.75, marginTop: 0 }}>
+              {isArabic
+                ? "«مدعوم» يعني أنّ المحوّل ينفّذها، و«مهيّأ» يعني أنّ هذا النشر وفّر ما تحتاجه، و«فعّال» يعني أنّها تعمل الآن. الخلط بين الثلاثة هو ما يجعل نظاماً يدّعي تغطية لا يملكها."
+                : "“Supported” means the adapter implements it; “Configured” means this deployment supplied what it needs; “Operational” means it works right now. Conflating the three is how a system claims coverage it does not have."}
             </p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ borderCollapse: "collapse", minWidth: "34rem" }}>
+                <thead>
+                  <tr>
+                    <th style={headCell}>
+                      {isArabic ? "القدرة" : "Capability"}
+                    </th>
+                    <th style={headCell}>{isArabic ? "مدعوم" : "Supported"}</th>
+                    <th style={headCell}>
+                      {isArabic ? "مهيّأ" : "Configured"}
+                    </th>
+                    <th style={headCell}>
+                      {isArabic ? "فعّال" : "Operational"}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {health.capabilities.map((c) => (
+                    <tr key={c.capability} data-capability={c.capability}>
+                      <td style={bodyCell}>
+                        <div style={{ fontWeight: 600 }}>{c.capability}</div>
+                        <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                          {c.note}
+                        </div>
+                      </td>
+                      <td style={bodyCell} data-supported={String(c.supported)}>
+                        {c.supported ? "✓" : "—"}
+                      </td>
+                      <td
+                        style={bodyCell}
+                        data-configured={String(c.configured)}
+                      >
+                        {c.configured ? "✓" : "—"}
+                      </td>
+                      <td
+                        style={bodyCell}
+                        data-operational={String(c.operational)}
+                      >
+                        {c.operational ? "✓" : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!health.pepOperational ? (
+              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
+                {isArabic
+                  ? "فحص الأشخاص السياسيين (PEP) غير فعّال. لا يجوز اعتبار أي عميل «خالياً» من هذه الناحية."
+                  : "PEP screening is NOT operational. No customer may be represented as clear of PEP status."}
+              </p>
+            ) : null}
           </section>
 
           <section style={card}>

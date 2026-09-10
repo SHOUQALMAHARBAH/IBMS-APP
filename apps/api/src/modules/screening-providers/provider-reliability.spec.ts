@@ -208,14 +208,21 @@ describe('provider responses are parsed defensively', () => {
                     schema: 'Person',
                     score: 0.91,
                     datasets: ['us_ofac_sdn'],
+                    properties: { topics: ['sanction'] },
                   },
                   {
                     id: 'pep-1',
                     caption: 'SOME MINISTER',
                     schema: 'Person',
                     score: 0.72,
-                    datasets: ['everypolitician_peps'],
-                    properties: { position: ['Minister of Something'] },
+                    datasets: ['wd_peps'],
+                    // A real OpenSanctions PEP entity carries this topic. It
+                    // is the AUTHORITATIVE signal — the provider stating what
+                    // the entity is, rather than us inferring from a name.
+                    properties: {
+                      topics: ['role.pep'],
+                      position: ['Minister of Something'],
+                    },
                   },
                 ],
               },
@@ -364,5 +371,57 @@ describe('commercial adapter — credential handling and score normalisation', (
     const result = await commercial().screenIndividual(SUBJECT, 'corr-16');
     expect(result.candidates[0].score).toBe(0.5);
     expect(result.candidates[0].listType).toBe('PEP');
+  });
+});
+
+describe('REGRESSION: SCREENING_MAX_RETRIES must mean what it says', () => {
+  // `envInt` rejected 0, so an explicit "do not retry" silently became the
+  // default of 2 — a deployment asking for one attempt got three. Verified
+  // here by counting ACTUAL fetch calls, not by reading the parsed config.
+
+  async function attemptsFor(retries: string | undefined): Promise<number> {
+    vi.stubEnv('SCREENING_PROVIDER', 'on_premise');
+    vi.stubEnv('SCREENING_BASE_URL', 'http://engine:8000');
+    vi.stubEnv('SCREENING_TIMEOUT_MS', '50');
+    if (retries !== undefined) vi.stubEnv('SCREENING_MAX_RETRIES', retries);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('boom', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = new OnPremiseScreeningProvider(readScreeningConfig());
+    const result = await provider.screenIndividual(SUBJECT, 'corr-retry');
+    // Whatever the count, a failure is never a clear result.
+    expect(result.outcome).toBe('SCREENING_FAILED');
+    return fetchMock.mock.calls.length;
+  }
+
+  it('0 retries means exactly ONE attempt', async () => {
+    expect(await attemptsFor('0')).toBe(1);
+  });
+
+  it('1 retry means two attempts', async () => {
+    expect(await attemptsFor('1')).toBe(2);
+  });
+
+  it('2 retries means three attempts', async () => {
+    expect(await attemptsFor('2')).toBe(3);
+  });
+
+  it('an unset value uses the documented default of 2 retries', async () => {
+    expect(await attemptsFor(undefined)).toBe(3);
+  });
+
+  it('a NEGATIVE value falls back to the default rather than meaning "never try"', async () => {
+    // -1 attempts is not a coherent instruction; the default is the safe read.
+    expect(await attemptsFor('-1')).toBe(3);
+  });
+
+  it('a non-numeric value falls back to the default', async () => {
+    expect(await attemptsFor('lots')).toBe(3);
+  });
+
+  it('an empty value falls back to the default', async () => {
+    expect(await attemptsFor('')).toBe(3);
   });
 });

@@ -45,11 +45,26 @@ function health(over: Record<string, unknown> = {}) {
     missing: [],
     thresholdProblems: [],
     sendIdentifiers: false,
-    coverage: {
-      sanctions: true,
-      pep: false,
-      note: "OFAC SDN + UN Consolidated are SANCTIONS lists. No PEP source is configured.",
-    },
+    state: "HEALTHY",
+    authenticationValid: null,
+    capabilities: [
+      {
+        capability: "SANCTIONS",
+        supported: true,
+        configured: true,
+        operational: true,
+        note: "OFAC SDN + UN Consolidated, synced locally.",
+      },
+      {
+        capability: "PEP",
+        supported: false,
+        configured: false,
+        operational: false,
+        note: "This provider has NO PEP data.",
+      },
+    ],
+    pepOperational: false,
+    sanctionsOperational: true,
     ...over,
   };
 }
@@ -67,6 +82,7 @@ test("says NOT_CONFIGURED and names what is missing", async ({ page }) => {
     health({
       provider: "commercial",
       status: "NOT_CONFIGURED",
+      state: "NOT_CONFIGURED",
       missing: ["SCREENING_API_KEY"],
       detail: "Missing configuration: SCREENING_API_KEY.",
     }),
@@ -92,9 +108,60 @@ test("does NOT imply PEP coverage the built-in provider lacks", async ({
 
   await page.goto("/screening-health");
 
-  await expect(page.locator('[data-coverage-sanctions="true"]')).toBeVisible();
-  await expect(page.locator('[data-coverage-pep="false"]')).toBeVisible();
-  await expect(page.getByText("No PEP source is configured")).toBeVisible();
+  const sanctions = page.locator('[data-capability="SANCTIONS"]');
+  const pep = page.locator('[data-capability="PEP"]');
+  await expect(sanctions.locator('[data-operational="true"]')).toBeVisible();
+  await expect(pep.locator('[data-supported="false"]')).toBeVisible();
+  await expect(pep.locator('[data-operational="false"]')).toBeVisible();
+  await expect(page.getByText("NO PEP data")).toBeVisible();
+});
+
+test("warns explicitly that no customer may be called clear of PEP status", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+
+  await page.goto("/screening-health");
+
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "PEP screening is NOT operational" }),
+  ).toBeVisible();
+});
+
+test("distinguishes supported / configured / operational", async ({ page }) => {
+  // A commercial provider whose credentials are set but which has never
+  // answered: supported and configured, NOT operational. Rendering that as
+  // "PEP available" is the failure this table exists to prevent.
+  await mockAuth(page);
+  await mockHealth(
+    page,
+    health({
+      provider: "commercial",
+      status: "UNAVAILABLE",
+      state: "UNAVAILABLE",
+      authenticationValid: null,
+      capabilities: [
+        {
+          capability: "PEP",
+          supported: true,
+          configured: true,
+          operational: false,
+          note: "Actual coverage depends on the contracted product.",
+        },
+      ],
+      pepOperational: false,
+    }),
+  );
+
+  await page.goto("/screening-health");
+
+  const pep = page.locator('[data-capability="PEP"]');
+  await expect(pep.locator('[data-supported="true"]')).toBeVisible();
+  await expect(pep.locator('[data-configured="true"]')).toBeVisible();
+  await expect(pep.locator('[data-operational="false"]')).toBeVisible();
 });
 
 test("shows an empty cache as UNAVAILABLE, not as a healthy clear system", async ({
@@ -105,6 +172,7 @@ test("shows an empty cache as UNAVAILABLE, not as a healthy clear system", async
     page,
     health({
       status: "UNAVAILABLE",
+      state: "CONFIGURED",
       datasetVersion: null,
       datasetUpdatedAt: null,
       detail:
@@ -124,6 +192,7 @@ test("shows a stale dataset as DEGRADED", async ({ page }) => {
     page,
     health({
       status: "DEGRADED",
+      state: "DEGRADED",
       detail:
         "The sanctions cache was last refreshed 100h ago, beyond the 48h staleness tolerance.",
     }),
@@ -186,5 +255,5 @@ test("renders in Arabic with RTL direction", async ({ page }) => {
 
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByText("غير مهيأ", { exact: true })).toBeVisible();
-  await expect(page.getByText("غير مُغطّى").first()).toBeVisible();
+  await expect(page.locator('[data-capability="PEP"]')).toBeVisible();
 });

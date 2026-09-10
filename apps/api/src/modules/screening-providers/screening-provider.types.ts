@@ -122,6 +122,55 @@ export interface ProviderScreeningResult {
   durationMs: number;
 }
 
+/**
+ * What a provider can do (task §26).
+ *
+ * Three separate questions, because conflating them is how a system ends up
+ * claiming PEP coverage it does not have:
+ *
+ *   supported   — this ADAPTER implements the capability at all
+ *   configured  — this DEPLOYMENT has supplied what the capability needs
+ *   operational — it is working RIGHT NOW, per the last health check
+ *
+ * `PEP: supported=true, configured=false` is an honest and common state. It
+ * must never render as "PEP screening is available".
+ */
+export type ProviderCapability =
+  | 'SANCTIONS'
+  | 'PEP'
+  | 'WATCHLIST'
+  | 'ADVERSE_MEDIA'
+  | 'INDIVIDUAL'
+  | 'ENTITY'
+  | 'BATCH'
+  | 'ONGOING_MONITORING'
+  | 'WEBHOOKS';
+
+export interface CapabilityState {
+  capability: ProviderCapability;
+  supported: boolean;
+  configured: boolean;
+  operational: boolean;
+  /** Why, in terms an operator can act on. */
+  note: string;
+}
+
+/**
+ * The provider's own lifecycle state (task §4), distinct from the outcome of
+ * any one screening.
+ *
+ * `CONFIGURED` is deliberately separate from `HEALTHY`: a provider can be
+ * fully configured and still unreachable, and treating configuration presence
+ * as health is exactly the check that lets a dead provider look fine.
+ */
+export type ProviderState =
+  | 'NOT_CONFIGURED'
+  | 'CONFIGURED'
+  | 'HEALTHY'
+  | 'DEGRADED'
+  | 'UNAVAILABLE'
+  | 'FAILED';
+
 export type ProviderHealthStatus =
   'HEALTHY' | 'DEGRADED' | 'UNAVAILABLE' | 'NOT_CONFIGURED';
 
@@ -129,12 +178,20 @@ export interface ProviderHealth {
   provider: ScreeningProviderKind;
   providerName: string;
   status: ProviderHealthStatus;
+  /** The lifecycle state (§4). Richer than `status`: distinguishes "never
+   * configured" from "configured and currently failing". */
+  state: ProviderState;
   /** Human-readable, safe to display. Never credentials. */
   detail: string;
   datasetVersion?: string | null;
   /** When the provider's data was last refreshed, where it exposes that. */
   datasetUpdatedAt?: string | null;
   checkedAt: string;
+  /** What this provider can actually do (§26/§27). */
+  capabilities: CapabilityState[];
+  /** Whether credentials were accepted, where the provider authenticates.
+   * `null` when the provider needs none (the built-in cache). */
+  authenticationValid?: boolean | null;
 }
 
 /**
@@ -166,6 +223,21 @@ export interface ScreeningProvider {
   ): Promise<ProviderScreeningResult[]>;
 
   getProviderHealth(): Promise<ProviderHealth>;
+
+  /** What this provider can do. Static in `supported`, deployment-dependent
+   * in `configured`, health-dependent in `operational`. */
+  capabilities(): CapabilityState[];
+}
+
+/** Convenience for building a capability row. */
+export function capability(
+  cap: ProviderCapability,
+  supported: boolean,
+  configured: boolean,
+  operational: boolean,
+  note: string,
+): CapabilityState {
+  return { capability: cap, supported, configured, operational, note };
 }
 
 /** Outcomes that mean "this subject was NOT cleared, and not because they
