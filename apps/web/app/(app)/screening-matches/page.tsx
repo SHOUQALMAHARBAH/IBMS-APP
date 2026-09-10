@@ -4,6 +4,7 @@ import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import {
+  getPendingMatchCount,
   listScreeningMatches,
   reviewScreeningMatch,
   type ScreeningMatch,
@@ -45,6 +46,8 @@ export default function ScreeningMatchesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  // null = not yet known. false = the synced sanctions cache is EMPTY.
+  const [watchlistReady, setWatchlistReady] = useState<boolean | null>(null);
 
   const load = useCallback(
     async (next: ScreeningMatchStatus) => {
@@ -78,6 +81,21 @@ export default function ScreeningMatchesPage() {
       await load(status);
     })();
   }, [user, status, load]);
+
+  // An EMPTY queue is ambiguous: "nothing matched" and "nothing was ever
+  // checked" look identical on this screen, and the second is the state every
+  // deployment of this system is actually in — the sync has never been run.
+  // Without this the page quietly reassures a Compliance Officer.
+  useEffect(() => {
+    if (!user) return;
+    void (async () => {
+      try {
+        setWatchlistReady((await getPendingMatchCount()).watchlistReady);
+      } catch {
+        setWatchlistReady(null); // unknown; say nothing rather than guess
+      }
+    })();
+  }, [user]);
 
   async function decide(
     id: string,
@@ -128,6 +146,22 @@ export default function ScreeningMatchesPage() {
           </button>
         ))}
       </div>
+
+      {watchlistReady === false ? (
+        <p
+          role="alert"
+          style={{
+            ...errorStyle,
+            padding: "0.75rem",
+            border: "1px solid currentColor",
+            borderRadius: 4,
+          }}
+        >
+          {isArabic
+            ? "قائمة العقوبات المحلية فارغة — لم تُنفَّذ المزامنة بعد. لم يُفحص أي عميل فعلياً، والقائمة الفارغة هنا لا تعني عدم وجود تطابقات. شغّل POST /watchlist-sync/run."
+            : "The local sanctions list is EMPTY — the sync has never run. No customer has actually been screened, and an empty queue here does NOT mean there are no matches. Run POST /watchlist-sync/run."}
+        </p>
+      ) : null}
 
       {actionError ? (
         <p role="alert" style={errorStyle}>

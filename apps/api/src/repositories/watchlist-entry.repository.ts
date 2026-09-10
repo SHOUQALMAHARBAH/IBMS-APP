@@ -184,6 +184,30 @@ export class WatchlistEntryRepository {
   }
 
   /**
+   * Is the synced sanctions cache actually usable for a screening decision?
+   *
+   * This exists because a CLEAR result must mean "we checked a list and this
+   * subject was not on it" — NOT "we checked an empty table". Those are
+   * indistinguishable to every consumer, and the second one is false
+   * assurance on a sanctions control, which is the worst thing this module
+   * can produce.
+   *
+   * It matters right now, not theoretically: `WatchlistEntry` is EMPTY on
+   * every deployment of this system, because the sync has never been run
+   * anywhere. Until someone triggers `POST /watchlist-sync/run` or the
+   * 12-hourly scheduler fires, every real-list check has nothing to match
+   * against.
+   *
+   * Cheap: a bounded existence check, not a count of 19,000 rows.
+   */
+  async hasUsableEntries(): Promise<boolean> {
+    const first = await this.prisma.client.watchlistEntry.findFirst({
+      select: { id: true },
+    });
+    return first !== null;
+  }
+
+  /**
    * Process 49 — fill `canonicalTokens` for entries written before that column
    * existed. Idempotent, and a cheap no-op once there are none.
    *

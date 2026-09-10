@@ -19,7 +19,15 @@
  * environment until a real provider is integrated (never a HIT it can't
  * substantiate).
  */
-export const SAMPLE_WATCHLIST_ENABLED = process.env.NODE_ENV !== 'production';
+export function sampleWatchlistEnabled(): boolean {
+  return process.env.NODE_ENV !== 'production';
+}
+
+/** @deprecated Read once at import, so it cannot reflect a later NODE_ENV and
+ * cannot be exercised by a test. Use {@link sampleWatchlistEnabled} — the same
+ * function form `rate-limit.guard.ts`'s `limiterEnabled()` uses, and for the
+ * same reason. */
+export const SAMPLE_WATCHLIST_ENABLED = sampleWatchlistEnabled();
 
 export interface SampleWatchlistEntry {
   name: string;
@@ -44,7 +52,7 @@ export const SAMPLE_WATCHLIST: readonly SampleWatchlistEntry[] = [
 export function matchesSampleWatchlist(
   name: string,
 ): SampleWatchlistEntry | null {
-  if (!SAMPLE_WATCHLIST_ENABLED) return null;
+  if (!sampleWatchlistEnabled()) return null;
   const normalized = name.trim().toLowerCase();
   if (!normalized) return null;
   return (

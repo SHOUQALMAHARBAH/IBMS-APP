@@ -13,6 +13,7 @@ import type { RecordAuditEntryInput } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 
 /** Registry workflow for adjudicating a queued sanctions match. */
 const SANCTIONS_MATCH_REVIEW_WORKFLOW = 'sanctions_match_review';
@@ -67,6 +68,7 @@ export class ScreeningMatchService {
 
   constructor(
     private readonly matches: ScreeningMatchRepository,
+    private readonly watchlistEntries: WatchlistEntryRepository,
     private readonly kycRecords: KycRecordRepository,
     private readonly sla: SlaTimerService,
     private readonly audit: AuditService,
@@ -98,8 +100,17 @@ export class ScreeningMatchService {
     return rows.map(toView);
   }
 
-  async pendingCount(): Promise<{ pending: number }> {
-    return { pending: await this.matches.countPending() };
+  /** `watchlistReady` is false when the synced sanctions cache is empty, which
+   * it is on every deployment of this system today — the sync has never been
+   * run. An empty queue then means "nothing was ever checked", not "nothing
+   * matched", and a Compliance Officer looking at a clean screen has no other
+   * way to tell those apart. */
+  async pendingCount(): Promise<{ pending: number; watchlistReady: boolean }> {
+    const [pending, watchlistReady] = await Promise.all([
+      this.matches.countPending(),
+      this.watchlistEntries.hasUsableEntries(),
+    ]);
+    return { pending, watchlistReady };
   }
 
   /** `cleared` = a false positive, the subject is not the sanctioned party.

@@ -40,7 +40,12 @@ export function listScreeningMatches(
   return apiGet(`/screening/matches?status=${encodeURIComponent(status)}`);
 }
 
-export function getPendingMatchCount(): Promise<{ pending: number }> {
+/** `watchlistReady` false = the synced sanctions cache is EMPTY, so an empty
+ * queue means "nothing was ever checked", not "nothing matched". */
+export function getPendingMatchCount(): Promise<{
+  pending: number;
+  watchlistReady: boolean;
+}> {
   return apiGet("/screening/matches/pending-count");
 }
 

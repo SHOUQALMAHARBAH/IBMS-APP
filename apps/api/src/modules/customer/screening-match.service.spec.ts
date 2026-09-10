@@ -4,6 +4,7 @@ import { ScreeningMatchService } from './screening-match.service';
 import type { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import type { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -56,13 +57,17 @@ function makeDeps(over: Record<string, unknown> = {}) {
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const kycRecords = { update: vi.fn().mockResolvedValue({}) };
   const sla = { resolve: vi.fn().mockResolvedValue({ count: 1 }) };
+  const watchlistEntries = {
+    hasUsableEntries: vi.fn().mockResolvedValue(true),
+  };
   const service = new ScreeningMatchService(
     matches as unknown as ScreeningMatchRepository,
+    watchlistEntries as unknown as WatchlistEntryRepository,
     kycRecords as unknown as KycRecordRepository,
     sla as unknown as SlaTimerService,
     audit as unknown as AuditService,
   );
-  return { service, matches, audit, kycRecords, sla };
+  return { service, matches, audit, kycRecords, sla, watchlistEntries };
 }
 
 describe('ScreeningMatchService.list', () => {

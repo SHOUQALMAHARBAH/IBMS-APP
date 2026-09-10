@@ -1,10 +1,18 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { Customer, RiskLevel, ScreeningResult } from '@ibms/db';
+import type {
+  Customer,
+  RiskLevel,
+  ScreeningOutcome,
+  ScreeningResult,
+} from '@ibms/db';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { AuditService } from '../audit/audit.service';
-import { matchesSampleWatchlist } from './sample-watchlist';
+import {
+  matchesSampleWatchlist,
+  sampleWatchlistEnabled,
+} from './sample-watchlist';
 import {
   canonicalNameTokens,
   classifyMatch,
@@ -36,6 +44,9 @@ export interface ScreeningRunResult {
   newHit: boolean;
   /** How many real-list entries were queued for review by this run. */
   matchCandidates: number;
+  /** False when NO populated list could be consulted, so `results` are
+   * PENDING_INVESTIGATION rather than CLEAR. */
+  screenable: boolean;
   /** True when candidates for at least one subject name hit the per-name cap,
    * so the review queue for this KYC file is INCOMPLETE. Surfaced rather than
    * swallowed: a reviewer working a truncated queue has no other way to know
@@ -47,6 +58,9 @@ export interface ScreeningBatchResult {
   screened: number;
   hits: number;
   failed: number;
+  /** Processed without error, matched nothing — but consulted no populated
+   * list, so the result is PENDING_INVESTIGATION rather than CLEAR. */
+  unscreenable: number;
 }
 
 const ACTIVE_CUSTOMER_RESCREEN_STATUSES = [
@@ -114,16 +128,54 @@ export class ScreeningService {
       actorUserId,
     );
     const { candidates: matchCandidates, truncated: matchesTruncated } = real;
+
+    // Could this screening actually reach a populated list?
+    //
+    // A CLEAR must mean "we checked a list and this subject was not on it",
+    // never "we checked an empty table". Those are indistinguishable to every
+    // consumer of ScreeningResult, and the second is FALSE ASSURANCE on a
+    // sanctions control — the same silent-CLEAR failure this module has now
+    // been bitten by twice (the exact-matcher misses, and this).
+    //
+    // Not theoretical: `WatchlistEntry` is EMPTY on every deployment of this
+    // system, because the sync has never been run anywhere. Every production
+    // screening to date has returned CLEAR without consulting any list.
+    //
+    // The fixture counts as a populated source where it is enabled, because
+    // there a real check against real data genuinely did happen. It is
+    // disabled in production (`sampleWatchlistEnabled()`), so there the
+    // synced cache is the only thing that can satisfy this.
+    const realListUsable = await this.watchlistEntries.hasUsableEntries();
+    const screenable = sampleWatchlistEnabled() || realListUsable;
     const hit: WatchlistHit | undefined = fixtureHit ?? real.hit ?? undefined;
     const anyHit = hit !== undefined;
+
+    // A HIT is still a HIT — matching something proves a list was consulted.
+    // Otherwise: CLEAR only if a populated source was actually searched,
+    // PENDING_INVESTIGATION when nothing was. That enum value has existed
+    // since the original schema with no writer anywhere in the codebase; this
+    // is exactly the state it describes.
+    const outcome: ScreeningOutcome = anyHit
+      ? 'HIT'
+      : screenable
+        ? 'CLEAR'
+        : 'PENDING_INVESTIGATION';
+
+    if (!screenable) {
+      this.logger.error(
+        `Screening ${kycRecordId}: the sanctions cache is EMPTY, so no real list was consulted. Recording PENDING_INVESTIGATION rather than CLEAR. Run POST /watchlist-sync/run (or wait for WatchlistSyncScheduler) — until then no customer can be meaningfully screened.`,
+      );
+    }
 
     for (const screeningType of SCREENING_TYPES) {
       const result = await this.kycRecords.createScreeningResult({
         kycRecordId,
         screeningType,
-        result: hit ? 'HIT' : 'CLEAR',
+        result: outcome,
         listSource: hit?.listSource,
-        escalatedToComplianceAt: hit ? now : undefined,
+        // An un-screenable file is escalated too: somebody has to notice that
+        // this customer was never actually checked.
+        escalatedToComplianceAt: anyHit || !screenable ? now : undefined,
       });
       results.push(result);
 
@@ -215,6 +267,7 @@ export class ScreeningService {
       riskLevel,
       isEdd: nextIsEdd,
       newHit: anyHit,
+      screenable,
       matchCandidates,
       matchesTruncated,
     };
@@ -371,6 +424,11 @@ export class ScreeningService {
     let screened = 0;
     let hits = 0;
     let failed = 0;
+    // Counted separately from `hits` and `failed`: these customers were
+    // processed without error and matched nothing, but nothing was actually
+    // checked. Reporting them inside `screened` alone would tell a Compliance
+    // Officer "500 screened, 0 hits" about a run that consulted no list.
+    let unscreenable = 0;
     for (const customer of activeCustomers) {
       try {
         const kyc = await this.kycRecords.findLatestByCustomerId(customer.id);
@@ -382,9 +440,10 @@ export class ScreeningService {
         ) {
           continue;
         }
-        const { newHit } = await this.run(kyc.id, actorUserId);
+        const { newHit, screenable } = await this.run(kyc.id, actorUserId);
         screened += 1;
         if (newHit) hits += 1;
+        if (!screenable) unscreenable += 1;
       } catch (err) {
         failed += 1;
         // A @code-reviewer MINOR on the first pass: `(err as Error).message`
@@ -402,6 +461,11 @@ export class ScreeningService {
         );
       }
     }
-    return { screened, hits, failed };
+    if (unscreenable > 0) {
+      this.logger.error(
+        `Recurring screening batch: ${unscreenable} of ${screened} customer(s) could not be screened against any populated list — recorded PENDING_INVESTIGATION, NOT cleared. Run POST /watchlist-sync/run.`,
+      );
+    }
+    return { screened, hits, failed, unscreenable };
   }
 }

@@ -57,9 +57,12 @@ function makeDeps() {
   const findMatchCandidates = vi
     .fn()
     .mockResolvedValue({ entries: [], truncated: false });
+  // Default TRUE: the synced cache has data, so a CLEAR is a real CLEAR.
+  const hasUsableEntries = vi.fn().mockResolvedValue(true);
   const watchlistEntries = {
     findByNormalizedName,
     findMatchCandidates,
+    hasUsableEntries,
   } as unknown as WatchlistEntryRepository;
 
   const recordCandidate = vi
@@ -90,6 +93,7 @@ function makeDeps() {
     mocks: {
       findById,
       findMatchCandidates,
+      hasUsableEntries,
       recordCandidate,
       startTimer,
       createScreeningResult,
@@ -456,5 +460,113 @@ describe('ScreeningService', () => {
         'db down',
       );
     });
+  });
+});
+
+describe('ScreeningService — an empty watchlist must not read as CLEAR', () => {
+  // The whole point. A CLEAR means "we checked a list and this subject was not
+  // on it". It must never mean "we checked an empty table" — those are
+  // indistinguishable to every consumer of ScreeningResult, and the second is
+  // false assurance on a sanctions control.
+  //
+  // This is not hypothetical: WatchlistEntry is empty on every deployment of
+  // this system, because the sync has never been run anywhere.
+
+  it('records PENDING_INVESTIGATION, not CLEAR, when no populated list was consulted', async () => {
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Perfectly Ordinary Trading Co.',
+    });
+    // Empty synced cache AND no fixture — i.e. production today.
+    mocks.hasUsableEntries.mockResolvedValue(false);
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const [input] of calls) {
+      expect(input.result).toBe('PENDING_INVESTIGATION');
+      // Somebody has to notice the customer was never actually checked.
+      expect(input.escalatedToComplianceAt).toBeInstanceOf(Date);
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it('still records a real CLEAR when the synced cache HAS data', async () => {
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Perfectly Ordinary Trading Co.',
+    });
+    mocks.hasUsableEntries.mockResolvedValue(true);
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    for (const [input] of calls) {
+      expect(input.result).toBe('CLEAR');
+      expect(input.escalatedToComplianceAt).toBeUndefined();
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it('a HIT is still a HIT — matching proves a list was consulted', async () => {
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Sanctioned Party',
+    });
+    mocks.hasUsableEntries.mockResolvedValue(false);
+    mocks.findMatchCandidates.mockResolvedValue({
+      truncated: false,
+      entries: [
+        {
+          id: 'wl-1',
+          source: 'OFAC_SDN',
+          sourceRecordId: '1',
+          fullName: 'Sanctioned Party',
+          listProgram: null,
+        },
+      ],
+    });
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    for (const [input] of calls) expect(input.result).toBe('HIT');
+    vi.unstubAllEnvs();
+  });
+
+  it('the dev/test fixture counts as a populated source', async () => {
+    // Outside production the fixture is enabled and holds real data, so a
+    // check against it genuinely happened and CLEAR is honest. This is what
+    // keeps the existing e2e suite meaningful rather than uniformly pending.
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Perfectly Ordinary Trading Co.',
+    });
+    mocks.hasUsableEntries.mockResolvedValue(false);
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    for (const [input] of calls) expect(input.result).toBe('CLEAR');
   });
 });
