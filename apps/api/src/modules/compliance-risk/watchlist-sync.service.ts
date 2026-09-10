@@ -17,6 +17,8 @@ export interface WatchlistSyncOutcome {
   source: WatchlistSource;
   status: 'succeeded' | 'failed' | 'skipped';
   recordCount?: number;
+  /** Part B §21 — entries seen for the first time in this run. */
+  addedCount?: number;
   errorMessage?: string;
 }
 
@@ -160,13 +162,27 @@ export class WatchlistSyncService {
 
       await this.entries.upsertMany(source, run.id, records);
       await this.entries.pruneStale(source, run.id);
+      // Part B §21 — counted AFTER the upserts and BEFORE the run is marked
+      // succeeded, so a file screened after this timestamp is genuinely
+      // screened against the additions.
+      const addedCount = await this.entries.countAddedInRun(
+        source,
+        run.id,
+        run.startedAt,
+      );
       await this.entries.completeSyncRun(run.id, {
         recordCount: records.length,
+        addedCount,
       });
       this.logger.log(
-        `Watchlist sync (${source}): ${records.length} record(s) synced.`,
+        `Watchlist sync (${source}): ${records.length} record(s) synced, ${addedCount} newly listed.`,
       );
-      return { source, status: 'succeeded', recordCount: records.length };
+      return {
+        source,
+        status: 'succeeded',
+        recordCount: records.length,
+        addedCount,
+      };
     } catch (err) {
       const errorMessage = (err as Error).message;
       await this.entries.completeSyncRun(run.id, { errorMessage });

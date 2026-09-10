@@ -87,7 +87,8 @@ export class WatchlistEntryRepository {
 
   completeSyncRun(
     id: string,
-    result: { recordCount: number } | { errorMessage: string },
+    result:
+      { recordCount: number; addedCount?: number } | { errorMessage: string },
   ): Promise<WatchlistSyncRun> {
     return this.prisma.client.watchlistSyncRun.update({
       where: { id },
@@ -102,6 +103,7 @@ export class WatchlistEntryRepository {
               status: 'succeeded',
               completedAt: new Date(),
               recordCount: result.recordCount,
+              addedCount: result.addedCount,
             },
     });
   }
@@ -350,5 +352,46 @@ export class WatchlistEntryRepository {
 
   countBySource(source: WatchlistSource): Promise<number> {
     return this.prisma.client.watchlistEntry.count({ where: { source } });
+  }
+
+  /**
+   * Part B §21 — how many entries this run saw for the FIRST time.
+   *
+   * `upsertMany` stamps every still-listed row with the current `syncRunId`
+   * but only sets `syncedAt` on CREATE (the update branch deliberately leaves
+   * it alone), so `syncedAt` is genuinely "first seen" rather than "last
+   * confirmed". A row carrying this run's id AND a `syncedAt` at or after the
+   * run started is therefore new, and one carrying this run's id with an
+   * older `syncedAt` is a row that was already there.
+   *
+   * Counted rather than tracked during the upsert loop: `upsert` does not
+   * report whether it created or updated, and pre-checking every one of
+   * ~19,000 records would double the round trips to learn something one
+   * COUNT can answer.
+   */
+  countAddedInRun(
+    source: WatchlistSource,
+    syncRunId: string,
+    runStartedAt: Date,
+  ): Promise<number> {
+    return this.prisma.client.watchlistEntry.count({
+      where: { source, syncRunId, syncedAt: { gte: runStartedAt } },
+    });
+  }
+
+  /**
+   * Part B §21 — the most recent successful sync that actually ADDED
+   * something, across all sources.
+   *
+   * Only additions matter: an entry leaving a list cannot create a match that
+   * did not exist before, but one arriving can. A run that added nothing is
+   * not a reason to re-screen anybody, and treating it as one would hold every
+   * pending file twice a day for no finding.
+   */
+  findLatestAddingSyncRun(): Promise<WatchlistSyncRun | null> {
+    return this.prisma.client.watchlistSyncRun.findFirst({
+      where: { status: 'succeeded', addedCount: { gt: 0 } },
+      orderBy: { completedAt: 'desc' },
+    });
   }
 }

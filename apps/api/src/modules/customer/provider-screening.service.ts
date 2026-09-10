@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScreeningProviderRegistry } from '../screening-providers/screening-provider.registry';
+import { MATCHING_ALGORITHM_VERSION } from '../compliance-risk/watchlist-match.config';
 import {
   isClear,
   isUnresolved,
@@ -143,6 +144,14 @@ export class ProviderScreeningService {
         correlationId,
         idempotencyKey,
         subjectFingerprint: subjectFingerprint(input.subjects),
+        // Part B §13 — what decided this attempt, recorded with it. A stored
+        // score is not interpretable later without the line it was judged
+        // against and the matcher that produced it.
+        algorithmVersion: MATCHING_ALGORITHM_VERSION,
+        // Spread into a plain object: Prisma's JSON input type requires an
+        // index signature, which the named `MatchThresholds` interface
+        // deliberately does not have.
+        thresholds: { ...thresholds },
         provider: provider.kind,
         providerName: provider.name,
         datasetVersion,
@@ -180,6 +189,16 @@ export class ProviderScreeningService {
       candidates: scored,
       idempotentResume: false,
     };
+  }
+
+  /** Part B §13 — the configured REVIEW band, for stamping onto a match.
+   *
+   * Exposed here rather than injecting the registry into `ScreeningService`
+   * too: the thresholds are part of the provider configuration this service
+   * already owns, and a second reader of the same settings is a second place
+   * for them to be read differently. */
+  reviewThreshold(): number {
+    return this.registry.thresholds().review;
   }
 
   /** Records how many cases the caller ended up opening for this attempt. */

@@ -758,6 +758,16 @@ model ScreeningRequest {
   providerName   String
   datasetVersion String?
 
+  /// Part B §13 — what DECIDED this attempt, recorded with it.
+  ///
+  /// A reviewer opening a six-month-old match has to know which matching
+  /// rules and which thresholds produced it. Without these, lowering a review
+  /// threshold silently makes every historical match uninterpretable: the
+  /// score is stored, but the line it was compared against is not.
+  algorithmVersion String?
+  /// The high/review/low bands in force, as configured at attempt time.
+  thresholds       Json?
+
   outcome        ScreeningAttemptOutcome
   /// Set for NOT_CONFIGURED / SCREENING_FAILED / UNABLE_TO_SCREEN. Never
   /// contains credentials or subject PII.
@@ -2570,6 +2580,12 @@ model ScreeningMatch {
   /// rather than a similarity engine — a fabricated fraction would be false
   /// precision.
   matchScore         Float?
+  /// Part B §13 — the review threshold this candidate was measured against,
+  /// and the matcher version that raised it. Stored per match rather than
+  /// looked up later: the configuration moves, and a match must stay
+  /// readable against the rules that actually produced it.
+  reviewThreshold    Float?
+  algorithmVersion   String?
   /// Which attributes agreed (name / dateOfBirth / nationality / ...). A
   /// name-only agreement is very different evidence from name+DOB+nationality.
   matchedAttributes  String[]               @default([])
@@ -2614,6 +2630,13 @@ model WatchlistSyncRun {
   completedAt  DateTime?
   status       String          @default("running") // running | succeeded | failed
   recordCount  Int?
+  /// Part B §21 — how many entries this run saw for the FIRST time.
+  ///
+  /// Only additions matter for re-screening: an entry leaving a list cannot
+  /// create a match that did not exist before, but one arriving can. A file
+  /// screened before the most recent ADDING run was checked against a list
+  /// that has since grown, which the screening hold reports.
+  addedCount   Int?
   errorMessage String?
 }
 

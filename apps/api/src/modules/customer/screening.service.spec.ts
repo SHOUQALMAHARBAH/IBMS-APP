@@ -94,6 +94,8 @@ function makeDeps() {
   });
   const recordCasesOpened = vi.fn().mockResolvedValue(undefined);
   const providerScreening = {
+    // Part B §13 — the review band a match is stamped with.
+    reviewThreshold: () => 0.7,
     execute,
     recordCasesOpened,
   } as unknown as ProviderScreeningService;

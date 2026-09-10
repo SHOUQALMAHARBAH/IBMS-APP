@@ -393,3 +393,74 @@ describe('Part B §12 — the people on the file are no longer the people we che
     expect(result.level).toBe('BLOCKED');
   });
 });
+
+describe('Part B §21 — the LIST moved after we screened', () => {
+  // The mirror of §12: that one catches the people changing, this one catches
+  // the list changing. Somebody added to OFAC yesterday is invisible to a file
+  // screened the day before, and every ScreeningResult row on it still says
+  // CLEAR — correctly, about a list that no longer exists.
+  const screenedOn = new Date('2026-09-10T09:00:00Z');
+  const base = {
+    ...clean,
+    lastScreenedAt: screenedOn,
+  };
+
+  it('holds when entries were added after the screening', () => {
+    const result = evaluateScreeningHold(
+      { ...base, listLastAddedAt: new Date('2026-09-10T12:00:00Z') },
+      policy,
+    );
+    expect(result.level).toBe('REVIEW_REQUIRED');
+    expect(result.reasons[0]?.condition).toBe('LIST_UPDATED_SINCE_SCREENING');
+    expect(result.reasons[0]?.detail).toContain('Re-run screening');
+  });
+
+  it('does NOT hold when the last addition predates the screening', () => {
+    const result = evaluateScreeningHold(
+      { ...base, listLastAddedAt: new Date('2026-09-10T06:00:00Z') },
+      policy,
+    );
+    expect(result.level).toBe('NO_HOLD');
+  });
+
+  it('does NOT hold when no sync has ever added anything', () => {
+    // A removal-only sync is not a reason to re-screen: an entry leaving a
+    // list cannot create a match that did not exist before. Holding on every
+    // routine sync would stop every pending file twice a day for no finding.
+    expect(
+      evaluateScreeningHold({ ...base, listLastAddedAt: null }, policy).level,
+    ).toBe('NO_HOLD');
+  });
+
+  it('says nothing when the caller does not evaluate list freshness', () => {
+    expect(evaluateScreeningHold(base, policy).level).toBe('NO_HOLD');
+  });
+
+  it('does not fire on a file that was never screened', () => {
+    // NEVER_SCREENED already covers that, and reporting both would imply a
+    // screening result exists to be out of date.
+    const result = evaluateScreeningHold(
+      {
+        attemptOutcomes: [],
+        matches: [],
+        lastScreenedAt: null,
+        listLastAddedAt: new Date('2026-09-10T12:00:00Z'),
+      },
+      policy,
+    );
+    expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0]?.condition).toBe('NEVER_SCREENED');
+  });
+
+  it('can be configured off for a deployment that relies on the batch', () => {
+    // The 4-hourly re-screen batch already covers APPROVED customers; a
+    // deployment may decide that is enough and not hold pending files.
+    const off = loadHoldPolicy({ SCREENING_HOLD_LIST_UPDATED: 'NO_HOLD' });
+    expect(
+      evaluateScreeningHold(
+        { ...base, listLastAddedAt: new Date('2026-09-10T12:00:00Z') },
+        off,
+      ).level,
+    ).toBe('NO_HOLD');
+  });
+});

@@ -64,26 +64,33 @@ export class ScreeningHoldService {
   /** Evaluate the hold in force on one KYC file, from current state. */
   async evaluate(kycRecordId: string): Promise<ScreeningHoldEvaluation> {
     const policy = this.policy();
-    const [results, matches, latestRequest, kyc] = await Promise.all([
-      this.prisma.client.screeningResult.findMany({
-        where: { kycRecordId },
-        select: { attemptOutcome: true, screenedAt: true },
-        orderBy: { screenedAt: 'desc' },
-      }),
-      this.prisma.client.screeningMatch.findMany({
-        where: { kycRecordId },
-        select: { status: true, listType: true },
-      }),
-      this.prisma.client.screeningRequest.findFirst({
-        where: { kycRecordId },
-        orderBy: { startedAt: 'desc' },
-        select: { subjectFingerprint: true },
-      }),
-      this.prisma.client.kYCRecord.findUnique({
-        where: { id: kycRecordId },
-        select: { customerId: true },
-      }),
-    ]);
+    const [results, matches, latestRequest, kyc, lastAddingSync] =
+      await Promise.all([
+        this.prisma.client.screeningResult.findMany({
+          where: { kycRecordId },
+          select: { attemptOutcome: true, screenedAt: true },
+          orderBy: { screenedAt: 'desc' },
+        }),
+        this.prisma.client.screeningMatch.findMany({
+          where: { kycRecordId },
+          select: { status: true, listType: true },
+        }),
+        this.prisma.client.screeningRequest.findFirst({
+          where: { kycRecordId },
+          orderBy: { startedAt: 'desc' },
+          select: { subjectFingerprint: true },
+        }),
+        this.prisma.client.kYCRecord.findUnique({
+          where: { id: kycRecordId },
+          select: { customerId: true },
+        }),
+        // Part B §21 — the newest successful sync that actually ADDED entries.
+        this.prisma.client.watchlistSyncRun.findFirst({
+          where: { status: 'succeeded', addedCount: { gt: 0 } },
+          orderBy: { completedAt: 'desc' },
+          select: { completedAt: true },
+        }),
+      ]);
 
     // Part B §12. Recomputed from live rows rather than read from a cached
     // column: the whole point is to notice a change nothing else recorded.
@@ -127,6 +134,7 @@ export class ScreeningHoldService {
         lastScreenedAt: results[0]?.screenedAt ?? null,
         currentSubjectFingerprint: currentFingerprint,
         screenedSubjectFingerprint: latestRequest?.subjectFingerprint ?? null,
+        listLastAddedAt: lastAddingSync?.completedAt ?? null,
       },
       policy,
     );

@@ -63,6 +63,28 @@ import { NAME_TRANSLITERATION_GROUPS } from '../../common/name-transliteration.c
  * NOTE: "exact-match-only" is load-bearing, not a consolation — a single-token
  * entry is still reachable through the exact branches of the candidate query.
  * It is only excluded from SUBSET matching. */
+/**
+ * Part B §13 — the version of the MATCHING RULES, stamped onto every attempt
+ * and every match they raise.
+ *
+ * Bump this whenever a change could make the same subject and the same list
+ * entry produce a different answer: the transliteration table, the
+ * canonicalisation, the fuzzy floor, the containment rule. Do NOT bump it for
+ * a comment, a refactor, or a test.
+ *
+ * It exists because a reviewer opening an old match needs to know what
+ * produced it. "This scored 0.82" is not interpretable six months later if
+ * nobody recorded which matcher, and against which threshold, that 0.82 was
+ * judged. Without it, tuning the matcher silently rewrites the meaning of
+ * every match already in the queue.
+ *
+ * History:
+ *   1.0.0  exact token-set equality only (pre-Process 49)
+ *   2.0.0  + transliteration-collapsed canonical tokens, + containment
+ *          matching for entries of two or more tokens (Process 49)
+ */
+export const MATCHING_ALGORITHM_VERSION = '2.0.0';
+
 export const MIN_ENTRY_TOKENS_FOR_FUZZY = 2;
 
 /** How a candidate was found. Surfaced to the reviewer, because an exact hit

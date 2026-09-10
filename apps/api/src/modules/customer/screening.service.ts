@@ -12,6 +12,7 @@ import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.rep
 import { AuditService } from '../audit/audit.service';
 import { matchesSampleWatchlist } from './sample-watchlist';
 import {
+  MATCHING_ALGORITHM_VERSION,
   canonicalNameTokens,
   classifyMatch,
   type WatchlistMatchType,
@@ -349,6 +350,12 @@ export class ScreeningService {
           matchType,
           // Snapshot: `pruneStale` deletes the entry when the subject is
           // de-listed, and a confirmed match has to outlive that.
+          // Part B §13 — which matcher raised this, and the review threshold
+          // it was judged against. The built-in matcher is deterministic set
+          // logic with no score, so it records the configured review band for
+          // context rather than a fabricated similarity fraction.
+          algorithmVersion: MATCHING_ALGORITHM_VERSION,
+          reviewThreshold: this.providerScreening.reviewThreshold(),
           entrySource: entry.source,
           entrySourceRecordId: entry.sourceRecordId,
           entryFullName: entry.fullName,

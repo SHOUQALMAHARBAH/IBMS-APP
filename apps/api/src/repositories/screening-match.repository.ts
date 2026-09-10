@@ -68,6 +68,12 @@ export class ScreeningMatchRepository {
     entrySourceRecordId: string | null;
     entryFullName: string;
     entryListProgram: string | null;
+    /** Part B §13 — the matcher that raised this candidate and the review
+     * threshold it was measured against. Written on CREATE only: a re-screen
+     * under a newer matcher must not rewrite the provenance of a match a
+     * reviewer is already working, or has already decided. */
+    algorithmVersion?: string;
+    reviewThreshold?: number;
   }): Promise<{ id: string; created: boolean }> {
     const before = await this.prisma.client.screeningMatch.findUnique({
       where: {
@@ -98,6 +104,8 @@ export class ScreeningMatchRepository {
         entrySourceRecordId: input.entrySourceRecordId,
         entryFullName: input.entryFullName,
         entryListProgram: input.entryListProgram,
+        algorithmVersion: input.algorithmVersion,
+        reviewThreshold: input.reviewThreshold,
       },
       update: {},
       select: { id: true },

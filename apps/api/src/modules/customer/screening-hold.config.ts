@@ -69,7 +69,8 @@ export type ScreeningHoldCondition =
   | 'UNRESOLVED_SCREENING'
   | 'POTENTIAL_MATCH'
   | 'SCREENING_STALE'
-  | 'IDENTITY_CHANGED_SINCE_SCREENING';
+  | 'IDENTITY_CHANGED_SINCE_SCREENING'
+  | 'LIST_UPDATED_SINCE_SCREENING';
 
 const LEVEL_RANK: Readonly<Record<ScreeningHoldLevel, number>> = {
   NO_HOLD: 0,
@@ -98,6 +99,7 @@ export const DEFAULT_HOLD_POLICY: Readonly<
   POTENTIAL_MATCH: 'REVIEW_REQUIRED',
   SCREENING_STALE: 'REVIEW_REQUIRED',
   IDENTITY_CHANGED_SINCE_SCREENING: 'REVIEW_REQUIRED',
+  LIST_UPDATED_SINCE_SCREENING: 'REVIEW_REQUIRED',
 };
 
 /** The env var that configures each condition. Named per condition so a
@@ -112,6 +114,7 @@ export const HOLD_ENV: Readonly<Record<ScreeningHoldCondition, string>> = {
   POTENTIAL_MATCH: 'SCREENING_HOLD_POTENTIAL_MATCH',
   SCREENING_STALE: 'SCREENING_HOLD_STALE',
   IDENTITY_CHANGED_SINCE_SCREENING: 'SCREENING_HOLD_IDENTITY_CHANGED',
+  LIST_UPDATED_SINCE_SCREENING: 'SCREENING_HOLD_LIST_UPDATED',
 };
 
 /** How old a screening may be before it stops counting as current, in days.
@@ -219,6 +222,9 @@ export interface ScreeningHoldFacts {
    * anybody was checked. Both null when there has been no attempt. */
   currentSubjectFingerprint?: string | null;
   screenedSubjectFingerprint?: string | null;
+  /** Part B §21. When the most recent sanctions-list sync that ADDED entries
+   * completed. Undefined when the caller does not evaluate list freshness. */
+  listLastAddedAt?: Date | null;
   now?: Date;
 }
 
@@ -355,6 +361,30 @@ export function evaluateScreeningHold(
       facts.screenedSubjectFingerprint
         ? 'The identity details on this file changed after it was screened — a subject was added, removed, or corrected. Re-run screening before deciding.'
         : 'This file was screened before the system recorded which identity details it checked, so the result cannot be tied to the people currently on the file. Re-run screening before deciding.',
+    );
+  }
+
+  // Part B §21 — the LIST moved after we screened.
+  //
+  // The mirror of §12: that one catches the people changing, this one catches
+  // the list changing. Somebody added to OFAC yesterday is invisible to a file
+  // screened the day before, and every ScreeningResult row on it still says
+  // CLEAR — correctly, about a list that no longer exists.
+  //
+  // Only ADDING runs count. An entry leaving a list cannot create a match that
+  // did not exist before, so treating a routine removal-only sync as a reason
+  // to re-screen would hold every pending file twice a day for no finding.
+  //
+  // The remedy is a re-screen, which is one call and cheap — deliberately much
+  // easier than writing a justification to waive it.
+  if (
+    facts.listLastAddedAt &&
+    facts.lastScreenedAt &&
+    facts.listLastAddedAt > facts.lastScreenedAt
+  ) {
+    add(
+      'LIST_UPDATED_SINCE_SCREENING',
+      'Entries were added to a sanctions list after this file was screened, so the result predates the current list. Re-run screening before deciding.',
     );
   }
 

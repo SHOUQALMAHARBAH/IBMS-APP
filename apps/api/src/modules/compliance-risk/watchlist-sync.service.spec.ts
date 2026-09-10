@@ -45,6 +45,8 @@ function makeService(
   const completeSyncRun = vi.fn().mockResolvedValue(undefined);
   const upsertMany = vi.fn().mockResolvedValue(undefined);
   const pruneStale = vi.fn().mockResolvedValue({ count: 0 });
+  // Part B §21 — how many entries this run saw for the first time.
+  const countAddedInRun = vi.fn().mockResolvedValue(0);
   const findLatestSyncRuns = vi.fn().mockResolvedValue([]);
   // Defaults to a prior run of 1 record (not `null`/"no prior sync") so the
   // plausibility floor (`floor(1 * WATCHLIST_MIN_ACCEPTABLE_RATIO) === 0`)
@@ -56,6 +58,7 @@ function makeService(
     completeSyncRun,
     upsertMany,
     pruneStale,
+    countAddedInRun,
     findLatestSyncRuns,
     findLastSuccessfulRun,
     ...over.entries,
@@ -76,6 +79,7 @@ function makeService(
       completeSyncRun,
       upsertMany,
       pruneStale,
+      countAddedInRun,
       findLatestSyncRuns,
       findLastSuccessfulRun,
     },
@@ -89,8 +93,21 @@ describe('WatchlistSyncService.runSync (Process 49)', () => {
     const outcomes = await service.runSync();
 
     expect(outcomes).toEqual([
-      { source: 'OFAC_SDN', status: 'succeeded', recordCount: 1 },
-      { source: 'UN_CONSOLIDATED', status: 'succeeded', recordCount: 1 },
+      // Part B §21 — `addedCount` reports how many entries this run saw for
+      // the FIRST time, which is what the screening hold reads to decide
+      // whether a pending file was checked against the current list.
+      {
+        source: 'OFAC_SDN',
+        status: 'succeeded',
+        recordCount: 1,
+        addedCount: 0,
+      },
+      {
+        source: 'UN_CONSOLIDATED',
+        status: 'succeeded',
+        recordCount: 1,
+        addedCount: 0,
+      },
     ]);
     expect(mocks.createSyncRun).toHaveBeenCalledWith('OFAC_SDN');
     expect(mocks.createSyncRun).toHaveBeenCalledWith('UN_CONSOLIDATED');
@@ -104,6 +121,7 @@ describe('WatchlistSyncService.runSync (Process 49)', () => {
     expect(mocks.pruneStale).toHaveBeenCalledWith('OFAC_SDN', 'run-OFAC_SDN');
     expect(mocks.completeSyncRun).toHaveBeenCalledWith('run-OFAC_SDN', {
       recordCount: 1,
+      addedCount: 0,
     });
   });
 
