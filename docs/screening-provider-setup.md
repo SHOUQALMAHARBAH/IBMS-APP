@@ -251,6 +251,30 @@ timestamps only — so none requires an `isSensitiveDataAccess` read.
 
 ---
 
+## Deploying this onto an existing database
+
+Two of the hold conditions read data that older rows do not carry, and both
+resolve deliberately toward review rather than toward silent approval.
+
+**Files already screened before this deploy have no `subjectFingerprint`.** A
+NULL is read as "we do not know which people were checked", which counts as
+CHANGED — so a KYC file sitting in `SCREENING` or `EDD` at deploy time is held
+with `IDENTITY_CHANGED_SINCE_SCREENING` until somebody either re-runs screening
+(one call, and the hold lifts on its own) or accepts it in writing. Reading
+"unknown" as "unchanged" would have asserted an identity check that never
+happened, so this is the intended behaviour, not an upgrade defect. Files
+already `APPROVED` are unaffected: the gate runs on the decision, and that
+decision is already made.
+
+Expect a burst of holds on the first day, proportional to how many files are
+mid-flight. Clearing them by re-screening is the cheap path.
+
+**`LIST_UPDATED_SINCE_SCREENING` stays quiet until the first sync that records
+additions.** Sync runs written before this deploy have a NULL `addedCount`,
+and the lookup requires `addedCount > 0`, so no historical run can trigger it.
+
+---
+
 ## What is still missing, and cannot be configured away
 
 ### There is no PEP data
