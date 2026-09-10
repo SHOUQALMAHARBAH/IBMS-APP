@@ -122,6 +122,60 @@ the vendor: two customers of the same provider can have different list access.
 
 ---
 
+## Provider status at a glance
+
+Read this before claiming any coverage in a report or to a regulator.
+
+| Provider | Data it really has | Live-tested? |
+|---|---|---|
+| **`built_in`** | **Real sanctions coverage** — OFAC SDN + UN Consolidated, fetched from the live public feeds and matched against the synced generation. | **Yes.** Proven end to end against the real feeds, including a fuzzy match routed through the review queue. |
+| **PEP (any provider)** | **None.** No PEP dataset is configured anywhere in this deployment. OFAC and UN are sanctions lists. | n/a — there is nothing to test. |
+| **`commercial`** | Adapter and provider contract are complete: request/response mapping, timeout, retry, circuit breaker, capability reporting, health check. | **No.** No credentials and no live vendor verification. Its shapes come from vendor documentation and have never touched a real service. |
+| **`on_premise` (yente)** | Adapter complete; compose profile defined and validated. | **No — not executed.** `docker compose --profile screening config` passes, but the engine was never started here (host disk full). Do not describe it as live-tested. |
+
+**No customer may be described as clear of PEP status by this system today.**
+`GET /screening/providers/health` reports `pepOperational: false`, and the
+operations screen states it in both languages.
+
+---
+
+## Dataset generations
+
+A screening reads only the **PUBLISHED** generation. A sync writes its rows
+against a new generation nobody can see, validates it, then publishes in one
+transaction that flips one row — so a reader sees the old complete list or the
+new complete list, never a mixture.
+
+  DOWNLOADED → VALIDATED → PUBLISHED → SUPERSEDED
+                        ↘ REJECTED
+
+* `GET /watchlist-sync/datasets` — every generation, newest first.
+* `POST /watchlist-sync/datasets/:id/rollback` — restore a SUPERSEDED
+  generation. Requires a written reason (enforced in the database), and only
+  works while that generation's rows are still retained.
+
+Retention keeps the published generation plus two superseded ones. **A
+generation past the retention window is still listed but cannot be rolled back
+to** — there is nothing left to screen against, and the API says so rather than
+succeeding emptily.
+
+---
+
+## The case queue
+
+A match opens a case: `OPEN → ASSIGNED → UNDER_REVIEW → CLOSED`, with
+`ESCALATED` available from ASSIGNED or UNDER_REVIEW.
+
+A decision can only be recorded from UNDER_REVIEW or ESCALATED. Deciding a case
+nobody picked up is unreachable, not merely discouraged — a cleared sanctions
+match with nobody assigned and no working record is the rubber-stamp the queue
+exists to prevent.
+
+Case notes are append-only and stop at closure. `reviewReason` justifies the
+outcome and is written once; notes are the working record.
+
+---
+
 ## Configuration reference
 
 ### Provider
