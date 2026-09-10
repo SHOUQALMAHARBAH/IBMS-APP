@@ -154,12 +154,36 @@ async function createIndividualCustomer(
  * and the test stops depending on ambient database state either way.
  */
 async function seedWatchlistFixtureEntry(): Promise<void> {
+  // Part B §6 — at most ONE generation per source may be PUBLISHED (a partial
+  // unique index enforces it). A fixture that assumed an empty slate would hit
+  // that constraint against any generation db-test already holds, so clear the
+  // source first. Deleting the generation cascades to its rows.
+  await prisma.watchlistDatasetVersion.deleteMany({
+    where: { source: 'OFAC_SDN' },
+  });
+  await prisma.watchlistEntry.deleteMany({ where: { source: 'OFAC_SDN' } });
   const run = await prisma.watchlistSyncRun.create({
     data: {
       source: 'OFAC_SDN',
-      status: 'SUCCEEDED',
+      status: 'succeeded',
       startedAt: new Date(),
       completedAt: new Date(),
+    },
+  });
+  // Part B §6 — an entry belongs to a GENERATION, and only a PUBLISHED
+  // generation is visible to a screening. A fixture that skipped this would
+  // insert rows no screening can see, and the test would silently assert
+  // nothing.
+  const version = await prisma.watchlistDatasetVersion.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'PUBLISHED',
+      version: `OFAC_SDN@fixture-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      recordCount: 1,
+      downloadedAt: new Date(),
+      validatedAt: new Date(),
+      publishedAt: new Date(),
+      syncRunId: run.id,
     },
   });
   await prisma.watchlistEntry.create({
@@ -170,6 +194,7 @@ async function seedWatchlistFixtureEntry(): Promise<void> {
       normalizedName: 'zzz fictional screening fixture',
       canonicalTokens: ['fictional', 'fixture', 'screening', 'zzz'],
       syncRunId: run.id,
+      datasetVersionId: version.id,
     },
   });
 }

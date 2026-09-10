@@ -266,10 +266,30 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
       .post('/watchlist-sync/run')
       .set(bearer(compliance.accessToken))
       .expect(201);
-    const countAfter = await prisma.watchlistEntry.count({
-      where: { source: 'OFAC_SDN', sourceRecordId: OFAC_ENT_NUM },
+    // Part B §6 — the property is "a re-sync does not duplicate a record",
+    // and it is now scoped to the generation a screening can actually see. A
+    // bare count across every generation is legitimately >1: the previous
+    // generation is RETAINED so it can be rolled back to, which is the point
+    // of the retention window.
+    const countInPublished = await prisma.watchlistEntry.count({
+      where: {
+        source: 'OFAC_SDN',
+        sourceRecordId: OFAC_ENT_NUM,
+        datasetVersion: { status: 'PUBLISHED' },
+      },
     });
-    expect(countAfter).toBe(1);
+    expect(countInPublished).toBe(1);
+
+    // And the re-sync really did publish a NEW generation, superseding rather
+    // than mutating the old one — the behaviour that makes the swap atomic.
+    const generations = await prisma.watchlistDatasetVersion.findMany({
+      where: { source: 'OFAC_SDN' },
+      orderBy: { downloadedAt: 'desc' },
+      select: { status: true },
+    });
+    expect(generations[0].status).toBe('PUBLISHED');
+    expect(generations.filter((g) => g.status === 'PUBLISHED')).toHaveLength(1);
+    expect(generations.some((g) => g.status === 'SUPERSEDED')).toBe(true);
 
     // now onboard a customer whose legal name is a token-reordering of the
     // synced sanctioned name — normalizeWatchlistName is order-independent.

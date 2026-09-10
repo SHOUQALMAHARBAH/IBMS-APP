@@ -348,7 +348,7 @@ export class ScreeningService {
           // re-spaced legal name mint a second item past a cleared decision.
           subjectCanonical: subjectTokens.join(' '),
           matchType,
-          // Snapshot: `pruneStale` deletes the entry when the subject is
+          // Snapshot: generation retention deletes the entry when the subject is
           // de-listed, and a confirmed match has to outlive that.
           // Part B §13 — which matcher raised this, and the review threshold
           // it was judged against. The built-in matcher is deterministic set

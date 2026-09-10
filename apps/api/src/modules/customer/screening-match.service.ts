@@ -256,7 +256,7 @@ function toView(row: ScreeningMatchWithContext): ScreeningMatchView {
     reviewedByUserId: row.reviewedByUserId,
     reviewedAt: row.reviewedAt?.toISOString() ?? null,
     reviewReason: row.reviewReason,
-    // Read from the SNAPSHOT, never the relation. `pruneStale` deletes an
+    // Read from the SNAPSHOT, never the relation. Generation retention deletes an
     // entry as soon as the subject drops off the source list, and the FK is
     // `SET NULL`, so a confirmed match rendered from the relation would decay
     // into "(deleted)" — the compliance record has to still say what was

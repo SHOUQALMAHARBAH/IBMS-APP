@@ -4,6 +4,7 @@ import { TransactionMonitoringService } from './transaction-monitoring.service';
 import { TransactionMonitoringAlertRepository } from '../../repositories/transaction-monitoring-alert.repository';
 import { TransactionMonitoringSweepScheduler } from './transaction-monitoring-sweep.scheduler';
 import { WatchlistSyncController } from './watchlist-sync.controller';
+import { WatchlistDatasetVersionRepository } from '../../repositories/watchlist-dataset-version.repository';
 import { WatchlistSyncService } from './watchlist-sync.service';
 import { WatchlistSyncScheduler } from './watchlist-sync.scheduler';
 import { OfacSdnFetcher, UnConsolidatedFetcher } from './watchlist-fetchers';
@@ -135,6 +136,7 @@ import { AuthModule } from '../auth/auth.module';
     TransactionMonitoringAlertRepository,
     TransactionMonitoringSweepScheduler,
     WatchlistSyncService,
+    WatchlistDatasetVersionRepository,
     WatchlistSyncScheduler,
     WatchlistEntryRepository,
     OfacSdnFetcher,

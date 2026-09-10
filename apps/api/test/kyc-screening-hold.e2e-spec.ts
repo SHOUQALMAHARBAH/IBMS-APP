@@ -139,28 +139,58 @@ async function emptyWatchlistCache(): Promise<void> {
   // `onDelete: SetNull` (a CONFIRMED match deliberately outlives the subject
   // being de-listed), and actively harmful on this shared cumulative test DB:
   // it wrote to rows belonging to other spec files.
+  // Generations too: an entry is only readable through a PUBLISHED generation,
+  // so leaving an empty published generation behind would still report the
+  // cache as "configured but empty" rather than genuinely unusable — and the
+  // fixture below could not then create its own published one.
   await prisma.watchlistEntry.deleteMany({});
+  await prisma.watchlistDatasetVersion.deleteMany({});
 }
 
 /** One obviously fictional entry, so the provider has a populated list to
  * report NO_MATCH against honestly. */
 async function seedWatchlistFixture(): Promise<void> {
+  // Part B §6 — at most ONE generation per source may be PUBLISHED (a partial
+  // unique index enforces it). A fixture that assumed an empty slate would hit
+  // that constraint against any generation db-test already holds, so clear the
+  // source first. Deleting the generation cascades to its rows.
+  await prisma.watchlistDatasetVersion.deleteMany({
+    where: { source: 'OFAC_SDN' },
+  });
+  await prisma.watchlistEntry.deleteMany({ where: { source: 'OFAC_SDN' } });
   const run = await prisma.watchlistSyncRun.create({
     data: {
       source: 'OFAC_SDN',
-      status: 'SUCCEEDED',
+      status: 'succeeded',
       startedAt: new Date(),
       completedAt: new Date(),
+    },
+  });
+  // Part B §6 — an entry belongs to a GENERATION, and only a PUBLISHED
+  // generation is visible to a screening. A fixture that skipped this would
+  // insert rows no screening can see, and the test would silently assert
+  // nothing.
+  const version = await prisma.watchlistDatasetVersion.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'PUBLISHED',
+      version: `OFAC_SDN@fixture-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      recordCount: 1,
+      downloadedAt: new Date(),
+      validatedAt: new Date(),
+      publishedAt: new Date(),
+      syncRunId: run.id,
     },
   });
   await prisma.watchlistEntry.create({
     data: {
       source: 'OFAC_SDN',
-      sourceRecordId: `e2e-hold-${Date.now()}`,
+      sourceRecordId: `e2e-hold-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       fullName: 'Zzz Fictional Screening Fixture',
       normalizedName: 'zzz fictional screening fixture',
       canonicalTokens: ['fictional', 'fixture', 'screening', 'zzz'],
       syncRunId: run.id,
+      datasetVersionId: version.id,
     },
   });
 }

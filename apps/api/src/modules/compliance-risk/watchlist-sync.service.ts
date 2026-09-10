@@ -1,8 +1,16 @@
 import { canonicalNameTokens } from './watchlist-match.config';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import type { WatchlistSource, WatchlistSyncRun } from '@ibms/db';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
+import type { WatchlistDatasetVersion } from '@ibms/db';
+import { WatchlistDatasetVersionRepository } from '../../repositories/watchlist-dataset-version.repository';
+import { validateDataset } from './watchlist-dataset.config';
 import { OfacSdnFetcher, UnConsolidatedFetcher } from './watchlist-fetchers';
 import {
   WATCHLIST_MIN_ACCEPTABLE_RATIO,
@@ -43,6 +51,7 @@ export class WatchlistSyncService {
 
   constructor(
     private readonly entries: WatchlistEntryRepository,
+    private readonly versions: WatchlistDatasetVersionRepository,
     private readonly ofac: OfacSdnFetcher,
     private readonly un: UnConsolidatedFetcher,
   ) {}
@@ -122,20 +131,28 @@ export class WatchlistSyncService {
       // against the last successful run's count before committing anything;
       // a suspicious drop is treated as a failure, leaving the existing
       // cache untouched rather than pruned to near-nothing.
-      const lastSuccessful = await this.entries.findLastSuccessfulRun(source);
-      const floor = lastSuccessful?.recordCount
-        ? Math.floor(
-            lastSuccessful.recordCount * WATCHLIST_MIN_ACCEPTABLE_RATIO,
-          )
-        : WATCHLIST_MIN_ABSOLUTE_RECORDS;
-      if (parsed.length < floor) {
-        throw new Error(
-          `Parsed only ${parsed.length} record(s), below the plausibility floor of ${floor}` +
-            (lastSuccessful?.recordCount
-              ? ` (last successful sync had ${lastSuccessful.recordCount})`
-              : ' (no prior successful sync)') +
-            ' — likely a fetch/parse failure, not a real list change. Refusing to prune the existing cache.',
-        );
+      // Part B §6 — open a generation. Rows are written against it and are
+      // invisible to every screening until it is PUBLISHED, so the validation
+      // and write phases below cannot be observed half-done.
+      const version = await this.versions.create({ source, syncRunId: run.id });
+
+      // A @code-reviewer BLOCKER on the first pass: a 200 response carrying
+      // the wrong content (a WAF/interstitial page, a captcha, a changed
+      // redirect target) parses to zero or near-zero records without ever
+      // throwing — nothing here distinguishes that from a genuine, drastic
+      // list shrink (which OFAC/UN lists don't do in practice). Validate
+      // against the PUBLISHED generation's count; a suspicious drop is
+      // REJECTED, which leaves the published generation exactly as it was.
+      const published = await this.versions.findPublished(source);
+      const validation = validateDataset({
+        parsedCount: parsed.length,
+        publishedCount: published?.recordCount ?? null,
+        minAbsoluteRecords: WATCHLIST_MIN_ABSOLUTE_RECORDS,
+        minAcceptableRatio: WATCHLIST_MIN_ACCEPTABLE_RATIO,
+      });
+      if (!validation.ok) {
+        await this.versions.markRejected(version.id, validation.reason);
+        throw new Error(validation.reason);
       }
 
       // A @code-reviewer BLOCKER on the first pass: normalizeWatchlistName
@@ -160,22 +177,38 @@ export class WatchlistSyncService {
         );
       }
 
-      await this.entries.upsertMany(source, run.id, records);
-      await this.entries.pruneStale(source, run.id);
-      // Part B §21 — counted AFTER the upserts and BEFORE the run is marked
-      // succeeded, so a file screened after this timestamp is genuinely
-      // screened against the additions.
-      const addedCount = await this.entries.countAddedInRun(
+      // DOWNLOADED: write every row against the new generation. Chunked and
+      // non-transactional, exactly as before — and now that is FINE, because
+      // nothing can read a generation that is not published.
+      await this.entries.upsertMany(source, run.id, records, version.id);
+
+      // VALIDATED: the parse cleared the plausibility floor and the rows are
+      // all present.
+      await this.versions.markValidated(version.id, records.length);
+
+      // Part B §21 — what this generation adds over the one currently live,
+      // compared on the list's own record identity rather than on our row ids.
+      // Computed BEFORE the flip, so it describes the change the flip makes.
+      const addedCount = await this.versions.countNewAgainstPublished(
         source,
-        run.id,
-        run.startedAt,
+        version.id,
       );
+
+      // PUBLISHED: one transaction, one row flipped. Every screening from this
+      // moment reads the new generation; every screening before it read the old
+      // one complete.
+      await this.versions.publish({ id: version.id, addedCount });
+
+      // Retention, after the flip: keeps the rollback window and reclaims
+      // anything older. Never touches the generation just published.
+      await this.versions.pruneRetired(source);
+
       await this.entries.completeSyncRun(run.id, {
         recordCount: records.length,
         addedCount,
       });
       this.logger.log(
-        `Watchlist sync (${source}): ${records.length} record(s) synced, ${addedCount} newly listed.`,
+        `Watchlist sync (${source}): published generation ${version.version} with ${records.length} record(s), ${addedCount} newly listed.`,
       );
       return {
         source,
@@ -193,5 +226,59 @@ export class WatchlistSyncService {
 
   findLatestSyncRuns(): Promise<WatchlistSyncRun[]> {
     return this.entries.findLatestSyncRuns();
+  }
+
+  /** Part B §6 — every generation, newest first. */
+  listDatasets() {
+    return this.versions.list();
+  }
+
+  /**
+   * Part B §6 — republish an earlier generation.
+   *
+   * Refuses three distinct ways, each with its own message, because they are
+   * three different operator problems:
+   *
+   *  * the generation does not exist
+   *  * it is not SUPERSEDED (publishing the already-live one is a no-op
+   *    dressed as an action; a REJECTED one was refused for a reason)
+   *  * its rows were reclaimed by retention, so there is nothing left to
+   *    screen against — the case an operator is most likely to hit, and the
+   *    one where a silent "success" would be worst
+   */
+  async rollbackDataset(
+    id: string,
+    reason: string,
+    actorUserId: string,
+  ): Promise<WatchlistDatasetVersion> {
+    const target = await this.versions.findById(id);
+    if (!target) {
+      throw new NotFoundException(`Dataset generation ${id} not found`);
+    }
+    if (target.status !== 'SUPERSEDED') {
+      throw new UnprocessableEntityException(
+        `Dataset generation ${target.version} is ${target.status}. Only a SUPERSEDED generation can be rolled back to.`,
+      );
+    }
+
+    const remaining = await this.entries.countByDatasetVersion(target.id);
+    if (remaining === 0) {
+      throw new UnprocessableEntityException(
+        `Dataset generation ${target.version} has no records left — it is past the retention window and cannot be restored. Run a fresh sync instead.`,
+      );
+    }
+
+    const current = await this.versions.findPublished(target.source);
+    const restored = await this.versions.publish({
+      id: target.id,
+      publishedByUserId: actorUserId,
+      rolledBackFromId: current?.id,
+      rollbackReason: reason,
+    });
+
+    this.logger.warn(
+      `Watchlist ROLLBACK (${target.source}): ${current?.version ?? '(none)'} -> ${restored.version} by ${actorUserId}. Screening now runs against the restored generation.`,
+    );
+    return restored;
   }
 }

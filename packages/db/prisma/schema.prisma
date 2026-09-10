@@ -2504,11 +2504,22 @@ model WatchlistEntry {
   /// `WatchlistEntryRepository.backfillCanonicalTokens` rewrites them at the
   /// start of every sync rather than waiting for a fetch to succeed.
   canonicalTokens String[]
-  matches         ScreeningMatch[]
+  /// Part B §6 — which generation of the list this row belongs to. A screening
+  /// reads only the PUBLISHED generation, which is what makes a sync invisible
+  /// to readers until it is complete.
+  /// Required: an entry with no generation would be invisible to the
+  /// published-generation reader AND exempt from the generation-scoped unique
+  /// key (Postgres treats NULLs as distinct), so it could silently duplicate.
+  datasetVersionId String
+  datasetVersion   WatchlistDatasetVersion @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+  matches          ScreeningMatch[]
 
-  @@unique([source, sourceRecordId])
+  /// Scoped to the generation: the same list entry legitimately exists in the
+  /// published generation and in the one being downloaded beside it.
+  @@unique([source, sourceRecordId, datasetVersionId])
   @@index([normalizedName])
   @@index([source])
+  @@index([datasetVersionId])
 }
 
 /// Process 49 — one row per sync attempt (scheduled every 12h, matching the
@@ -3448,4 +3459,81 @@ enum ScreeningHoldLevel {
   NO_HOLD
   REVIEW_REQUIRED
   BLOCKED
+}
+
+/// Part B §6/§7 — one downloaded, validated, published generation of a
+/// sanctions list.
+///
+/// ## Why this exists: the reader must never see a half-written list
+///
+/// The sync used to upsert ~19,000 rows in chunks and then delete whatever it
+/// had not stamped. Neither step is a transaction, so a screening running
+/// during a sync could observe a list that was partly the old generation and
+/// partly the new one — and worse, one where the entries a subject would have
+/// matched had already been pruned but their replacements had not yet landed.
+/// A sanctions check against a half-written list produces a CLEAR result, which
+/// is the failure mode this whole module exists to prevent.
+///
+/// So entries are written against a VERSION, and a screening reads only the
+/// version that is currently PUBLISHED. Writing happens entirely outside what
+/// any reader can see; publishing is a single transaction that flips one row.
+/// A reader therefore sees the old complete generation or the new complete
+/// generation, never a mixture.
+///
+/// ## The lifecycle
+///
+///   DOWNLOADED  rows are being written; no reader can see them
+///   VALIDATED   the plausibility checks passed; still invisible
+///   PUBLISHED   readers now see exactly this generation
+///   SUPERSEDED  a newer generation was published; kept for rollback
+///   REJECTED    validation failed; never visible, kept for the audit trail
+///
+/// A generation can only be published from VALIDATED. Rollback re-publishes a
+/// SUPERSEDED generation whose rows are still present, which is why superseded
+/// generations are retained rather than pruned immediately.
+model WatchlistDatasetVersion {
+  id     String                @id @default(uuid())
+  source WatchlistSource
+  status DatasetVersionStatus  @default(DOWNLOADED)
+
+  /// Human-readable and stable, e.g. `OFAC_SDN@2026-09-10T18:00:00.000Z`.
+  /// This is what a `ScreeningResult.datasetVersion` records, so a historical
+  /// screening stays traceable to the exact generation it was made against
+  /// even after that generation's rows are gone.
+  version     String @unique
+  recordCount Int?
+  /// Entries in this generation that were not in the previously published one.
+  addedCount  Int?
+  /// SHA-256 of the raw feed, so an identical re-download is recognisable.
+  checksum    String?
+
+  downloadedAt DateTime  @default(now())
+  validatedAt  DateTime?
+  publishedAt  DateTime?
+  supersededAt DateTime?
+  rejectedAt   DateTime?
+  /// Why validation refused this generation. Never contains feed content.
+  rejectionReason String?
+
+  syncRunId String?
+  /// Null when the 12-hourly scheduler published it; set when a person did.
+  publishedByUserId String?
+  /// Set when this publication is a ROLLBACK — the generation it displaced.
+  rolledBackFromId  String?
+  /// Mandatory on a rollback: a person overriding the newest list owes a
+  /// written reason, the same rule the screening match queue follows.
+  rollbackReason    String?
+
+  entries WatchlistEntry[]
+
+  @@index([source, status])
+  @@index([source, downloadedAt(sort: Desc)])
+}
+
+enum DatasetVersionStatus {
+  DOWNLOADED
+  VALIDATED
+  PUBLISHED
+  SUPERSEDED
+  REJECTED
 }
