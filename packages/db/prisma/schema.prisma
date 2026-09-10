@@ -506,6 +506,19 @@ model Customer {
   familyName              String? // individual only
   registrationNumber      String? // corporate: commercial registration number
   nationalIdEnc           String? // individual -- ENCRYPT
+  /// Part B §11 — screening discriminators. Individual only.
+  ///
+  /// Stored in the CLEAR, unlike `nationalIdEnc`, and that is deliberate:
+  /// their entire purpose is to be COMPARED against a sanctions/PEP list
+  /// entry so a real person is not confused with a listed one. Name-only
+  /// matching against ~19,000 entries produces false positives constantly;
+  /// date of birth and nationality are what separate a true match from a
+  /// coincidence of names. Encrypting them would defeat the control they
+  /// exist for. They are Confidential — the Customer's own classification —
+  /// not Highly Confidential like an identity-document number.
+  dateOfBirth             DateTime?                @db.Date
+  /// ISO 3166-1 alpha-2, upper case. Constrained in the database.
+  nationality             String?
   taxRegistrationNumber   String?
   registeredAddress       String?
   natureOfBusiness        String?
@@ -566,6 +579,11 @@ model UltimateBeneficialOwner {
   grandfatherName       String?
   familyName            String?
   nationalIdEnc         String // -- ENCRYPT
+  /// Part B §11 — screening discriminators. See `Customer.dateOfBirth` for
+  /// why these are not encrypted.
+  dateOfBirth           DateTime? @db.Date
+  /// ISO 3166-1 alpha-2, upper case. Constrained in the database.
+  nationality           String?
   ownershipPercent      Decimal? @db.Decimal(5, 2)
   isAuthorizedSignatory Boolean  @default(false)
   isPep                 Boolean  @default(false)
@@ -626,9 +644,11 @@ model KYCRecord {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  screeningResults ScreeningResult[]
-  screeningMatches ScreeningMatch[]
-  riskRating       RiskRating?
+  screeningResults  ScreeningResult[]
+  screeningMatches  ScreeningMatch[]
+  riskRating        RiskRating?
+  screeningRequests ScreeningRequest[]
+  holdReleases      ScreeningHoldRelease[]
 
   @@index([customerId])
   @@index([status])
@@ -638,6 +658,38 @@ enum ScreeningType {
   SANCTIONS
   PEP
   AML
+}
+
+/// What a screening ATTEMPT concluded — five values behind
+/// `ScreeningOutcome`'s three. The distinction "we checked and found nothing"
+/// vs "we could not check" is the single most consequential one in this
+/// module, and `ScreeningOutcome` alone cannot express it.
+enum ScreeningAttemptOutcome {
+  /// A populated source was searched and the subject was not on it. The only
+  /// outcome that may map to `ScreeningOutcome.CLEAR`.
+  NO_MATCH
+  POTENTIAL_MATCH
+  /// No provider configured. Say so; never NO_MATCH.
+  NOT_CONFIGURED
+  /// Configured, but the attempt failed. Explicitly NOT no-match.
+  SCREENING_FAILED
+  /// Answered, but the data cannot support a decision (empty or stale).
+  UNABLE_TO_SCREEN
+}
+
+/// Which screening implementation answered. Selected by configuration.
+enum ScreeningProviderKind {
+  built_in
+  on_premise
+  commercial
+}
+
+/// PEP is first-class, not a flavour of sanctions — the obligations attached
+/// to each are different.
+enum ScreeningListType {
+  SANCTIONS
+  PEP
+  WATCHLIST
 }
 
 enum ScreeningOutcome {
@@ -658,7 +710,82 @@ model ScreeningResult {
   listSource              String?
   escalatedToComplianceAt DateTime?
 
+  /// The attempt that produced this result — which provider, which dataset,
+  /// and why it failed if it did.
+  screeningRequestId String?
+  screeningRequest   ScreeningRequest?        @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  provider           ScreeningProviderKind?
+  /// The five-value outcome behind `result`. A DB CHECK
+  /// (`ScreeningResult_clear_requires_no_match`) makes it impossible to store
+  /// a CLEAR result from any attempt other than NO_MATCH.
+  attemptOutcome     ScreeningAttemptOutcome?
+  datasetVersion     String?
+
   @@index([kycRecordId])
+  @@index([screeningRequestId])
+}
+
+/// One screening ATTEMPT: what was asked, of whom, and what came back.
+///
+/// Separate from `ScreeningResult` (which is per `ScreeningType`) because one
+/// attempt produces several results, and because the attempt is where the
+/// provider, dataset, correlation id and failure reason live. It is also the
+/// idempotency record: a retried job recognises work it already did instead of
+/// opening a second set of cases.
+model ScreeningRequest {
+  id             String    @id @default(uuid())
+  kycRecordId    String
+  kycRecord      KYCRecord @relation(fields: [kycRecordId], references: [id])
+  /// Ties this attempt to the provider's logs, its audit rows and its cases.
+  correlationId  String
+  /// Derived from (KYC file, subject set, provider, dataset). UNIQUE — the
+  /// constraint IS the idempotency guarantee, not a preceding findFirst.
+  idempotencyKey String    @unique
+
+  /// Part B §12 — a hash of the IDENTITY ATTRIBUTES actually screened
+  /// (every subject's name, date of birth and nationality), independent of
+  /// provider and dataset.
+  ///
+  /// `idempotencyKey` cannot serve this purpose: it deliberately folds in the
+  /// provider and dataset, so it changes when the deployment switches
+  /// provider even though the same people were screened. This answers the
+  /// different question "are the people on this file still the people we
+  /// checked?" — which is what makes a UBO added after screening, or a
+  /// corrected date of birth, visible instead of silent.
+  subjectFingerprint String?
+
+  provider       ScreeningProviderKind
+  providerName   String
+  datasetVersion String?
+
+  /// Part B §13 — what DECIDED this attempt, recorded with it.
+  ///
+  /// A reviewer opening a six-month-old match has to know which matching
+  /// rules and which thresholds produced it. Without these, lowering a review
+  /// threshold silently makes every historical match uninterpretable: the
+  /// score is stored, but the line it was compared against is not.
+  algorithmVersion String?
+  /// The high/review/low bands in force, as configured at attempt time.
+  thresholds       Json?
+
+  outcome        ScreeningAttemptOutcome
+  /// Set for NOT_CONFIGURED / SCREENING_FAILED / UNABLE_TO_SCREEN. Never
+  /// contains credentials or subject PII.
+  failureReason  String?
+  candidateCount Int                     @default(0)
+  casesOpened    Int                     @default(0)
+
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  durationMs        Int?
+  requestedByUserId String?
+
+  results ScreeningResult[]
+  matches ScreeningMatch[]
+
+  @@index([kycRecordId, startedAt(sort: Desc)])
+  @@index([outcome])
+  @@index([correlationId])
 }
 
 enum RiskLevel {
@@ -2377,11 +2504,22 @@ model WatchlistEntry {
   /// `WatchlistEntryRepository.backfillCanonicalTokens` rewrites them at the
   /// start of every sync rather than waiting for a fetch to succeed.
   canonicalTokens String[]
-  matches         ScreeningMatch[]
+  /// Part B §6 — which generation of the list this row belongs to. A screening
+  /// reads only the PUBLISHED generation, which is what makes a sync invisible
+  /// to readers until it is complete.
+  /// Required: an entry with no generation would be invisible to the
+  /// published-generation reader AND exempt from the generation-scoped unique
+  /// key (Postgres treats NULLs as distinct), so it could silently duplicate.
+  datasetVersionId String
+  datasetVersion   WatchlistDatasetVersion @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+  matches          ScreeningMatch[]
 
-  @@unique([source, sourceRecordId])
+  /// Scoped to the generation: the same list entry legitimately exists in the
+  /// published generation and in the one being downloaded beside it.
+  @@unique([source, sourceRecordId, datasetVersionId])
   @@index([normalizedName])
   @@index([source])
+  @@index([datasetVersionId])
 }
 
 /// Process 49 — one row per sync attempt (scheduled every 12h, matching the
@@ -2437,29 +2575,88 @@ model ScreeningMatch {
   entrySourceRecordId String?
   entryFullName       String
   entryListProgram    String?
+
+  /// The attempt that raised this candidate.
+  screeningRequestId String?
+  screeningRequest   ScreeningRequest?      @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  provider           ScreeningProviderKind?
+  /// SANCTIONS / PEP / WATCHLIST. Defaults to SANCTIONS because every match
+  /// that existed before providers came from OFAC/UN, which are sanctions
+  /// lists — a backfill that guessed PEP would be fabricating a
+  /// determination.
+  listType           ScreeningListType      @default(SANCTIONS)
+  /// The provider's own entity id, so a reviewer can look the candidate up.
+  providerEntityId   String?
+  /// 0..1. NULL for the built-in matcher, which is deterministic set logic
+  /// rather than a similarity engine — a fabricated fraction would be false
+  /// precision.
+  matchScore         Float?
+  /// Part B §13 — the review threshold this candidate was measured against,
+  /// and the matcher version that raised it. Stored per match rather than
+  /// looked up later: the configuration moves, and a match must stay
+  /// readable against the rules that actually produced it.
+  reviewThreshold    Float?
+  algorithmVersion   String?
+  /// Which attributes agreed (name / dateOfBirth / nationality / ...). A
+  /// name-only agreement is very different evidence from name+DOB+nationality.
+  matchedAttributes  String[]               @default([])
+  /// For a PEP candidate: the position that makes them politically exposed.
+  pepPosition        String?
   /// The name that actually matched. NOT always the customer's own legal
   /// name — screening covers UBOs too, and the reviewer needs to know which
   /// subject triggered it. Display-only: see `subjectCanonical`.
-  subjectName         String
+  subjectName        String
   /// `canonicalNameTokens(subjectName).join(' ')` — what the match was
   /// actually made on, and what the duplicate-suppression UNIQUE keys on.
   /// Keying that on the RAW name meant re-casing or re-spacing a customer's
   /// legal name minted a second queue item that a prior `cleared` decision
   /// did not suppress.
-  subjectCanonical    String
+  subjectCanonical   String
   /// `exact` (identical after canonicalisation) or `fuzzy` (the entry's
   /// tokens are contained in the subject's). Surfaced so a reviewer can
   /// triage: an exact hit deserves more scrutiny than a subset one.
-  matchType           String
-  /// `pending` | `cleared` | `confirmed`.
-  status              String          @default("pending")
-  detectedAt          DateTime        @default(now())
-  reviewedByUserId    String?
-  reviewedAt          DateTime?
+  matchType          String
+  /// The DECISION: `pending` | `cleared` | `confirmed`.
+  ///
+  /// Distinct from `caseStatus` below, which is the WORKFLOW state, and they
+  /// answer different questions. "Has anyone looked at this yet?" is workflow;
+  /// "was it a real match?" is the decision. Collapsing them would make
+  /// "assigned but not yet decided" unrepresentable.
+  status             String                 @default("pending")
+
+  /// Part B §16 — the case workflow.
+  ///
+  ///   OPEN          detected, nobody owns it
+  ///   ASSIGNED      a named reviewer owns it
+  ///   UNDER_REVIEW  that reviewer has started work
+  ///   ESCALATED     raised to someone else, with a written reason
+  ///   CLOSED        a decision was recorded; terminal
+  ///
+  /// A decision may only be recorded from UNDER_REVIEW or ESCALATED — not from
+  /// OPEN. Deciding a case nobody ever picked up is exactly the rubber-stamp
+  /// this queue exists to prevent, so the transition table makes it
+  /// unreachable rather than discouraged.
+  caseStatus         ScreeningCaseStatus    @default(OPEN)
+  assignedToUserId   String?
+  assignedByUserId   String?
+  assignedAt         DateTime?
+  reviewStartedAt    DateTime?
+  escalatedToUserId  String?
+  escalatedAt        DateTime?
+  /// Mandatory when escalating — enforced in the database.
+  escalationReason   String?
+  closedAt           DateTime?
+  closedByUserId     String?
+
+  notes              ScreeningCaseNote[]
+
+  detectedAt         DateTime               @default(now())
+  reviewedByUserId   String?
+  reviewedAt         DateTime?
   /// Mandatory when a decision is recorded — the business justification for
   /// clearing or confirming, kept verbatim (a justification, not personal
   /// data — the same treatment `Refund.reason` gets).
-  reviewReason        String?
+  reviewReason       String?
 
   /// One open item per (KYC file, list entry, CANONICAL subject name): a
   /// re-screen of the same customer must not manufacture a duplicate queue
@@ -2467,6 +2664,40 @@ model ScreeningMatch {
   @@unique([kycRecordId, watchlistEntryId, subjectCanonical])
   @@index([status])
   @@index([kycRecordId])
+  /// The "my queue" read.
+  @@index([assignedToUserId, caseStatus])
+  @@index([caseStatus])
+}
+
+/// Part B §16 — a note on a screening case.
+///
+/// Separate from `reviewReason`, deliberately: that field is the JUSTIFICATION
+/// for the final decision and is written once, at closure. These are the
+/// working record — what was checked, who was contacted, what a document said —
+/// and there are many of them over a case's life.
+///
+/// Append-only. A case note that can be edited is not evidence of what the
+/// reviewer knew at the time, which is the only reason to keep one.
+model ScreeningCaseNote {
+  id               String         @id @default(uuid())
+  screeningMatchId String
+  screeningMatch   ScreeningMatch @relation(fields: [screeningMatchId], references: [id], onDelete: Cascade)
+  /// Free text by a reviewer about a screening finding. It may name the
+  /// subject, so it inherits the match's own Highly Confidential handling and
+  /// is never copied into an audit payload.
+  note             String
+  authorUserId     String
+  createdAt        DateTime       @default(now())
+
+  @@index([screeningMatchId, createdAt])
+}
+
+enum ScreeningCaseStatus {
+  OPEN
+  ASSIGNED
+  UNDER_REVIEW
+  ESCALATED
+  CLOSED
 }
 
 model WatchlistSyncRun {
@@ -2476,6 +2707,13 @@ model WatchlistSyncRun {
   completedAt  DateTime?
   status       String          @default("running") // running | succeeded | failed
   recordCount  Int?
+  /// Part B §21 — how many entries this run saw for the FIRST time.
+  ///
+  /// Only additions matter for re-screening: an entry leaving a list cannot
+  /// create a match that did not exist before, but one arriving can. A file
+  /// screened before the most recent ADDING run was checked against a list
+  /// that has since grown, which the screening hold reports.
+  addedCount   Int?
   errorMessage String?
 }
 
@@ -3243,4 +3481,125 @@ model SlaTimer {
 
   @@index([entityType, entityId])
   @@index([dueAt])
+}
+
+/// A screening hold that a compliance user accepted in writing so a workflow
+/// could proceed (task Part B §17).
+///
+/// This exists because "the approver knew" is not a control. A REVIEW_REQUIRED
+/// hold is released only by naming, in writing, what is being accepted — and
+/// the acceptance is a row, attributable and queryable, not a line in a log
+/// that rotates. A BLOCKED hold has no release path at all and never produces
+/// one of these.
+model ScreeningHoldRelease {
+  id          String    @id @default(uuid())
+  kycRecordId String
+  kycRecord   KYCRecord @relation(fields: [kycRecordId], references: [id])
+
+  /// The level in force when it was released. Always REVIEW_REQUIRED today —
+  /// stored rather than assumed so a later policy change stays legible in the
+  /// history.
+  level      ScreeningHoldLevel
+  /// The conditions accepted, as `ScreeningHoldCondition` names. A snapshot:
+  /// re-evaluating later can give a different answer, and this is what the
+  /// releaser actually saw.
+  conditions String[]           @default([])
+  /// The evaluator's own operator-facing detail lines at release time. Free of
+  /// subject PII by construction (see `screening-hold.config.ts`).
+  detail     String
+
+  /// Mandatory. The business justification, kept verbatim — the same treatment
+  /// `ScreeningMatch.reviewReason` and `Refund.reason` get.
+  reason           String
+  releasedByUserId String
+  releasedAt       DateTime @default(now())
+
+  /// What the release let happen, so a reviewer can trace effect to cause.
+  workflow String @default("kyc_decision")
+
+  @@index([kycRecordId, releasedAt(sort: Desc)])
+  @@index([releasedByUserId])
+}
+
+enum ScreeningHoldLevel {
+  NO_HOLD
+  REVIEW_REQUIRED
+  BLOCKED
+}
+
+/// Part B §6/§7 — one downloaded, validated, published generation of a
+/// sanctions list.
+///
+/// ## Why this exists: the reader must never see a half-written list
+///
+/// The sync used to upsert ~19,000 rows in chunks and then delete whatever it
+/// had not stamped. Neither step is a transaction, so a screening running
+/// during a sync could observe a list that was partly the old generation and
+/// partly the new one — and worse, one where the entries a subject would have
+/// matched had already been pruned but their replacements had not yet landed.
+/// A sanctions check against a half-written list produces a CLEAR result, which
+/// is the failure mode this whole module exists to prevent.
+///
+/// So entries are written against a VERSION, and a screening reads only the
+/// version that is currently PUBLISHED. Writing happens entirely outside what
+/// any reader can see; publishing is a single transaction that flips one row.
+/// A reader therefore sees the old complete generation or the new complete
+/// generation, never a mixture.
+///
+/// ## The lifecycle
+///
+///   DOWNLOADED  rows are being written; no reader can see them
+///   VALIDATED   the plausibility checks passed; still invisible
+///   PUBLISHED   readers now see exactly this generation
+///   SUPERSEDED  a newer generation was published; kept for rollback
+///   REJECTED    validation failed; never visible, kept for the audit trail
+///
+/// A generation can only be published from VALIDATED. Rollback re-publishes a
+/// SUPERSEDED generation whose rows are still present, which is why superseded
+/// generations are retained rather than pruned immediately.
+model WatchlistDatasetVersion {
+  id     String                @id @default(uuid())
+  source WatchlistSource
+  status DatasetVersionStatus  @default(DOWNLOADED)
+
+  /// Human-readable and stable, e.g. `OFAC_SDN@2026-09-10T18:00:00.000Z`.
+  /// This is what a `ScreeningResult.datasetVersion` records, so a historical
+  /// screening stays traceable to the exact generation it was made against
+  /// even after that generation's rows are gone.
+  version     String @unique
+  recordCount Int?
+  /// Entries in this generation that were not in the previously published one.
+  addedCount  Int?
+  /// SHA-256 of the raw feed, so an identical re-download is recognisable.
+  checksum    String?
+
+  downloadedAt DateTime  @default(now())
+  validatedAt  DateTime?
+  publishedAt  DateTime?
+  supersededAt DateTime?
+  rejectedAt   DateTime?
+  /// Why validation refused this generation. Never contains feed content.
+  rejectionReason String?
+
+  syncRunId String?
+  /// Null when the 12-hourly scheduler published it; set when a person did.
+  publishedByUserId String?
+  /// Set when this publication is a ROLLBACK — the generation it displaced.
+  rolledBackFromId  String?
+  /// Mandatory on a rollback: a person overriding the newest list owes a
+  /// written reason, the same rule the screening match queue follows.
+  rollbackReason    String?
+
+  entries WatchlistEntry[]
+
+  @@index([source, status])
+  @@index([source, downloadedAt(sort: Desc)])
+}
+
+enum DatasetVersionStatus {
+  DOWNLOADED
+  VALIDATED
+  PUBLISHED
+  SUPERSEDED
+  REJECTED
 }

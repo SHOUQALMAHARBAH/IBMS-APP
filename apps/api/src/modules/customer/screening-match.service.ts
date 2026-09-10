@@ -3,7 +3,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import { canDecide } from './screening-case.config';
 import {
   ScreeningMatchRepository,
   type ScreeningMatchWithContext,
@@ -133,6 +135,16 @@ export class ScreeningMatchService {
       );
     }
 
+    // Part B §16 — a decision may only be recorded on a case somebody actually
+    // picked up. Deciding straight from OPEN is the rubber-stamp this queue
+    // exists to prevent: it produces a cleared sanctions match with nobody
+    // having been assigned, nobody having started, and no working record.
+    if (!canDecide(existing.caseStatus)) {
+      throw new UnprocessableEntityException(
+        `Screening case ${id} is ${existing.caseStatus}. Assign it and start the review before recording a decision — a decision on a case nobody picked up is not a review.`,
+      );
+    }
+
     const updated = await this.matches.recordDecision({
       id,
       status: decision,
@@ -256,7 +268,7 @@ function toView(row: ScreeningMatchWithContext): ScreeningMatchView {
     reviewedByUserId: row.reviewedByUserId,
     reviewedAt: row.reviewedAt?.toISOString() ?? null,
     reviewReason: row.reviewReason,
-    // Read from the SNAPSHOT, never the relation. `pruneStale` deletes an
+    // Read from the SNAPSHOT, never the relation. Generation retention deletes an
     // entry as soon as the subject drops off the source list, and the FK is
     // `SET NULL`, so a confirmed match rendered from the relation would decay
     // into "(deleted)" — the compliance record has to still say what was

@@ -13,6 +13,7 @@ import {
 import { Transform } from 'class-transformer';
 import { CustomerType, InteractionChannel, LanguagePreference } from '@ibms/db';
 import { emptyStringToUndefined } from '../../../common/dto.util';
+import { IsDateOfBirth, IsNationality } from './screening-identity.dto-parts';
 
 /**
  * Enforces that the two customer forms stay mutually exclusive: an
@@ -109,6 +110,26 @@ export class CreateCustomerDto {
   @IsString()
   @Length(5, 40)
   nationalId?: string;
+
+  /**
+   * Part B §11 — screening discriminators, INDIVIDUAL only.
+   *
+   * Optional: a broker often onboards before every identity document is in
+   * hand, and refusing the customer record would push the work out of the
+   * system entirely. Absent means "not known", which screening reports as such
+   * rather than treating as a non-match.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @ValidateIf((o: CreateCustomerDto) => o.customerType === 'INDIVIDUAL')
+  @IsDateOfBirth()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @ValidateIf((o: CreateCustomerDto) => o.customerType === 'INDIVIDUAL')
+  @IsNationality()
+  nationality?: string;
 
   @ValidateIf((o: CreateCustomerDto) => o.customerType === 'CORPORATE')
   @IsString()

@@ -141,6 +141,64 @@ async function createIndividualCustomer(
   return res.body as CustomerBody;
 }
 
+/**
+ * One obviously fictional `WatchlistEntry`, so the built-in screening provider
+ * has a POPULATED list to report "no match" against.
+ *
+ * Added when Part B §17 (workflow holds) landed. Before it, this file's
+ * "standard (no hit)" test passed only when db-test happened to carry entries
+ * from some earlier run: with an empty cache the provider correctly answers
+ * UNABLE_TO_SCREEN, which is now a REVIEW_REQUIRED hold and refuses the
+ * approval. The test's own premise is "screened, and nothing was found", so
+ * the fix is to make that premise true rather than to weaken the control —
+ * and the test stops depending on ambient database state either way.
+ */
+async function seedWatchlistFixtureEntry(): Promise<void> {
+  // Part B §6 — at most ONE generation per source may be PUBLISHED (a partial
+  // unique index enforces it). A fixture that assumed an empty slate would hit
+  // that constraint against any generation db-test already holds, so clear the
+  // source first. Deleting the generation cascades to its rows.
+  await prisma.watchlistDatasetVersion.deleteMany({
+    where: { source: 'OFAC_SDN' },
+  });
+  await prisma.watchlistEntry.deleteMany({ where: { source: 'OFAC_SDN' } });
+  const run = await prisma.watchlistSyncRun.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'succeeded',
+      startedAt: new Date(),
+      completedAt: new Date(),
+    },
+  });
+  // Part B §6 — an entry belongs to a GENERATION, and only a PUBLISHED
+  // generation is visible to a screening. A fixture that skipped this would
+  // insert rows no screening can see, and the test would silently assert
+  // nothing.
+  const version = await prisma.watchlistDatasetVersion.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'PUBLISHED',
+      version: `OFAC_SDN@fixture-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      recordCount: 1,
+      downloadedAt: new Date(),
+      validatedAt: new Date(),
+      publishedAt: new Date(),
+      syncRunId: run.id,
+    },
+  });
+  await prisma.watchlistEntry.create({
+    data: {
+      source: 'OFAC_SDN',
+      sourceRecordId: `e2e-customer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      fullName: 'Zzz Fictional Screening Fixture',
+      normalizedName: 'zzz fictional screening fixture',
+      canonicalTokens: ['fictional', 'fixture', 'screening', 'zzz'],
+      syncRunId: run.id,
+      datasetVersionId: version.id,
+    },
+  });
+}
+
 describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () => {
   let app: INestApplication<App>;
 
@@ -650,6 +708,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
   describe('full KYC lifecycle — standard (no hit)', () => {
     it('submit -> run-screening -> approve activates the Customer, and a self-approval is rejected', async () => {
       const app = await boot();
+      // The premise of this test is "screened, and nothing was found" — which
+      // needs a list to have been searched. See the helper.
+      await seedWatchlistFixtureEntry();
       const sales = await makeUser(
         app,
         'kyc-owner-a',

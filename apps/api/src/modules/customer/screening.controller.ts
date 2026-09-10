@@ -2,6 +2,14 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ScreeningService } from './screening.service';
 import { ScreeningMatchService } from './screening-match.service';
+import { ScreeningOperationsService } from './screening-operations.service';
+import { ScreeningCaseService } from './screening-case.service';
+import {
+  AddScreeningCaseNoteDto,
+  AssignScreeningCaseDto,
+  EscalateScreeningCaseDto,
+} from './dto/screening-case.dto';
+import { ScreeningOverviewQueryDto } from './dto/screening-overview-query.dto';
 import {
   ListScreeningMatchesDto,
   ReviewScreeningMatchDto,
@@ -23,7 +31,27 @@ export class ScreeningController {
   constructor(
     private readonly screening: ScreeningService,
     private readonly matches: ScreeningMatchService,
+    private readonly operations: ScreeningOperationsService,
+    private readonly cases: ScreeningCaseService,
   ) {}
+
+  /**
+   * Part B §18/§28/§33 — the operations view.
+   *
+   * A provider health check answers "can I reach it right now?". This answers
+   * the question that actually matters: how many of our customers were
+   * screened for real? A deployment can pass every health check while a third
+   * of its attempts come back SCREENING_FAILED, each one correctly refusing to
+   * say NO_MATCH and each one silently held, with nobody watching the total.
+   *
+   * Counts, outcomes, versions and timestamps only — no subject PII, so this
+   * needs no `isSensitiveDataAccess` read.
+   */
+  @RequirePermissions('sanctions-pep.screen')
+  @Get('overview')
+  overview(@Query() query: ScreeningOverviewQueryDto) {
+    return this.operations.overview(query.windowDays ?? 30);
+  }
 
   @RequirePermissions('sanctions-pep.screen')
   @Post('recurring-batch')
@@ -63,5 +91,55 @@ export class ScreeningController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.matches.decide(id, dto.decision, dto.reviewReason, user);
+  }
+
+  /**
+   * Part B §16 — the case workflow around a match.
+   *
+   * All gated on `sanctions-pep.screen`, the same permission that lets a user
+   * see the queue at all. Deliberately not a second permission: every action
+   * here is part of one person's work on one case, and splitting them would
+   * produce a reviewer who can start a case but not finish it.
+   */
+  @RequirePermissions('sanctions-pep.screen')
+  @Get('matches/:id/case')
+  getCase(@Param('id') id: string) {
+    return this.cases.get(id);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/assign')
+  assignCase(
+    @Param('id') id: string,
+    @Body() dto: AssignScreeningCaseDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cases.assign(id, dto.assigneeUserId, user);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/start-review')
+  startReview(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.cases.startReview(id, user);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/escalate')
+  escalateCase(
+    @Param('id') id: string,
+    @Body() dto: EscalateScreeningCaseDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cases.escalate(id, dto.toUserId, dto.reason, user);
+  }
+
+  @RequirePermissions('sanctions-pep.screen')
+  @Post('matches/:id/notes')
+  addCaseNote(
+    @Param('id') id: string,
+    @Body() dto: AddScreeningCaseNoteDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.cases.addNote(id, dto.note, user);
   }
 }

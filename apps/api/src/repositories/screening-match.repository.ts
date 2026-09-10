@@ -68,6 +68,12 @@ export class ScreeningMatchRepository {
     entrySourceRecordId: string | null;
     entryFullName: string;
     entryListProgram: string | null;
+    /** Part B §13 — the matcher that raised this candidate and the review
+     * threshold it was measured against. Written on CREATE only: a re-screen
+     * under a newer matcher must not rewrite the provenance of a match a
+     * reviewer is already working, or has already decided. */
+    algorithmVersion?: string;
+    reviewThreshold?: number;
   }): Promise<{ id: string; created: boolean }> {
     const before = await this.prisma.client.screeningMatch.findUnique({
       where: {
@@ -98,6 +104,8 @@ export class ScreeningMatchRepository {
         entrySourceRecordId: input.entrySourceRecordId,
         entryFullName: input.entryFullName,
         entryListProgram: input.entryListProgram,
+        algorithmVersion: input.algorithmVersion,
+        reviewThreshold: input.reviewThreshold,
       },
       update: {},
       select: { id: true },
@@ -162,6 +170,15 @@ export class ScreeningMatchRepository {
         reviewedByUserId: input.reviewedByUserId,
         reviewReason: input.reviewReason,
         reviewedAt: input.reviewedAt,
+        // Part B §16 — a decision CLOSES the case, in the same write. Two
+        // database CHECKs make the pair inseparable: a CLOSED case must carry
+        // a decision and a written reason, and a decided match must be CLOSED.
+        // Without the second, a confirmed sanctions match could still show as
+        // open work in the queue while the screening hold already treated it
+        // as confirmed.
+        caseStatus: 'CLOSED',
+        closedAt: input.reviewedAt,
+        closedByUserId: input.reviewedByUserId,
       },
     });
     if (count === 0) return null;

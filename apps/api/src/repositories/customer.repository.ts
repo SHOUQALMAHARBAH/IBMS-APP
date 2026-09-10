@@ -31,6 +31,9 @@ export interface CreateCustomerInput {
   grandfatherName?: string;
   familyName?: string;
   registrationNumber?: string;
+  /** Part B §11 — screening discriminators. Individual only. */
+  dateOfBirth?: Date;
+  nationality?: string;
   nationalIdEnc?: string;
   taxRegistrationNumber?: string;
   registeredAddress?: string;
@@ -62,6 +65,9 @@ export interface CreateUboInput {
   grandfatherName?: string;
   familyName: string;
   nationalIdEnc: string;
+  /** Part B §11 — screening discriminators. */
+  dateOfBirth?: Date;
+  nationality?: string;
   ownershipPercent?: Prisma.Decimal;
   isAuthorizedSignatory: boolean;
   isPep: boolean;

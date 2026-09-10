@@ -9,4 +9,13 @@ export class KycDecisionDto {
   @IsString()
   @Length(1, 1000)
   reason?: string;
+
+  /** Part B §17. The written acceptance of a REVIEW_REQUIRED screening hold.
+   * Optional here because most files carry no hold at all; when one is in
+   * force, `ScreeningHoldService` refuses the approval without it. Never
+   * releases a BLOCKED hold — nothing does. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 1000)
+  screeningHoldReason?: string;
 }

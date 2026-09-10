@@ -116,7 +116,66 @@ services:
     ports:
       - "3000:3000"
 
+  # ---------------------------------------------------------------------------
+  # ON-PREMISE SCREENING ENGINE (optional — profile "screening")
+  #
+  # yente is the OpenSanctions matching API. Running it here keeps customer
+  # data inside the broker's own infrastructure: the subjects screened are
+  # Highly Confidential, and sending them to a commercial provider is a
+  # third-party data share with its own PDPL basis to establish first.
+  #
+  # NOT started by default. `docker compose up` stays as it was; this needs
+  # an explicit opt-in because the dataset is a multi-GB download:
+  #
+  #   docker compose --profile screening up -d screening-engine
+  #   SCREENING_PROVIDER=on_premise SCREENING_BASE_URL=http://localhost:8000 npm run dev
+  #
+  # The index is EMPTY until yente finishes its first ingest. Until then the
+  # adapter reports UNABLE_TO_SCREEN rather than NO_MATCH — the same rule the
+  # built-in cache follows for an unsynced list.
+  screening-engine:
+    image: ghcr.io/opensanctions/yente:latest
+    profiles: ["screening"]
+    restart: unless-stopped
+    depends_on:
+      - screening-index
+    environment:
+      YENTE_INDEX_TYPE: elasticsearch
+      YENTE_INDEX_URL: http://screening-index:9200
+      YENTE_AUTO_REINDEX: "true"
+      # The manifest decides WHICH datasets are ingested. Left at the upstream
+      # default here; a real deployment pins its own so the data a screening
+      # decision was made against is reproducible.
+      YENTE_UPDATE_TOKEN: ""
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/readyz"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      # Generous: the first ingest takes a long time and a container flapping
+      # mid-ingest just restarts it.
+      start_period: 600s
+
+  screening-index:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    profiles: ["screening"]
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    volumes:
+      - screening-index-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
 volumes:
+  screening-index-data:
   db-data:
   db-test-data:
   db-uat-data:
