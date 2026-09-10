@@ -475,6 +475,12 @@ describe('Part B §17 — a screening that did not happen holds the workflow', (
         matchType: 'exact',
         listType: 'SANCTIONS',
         status: 'confirmed',
+        // Part B §16 — a decided match IS a closed case, and the database
+        // refuses the pair coming apart. A fixture that set only the decision
+        // was building a state the application can no longer produce.
+        caseStatus: 'CLOSED',
+        closedAt: new Date(),
+        closedByUserId: compliance.id,
         reviewedByUserId: compliance.id,
         reviewedAt: new Date(),
         reviewReason: 'Identity confirmed against the published list entry.',
@@ -560,7 +566,17 @@ describe('Part B §17 — a screening that did not happen holds the workflow', (
     );
 
     // Clearing it as a false positive lifts the hold — that is what a
-    // cleared match means.
+    // cleared match means. Part B §16 routes that through the case workflow:
+    // a decision may only be recorded on a case somebody actually picked up.
+    await request(application.getHttpServer())
+      .post(`/screening/matches/${match.id}/assign`)
+      .set(bearer(compliance.accessToken))
+      .send({ assigneeUserId: compliance.id })
+      .expect(201);
+    await request(application.getHttpServer())
+      .post(`/screening/matches/${match.id}/start-review`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
     await request(application.getHttpServer())
       .post(`/screening/matches/${match.id}/review`)
       .set(bearer(compliance.accessToken))

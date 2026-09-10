@@ -411,6 +411,20 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
       .set(bearer(compliance.accessToken))
       .expect(400);
 
+    // Part B §16 — a decision may only be recorded on a case somebody actually
+    // picked up. Deciding straight from OPEN is the rubber-stamp the queue
+    // exists to prevent, so the match is assigned and started first; that is
+    // now part of adjudicating one end to end.
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/assign`)
+      .set(bearer(compliance.accessToken))
+      .send({ assigneeUserId: compliance.userId })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/start-review`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
     // A written reason is mandatory on BOTH outcomes and has a real floor:
     // "cleared" with no stated basis is indistinguishable from "ignored".
     await request(app.getHttpServer())
