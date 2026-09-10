@@ -549,3 +549,32 @@ test("renders the operations view in Arabic with RTL direction", async ({
   await expect(page.getByTestId("ops-unresolved-rate")).toContainText("20%");
   await expect(page.getByTestId("ops-attempts")).toContainText("عمليات الفحص");
 });
+
+test("loading: shows a loading state before the data arrives", async ({
+  page,
+}) => {
+  // The fourth render state named by the verification contract. Held open with
+  // a deliberate delay rather than raced against a fast local response: a test
+  // that asserts a loading indicator without controlling the timing passes or
+  // fails on machine speed, which is not a property of the code.
+  await mockAuth(page);
+  await mockHealth(page, health());
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/screening/overview*", async (route) => {
+    await held;
+    await route.fulfill({ status: 200, json: overviewBody() });
+  });
+
+  await page.goto("/screening-health");
+  await expect(page.getByText("Loading…")).toBeVisible();
+  // Nothing from the operations view is on screen yet.
+  await expect(page.getByTestId("ops-attempts")).toHaveCount(0);
+
+  release();
+  // And once it lands, the loading state is gone and the view renders.
+  await expect(page.getByText("Loading…")).toHaveCount(0);
+  await expect(page.getByTestId("ops-attempts")).toBeVisible();
+});
