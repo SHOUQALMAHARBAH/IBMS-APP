@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 import {
   createInvoice,
   downloadInvoiceDocument,
@@ -10,16 +10,19 @@ import {
   reconcileInvoice,
   RECEIPT_METHOD_OPTIONS,
   type Invoice,
-} from '../../lib/finance/invoice-api';
+} from "../../lib/finance/invoice-api";
 import {
   listPoliciesForOpportunity,
   type Policy,
-} from '../../lib/policy/policy-api';
-import { ApiError } from '../../lib/auth/api-client';
-import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
-import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
-import { useLanguage } from '../../lib/i18n/language-context';
-import { formatDate, formatMoney } from '../../lib/i18n/format';
+} from "../../lib/policy/policy-api";
+import { ApiError } from "../../lib/auth/api-client";
+import { buttonStyle, errorStyle } from "../auth/auth-form.styles";
+import {
+  quoteChainCardStyle,
+  quoteFieldStyle,
+} from "../quotation/quotation.styles";
+import { useLanguage } from "../../lib/i18n/language-context";
+import { formatDate, formatMoney } from "../../lib/i18n/format";
 
 interface Props {
   opportunityId: string;
@@ -42,17 +45,17 @@ export function FinanceSection({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [taxAmount, setTaxAmount] = useState('0.000');
-  const [feesAmount, setFeesAmount] = useState('0.000');
-  const [dueDate, setDueDate] = useState('');
+  const [taxAmount, setTaxAmount] = useState("0.000");
+  const [feesAmount, setFeesAmount] = useState("0.000");
+  const [dueDate, setDueDate] = useState("");
   const [receiptMethod, setReceiptMethod] = useState<string>(
     RECEIPT_METHOD_OPTIONS[0],
   );
   // Process 32 — an invoice may be settled in instalments. Blank means "the
   // whole outstanding balance", which is the common case and keeps the
   // one-click full-payment flow intact.
-  const [instalmentAmount, setInstalmentAmount] = useState('');
-  const [paymentReference, setPaymentReference] = useState('');
+  const [instalmentAmount, setInstalmentAmount] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -68,7 +71,7 @@ export function FinanceSection({
         setInvoices([]);
         return;
       }
-      setError(err instanceof Error ? err.message : t('financeLoadError'));
+      setError(err instanceof Error ? err.message : t("financeLoadError"));
     }
   }, [opportunityId, t]);
 
@@ -90,7 +93,7 @@ export function FinanceSection({
     try {
       const blob = await downloadInvoiceDocument(id);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `invoice-${id}.pdf`;
       document.body.appendChild(a);
@@ -101,7 +104,7 @@ export function FinanceSection({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not generate the invoice — try again.',
+          : "Could not generate the invoice — try again.",
       );
     }
   }
@@ -120,47 +123,62 @@ export function FinanceSection({
   }
 
   return (
-    <section style={{ marginTop: '2rem' }}>
-      <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>{t('financeSectionHeading')}</h2>
+    <section style={{ marginTop: "2rem" }}>
+      <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>
+        {t("financeSectionHeading")}
+      </h2>
 
       {error ? <p style={errorStyle}>{error}</p> : null}
 
       {invoice ? (
         <div style={quoteChainCardStyle}>
           <div style={quoteFieldStyle}>
-            <span>{t('financePremiumLabel')}</span>
-            <strong>{formatMoney(invoice.premiumAmount, language, invoice.currency)}</strong>
-          </div>
-          <div style={quoteFieldStyle}>
-            <span>{t('financeTaxLabel')}</span>
-            <strong>{formatMoney(invoice.taxAmount, language, invoice.currency)}</strong>
-          </div>
-          <div style={quoteFieldStyle}>
-            <span>{t('financeFeesLabel')}</span>
-            <strong>{formatMoney(invoice.feesAmount, language, invoice.currency)}</strong>
-          </div>
-          <div style={quoteFieldStyle}>
-            <span>{t('financeCommissionDeductedLabel')}</span>
+            <span>{t("financePremiumLabel")}</span>
             <strong>
-              −{formatMoney(invoice.commissionDeducted, language, invoice.currency)}
+              {formatMoney(invoice.premiumAmount, language, invoice.currency)}
             </strong>
           </div>
           <div style={quoteFieldStyle}>
-            <span>{t('financeTotalLabel')}</span>
-            <strong>{formatMoney(invoice.totalAmount, language, invoice.currency)}</strong>
+            <span>{t("financeTaxLabel")}</span>
+            <strong>
+              {formatMoney(invoice.taxAmount, language, invoice.currency)}
+            </strong>
           </div>
           <div style={quoteFieldStyle}>
-            <span>{t('financeDueDateLabel')}</span>
+            <span>{t("financeFeesLabel")}</span>
+            <strong>
+              {formatMoney(invoice.feesAmount, language, invoice.currency)}
+            </strong>
+          </div>
+          <div style={quoteFieldStyle}>
+            <span>{t("financeCommissionDeductedLabel")}</span>
+            <strong>
+              −
+              {formatMoney(
+                invoice.commissionDeducted,
+                language,
+                invoice.currency,
+              )}
+            </strong>
+          </div>
+          <div style={quoteFieldStyle}>
+            <span>{t("financeTotalLabel")}</span>
+            <strong>
+              {formatMoney(invoice.totalAmount, language, invoice.currency)}
+            </strong>
+          </div>
+          <div style={quoteFieldStyle}>
+            <span>{t("financeDueDateLabel")}</span>
             <strong>{formatDate(invoice.dueDate, language)}</strong>
           </div>
           <div style={quoteFieldStyle}>
-            <span>{t('financeStatusLabel')}</span>
+            <span>{t("financeStatusLabel")}</span>
             <strong>{invoice.status}</strong>
           </div>
           {(invoice.receipts?.length ?? 0) > 0 ? (
             <>
               <div style={quoteFieldStyle}>
-                <span>{t('financeCollectedLabel')}</span>
+                <span>{t("financeCollectedLabel")}</span>
                 <strong>
                   {formatMoney(
                     invoice.collectedAmount,
@@ -171,7 +189,7 @@ export function FinanceSection({
               </div>
               {!invoice.fullyCollected ? (
                 <div style={quoteFieldStyle}>
-                  <span>{t('financeOutstandingLabel')}</span>
+                  <span>{t("financeOutstandingLabel")}</span>
                   <strong>
                     {formatMoney(
                       invoice.outstandingAmount,
@@ -183,14 +201,14 @@ export function FinanceSection({
               ) : null}
               {(invoice.receipts?.length ?? 0) > 1 ? (
                 <div style={quoteFieldStyle}>
-                  <span>{t('financeInstalmentsLabel')}</span>
+                  <span>{t("financeInstalmentsLabel")}</span>
                   <strong>
                     {(invoice.receipts ?? [])
                       .map(
                         (r) =>
                           `${formatMoney(r.amount, language, invoice.currency)} · ${formatDate(r.receivedAt, language)}`,
                       )
-                      .join(' | ')}
+                      .join(" | ")}
                   </strong>
                 </div>
               ) : null}
@@ -198,58 +216,73 @@ export function FinanceSection({
           ) : null}
           {invoice.remittance ? (
             <div style={quoteFieldStyle}>
-              <span>{t('financeRemittedLabel')}</span>
+              <span>{t("financeRemittedLabel")}</span>
               <strong>
-                {formatMoney(invoice.remittance.amount, language, invoice.currency)}
+                {formatMoney(
+                  invoice.remittance.amount,
+                  language,
+                  invoice.currency,
+                )}
                 {invoice.remittance.remittedAt
                   ? ` on ${formatDate(invoice.remittance.remittedAt, language)}`
-                  : ''}
+                  : ""}
               </strong>
             </div>
           ) : null}
           <button
             type="button"
             onClick={() => void downloadDocument(invoice.id)}
-            style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
+            style={{ ...buttonStyle, width: "auto", marginTop: "0.4rem" }}
           >
             Download invoice (PDF)
           </button>
         </div>
       ) : (
-        <p style={{ color: '#6b7280' }}>
-          {t('financeNoInvoiceMessage', {
-            amount: formatMoney(policy.issuedPremium, language, policy.currency),
+        <p style={{ color: "#6b7280" }}>
+          {t("financeNoInvoiceMessage", {
+            amount: formatMoney(
+              policy.issuedPremium,
+              language,
+              policy.currency,
+            ),
           })}
         </p>
       )}
 
       {!invoice && canInvoice ? (
-        <div style={{ display: 'grid', gap: '0.5rem', maxWidth: '22rem', marginTop: '0.75rem' }}>
+        <div
+          style={{
+            display: "grid",
+            gap: "0.5rem",
+            maxWidth: "22rem",
+            marginTop: "0.75rem",
+          }}
+        >
           <label>
-            {t('financeTaxAmountLabel')}
+            {t("financeTaxAmountLabel")}
             <input
               value={taxAmount}
               onChange={(e) => setTaxAmount(e.target.value)}
               inputMode="decimal"
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             />
           </label>
           <label>
-            {t('financeFeesAmountLabel')}
+            {t("financeFeesAmountLabel")}
             <input
               value={feesAmount}
               onChange={(e) => setFeesAmount(e.target.value)}
               inputMode="decimal"
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             />
           </label>
           <label>
-            {t('financeDueDateLabel')}
+            {t("financeDueDateLabel")}
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             />
           </label>
           <button
@@ -259,29 +292,36 @@ export function FinanceSection({
                 () =>
                   createInvoice({
                     policyId: policy.id,
-                    taxAmount: taxAmount.trim() || '0',
-                    feesAmount: feesAmount.trim() || '0',
+                    taxAmount: taxAmount.trim() || "0",
+                    feesAmount: feesAmount.trim() || "0",
                     dueDate,
                   }),
-                t('financeCreateError'),
+                t("financeCreateError"),
               )
             }
             disabled={busy || dueDate.trim().length === 0}
             style={buttonStyle}
           >
-            {t('financeIssueInvoiceButton')}
+            {t("financeIssueInvoiceButton")}
           </button>
         </div>
       ) : null}
 
-      {invoice && canCollect && invoice.status === 'INVOICED' ? (
-        <div style={{ display: 'grid', gap: '0.5rem', maxWidth: '22rem', marginTop: '0.75rem' }}>
+      {invoice && canCollect && invoice.status === "INVOICED" ? (
+        <div
+          style={{
+            display: "grid",
+            gap: "0.5rem",
+            maxWidth: "22rem",
+            marginTop: "0.75rem",
+          }}
+        >
           <label>
-            {t('financeReceivedViaLabel')}
+            {t("financeReceivedViaLabel")}
             <select
               value={receiptMethod}
               onChange={(e) => setReceiptMethod(e.target.value)}
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             >
               {RECEIPT_METHOD_OPTIONS.map((m) => (
                 <option key={m} value={m}>
@@ -291,21 +331,23 @@ export function FinanceSection({
             </select>
           </label>
           <label>
-            {t('financeInstalmentAmountLabel')}
+            {t("financeInstalmentAmountLabel")}
             <input
               value={instalmentAmount}
               onChange={(e) => setInstalmentAmount(e.target.value)}
               inputMode="decimal"
               placeholder={invoice.outstandingAmount}
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             />
           </label>
           <label>
-            {t('financePaymentReferenceLabel')}
+            {t("financePaymentReferenceLabel")}
             <input
               value={paymentReference}
               onChange={(e) => setPaymentReference(e.target.value)}
-              style={{ width: '100%' }}
+              required
+              aria-required="true"
+              style={{ width: "100%" }}
             />
           </label>
           <button
@@ -316,53 +358,57 @@ export function FinanceSection({
                   // Blank = settle the whole remaining balance.
                   amount: instalmentAmount.trim() || invoice.outstandingAmount,
                   method: receiptMethod,
-                  ...(paymentReference.trim()
-                    ? { reference: paymentReference.trim() }
-                    : {}),
+                  // Mandatory: it is the idempotency key. Without it a
+                  // double-click books the client's payment twice.
+                  reference: paymentReference.trim(),
                 });
-                setInstalmentAmount('');
-                setPaymentReference('');
+                setInstalmentAmount("");
+                setPaymentReference("");
                 return result;
-              }, t('financeCreateError'))
+              }, t("financeCreateError"))
             }
-            disabled={busy}
+            disabled={busy || paymentReference.trim().length === 0}
             style={buttonStyle}
           >
-            {t('financeRecordCollectionButton')}
+            {t("financeRecordCollectionButton")}
           </button>
         </div>
       ) : null}
 
-      {invoice && canCollect && invoice.status === 'COLLECTED' ? (
+      {invoice && canCollect && invoice.status === "COLLECTED" ? (
         <button
           type="button"
           onClick={() =>
             void runStep(
               () => reconcileInvoice(invoice.id),
-              t('financeCreateError'),
+              t("financeCreateError"),
             )
           }
           disabled={busy}
-          style={{ ...buttonStyle, marginTop: '0.75rem' }}
+          style={{ ...buttonStyle, marginTop: "0.75rem" }}
         >
-          {t('financeReconcileButton')}
+          {t("financeReconcileButton")}
         </button>
       ) : null}
 
-      {invoice && canCollect && invoice.status === 'RECONCILED' ? (
+      {invoice && canCollect && invoice.status === "RECONCILED" ? (
         <button
           type="button"
           onClick={() =>
             void runStep(
               () => recordRemittance(invoice.id),
-              t('financeCreateError'),
+              t("financeCreateError"),
             )
           }
           disabled={busy}
-          style={{ ...buttonStyle, marginTop: '0.75rem' }}
+          style={{ ...buttonStyle, marginTop: "0.75rem" }}
         >
-          {t('financeRemitButton', {
-            amount: formatMoney(invoice.netRemittance, language, invoice.currency),
+          {t("financeRemitButton", {
+            amount: formatMoney(
+              invoice.netRemittance,
+              language,
+              invoice.currency,
+            ),
           })}
         </button>
       ) : null}

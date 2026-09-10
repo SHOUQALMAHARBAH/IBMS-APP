@@ -547,7 +547,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .send({
+        amount: '115350.000',
+        method: 'bank_transfer',
+        reference: 'E2E-REF-549',
+      })
       .expect(201);
     const withReceipt = await request(app.getHttpServer())
       .get(`/invoices/${invoiceId}/document`)
@@ -677,7 +681,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     const partial = await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '100000.000', method: 'bank_transfer' })
+      .send({
+        amount: '100000.000',
+        method: 'bank_transfer',
+        reference: 'E2E-REF-679',
+      })
       .expect(201);
     expect((partial.body as InvoiceBody).status).toBe('INVOICED');
     expect((partial.body as InvoiceBody).collectedAmount).toBe('100000.000');
@@ -689,7 +697,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '20000.000', method: 'bank_transfer' })
+      .send({
+        amount: '20000.000',
+        method: 'bank_transfer',
+        reference: 'E2E-REF-691',
+      })
       .expect(422);
 
     // 1b. the instalment that settles the balance -> COLLECTED. It carries a
@@ -714,7 +726,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '1.000', method: 'bank_transfer' })
+      .send({
+        amount: '1.000',
+        method: 'bank_transfer',
+        reference: 'E2E-REF-716',
+      })
       .expect(422);
 
     // Idempotent RETRY: the same payment reference resumes the same receipt
@@ -904,7 +920,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .send({
+        amount: '115350.000',
+        method: 'bank_transfer',
+        reference: 'E2E-REF-906',
+      })
       .expect(201);
     const settled = await request(app.getHttpServer())
       .get(`/client-accounting/ageing?customerId=${customerId}`)
@@ -985,7 +1005,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', method: 'bank_transfer' })
+      .send({
+        amount: '115350.000',
+        method: 'bank_transfer',
+        reference: 'E2E-REF-987',
+      })
       .expect(201);
 
     const owed = await request(app.getHttpServer())
@@ -1191,13 +1215,21 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', paymentChannelId: deadChanId })
+      .send({
+        amount: '115350.000',
+        paymentChannelId: deadChanId,
+        reference: 'E2E-REF-1193',
+      })
       .expect(422);
     // a receipt against the INSURER channel (wrong owner) -> 422
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000', paymentChannelId: insChanId })
+      .send({
+        amount: '115350.000',
+        paymentChannelId: insChanId,
+        reference: 'E2E-REF-1199',
+      })
       .expect(422);
     // an explicit method conflicting with the channel type -> 422
     await request(app.getHttpServer())
@@ -1207,6 +1239,7 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
         amount: '115350.000',
         method: 'cheque',
         paymentChannelId: custChanId,
+        reference: 'E2E-REF-1205',
       })
       .expect(422);
 
@@ -1328,7 +1361,7 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000' })
+      .send({ amount: '115350.000', reference: 'E2E-REF-1330' })
       .expect(201);
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/reconcile`)
@@ -1506,7 +1539,7 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     await request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/receipt`)
       .set(bearer(fin.accessToken))
-      .send({ amount: '115350.000' })
+      .send({ amount: '115350.000', reference: 'E2E-REF-1508' })
       .expect(201);
 
     // a governed commission rate for the pair, then Finance calculates + settles

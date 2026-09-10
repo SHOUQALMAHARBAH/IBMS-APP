@@ -57,6 +57,18 @@ interface ScreeningBatchBody {
   hits: number;
   failed: number;
 }
+interface ScreeningMatchBody {
+  id: string;
+  subjectName: string;
+  matchType: string;
+  status: string;
+  listSource: string;
+  listEntryName: string;
+}
+interface PendingCountBody {
+  pending: number;
+  watchlistReady: boolean;
+}
 
 // A run-unique OFAC entity number and name, so this test never collides
 // with another isolated e2e run seeding its own sync data — WatchlistEntry
@@ -302,5 +314,131 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
       .set(bearer(compliance.accessToken))
       .expect(201);
     expect(typeof (batch.body as ScreeningBatchBody).screened).toBe('number');
+  });
+  it('routes a FUZZY match into the review queue and adjudicates it end to end', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'wl-queue-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    const sales = await makeUser(
+      app,
+      'wl-queue-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    // Self-contained: the sync is idempotent, so this does not depend on the
+    // test above having run first.
+    await request(app.getHttpServer())
+      .post('/watchlist-sync/run')
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    // The whole point of Process 49's fuzzy rule: a Jordanian four-part name
+    // carrying an EXTRA given name that the list entry does not have. Exact
+    // token-set equality returned CLEAR for this shape; containment catches it.
+    const [first, ...rest] = SANCTIONED_NAME.split(' ');
+    const fuzzyName = [first, 'Ekhtebar', ...rest].join(' ');
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: fuzzyName,
+        ownerUserId: sales.userId,
+      },
+    });
+    const started = await request(app.getHttpServer())
+      .post(`/customers/${customer.id}/kyc`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    const kycId = (started.body as KycRecordBody).id;
+    await request(app.getHttpServer())
+      .post(`/kyc-records/${kycId}/submit`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/kyc-records/${kycId}/run-screening`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    // The queue is permission-gated on sanctions-pep.screen.
+    await request(app.getHttpServer())
+      .get('/screening/matches')
+      .set(bearer(sales.accessToken))
+      .expect(403);
+
+    // Scoped to THIS test's own kycRecordId — db-test is cumulative across
+    // specs, so a book-wide read would be answering someone else's question.
+    const queued = await request(app.getHttpServer())
+      .get(`/screening/matches?kycRecordId=${kycId}`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const rows = queued.body as ScreeningMatchBody[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].matchType).toBe('fuzzy');
+    expect(rows[0].subjectName).toBe(fuzzyName);
+    expect(rows[0].listEntryName).toBe(SANCTIONED_NAME);
+    expect(rows[0].status).toBe('pending');
+    // Snapshotted from the entry, so the row survives the entry being pruned.
+    expect(rows[0].listSource).toBe('OFAC_SDN (SDGT)');
+    const matchId = rows[0].id;
+
+    // An unvalidated `status` used to be passed straight into the Prisma
+    // where, so a typo silently returned an EMPTY queue — which a Compliance
+    // Officer reads as "nothing to review".
+    await request(app.getHttpServer())
+      .get('/screening/matches?status=Pending')
+      .set(bearer(compliance.accessToken))
+      .expect(400);
+
+    // A written reason is mandatory on BOTH outcomes and has a real floor:
+    // "cleared" with no stated basis is indistinguishable from "ignored".
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/review`)
+      .set(bearer(compliance.accessToken))
+      .send({ decision: 'cleared', reviewReason: 'nope' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/review`)
+      .set(bearer(compliance.accessToken))
+      .send({ decision: 'sideways', reviewReason: 'A perfectly good reason.' })
+      .expect(400);
+
+    const reviewed = await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/review`)
+      .set(bearer(compliance.accessToken))
+      .send({
+        decision: 'cleared',
+        reviewReason:
+          'Different date of birth and nationality; not the listed individual.',
+      })
+      .expect(201);
+    expect((reviewed.body as ScreeningMatchBody).status).toBe('cleared');
+
+    // A recorded decision is FINAL here — a second review is a 409, not a
+    // silent overwrite of somebody else's adjudication.
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/review`)
+      .set(bearer(compliance.accessToken))
+      .send({
+        decision: 'confirmed',
+        reviewReason: 'Changing my mind after the fact.',
+      })
+      .expect(409);
+
+    // Clearing a false positive does NOT unwind the EDD escalation the match
+    // caused — that is a separate, deliberate Compliance decision.
+    const kyc = await prisma.kYCRecord.findUniqueOrThrow({
+      where: { id: kycId },
+    });
+    expect(kyc.isEdd).toBe(true);
+
+    // The cache has been synced in this test, so the queue screen must not
+    // warn that nothing was ever checked.
+    const counted = await request(app.getHttpServer())
+      .get('/screening/matches/pending-count')
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    expect((counted.body as PendingCountBody).watchlistReady).toBe(true);
   });
 });

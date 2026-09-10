@@ -292,6 +292,34 @@ export const SLA_REGISTRY: readonly SlaRegistryEntry[] = [
     citation:
       'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers KYC/AML EDD review turnaround)',
   },
+  // Backlog Part C #49 (Sanctions/PEP screening, Domain F). Same DRAFT,
+  // UNSOURCED caveat as the two KYC rows above — and for the same reason:
+  // ibms-brain/meta/lex/kyc-aml-sla-timers.md covers KYC review turnaround
+  // and re-KYC cadence, but NOTHING in the brain or in pdpl-sla-timers.md
+  // names a turnaround for adjudicating a sanctions-list match. Filed via
+  // `/brain-gap`; do not cite this row as PRIV-SOP/PRIV-STD-sourced.
+  //
+  // Why it exists at all: fuzzy matching over-fires by construction, so the
+  // whole design rests on a human working the queue. Without a tracked
+  // deadline "a person decides" degrades to "a pending row nobody is
+  // accountable for", which is the failure mode pdpl-sla-timers.md exists to
+  // prevent. 3 business days is DRAFTED as tighter than the 5-day standard
+  // KYC review, because an unadjudicated sanctions candidate on a LIVE
+  // customer is a live exposure, not a queued onboarding step.
+  {
+    workflowName: 'sanctions_match_review',
+    label: 'Sanctions match review (Compliance adjudication)',
+    entityType: 'ScreeningMatch',
+    duration: { value: 3, unit: 'businessDays' },
+    escalationStages: [
+      {
+        offset: { value: 0, unit: 'businessDays' },
+        escalateTo: 'COMPLIANCE_OFFICER',
+      },
+    ],
+    citation:
+      'DRAFT, UNSOURCED — see ibms-brain/meta/lex/kyc-aml-sla-timers.md (no PRIV-SOP/PRIV-STD or pdpl-sla-timers.md row covers sanctions-match adjudication turnaround)',
+  },
   // Backlog Part C #41 (Customer Requests, Domain E). Like the two KYC rows
   // above — but UNLIKE the 14 PDPL rows — this has NO source in
   // pdpl-sla-timers.md's registry: a customer-service-request turnaround is a

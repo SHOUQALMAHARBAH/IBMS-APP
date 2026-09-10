@@ -2093,6 +2093,11 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   //     stays INVOICED: only the instalment that completes it moves it on,
   //     which is what keeps it on the #33 ageing report for the remainder.
   await page.getByLabel("Instalment amount").fill("15,350.000".replace(",", ""));
+  // The payment reference is MANDATORY — it is the idempotency key, and the
+  // submit button stays disabled without one. While it was optional the cash
+  // path had no duplicate protection at all: a double-click booked the
+  // client's money twice (two Receipts, two `in` ledger rows).
+  await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-1");
   await page.getByRole("button", { name: "Record collection" }).click();
   await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
   await expect(page.getByText("JOD 15,350.000")).toBeVisible();
@@ -2102,6 +2107,9 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
 
   // 1b. the instalment that settles the rest — a blank amount means "the whole
   //     outstanding balance", so this closes it out and drives the transition.
+  //     A DIFFERENT reference: the same one would resume the first instalment
+  //     idempotently rather than booking a second.
+  await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-2");
   await page.getByRole("button", { name: "Record collection" }).click();
   await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
   // Collected is now the pooled total of BOTH instalments — which equals the

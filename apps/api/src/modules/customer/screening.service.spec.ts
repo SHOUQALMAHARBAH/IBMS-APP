@@ -4,6 +4,8 @@ import { ScreeningService } from './screening.service';
 import type { KycRecordRepository } from '../../repositories/kyc-record.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
+import type { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
+import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuditService } from '../audit/audit.service';
 
 interface ScreeningResultInput {
@@ -50,9 +52,31 @@ function makeDeps() {
   } as unknown as CustomerRepository;
 
   const findByNormalizedName = vi.fn().mockResolvedValue(null);
+  // Process 49 fuzzy matching: screening now asks for CONTAINMENT candidates
+  // (entry tokens ⊆ subject tokens), not one exact normalized-name row.
+  const findMatchCandidates = vi
+    .fn()
+    .mockResolvedValue({ entries: [], truncated: false });
+  // Default TRUE: the synced cache has data, so a CLEAR is a real CLEAR.
+  const hasUsableEntries = vi.fn().mockResolvedValue(true);
   const watchlistEntries = {
     findByNormalizedName,
+    findMatchCandidates,
+    hasUsableEntries,
   } as unknown as WatchlistEntryRepository;
+
+  const recordCandidate = vi
+    .fn()
+    .mockResolvedValue({ id: 'sm-1', created: true });
+  const screeningMatches = {
+    recordCandidate,
+  } as unknown as ScreeningMatchRepository;
+
+  const startTimer = vi.fn().mockResolvedValue([]);
+  const computeDueAt = vi
+    .fn()
+    .mockReturnValue(new Date('2026-09-14T00:00:00Z'));
+  const sla = { startTimer, computeDueAt } as unknown as SlaTimerService;
 
   const record = vi.fn().mockResolvedValue(undefined);
   const audit = { record } as unknown as AuditService;
@@ -62,10 +86,16 @@ function makeDeps() {
       kycRecords,
       customers,
       watchlistEntries,
+      screeningMatches,
+      sla,
       audit,
     ),
     mocks: {
       findById,
+      findMatchCandidates,
+      hasUsableEntries,
+      recordCandidate,
+      startTimer,
       createScreeningResult,
       upsertRiskRating,
       findRiskRatingByKycRecordId,
@@ -266,11 +296,17 @@ describe('ScreeningService', () => {
         id: 'cust-1',
         legalName: 'Perfectly Ordinary Trading Co.',
       });
-      mocks.findByNormalizedName.mockResolvedValue({
-        source: 'OFAC_SDN',
-        sourceRecordId: '2674',
-        fullName: 'ABBAS, Abu',
-        listProgram: 'SDGT',
+      mocks.findMatchCandidates.mockResolvedValue({
+        truncated: false,
+        entries: [
+          {
+            id: 'wl-1',
+            source: 'OFAC_SDN',
+            sourceRecordId: '2674',
+            fullName: 'Perfectly Ordinary Trading Co.',
+            listProgram: 'SDGT',
+          },
+        ],
       });
 
       const outcome = await service.run('kyc-1', 'compliance-1');
@@ -293,11 +329,17 @@ describe('ScreeningService', () => {
         id: 'cust-1',
         legalName: 'Perfectly Ordinary Trading Co.',
       });
-      mocks.findByNormalizedName.mockResolvedValue({
-        source: 'UN_CONSOLIDATED',
-        sourceRecordId: '6907993',
-        fullName: 'ERIC BADEGE',
-        listProgram: null,
+      mocks.findMatchCandidates.mockResolvedValue({
+        truncated: false,
+        entries: [
+          {
+            id: 'wl-2',
+            source: 'UN_CONSOLIDATED',
+            sourceRecordId: '6907993',
+            fullName: 'Perfectly Ordinary Trading Co.',
+            listProgram: null,
+          },
+        ],
       });
 
       const outcome = await service.run('kyc-1', 'compliance-1');
@@ -322,7 +364,7 @@ describe('ScreeningService', () => {
 
       await service.run('kyc-1', 'compliance-1');
 
-      expect(mocks.findByNormalizedName).toHaveBeenCalledTimes(2);
+      expect(mocks.findMatchCandidates).toHaveBeenCalledTimes(2);
     });
 
     // A @code-reviewer BLOCKER on the first pass: a name that normalizes to
@@ -341,7 +383,7 @@ describe('ScreeningService', () => {
 
       const outcome = await service.run('kyc-1', 'compliance-1');
 
-      expect(mocks.findByNormalizedName).not.toHaveBeenCalled();
+      expect(mocks.findMatchCandidates).not.toHaveBeenCalled();
       expect(outcome.newHit).toBe(false);
     });
   });
@@ -418,5 +460,113 @@ describe('ScreeningService', () => {
         'db down',
       );
     });
+  });
+});
+
+describe('ScreeningService — an empty watchlist must not read as CLEAR', () => {
+  // The whole point. A CLEAR means "we checked a list and this subject was not
+  // on it". It must never mean "we checked an empty table" — those are
+  // indistinguishable to every consumer of ScreeningResult, and the second is
+  // false assurance on a sanctions control.
+  //
+  // This is not hypothetical: WatchlistEntry is empty on every deployment of
+  // this system, because the sync has never been run anywhere.
+
+  it('records PENDING_INVESTIGATION, not CLEAR, when no populated list was consulted', async () => {
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Perfectly Ordinary Trading Co.',
+    });
+    // Empty synced cache AND no fixture — i.e. production today.
+    mocks.hasUsableEntries.mockResolvedValue(false);
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const [input] of calls) {
+      expect(input.result).toBe('PENDING_INVESTIGATION');
+      // Somebody has to notice the customer was never actually checked.
+      expect(input.escalatedToComplianceAt).toBeInstanceOf(Date);
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it('still records a real CLEAR when the synced cache HAS data', async () => {
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Perfectly Ordinary Trading Co.',
+    });
+    mocks.hasUsableEntries.mockResolvedValue(true);
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    for (const [input] of calls) {
+      expect(input.result).toBe('CLEAR');
+      expect(input.escalatedToComplianceAt).toBeUndefined();
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it('a HIT is still a HIT — matching proves a list was consulted', async () => {
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Sanctioned Party',
+    });
+    mocks.hasUsableEntries.mockResolvedValue(false);
+    mocks.findMatchCandidates.mockResolvedValue({
+      truncated: false,
+      entries: [
+        {
+          id: 'wl-1',
+          source: 'OFAC_SDN',
+          sourceRecordId: '1',
+          fullName: 'Sanctioned Party',
+          listProgram: null,
+        },
+      ],
+    });
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    for (const [input] of calls) expect(input.result).toBe('HIT');
+    vi.unstubAllEnvs();
+  });
+
+  it('the dev/test fixture counts as a populated source', async () => {
+    // Outside production the fixture is enabled and holds real data, so a
+    // check against it genuinely happened and CLEAR is honest. This is what
+    // keeps the existing e2e suite meaningful rather than uniformly pending.
+    const { service, mocks } = makeDeps();
+    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
+    mocks.findCustomerById.mockResolvedValue({
+      id: 'cust-1',
+      legalName: 'Perfectly Ordinary Trading Co.',
+    });
+    mocks.hasUsableEntries.mockResolvedValue(false);
+
+    await service.run('kyc-1', 'compliance-1');
+
+    const calls = mocks.createScreeningResult.mock.calls as [
+      ScreeningResultInput,
+    ][];
+    for (const [input] of calls) expect(input.result).toBe('CLEAR');
   });
 });
