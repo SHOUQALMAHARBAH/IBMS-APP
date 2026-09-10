@@ -9,7 +9,9 @@ import { pageStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
 import {
   getScreeningHealth,
+  getScreeningOverview,
   type ScreeningHealth,
+  type ScreeningOverview,
 } from "../../../lib/screening/screening-config-api";
 
 /**
@@ -71,14 +73,25 @@ export default function ScreeningHealthPage() {
 
   const [health, setHealth] = useState<ScreeningHealth | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [overview, setOverview] = useState<ScreeningOverview | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setHealth(await getScreeningHealth());
+      // Both in one pass: the provider answers "can I reach it right now?",
+      // the overview answers "how many customers were actually screened?".
+      // A screen showing only the first is the one that reads green while a
+      // third of screenings are failing.
+      const [nextHealth, nextOverview] = await Promise.all([
+        getScreeningHealth(),
+        getScreeningOverview(30),
+      ]);
+      setHealth(nextHealth);
+      setOverview(nextOverview);
       setLoadError(null);
     } catch (err) {
       setHealth(null);
+      setOverview(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
           ? isArabic
@@ -335,6 +348,319 @@ export default function ScreeningHealthPage() {
                 {health.thresholdProblems.join("; ")}
               </p>
             ) : null}
+          </section>
+        </>
+      ) : null}
+      {overview ? (
+        <>
+          {/* ---------------- screening volume ---------------- */}
+          <section style={card} data-testid="ops-attempts">
+            <h2 style={{ marginTop: 0 }}>
+              {isArabic
+                ? `عمليات الفحص (آخر ${overview.windowDays} يوماً)`
+                : `Screening attempts (last ${overview.windowDays} days)`}
+            </h2>
+            <p style={{ opacity: 0.75, marginTop: 0 }}>
+              {isArabic
+                ? "فحص الاتصال يجيب: هل المزوّد متاح الآن؟ هذه الأرقام تجيب: كم عميلاً تم فحصه فعلاً؟"
+                : "A health check answers whether the provider is reachable. These numbers answer how many customers were actually screened."}
+            </p>
+            {overview.attempts.total === 0 ? (
+              <p data-testid="ops-attempts-empty" style={{ opacity: 0.7 }}>
+                {isArabic
+                  ? "لا توجد عمليات فحص مسجّلة في هذه الفترة."
+                  : "No screening attempts recorded in this window."}
+              </p>
+            ) : (
+              <>
+                <div style={row}>
+                  <span>{isArabic ? "الإجمالي" : "Total"}</span>
+                  <span data-testid="ops-attempts-total">
+                    {overview.attempts.total}
+                  </span>
+                </div>
+                <div style={row}>
+                  <strong>
+                    {isArabic
+                      ? "لم تُنتج نتيجة قابلة للاستخدام"
+                      : "Did not produce a usable answer"}
+                  </strong>
+                  <strong
+                    data-testid="ops-unresolved-rate"
+                    data-unresolved={overview.attempts.unresolved}
+                    style={{
+                      color:
+                        overview.attempts.unresolved > 0
+                          ? "#b91c1c"
+                          : undefined,
+                    }}
+                  >
+                    {overview.attempts.unresolved} (
+                    {Math.round(overview.attempts.unresolvedRate * 100)}%)
+                  </strong>
+                </div>
+                {Object.entries(overview.attempts.byOutcome).map(
+                  ([outcome, count]) => (
+                    <div key={outcome} style={row} data-outcome={outcome}>
+                      <span>{outcome}</span>
+                      <span>{count}</span>
+                    </div>
+                  ),
+                )}
+                {overview.attempts.unresolved > 0 ? (
+                  <p
+                    role="alert"
+                    style={{ ...errorStyle, marginTop: "0.75rem" }}
+                  >
+                    {isArabic
+                      ? "لم يتم فحص هؤلاء العملاء — ولم يُعتبروا خالين من المطابقة. راجع الأسباب أدناه."
+                      : "These customers were NOT screened — and were not treated as clear. See the reasons below."}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </section>
+
+          {/* ---------------- failures ---------------- */}
+          {overview.attempts.recentUnresolved.length > 0 ? (
+            <section style={card} data-testid="ops-failures">
+              <h2 style={{ marginTop: 0 }}>
+                {isArabic ? "أحدث الإخفاقات" : "Most recent failures"}
+              </h2>
+              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                <thead>
+                  <tr>
+                    <th style={headCell}>{isArabic ? "النتيجة" : "Outcome"}</th>
+                    <th style={headCell}>
+                      {isArabic ? "المزوّد" : "Provider"}
+                    </th>
+                    <th style={headCell}>{isArabic ? "السبب" : "Reason"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.attempts.recentUnresolved.map((row_) => (
+                    <tr key={row_.correlationId}>
+                      <td style={bodyCell}>{row_.outcome}</td>
+                      <td style={bodyCell}>{row_.providerName}</td>
+                      {/* The reason names the remedy, never the customer. */}
+                      <td style={bodyCell}>{row_.failureReason ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : null}
+
+          {/* ---------------- holds and case workload ---------------- */}
+          <section style={card} data-testid="ops-holds">
+            <h2 style={{ marginTop: 0 }}>
+              {isArabic
+                ? "الملفات الموقوفة وقائمة العمل"
+                : "Holds and case workload"}
+            </h2>
+            <div style={row}>
+              <span>
+                {isArabic
+                  ? "ملفات قابلة للقرار موقوفة حالياً"
+                  : "Decidable files currently held"}
+              </span>
+              <strong data-testid="ops-active-holds">
+                {overview.holds.activeHolds} / {overview.holds.decidableFiles}
+              </strong>
+            </div>
+            <div style={row}>
+              <span>
+                {isArabic
+                  ? `حالات رفع الإيقاف (آخر ${overview.windowDays} يوماً)`
+                  : `Holds released (last ${overview.windowDays} days)`}
+              </span>
+              <span data-testid="ops-holds-released">
+                {overview.holds.releasedInWindow}
+              </span>
+            </div>
+            <div style={row}>
+              <span>
+                {isArabic ? "مطابقات قيد الانتظار" : "Pending matches"}
+              </span>
+              <span data-testid="ops-pending-matches">
+                {overview.matchQueue.pending}
+              </span>
+            </div>
+            {Object.entries(overview.caseWorkload).length > 0 ? (
+              <table
+                style={{
+                  borderCollapse: "collapse",
+                  width: "100%",
+                  marginTop: "0.75rem",
+                }}
+                data-testid="ops-case-workload"
+              >
+                <thead>
+                  <tr>
+                    <th style={headCell}>
+                      {isArabic ? "حالة الحالة" : "Case state"}
+                    </th>
+                    <th style={headCell}>{isArabic ? "العدد" : "Count"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(overview.caseWorkload).map(
+                    ([state, count]) => (
+                      <tr key={state} data-case-state={state}>
+                        <td style={bodyCell}>{state}</td>
+                        <td style={bodyCell}>{count}</td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ opacity: 0.7 }} data-testid="ops-cases-empty">
+                {isArabic ? "لا توجد حالات مفتوحة." : "No open cases."}
+              </p>
+            )}
+            {overview.holds.configurationProblems.length > 0 ? (
+              <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
+                {overview.holds.configurationProblems.join(" ")}
+              </p>
+            ) : null}
+          </section>
+
+          {/* ---------------- dataset generations ---------------- */}
+          <section style={card} data-testid="ops-datasets">
+            <h2 style={{ marginTop: 0 }}>
+              {isArabic
+                ? "إصدارات قوائم العقوبات"
+                : "Sanctions list generations"}
+            </h2>
+            <p style={{ opacity: 0.75, marginTop: 0 }}>
+              {isArabic
+                ? "يقرأ الفحص الإصدار المنشور فقط. الإصدار قيد التنزيل غير مرئي إطلاقاً."
+                : "A screening reads only the PUBLISHED generation. One still downloading is invisible to it."}
+            </p>
+            {overview.datasets.length === 0 ? (
+              <p
+                role="alert"
+                style={errorStyle}
+                data-testid="ops-datasets-empty"
+              >
+                {isArabic
+                  ? "لا يوجد أي إصدار — لم تكتمل أي مزامنة بعد، ولا يمكن اعتبار أي عميل خالياً من المطابقة."
+                  : "No generation exists — no sync has completed, and no customer can be treated as clear."}
+              </p>
+            ) : (
+              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                <thead>
+                  <tr>
+                    <th style={headCell}>{isArabic ? "المصدر" : "Source"}</th>
+                    <th style={headCell}>{isArabic ? "الحالة" : "Status"}</th>
+                    <th style={headCell}>{isArabic ? "السجلات" : "Records"}</th>
+                    <th style={headCell}>{isArabic ? "جديدة" : "Added"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.datasets.map((d) => (
+                    <tr
+                      key={d.id}
+                      data-dataset-status={d.status}
+                      data-dataset-source={d.source}
+                    >
+                      <td style={bodyCell}>{d.source}</td>
+                      <td style={bodyCell}>
+                        <span style={statusStyle(d.status)}>{d.status}</span>
+                        {d.rejectionReason ? (
+                          <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                            {d.rejectionReason}
+                          </div>
+                        ) : null}
+                        {d.rollbackReason ? (
+                          <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                            {isArabic ? "تراجع: " : "Rolled back: "}
+                            {d.rollbackReason}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={bodyCell}>{d.recordCount ?? "—"}</td>
+                      <td style={bodyCell}>{d.addedCount ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+
+          {/* ---------------- schedules ---------------- */}
+          <section style={card} data-testid="ops-schedules">
+            <h2 style={{ marginTop: 0 }}>
+              {isArabic ? "المهام الدورية" : "Recurring work"}
+            </h2>
+            <div style={row}>
+              <span>
+                {isArabic ? "إعادة الفحص الدورية" : "Recurring re-screen"}
+              </span>
+              <span data-testid="ops-next-rescreen">
+                {overview.schedules.rescreenBatch.nextRunAt ??
+                  (isArabic ? "غير معروف" : "unknown")}
+              </span>
+            </div>
+            <div style={row}>
+              <span>{isArabic ? "مزامنة القوائم" : "List sync"}</span>
+              <span data-testid="ops-next-sync">
+                {overview.schedules.listSync.nextRunAt ??
+                  (isArabic ? "غير معروف" : "unknown")}
+              </span>
+            </div>
+            <div style={row}>
+              <span>
+                {isArabic ? "آخر مزامنة ناجحة" : "Last successful sync"}
+              </span>
+              <span data-testid="ops-last-sync-success">
+                {overview.schedules.listSync.lastSuccessAt ??
+                  (isArabic ? "لا يوجد" : "never")}
+              </span>
+            </div>
+          </section>
+
+          {/* ---------------- sync history ---------------- */}
+          <section style={card} data-testid="ops-sync-history">
+            <h2 style={{ marginTop: 0 }}>
+              {isArabic ? "سجل المزامنة" : "Sync history"}
+            </h2>
+            {overview.listSync.length === 0 ? (
+              <p style={{ opacity: 0.7 }} data-testid="ops-sync-empty">
+                {isArabic
+                  ? "لم تُشغَّل أي مزامنة بعد."
+                  : "No sync has run yet."}
+              </p>
+            ) : (
+              <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                <thead>
+                  <tr>
+                    <th style={headCell}>{isArabic ? "المصدر" : "Source"}</th>
+                    <th style={headCell}>{isArabic ? "الحالة" : "Status"}</th>
+                    <th style={headCell}>{isArabic ? "السجلات" : "Records"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.listSync.map((r, i) => (
+                    <tr key={`${r.source}-${r.startedAt}-${i}`}>
+                      <td style={bodyCell}>{r.source}</td>
+                      <td style={bodyCell}>
+                        {r.status}
+                        {r.errorMessage ? (
+                          <div
+                            style={{ fontSize: "0.75rem", color: "#b91c1c" }}
+                          >
+                            {r.errorMessage}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={bodyCell}>{r.recordCount ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </section>
         </>
       ) : null}

@@ -21,6 +21,11 @@ const ME_BASE = {
 };
 
 async function mockAuth(page: Page, languagePreference: "AR" | "EN" = "EN") {
+  // Default operations view — overridden per test by a later page.route,
+  // which Playwright matches first.
+  await page.route("**/screening/overview*", (route) =>
+    route.fulfill({ status: 200, json: overviewBody() }),
+  );
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "t" } }),
   );
@@ -67,6 +72,62 @@ function health(over: Record<string, unknown> = {}) {
     sanctionsOperational: true,
     ...over,
   };
+}
+
+/**
+ * The operations view the screen loads alongside provider health.
+ *
+ * Mocked by default in `mockAuth` so every pre-existing test keeps exercising
+ * what it was written for: the page issues both requests, and an unmocked one
+ * would surface as a load error and mask the assertion under test.
+ */
+export function overviewBody(over: Record<string, unknown> = {}) {
+  return {
+    windowDays: 30,
+    since: "2026-08-11T00:00:00.000Z",
+    attempts: {
+      total: 0,
+      byOutcome: {},
+      byProvider: {},
+      unresolved: 0,
+      unresolvedRate: 0,
+      recentUnresolved: [],
+    },
+    matchQueue: {
+      pending: 0,
+      pendingByAlgorithmVersion: {},
+      currentAlgorithmVersion: "2.0.0",
+    },
+    caseWorkload: {},
+    datasets: [],
+    schedules: {
+      rescreenBatch: {
+        cron: "0 */4 * * *",
+        nextRunAt: "2026-09-11T00:00:00.000Z",
+      },
+      listSync: {
+        cron: "0 */12 * * *",
+        nextRunAt: "2026-09-11T00:00:00.000Z",
+        lastSuccessAt: null,
+      },
+    },
+    holds: {
+      activeHolds: 0,
+      decidableFiles: 0,
+      releasedInWindow: 0,
+      policy: {},
+      staleAfterDays: 0,
+      configurationProblems: [],
+    },
+    listSync: [],
+    ...over,
+  };
+}
+
+async function mockOverview(page: Page, body: Record<string, unknown>) {
+  await page.route("**/screening/overview*", (route) =>
+    route.fulfill({ status: 200, json: body }),
+  );
 }
 
 async function mockHealth(page: Page, body: Record<string, unknown>) {
@@ -256,4 +317,235 @@ test("renders in Arabic with RTL direction", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByText("غير مهيأ", { exact: true })).toBeVisible();
   await expect(page.locator('[data-capability="PEP"]')).toBeVisible();
+});
+
+/* ---------------------------------------------------------------------------
+ * Part B §18/§28/§33 — the operations view.
+ *
+ * The screen must answer the question a provider health check cannot: how many
+ * customers were actually screened. These tests cover the four render states
+ * the verification contract names — loading, empty, populated, error — plus
+ * permission denied, in both reading directions.
+ * ------------------------------------------------------------------------- */
+
+test("populated: reports the unresolved rate rather than leaving it to be computed", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await mockOverview(
+    page,
+    overviewBody({
+      attempts: {
+        total: 100,
+        byOutcome: { NO_MATCH: 60, SCREENING_FAILED: 30, UNABLE_TO_SCREEN: 10 },
+        byProvider: { commercial: 100 },
+        unresolved: 40,
+        unresolvedRate: 0.4,
+        recentUnresolved: [
+          {
+            correlationId: "scr-1",
+            outcome: "SCREENING_FAILED",
+            failureReason: "timed out after 10000ms",
+            providerName: "Commercial provider",
+            startedAt: "2026-09-10T10:00:00.000Z",
+            durationMs: 10000,
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/screening-health");
+
+  const rate = page.getByTestId("ops-unresolved-rate");
+  await expect(rate).toBeVisible();
+  await expect(rate).toContainText("40");
+  await expect(rate).toContainText("40%");
+
+  // A deployment where 40% of attempts produce no answer is not a working
+  // screening function, however green the provider check is.
+  await expect(
+    page.getByText("These customers were NOT screened", { exact: false }),
+  ).toBeVisible();
+
+  // The failure names the remedy, not the customer.
+  await expect(page.getByTestId("ops-failures")).toContainText("timed out");
+});
+
+test("populated: shows which list generation is live and which was refused", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await mockOverview(
+    page,
+    overviewBody({
+      datasets: [
+        {
+          id: "v2",
+          source: "OFAC_SDN",
+          status: "REJECTED",
+          version: "OFAC_SDN@2026-09-10T18:00:00.000Z",
+          recordCount: 3,
+          addedCount: null,
+          downloadedAt: "2026-09-10T18:00:00.000Z",
+          publishedAt: null,
+          rejectionReason: "Parsed only 3 record(s), below the floor of 9500.",
+          rollbackReason: null,
+        },
+        {
+          id: "v1",
+          source: "OFAC_SDN",
+          status: "PUBLISHED",
+          version: "OFAC_SDN@2026-09-10T06:00:00.000Z",
+          recordCount: 19369,
+          addedCount: 12,
+          downloadedAt: "2026-09-10T06:00:00.000Z",
+          publishedAt: "2026-09-10T06:05:00.000Z",
+          rejectionReason: null,
+          rollbackReason: null,
+        },
+      ],
+    }),
+  );
+  await page.goto("/screening-health");
+
+  const datasets = page.getByTestId("ops-datasets");
+  await expect(
+    datasets.locator('[data-dataset-status="PUBLISHED"]'),
+  ).toHaveCount(1);
+  await expect(datasets).toContainText("19369");
+  // The refusal is visible, with its reason — a truncated feed that was
+  // correctly refused should not look like a sync that simply did not happen.
+  await expect(
+    datasets.locator('[data-dataset-status="REJECTED"]'),
+  ).toHaveCount(1);
+  await expect(datasets).toContainText("below the floor");
+});
+
+test("populated: shows held files and who is working the queue", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await mockOverview(
+    page,
+    overviewBody({
+      matchQueue: {
+        pending: 7,
+        pendingByAlgorithmVersion: { "2.0.0": 7 },
+        currentAlgorithmVersion: "2.0.0",
+      },
+      caseWorkload: { OPEN: 5, UNDER_REVIEW: 2 },
+      holds: {
+        activeHolds: 3,
+        decidableFiles: 9,
+        releasedInWindow: 1,
+        policy: { CONFIRMED_SANCTIONS_MATCH: "BLOCKED" },
+        staleAfterDays: 0,
+        configurationProblems: [],
+      },
+    }),
+  );
+  await page.goto("/screening-health");
+
+  await expect(page.getByTestId("ops-active-holds")).toContainText("3 / 9");
+  await expect(page.getByTestId("ops-pending-matches")).toContainText("7");
+  // A queue where everything is OPEN and nothing is UNDER_REVIEW is a queue
+  // nobody is working — which a bare "7 pending" would not reveal.
+  const workload = page.getByTestId("ops-case-workload");
+  await expect(workload.locator('[data-case-state="OPEN"]')).toContainText("5");
+  await expect(
+    workload.locator('[data-case-state="UNDER_REVIEW"]'),
+  ).toContainText("2");
+});
+
+test("populated: states when the recurring work next runs", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await mockOverview(page, overviewBody());
+  await page.goto("/screening-health");
+
+  await expect(page.getByTestId("ops-next-rescreen")).toContainText(
+    "2026-09-11",
+  );
+  await expect(page.getByTestId("ops-next-sync")).toContainText("2026-09-11");
+  // Never run is stated as such rather than shown blank.
+  await expect(page.getByTestId("ops-last-sync-success")).toContainText(
+    "never",
+  );
+});
+
+test("empty: says no list generation exists rather than rendering a blank table", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await mockOverview(page, overviewBody());
+  await page.goto("/screening-health");
+
+  await expect(page.getByTestId("ops-attempts-empty")).toBeVisible();
+  const empty = page.getByTestId("ops-datasets-empty");
+  await expect(empty).toBeVisible();
+  // And it is an alert, not a neutral note: with no generation, no customer
+  // can be treated as clear.
+  await expect(empty).toHaveAttribute("role", "alert");
+  await expect(page.getByTestId("ops-sync-empty")).toBeVisible();
+});
+
+test("error: a failing overview surfaces a message, not a half-rendered page", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await page.route("**/screening/overview*", (route) =>
+    route.fulfill({ status: 500, json: { message: "boom" } }),
+  );
+  await page.goto("/screening-health");
+
+  await expect(page.getByRole("alert").first()).toBeVisible();
+  // Nothing from the operations view is rendered against failed data.
+  await expect(page.getByTestId("ops-attempts")).toHaveCount(0);
+});
+
+test("permission denied: the operations view is not rendered at all", async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await mockHealth(page, health());
+  await page.route("**/screening/overview*", (route) =>
+    route.fulfill({ status: 403, json: { message: "Forbidden" } }),
+  );
+  await page.goto("/screening-health");
+
+  await expect(page.getByRole("alert").first()).toBeVisible();
+  await expect(page.getByTestId("ops-holds")).toHaveCount(0);
+});
+
+test("renders the operations view in Arabic with RTL direction", async ({
+  page,
+}) => {
+  await mockAuth(page, "AR");
+  await mockHealth(page, health());
+  await mockOverview(
+    page,
+    overviewBody({
+      attempts: {
+        total: 10,
+        byOutcome: { NO_MATCH: 8, SCREENING_FAILED: 2 },
+        byProvider: { built_in: 10 },
+        unresolved: 2,
+        unresolvedRate: 0.2,
+        recentUnresolved: [],
+      },
+    }),
+  );
+  await page.goto("/screening-health");
+
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  // The numbers are the same in either direction; the surrounding prose is not.
+  await expect(page.getByTestId("ops-unresolved-rate")).toContainText("20%");
+  await expect(page.getByTestId("ops-attempts")).toContainText("عمليات الفحص");
 });

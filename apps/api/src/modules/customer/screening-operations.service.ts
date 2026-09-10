@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MATCHING_ALGORITHM_VERSION } from '../compliance-risk/watchlist-match.config';
 import { loadHoldPolicy } from './screening-hold.config';
+import {
+  SANCTIONS_RESCREEN_CRON,
+  WATCHLIST_SYNC_CRON,
+} from '../compliance-risk/watchlist-sync.config';
+import { nextCronRun } from './screening-schedule.util';
 
 /**
  * Part B §18/§28/§33 — what an operator needs to see to know whether screening
@@ -43,6 +48,10 @@ export class ScreeningOperationsService {
       pendingMatches,
       holdsReleased,
       matchProvenance,
+      caseWorkload,
+      datasets,
+      heldFiles,
+      decidableFiles,
     ] = await Promise.all([
       this.prisma.client.screeningRequest.groupBy({
         by: ['outcome'],
@@ -103,6 +112,60 @@ export class ScreeningOperationsService {
         where: { status: 'pending' },
         _count: { _all: true },
       }),
+      // Part B §16 — open case work, by workflow state. A queue where
+      // everything is OPEN and nothing is UNDER_REVIEW is a queue nobody is
+      // working, which no count of "pending" alone would reveal.
+      this.prisma.client.screeningMatch.groupBy({
+        by: ['caseStatus'],
+        where: { status: 'pending' },
+        _count: { _all: true },
+      }),
+      // Part B §6 — the generations, so an operator can see which list is live.
+      this.prisma.client.watchlistDatasetVersion.findMany({
+        orderBy: { downloadedAt: 'desc' },
+        take: 8,
+        select: {
+          id: true,
+          source: true,
+          status: true,
+          version: true,
+          recordCount: true,
+          addedCount: true,
+          downloadedAt: true,
+          publishedAt: true,
+          rejectionReason: true,
+          rollbackReason: true,
+        },
+      }),
+      // Part B §17 — files sitting in a decidable state that a hold is
+      // currently stopping. Counted from the same signals the hold evaluator
+      // reads, rather than by evaluating every file (which would be one query
+      // per KYC record on a dashboard read).
+      this.prisma.client.kYCRecord.count({
+        where: {
+          status: { in: ['SCREENING', 'EDD'] },
+          OR: [
+            {
+              screeningResults: {
+                some: {
+                  attemptOutcome: {
+                    in: [
+                      'NOT_CONFIGURED',
+                      'SCREENING_FAILED',
+                      'UNABLE_TO_SCREEN',
+                    ],
+                  },
+                },
+              },
+            },
+            { screeningMatches: { some: { status: 'pending' } } },
+            { screeningMatches: { some: { status: 'confirmed' } } },
+          ],
+        },
+      }),
+      this.prisma.client.kYCRecord.count({
+        where: { status: { in: ['SCREENING', 'EDD'] } },
+      }),
     ]);
 
     const total = byOutcome.reduce((sum, row) => sum + row._count._all, 0);
@@ -152,7 +215,38 @@ export class ScreeningOperationsService {
         ),
         currentAlgorithmVersion: MATCHING_ALGORITHM_VERSION,
       },
+      caseWorkload: Object.fromEntries(
+        caseWorkload.map((row) => [row.caseStatus, row._count._all]),
+      ),
+      datasets: datasets.map((d) => ({
+        ...d,
+        downloadedAt: d.downloadedAt.toISOString(),
+        publishedAt: d.publishedAt?.toISOString() ?? null,
+      })),
+      /**
+       * Part B §19 — when the recurring work last ran and when it runs next,
+       * computed from the same cron expressions the schedulers are registered
+       * with rather than restated. A dashboard that says "every 4 hours" while
+       * the scheduler says something else is worse than saying nothing.
+       */
+      schedules: {
+        rescreenBatch: {
+          cron: SANCTIONS_RESCREEN_CRON,
+          nextRunAt: nextCronRun(SANCTIONS_RESCREEN_CRON),
+        },
+        listSync: {
+          cron: WATCHLIST_SYNC_CRON,
+          nextRunAt: nextCronRun(WATCHLIST_SYNC_CRON),
+          lastSuccessAt:
+            syncRuns
+              .find((r) => r.status === 'succeeded' && r.completedAt)
+              ?.completedAt?.toISOString() ?? null,
+        },
+      },
       holds: {
+        /** Files in a decidable state that a hold is currently stopping. */
+        activeHolds: heldFiles,
+        decidableFiles,
         releasedInWindow: holdsReleased,
         policy: policy.levels,
         staleAfterDays: policy.staleAfterDays,

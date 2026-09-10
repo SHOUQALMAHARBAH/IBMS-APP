@@ -78,3 +78,79 @@ export function getScreeningHealth(): Promise<ScreeningHealth> {
 export function getScreeningConfig(): Promise<ScreeningConfig> {
   return apiGet("/screening/providers/config");
 }
+
+/**
+ * Part B §18/§28/§33 — the operations view.
+ *
+ * What a health check cannot answer: how many customers were actually
+ * screened, how much of the queue nobody has picked up, which list generation
+ * is live, and when the recurring work runs next.
+ */
+export interface ScreeningOverview {
+  windowDays: number;
+  since: string;
+  attempts: {
+    total: number;
+    byOutcome: Record<string, number>;
+    byProvider: Record<string, number>;
+    unresolved: number;
+    unresolvedRate: number;
+    recentUnresolved: {
+      correlationId: string;
+      outcome: string;
+      failureReason: string | null;
+      providerName: string;
+      startedAt: string;
+      durationMs: number | null;
+    }[];
+  };
+  matchQueue: {
+    pending: number;
+    pendingByAlgorithmVersion: Record<string, number>;
+    currentAlgorithmVersion: string;
+  };
+  caseWorkload: Record<string, number>;
+  datasets: {
+    id: string;
+    source: string;
+    status: string;
+    version: string;
+    recordCount: number | null;
+    addedCount: number | null;
+    downloadedAt: string;
+    publishedAt: string | null;
+    rejectionReason: string | null;
+    rollbackReason: string | null;
+  }[];
+  schedules: {
+    rescreenBatch: { cron: string; nextRunAt: string | null };
+    listSync: {
+      cron: string;
+      nextRunAt: string | null;
+      lastSuccessAt: string | null;
+    };
+  };
+  holds: {
+    activeHolds: number;
+    decidableFiles: number;
+    releasedInWindow: number;
+    policy: Record<string, string>;
+    staleAfterDays: number;
+    configurationProblems: string[];
+  };
+  listSync: {
+    source: string;
+    status: string;
+    recordCount: number | null;
+    addedCount: number | null;
+    startedAt: string;
+    completedAt: string | null;
+    errorMessage: string | null;
+  }[];
+}
+
+export function getScreeningOverview(
+  windowDays = 30,
+): Promise<ScreeningOverview> {
+  return apiGet(`/screening/overview?windowDays=${windowDays}`);
+}
