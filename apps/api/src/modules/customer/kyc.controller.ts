@@ -72,7 +72,18 @@ export class KycController {
    */
   @RequirePermissions('kyc.capture', 'kyc.approve')
   @Get('kyc-records/:id/screening-hold')
-  screeningHold(@Param('id') id: string) {
+  async screeningHold(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // Visibility FIRST, through the file's own canonical read. Holding
+    // `kyc.capture` does not entitle an officer to another officer's file: the
+    // hold view names how many matches are pending, whether the file is
+    // blocked, and who released a hold and when. `KycService.get()` already
+    // owns that rule (404, never 403 — a response must not be usable as an
+    // existence oracle for someone else's customer), so it is reused rather
+    // than restated here.
+    await this.kyc.get(id, user);
     return this.holds.view(id);
   }
 
