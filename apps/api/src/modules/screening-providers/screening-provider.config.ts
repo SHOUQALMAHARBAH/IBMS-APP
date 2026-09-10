@@ -13,6 +13,9 @@ import type { ScreeningProviderKind } from './screening-provider.types';
  */
 
 /** Env var names, in one place so nothing greps for a string literal. */
+/** See `ScreeningProviderConfig.idempotencyWindowMinutes`. */
+export const DEFAULT_IDEMPOTENCY_WINDOW_MINUTES = 15;
+
 export const SCREENING_ENV = {
   provider: 'SCREENING_PROVIDER',
   baseUrl: 'SCREENING_BASE_URL',
@@ -26,6 +29,7 @@ export const SCREENING_ENV = {
   thresholdHigh: 'SCREENING_MATCH_THRESHOLD_HIGH',
   thresholdReview: 'SCREENING_MATCH_THRESHOLD_REVIEW',
   thresholdLow: 'SCREENING_MATCH_THRESHOLD_LOW',
+  idempotencyWindowMinutes: 'SCREENING_IDEMPOTENCY_WINDOW_MINUTES',
 } as const;
 
 /**
@@ -66,6 +70,26 @@ export interface ScreeningProviderConfig {
   dataset: string | null;
   timeoutMs: number;
   maxRetries: number;
+  /**
+   * How long a screening attempt for the same file, the same people and the
+   * same provider is treated as a REPEAT of the previous one rather than a new
+   * screening.
+   *
+   * This exists because the first implementation had no window at all, and the
+   * consequence was severe: the idempotency key was derived from the KYC file,
+   * the subject set, the provider and the dataset — with nothing time-varying
+   * in it — so the SECOND time the 4-hourly recurring batch reached a customer
+   * it resumed the original attempt and never called the provider again. For
+   * `built_in` that was masked, because the real list check runs separately
+   * against the local cache; for `on_premise` and `commercial`, where the
+   * provider IS the only source, ongoing monitoring silently stopped after the
+   * first screening of each customer.
+   *
+   * Fifteen minutes: comfortably longer than any retry storm or double-submit,
+   * and far shorter than the four-hourly re-screen cadence it must not
+   * suppress.
+   */
+  idempotencyWindowMinutes: number;
   /**
    * Whether national ID / passport may be sent to the provider.
    *
@@ -134,6 +158,11 @@ export function readScreeningConfig(
     tenantId: env[SCREENING_ENV.tenantId]?.trim() || null,
     dataset: env[SCREENING_ENV.dataset]?.trim() || null,
     timeoutMs: envInt(SCREENING_ENV.timeoutMs, 10_000),
+    idempotencyWindowMinutes: envInt(
+      SCREENING_ENV.idempotencyWindowMinutes,
+      DEFAULT_IDEMPOTENCY_WINDOW_MINUTES,
+      1,
+    ),
     maxRetries: envInt(SCREENING_ENV.retries, 2, 0),
     sendIdentifiers: envBool(SCREENING_ENV.sendIdentifiers, false),
     datasetStaleAfterHours: envInt(SCREENING_ENV.staleAfterHours, 48),
@@ -202,6 +231,7 @@ export function describeConfig(config: ScreeningProviderConfig): {
   maxRetries: number;
   sendIdentifiers: boolean;
   datasetStaleAfterHours: number;
+  idempotencyWindowMinutes: number;
   thresholds: MatchThresholds;
   missing: string[];
   thresholdProblems: string[];
@@ -216,6 +246,10 @@ export function describeConfig(config: ScreeningProviderConfig): {
     maxRetries: config.maxRetries,
     sendIdentifiers: config.sendIdentifiers,
     datasetStaleAfterHours: config.datasetStaleAfterHours,
+    // Surfaced because raising it past the re-screening cadence silently
+    // stops ongoing monitoring — an operator should be able to see it without
+    // shell access to the deployment's environment.
+    idempotencyWindowMinutes: config.idempotencyWindowMinutes,
     thresholds: config.thresholds,
     missing: missingConfigFor(config),
     thresholdProblems: thresholdProblems(config.thresholds),

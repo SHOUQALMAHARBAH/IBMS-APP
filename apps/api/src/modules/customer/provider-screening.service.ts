@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { Prisma } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScreeningProviderRegistry } from '../screening-providers/screening-provider.registry';
 import { MATCHING_ALGORITHM_VERSION } from '../compliance-risk/watchlist-match.config';
@@ -79,26 +80,16 @@ export class ProviderScreeningService {
       subjects: input.subjects,
       provider: provider.kind,
       dataset: config.dataset,
+      bucket: idempotencyBucket(config.idempotencyWindowMinutes),
     });
 
     const existing = await this.prisma.client.screeningRequest.findUnique({
       where: { idempotencyKey },
     });
-    if (existing) {
-      // Already done. Returning the recorded outcome — rather than re-running
-      // — is what stops a retry storm minting duplicate compliance cases.
-      return {
-        requestId: existing.id,
-        correlationId: existing.correlationId,
-        outcome: existing.outcome,
-        provider: existing.provider,
-        providerName: existing.providerName,
-        datasetVersion: existing.datasetVersion,
-        failureReason: existing.failureReason,
-        candidates: [],
-        idempotentResume: true,
-      };
-    }
+    // Already done in this window. Returning the recorded outcome — rather
+    // than re-running — is what stops a retry storm minting duplicate
+    // compliance cases.
+    if (existing) return resumed(existing);
 
     const startedAt = new Date();
     let results: ProviderScreeningResult[];
@@ -138,37 +129,53 @@ export class ProviderScreeningService {
     });
 
     const completedAt = new Date();
-    const request = await this.prisma.client.screeningRequest.create({
-      data: {
-        kycRecordId: input.kycRecordId,
-        correlationId,
-        idempotencyKey,
-        subjectFingerprint: subjectFingerprint(input.subjects),
-        // Part B §13 — what decided this attempt, recorded with it. A stored
-        // score is not interpretable later without the line it was judged
-        // against and the matcher that produced it.
-        algorithmVersion: MATCHING_ALGORITHM_VERSION,
-        // Spread into a plain object: Prisma's JSON input type requires an
-        // index signature, which the named `MatchThresholds` interface
-        // deliberately does not have.
-        thresholds: { ...thresholds },
-        provider: provider.kind,
-        providerName: provider.name,
-        datasetVersion,
-        outcome,
-        failureReason,
-        candidateCount: results.reduce(
-          (sum, r) => sum + r.candidates.length,
-          0,
-        ),
-        // Filled in by the caller once cases are opened.
-        casesOpened: 0,
-        startedAt,
-        completedAt,
-        durationMs: completedAt.getTime() - startedAt.getTime(),
-        requestedByUserId: input.requestedByUserId,
-      },
-    });
+    let request: { id: string };
+    try {
+      request = await this.prisma.client.screeningRequest.create({
+        data: {
+          kycRecordId: input.kycRecordId,
+          correlationId,
+          idempotencyKey,
+          subjectFingerprint: subjectFingerprint(input.subjects),
+          // Part B §13 — what decided this attempt, recorded with it. A stored
+          // score is not interpretable later without the line it was judged
+          // against and the matcher that produced it.
+          algorithmVersion: MATCHING_ALGORITHM_VERSION,
+          // Spread into a plain object: Prisma's JSON input type requires an
+          // index signature, which the named `MatchThresholds` interface
+          // deliberately does not have.
+          thresholds: { ...thresholds },
+          provider: provider.kind,
+          providerName: provider.name,
+          datasetVersion,
+          outcome,
+          failureReason,
+          candidateCount: results.reduce(
+            (sum, r) => sum + r.candidates.length,
+            0,
+          ),
+          // Filled in by the caller once cases are opened.
+          casesOpened: 0,
+          startedAt,
+          completedAt,
+          durationMs: completedAt.getTime() - startedAt.getTime(),
+          requestedByUserId: input.requestedByUserId,
+        },
+      });
+    } catch (err) {
+      // The UNIQUE on `idempotencyKey` is the guarantee; the read above is
+      // only an optimisation (`race-safe-invariants.md`). Two concurrent
+      // requests in the same window both find nothing and both insert — and
+      // before this catch existed, the loser threw an unhandled P2002 and the
+      // caller saw a 500 for a screening that had in fact just succeeded.
+      if (isUniqueConstraintViolation(err)) {
+        const winner = await this.prisma.client.screeningRequest.findUnique({
+          where: { idempotencyKey },
+        });
+        if (winner) return resumed(winner);
+      }
+      throw err;
+    }
 
     if (isUnresolved(outcome)) {
       // Loud: this customer was NOT cleared, and not because they matched
@@ -248,6 +255,37 @@ export function bandFor(
   return 'below';
 }
 
+function isUniqueConstraintViolation(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+  );
+}
+
+/** The shape returned when an identical attempt already exists in this
+ * window — from the read fast-path and from the P2002 loser alike, so the two
+ * cannot drift apart. */
+function resumed(row: {
+  id: string;
+  correlationId: string;
+  outcome: ScreeningAttemptOutcome;
+  provider: string;
+  providerName: string;
+  datasetVersion: string | null;
+  failureReason: string | null;
+}): ScreeningExecution {
+  return {
+    requestId: row.id,
+    correlationId: row.correlationId,
+    outcome: row.outcome,
+    provider: row.provider,
+    providerName: row.providerName,
+    datasetVersion: row.datasetVersion,
+    failureReason: row.failureReason,
+    candidates: [],
+    idempotentResume: true,
+  };
+}
+
 /**
  * Part B §12 — a hash of the IDENTITY ATTRIBUTES actually screened.
  *
@@ -294,13 +332,37 @@ export function buildIdempotencyKey(input: {
   subjects: readonly ScreeningSubject[];
   provider: string;
   dataset: string | null;
+  /** The window this attempt falls in. See `idempotencyBucket`. */
+  bucket: number;
 }): string {
   const material = [
     input.provider,
     input.dataset ?? '-',
+    String(input.bucket),
     // Sorted: the same people in a different order is the same screening.
     ...[...input.subjects].map((s) => s.fullName.trim().toLowerCase()).sort(),
   ].join('|');
   const digest = createHash('sha256').update(material).digest('hex');
   return `${input.kycRecordId}:${digest.slice(0, 32)}`;
+}
+
+/**
+ * Which idempotency window a moment falls in.
+ *
+ * A coarse bucket rather than a sliding "was there an attempt in the last N
+ * minutes?" query, because the UNIQUE constraint on `idempotencyKey` is what
+ * actually makes this race-safe (`race-safe-invariants.md`) — and a constraint
+ * needs a deterministic key, which a sliding window cannot give.
+ *
+ * The cost is a boundary artefact: two requests a minute apart can straddle a
+ * bucket edge and both reach the provider. That is the harmless direction —
+ * one extra screening read, with the resulting candidates de-duplicated by
+ * `ScreeningMatch`'s own unique key. The opposite error, suppressing a genuine
+ * re-screen, is the one that stops ongoing monitoring dead.
+ */
+export function idempotencyBucket(
+  windowMinutes: number,
+  now: Date = new Date(),
+): number {
+  return Math.floor(now.getTime() / (windowMinutes * 60_000));
 }

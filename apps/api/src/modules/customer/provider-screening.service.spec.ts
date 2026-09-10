@@ -1,10 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '@ibms/db';
 import {
+  ProviderScreeningService,
   aggregateOutcome,
   bandFor,
   buildIdempotencyKey,
+  idempotencyBucket,
 } from './provider-screening.service';
 import type { ProviderScreeningResult } from '../screening-providers/screening-provider.types';
+import type { PrismaService } from '../../prisma/prisma.service';
+import type { ScreeningProviderRegistry } from '../screening-providers/screening-provider.registry';
 
 function result(
   outcome: ProviderScreeningResult['outcome'],
@@ -119,12 +124,14 @@ describe('idempotency key', () => {
       subjects,
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     const b = buildIdempotencyKey({
       kycRecordId: 'kyc-1',
       subjects,
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     expect(a).toBe(b);
   });
@@ -135,12 +142,14 @@ describe('idempotency key', () => {
       subjects,
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     const reversed = buildIdempotencyKey({
       kycRecordId: 'kyc-1',
       subjects: [...subjects].reverse(),
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     expect(forward).toBe(reversed);
   });
@@ -158,12 +167,14 @@ describe('idempotency key', () => {
       ],
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     const without = buildIdempotencyKey({
       kycRecordId: 'kyc-1',
       subjects,
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     expect(withExtra).not.toBe(without);
   });
@@ -175,6 +186,7 @@ describe('idempotency key', () => {
         subjects,
         provider: 'built_in',
         dataset: null,
+        bucket: 1,
       }),
     ).not.toBe(
       buildIdempotencyKey({
@@ -182,6 +194,7 @@ describe('idempotency key', () => {
         subjects,
         provider: 'commercial',
         dataset: null,
+        bucket: 1,
       }),
     );
   });
@@ -193,6 +206,7 @@ describe('idempotency key', () => {
         subjects,
         provider: 'on_premise',
         dataset: 'default',
+        bucket: 1,
       }),
     ).not.toBe(
       buildIdempotencyKey({
@@ -200,6 +214,7 @@ describe('idempotency key', () => {
         subjects,
         provider: 'on_premise',
         dataset: 'sanctions-only',
+        bucket: 1,
       }),
     );
   });
@@ -213,9 +228,321 @@ describe('idempotency key', () => {
       subjects,
       provider: 'built_in',
       dataset: null,
+      bucket: 1,
     });
     expect(key).toMatch(/^kyc-1:[0-9a-f]{32}$/);
     expect(key).not.toContain('Ahmad');
     expect(key).not.toContain('Acme');
+  });
+});
+
+describe('REGRESSION: the recurring batch has to actually re-screen', () => {
+  // The bug: `buildIdempotencyKey` was derived from the KYC file, the subject
+  // set, the provider and the dataset — with nothing time-varying in it. So
+  // the SECOND time the 4-hourly batch reached a customer, `execute()` found
+  // the original attempt and returned it without calling the provider. For
+  // `built_in` that was masked, because the real list check runs separately
+  // against the local cache. For `on_premise` and `commercial`, where the
+  // provider IS the only source, ongoing monitoring stopped dead after each
+  // customer's first screening — which is the entire point of the batch.
+  //
+  // Proven before it was fixed: the second run reported
+  // `idempotentResume: true` with the provider called exactly once.
+
+  function harness(windowMinutes = 15) {
+    const screenBatch = vi.fn().mockResolvedValue([
+      {
+        outcome: 'NO_MATCH',
+        candidates: [],
+        provider: 'commercial',
+        providerName: 'X',
+        correlationId: 'c',
+        durationMs: 1,
+      },
+    ]);
+
+    const rows = new Map<string, Record<string, unknown>>();
+    const create = vi.fn(({ data }: { data: Record<string, unknown> }) => {
+      const key = data.idempotencyKey as string;
+      if (rows.has(key)) {
+        // What Postgres does with the UNIQUE on `idempotencyKey`.
+        return Promise.reject(
+          new Prisma.PrismaClientKnownRequestError('duplicate', {
+            code: 'P2002',
+            clientVersion: 'test',
+          }),
+        );
+      }
+      const row = {
+        id: `r${rows.size}`,
+        correlationId: 'c',
+        outcome: 'NO_MATCH',
+        provider: 'commercial',
+        providerName: 'X',
+        datasetVersion: null,
+        failureReason: null,
+        ...data,
+      };
+      rows.set(key, row);
+      return Promise.resolve(row);
+    });
+
+    const prisma = {
+      client: {
+        screeningRequest: {
+          findUnique: vi.fn(
+            ({ where }: { where: { idempotencyKey: string } }) =>
+              Promise.resolve(rows.get(where.idempotencyKey) ?? null),
+          ),
+          create,
+        },
+      },
+    } as unknown as PrismaService;
+
+    const registry = {
+      resolve: () => ({ kind: 'commercial', name: 'X', screenBatch }),
+      config: () => ({
+        dataset: 'sanctions',
+        idempotencyWindowMinutes: windowMinutes,
+      }),
+      thresholds: () => ({ high: 0.9, review: 0.7, low: 0.5 }),
+      newCorrelationId: () => 'corr',
+    } as unknown as ScreeningProviderRegistry;
+
+    return {
+      service: new ProviderScreeningService(prisma, registry),
+      screenBatch,
+      create,
+      rows,
+    };
+  }
+
+  const input = {
+    kycRecordId: 'kyc-1',
+    subjects: [
+      {
+        subjectRef: 'customer:c1',
+        fullName: 'Sami Al-Rashid',
+        entityType: 'individual' as const,
+      },
+    ],
+    requestedByUserId: 'u1',
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('calls the provider again four hours later', async () => {
+    const { service, screenBatch } = harness();
+    vi.useFakeTimers();
+
+    vi.setSystemTime(new Date('2026-09-10T00:00:00Z'));
+    expect((await service.execute(input)).idempotentResume).toBe(false);
+
+    // The recurring batch, one cadence later.
+    vi.setSystemTime(new Date('2026-09-10T04:00:00Z'));
+    const second = await service.execute(input);
+
+    expect(second.idempotentResume).toBe(false);
+    expect(screenBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it('still resumes an immediate retry — the reason the key exists', async () => {
+    const { service, screenBatch } = harness();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-10T00:00:00Z'));
+
+    await service.execute(input);
+    // A duplicated request seconds later must NOT mint a second set of
+    // compliance cases.
+    vi.setSystemTime(new Date('2026-09-10T00:00:20Z'));
+    const retry = await service.execute(input);
+
+    expect(retry.idempotentResume).toBe(true);
+    expect(screenBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours a configured window', async () => {
+    const { service, screenBatch } = harness(60);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-10T00:00:00Z'));
+    await service.execute(input);
+
+    // 30 minutes on, inside a 60-minute window: still a repeat.
+    vi.setSystemTime(new Date('2026-09-10T00:30:00Z'));
+    expect((await service.execute(input)).idempotentResume).toBe(true);
+    expect(screenBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('a changed subject set re-screens immediately, window or not', async () => {
+    // A UBO added seconds after a screening is a different screening.
+    const { service, screenBatch } = harness();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-10T00:00:00Z'));
+    await service.execute(input);
+
+    const withUbo = {
+      ...input,
+      subjects: [
+        ...input.subjects,
+        {
+          subjectRef: 'ubo:u1',
+          fullName: 'Layla Haddad',
+          entityType: 'individual' as const,
+        },
+      ],
+    };
+    expect((await service.execute(withUbo)).idempotentResume).toBe(false);
+    expect(screenBatch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('REGRESSION: the UNIQUE constraint is the guarantee, so P2002 must resume', () => {
+  // The comment said "A UNIQUE constraint on the key is what enforces it; the
+  // read below is an optimisation, not the guarantee" — and nothing caught the
+  // constraint firing. Two concurrent requests both found nothing, both
+  // inserted, and the loser threw an unhandled P2002: a 500 for a screening
+  // that had in fact just succeeded.
+  it('the loser of a concurrent insert resumes the winner instead of throwing', async () => {
+    const screenBatch = vi.fn().mockResolvedValue([
+      {
+        outcome: 'NO_MATCH',
+        candidates: [],
+        provider: 'commercial',
+        providerName: 'X',
+        correlationId: 'c',
+        durationMs: 1,
+      },
+    ]);
+
+    const winner = {
+      id: 'winner',
+      correlationId: 'winner-corr',
+      outcome: 'NO_MATCH',
+      provider: 'commercial',
+      providerName: 'X',
+      datasetVersion: null,
+      failureReason: null,
+    };
+
+    let readCount = 0;
+    const prisma = {
+      client: {
+        screeningRequest: {
+          // First read (the fast path) sees nothing — the winner has not
+          // committed yet. The read AFTER the P2002 sees it.
+          findUnique: vi.fn(() =>
+            Promise.resolve(readCount++ === 0 ? null : winner),
+          ),
+          create: vi.fn(() =>
+            Promise.reject(
+              new Prisma.PrismaClientKnownRequestError('duplicate', {
+                code: 'P2002',
+                clientVersion: 'test',
+              }),
+            ),
+          ),
+        },
+      },
+    } as unknown as PrismaService;
+
+    const registry = {
+      resolve: () => ({ kind: 'commercial', name: 'X', screenBatch }),
+      config: () => ({ dataset: 'sanctions', idempotencyWindowMinutes: 15 }),
+      thresholds: () => ({ high: 0.9, review: 0.7, low: 0.5 }),
+      newCorrelationId: () => 'loser-corr',
+    } as unknown as ScreeningProviderRegistry;
+
+    const service = new ProviderScreeningService(prisma, registry);
+    const result = await service.execute({
+      kycRecordId: 'kyc-1',
+      subjects: [
+        {
+          subjectRef: 'customer:c1',
+          fullName: 'Sami Al-Rashid',
+          entityType: 'individual' as const,
+        },
+      ],
+      requestedByUserId: 'u1',
+    });
+
+    expect(result.idempotentResume).toBe(true);
+    expect(result.requestId).toBe('winner');
+    // The caller is handed the WINNER's correlation id, not its own — that is
+    // the attempt whose record actually exists.
+    expect(result.correlationId).toBe('winner-corr');
+  });
+
+  it('rethrows a constraint violation it cannot resolve', async () => {
+    // A P2002 on some other constraint is a real error, not an idempotent
+    // repeat, and swallowing it would hide a genuine failure.
+    const prisma = {
+      client: {
+        screeningRequest: {
+          findUnique: vi.fn(() => Promise.resolve(null)),
+          create: vi.fn(() =>
+            Promise.reject(
+              new Prisma.PrismaClientKnownRequestError('other', {
+                code: 'P2002',
+                clientVersion: 'test',
+              }),
+            ),
+          ),
+        },
+      },
+    } as unknown as PrismaService;
+
+    const registry = {
+      resolve: () => ({
+        kind: 'commercial',
+        name: 'X',
+        screenBatch: vi.fn().mockResolvedValue([
+          {
+            outcome: 'NO_MATCH',
+            candidates: [],
+            provider: 'commercial',
+            providerName: 'X',
+            correlationId: 'c',
+            durationMs: 1,
+          },
+        ]),
+      }),
+      config: () => ({ dataset: 'sanctions', idempotencyWindowMinutes: 15 }),
+      thresholds: () => ({ high: 0.9, review: 0.7, low: 0.5 }),
+      newCorrelationId: () => 'corr',
+    } as unknown as ScreeningProviderRegistry;
+
+    await expect(
+      new ProviderScreeningService(prisma, registry).execute({
+        kycRecordId: 'kyc-1',
+        subjects: [
+          {
+            subjectRef: 'customer:c1',
+            fullName: 'Sami Al-Rashid',
+            entityType: 'individual' as const,
+          },
+        ],
+        requestedByUserId: 'u1',
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe('idempotencyBucket', () => {
+  it('is stable inside a window and changes across one', () => {
+    const w = 15;
+    const at = (iso: string) => idempotencyBucket(w, new Date(iso));
+    expect(at('2026-09-10T00:00:00Z')).toBe(at('2026-09-10T00:14:59Z'));
+    expect(at('2026-09-10T00:00:00Z')).not.toBe(at('2026-09-10T00:15:01Z'));
+  });
+
+  it('a 4-hour gap is always a different bucket at any sane window', () => {
+    for (const w of [1, 5, 15, 60, 120]) {
+      expect(
+        idempotencyBucket(w, new Date('2026-09-10T00:00:00Z')),
+        `window ${w}`,
+      ).not.toBe(idempotencyBucket(w, new Date('2026-09-10T04:00:00Z')));
+    }
   });
 });

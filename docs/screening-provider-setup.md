@@ -137,6 +137,7 @@ the vendor: two customers of the same provider can have different list access.
 | `SCREENING_SEND_IDENTIFIERS` | `false` | Whether national ID / passport number leave this system |
 | `SCREENING_TENANT_ID` | — | Vendor tenant, where the contract uses one |
 | `SCREENING_DATASET_STALE_AFTER_HOURS` | `48` | Dataset age past which health reports DEGRADED |
+| `SCREENING_IDEMPOTENCY_WINDOW_MINUTES` | `15` | How long an identical attempt counts as a REPEAT rather than a new screening |
 
 `SCREENING_API_KEY` is read from the environment and **never** returned by any
 endpoint, not even masked. `GET /screening/providers/config` reports
@@ -144,6 +145,24 @@ endpoint, not even masked. `GET /screening/providers/config` reports
 endpoint that writes provider settings: a credential that can be written
 through HTTP can be read back through HTTP, and every screen that edits a key
 eventually grows a "show" button.
+
+### The idempotency window — read this before changing it
+
+An attempt for the same KYC file, the same people and the same provider inside
+`SCREENING_IDEMPOTENCY_WINDOW_MINUTES` resumes the previous one instead of
+calling the provider again. That is what stops a retry storm or a
+double-submitted request from minting a second set of compliance cases.
+
+**Do not raise it past the re-screening cadence.** The first implementation had
+no window at all, and the consequence was severe: the second time the 4-hourly
+recurring batch reached a customer it resumed the original attempt and never
+called the provider again. For `built_in` that was masked — the real list check
+runs separately against the local cache — but for `on_premise` and
+`commercial`, where the provider is the only source, **ongoing monitoring
+stopped after each customer's first screening.**
+
+A changed subject set produces a different key regardless of the window, so a
+UBO added seconds after a screening is screened immediately.
 
 ### Match thresholds
 
