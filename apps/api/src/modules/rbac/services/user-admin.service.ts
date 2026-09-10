@@ -13,6 +13,10 @@ import { AuditService } from '../../audit/audit.service';
 import type { RecordAuditEntryInput } from '../../audit/audit.service';
 import { PermissionsService } from './permissions.service';
 import type { ProvisionUserDto } from '../dto/provision-user.dto';
+import {
+  segregationSignal,
+  type SegregationSignal,
+} from '../checker-roles.config';
 
 /** A book-wide admin list is a console view, not a report — capped like every
  * other unbounded read in this codebase (`ANALYTICS_POLICY_LIMIT` et al). */
@@ -147,6 +151,15 @@ export class UserAdminService {
       },
     });
 
+    await this.recordSegregationSignal(
+      segregationSignal({
+        roles: requested,
+        subjectUserId: user.id,
+        actorUserId,
+      }),
+      { subjectUserId: user.id, actorUserId, via: 'provision' },
+    );
+
     return {
       id: user.id,
       fullName: user.fullName,
@@ -185,6 +198,15 @@ export class UserAdminService {
       entityId: `${userId}:${role.id}`,
       afterValue: { userId, role: roleName, granted: true },
     });
+
+    await this.recordSegregationSignal(
+      segregationSignal({
+        roles: [roleName],
+        subjectUserId: userId,
+        actorUserId,
+      }),
+      { subjectUserId: userId, actorUserId, via: 'grantRole' },
+    );
 
     // The permission grid is cached for 60s per role-combination; an admin
     // must not have to wait out the TTL to see their own grant take effect.
@@ -307,6 +329,59 @@ export class UserAdminService {
       afterValue: { isActive },
     });
     return { userId, isActive };
+  }
+
+  /**
+   * Emits a distinct, queryable record when an administrator hands out the
+   * CHECKER half of a maker/checker pair.
+   *
+   * `assertDifferentActors` enforces maker != checker on one identity. It
+   * cannot see that one human holds two. A `user.manage` holder can provision
+   * a second account carrying the other half of any pair and work both sides
+   * single-handed — no dual control, and nothing that looks unusual in any
+   * existing record.
+   *
+   * `maker-checker-segregation.md` is explicit that "admin consoles and
+   * back-office override tools" are NOT exempt from that rule, so this is not
+   * a gap in the lex; it is a gap in what the system can SEE. This closes the
+   * visibility half. It deliberately does not BLOCK: requiring a second
+   * administrator to provision would invent a dual-control policy for
+   * provisioning that the business has not agreed to, which is not a call to
+   * make unilaterally on a regulated control. A detective control is a real
+   * control; a silent one is not.
+   *
+   * Never throws — a grant that has already committed must not be reported as
+   * a failure because its signal could not be written.
+   */
+  private async recordSegregationSignal(
+    signal: SegregationSignal | null,
+    context: { subjectUserId: string; actorUserId: string; via: string },
+  ): Promise<void> {
+    if (!signal) return;
+
+    const roles = signal.checkerRoles.join(', ');
+    const message = signal.selfGrant
+      ? `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted THEMSELVES the checker role(s) ${roles} via ${context.via}. One identity now holds both halves of a maker/checker pair.`
+      : `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted checker role(s) ${roles} to user ${context.subjectUserId} via ${context.via}. Verify this is not a second identity for an existing maker.`;
+
+    // Self-grant is the shape that needs no second account at all, so it is
+    // the stronger signal and is logged as an error rather than a warning.
+    if (signal.selfGrant) this.logger.error(message);
+    else this.logger.warn(message);
+
+    await this.safeAudit({
+      userId: context.actorUserId,
+      action: 'UPDATE',
+      entityType: 'SegregationOfDutiesSignal',
+      entityId: context.subjectUserId,
+      afterValue: {
+        checkerRoles: signal.checkerRoles,
+        selfGrant: signal.selfGrant,
+        grantedByUserId: context.actorUserId,
+        grantedToUserId: context.subjectUserId,
+        via: context.via,
+      },
+    });
   }
 
   /** Audit failures never fail the request — the write has already committed
