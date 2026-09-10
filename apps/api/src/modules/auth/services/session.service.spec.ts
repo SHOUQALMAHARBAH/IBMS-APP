@@ -10,6 +10,7 @@ import {
 function makeConfig(overrides: Partial<SecurityConfig> = {}): SecurityConfig {
   return {
     id: 'default',
+    organizationId: 'org-1',
     idleTimeoutMinutes: 15,
     hardLogoutAfterIdleMinutes: 30,
     accessTokenTtlMinutes: 15,
@@ -26,6 +27,7 @@ function makeConfig(overrides: Partial<SecurityConfig> = {}): SecurityConfig {
 function makeSession(overrides: Partial<UserSession> = {}): UserSession {
   return {
     id: 'session-1',
+    organizationId: 'org-1',
     userId: 'user-1',
     refreshTokenId: null,
     createdAt: new Date(),
@@ -43,6 +45,7 @@ function makeSession(overrides: Partial<UserSession> = {}): UserSession {
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 'user-1',
+    organizationId: 'org-1',
     fullName: 'Test User',
     email: 'test@ibms.test',
     passwordHash: 'x',

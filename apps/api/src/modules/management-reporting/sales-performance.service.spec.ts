@@ -13,6 +13,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 
 const TARGET: SalesTarget = {
   id: 'target-1',
+  organizationId: 'org-1',
   ownerUserId: 'sales-1',
   branchId: null,
   periodLabel: '2026-Q4',

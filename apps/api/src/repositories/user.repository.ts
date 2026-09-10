@@ -7,8 +7,24 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Multi-tenancy Phase 1 — `findFirst`, not `findUnique`.
+   *
+   * `User.email` is no longer globally unique: the constraint is now
+   * `@@unique([organizationId, email])` (spec §3.2/§4.1.3), because two
+   * brokerage offices may legitimately hold the same address. `findUnique`
+   * cannot express "by email alone" against a compound key, so this reads the
+   * first match instead.
+   *
+   * That is exactly equivalent today — Phase 1 seats exactly one Organization,
+   * so at most one row can match. It stops being equivalent the moment a
+   * second Organization exists: PHASE 2 MUST give this method the caller's
+   * resolved `organizationId` and go back to a real unique read
+   * (`findUnique({ where: { organizationId_email: { organizationId, email } } })`).
+   * Until then, login resolves no org, so there is none to pass.
+   */
   findByEmail(email: string): Promise<User | null> {
-    return this.prisma.client.user.findUnique({ where: { email } });
+    return this.prisma.client.user.findFirst({ where: { email } });
   }
 
   findById(id: string): Promise<User | null> {

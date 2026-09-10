@@ -6,6 +6,7 @@ import type { AccessAnomalyAlertRepository } from '../../repositories/access-ano
 function makeEntry(overrides?: Partial<AuditLogEntry>): AuditLogEntry {
   return {
     id: 'entry-1',
+    organizationId: 'org-1',
     userId: 'user-1',
     action: 'READ',
     entityType: 'Customer',

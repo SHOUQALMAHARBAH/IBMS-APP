@@ -34,6 +34,7 @@ function invoiceFixture(over?: {
 }): InvoiceWithCycle {
   return {
     id: 'inv-1',
+    organizationId: 'org-1',
     policyId: over?.policyId === undefined ? 'pol-1' : over.policyId,
     customerId: 'cust-1',
     invoiceType: 'new_business_premium',
@@ -53,6 +54,7 @@ function invoiceFixture(over?: {
 function receiptFixture(over?: Partial<ReceiptFixture>): ReceiptFixture {
   return {
     id: 'rcpt-1',
+    organizationId: 'org-1',
     invoiceId: 'inv-1',
     amount: d('115350.000'),
     method: 'bank_transfer',
@@ -533,6 +535,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
           receiptFixture({
             remittance: {
               id: 'rem-1',
+              organizationId: 'org-1',
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
@@ -586,6 +589,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
           receiptFixture({
             remittance: {
               id: 'rem-1',
+              organizationId: 'org-1',
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
@@ -610,6 +614,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
           receiptFixture({
             remittance: {
               id: 'rem-1',
+              organizationId: 'org-1',
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('999.000'),
@@ -634,6 +639,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
           receiptFixture({
             remittance: {
               id: 'rem-1',
+              organizationId: 'org-1',
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
@@ -657,6 +663,7 @@ describe('CollectionService.recordRemittance (Process 32)', () => {
         receiptFixture({
           remittance: {
             id: 'rem-1',
+            organizationId: 'org-1',
             receiptId: 'rcpt-1',
             insurerId: 'ins-1',
             amount: d('105600.000'),
@@ -846,6 +853,7 @@ describe('CollectionService — Process 38 payment channels', () => {
           receiptFixture({
             remittance: {
               id: 'rem-1',
+              organizationId: 'org-1',
               receiptId: 'rcpt-1',
               insurerId: 'ins-1',
               amount: d('105600.000'),
@@ -920,6 +928,7 @@ describe('CollectionService — Process 38 payment channels', () => {
     const landed = receiptFixture({
       remittance: {
         id: 'rem-1',
+        organizationId: 'org-1',
         receiptId: 'rcpt-1',
         insurerId: 'ins-1',
         amount: d('105600.000'),

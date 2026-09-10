@@ -37,10 +37,17 @@ import type { RevealFieldDto } from './dto/reveal-field.dto';
 
 /** Masked view of a Customer's own `-- ENCRYPT` fields for the profile
  * screen (Part 10.6 — masked-by-default, full reveal only via
- * SensitiveFieldRevealService.reveal()). */
+ * SensitiveFieldRevealService.reveal()).
+ *
+ * `organizationId` is omitted alongside the encrypted columns, for a
+ * different reason: it is multi-tenancy plumbing (spec §3.2), not customer
+ * data. A user only ever reaches customers inside their own Organization, so
+ * echoing the tenant id back tells the client nothing it does not already
+ * know — and keeping it off the wire means this response shape is byte-for-
+ * byte what it was before multi-tenancy, which is what Phase 1 requires. */
 export interface MaskedCustomer extends Omit<
   Customer,
-  'nationalIdEnc' | 'contactPhoneEnc' | 'contactEmailEnc'
+  'organizationId' | 'nationalIdEnc' | 'contactPhoneEnc' | 'contactEmailEnc'
 > {
   nationalId: string | null;
   contactPhone: string | null;
@@ -257,7 +264,13 @@ export class CustomerService {
     query: ListCustomersQueryDto,
     actor: AuthenticatedUser,
   ): Promise<
-    Omit<Customer, 'nationalIdEnc' | 'contactPhoneEnc' | 'contactEmailEnc'>[]
+    Omit<
+      Customer,
+      // `organizationId` omitted for the same reason as on MaskedCustomer —
+      // tenancy plumbing, not customer data, and keeping it out preserves the
+      // pre-multi-tenancy response shape exactly.
+      'organizationId' | 'nationalIdEnc' | 'contactPhoneEnc' | 'contactEmailEnc'
+    >[]
   > {
     const canViewAllOwners = actor.roles.some((role) =>
       (CUSTOMER_CROSS_OWNER_ROLES as readonly string[]).includes(role),
