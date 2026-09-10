@@ -5,6 +5,7 @@ import { SlaTimerService } from './sla-timer.service';
 import { SlaTimerScheduler } from './sla-timer.scheduler';
 import { SlaPolicyService } from './sla-policy.service';
 import { SlaPolicyController } from './sla-policy.controller';
+import { SlaTimerController } from './sla-timer.controller';
 import { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
 
 @Global()
@@ -16,7 +17,7 @@ import { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
   // resolves the regulatory-metadata permission the same way PermissionsGuard
   // does, so there is one notion of "holds this permission".
   imports: [AuthModule, RbacModule],
-  controllers: [SlaPolicyController],
+  controllers: [SlaPolicyController, SlaTimerController],
   providers: [
     SlaTimerService,
     SlaTimerScheduler,
