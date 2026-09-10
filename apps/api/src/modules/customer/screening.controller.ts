@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ScreeningService } from './screening.service';
 import { ScreeningMatchService } from './screening-match.service';
+import { ScreeningOperationsService } from './screening-operations.service';
+import { ScreeningOverviewQueryDto } from './dto/screening-overview-query.dto';
 import {
   ListScreeningMatchesDto,
   ReviewScreeningMatchDto,
@@ -23,7 +25,26 @@ export class ScreeningController {
   constructor(
     private readonly screening: ScreeningService,
     private readonly matches: ScreeningMatchService,
+    private readonly operations: ScreeningOperationsService,
   ) {}
+
+  /**
+   * Part B §18/§28/§33 — the operations view.
+   *
+   * A provider health check answers "can I reach it right now?". This answers
+   * the question that actually matters: how many of our customers were
+   * screened for real? A deployment can pass every health check while a third
+   * of its attempts come back SCREENING_FAILED, each one correctly refusing to
+   * say NO_MATCH and each one silently held, with nobody watching the total.
+   *
+   * Counts, outcomes, versions and timestamps only — no subject PII, so this
+   * needs no `isSensitiveDataAccess` read.
+   */
+  @RequirePermissions('sanctions-pep.screen')
+  @Get('overview')
+  overview(@Query() query: ScreeningOverviewQueryDto) {
+    return this.operations.overview(query.windowDays ?? 30);
+  }
 
   @RequirePermissions('sanctions-pep.screen')
   @Post('recurring-batch')

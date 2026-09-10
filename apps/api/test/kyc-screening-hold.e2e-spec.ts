@@ -833,3 +833,101 @@ describe('Part B §12 — a subject added after screening is not a screened subj
     expect(stored.nationality).toBe('JO');
   });
 });
+
+describe('Part B §33 — the operations view', () => {
+  it('reports what actually happened, gated, and free of subject PII', async () => {
+    const application = await boot();
+    await emptyWatchlistCache();
+
+    const sales = await makeUser(
+      application,
+      'ops-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const compliance = await makeUser(
+      application,
+      'ops-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+
+    // A Sales Officer cannot read it: it is a compliance operations view.
+    await request(application.getHttpServer())
+      .get('/screening/overview')
+      .set(bearer(sales.accessToken))
+      .expect(403);
+
+    const legalName = 'Operations Distinctive Screening Subject';
+    await startAndScreen(application, sales, compliance, legalName);
+
+    const res = await request(application.getHttpServer())
+      .get('/screening/overview?windowDays=1')
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+
+    const body = res.body as {
+      windowDays: number;
+      attempts: {
+        total: number;
+        byOutcome: Record<string, number>;
+        unresolved: number;
+        unresolvedRate: number;
+        recentUnresolved: { outcome: string; failureReason: string | null }[];
+      };
+      matchQueue: {
+        pending: number;
+        currentAlgorithmVersion: string;
+      };
+      holds: {
+        policy: Record<string, string>;
+        configurationProblems: string[];
+      };
+      listSync: unknown[];
+    };
+
+    expect(body.windowDays).toBe(1);
+    // The screening above ran against an empty cache, so it is unresolved —
+    // and the view says so rather than reporting a healthy total.
+    expect(body.attempts.total).toBeGreaterThan(0);
+    expect(body.attempts.byOutcome.UNABLE_TO_SCREEN).toBeGreaterThan(0);
+    expect(body.attempts.unresolved).toBeGreaterThan(0);
+    expect(body.attempts.unresolvedRate).toBeGreaterThan(0);
+    expect(body.attempts.recentUnresolved[0]?.outcome).toBe('UNABLE_TO_SCREEN');
+    // The failure reason names the remedy, not the customer.
+    expect(body.attempts.recentUnresolved[0]?.failureReason).toContain('sync');
+
+    // The hold policy in force is visible — configuration an operator can
+    // check without shell access to the deployment's environment.
+    expect(body.holds.policy.CONFIRMED_SANCTIONS_MATCH).toBe('BLOCKED');
+    expect(body.holds.policy.NEVER_SCREENED).toBe('BLOCKED');
+    expect(body.holds.configurationProblems).toEqual([]);
+
+    expect(body.matchQueue.currentAlgorithmVersion).toMatch(
+      /^[0-9]+\.[0-9]+\.[0-9]+$/,
+    );
+
+    // No subject PII anywhere in the payload. This view is read by operators
+    // who may not hold `isSensitiveDataAccess`.
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('Distinctive');
+    expect(serialized).not.toContain(legalName);
+  });
+
+  it('bounds the window rather than accepting an unbounded scan', async () => {
+    const application = await boot();
+    const compliance = await makeUser(
+      application,
+      'ops-window',
+      'COMPLIANCE_OFFICER',
+    );
+    for (const windowDays of ['0', '-5', '400', 'forever']) {
+      await request(application.getHttpServer())
+        .get(`/screening/overview?windowDays=${windowDays}`)
+        .set(bearer(compliance.accessToken))
+        .expect(400);
+    }
+    await request(application.getHttpServer())
+      .get('/screening/overview?windowDays=365')
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+  });
+});
