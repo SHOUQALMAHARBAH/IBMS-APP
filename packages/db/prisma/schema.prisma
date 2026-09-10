@@ -3219,6 +3219,167 @@ model AccessAnomalyAlert {
 }
 
 // ============================================================================
+// CONFIGURABLE SLA POLICIES
+// ============================================================================
+
+/// How an SLA duration is measured.
+///
+/// `BUSINESS_DAYS` is NOT `value * 24h` — it walks the configured working
+/// calendar (Jordan's weekend is Friday+Saturday, and `SlaHoliday` rows are
+/// skipped too). Getting that wrong silently moves a statutory deadline.
+enum SlaDurationUnit {
+  MINUTES
+  HOURS
+  BUSINESS_DAYS
+  CALENDAR_DAYS
+  MONTHS
+}
+
+/// Which working calendar a BUSINESS_DAYS duration walks.
+enum SlaCalendarType {
+  /// Jordan default: Friday+Saturday weekend, plus any `SlaHoliday` rows.
+  JORDAN_STANDARD
+  /// Round the clock — every day counts. For SLAs that genuinely do not
+  /// pause for weekends (e.g. a breach-containment clock).
+  CONTINUOUS_24_7
+  /// Weekend days supplied per-policy via `customWeekendDays`.
+  CUSTOM
+}
+
+/// WHERE AN SLA COMES FROM. The whole reason this table exists.
+///
+/// A duration alone cannot tell you whether missing it breaks the law or
+/// breaks an internal target, and the system must never present the second as
+/// the first. `SLA_REGISTRY` carried this only as free text inside `citation`,
+/// mixing genuine PDPL rows with ones whose own citation said "DRAFT,
+/// UNSOURCED" — indistinguishable to any consumer, and to any UI.
+enum SlaSourceType {
+  /// Backed by law/regulation. `sourceReference` + `sourceDocument` are
+  /// MANDATORY (enforced in `SlaPolicyService`, and by a CHECK constraint).
+  REGULATORY
+  /// The broker's own governance decision. The honest home for a drafted
+  /// figure with no authority behind it.
+  INTERNAL_POLICY
+  /// Owed to a counterparty under an agreement.
+  CONTRACTUAL
+  /// An operational/service target, not a commitment to anyone external.
+  OPERATIONAL
+  OTHER
+}
+
+enum SlaPolicyStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+/// One configurable SLA rule. Replaces the hard-coded `SLA_REGISTRY` const as
+/// the RUNTIME source of truth: changing "3 business days" to "5" is a row
+/// update, not a code change and redeploy.
+///
+/// The registry remains in code as the SEED baseline and as the compile-time
+/// list of known workflow names — it is where a new workflow declares itself.
+/// What it no longer is, is the thing the application reads at runtime.
+///
+/// `processType` matches `SlaTimer.workflowName` / `SlaRegistryEntry
+/// .workflowName`. `workflowState` narrows a policy to one state of that
+/// process where a workflow needs different deadlines at different stages;
+/// NULL means "the whole process".
+model SlaPolicy {
+  id            String  @id @default(uuid())
+  /// Stable human-facing identifier, e.g. "SLA-DSR-ACCESS". Quoted in
+  /// governance documents, so it must not change when the duration does.
+  policyCode    String  @unique
+  policyName    String
+  processType   String
+  /// NULL = applies to the whole process.
+  workflowState String?
+  description   String?
+
+  durationValue Int
+  durationUnit  SlaDurationUnit
+
+  calendarType      SlaCalendarType @default(JORDAN_STANDARD)
+  /// `SlaCalendarType.CUSTOM` only — `Date#getUTCDay()` numbering (0=Sunday).
+  customWeekendDays Int[]           @default([])
+  /// "HH:MM", 24h. Both NULL = the clock runs across the whole day. Only
+  /// meaningful for MINUTES/HOURS durations.
+  workingHoursStart String?
+  workingHoursEnd   String?
+  timezone          String          @default("Asia/Amman")
+
+  sourceType      SlaSourceType
+  /// e.g. "PDPL Art. 23(b)" or "INTERNAL-POLICY-AML-002". MANDATORY when
+  /// `sourceType` is REGULATORY.
+  sourceReference String?
+  /// e.g. "PRIV-SOP-05". MANDATORY when `sourceType` is REGULATORY.
+  sourceDocument  String?
+  sourceSection   String?
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  escalationEnabled Boolean @default(true)
+  /// Fraction of the SLA elapsed at which a record is "approaching due"
+  /// (0.8 = at 80%). Drives the APPROACHING_DUE status, not an escalation
+  /// write — the escalation stages below do that.
+  warningThreshold  Float   @default(0.8)
+
+  status SlaPolicyStatus @default(DRAFT)
+
+  createdByUserId String
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  escalations SlaPolicyEscalation[]
+  timers      SlaTimer[]
+
+  /// Read path: "the ACTIVE policy for this process (and state) right now".
+  @@index([processType, workflowState, status])
+  @@index([status, effectiveFrom])
+}
+
+/// One escalation stage of a policy. `offsetValue` is SIGNED and relative to
+/// the policy's own due date: 0 is the deadline itself, negative is an
+/// early-warning stage before it (the DSR T-3-business-days DPO alert).
+model SlaPolicyEscalation {
+  id          String          @id @default(uuid())
+  slaPolicyId String
+  slaPolicy   SlaPolicy       @relation(fields: [slaPolicyId], references: [id], onDelete: Cascade)
+  stageOrder  Int
+  offsetValue Int
+  offsetUnit  SlaDurationUnit
+  /// Free text: several targets named by the lex have no RBAC role yet
+  /// (General Manager, Legal Counsel). NULL = the deadline is tracked but no
+  /// named party is escalated to.
+  escalateTo  String?
+
+  @@unique([slaPolicyId, stageOrder])
+}
+
+/// A non-working day for business-day SLA math.
+///
+/// `business-days.util.ts` accounted for the weekend ONLY, and said so: "treat
+/// a computed business-day deadline as a lower bound rather than an exact one
+/// until a public-holiday calendar is supplied". This is that calendar.
+///
+/// `observedOn` is a DATE, not a timestamp — a holiday is a whole day in the
+/// policy's timezone, not an instant.
+model SlaHoliday {
+  id              String           @id @default(uuid())
+  observedOn      DateTime         @db.Date
+  name            String
+  /// NULL = applies to every calendar. Set to scope a holiday to one.
+  calendarType    SlaCalendarType?
+  createdByUserId String?
+  createdAt       DateTime         @default(now())
+
+  @@unique([observedOn, calendarType])
+  @@index([observedOn])
+}
+
+// ============================================================================
 // GENERIC SLA TIMER (Part 2 cross-cutting "Workflow & Notifications";
 // every lex-listed SLA in Part 6.2/7/3.x becomes a queryable row here, not
 // a note in a ticket)
@@ -3237,6 +3398,30 @@ model SlaTimer {
   escalatedTo  String? // role or user escalated to
   resolvedAt   DateTime?
   createdAt    DateTime  @default(now())
+
+  /// Which configured policy produced `dueAt`. Nullable: timers created
+  /// before SLA policies existed have none, and a caller may still compute a
+  /// domain-specific due date without going through a policy. When set, it is
+  /// what lets a reader answer "was this deadline regulatory or internal?"
+  /// about a HISTORICAL timer, even after the policy is later edited.
+  slaPolicyId String?
+  slaPolicy   SlaPolicy? @relation(fields: [slaPolicyId], references: [id])
+
+  /// PAUSE/RESUME. `pausedAt` set = the clock is stopped. `pausedTotalMs`
+  /// accumulates completed pauses, so remaining time is
+  /// `dueAt + pausedTotalMs (+ now - pausedAt while paused) - now`. Storing
+  /// accumulated pause rather than mutating `dueAt` keeps the ORIGINAL
+  /// deadline legible next to the adjusted one — a regulator asking "when was
+  /// this due?" gets a different answer from "how long did you have?", and
+  /// both are recoverable.
+  pausedAt      DateTime?
+  pausedTotalMs Int       @default(0)
+  pauseReason   String?
+
+  /// Stamped once by the escalation sweep when the adjusted deadline passes
+  /// unresolved, so a breach is a queryable fact rather than a comparison
+  /// every reader has to redo (and get the pause arithmetic right in).
+  breachedAt DateTime?
 
   serviceRequest ServiceRequest?
   complaint      Complaint?

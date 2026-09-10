@@ -69,6 +69,7 @@ const NAV_ITEMS: { href: string; labelKey: TranslationKey }[] = [
   { href: '/incidents', labelKey: 'navIncidentManagement' },
   { href: '/internal-controls', labelKey: 'navInternalControls' },
   { href: '/internal-audit-findings', labelKey: 'navInternalAuditFindings' },
+  { href: '/sla-policies', labelKey: 'navSlaPolicies' },
   { href: '/audit-trail', labelKey: 'navAuditTrail' },
   { href: '/kpi-dashboard', labelKey: 'navKpiDashboard' },
   { href: '/sales-performance', labelKey: 'navSalesPerformance' },
