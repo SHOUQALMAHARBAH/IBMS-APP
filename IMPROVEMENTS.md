@@ -546,6 +546,7 @@ system is used for anything.
 | `SLA_DASHBOARD_DUE_SOON_WINDOW` | #43 `sla-dashboard.config.ts` | 3 calendar days — a dashboard lookahead heuristic, not a registry SLA value, so lower stakes than the others in this table (doesn't move a deadline) but still an untraced number |
 | `FEEDBACK_SCORE_MIN`/`MAX` (satisfaction scale) | #45 `feedback.config.ts` | 1–5, common CSAT convention — no CX/Compliance SOP source |
 | `RENEWAL_INACTIVITY_THRESHOLD_BUSINESS_DAYS` | #46 `retention-case.config.ts` | 30 business days since `RenewalCase.triggeredAt` — no source; blocked on the same renewal-module gap as 3.6 anyway |
+| `sanctions_match_review` SLA | #49 `sla-registry.config.ts` | 3 business days, escalate to Compliance Officer — DRAFT/UNSOURCED. Neither `pdpl-sla-timers.md` nor `kyc-aml-sla-timers.md` covers turnaround for adjudicating a sanctions-list match. Drafted TIGHTER than the 5-day standard KYC review on the reasoning that an unadjudicated match on a LIVE customer is a live exposure, not a queued onboarding step — that reasoning is ours, not a regulator's. A CBJ AML/CFT instruction or the broker's own AML policy should supply the real figure. |
 
 ---
 
@@ -613,13 +614,65 @@ refunds, disposal and DSR closure. The compensating control is A.2's periodic
 access recertification, which explicitly does not exempt the administrator's
 own access.
 
-### 5.2 `P0` — Screening is simulated
+### 5.2 ~~`P0` — Screening is simulated~~ — LARGELY RESOLVED
 
-- Customer onboarding (#3–4) does **simulated** sanctions/PEP screening. No real
-  watchlist provider is integrated. `ScreeningResult` is populated with fake
-  outcomes.
-- **Fix:** integrate a real screening provider (or a maintained local list),
-  with a match-review queue and a maker/checker clear/escalate path.
+**This entry was stale.** A real provider integration landed with Process 49
+(`watchlist-sync`) and was never reflected here: `watchlist-fetchers.ts` pulls
+the **live OFAC SDN** and **UN Consolidated** lists (free, no API key), and
+`ScreeningService` has matched against that synced cache in every environment,
+production included. Verified live 2026-09-09: HTTP 200, 5.7 MB, **19,369
+records** parsed by this repo's own parser. The fictional fixture is a
+*second*, dev-only source, hard-gated off in production. Exactly the "a claim
+outlives the session that made it true" pattern this file's own 2026-09-07
+note warns about.
+
+**What was genuinely wrong, and is now fixed (2026-09-09):**
+
+- **Matching was exact token-set equality**, which silently missed the two
+  commonest real shapes for a Jordan-based broker: a different romanisation of
+  the same Arabic name (Muhammad/Mohammed), and a four-part national-ID name
+  against a two/three-part list entry. Both produced a **CLEAR** result — the
+  worst failure mode a sanctions control has. Replaced with containment
+  matching over canonical tokens (`watchlist-match.config.ts`), reusing the
+  curated transliteration table Part F item #6 already ships, so an
+  Arabic-script given name now collapses to the same key as its Latin
+  spelling. Proven against the live OFAC list: a name + an extra middle name
+  went **MISS → HIT**, while an exact name stayed a HIT.
+- **No match-review queue.** Added `ScreeningMatch` + `GET /screening/matches`
+  / `POST /screening/matches/:id/review`, with a mandatory written reason on
+  both outcomes and a status-conditional write so two reviewers cannot
+  overwrite each other. Conservative by design: a match escalates to EDD and
+  raises a queue item, and **never** auto-blocks or auto-suspends — fuzzy
+  matching produces false positives, so the decision is a person's.
+  Clearing a match does not unwind the EDD escalation it caused.
+
+**Still open (deliberately, and NOT to be self-selected):**
+
+- **No PEP data.** OFAC and UN are sanctions lists. The backlog asks for
+  "sanctions/PEP/AML" and there is no free PEP source — this needs a
+  commercial provider (Dow Jones / Refinitiv / ComplyAdvantage) with a
+  contract and an API key. The provider-adapter shape was scoped and
+  deliberately not built, because it could not be tested against the real
+  service without credentials.
+- **The sync has never been run on a real deployment**, so `WatchlistEntry`
+  starts empty. The 12-hourly `WatchlistSyncScheduler` and
+  `POST /watchlist-sync/run` both exist; someone has to run one. This is an
+  OPERATIONAL gap, no longer a silent one: as of 2026-09-10 an unsynced cache
+  no longer produces a CLEAR. A screening that could not reach a populated
+  list records `PENDING_INVESTIGATION` (the enum value that had sat in the
+  schema since the original model with zero writers), escalates to Compliance,
+  is counted separately by the recurring batch as `unscreenable`, and raises a
+  banner on the review-queue screen. A CLEAR now means "we checked a list and
+  this subject was not on it", never "we checked an empty table".
+- The transliteration table covers ~50 common Jordanian/Arab **given** names
+  and deliberately excludes family-name components. Family names across
+  scripts still will not match. Adding them is NOT a safe incremental change:
+  the table's own header records that "Al-"/"El-" prefixes "compose with far
+  more variation than a fixed-group table can safely represent without new
+  false-positive risk".
+- The `sanctions_match_review` SLA figure (3 business days) is **drafted, not
+  sourced** — see §4. The queue now has a tracked deadline and escalation;
+  what it does not have is a regulatory basis for that particular number.
 
 ### 5.3 `P1` — No AML/CFT transaction monitoring (#48)
 

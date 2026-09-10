@@ -5,11 +5,13 @@ import { KycController } from './kyc.controller';
 import { KycService } from './kyc.service';
 import { ScreeningController } from './screening.controller';
 import { ScreeningService } from './screening.service';
+import { ScreeningMatchService } from './screening-match.service';
 import { ScreeningBatchScheduler } from './screening-batch.scheduler';
 import { KycPeriodicReviewScheduler } from './kyc-periodic-review.scheduler';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
+import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { SecurityModule } from '../security/security.module';
@@ -39,6 +41,10 @@ import { ProspectModule } from '../prospect/prospect.module';
     CustomerService,
     KycService,
     ScreeningService,
+    // Process 49 — the human review queue fuzzy matching feeds. Fuzzy
+    // matching over-fires by design, so a person adjudicates every candidate;
+    // nothing auto-blocks a customer.
+    ScreeningMatchService,
     ScreeningBatchScheduler,
     KycPeriodicReviewScheduler,
     CustomerRepository,
@@ -48,6 +54,7 @@ import { ProspectModule } from '../prospect/prospect.module';
     // ComplianceRiskModule (which owns the sync writing these rows) —
     // instantiating it twice is safe and avoids a cross-module import.
     WatchlistEntryRepository,
+    ScreeningMatchRepository,
   ],
   // RiskProfileModule (Part C #5) reads a Customer's owner to resolve
   // visibility on Risk Profiles / Needs Assessments hung off it — reuses
