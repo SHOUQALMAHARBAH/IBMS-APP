@@ -322,7 +322,18 @@ model UserRoleAssignment {
   // deleted) as the audit record of when/that access was withdrawn.
   revokedAt DateTime?
 
-  @@unique([userId, roleId])
+  /// NOTE — there is deliberately NO `@@unique([userId, roleId])` here. The
+  /// real invariant is "at most one ACTIVE grant per (user, role)", which is
+  /// a PARTIAL unique Prisma cannot express:
+  /// `UserRoleAssignment_one_active_per_user_role`, raw SQL in migration
+  /// 20260920140000, `WHERE "revokedAt" IS NULL`.
+  ///
+  /// A full compound unique allowed only one row per pair, so re-granting a
+  /// role forced an upsert that cleared `revokedAt` and overwrote `grantedAt`
+  /// — erasing the audit record this very column exists to hold. Revoked rows
+  /// are history and must be unlimited. `prisma migrate dev` will offer to
+  /// re-add the full unique as drift; do NOT accept it.
+  @@index([userId, roleId])
 }
 
 /// Part 10.1 — periodic (e.g. quarterly) access recertification workflow.

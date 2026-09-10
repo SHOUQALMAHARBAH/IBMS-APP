@@ -8,14 +8,15 @@ interface ClientStore {
 }
 
 /**
- * Singleton in-memory rate limiter for high-risk endpoints (auth, password reset).
- * Tracks requests per IP address within a sliding window.
- * Shared globally to prevent endpoint-bypass attacks (login -> signup -> forgot-password bypass).
- * For production with multiple replicas, use redis-based rate limiting instead.
+ * In-memory rate limiter for high-risk endpoints (auth, MFA, password reset).
  *
- * SECURITY NOTE: This is a per-process, per-IP limiter. In a multi-process deployment,
- * use Redis or a distributed rate limiter to track across all servers. The entries are
- * cleaned up on access (lazy cleanup) to prevent unbounded memory growth.
+ * FIXED window, not sliding: `resetTime` is stamped once when a bucket is
+ * created and the whole bucket resets at that instant. (The header used to say
+ * "sliding window", which it never was.)
+ *
+ * SECURITY NOTE: per-process. In a multi-replica deployment use Redis or
+ * another shared store — three replicas behind a load balancer means three
+ * times the budget.
  *
  * ENFORCED IN PRODUCTION ONLY — the same `NODE_ENV` gate `securityHeaders()`'s
  * TLS enforcement, the secure-cookie flag and `ENABLE_DEV_RESET_TOKEN` already
@@ -41,6 +42,14 @@ function limiterEnabled(): boolean {
   );
 }
 
+/**
+ * Hard ceiling on distinct buckets held in memory. An attacker who can
+ * influence the bucket key (see `getClientIp`) would otherwise grow this map
+ * without bound — `performCleanup` alone cannot prevent that, because it runs
+ * at most hourly and retains entries for a further 24h.
+ */
+const MAX_TRACKED_BUCKETS = 50_000;
+
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private static readonly store = new Map<string, ClientStore>();
@@ -50,10 +59,12 @@ export class RateLimitGuard implements CanActivate {
 
   private readonly windowMs: number = 15 * 60 * 1000;
   private readonly maxRequests: number = 5;
+  private readonly bucketName: string = 'default';
 
-  constructor(windowMs?: number, maxRequests?: number) {
+  constructor(windowMs?: number, maxRequests?: number, bucketName?: string) {
     if (windowMs !== undefined) this.windowMs = windowMs;
     if (maxRequests !== undefined) this.maxRequests = maxRequests;
+    if (bucketName !== undefined) this.bucketName = bucketName;
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -65,14 +76,31 @@ export class RateLimitGuard implements CanActivate {
 
     this.performCleanup(now);
 
-    let clientData = RateLimitGuard.store.get(clientIp);
+    // Keyed by BUCKET as well as IP.
+    //
+    // The store is `static` and was previously keyed on the IP alone, while
+    // three guards with three DIFFERENT windows shared it (15min/5, 1hr/3,
+    // 15min/10). `resetTime` was stamped by whichever guard created the bucket
+    // first, so one request to `POST /auth/login` created a 15-minute bucket
+    // that the password-reset guard then inherited — turning its declared
+    // 3-per-HOUR budget into 3-per-15-minutes, i.e. 12/hour. A 4x bypass of a
+    // declared security control, reachable with one extra request. The mirror
+    // case penalised real users: an MFA retry burned the login budget.
+    //
+    // Grouping is preserved where it was actually intended — `signup` and
+    // `login` share one guard instance and therefore one bucket, as do
+    // `forgot-password` and `reset-password`, so cycling between endpoints in
+    // a group does not multiply the budget.
+    const key = `${this.bucketName}:${clientIp}`;
+    let clientData = RateLimitGuard.store.get(key);
 
     if (!clientData || now > clientData.resetTime) {
       clientData = {
         count: 0,
         resetTime: now + this.windowMs,
       };
-      RateLimitGuard.store.set(clientIp, clientData);
+      this.evictIfFull(now);
+      RateLimitGuard.store.set(key, clientData);
     }
 
     clientData.count++;
@@ -93,26 +121,72 @@ export class RateLimitGuard implements CanActivate {
   }
 
   /**
-   * `x-forwarded-for` is CLIENT-SUPPLIED and trivially spoofable: an attacker
-   * rotating the header gets a fresh bucket on every request, which defeats
-   * the limiter entirely. It is therefore honoured ONLY when the deployment
-   * declares that a trusted reverse proxy sets it — `TRUST_PROXY_HEADERS=true`
-   * — the same "the deployment target decides" gate `securityHeaders()` and
-   * the secure-cookie flag already use. With no proxy in front (local dev, and
-   * any deployment that has not opted in) the socket address is the only
-   * value an attacker cannot choose.
+   * `x-forwarded-for` is CLIENT-SUPPLIED and trivially spoofable, so it is
+   * honoured ONLY when the deployment declares a trusted reverse proxy sets it
+   * — `TRUST_PROXY_HEADERS=true`, the same "the deployment target decides"
+   * gate `securityHeaders()` and the secure-cookie flag already use.
+   *
+   * THE HOP MUST BE COUNTED FROM THE RIGHT. Taking `split(',')[0]` — the
+   * LEFTMOST value — was the original bug and it left the vulnerability fully
+   * open on the exact deployments the flag exists for. Every standard reverse
+   * proxy APPENDS the peer it sees to whatever the client already sent (nginx
+   * `$proxy_add_x_forwarded_for`, ALB, Cloudflare), so a request arriving with
+   * a forged `x-forwarded-for: 1.2.3.4` reaches the app as
+   * `1.2.3.4, <real client ip>` and the leftmost read returns the attacker's
+   * own value. Rotating it per request then yields a fresh bucket every time:
+   * a complete bypass of the brute-force control on login and password reset.
+   *
+   * The RIGHTMOST entry is the one contributed by the nearest trusted proxy
+   * and cannot be forged by the client. `TRUST_PROXY_HOP_COUNT` handles a
+   * chain of more than one trusted proxy: with N trusted hops the client's own
+   * address is N from the right.
    */
   private getClientIp(request: Request): string {
     if (process.env.TRUST_PROXY_HEADERS === 'true') {
-      const forwardedFor = request.headers['x-forwarded-for'];
-      if (typeof forwardedFor === 'string') {
-        return forwardedFor.split(',')[0].trim();
-      }
-      if (Array.isArray(forwardedFor)) {
-        return forwardedFor[0].split(',')[0].trim();
+      const header = request.headers['x-forwarded-for'];
+      const raw = Array.isArray(header) ? header.join(',') : header;
+      if (typeof raw === 'string') {
+        const hops = raw
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean);
+        const trusted = trustedProxyHopCount();
+        const index = hops.length - trusted;
+        if (index >= 0 && index < hops.length) return hops[index];
+        // Fewer entries than declared hops: the header is not what this
+        // deployment says it should be. Fall through to the socket address
+        // rather than trust an attacker-controlled position in the list.
       }
     }
+    // `request.ip` can be undefined behind some adapters. Everything in that
+    // state shares ONE bucket, which is deliberately restrictive rather than
+    // permissive: an unidentifiable client gets the smallest possible budget
+    // instead of an unlimited one.
     return request.ip ?? 'unknown';
+  }
+
+  /**
+   * Drops the oldest buckets when the map hits its ceiling. Called only on
+   * insert, so it costs nothing on the hot path of an existing bucket.
+   */
+  private evictIfFull(now: number): void {
+    if (RateLimitGuard.store.size < MAX_TRACKED_BUCKETS) return;
+
+    // Expired entries first — they carry no security value.
+    for (const [key, data] of RateLimitGuard.store.entries()) {
+      if (now > data.resetTime) RateLimitGuard.store.delete(key);
+    }
+    if (RateLimitGuard.store.size < MAX_TRACKED_BUCKETS) return;
+
+    // Still full: drop the buckets closest to expiring. Map preserves
+    // insertion order, so this also drops the oldest first among equals.
+    const sorted = [...RateLimitGuard.store.entries()].sort(
+      (a, b) => a[1].resetTime - b[1].resetTime,
+    );
+    const toDrop = Math.ceil(MAX_TRACKED_BUCKETS / 10);
+    for (let i = 0; i < toDrop && i < sorted.length; i++) {
+      RateLimitGuard.store.delete(sorted[i][0]);
+    }
   }
 
   private performCleanup(now: number): void {
@@ -133,4 +207,14 @@ export class RateLimitGuard implements CanActivate {
       RateLimitGuard.store.delete(ip);
     }
   }
+}
+
+/** How many trusted proxies sit between the client and this process. Only
+ * consulted when `TRUST_PROXY_HEADERS=true`. Defaults to 1 (the common single
+ * reverse proxy / load balancer). A value below 1 is meaningless and is
+ * clamped — reading the 0th-from-right entry would mean trusting whatever the
+ * client sent last. */
+function trustedProxyHopCount(): number {
+  const parsed = Number.parseInt(process.env.TRUST_PROXY_HOP_COUNT ?? '1', 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
 }

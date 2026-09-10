@@ -131,11 +131,14 @@ describe('API contract (OpenAPI)', () => {
       update: {},
       create: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
     });
-    await prisma.userRoleAssignment.upsert({
-      where: { userId_roleId: { userId, roleId: role.id } },
-      update: { revokedAt: null },
-      create: { userId, roleId: role.id },
+    const activeGrant = await prisma.userRoleAssignment.findFirst({
+      where: { userId, roleId: role.id, revokedAt: null },
     });
+    if (!activeGrant) {
+      await prisma.userRoleAssignment.create({
+        data: { userId, roleId: role.id },
+      });
+    }
 
     const res = await request(app.getHttpServer())
       .get('/rbac/roles')

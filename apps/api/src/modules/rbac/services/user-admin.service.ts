@@ -13,6 +13,10 @@ import { AuditService } from '../../audit/audit.service';
 import type { RecordAuditEntryInput } from '../../audit/audit.service';
 import { PermissionsService } from './permissions.service';
 import type { ProvisionUserDto } from '../dto/provision-user.dto';
+import {
+  segregationSignal,
+  type SegregationSignal,
+} from '../checker-roles.config';
 
 /** A book-wide admin list is a console view, not a report — capped like every
  * other unbounded read in this codebase (`ANALYTICS_POLICY_LIMIT` et al). */
@@ -147,6 +151,15 @@ export class UserAdminService {
       },
     });
 
+    await this.recordSegregationSignal(
+      segregationSignal({
+        roles: requested,
+        subjectUserId: user.id,
+        actorUserId,
+      }),
+      { subjectUserId: user.id, actorUserId, via: 'provision' },
+    );
+
     return {
       id: user.id,
       fullName: user.fullName,
@@ -186,6 +199,15 @@ export class UserAdminService {
       afterValue: { userId, role: roleName, granted: true },
     });
 
+    await this.recordSegregationSignal(
+      segregationSignal({
+        roles: [roleName],
+        subjectUserId: userId,
+        actorUserId,
+      }),
+      { subjectUserId: userId, actorUserId, via: 'grantRole' },
+    );
+
     // The permission grid is cached for 60s per role-combination; an admin
     // must not have to wait out the TTL to see their own grant take effect.
     this.permissions.invalidateCache();
@@ -206,18 +228,28 @@ export class UserAdminService {
     }
 
     // Lockout guard: SYSTEM_SECURITY_ADMINISTRATOR is the only role holding
-    // `user.manage`, so revoking the last active one would leave nobody able
-    // to grant it back — an unrecoverable state short of direct DB access.
-    if (roleName === RoleName.SYSTEM_SECURITY_ADMINISTRATOR) {
-      const holders = await this.users.countActiveHoldersOfRole(role.id);
-      if (holders <= 1) {
-        throw new UnprocessableEntityException(
-          'Refusing to revoke the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to grant it back. Provision a second administrator first.',
-        );
-      }
-    }
-
-    const revoked = await this.users.revokeRole(userId, role.id);
+    // `user.manage`, so revoking the last usable one leaves nobody able to
+    // grant it back — an unrecoverable state short of direct DB access.
+    //
+    // The count and the revoke run under a LOCK on the Role row. As a plain
+    // count-then-act, two concurrent revocations of the two remaining
+    // administrators both read `holders === 2`, both passed `holders <= 1`,
+    // and both committed — producing exactly the state this guard exists to
+    // prevent (`race-safe-invariants.md` § What triggers this rule: "any
+    // 'has this already happened?' guard before a state change that is not a
+    // status-conditional updateMany").
+    const revoked =
+      roleName === RoleName.SYSTEM_SECURITY_ADMINISTRATOR
+        ? await this.users.withRoleLocked(role.id, async () => {
+            const holders = await this.users.countActiveHoldersOfRole(role.id);
+            if (holders <= 1) {
+              throw new UnprocessableEntityException(
+                'Refusing to revoke the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to grant it back. Provision a second administrator first.',
+              );
+            }
+            return this.users.revokeRole(userId, role.id);
+          })
+        : await this.users.revokeRole(userId, role.id);
     if (revoked === 0) {
       throw new ConflictException(
         `User ${userId} does not hold an active ${roleName} grant.`,
@@ -253,7 +285,36 @@ export class UserAdminService {
       );
     }
 
-    const changed = await this.users.setActive(userId, isActive);
+    // The SAME lockout invariant as revokeRole, which this path could reach by
+    // a different route. The self-deactivation guard above is NOT sufficient:
+    // two administrators deactivating EACH OTHER concurrently are neither of
+    // them deactivating themselves, so both calls passed and the system was
+    // left with zero active administrators. Deactivating is as effective a
+    // way to remove the last usable holder as revoking is — `AuthService.login`
+    // refuses an inactive account outright — so it takes the same Role lock
+    // and the same count.
+    const adminRole = await this.users.findRoleByName(
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+    );
+    const changed =
+      !isActive && adminRole
+        ? await this.users.withRoleLocked(adminRole.id, async () => {
+            const holdsAdmin = (await this.users.getRoleNames(userId)).includes(
+              RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+            );
+            if (holdsAdmin) {
+              const holders = await this.users.countActiveHoldersOfRole(
+                adminRole.id,
+              );
+              if (holders <= 1) {
+                throw new UnprocessableEntityException(
+                  'Refusing to deactivate the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to sign in and grant the role back. Provision a second administrator first.',
+                );
+              }
+            }
+            return this.users.setActive(userId, isActive);
+          })
+        : await this.users.setActive(userId, isActive);
     if (changed === 0) {
       // Already in the requested state — idempotent, not an error.
       return { userId, isActive };
@@ -268,6 +329,59 @@ export class UserAdminService {
       afterValue: { isActive },
     });
     return { userId, isActive };
+  }
+
+  /**
+   * Emits a distinct, queryable record when an administrator hands out the
+   * CHECKER half of a maker/checker pair.
+   *
+   * `assertDifferentActors` enforces maker != checker on one identity. It
+   * cannot see that one human holds two. A `user.manage` holder can provision
+   * a second account carrying the other half of any pair and work both sides
+   * single-handed — no dual control, and nothing that looks unusual in any
+   * existing record.
+   *
+   * `maker-checker-segregation.md` is explicit that "admin consoles and
+   * back-office override tools" are NOT exempt from that rule, so this is not
+   * a gap in the lex; it is a gap in what the system can SEE. This closes the
+   * visibility half. It deliberately does not BLOCK: requiring a second
+   * administrator to provision would invent a dual-control policy for
+   * provisioning that the business has not agreed to, which is not a call to
+   * make unilaterally on a regulated control. A detective control is a real
+   * control; a silent one is not.
+   *
+   * Never throws — a grant that has already committed must not be reported as
+   * a failure because its signal could not be written.
+   */
+  private async recordSegregationSignal(
+    signal: SegregationSignal | null,
+    context: { subjectUserId: string; actorUserId: string; via: string },
+  ): Promise<void> {
+    if (!signal) return;
+
+    const roles = signal.checkerRoles.join(', ');
+    const message = signal.selfGrant
+      ? `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted THEMSELVES the checker role(s) ${roles} via ${context.via}. One identity now holds both halves of a maker/checker pair.`
+      : `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted checker role(s) ${roles} to user ${context.subjectUserId} via ${context.via}. Verify this is not a second identity for an existing maker.`;
+
+    // Self-grant is the shape that needs no second account at all, so it is
+    // the stronger signal and is logged as an error rather than a warning.
+    if (signal.selfGrant) this.logger.error(message);
+    else this.logger.warn(message);
+
+    await this.safeAudit({
+      userId: context.actorUserId,
+      action: 'UPDATE',
+      entityType: 'SegregationOfDutiesSignal',
+      entityId: context.subjectUserId,
+      afterValue: {
+        checkerRoles: signal.checkerRoles,
+        selfGrant: signal.selfGrant,
+        grantedByUserId: context.actorUserId,
+        grantedToUserId: context.subjectUserId,
+        via: context.via,
+      },
+    });
   }
 
   /** Audit failures never fail the request — the write has already committed

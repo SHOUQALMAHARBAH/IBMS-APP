@@ -82,11 +82,14 @@ async function grantRole(userId: string, roleName: RoleName): Promise<void> {
     update: {},
     create: { name: roleName },
   });
-  await prisma.userRoleAssignment.upsert({
-    where: { userId_roleId: { userId, roleId: role.id } },
-    update: { revokedAt: null },
-    create: { userId, roleId: role.id },
+  const activeGrant = await prisma.userRoleAssignment.findFirst({
+    where: { userId, roleId: role.id, revokedAt: null },
   });
+  if (!activeGrant) {
+    await prisma.userRoleAssignment.create({
+      data: { userId, roleId: role.id },
+    });
+  }
 }
 
 async function makeUser(

@@ -30,7 +30,10 @@ export class ProvisionUserDto {
   email!: string;
 
   /** Validated against the Part 10.1 policy in `PasswordService`, not here —
-   * one source of truth shared with signup and password reset. */
+   * one source of truth shared with signup and password reset, INCLUDING the
+   * 72-byte bcrypt ceiling. The bound here is only a cheap early reject; it is
+   * generous in characters because the real limit is in BYTES and a
+   * multi-byte Arabic passphrase hits it far sooner. */
   @IsString()
   @Length(12, 200)
   password!: string;

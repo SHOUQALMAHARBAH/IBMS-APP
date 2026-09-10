@@ -1,12 +1,12 @@
-import { PrismaClient, RoleName } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
-import { ROLES } from './seed-data/roles';
-import { PERMISSIONS } from './seed-data/permissions';
-import { RETENTION_SCHEDULE } from './seed-data/retention-schedule';
-import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from './seed-data/sample-users';
-import { validatePasswordPolicy } from '../src/password-policy';
-import { SAMPLE_INSURERS } from './seed-data/insurers';
-import { DOCUMENT_TEMPLATES } from './seed-data/document-templates';
+import { PrismaClient, RoleName } from "@prisma/client";
+import * as bcrypt from "bcryptjs";
+import { ROLES } from "./seed-data/roles";
+import { PERMISSIONS } from "./seed-data/permissions";
+import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
+import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
+import { validatePasswordPolicy } from "../src/password-policy";
+import { SAMPLE_INSURERS } from "./seed-data/insurers";
+import { DOCUMENT_TEMPLATES } from "./seed-data/document-templates";
 
 const prisma = new PrismaClient();
 
@@ -18,7 +18,7 @@ const prisma = new PrismaClient();
  * Roles, permissions, the retention schedule, and document templates are
  * real configuration data and are seeded in every environment.
  */
-const SEED_SAMPLE_DATA = process.env.NODE_ENV !== 'production';
+const SEED_SAMPLE_DATA = process.env.NODE_ENV !== "production";
 
 /**
  * Well-known service-account email for actions with no human actor (the
@@ -30,20 +30,20 @@ const SEED_SAMPLE_DATA = process.env.NODE_ENV !== 'production';
  * apps/api/src/modules/rbac/services/access-recertification.scheduler.ts —
  * keep both in sync if this ever changes.
  */
-export const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+export const SYSTEM_ACCOUNT_EMAIL = "system@ibms.internal";
 
 async function ensureSystemAccount(): Promise<void> {
   await prisma.user.upsert({
     where: { email: SYSTEM_ACCOUNT_EMAIL },
     update: {},
     create: {
-      fullName: 'IBMS System (scheduled jobs)',
+      fullName: "IBMS System (scheduled jobs)",
       email: SYSTEM_ACCOUNT_EMAIL,
-      passwordHash: 'disabled-service-account-no-password-login',
+      passwordHash: "disabled-service-account-no-password-login",
       isActive: false,
     },
   });
-  console.log('Seeded system service account.');
+  console.log("Seeded system service account.");
 }
 
 /**
@@ -63,7 +63,13 @@ async function ensureSystemAccount(): Promise<void> {
  * repo is exactly the finding `sensitive-data-handling.md` exists to prevent.
  *
  * Idempotent: an existing account keeps its current password (this never
- * resets a live credential), it only ensures the role grant is in place.
+ * resets a live credential), and its existing role grant is left exactly as
+ * it is. A grant that has been REVOKED is NOT restored — the seed throws
+ * instead, because re-granting it would silently undo an offboarding on the
+ * next routine deploy. See the check below.
+ *
+ * NOTE: the account is created with `mfaEnabled` at its schema default. A
+ * break-glass administrator should enrol MFA immediately after first login.
  */
 async function ensureBootstrapAdmin(
   roleIdByName: Map<string, string>,
@@ -73,7 +79,7 @@ async function ensureBootstrapAdmin(
   if (!email || !password) {
     if (!SEED_SAMPLE_DATA) {
       console.warn(
-        'No BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD set and sample users are skipped outside dev — this database will have NO user able to sign in. Set both and re-run `npm run db:seed`.',
+        "No BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD set and sample users are skipped outside dev — this database will have NO user able to sign in. Set both and re-run `npm run db:seed`.",
       );
     }
     return;
@@ -82,14 +88,14 @@ async function ensureBootstrapAdmin(
   const violations = validatePasswordPolicy(password);
   if (violations.length > 0) {
     throw new Error(
-      `BOOTSTRAP_ADMIN_PASSWORD does not satisfy the Part 10.1 password policy: ${violations.join('; ')}`,
+      `BOOTSTRAP_ADMIN_PASSWORD does not satisfy the Part 10.1 password policy: ${violations.join("; ")}`,
     );
   }
 
   const roleId = roleIdByName.get(RoleName.SYSTEM_SECURITY_ADMINISTRATOR);
   if (!roleId) {
     throw new Error(
-      'SYSTEM_SECURITY_ADMINISTRATOR role was not seeded — is it missing from seed-data/roles.ts?',
+      "SYSTEM_SECURITY_ADMINISTRATOR role was not seeded — is it missing from seed-data/roles.ts?",
     );
   }
 
@@ -99,21 +105,45 @@ async function ensureBootstrapAdmin(
     ? existing
     : await prisma.user.create({
         data: {
-          fullName: 'IBMS Bootstrap Administrator',
+          fullName: "IBMS Bootstrap Administrator",
           email,
           passwordHash,
           passwordUpdatedAt: new Date(),
         },
       });
 
-  await prisma.userRoleAssignment.upsert({
-    where: { userId_roleId: { userId: user.id, roleId } },
-    update: { revokedAt: null },
-    create: { userId: user.id, roleId },
+  // The grant is created ONLY for a new account, and a REVOKED grant on an
+  // existing one is refused loudly rather than quietly restored.
+  //
+  // This used to `upsert(..., update: { revokedAt: null })` on every seed run.
+  // BOOTSTRAP_ADMIN_EMAIL/PASSWORD normally stay set in the deployment
+  // environment and `npm run db:seed` is a routine step alongside migrations,
+  // so an operator who offboarded the shared break-glass account by revoking
+  // its SYSTEM_SECURITY_ADMINISTRATOR grant got it SILENTLY re-granted on the
+  // next deploy — with no AuditLogEntry, because the seed writes Prisma
+  // directly. A revocation that undoes itself is not a revocation.
+  // Newest grant first: with the partial UNIQUE a (user, role) pair may now
+  // carry a history of revoked rows alongside at most one active one.
+  const grant = await prisma.userRoleAssignment.findFirst({
+    where: { userId: user.id, roleId },
+    orderBy: { grantedAt: "desc" },
   });
+
+  if (grant?.revokedAt) {
+    throw new Error(
+      `Bootstrap administrator ${email} exists but its SYSTEM_SECURITY_ADMINISTRATOR grant was REVOKED on ${grant.revokedAt.toISOString()}. Refusing to silently restore it — that would undo a deliberate offboarding. Either unset BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD, or re-grant the role deliberately through POST /admin/users/:id/roles so the action is audited.`,
+    );
+  }
+
+  if (!grant) {
+    await prisma.userRoleAssignment.create({
+      data: { userId: user.id, roleId },
+    });
+  }
+
   console.log(
     existing
-      ? `Bootstrap administrator ${email} already exists — role grant confirmed, password left unchanged.`
+      ? `Bootstrap administrator ${email} already exists — password left unchanged, existing role grant untouched.`
       : `Seeded bootstrap administrator ${email}.`,
   );
 }
@@ -139,7 +169,9 @@ async function ensureRetentionSchedule(): Promise<void> {
       },
     });
   }
-  console.log(`Seeded ${RETENTION_SCHEDULE.length} retention schedule item(s).`);
+  console.log(
+    `Seeded ${RETENTION_SCHEDULE.length} retention schedule item(s).`,
+  );
 }
 
 /**
@@ -181,7 +213,9 @@ async function ensureDocumentTemplates(): Promise<void> {
 async function ensureSampleInsurers(): Promise<void> {
   let created = 0;
   for (const insurer of SAMPLE_INSURERS) {
-    const existing = await prisma.insurer.findFirst({ where: { name: insurer.name } });
+    const existing = await prisma.insurer.findFirst({
+      where: { name: insurer.name },
+    });
     if (existing) continue;
     await prisma.insurer.create({
       data: {
@@ -199,7 +233,9 @@ async function ensureSampleInsurers(): Promise<void> {
     });
     created += 1;
   }
-  console.log(`Seeded ${created} sample insurer(s) (${SAMPLE_INSURERS.length - created} already present).`);
+  console.log(
+    `Seeded ${created} sample insurer(s) (${SAMPLE_INSURERS.length - created} already present).`,
+  );
 }
 
 /**
@@ -207,7 +243,9 @@ async function ensureSampleInsurers(): Promise<void> {
  * one per `RoleName` (see seed-data/sample-users.ts). Requires
  * `roleIdByName` from the roles seeded earlier in `main()`.
  */
-async function ensureSampleUsers(roleIdByName: Map<string, string>): Promise<void> {
+async function ensureSampleUsers(
+  roleIdByName: Map<string, string>,
+): Promise<void> {
   const passwordHash = await bcrypt.hash(SAMPLE_USER_PASSWORD, 12);
 
   for (const sampleUser of SAMPLE_USERS) {
@@ -227,11 +265,14 @@ async function ensureSampleUsers(roleIdByName: Map<string, string>): Promise<voi
         `Sample user "${sampleUser.email}" references role "${sampleUser.role}", which was not seeded — is it missing from seed-data/roles.ts?`,
       );
     }
-    await prisma.userRoleAssignment.upsert({
-      where: { userId_roleId: { userId: user.id, roleId } },
-      update: {},
-      create: { userId: user.id, roleId },
+    const activeGrant = await prisma.userRoleAssignment.findFirst({
+      where: { userId: user.id, roleId, revokedAt: null },
     });
+    if (!activeGrant) {
+      await prisma.userRoleAssignment.create({
+        data: { userId: user.id, roleId },
+      });
+    }
   }
   console.log(`Seeded ${SAMPLE_USERS.length} sample user(s), one per role.`);
 }
@@ -293,7 +334,7 @@ async function main() {
     await ensureSampleInsurers();
     await ensureSampleUsers(roleIdByName);
   } else {
-    console.log('NODE_ENV=production — skipping sample insurers/users.');
+    console.log("NODE_ENV=production — skipping sample insurers/users.");
   }
 
   // Runs in EVERY environment: in dev it is an optional extra alongside the

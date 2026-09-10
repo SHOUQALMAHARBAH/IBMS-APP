@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@ibms/db';
 import type { Role, RoleName, User, UserRoleAssignment } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -150,16 +151,51 @@ export class UserRepository {
     return this.prisma.client.role.findMany({ where: { name: { in: names } } });
   }
 
-  /** Grant a role. Idempotent by construction: `UserRoleAssignment` carries
-   * `@@unique([userId, roleId])`, so a re-grant of a still-active assignment
-   * is an `update` no-op and a re-grant of a previously REVOKED one clears
-   * `revokedAt` — one upsert, no check-then-act read
-   * (`race-safe-invariants.md`). */
-  grantRole(userId: string, roleId: string): Promise<UserRoleAssignment> {
-    return this.prisma.client.userRoleAssignment.upsert({
-      where: { userId_roleId: { userId, roleId } },
-      create: { userId, roleId },
-      update: { revokedAt: null, grantedAt: new Date() },
+  /**
+   * Grant a role by writing a NEW assignment row, never by resurrecting a
+   * revoked one.
+   *
+   * This used to upsert with `update: { revokedAt: null, grantedAt: new Date() }`,
+   * which erased the revocation timestamp and overwrote the original grant
+   * date — destroying the audit record `UserRoleAssignment.revokedAt` exists
+   * to hold. "User X held FINANCE_OFFICER from A to B" then survived only in
+   * AuditLogEntry.
+   *
+   * Race safety is unchanged in kind, only in mechanism: the partial UNIQUE
+   * `UserRoleAssignment_one_active_per_user_role` (`WHERE "revokedAt" IS NULL`,
+   * migration 20260920140000) is the invariant, so a concurrent double-grant
+   * loses on P2002 rather than being caught by a check-then-act read
+   * (`race-safe-invariants.md`). A re-grant of a still-active role is
+   * idempotent: it hits that constraint and returns the existing row.
+   */
+  async grantRole(userId: string, roleId: string): Promise<UserRoleAssignment> {
+    try {
+      return await this.prisma.client.userRoleAssignment.create({
+        data: { userId, roleId },
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const active = await this.prisma.client.userRoleAssignment.findFirst({
+          where: { userId, roleId, revokedAt: null },
+        });
+        if (active) return active;
+      }
+      throw err;
+    }
+  }
+
+  /** Every grant ever made for this user+role, newest first — the history the
+   * partial UNIQUE now makes it possible to keep. */
+  findRoleGrantHistory(
+    userId: string,
+    roleId: string,
+  ): Promise<UserRoleAssignment[]> {
+    return this.prisma.client.userRoleAssignment.findMany({
+      where: { userId, roleId },
+      orderBy: { grantedAt: 'desc' },
     });
   }
 
@@ -186,11 +222,67 @@ export class UserRepository {
     return count;
   }
 
-  /** Active holders of a role, used to refuse the last-administrator revoke
-   * that would lock every admin out of the provisioning surface. */
-  countActiveHoldersOfRole(roleId: string): Promise<number> {
+  /**
+   * Holders of a role who can ACTUALLY SIGN IN RIGHT NOW — used to refuse the
+   * last-administrator revoke that would lock everyone out of the
+   * provisioning surface.
+   *
+   * The access-validity window is part of "can sign in", not decoration:
+   * `AuthService.login` and `SessionService` both refuse a user outside it.
+   * Counting only `revokedAt: null` + `user.isActive` therefore counted
+   * administrators who are provably unable to log in — an EXTERNAL_AUDITOR-
+   * style time-boxed account whose window has closed still satisfied the
+   * guard, so the one genuinely usable administrator could revoke their own
+   * role and reach exactly the unrecoverable state the guard exists to
+   * prevent. One request, no race required.
+   */
+  countActiveHoldersOfRole(roleId: string, now = new Date()): Promise<number> {
     return this.prisma.client.userRoleAssignment.count({
-      where: { roleId, revokedAt: null, user: { isActive: true } },
+      where: {
+        roleId,
+        revokedAt: null,
+        user: {
+          isActive: true,
+          AND: [
+            {
+              OR: [
+                { accessValidFrom: null },
+                { accessValidFrom: { lte: now } },
+              ],
+            },
+            {
+              OR: [
+                { accessValidUntil: null },
+                { accessValidUntil: { gt: now } },
+              ],
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  /**
+   * Runs `work` with the Role row LOCKED, so a "is this the last holder?"
+   * count and the write that depends on it cannot interleave with another
+   * request doing the same thing.
+   *
+   * The guard in `UserAdminService` was a plain count-then-act: two concurrent
+   * revocations of the two remaining SYSTEM_SECURITY_ADMINISTRATORs both read
+   * `holders === 2`, both passed `holders <= 1`, and both committed — leaving
+   * nobody holding `user.manage` and no way to grant it back short of direct
+   * database access, which is the precise outcome the guard's own comment
+   * says it exists to prevent. `race-safe-invariants.md` § What triggers this
+   * rule names this shape exactly.
+   *
+   * Locking the Role row (rather than the assignments) is what serialises
+   * revoke against deactivate: they touch different tables but share the same
+   * invariant, "at least one usable holder of this role".
+   */
+  withRoleLocked<T>(roleId: string, work: () => Promise<T>): Promise<T> {
+    return this.prisma.client.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Role" WHERE id = ${roleId} FOR UPDATE`;
+      return work();
     });
   }
 
