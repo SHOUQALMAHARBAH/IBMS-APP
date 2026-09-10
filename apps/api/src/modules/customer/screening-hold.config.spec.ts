@@ -322,3 +322,74 @@ describe('hold reasons carry no subject PII', () => {
     expect(text).not.toMatch(/[A-Z][a-z]+ [A-Z][a-z]+/); // no "Firstname Lastname"
   });
 });
+
+describe('Part B §12 — the people on the file are no longer the people we checked', () => {
+  // The hole none of the other conditions can see: a UBO added AFTER
+  // run-screening but BEFORE approve is a real person who has never been
+  // checked against any list, while the file's own ScreeningResult rows sit
+  // there saying NO_MATCH. Nothing about those rows is wrong. They are just
+  // about a different set of people.
+  const screened = {
+    ...clean,
+    screenedSubjectFingerprint: 'abc123',
+  };
+
+  it('holds when the current fingerprint differs from the screened one', () => {
+    const result = evaluateScreeningHold(
+      { ...screened, currentSubjectFingerprint: 'def456' },
+      policy,
+    );
+    expect(result.level).toBe('REVIEW_REQUIRED');
+    expect(result.reasons[0]?.condition).toBe(
+      'IDENTITY_CHANGED_SINCE_SCREENING',
+    );
+    expect(result.reasons[0]?.detail).toContain(
+      'changed after it was screened',
+    );
+  });
+
+  it('does NOT hold when they agree', () => {
+    const result = evaluateScreeningHold(
+      { ...screened, currentSubjectFingerprint: 'abc123' },
+      policy,
+    );
+    expect(result.level).toBe('NO_HOLD');
+  });
+
+  it('treats an unrecorded fingerprint as changed, never as unchanged', () => {
+    // An attempt written before §12 existed screened a subject set nobody
+    // recorded. Reading that as "unchanged" would assert an identity check
+    // that never happened.
+    const result = evaluateScreeningHold(
+      {
+        ...clean,
+        screenedSubjectFingerprint: null,
+        currentSubjectFingerprint: 'def456',
+      },
+      policy,
+    );
+    expect(result.level).toBe('REVIEW_REQUIRED');
+    expect(result.reasons[0]?.detail).toContain(
+      'before the system recorded which identity details',
+    );
+  });
+
+  it('says nothing when the caller supplied no fingerprint at all', () => {
+    // `undefined` means "this caller does not evaluate identity change" —
+    // distinct from `null`, which means "screened, but we did not record
+    // what". Conflating them would hold every file on every unrelated path.
+    const result = evaluateScreeningHold(clean, policy);
+    expect(result.level).toBe('NO_HOLD');
+  });
+
+  it('can be configured to block outright', () => {
+    const strict = loadHoldPolicy({
+      SCREENING_HOLD_IDENTITY_CHANGED: 'BLOCKED',
+    });
+    const result = evaluateScreeningHold(
+      { ...screened, currentSubjectFingerprint: 'def456' },
+      strict,
+    );
+    expect(result.level).toBe('BLOCKED');
+  });
+});

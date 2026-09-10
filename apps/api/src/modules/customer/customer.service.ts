@@ -98,6 +98,12 @@ export class CustomerService {
       fatherName: customer.fatherName,
       grandfatherName: customer.grandfatherName,
       familyName: customer.familyName,
+      // Part B §11 — screening discriminators. Returned in the clear
+      // deliberately (unlike the `-- ENCRYPT` columns above): they exist to be
+      // compared against a sanctions/PEP list entry, and a reviewer working a
+      // match needs to see them.
+      dateOfBirth: customer.dateOfBirth,
+      nationality: customer.nationality,
       registrationNumber: customer.registrationNumber,
       taxRegistrationNumber: customer.taxRegistrationNumber,
       registeredAddress: customer.registeredAddress,
@@ -179,6 +185,11 @@ export class CustomerService {
         grandfatherName: isIndividual ? dto.grandfatherName : undefined,
         familyName: isIndividual ? dto.familyName : undefined,
         registrationNumber: isIndividual ? undefined : dto.registrationNumber,
+        // Part B §11 — screening discriminators. INDIVIDUAL only: a company
+        // has no date of birth or nationality of its own; those belong to the
+        // natural persons behind it, which is what the UBO records carry.
+        dateOfBirth: isIndividual ? parseDateOnly(dto.dateOfBirth) : undefined,
+        nationality: isIndividual ? dto.nationality : undefined,
         nationalIdEnc: encrypted.nationalIdEnc,
         taxRegistrationNumber: dto.taxRegistrationNumber,
         registeredAddress: isIndividual ? undefined : dto.registeredAddress,
@@ -274,6 +285,12 @@ export class CustomerService {
       fatherName: customer.fatherName,
       grandfatherName: customer.grandfatherName,
       familyName: customer.familyName,
+      // Part B §11 — screening discriminators. Returned in the clear
+      // deliberately (unlike the `-- ENCRYPT` columns above): they exist to be
+      // compared against a sanctions/PEP list entry, and a reviewer working a
+      // match needs to see them.
+      dateOfBirth: customer.dateOfBirth,
+      nationality: customer.nationality,
       registrationNumber: customer.registrationNumber,
       taxRegistrationNumber: customer.taxRegistrationNumber,
       registeredAddress: customer.registeredAddress,
@@ -423,6 +440,9 @@ export class CustomerService {
           : undefined,
       isAuthorizedSignatory: dto.isAuthorizedSignatory ?? false,
       isPep: dto.isPep,
+      // Part B §11 — screening discriminators.
+      dateOfBirth: parseDateOnly(dto.dateOfBirth),
+      nationality: dto.nationality,
     });
 
     try {
@@ -502,4 +522,17 @@ export class CustomerService {
     await this.findOwnedOrVisible(customerId, actor);
     return this.customers.findDocumentsByCustomerId(customerId);
   }
+}
+
+/**
+ * `YYYY-MM-DD` -> a `Date` at midnight UTC.
+ *
+ * `new Date('1990-05-14')` already parses as midnight UTC, and the column is a
+ * Postgres DATE, so no timezone shift is possible. Written out rather than
+ * inlined because getting this wrong silently moves a date of birth by a day
+ * — and a screening discriminator that is one day out is worse than an absent
+ * one: it makes a true match look contradicted.
+ */
+function parseDateOnly(value: string | undefined): Date | undefined {
+  return value ? new Date(`${value}T00:00:00.000Z`) : undefined;
 }

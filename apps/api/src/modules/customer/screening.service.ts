@@ -20,7 +20,7 @@ import { ScreeningMatchRepository } from '../../repositories/screening-match.rep
 import { normalizeWatchlistName } from '../compliance-risk/watchlist-sync.config';
 import { ProviderScreeningService } from './provider-screening.service';
 import type { ScreeningExecution } from './provider-screening.service';
-import type { ScreeningSubject } from '../screening-providers/screening-provider.types';
+import { buildScreeningSubjects } from './screening-subjects.util';
 import { SlaTimerService } from '../sla/sla-timer.service';
 
 /** Registry workflow for adjudicating a queued sanctions match. */
@@ -138,7 +138,7 @@ export class ScreeningService {
     // commercial PEP provider changes the configuration, not this method.
     const execution = await this.providerScreening.execute({
       kycRecordId,
-      subjects: buildSubjects(customer, ubos),
+      subjects: buildScreeningSubjects(customer, ubos),
       requestedByUserId: actorUserId,
     });
 
@@ -489,26 +489,6 @@ export class ScreeningService {
  * attributes because name-only matching manufactures false positives; filling
  * them needs the KYC data model to capture them first.
  */
-function buildSubjects(
-  customer: { id: string; legalName: string; customerType: string },
-  ubos: readonly { id: string; fullName: string }[],
-): ScreeningSubject[] {
-  return [
-    {
-      subjectRef: `customer:${customer.id}`,
-      fullName: customer.legalName,
-      entityType:
-        customer.customerType === 'INDIVIDUAL' ? 'individual' : 'organization',
-    },
-    ...ubos.map((ubo) => ({
-      subjectRef: `ubo:${ubo.id}`,
-      fullName: ubo.fullName,
-      // A UBO is always a natural person.
-      entityType: 'individual' as const,
-    })),
-  ];
-}
-
 /** True when the provider returned at least one candidate worth a case. */
 function anyHitFromProvider(execution: ScreeningExecution): boolean {
   return execution.candidates.length > 0;

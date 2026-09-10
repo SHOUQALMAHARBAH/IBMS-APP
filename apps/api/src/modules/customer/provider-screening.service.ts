@@ -142,6 +142,7 @@ export class ProviderScreeningService {
         kycRecordId: input.kycRecordId,
         correlationId,
         idempotencyKey,
+        subjectFingerprint: subjectFingerprint(input.subjects),
         provider: provider.kind,
         providerName: provider.name,
         datasetVersion,
@@ -226,6 +227,39 @@ export function bandFor(
   if (score >= thresholds.high) return 'high';
   if (score >= thresholds.review) return 'review';
   return 'below';
+}
+
+/**
+ * Part B §12 — a hash of the IDENTITY ATTRIBUTES actually screened.
+ *
+ * Deliberately NOT the idempotency key. That key folds in the provider and the
+ * dataset, so it changes when a deployment switches provider even though the
+ * same people were checked. This answers the different question: "are the
+ * people on this file still the people we checked?"
+ *
+ * Covers each subject's name, date of birth and nationality — every attribute
+ * a match is made on. Adding a UBO changes it. Correcting a date of birth
+ * changes it. Switching provider does not.
+ *
+ * Sorted, so the same people in a different order fingerprint identically, and
+ * hashed, so a column an operator can query is not a readable list of the
+ * people screened (sensitive-data-handling.md).
+ */
+export function subjectFingerprint(
+  subjects: readonly ScreeningSubject[],
+): string {
+  const material = [...subjects]
+    .map((s) =>
+      [
+        s.fullName.trim().toLowerCase(),
+        s.dateOfBirth ?? '-',
+        (s.nationality ?? '-').toUpperCase(),
+        s.entityType,
+      ].join('~'),
+    )
+    .sort()
+    .join('|');
+  return createHash('sha256').update(material).digest('hex').slice(0, 32);
 }
 
 /**

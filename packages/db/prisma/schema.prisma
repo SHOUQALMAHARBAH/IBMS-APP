@@ -506,6 +506,19 @@ model Customer {
   familyName              String? // individual only
   registrationNumber      String? // corporate: commercial registration number
   nationalIdEnc           String? // individual -- ENCRYPT
+  /// Part B §11 — screening discriminators. Individual only.
+  ///
+  /// Stored in the CLEAR, unlike `nationalIdEnc`, and that is deliberate:
+  /// their entire purpose is to be COMPARED against a sanctions/PEP list
+  /// entry so a real person is not confused with a listed one. Name-only
+  /// matching against ~19,000 entries produces false positives constantly;
+  /// date of birth and nationality are what separate a true match from a
+  /// coincidence of names. Encrypting them would defeat the control they
+  /// exist for. They are Confidential — the Customer's own classification —
+  /// not Highly Confidential like an identity-document number.
+  dateOfBirth             DateTime?                @db.Date
+  /// ISO 3166-1 alpha-2, upper case. Constrained in the database.
+  nationality             String?
   taxRegistrationNumber   String?
   registeredAddress       String?
   natureOfBusiness        String?
@@ -566,6 +579,11 @@ model UltimateBeneficialOwner {
   grandfatherName       String?
   familyName            String?
   nationalIdEnc         String // -- ENCRYPT
+  /// Part B §11 — screening discriminators. See `Customer.dateOfBirth` for
+  /// why these are not encrypted.
+  dateOfBirth           DateTime? @db.Date
+  /// ISO 3166-1 alpha-2, upper case. Constrained in the database.
+  nationality           String?
   ownershipPercent      Decimal? @db.Decimal(5, 2)
   isAuthorizedSignatory Boolean  @default(false)
   isPep                 Boolean  @default(false)
@@ -723,6 +741,18 @@ model ScreeningRequest {
   /// Derived from (KYC file, subject set, provider, dataset). UNIQUE — the
   /// constraint IS the idempotency guarantee, not a preceding findFirst.
   idempotencyKey String    @unique
+
+  /// Part B §12 — a hash of the IDENTITY ATTRIBUTES actually screened
+  /// (every subject's name, date of birth and nationality), independent of
+  /// provider and dataset.
+  ///
+  /// `idempotencyKey` cannot serve this purpose: it deliberately folds in the
+  /// provider and dataset, so it changes when the deployment switches
+  /// provider even though the same people were screened. This answers the
+  /// different question "are the people on this file still the people we
+  /// checked?" — which is what makes a UBO added after screening, or a
+  /// corrected date of birth, visible instead of silent.
+  subjectFingerprint String?
 
   provider       ScreeningProviderKind
   providerName   String

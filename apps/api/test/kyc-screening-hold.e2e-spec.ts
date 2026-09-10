@@ -143,7 +143,7 @@ async function emptyWatchlistCache(): Promise<void> {
 
 /** One obviously fictional entry, so the provider has a populated list to
  * report NO_MATCH against honestly. */
-async function seedWatchlistEntry(): Promise<void> {
+async function seedWatchlistFixture(): Promise<void> {
   const run = await prisma.watchlistSyncRun.create({
     data: {
       source: 'OFAC_SDN',
@@ -359,7 +359,7 @@ describe('Part B §17 — a screening that did not happen holds the workflow', (
 
   it('a populated list with no match is NO_HOLD — the approval needs nothing', async () => {
     const application = await boot();
-    await seedWatchlistEntry();
+    await seedWatchlistFixture();
 
     const sales = await makeUser(
       application,
@@ -413,7 +413,7 @@ describe('Part B §17 — a screening that did not happen holds the workflow', (
 
   it('a CONFIRMED sanctions match BLOCKS, and no written reason releases it', async () => {
     const application = await boot();
-    await seedWatchlistEntry();
+    await seedWatchlistFixture();
 
     const sales = await makeUser(
       application,
@@ -487,7 +487,7 @@ describe('Part B §17 — a screening that did not happen holds the workflow', (
 
   it('a PENDING match holds the file until the review queue is worked', async () => {
     const application = await boot();
-    await seedWatchlistEntry();
+    await seedWatchlistFixture();
 
     const sales = await makeUser(
       application,
@@ -595,5 +595,241 @@ describe('Part B §17 — a screening that did not happen holds the workflow', (
     const serialized = JSON.stringify(hold.body);
     expect(serialized).not.toContain('Mnemonic');
     expect(serialized).not.toContain('Zzz Fictional');
+  });
+});
+
+describe('Part B §12 — a subject added after screening is not a screened subject', () => {
+  beforeEach(async () => {
+    await emptyWatchlistCache();
+  });
+
+  it('a UBO added after run-screening holds the approval until a re-screen', async () => {
+    // THE HOLE. Before §12: a CORPORATE file is screened with one UBO, comes
+    // back NO_MATCH, and a second beneficial owner is then added. That person
+    // has never been checked against any list — and the file's own
+    // ScreeningResult rows still say CLEAR, because they are about a
+    // different set of people. Nothing read the difference.
+    const application = await boot();
+    await seedWatchlistFixture();
+
+    const sales = await makeUser(
+      application,
+      'identity-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const compliance = await makeUser(
+      application,
+      'identity-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+
+    const created = await request(application.getHttpServer())
+      .post('/customers')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerType: 'CORPORATE',
+        legalName: 'Identity Change E2E Trading LLC',
+        registrationNumber: 'CR-IDENTITY-E2E',
+        registeredAddress: 'Amman',
+        natureOfBusiness: 'Trading',
+        contactPhone: '+962-7-9000-0000',
+        contactEmail: 'corporate@example.test',
+        languagePreference: 'AR',
+      })
+      .expect(201);
+    const customerId = (created.body as { id: string }).id;
+
+    await request(application.getHttpServer())
+      .post(`/customers/${customerId}/ubos`)
+      .set(bearer(sales.accessToken))
+      .send({
+        givenName: 'Layla',
+        familyName: 'Haddad',
+        nationalId: '9901019999',
+        isPep: false,
+        dateOfBirth: '1979-11-02',
+        nationality: 'JO',
+      })
+      .expect(201);
+
+    const started = await request(application.getHttpServer())
+      .post(`/customers/${customerId}/kyc`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    const kycId = (started.body as KycRecordBody).id;
+    await request(application.getHttpServer())
+      .post(`/kyc-records/${kycId}/submit`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    await request(application.getHttpServer())
+      .post(`/kyc-records/${kycId}/run-screening`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    // Screened, clean, and no hold — the file is decidable.
+    const beforeChange = await request(application.getHttpServer())
+      .get(`/kyc-records/${kycId}/screening-hold`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    expect((beforeChange.body as HoldBody).level).toBe('NO_HOLD');
+
+    // The fingerprint of what was screened was recorded.
+    const firstRequest = await prisma.screeningRequest.findFirstOrThrow({
+      where: { kycRecordId: kycId },
+      orderBy: { startedAt: 'desc' },
+    });
+    expect(firstRequest.subjectFingerprint).toMatch(/^[0-9a-f]{32}$/);
+
+    // A second beneficial owner is added. Nobody has screened this person.
+    await request(application.getHttpServer())
+      .post(`/customers/${customerId}/ubos`)
+      .set(bearer(sales.accessToken))
+      .send({
+        givenName: 'Nour',
+        familyName: 'Masri',
+        nationalId: '9901018888',
+        isPep: false,
+        dateOfBirth: '1988-06-21',
+        nationality: 'JO',
+      })
+      .expect(201);
+
+    // The file is now held — and says exactly why.
+    const afterChange = await request(application.getHttpServer())
+      .get(`/kyc-records/${kycId}/screening-hold`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const held = afterChange.body as HoldBody;
+    expect(held.level).toBe('REVIEW_REQUIRED');
+    expect(held.reasons.map((r) => r.condition)).toContain(
+      'IDENTITY_CHANGED_SINCE_SCREENING',
+    );
+
+    // And the approval is refused without a written acceptance.
+    await request(application.getHttpServer())
+      .post(`/kyc-records/${kycId}/approve`)
+      .set(bearer(compliance.accessToken))
+      .send({})
+      .expect(400);
+
+    // The remedy is to actually screen the new person. Re-running screening
+    // records a fingerprint covering both UBOs, and the hold lifts on its own.
+    await request(application.getHttpServer())
+      .post(`/kyc-records/${kycId}/rerun-screening`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    const rescreened = await prisma.screeningRequest.findFirstOrThrow({
+      where: { kycRecordId: kycId },
+      orderBy: { startedAt: 'desc' },
+    });
+    expect(rescreened.subjectFingerprint).not.toBe(
+      firstRequest.subjectFingerprint,
+    );
+
+    const lifted = await request(application.getHttpServer())
+      .get(`/kyc-records/${kycId}/screening-hold`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    expect((lifted.body as HoldBody).level).toBe('NO_HOLD');
+
+    await request(application.getHttpServer())
+      .post(`/kyc-records/${kycId}/approve`)
+      .set(bearer(compliance.accessToken))
+      .send({})
+      .expect(201);
+  });
+
+  it('rejects an invalid nationality and an impossible date of birth', async () => {
+    const application = await boot();
+    const sales = await makeUser(
+      application,
+      'identity-validation',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    // A control test first: the SAME payload with no bad field is accepted.
+    // Without it this loop would pass just as happily if the 400 came from an
+    // unrelated missing field — which is exactly what it did on first run.
+    await request(application.getHttpServer())
+      .post('/customers')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerType: 'INDIVIDUAL',
+        givenName: 'Validation',
+        familyName: 'Control',
+        nationalId: '9901012345',
+        contactPhone: '+962-7-9000-0000',
+        contactEmail: 'customer@example.test',
+        languagePreference: 'AR',
+      })
+      .expect(201);
+
+    for (const bad of [
+      { nationality: 'Jordan' },
+      { nationality: 'jo' },
+      { nationality: '962' },
+      { dateOfBirth: '14-05-1990' },
+      { dateOfBirth: 'yesterday' },
+    ]) {
+      const rejected = await request(application.getHttpServer())
+        .post('/customers')
+        .set(bearer(sales.accessToken))
+        .send({
+          customerType: 'INDIVIDUAL',
+          givenName: 'Validation',
+          familyName: 'Case',
+          nationalId: '9901012345',
+          contactPhone: '+962-7-9000-0000',
+          contactEmail: 'customer@example.test',
+          languagePreference: 'AR',
+          ...bad,
+        })
+        .expect(400);
+      const field = Object.keys(bad)[0];
+      expect(JSON.stringify(rejected.body), JSON.stringify(bad)).toContain(
+        field,
+      );
+    }
+  });
+
+  it('stores the discriminators and returns them on the customer', async () => {
+    const application = await boot();
+    const sales = await makeUser(
+      application,
+      'identity-store',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const created = await request(application.getHttpServer())
+      .post('/customers')
+      .set(bearer(sales.accessToken))
+      .send({
+        customerType: 'INDIVIDUAL',
+        givenName: 'Stored',
+        familyName: 'Discriminators',
+        nationalId: '9901012345',
+        contactPhone: '+962-7-9000-0000',
+        contactEmail: 'customer@example.test',
+        languagePreference: 'AR',
+        dateOfBirth: '1985-03-17',
+        nationality: 'JO',
+      })
+      .expect(201);
+
+    const body = created.body as {
+      id: string;
+      dateOfBirth: string;
+      nationality: string;
+    };
+    expect(body.nationality).toBe('JO');
+    // Not shifted by a timezone: the column is a DATE and the value is parsed
+    // at midnight UTC.
+    expect(body.dateOfBirth.slice(0, 10)).toBe('1985-03-17');
+
+    const stored = await prisma.customer.findUniqueOrThrow({
+      where: { id: body.id },
+    });
+    expect(stored.dateOfBirth?.toISOString().slice(0, 10)).toBe('1985-03-17');
+    expect(stored.nationality).toBe('JO');
   });
 });

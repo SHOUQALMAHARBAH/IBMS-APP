@@ -68,7 +68,8 @@ export type ScreeningHoldCondition =
   | 'PENDING_MATCH_REVIEW'
   | 'UNRESOLVED_SCREENING'
   | 'POTENTIAL_MATCH'
-  | 'SCREENING_STALE';
+  | 'SCREENING_STALE'
+  | 'IDENTITY_CHANGED_SINCE_SCREENING';
 
 const LEVEL_RANK: Readonly<Record<ScreeningHoldLevel, number>> = {
   NO_HOLD: 0,
@@ -96,6 +97,7 @@ export const DEFAULT_HOLD_POLICY: Readonly<
   UNRESOLVED_SCREENING: 'REVIEW_REQUIRED',
   POTENTIAL_MATCH: 'REVIEW_REQUIRED',
   SCREENING_STALE: 'REVIEW_REQUIRED',
+  IDENTITY_CHANGED_SINCE_SCREENING: 'REVIEW_REQUIRED',
 };
 
 /** The env var that configures each condition. Named per condition so a
@@ -109,6 +111,7 @@ export const HOLD_ENV: Readonly<Record<ScreeningHoldCondition, string>> = {
   UNRESOLVED_SCREENING: 'SCREENING_HOLD_UNRESOLVED',
   POTENTIAL_MATCH: 'SCREENING_HOLD_POTENTIAL_MATCH',
   SCREENING_STALE: 'SCREENING_HOLD_STALE',
+  IDENTITY_CHANGED_SINCE_SCREENING: 'SCREENING_HOLD_IDENTITY_CHANGED',
 };
 
 /** How old a screening may be before it stops counting as current, in days.
@@ -210,6 +213,12 @@ export interface ScreeningHoldFacts {
   }[];
   /** When the most recent screening ran. Null when none has. */
   lastScreenedAt: Date | null;
+  /** Part B §12. The identity fingerprint of the subjects on the file RIGHT
+   * NOW, versus the one recorded on the most recent screening attempt. A
+   * difference means the people (or their identity attributes) changed since
+   * anybody was checked. Both null when there has been no attempt. */
+  currentSubjectFingerprint?: string | null;
+  screenedSubjectFingerprint?: string | null;
   now?: Date;
 }
 
@@ -323,6 +332,29 @@ export function evaluateScreeningHold(
     add(
       'PENDING_MATCH_REVIEW',
       `${pending} screening match(es) are still awaiting review. Work the review queue before deciding this file.`,
+    );
+  }
+
+  // Part B §12 — the people on this file are no longer the people we checked.
+  //
+  // This is the hole the other conditions cannot see: a UBO added AFTER
+  // run-screening but BEFORE approve is a real person who has never been
+  // checked against any list, while the file's own ScreeningResult rows sit
+  // there saying NO_MATCH. Nothing about those rows is wrong — they are just
+  // about a different set of people.
+  //
+  // A null recorded fingerprint (an attempt written before §12 existed) counts
+  // as changed. Treating "unknown" as "unchanged" would assert an identity
+  // check that never happened.
+  if (
+    facts.currentSubjectFingerprint !== undefined &&
+    facts.currentSubjectFingerprint !== facts.screenedSubjectFingerprint
+  ) {
+    add(
+      'IDENTITY_CHANGED_SINCE_SCREENING',
+      facts.screenedSubjectFingerprint
+        ? 'The identity details on this file changed after it was screened — a subject was added, removed, or corrected. Re-run screening before deciding.'
+        : 'This file was screened before the system recorded which identity details it checked, so the result cannot be tied to the people currently on the file. Re-run screening before deciding.',
     );
   }
 

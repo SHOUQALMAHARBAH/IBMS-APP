@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { KYCRecord } from '@ibms/db';
+import type { KYCRecord, KycStatus } from '@ibms/db';
 import {
   KycRecordRepository,
   type KycRecordWithCustomer,
@@ -67,6 +67,14 @@ function slaWorkflowName(
  * watchlist check *before* the SCREENING transition for the same reason:
  * a screening failure leaves the record retriable in SUBMITTED, never
  * stranded in SCREENING with no results. */
+/** Statuses a re-screen may run from. See `rerunScreening`. */
+const RERUN_SCREENING_STATUSES: KycStatus[] = [
+  'APPROVED',
+  'PERIODIC_REVIEW_DUE',
+  'SCREENING',
+  'EDD',
+];
+
 @Injectable()
 export class KycService {
   private readonly logger = new Logger(KycService.name);
@@ -233,12 +241,27 @@ export class KycService {
    * file awaiting re-KYC covers an ACTIVE customer whose ongoing
    * sanctions/PEP/AML screening must not lapse just because the periodic
    * scheduler has flagged the review (same reason the monthly batch
-   * re-screens both — see screening-batch.scheduler.ts). */
+   * re-screens both — see screening-batch.scheduler.ts).
+   *
+   * SCREENING and EDD were added by Part B §12. Before it, a file sitting in
+   * SCREENING could not be re-screened by any endpoint at all: `runScreening`
+   * requires SUBMITTED and this one required APPROVED, so the window between
+   * the two had no re-screen path. That did not matter much until an identity
+   * change could hold the file — at which point the ONLY way past the hold
+   * would have been to waive it in writing, which is precisely the outcome
+   * the hold exists to avoid. Screening the new person has to be possible, and
+   * has to be the easier option than waiving.
+   *
+   * Safe in those two states because this method deliberately does not
+   * transition anything: it re-runs the check and writes fresh
+   * ScreeningResult/RiskRating rows, exactly as it does for an APPROVED file.
+   * A re-screen that newly raises `isEdd` still routes the file through the
+   * EDD path at decision time, which is the correct outcome. */
   async rerunScreening(id: string, actorUserId: string) {
     const kyc = await this.mustFind(id);
-    if (kyc.status !== 'APPROVED' && kyc.status !== 'PERIODIC_REVIEW_DUE') {
+    if (!RERUN_SCREENING_STATUSES.includes(kyc.status)) {
       throw new UnprocessableEntityException(
-        `KYCRecord ${id}: can only rerun screening on an APPROVED or PERIODIC_REVIEW_DUE KYC file (this one is ${kyc.status})`,
+        `KYCRecord ${id}: can only rerun screening on a ${RERUN_SCREENING_STATUSES.join('/')} KYC file (this one is ${kyc.status})`,
       );
     }
     return this.screening.run(id, actorUserId);

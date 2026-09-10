@@ -7,6 +7,8 @@ import {
 import type { ScreeningHoldRelease } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { subjectFingerprint } from './provider-screening.service';
+import { buildScreeningSubjects } from './screening-subjects.util';
 import {
   describeHold,
   evaluateScreeningHold,
@@ -62,7 +64,7 @@ export class ScreeningHoldService {
   /** Evaluate the hold in force on one KYC file, from current state. */
   async evaluate(kycRecordId: string): Promise<ScreeningHoldEvaluation> {
     const policy = this.policy();
-    const [results, matches] = await Promise.all([
+    const [results, matches, latestRequest, kyc] = await Promise.all([
       this.prisma.client.screeningResult.findMany({
         where: { kycRecordId },
         select: { attemptOutcome: true, screenedAt: true },
@@ -72,7 +74,48 @@ export class ScreeningHoldService {
         where: { kycRecordId },
         select: { status: true, listType: true },
       }),
+      this.prisma.client.screeningRequest.findFirst({
+        where: { kycRecordId },
+        orderBy: { startedAt: 'desc' },
+        select: { subjectFingerprint: true },
+      }),
+      this.prisma.client.kYCRecord.findUnique({
+        where: { id: kycRecordId },
+        select: { customerId: true },
+      }),
     ]);
+
+    // Part B §12. Recomputed from live rows rather than read from a cached
+    // column: the whole point is to notice a change nothing else recorded.
+    let currentFingerprint: string | undefined;
+    if (kyc && results.length > 0) {
+      const [customer, ubos] = await Promise.all([
+        this.prisma.client.customer.findUnique({
+          where: { id: kyc.customerId },
+          select: {
+            id: true,
+            legalName: true,
+            customerType: true,
+            dateOfBirth: true,
+            nationality: true,
+          },
+        }),
+        this.prisma.client.ultimateBeneficialOwner.findMany({
+          where: { customerId: kyc.customerId },
+          select: {
+            id: true,
+            fullName: true,
+            dateOfBirth: true,
+            nationality: true,
+          },
+        }),
+      ]);
+      if (customer) {
+        currentFingerprint = subjectFingerprint(
+          buildScreeningSubjects(customer, ubos),
+        );
+      }
+    }
 
     return evaluateScreeningHold(
       {
@@ -82,6 +125,8 @@ export class ScreeningHoldService {
           listType: m.listType,
         })),
         lastScreenedAt: results[0]?.screenedAt ?? null,
+        currentSubjectFingerprint: currentFingerprint,
+        screenedSubjectFingerprint: latestRequest?.subjectFingerprint ?? null,
       },
       policy,
     );
