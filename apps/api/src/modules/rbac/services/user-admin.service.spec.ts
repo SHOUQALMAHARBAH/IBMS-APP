@@ -38,6 +38,12 @@ function makeDeps(over: Record<string, unknown> = {}) {
     revokeRole: vi.fn().mockResolvedValue(1),
     setActive: vi.fn().mockResolvedValue(1),
     countActiveHoldersOfRole: vi.fn().mockResolvedValue(2),
+    // The real one wraps `work` in a transaction that first takes
+    // `SELECT ... FOR UPDATE` on the Role row, so the last-administrator count
+    // and the write it gates cannot interleave. Here it just runs the callback.
+    withRoleLocked: vi.fn(
+      async (_roleId: string, work: () => Promise<unknown>) => work(),
+    ),
     listWithRoles: vi.fn().mockResolvedValue([]),
     countAll: vi.fn().mockResolvedValue(0),
     provision: vi.fn().mockResolvedValue({
@@ -260,6 +266,13 @@ describe('UserAdminService role assignment', () => {
       users: {
         findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
         countActiveHoldersOfRole: vi.fn().mockResolvedValue(2),
+        // The real one wraps `work` in a transaction that first takes
+        // `SELECT ... FOR UPDATE` on the Role row, so the last-administrator count
+        // and the write it gates cannot interleave. Here it just runs the callback.
+        withRoleLocked: vi.fn(
+          async (_roleId: string, work: () => Promise<unknown>) => work(),
+        ),
+        getRoleNames: vi.fn().mockResolvedValue([]),
       },
     });
     await deps.service.revokeRole(
@@ -295,5 +308,83 @@ describe('UserAdminService.setActive (de-provisioning)', () => {
     expect(deps.audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ entityType: 'User', action: 'UPDATE' }),
     );
+  });
+});
+
+describe('UserAdminService — the last-administrator lockout invariant', () => {
+  it('takes the Role LOCK around the count and the revoke, not just a bare count', () => {
+    // As a plain count-then-act, two concurrent revocations of the two
+    // remaining administrators both read holders === 2, both passed
+    // `holders <= 1`, and both committed — leaving nobody holding
+    // `user.manage` and no way to grant it back short of direct database
+    // access, the precise outcome the guard exists to prevent.
+    // race-safe-invariants.md § What triggers this rule names this shape.
+    const deps = makeDeps({
+      users: { findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE) },
+    });
+    return deps.service
+      .revokeRole('u-1', RoleName.SYSTEM_SECURITY_ADMINISTRATOR, actor.id)
+      .then(() => {
+        expect(deps.users.withRoleLocked).toHaveBeenCalledWith(
+          ADMIN_ROLE.id,
+          expect.any(Function),
+        );
+      });
+  });
+
+  it('refuses to DEACTIVATE the last active administrator', async () => {
+    // The self-deactivation guard is not sufficient: two administrators
+    // deactivating EACH OTHER concurrently are neither of them deactivating
+    // themselves, so both calls passed and the system was left with zero
+    // active administrators. Deactivating removes a usable holder just as
+    // effectively as revoking — AuthService.login refuses an inactive account.
+    const deps = makeDeps({
+      users: {
+        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        getRoleNames: vi
+          .fn()
+          .mockResolvedValue([RoleName.SYSTEM_SECURITY_ADMINISTRATOR]),
+        countActiveHoldersOfRole: vi.fn().mockResolvedValue(1),
+      },
+    });
+    await expect(
+      deps.service.setActive('u-other', false, actor.id),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.users.setActive).not.toHaveBeenCalled();
+  });
+
+  it('allows deactivating an administrator while a second usable one remains', async () => {
+    const deps = makeDeps({
+      users: {
+        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        getRoleNames: vi
+          .fn()
+          .mockResolvedValue([RoleName.SYSTEM_SECURITY_ADMINISTRATOR]),
+        countActiveHoldersOfRole: vi.fn().mockResolvedValue(2),
+      },
+    });
+    await deps.service.setActive('u-other', false, actor.id);
+    expect(deps.users.setActive).toHaveBeenCalledWith('u-other', false);
+  });
+
+  it('does not run the admin lockout check when deactivating a NON-administrator', async () => {
+    const deps = makeDeps({
+      users: {
+        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        getRoleNames: vi.fn().mockResolvedValue([RoleName.SALES_RELATIONSHIP_OFFICER]),
+      },
+    });
+    await deps.service.setActive('u-sales', false, actor.id);
+    expect(deps.users.countActiveHoldersOfRole).not.toHaveBeenCalled();
+    expect(deps.users.setActive).toHaveBeenCalledWith('u-sales', false);
+  });
+
+  it('never blocks REACTIVATION', async () => {
+    const deps = makeDeps({
+      users: { findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE) },
+    });
+    await deps.service.setActive('u-other', true, actor.id);
+    expect(deps.users.setActive).toHaveBeenCalledWith('u-other', true);
+    expect(deps.users.withRoleLocked).not.toHaveBeenCalled();
   });
 });

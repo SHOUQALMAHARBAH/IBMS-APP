@@ -84,11 +84,14 @@ async function grantRoleDirect(
     update: {},
     create: { name: roleName },
   });
-  await prisma.userRoleAssignment.upsert({
-    where: { userId_roleId: { userId, roleId: role.id } },
-    update: { revokedAt: null },
-    create: { userId, roleId: role.id },
+  const activeGrant = await prisma.userRoleAssignment.findFirst({
+    where: { userId, roleId: role.id, revokedAt: null },
   });
+  if (!activeGrant) {
+    await prisma.userRoleAssignment.create({
+      data: { userId, roleId: role.id },
+    });
+  }
 }
 
 async function makeUser(
@@ -266,8 +269,9 @@ describe('User admin / provisioning (e2e)', () => {
     const role = await prisma.role.findUniqueOrThrow({
       where: { name: 'CLAIMS_OFFICER' },
     });
-    const assignment = await prisma.userRoleAssignment.findUnique({
-      where: { userId_roleId: { userId: subject.userId, roleId: role.id } },
+    const assignment = await prisma.userRoleAssignment.findFirst({
+      where: { userId: subject.userId, roleId: role.id },
+      orderBy: { grantedAt: 'desc' },
     });
     expect(assignment).not.toBeNull();
     expect(assignment?.revokedAt).not.toBeNull();

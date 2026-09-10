@@ -109,38 +109,93 @@ describe('RateLimitGuard', () => {
     expect(() => g.canActivate(ctx('10.3.3.3'))).toThrow(HttpException);
   });
 
-  it('should extract first IP from x-forwarded-for header', () => {
+  it('takes the RIGHTMOST x-forwarded-for hop, so a spoofed prefix cannot mint a fresh bucket', () => {
+    // THE bypass this guard exists to prevent. Every standard reverse proxy
+    // APPENDS the peer it sees, so a request forged with
+    // `x-forwarded-for: 1.2.3.4` arrives as `1.2.3.4, <real client>`. Reading
+    // the LEFTMOST value (the original implementation) returns the attacker's
+    // own string — rotate it per request and the limiter never fires.
     process.env.TRUST_PROXY_HEADERS = 'true';
-    const req1 = mockRequest() as any;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    req1.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.2';
+    const attacker = '198.51.100.200'; // the real peer the proxy appends
 
-    const req2 = mockRequest() as any;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    req2.headers['x-forwarded-for'] = '10.0.0.1, 10.0.0.3';
+    const spoof = (forged: string): ExecutionContext => {
+      const req = mockRequest('10.9.9.9') as any;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      req.headers['x-forwarded-for'] = `${forged}, ${attacker}`;
+      return {
+        switchToHttp: () => ({ getRequest: () => req }),
+      } as ExecutionContext;
+    };
 
-    const context1 = {
-      switchToHttp: () => ({ getRequest: () => req1 }),
-    } as ExecutionContext;
+    // Four requests, each with a DIFFERENT forged prefix. Limit is 3.
+    guard.canActivate(spoof('1.1.1.1'));
+    guard.canActivate(spoof('2.2.2.2'));
+    guard.canActivate(spoof('3.3.3.3'));
 
-    const context2 = {
-      switchToHttp: () => ({ getRequest: () => req2 }),
-    } as ExecutionContext;
-
-    guard.canActivate(context1);
-    guard.canActivate(context1);
-    guard.canActivate(context1);
-
-    // Same first IP in forwarded-for should hit rate limit
     let threwCorrectly = false;
     try {
-      guard.canActivate(context2);
+      guard.canActivate(spoof('4.4.4.4'));
     } catch (error) {
-      if (error instanceof HttpException) {
-        threwCorrectly = true;
-      }
+      if (error instanceof HttpException) threwCorrectly = true;
+    }
+    // All four resolved to the same real peer, so the fourth is refused.
+    expect(threwCorrectly).toBe(true);
+  });
+
+  it('honours TRUST_PROXY_HOP_COUNT for a chain of trusted proxies', () => {
+    process.env.TRUST_PROXY_HEADERS = 'true';
+    process.env.TRUST_PROXY_HOP_COUNT = '2';
+    const client = '203.0.113.50';
+
+    const ctx = (forged: string): ExecutionContext => {
+      const req = mockRequest('10.9.9.9') as any;
+      // Two trusted hops: [forged...], realClient, innerProxy
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      req.headers['x-forwarded-for'] = `${forged}, ${client}, 10.0.0.1`;
+      return {
+        switchToHttp: () => ({ getRequest: () => req }),
+      } as ExecutionContext;
+    };
+
+    guard.canActivate(ctx('1.1.1.1'));
+    guard.canActivate(ctx('2.2.2.2'));
+    guard.canActivate(ctx('3.3.3.3'));
+
+    let threwCorrectly = false;
+    try {
+      guard.canActivate(ctx('4.4.4.4'));
+    } catch (error) {
+      if (error instanceof HttpException) threwCorrectly = true;
     }
     expect(threwCorrectly).toBe(true);
+    delete process.env.TRUST_PROXY_HOP_COUNT;
+  });
+
+  it('keeps each named bucket on its OWN window', () => {
+    // The 4x bypass: three guards shared one store keyed on IP alone, so
+    // `resetTime` was stamped by whichever ran first. One request to the
+    // 15-minute auth limiter handed the 1-hour password-reset limiter a
+    // 15-minute window — 3 attempts every 15 minutes instead of every hour.
+    const shortWindow = new RateLimitGuard(1000, 3, 'short');
+    const longWindow = new RateLimitGuard(3_600_000, 2, 'long');
+    const context = mockExecutionContext('192.168.77.1');
+
+    shortWindow.canActivate(context);
+    longWindow.canActivate(context);
+    longWindow.canActivate(context);
+
+    // The long bucket is at its own limit of 2 and must refuse, regardless of
+    // the short bucket's separate, shorter window.
+    let threwCorrectly = false;
+    try {
+      longWindow.canActivate(context);
+    } catch (error) {
+      if (error instanceof HttpException) threwCorrectly = true;
+    }
+    expect(threwCorrectly).toBe(true);
+
+    // ...and the short bucket still has its own budget left.
+    expect(shortWindow.canActivate(context)).toBe(true);
   });
 
   it('should throw HttpException with correct status code', () => {
@@ -178,7 +233,12 @@ describe('RateLimitGuard', () => {
     expect(hasRetryAfter).toBe(true);
   });
 
-  it('should use singleton store shared across all guard instances', () => {
+  it('shares one store across guard instances with the SAME bucket name', () => {
+    // Two routes carrying the same decorator share a budget — that is where
+    // "cycling endpoints must not multiply the budget" actually comes from
+    // (signup + login are one bucket; forgot-password + reset-password
+    // another). Guards with DIFFERENT bucket names do not share, which is the
+    // separate test above.
     const guard2 = new RateLimitGuard(60000, 3);
     const context = mockExecutionContext('192.168.1.106');
 

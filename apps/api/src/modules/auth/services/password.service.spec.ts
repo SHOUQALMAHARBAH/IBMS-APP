@@ -53,3 +53,30 @@ describe('PasswordService', () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe('Part 10.1 password policy — the bcrypt 72-byte ceiling', () => {
+  const service = new PasswordService();
+
+  it('rejects a password longer than bcrypt will actually hash', () => {
+    // bcrypt hashes at most 72 bytes and silently discards the rest, so two
+    // passwords sharing a 72-byte prefix authenticate identically. Accepting a
+    // 200-character password and quietly using 72 bytes of it is dishonest
+    // about the protection the account actually has.
+    const violations = service.validatePolicy(`Aa1!${'x'.repeat(80)}`);
+    expect(violations.join(' ')).toMatch(/72 bytes/);
+  });
+
+  it('measures BYTES, not characters — an Arabic passphrase hits it sooner', () => {
+    // Load-bearing in a bilingual app: Arabic code points are 2 bytes in
+    // UTF-8, so a 40-character Arabic passphrase is 80+ bytes while a
+    // 40-character ASCII one is 40. A character cap would silently truncate
+    // exactly the users this system is built for.
+    const arabic = `Aa1!${'م'.repeat(40)}`;
+    expect(arabic.length).toBeLessThan(72);
+    expect(service.validatePolicy(arabic).join(' ')).toMatch(/72 bytes/);
+  });
+
+  it('accepts a strong password inside the ceiling', () => {
+    expect(service.validatePolicy('Str0ng!Passphrase-2026')).toEqual([]);
+  });
+});

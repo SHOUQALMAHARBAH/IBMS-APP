@@ -85,11 +85,18 @@ async function makeUser(
       update: {},
       create: { name: roleName },
     });
-    await prisma.userRoleAssignment.upsert({
-      where: { userId_roleId: { userId: user.id, roleId: role.id } },
-      update: { revokedAt: null },
-      create: { userId: user.id, roleId: role.id },
+    // Partial UNIQUE `UserRoleAssignment_one_active_per_user_role` (migration
+    // 20260920140000) means a revoked grant is HISTORY and a new grant is a
+    // new row — so this creates one only when no active grant exists, rather
+    // than resurrecting a revoked one and erasing its audit trail.
+    const activeGrant = await prisma.userRoleAssignment.findFirst({
+      where: { userId: user.id, roleId: role.id, revokedAt: null },
     });
+    if (!activeGrant) {
+      await prisma.userRoleAssignment.create({
+        data: { userId: user.id, roleId: role.id },
+      });
+    }
   }
   return { accessToken, userId: user.id };
 }

@@ -206,18 +206,28 @@ export class UserAdminService {
     }
 
     // Lockout guard: SYSTEM_SECURITY_ADMINISTRATOR is the only role holding
-    // `user.manage`, so revoking the last active one would leave nobody able
-    // to grant it back — an unrecoverable state short of direct DB access.
-    if (roleName === RoleName.SYSTEM_SECURITY_ADMINISTRATOR) {
-      const holders = await this.users.countActiveHoldersOfRole(role.id);
-      if (holders <= 1) {
-        throw new UnprocessableEntityException(
-          'Refusing to revoke the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to grant it back. Provision a second administrator first.',
-        );
-      }
-    }
-
-    const revoked = await this.users.revokeRole(userId, role.id);
+    // `user.manage`, so revoking the last usable one leaves nobody able to
+    // grant it back — an unrecoverable state short of direct DB access.
+    //
+    // The count and the revoke run under a LOCK on the Role row. As a plain
+    // count-then-act, two concurrent revocations of the two remaining
+    // administrators both read `holders === 2`, both passed `holders <= 1`,
+    // and both committed — producing exactly the state this guard exists to
+    // prevent (`race-safe-invariants.md` § What triggers this rule: "any
+    // 'has this already happened?' guard before a state change that is not a
+    // status-conditional updateMany").
+    const revoked =
+      roleName === RoleName.SYSTEM_SECURITY_ADMINISTRATOR
+        ? await this.users.withRoleLocked(role.id, async () => {
+            const holders = await this.users.countActiveHoldersOfRole(role.id);
+            if (holders <= 1) {
+              throw new UnprocessableEntityException(
+                'Refusing to revoke the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to grant it back. Provision a second administrator first.',
+              );
+            }
+            return this.users.revokeRole(userId, role.id);
+          })
+        : await this.users.revokeRole(userId, role.id);
     if (revoked === 0) {
       throw new ConflictException(
         `User ${userId} does not hold an active ${roleName} grant.`,
@@ -253,7 +263,36 @@ export class UserAdminService {
       );
     }
 
-    const changed = await this.users.setActive(userId, isActive);
+    // The SAME lockout invariant as revokeRole, which this path could reach by
+    // a different route. The self-deactivation guard above is NOT sufficient:
+    // two administrators deactivating EACH OTHER concurrently are neither of
+    // them deactivating themselves, so both calls passed and the system was
+    // left with zero active administrators. Deactivating is as effective a
+    // way to remove the last usable holder as revoking is — `AuthService.login`
+    // refuses an inactive account outright — so it takes the same Role lock
+    // and the same count.
+    const adminRole = await this.users.findRoleByName(
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+    );
+    const changed =
+      !isActive && adminRole
+        ? await this.users.withRoleLocked(adminRole.id, async () => {
+            const holdsAdmin = (await this.users.getRoleNames(userId)).includes(
+              RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+            );
+            if (holdsAdmin) {
+              const holders = await this.users.countActiveHoldersOfRole(
+                adminRole.id,
+              );
+              if (holders <= 1) {
+                throw new UnprocessableEntityException(
+                  'Refusing to deactivate the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to sign in and grant the role back. Provision a second administrator first.',
+                );
+              }
+            }
+            return this.users.setActive(userId, isActive);
+          })
+        : await this.users.setActive(userId, isActive);
     if (changed === 0) {
       // Already in the requested state — idempotent, not an error.
       return { userId, isActive };
