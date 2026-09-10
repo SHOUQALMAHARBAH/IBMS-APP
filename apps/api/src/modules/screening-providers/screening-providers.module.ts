@@ -3,6 +3,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { BuiltInWatchlistProvider } from './built-in-watchlist.provider';
 import { ScreeningProviderRegistry } from './screening-provider.registry';
+import { ScreeningConfigController } from './screening-config.controller';
 
 /**
  * The screening provider seam.
@@ -14,6 +15,7 @@ import { ScreeningProviderRegistry } from './screening-provider.registry';
 @Global()
 @Module({
   imports: [PrismaModule],
+  controllers: [ScreeningConfigController],
   providers: [
     WatchlistEntryRepository,
     BuiltInWatchlistProvider,

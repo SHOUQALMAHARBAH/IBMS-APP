@@ -64,6 +64,7 @@ const NAV_ITEMS: { href: string; labelKey: TranslationKey }[] = [
   { href: '/transaction-monitoring', labelKey: 'navAmlMonitoring' },
   { href: '/watchlist-sync', labelKey: 'navWatchlistSync' },
   { href: '/screening-matches', labelKey: 'navScreeningMatches' },
+  { href: '/screening-health', labelKey: 'navScreeningHealth' },
   { href: '/regulatory-compliance', labelKey: 'navRegulatoryCompliance' },
   { href: '/operational-pi-risk', labelKey: 'navOperationalPiRisk' },
   { href: '/incidents', labelKey: 'navIncidentManagement' },
