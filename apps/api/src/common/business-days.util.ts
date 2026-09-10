@@ -19,6 +19,21 @@ export const JORDAN_WEEKEND_DAYS: readonly number[] = [5, 6];
 
 export interface BusinessDayOptions {
   weekendDays?: readonly number[];
+  /** Non-working dates, as `YYYY-MM-DD` strings in UTC. Supplied by the caller
+   * from `SlaHoliday` rows — this util stays pure and does no I/O.
+   *
+   * Until SLA policies existed this file accounted for the WEEKEND ONLY, and
+   * said so: "treat a computed business-day deadline as a lower bound rather
+   * than an exact one until a public-holiday calendar is supplied." A holiday
+   * calendar now exists, so a caller that passes one gets an exact deadline
+   * instead of a lower bound. A caller that passes none behaves exactly as
+   * before. */
+  holidays?: ReadonlySet<string>;
+}
+
+/** `YYYY-MM-DD` in UTC — the key `BusinessDayOptions.holidays` is keyed on. */
+export function utcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
 export function isBusinessDay(
@@ -26,7 +41,8 @@ export function isBusinessDay(
   options?: BusinessDayOptions,
 ): boolean {
   const weekend = new Set(options?.weekendDays ?? JORDAN_WEEKEND_DAYS);
-  return !weekend.has(date.getUTCDay());
+  if (weekend.has(date.getUTCDay())) return false;
+  return !(options?.holidays?.has(utcDateKey(date)) ?? false);
 }
 
 /**
@@ -41,13 +57,12 @@ export function addBusinessDays(
   days: number,
   options?: BusinessDayOptions,
 ): Date {
-  const weekend = new Set(options?.weekendDays ?? JORDAN_WEEKEND_DAYS);
   const direction = days >= 0 ? 1 : -1;
   let remaining = Math.abs(days);
   const result = new Date(start.getTime());
   while (remaining > 0) {
     result.setUTCDate(result.getUTCDate() + direction);
-    if (!weekend.has(result.getUTCDay())) {
+    if (isBusinessDay(result, options)) {
       remaining -= 1;
     }
   }
@@ -55,7 +70,7 @@ export function addBusinessDays(
 }
 
 export type SlaDurationUnit =
-  'hours' | 'calendarDays' | 'businessDays' | 'months';
+  'minutes' | 'hours' | 'calendarDays' | 'businessDays' | 'months';
 
 /** A signed SLA duration or escalation offset. Negative `value` means
  * "before the reference date" — used for a pre-deadline early-warning
@@ -70,6 +85,11 @@ export interface SlaDuration {
 /** Applies a signed `SlaDuration` to `base`, returning the resulting Date. */
 export function applyDuration(base: Date, duration: SlaDuration): Date {
   switch (duration.unit) {
+    case 'minutes': {
+      const result = new Date(base.getTime());
+      result.setUTCMinutes(result.getUTCMinutes() + duration.value);
+      return result;
+    }
     case 'hours': {
       const result = new Date(base.getTime());
       result.setUTCHours(result.getUTCHours() + duration.value);

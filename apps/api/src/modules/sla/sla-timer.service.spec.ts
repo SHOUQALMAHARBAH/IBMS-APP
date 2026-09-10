@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
 import { SlaTimerService } from './sla-timer.service';
 import { applyDuration } from '../../common/business-days.util';
 import type { AuditService } from '../audit/audit.service';
@@ -47,13 +48,23 @@ function makeDeps(overrides?: {
   const users = { findByEmail } as unknown as UserRepository;
 
   return {
-    service: new SlaTimerService(prisma, audit, users),
+    service: new SlaTimerService(prisma, audit, users, policiesRepoMock()),
     create,
     findMany,
     updateMany,
     record,
     findByEmail,
   };
+}
+
+/** No SLA policies configured — every existing test exercises the
+ * registry-fallback path, which is exactly the behaviour that must keep
+ * working on a database that has not been seeded with policies. */
+function policiesRepoMock() {
+  return {
+    findActiveFor: vi.fn().mockResolvedValue(null),
+    findHolidays: vi.fn().mockResolvedValue([]),
+  } as unknown as SlaPolicyRepository;
 }
 
 describe('SlaTimerService.computeDueAt', () => {

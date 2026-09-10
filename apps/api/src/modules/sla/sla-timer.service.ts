@@ -1,9 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type { SlaTimer } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { UserRepository } from '../../repositories/user.repository';
 import { applyDuration } from '../../common/business-days.util';
+import { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
+import {
+  computePolicyDueAt,
+  effectiveDueAt,
+  holidaySet,
+  remainingMs,
+  slaStatus,
+  type SlaStatus,
+} from './sla-status.config';
 import { getSlaRegistryEntry } from './sla-registry.config';
 
 // Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
@@ -88,6 +103,7 @@ export class SlaTimerService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly users: UserRepository,
+    private readonly policies: SlaPolicyRepository,
   ) {}
 
   /** Applies a registry workflow's `duration` (or, when `regulatoryChannel`
@@ -107,6 +123,43 @@ export class SlaTimerService {
         ? entry.regulatoryChannelDuration
         : entry.duration;
     return applyDuration(baseDate, duration);
+  }
+
+  /**
+   * Due date from the CONFIGURED policy — the runtime path.
+   *
+   * Reads the active `SlaPolicy` for this process (and workflow state, where
+   * one is configured), applies its duration across its own working calendar
+   * including `SlaHoliday` rows, and returns the policy alongside the date so
+   * the caller can record WHICH policy set the deadline on the timer.
+   *
+   * Falls back to the compile-time `SLA_REGISTRY` when no policy is
+   * configured, which is what keeps every existing caller working on a
+   * database that has not been seeded with policies yet. The fallback is a
+   * bridge, not the design: `policy` comes back `null` so a caller (and the
+   * timer row) can tell a configured deadline from a defaulted one.
+   */
+  async resolveDueAt(
+    workflowName: string,
+    baseDate: Date,
+    options?: { regulatoryChannel?: boolean; workflowState?: string | null },
+  ): Promise<{
+    dueAt: Date;
+    policy: Awaited<ReturnType<SlaPolicyRepository['findActiveFor']>>;
+  }> {
+    const policy = await this.policies.findActiveFor(
+      workflowName,
+      options?.workflowState ?? null,
+      baseDate,
+    );
+    if (!policy) {
+      return {
+        dueAt: this.computeDueAt(workflowName, baseDate, options),
+        policy: null,
+      };
+    }
+    const holidays = holidaySet(await this.policies.findHolidays());
+    return { dueAt: computePolicyDueAt(policy, baseDate, holidays), policy };
   }
 
   /** Creates one `SlaTimer` row per escalation stage defined for
@@ -188,6 +241,180 @@ export class SlaTimerService {
     }
 
     return result;
+  }
+
+  /**
+   * PAUSE the clock. `dueAt` is NOT moved — accumulated pause is tracked
+   * separately, so "when was this originally due?" and "how long did you
+   * actually have?" stay separately answerable, which is the pair a regulator
+   * asks about together.
+   *
+   * Status-conditional: pausing an already-paused or resolved timer matches 0
+   * rows and 409s rather than silently restarting the accumulator.
+   */
+  async pause(
+    timerId: string,
+    reason: string,
+    actorUserId: string,
+  ): Promise<SlaTimer> {
+    const now = new Date();
+    const { count } = await this.prisma.client.slaTimer.updateMany({
+      where: { id: timerId, pausedAt: null, resolvedAt: null },
+      data: { pausedAt: now, pauseReason: reason },
+    });
+    if (count === 0) {
+      throw new ConflictException(
+        `SLA timer ${timerId} is already paused, or already resolved.`,
+      );
+    }
+    const timer = await this.prisma.client.slaTimer.findUniqueOrThrow({
+      where: { id: timerId },
+    });
+    await this.safeAudit({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: timer.entityType,
+      entityId: timer.entityId,
+      afterValue: {
+        slaTimerId: timer.id,
+        workflowName: timer.workflowName,
+        event: 'SLA_PAUSED',
+        pausedAt: now.toISOString(),
+        // The stated basis is the control — a stopped compliance clock with
+        // no reason is indistinguishable from one somebody forgot to restart.
+        reason,
+      },
+    });
+    return timer;
+  }
+
+  /** RESUME, banking the elapsed pause into `pausedTotalMs`. */
+  async resume(timerId: string, actorUserId: string): Promise<SlaTimer> {
+    const existing = await this.prisma.client.slaTimer.findUnique({
+      where: { id: timerId },
+    });
+    if (!existing) {
+      throw new NotFoundException(`SLA timer ${timerId} not found.`);
+    }
+    if (!existing.pausedAt) {
+      throw new ConflictException(`SLA timer ${timerId} is not paused.`);
+    }
+
+    const now = new Date();
+    const banked =
+      existing.pausedTotalMs +
+      Math.max(0, now.getTime() - existing.pausedAt.getTime());
+
+    // Re-assert `pausedAt` so a concurrent resume cannot bank the same pause
+    // twice (race-safe-invariants.md — the write re-asserts what was read).
+    const { count } = await this.prisma.client.slaTimer.updateMany({
+      where: { id: timerId, pausedAt: existing.pausedAt },
+      data: { pausedAt: null, pausedTotalMs: banked, pauseReason: null },
+    });
+    if (count === 0) {
+      throw new ConflictException(
+        `SLA timer ${timerId} was resumed concurrently by another request.`,
+      );
+    }
+
+    const timer = await this.prisma.client.slaTimer.findUniqueOrThrow({
+      where: { id: timerId },
+    });
+    await this.safeAudit({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: timer.entityType,
+      entityId: timer.entityId,
+      afterValue: {
+        slaTimerId: timer.id,
+        workflowName: timer.workflowName,
+        event: 'SLA_RESUMED',
+        resumedAt: now.toISOString(),
+        pausedTotalMs: banked,
+      },
+    });
+    return timer;
+  }
+
+  /**
+   * Where a timer stands right now, with the provenance of the deadline
+   * attached.
+   *
+   * `isRegulatory` travels with the status on purpose: a screen showing
+   * "BREACHED" needs to say whether what was breached is the law or an
+   * internal target, and it must not have to guess.
+   */
+  async checkSlaStatus(timerId: string): Promise<{
+    timerId: string;
+    workflowName: string;
+    status: SlaStatus;
+    dueAt: string;
+    effectiveDueAt: string;
+    remainingMs: number | null;
+    pausedTotalMs: number;
+    isRegulatory: boolean;
+    sourceType: string | null;
+    policyCode: string | null;
+  }> {
+    const timer = await this.prisma.client.slaTimer.findUnique({
+      where: { id: timerId },
+      include: { slaPolicy: true },
+    });
+    if (!timer) throw new NotFoundException(`SLA timer ${timerId} not found.`);
+
+    const now = new Date();
+    const warning = timer.slaPolicy?.warningThreshold ?? 0.8;
+    return {
+      timerId: timer.id,
+      workflowName: timer.workflowName,
+      status: slaStatus(timer, now, warning),
+      dueAt: timer.dueAt.toISOString(),
+      effectiveDueAt: effectiveDueAt(timer, now).toISOString(),
+      remainingMs: remainingMs(timer, now),
+      pausedTotalMs: timer.pausedTotalMs,
+      isRegulatory: timer.slaPolicy?.sourceType === 'REGULATORY',
+      sourceType: timer.slaPolicy?.sourceType ?? null,
+      policyCode: timer.slaPolicy?.policyCode ?? null,
+    };
+  }
+
+  /**
+   * Stamp `breachedAt` on everything now past its PAUSE-ADJUSTED deadline.
+   *
+   * Separate from `runEscalationSweep`, which fires on raw `dueAt`: a paused
+   * timer is not breached, and recording a breach is a different fact from
+   * notifying somebody about it. Conditional on `breachedAt: null` so a
+   * re-run cannot re-stamp a breach with a later time.
+   */
+  async recordBreaches(): Promise<number> {
+    const now = new Date();
+    const open = await this.prisma.client.slaTimer.findMany({
+      where: { resolvedAt: null, breachedAt: null, pausedAt: null },
+      select: { id: true, dueAt: true, pausedTotalMs: true },
+    });
+    const overdue = open.filter(
+      (t) => now.getTime() > t.dueAt.getTime() + t.pausedTotalMs,
+    );
+    if (overdue.length === 0) return 0;
+
+    const { count } = await this.prisma.client.slaTimer.updateMany({
+      where: { id: { in: overdue.map((t) => t.id) }, breachedAt: null },
+      data: { breachedAt: now },
+    });
+    if (count > 0) {
+      this.logger.warn(`Recorded ${count} SLA breach(es).`);
+    }
+    return count;
+  }
+
+  private async safeAudit(input: RecordAuditEntryInput): Promise<void> {
+    try {
+      await this.audit.record(input);
+    } catch (err) {
+      this.logger.error(
+        `SLA timer audit failed after the write committed: ${(err as Error).message}`,
+      );
+    }
   }
 
   /** The scheduled sweep (`SlaTimerScheduler`): escalates every unresolved,

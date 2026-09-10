@@ -7,6 +7,7 @@ import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
 import { SAMPLE_INSURERS } from "./seed-data/insurers";
 import { DOCUMENT_TEMPLATES } from "./seed-data/document-templates";
+import { SLA_POLICY_SEEDS } from "./seed-data/sla-policies";
 
 const prisma = new PrismaClient();
 
@@ -282,10 +283,95 @@ async function ensureSampleUsers(
  * (upsert-based) so it's safe to re-run in CI/dev without duplicating rows
  * or clobbering roles/permissions added by hand since the last run.
  */
+/**
+ * Seeds the configurable SLA policies that replace the hard-coded
+ * `SLA_REGISTRY` as the runtime source of every deadline.
+ *
+ * Seeded ACTIVE, because the values are the ones the system has been using all
+ * along — this is a migration of where they LIVE, not a change to what they
+ * are. A deployment that seeds and changes nothing behaves exactly as before.
+ *
+ * IDEMPOTENT AND NON-DESTRUCTIVE. An existing policy is left completely
+ * untouched: once Compliance has edited a duration or re-cited a source, a
+ * later `npm run db:seed` (a routine step alongside migrations) must not
+ * silently revert it. That is the same failure the bootstrap-administrator
+ * grant had — a change that undoes itself on the next deploy is not a change.
+ * Only genuinely NEW policy codes are inserted.
+ *
+ * The five entries whose registry citation reads "DRAFT, UNSOURCED" seed as
+ * INTERNAL_POLICY, and three business-process targets as OPERATIONAL. Only
+ * figures traceable to a governing document section seed as REGULATORY — and
+ * the DB CHECK refuses that classification without a named instrument, so this
+ * cannot drift into over-claiming.
+ */
+async function ensureSlaPolicies(): Promise<void> {
+  // The scheduled-jobs service account owns the seeded baseline — these
+  // policies were not authored by any human operator, and attributing them to
+  // one would be a small lie in an audit-relevant field.
+  const systemUser = await prisma.user.findUnique({
+    where: { email: SYSTEM_ACCOUNT_EMAIL },
+    select: { id: true },
+  });
+  if (!systemUser) {
+    throw new Error(
+      "System service account missing — ensureSystemAccount() must run before ensureSlaPolicies().",
+    );
+  }
+
+  const existing = new Set(
+    (await prisma.slaPolicy.findMany({ select: { policyCode: true } })).map(
+      (p) => p.policyCode,
+    ),
+  );
+
+  let created = 0;
+  for (const seed of SLA_POLICY_SEEDS) {
+    if (existing.has(seed.policyCode)) continue;
+    await prisma.slaPolicy.create({
+      data: {
+        policyCode: seed.policyCode,
+        policyName: seed.policyName,
+        processType: seed.processType,
+        description: seed.description,
+        durationValue: seed.durationValue,
+        durationUnit: seed.durationUnit,
+        calendarType: seed.calendarType,
+        sourceType: seed.sourceType,
+        sourceReference: seed.sourceReference,
+        sourceDocument: seed.sourceDocument,
+        sourceSection: seed.sourceSection,
+        status: "ACTIVE",
+        createdByUserId: systemUser.id,
+        escalations: {
+          create: seed.escalations.map((e) => ({
+            stageOrder: e.stageOrder,
+            offsetValue: e.offsetValue,
+            offsetUnit: e.offsetUnit,
+            escalateTo: e.escalateTo,
+          })),
+        },
+      },
+    });
+    created += 1;
+  }
+
+  const byType = SLA_POLICY_SEEDS.reduce<Record<string, number>>((acc, s) => {
+    acc[s.sourceType] = (acc[s.sourceType] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(
+    `Seeded ${created} new SLA policy/policies (${SLA_POLICY_SEEDS.length} defined, ${existing.size} already present and left untouched). ` +
+      `Provenance: ${Object.entries(byType)
+        .map(([k, v]) => `${v} ${k}`)
+        .join(", ")}.`,
+  );
+}
+
 async function main() {
   await ensureSystemAccount();
   await ensureRetentionSchedule();
   await ensureDocumentTemplates();
+  await ensureSlaPolicies();
 
   for (const role of ROLES) {
     await prisma.role.upsert({
