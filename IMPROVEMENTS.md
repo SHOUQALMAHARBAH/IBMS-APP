@@ -546,6 +546,7 @@ system is used for anything.
 | `SLA_DASHBOARD_DUE_SOON_WINDOW` | #43 `sla-dashboard.config.ts` | 3 calendar days — a dashboard lookahead heuristic, not a registry SLA value, so lower stakes than the others in this table (doesn't move a deadline) but still an untraced number |
 | `FEEDBACK_SCORE_MIN`/`MAX` (satisfaction scale) | #45 `feedback.config.ts` | 1–5, common CSAT convention — no CX/Compliance SOP source |
 | `RENEWAL_INACTIVITY_THRESHOLD_BUSINESS_DAYS` | #46 `retention-case.config.ts` | 30 business days since `RenewalCase.triggeredAt` — no source; blocked on the same renewal-module gap as 3.6 anyway |
+| `sanctions_match_review` SLA | #49 `sla-registry.config.ts` | 3 business days, escalate to Compliance Officer — DRAFT/UNSOURCED. Neither `pdpl-sla-timers.md` nor `kyc-aml-sla-timers.md` covers turnaround for adjudicating a sanctions-list match. Drafted TIGHTER than the 5-day standard KYC review on the reasoning that an unadjudicated match on a LIVE customer is a live exposure, not a queued onboarding step — that reasoning is ours, not a regulator's. A CBJ AML/CFT instruction or the broker's own AML policy should supply the real figure. |
 
 ---
 
@@ -654,12 +655,24 @@ note warns about.
   deliberately not built, because it could not be tested against the real
   service without credentials.
 - **The sync has never been run on a real deployment**, so `WatchlistEntry`
-  starts empty and every real-list check returns CLEAR until the first sync.
-  The 12-hourly `WatchlistSyncScheduler` and `POST /watchlist-sync/run` both
-  exist; someone has to run one.
+  starts empty. The 12-hourly `WatchlistSyncScheduler` and
+  `POST /watchlist-sync/run` both exist; someone has to run one. This is an
+  OPERATIONAL gap, no longer a silent one: as of 2026-09-10 an unsynced cache
+  no longer produces a CLEAR. A screening that could not reach a populated
+  list records `PENDING_INVESTIGATION` (the enum value that had sat in the
+  schema since the original model with zero writers), escalates to Compliance,
+  is counted separately by the recurring batch as `unscreenable`, and raises a
+  banner on the review-queue screen. A CLEAR now means "we checked a list and
+  this subject was not on it", never "we checked an empty table".
 - The transliteration table covers ~50 common Jordanian/Arab **given** names
   and deliberately excludes family-name components. Family names across
-  scripts still will not match.
+  scripts still will not match. Adding them is NOT a safe incremental change:
+  the table's own header records that "Al-"/"El-" prefixes "compose with far
+  more variation than a fixed-group table can safely represent without new
+  false-positive risk".
+- The `sanctions_match_review` SLA figure (3 business days) is **drafted, not
+  sourced** — see §4. The queue now has a tracked deadline and escalation;
+  what it does not have is a regulatory basis for that particular number.
 
 ### 5.3 `P1` — No AML/CFT transaction monitoring (#48)
 
