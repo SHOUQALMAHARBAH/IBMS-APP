@@ -1729,11 +1729,20 @@ model Invoice {
 ///    concurrent instalments cannot both pass the "does this exceed the
 ///    invoiced total?" check (`race-safe-invariants.md` — the write
 ///    re-asserts the condition, under serialisation).
-///  * `reference` (the payment/bank reference) carries a partial UNIQUE per
-///    invoice — `Receipt_invoiceId_reference_key`, migration
+///  * `reference` (the payment/bank/voucher reference) carries a partial
+///    UNIQUE per invoice — `Receipt_invoiceId_reference_key`, migration
 ///    20260909160000 — so a retried POST is idempotent rather than becoming
 ///    a phantom second instalment. Figures alone can no longer distinguish a
 ///    retry from a genuine second payment of the same amount.
+///
+/// NOTE — `Receipt_invoiceId_reference_key` exists ONLY in raw SQL (Prisma
+/// cannot express `WHERE "reference" IS NOT NULL`), so it is invisible to
+/// this schema. `prisma migrate dev` diffs the schema against the database
+/// and will offer to DROP it as drift. DO NOT accept that: it is the
+/// idempotency key that stops a retried instalment booking the client's
+/// money twice. This is the same class of schema/DB divergence that
+/// migration 20260909160000's own header documents at length for
+/// `Receipt_invoiceId_key` — the difference is that this one is load-bearing.
 model Receipt {
   id               String          @id @default(uuid())
   invoiceId        String
@@ -1741,11 +1750,17 @@ model Receipt {
   amount           Decimal         @db.Decimal(18, 3)
   receivedAt       DateTime        @default(now())
   method           String? // bank_transfer | cheque | card | cash
-  /// Process 32 — the client's payment/bank reference for this instalment,
-  /// and the idempotency key for the collection endpoint. Optional: a cash
-  /// collection may genuinely have none, and NULLs are unconstrained by the
-  /// partial UNIQUE below (the same treatment every other nullable partial
-  /// UNIQUE in this schema gets).
+  /// Process 32 — the client's payment/bank/voucher reference for this
+  /// instalment, and the idempotency key for the collection endpoint.
+  ///
+  /// Nullable in the SCHEMA (rows written before it existed), but MANDATORY
+  /// at the API boundary — `RecordReceiptDto.reference` is required. It was
+  /// optional on the grounds that "a cash collection may have none", which
+  /// left the cash path with no duplicate protection at all: the partial
+  /// UNIQUE below only covers `reference IS NOT NULL`, and the row lock on
+  /// the parent Invoice serialises concurrent writes without deduplicating
+  /// them, so a double-submitted cash instalment booked the client's money
+  /// twice.
   reference        String?
   /// Process 38 — the approved customer PaymentChannel the money came in on
   /// (optional). When set, `method` is derived from the channel's `channelType`.

@@ -217,12 +217,28 @@ export class EndorsementRepository {
     refundId: string;
     customerId: string;
     amount: Prisma.Decimal;
+    /** Re-asserted in the `where` below. `null` when the amount is under the
+     * approval threshold and no approval was required. */
+    approvedByUserId: string | null;
     paidAt: Date;
     ledgerReference: string;
   }): Promise<{ refund: Refund; ledgerEntry: ClientFundsLedgerEntry } | null> {
     return this.prisma.client.$transaction(async (tx) => {
+      // Re-assert EVERY field the caller validated, not just `paidAt`
+      // (`race-safe-invariants.md` § Rule). `RefundService.disburse` checked
+      // the amount and the approval before getting here; if either moved in
+      // between, this must match 0 rows rather than pay out against a stale
+      // read. Today `Refund.amount` is write-once and `approvedByUserId` only
+      // ever goes null -> set, so no interleaving currently misbehaves — but
+      // that is incidental, not enforced, and the day either becomes mutable
+      // this would silently disburse a figure nobody approved.
       const { count } = await tx.refund.updateMany({
-        where: { id: input.refundId, paidAt: null },
+        where: {
+          id: input.refundId,
+          paidAt: null,
+          amount: input.amount,
+          approvedByUserId: input.approvedByUserId,
+        },
         data: { paidAt: input.paidAt },
       });
       if (count === 0) return null;

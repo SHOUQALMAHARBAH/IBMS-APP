@@ -496,9 +496,13 @@ export function deriveInvoiceView(row: InvoiceRow): InvoiceView {
   // (INVOICE_CYCLE_INCLUDE), so the last element is the latest payment — and,
   // once the invoice is settled, the one that completed it.
   const latest = receipts.length > 0 ? receipts[receipts.length - 1] : null;
-  // The Remittance hangs off ONE receipt (`Remittance.receiptId @unique`,
-  // which is what keeps it to one per invoice); with instalments it is no
-  // longer safe to assume which, so find it rather than index.
+  // The Remittance hangs off ONE receipt (`Remittance.receiptId @unique`).
+  // That constraint is NOT what keeps it to one per INVOICE — with instalments
+  // an invoice carries several receipts, so it permits one remittance per
+  // receipt. What actually holds "one remittance per invoice" is the
+  // `RECONCILED -> REMITTED` transition, which fires once. With instalments it
+  // is also no longer safe to assume WHICH receipt carries it, so find it
+  // rather than index.
   const remitted = receipts.find((r) => r.remittance)?.remittance ?? null;
   const collected = sumMoney(receipts.map((r) => r.amount));
   const outstandingRaw = subtractMoney(row.totalAmount, collected);

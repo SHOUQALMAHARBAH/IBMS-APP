@@ -52,9 +52,16 @@ function isUniqueViolation(err: unknown): boolean {
  * (the status-conditional `updateMany` is the race gate); the `Receipt` /
  * `Remittance` / `ClientFundsLedgerEntry` artefacts are written AFTER the
  * transition commits (the #24 register pattern), each in one `$transaction`
- * with its client-money ledger row. #32 supports a single full-payment receipt
- * per invoice — a partial / over payment is a 422 (the variance path is
- * Process 39, never a silent write-off — `money-decimal-jod.md`).
+ * with its client-money ledger row.
+ *
+ * #32 supports PARTIAL payment: an invoice may carry several instalment
+ * receipts, and only the one that completes it walks the invoice on to
+ * COLLECTED. (This paragraph previously said the opposite — "a single
+ * full-payment receipt per invoice" — which is the invariant migration
+ * 20260909160000 deliberately replaced.) An OVER payment is still a 422
+ * pointing at Process 39, never a silent write-off (`money-decimal-jod.md`).
+ * Two receipts can never be booked for one payment because `reference` is
+ * mandatory and uniquely constrained per invoice.
  *
  * No maker/checker — recording a receipt / remittance is single-actor Finance
  * work (`roles-and-segregation-of-duties.md` lists both as Finance/Collections
@@ -176,7 +183,7 @@ export class CollectionService {
     const channel = await this.loadChannel(dto.paymentChannelId);
     const paymentChannelId = channel?.id ?? null;
     const method = this.receiptMethodFor(channel, dto.method ?? null);
-    const reference = dto.reference ?? null;
+    const reference = dto.reference;
     const receivedAt = dto.receivedAt
       ? parseHistoricalInstant(dto.receivedAt, 'receivedAt')
       : new Date();
@@ -184,22 +191,23 @@ export class CollectionService {
     // Idempotent retry. With instalments allowed, figures alone can no longer
     // tell a retry from a genuine second payment of the same amount, so the
     // client's payment `reference` is the key (partial UNIQUE per invoice).
-    if (reference !== null) {
-      const already = invoice.receipts.find((r) => r.reference === reference);
-      if (already) {
-        const same =
-          compareMoney(already.amount, amount) === 0 &&
-          (already.method ?? null) === method &&
-          (already.paymentChannelId ?? null) === paymentChannelId;
-        if (!same) {
-          throw new ConflictException(
-            `Invoice ${invoiceId} already has a receipt with reference "${reference}" for ${formatMoney(
-              already.amount,
-            )}. A receipt is recorded once — a correction is not yet supported.`,
-          );
-        }
-        return deriveInvoiceView(invoice);
+    // It is MANDATORY precisely so this branch always applies: when it was
+    // optional, a cash instalment had no duplicate protection whatsoever and a
+    // double-submit booked the client's money twice.
+    const already = invoice.receipts.find((r) => r.reference === reference);
+    if (already) {
+      const same =
+        compareMoney(already.amount, amount) === 0 &&
+        (already.method ?? null) === method &&
+        (already.paymentChannelId ?? null) === paymentChannelId;
+      if (!same) {
+        throw new ConflictException(
+          `Invoice ${invoiceId} already has a receipt with reference "${reference}" for ${formatMoney(
+            already.amount,
+          )}. A receipt is recorded once — a correction is not yet supported.`,
+        );
       }
+      return deriveInvoiceView(invoice);
     }
 
     if (invoice.status !== 'INVOICED' && invoice.status !== 'COLLECTED') {
@@ -253,7 +261,7 @@ export class CollectionService {
       // as the read would have: byte-identical is an idempotent resume,
       // anything else is a 409. This is the "the write re-asserts the
       // condition" half of race-safe-invariants.md.
-      if (isUniqueViolation(err) && reference !== null) {
+      if (isUniqueViolation(err)) {
         const now = await this.loadInvoice(invoice.id);
         const landed = now.receipts.find((r) => r.reference === reference);
         if (
@@ -301,10 +309,12 @@ export class CollectionService {
         });
       } catch (err) {
         // The receipt and its ledger row have committed — they are the
-        // authoritative money record. A concurrent final instalment may have
-        // already walked the invoice to COLLECTED; either way the status
-        // self-heals on the next call (`reconcile` re-derives the sum from
-        // live rows regardless). Logged, never thrown.
+        // authoritative money record, so this must not throw. A concurrent
+        // final instalment may have already walked the invoice to COLLECTED.
+        // If instead nothing did, `reconcile()` re-derives the collected total
+        // and applies the missed transition itself — see its self-heal branch,
+        // which exists because this swallow used to strand a fully-paid
+        // invoice with no way forward at all.
         this.logger.warn(
           `Invoice ${invoiceId}: receipt ${written.receipt.id} committed but the INVOICED -> COLLECTED transition did not apply: ${(err as Error).message}`,
         );
@@ -363,6 +373,42 @@ export class CollectionService {
     if (invoice.status === 'RECONCILED' || invoice.status === 'REMITTED') {
       return deriveInvoiceView(invoice); // idempotent
     }
+
+    // SELF-HEAL a fully-collected invoice stranded at INVOICED.
+    //
+    // `recordReceipt` writes the receipt and its client-money ledger row
+    // FIRST, then transitions, and deliberately swallows a transition failure
+    // because the money record is already committed and authoritative. That
+    // left a real trap: an invoice whose final instalment landed but whose
+    // INVOICED -> COLLECTED transition threw could never move again.
+    // `recordReceipt` refuses it ("already collected in full") and this method
+    // used to refuse it too, one line below — and no other caller in the
+    // codebase transitions an Invoice to COLLECTED (verified by grep). The
+    // client's money was banked and the invoice could never be reconciled or
+    // remitted to the insurer, short of editing the database by hand, while
+    // sitting on the #33 ageing report as a receivable that would never clear.
+    //
+    // The comment in `recordReceipt` claimed this method already healed that.
+    // It did not: the status gate below rejected INVOICED before any figure
+    // was re-derived. Now it genuinely does, and only on the one safe
+    // condition — the receipts sum EXACTLY to the invoiced total, which is the
+    // same test `fullyCollected` applies under the row lock.
+    if (invoice.status === 'INVOICED') {
+      const collectedSoFar = sumMoney(invoice.receipts.map((r) => r.amount));
+      if (compareMoney(collectedSoFar, invoice.totalAmount) === 0) {
+        this.logger.warn(
+          `Invoice ${invoiceId}: fully collected but still INVOICED — applying the INVOICED -> COLLECTED transition that did not commit when the final instalment was recorded.`,
+        );
+        await this.workflow.transition({
+          entityType: 'Invoice',
+          entityId: invoiceId,
+          toStatus: 'COLLECTED',
+          actorUserId: actor.id,
+        });
+        invoice = await this.loadInvoice(invoiceId);
+      }
+    }
+
     if (invoice.status !== 'COLLECTED') {
       throw new UnprocessableEntityException(
         `Invoice ${invoiceId} is ${invoice.status}; reconciliation follows a recorded collection (COLLECTED).`,
