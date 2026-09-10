@@ -63,6 +63,7 @@ const NAV_ITEMS: { href: string; labelKey: TranslationKey }[] = [
   { href: '/dpo-workspace', labelKey: 'navDpoWorkspace' },
   { href: '/transaction-monitoring', labelKey: 'navAmlMonitoring' },
   { href: '/watchlist-sync', labelKey: 'navWatchlistSync' },
+  { href: '/screening-matches', labelKey: 'navScreeningMatches' },
   { href: '/regulatory-compliance', labelKey: 'navRegulatoryCompliance' },
   { href: '/operational-pi-risk', labelKey: 'navOperationalPiRisk' },
   { href: '/incidents', labelKey: 'navIncidentManagement' },
