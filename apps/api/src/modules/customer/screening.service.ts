@@ -6,13 +6,11 @@ import type {
   ScreeningResult,
 } from '@ibms/db';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
+import type { CreateScreeningResultInput } from '../../repositories/kyc-record.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import { AuditService } from '../audit/audit.service';
-import {
-  matchesSampleWatchlist,
-  sampleWatchlistEnabled,
-} from './sample-watchlist';
+import { matchesSampleWatchlist } from './sample-watchlist';
 import {
   canonicalNameTokens,
   classifyMatch,
@@ -20,6 +18,9 @@ import {
 } from '../compliance-risk/watchlist-match.config';
 import { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import { normalizeWatchlistName } from '../compliance-risk/watchlist-sync.config';
+import { ProviderScreeningService } from './provider-screening.service';
+import type { ScreeningExecution } from './provider-screening.service';
+import type { ScreeningSubject } from '../screening-providers/screening-provider.types';
 import { SlaTimerService } from '../sla/sla-timer.service';
 
 /** Registry workflow for adjudicating a queued sanctions match. */
@@ -95,6 +96,7 @@ export class ScreeningService {
     private readonly watchlistEntries: WatchlistEntryRepository,
     private readonly screeningMatches: ScreeningMatchRepository,
     private readonly sla: SlaTimerService,
+    private readonly providerScreening: ProviderScreeningService,
     private readonly audit: AuditService,
   ) {}
 
@@ -129,43 +131,34 @@ export class ScreeningService {
     );
     const { candidates: matchCandidates, truncated: matchesTruncated } = real;
 
-    // Could this screening actually reach a populated list?
+    // WHICH PROVIDER answered, and what it concluded.
     //
-    // A CLEAR must mean "we checked a list and this subject was not on it",
-    // never "we checked an empty table". Those are indistinguishable to every
-    // consumer of ScreeningResult, and the second is FALSE ASSURANCE on a
-    // sanctions control — the same silent-CLEAR failure this module has now
-    // been bitten by twice (the exact-matcher misses, and this).
-    //
-    // Not theoretical: `WatchlistEntry` is EMPTY on every deployment of this
-    // system, because the sync has never been run anywhere. Every production
-    // screening to date has returned CLEAR without consulting any list.
-    //
-    // The fixture counts as a populated source where it is enabled, because
-    // there a real check against real data genuinely did happen. It is
-    // disabled in production (`sampleWatchlistEnabled()`), so there the
-    // synced cache is the only thing that can satisfy this.
-    const realListUsable = await this.watchlistEntries.hasUsableEntries();
-    const screenable = sampleWatchlistEnabled() || realListUsable;
-    const hit: WatchlistHit | undefined = fixtureHit ?? real.hit ?? undefined;
+    // This is the seam: `ScreeningService` no longer knows how matching works,
+    // only what the attempt concluded. Swapping the built-in cache for a
+    // commercial PEP provider changes the configuration, not this method.
+    const execution = await this.providerScreening.execute({
+      kycRecordId,
+      subjects: buildSubjects(customer, ubos),
+      requestedByUserId: actorUserId,
+    });
+
+    const screenable =
+      execution.outcome === 'NO_MATCH' || anyHitFromProvider(execution);
+    const hit: WatchlistHit | undefined =
+      fixtureHit ?? real.hit ?? providerHit(execution);
     const anyHit = hit !== undefined;
 
-    // A HIT is still a HIT — matching something proves a list was consulted.
-    // Otherwise: CLEAR only if a populated source was actually searched,
-    // PENDING_INVESTIGATION when nothing was. That enum value has existed
-    // since the original schema with no writer anywhere in the codebase; this
-    // is exactly the state it describes.
+    // The five-value attempt outcome collapses onto the three-value
+    // `ScreeningOutcome` — but ONLY `NO_MATCH` may become CLEAR. Every
+    // unresolved outcome becomes PENDING_INVESTIGATION, and the attempt
+    // outcome is stored alongside so the reason stays recoverable. A DB CHECK
+    // (`ScreeningResult_clear_requires_no_match`) makes the wrong mapping
+    // impossible to write from any path.
     const outcome: ScreeningOutcome = anyHit
       ? 'HIT'
       : screenable
         ? 'CLEAR'
         : 'PENDING_INVESTIGATION';
-
-    if (!screenable) {
-      this.logger.error(
-        `Screening ${kycRecordId}: the sanctions cache is EMPTY, so no real list was consulted. Recording PENDING_INVESTIGATION rather than CLEAR. Run POST /watchlist-sync/run (or wait for WatchlistSyncScheduler) — until then no customer can be meaningfully screened.`,
-      );
-    }
 
     for (const screeningType of SCREENING_TYPES) {
       const result = await this.kycRecords.createScreeningResult({
@@ -173,6 +166,10 @@ export class ScreeningService {
         screeningType,
         result: outcome,
         listSource: hit?.listSource,
+        screeningRequestId: execution.requestId,
+        provider: execution.provider as CreateScreeningResultInput['provider'],
+        attemptOutcome: execution.outcome,
+        datasetVersion: execution.datasetVersion ?? undefined,
         // An un-screenable file is escalated too: somebody has to notice that
         // this customer was never actually checked.
         escalatedToComplianceAt: anyHit || !screenable ? now : undefined,
@@ -468,4 +465,64 @@ export class ScreeningService {
     }
     return { screened, hits, failed, unscreenable };
   }
+}
+
+/**
+ * The subjects screened for one KYC file: the customer plus every ultimate
+ * beneficial owner.
+ *
+ * ## What is deliberately NOT sent
+ *
+ * `Customer.nationalIdEnc` and `UltimateBeneficialOwner.nationalIdEnc` are
+ * ENCRYPTED at rest. Decrypting them to hand to a screening provider is a
+ * separate, deliberate data-sharing decision with its own PDPL basis — not
+ * something to do implicitly because it would improve match quality. The
+ * provider contract carries the fields; this mapper does not fill them.
+ *
+ * `UltimateBeneficialOwner.isPep` is a MANUALLY DECLARED KYC flag, captured
+ * during onboarding. It is never sent as though it were a screening input and
+ * never treated as a screening determination — conflating a self-declaration
+ * with a provider finding would corrupt both.
+ *
+ * The customer model does not currently capture date of birth, nationality or
+ * country, so only names are available today. The contract supports those
+ * attributes because name-only matching manufactures false positives; filling
+ * them needs the KYC data model to capture them first.
+ */
+function buildSubjects(
+  customer: { id: string; legalName: string; customerType: string },
+  ubos: readonly { id: string; fullName: string }[],
+): ScreeningSubject[] {
+  return [
+    {
+      subjectRef: `customer:${customer.id}`,
+      fullName: customer.legalName,
+      entityType:
+        customer.customerType === 'INDIVIDUAL' ? 'individual' : 'organization',
+    },
+    ...ubos.map((ubo) => ({
+      subjectRef: `ubo:${ubo.id}`,
+      fullName: ubo.fullName,
+      // A UBO is always a natural person.
+      entityType: 'individual' as const,
+    })),
+  ];
+}
+
+/** True when the provider returned at least one candidate worth a case. */
+function anyHitFromProvider(execution: ScreeningExecution): boolean {
+  return execution.candidates.length > 0;
+}
+
+/** The headline list source for the `ScreeningResult`, taken from the
+ * strongest candidate the provider returned. */
+function providerHit(execution: ScreeningExecution): WatchlistHit | undefined {
+  if (execution.candidates.length === 0) return undefined;
+  const strongest = [...execution.candidates].sort(
+    (a, b) => b.score - a.score,
+  )[0];
+  return {
+    listSource: strongest.sourceList,
+    matchType: strongest.band === 'high' ? 'exact' : 'fuzzy',
+  };
 }

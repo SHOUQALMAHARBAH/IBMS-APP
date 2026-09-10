@@ -6,14 +6,21 @@ import type { CustomerRepository } from '../../repositories/customer.repository'
 import type { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import type { ScreeningMatchRepository } from '../../repositories/screening-match.repository';
 import type { SlaTimerService } from '../sla/sla-timer.service';
+import type { ProviderScreeningService } from './provider-screening.service';
 import type { AuditService } from '../audit/audit.service';
 
 interface ScreeningResultInput {
   kycRecordId: string;
   screeningType: 'SANCTIONS' | 'PEP' | 'AML';
-  result: 'CLEAR' | 'HIT';
+  result: 'CLEAR' | 'HIT' | 'PENDING_INVESTIGATION';
   listSource?: string;
   escalatedToComplianceAt?: Date;
+  /** The attempt behind the result — which provider, and the five-value
+   * outcome that PENDING_INVESTIGATION alone cannot express. */
+  screeningRequestId?: string;
+  provider?: string;
+  attemptOutcome?: string;
+  datasetVersion?: string;
 }
 
 function makeDeps() {
@@ -72,6 +79,25 @@ function makeDeps() {
     recordCandidate,
   } as unknown as ScreeningMatchRepository;
 
+  // The provider seam. Default: a real check that found nothing — the CLEAR
+  // path. Tests that need a candidate override `execute`.
+  const execute = vi.fn().mockResolvedValue({
+    requestId: 'req-1',
+    correlationId: 'corr-1',
+    outcome: 'NO_MATCH',
+    provider: 'built_in',
+    providerName: 'Built-in watchlist cache',
+    datasetVersion: 'local-test',
+    failureReason: null,
+    candidates: [],
+    idempotentResume: false,
+  });
+  const recordCasesOpened = vi.fn().mockResolvedValue(undefined);
+  const providerScreening = {
+    execute,
+    recordCasesOpened,
+  } as unknown as ProviderScreeningService;
+
   const startTimer = vi.fn().mockResolvedValue([]);
   const computeDueAt = vi
     .fn()
@@ -88,6 +114,7 @@ function makeDeps() {
       watchlistEntries,
       screeningMatches,
       sla,
+      providerScreening,
       audit,
     ),
     mocks: {
@@ -96,6 +123,8 @@ function makeDeps() {
       hasUsableEntries,
       recordCandidate,
       startTimer,
+      execute,
+      recordCasesOpened,
       createScreeningResult,
       upsertRiskRating,
       findRiskRatingByKycRecordId,
@@ -463,110 +492,91 @@ describe('ScreeningService', () => {
   });
 });
 
-describe('ScreeningService — an empty watchlist must not read as CLEAR', () => {
-  // The whole point. A CLEAR means "we checked a list and this subject was not
-  // on it". It must never mean "we checked an empty table" — those are
-  // indistinguishable to every consumer of ScreeningResult, and the second is
-  // false assurance on a sanctions control.
-  //
-  // This is not hypothetical: WatchlistEntry is empty on every deployment of
-  // this system, because the sync has never been run anywhere.
+describe('ScreeningService — only NO_MATCH may become CLEAR', () => {
+  // The five-value attempt outcome collapses onto the three-value
+  // ScreeningOutcome. Exactly one of the five may be presented as clear; the
+  // rest escalate. "Can I screen at all?" is now the PROVIDER's judgement
+  // (an empty cache, a stale dataset, a missing credential), which is why
+  // these drive the provider rather than a repository flag.
 
-  it('records PENDING_INVESTIGATION, not CLEAR, when no populated list was consulted', async () => {
+  async function runWith(outcome: string, candidates: unknown[] = []) {
     const { service, mocks } = makeDeps();
     mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
     mocks.findCustomerById.mockResolvedValue({
       id: 'cust-1',
       legalName: 'Perfectly Ordinary Trading Co.',
+      customerType: 'CORPORATE',
     });
-    // Empty synced cache AND no fixture — i.e. production today.
-    mocks.hasUsableEntries.mockResolvedValue(false);
+    mocks.execute.mockResolvedValue({
+      requestId: 'req-1',
+      correlationId: 'corr-1',
+      outcome,
+      provider: 'built_in',
+      providerName: 'Built-in watchlist cache',
+      datasetVersion: null,
+      failureReason: outcome === 'NO_MATCH' ? null : 'reason withheld',
+      candidates,
+      idempotentResume: false,
+    });
     vi.stubEnv('NODE_ENV', 'production');
-
     await service.run('kyc-1', 'compliance-1');
-
-    const calls = mocks.createScreeningResult.mock.calls as [
-      ScreeningResultInput,
-    ][];
-    expect(calls.length).toBeGreaterThan(0);
-    for (const [input] of calls) {
-      expect(input.result).toBe('PENDING_INVESTIGATION');
-      // Somebody has to notice the customer was never actually checked.
-      expect(input.escalatedToComplianceAt).toBeInstanceOf(Date);
-    }
     vi.unstubAllEnvs();
-  });
+    return mocks.createScreeningResult.mock.calls as [ScreeningResultInput][];
+  }
 
-  it('still records a real CLEAR when the synced cache HAS data', async () => {
-    const { service, mocks } = makeDeps();
-    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
-    mocks.findCustomerById.mockResolvedValue({
-      id: 'cust-1',
-      legalName: 'Perfectly Ordinary Trading Co.',
-    });
-    mocks.hasUsableEntries.mockResolvedValue(true);
-    vi.stubEnv('NODE_ENV', 'production');
+  it.each(['UNABLE_TO_SCREEN', 'SCREENING_FAILED', 'NOT_CONFIGURED'])(
+    '%s becomes PENDING_INVESTIGATION and escalates — never CLEAR',
+    async (outcome) => {
+      const calls = await runWith(outcome);
+      expect(calls.length).toBeGreaterThan(0);
+      for (const [input] of calls) {
+        expect(input.result).toBe('PENDING_INVESTIGATION');
+        // Somebody has to notice the customer was never actually cleared.
+        expect(input.escalatedToComplianceAt).toBeInstanceOf(Date);
+      }
+    },
+  );
 
-    await service.run('kyc-1', 'compliance-1');
-
-    const calls = mocks.createScreeningResult.mock.calls as [
-      ScreeningResultInput,
-    ][];
+  it('NO_MATCH becomes CLEAR — the one outcome that may', async () => {
+    const calls = await runWith('NO_MATCH');
     for (const [input] of calls) {
       expect(input.result).toBe('CLEAR');
       expect(input.escalatedToComplianceAt).toBeUndefined();
     }
-    vi.unstubAllEnvs();
   });
 
-  it('a HIT is still a HIT — matching proves a list was consulted', async () => {
-    const { service, mocks } = makeDeps();
-    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
-    mocks.findCustomerById.mockResolvedValue({
-      id: 'cust-1',
-      legalName: 'Sanctioned Party',
-    });
-    mocks.hasUsableEntries.mockResolvedValue(false);
-    mocks.findMatchCandidates.mockResolvedValue({
-      truncated: false,
-      entries: [
-        {
-          id: 'wl-1',
-          source: 'OFAC_SDN',
-          sourceRecordId: '1',
-          fullName: 'Sanctioned Party',
-          listProgram: null,
+  it('records the attempt outcome alongside the result, so the reason survives', async () => {
+    // PENDING_INVESTIGATION alone cannot say WHY. The attempt outcome is what
+    // keeps "the provider timed out" distinct from "the dataset is empty".
+    const calls = await runWith('SCREENING_FAILED');
+    for (const [input] of calls) {
+      expect(input.attemptOutcome).toBe('SCREENING_FAILED');
+      expect(input.screeningRequestId).toBe('req-1');
+      expect(input.provider).toBe('built_in');
+    }
+  });
+
+  it('a provider candidate produces a HIT', async () => {
+    const calls = await runWith('POTENTIAL_MATCH', [
+      {
+        providerEntityId: 'OFAC_SDN:1',
+        entityName: 'AHMAD AL HASHIMI',
+        entityType: 'individual',
+        listType: 'SANCTIONS',
+        score: 0.95,
+        matchedAttributes: ['name'],
+        sourceList: 'OFAC_SDN (SDGT)',
+        band: 'high',
+        subject: {
+          subjectRef: 'customer:cust-1',
+          fullName: 'X',
+          entityType: 'individual',
         },
-      ],
-    });
-    vi.stubEnv('NODE_ENV', 'production');
-
-    await service.run('kyc-1', 'compliance-1');
-
-    const calls = mocks.createScreeningResult.mock.calls as [
-      ScreeningResultInput,
-    ][];
-    for (const [input] of calls) expect(input.result).toBe('HIT');
-    vi.unstubAllEnvs();
-  });
-
-  it('the dev/test fixture counts as a populated source', async () => {
-    // Outside production the fixture is enabled and holds real data, so a
-    // check against it genuinely happened and CLEAR is honest. This is what
-    // keeps the existing e2e suite meaningful rather than uniformly pending.
-    const { service, mocks } = makeDeps();
-    mocks.findById.mockResolvedValue({ id: 'kyc-1', customerId: 'cust-1' });
-    mocks.findCustomerById.mockResolvedValue({
-      id: 'cust-1',
-      legalName: 'Perfectly Ordinary Trading Co.',
-    });
-    mocks.hasUsableEntries.mockResolvedValue(false);
-
-    await service.run('kyc-1', 'compliance-1');
-
-    const calls = mocks.createScreeningResult.mock.calls as [
-      ScreeningResultInput,
-    ][];
-    for (const [input] of calls) expect(input.result).toBe('CLEAR');
+      },
+    ]);
+    for (const [input] of calls) {
+      expect(input.result).toBe('HIT');
+      expect(input.listSource).toBe('OFAC_SDN (SDGT)');
+    }
   });
 });

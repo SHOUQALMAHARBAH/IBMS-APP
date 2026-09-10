@@ -626,9 +626,10 @@ model KYCRecord {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  screeningResults ScreeningResult[]
-  screeningMatches ScreeningMatch[]
-  riskRating       RiskRating?
+  screeningResults  ScreeningResult[]
+  screeningMatches  ScreeningMatch[]
+  riskRating        RiskRating?
+  screeningRequests ScreeningRequest[]
 
   @@index([customerId])
   @@index([status])
@@ -638,6 +639,38 @@ enum ScreeningType {
   SANCTIONS
   PEP
   AML
+}
+
+/// What a screening ATTEMPT concluded — five values behind
+/// `ScreeningOutcome`'s three. The distinction "we checked and found nothing"
+/// vs "we could not check" is the single most consequential one in this
+/// module, and `ScreeningOutcome` alone cannot express it.
+enum ScreeningAttemptOutcome {
+  /// A populated source was searched and the subject was not on it. The only
+  /// outcome that may map to `ScreeningOutcome.CLEAR`.
+  NO_MATCH
+  POTENTIAL_MATCH
+  /// No provider configured. Say so; never NO_MATCH.
+  NOT_CONFIGURED
+  /// Configured, but the attempt failed. Explicitly NOT no-match.
+  SCREENING_FAILED
+  /// Answered, but the data cannot support a decision (empty or stale).
+  UNABLE_TO_SCREEN
+}
+
+/// Which screening implementation answered. Selected by configuration.
+enum ScreeningProviderKind {
+  built_in
+  on_premise
+  commercial
+}
+
+/// PEP is first-class, not a flavour of sanctions — the obligations attached
+/// to each are different.
+enum ScreeningListType {
+  SANCTIONS
+  PEP
+  WATCHLIST
 }
 
 enum ScreeningOutcome {
@@ -658,7 +691,60 @@ model ScreeningResult {
   listSource              String?
   escalatedToComplianceAt DateTime?
 
+  /// The attempt that produced this result — which provider, which dataset,
+  /// and why it failed if it did.
+  screeningRequestId String?
+  screeningRequest   ScreeningRequest?        @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  provider           ScreeningProviderKind?
+  /// The five-value outcome behind `result`. A DB CHECK
+  /// (`ScreeningResult_clear_requires_no_match`) makes it impossible to store
+  /// a CLEAR result from any attempt other than NO_MATCH.
+  attemptOutcome     ScreeningAttemptOutcome?
+  datasetVersion     String?
+
   @@index([kycRecordId])
+  @@index([screeningRequestId])
+}
+
+/// One screening ATTEMPT: what was asked, of whom, and what came back.
+///
+/// Separate from `ScreeningResult` (which is per `ScreeningType`) because one
+/// attempt produces several results, and because the attempt is where the
+/// provider, dataset, correlation id and failure reason live. It is also the
+/// idempotency record: a retried job recognises work it already did instead of
+/// opening a second set of cases.
+model ScreeningRequest {
+  id             String    @id @default(uuid())
+  kycRecordId    String
+  kycRecord      KYCRecord @relation(fields: [kycRecordId], references: [id])
+  /// Ties this attempt to the provider's logs, its audit rows and its cases.
+  correlationId  String
+  /// Derived from (KYC file, subject set, provider, dataset). UNIQUE — the
+  /// constraint IS the idempotency guarantee, not a preceding findFirst.
+  idempotencyKey String    @unique
+
+  provider       ScreeningProviderKind
+  providerName   String
+  datasetVersion String?
+
+  outcome        ScreeningAttemptOutcome
+  /// Set for NOT_CONFIGURED / SCREENING_FAILED / UNABLE_TO_SCREEN. Never
+  /// contains credentials or subject PII.
+  failureReason  String?
+  candidateCount Int                     @default(0)
+  casesOpened    Int                     @default(0)
+
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  durationMs        Int?
+  requestedByUserId String?
+
+  results ScreeningResult[]
+  matches ScreeningMatch[]
+
+  @@index([kycRecordId, startedAt(sort: Desc)])
+  @@index([outcome])
+  @@index([correlationId])
 }
 
 enum RiskLevel {
@@ -2437,29 +2523,50 @@ model ScreeningMatch {
   entrySourceRecordId String?
   entryFullName       String
   entryListProgram    String?
+
+  /// The attempt that raised this candidate.
+  screeningRequestId String?
+  screeningRequest   ScreeningRequest?      @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  provider           ScreeningProviderKind?
+  /// SANCTIONS / PEP / WATCHLIST. Defaults to SANCTIONS because every match
+  /// that existed before providers came from OFAC/UN, which are sanctions
+  /// lists — a backfill that guessed PEP would be fabricating a
+  /// determination.
+  listType           ScreeningListType      @default(SANCTIONS)
+  /// The provider's own entity id, so a reviewer can look the candidate up.
+  providerEntityId   String?
+  /// 0..1. NULL for the built-in matcher, which is deterministic set logic
+  /// rather than a similarity engine — a fabricated fraction would be false
+  /// precision.
+  matchScore         Float?
+  /// Which attributes agreed (name / dateOfBirth / nationality / ...). A
+  /// name-only agreement is very different evidence from name+DOB+nationality.
+  matchedAttributes  String[]               @default([])
+  /// For a PEP candidate: the position that makes them politically exposed.
+  pepPosition        String?
   /// The name that actually matched. NOT always the customer's own legal
   /// name — screening covers UBOs too, and the reviewer needs to know which
   /// subject triggered it. Display-only: see `subjectCanonical`.
-  subjectName         String
+  subjectName        String
   /// `canonicalNameTokens(subjectName).join(' ')` — what the match was
   /// actually made on, and what the duplicate-suppression UNIQUE keys on.
   /// Keying that on the RAW name meant re-casing or re-spacing a customer's
   /// legal name minted a second queue item that a prior `cleared` decision
   /// did not suppress.
-  subjectCanonical    String
+  subjectCanonical   String
   /// `exact` (identical after canonicalisation) or `fuzzy` (the entry's
   /// tokens are contained in the subject's). Surfaced so a reviewer can
   /// triage: an exact hit deserves more scrutiny than a subset one.
-  matchType           String
+  matchType          String
   /// `pending` | `cleared` | `confirmed`.
-  status              String          @default("pending")
-  detectedAt          DateTime        @default(now())
-  reviewedByUserId    String?
-  reviewedAt          DateTime?
+  status             String                 @default("pending")
+  detectedAt         DateTime               @default(now())
+  reviewedByUserId   String?
+  reviewedAt         DateTime?
   /// Mandatory when a decision is recorded — the business justification for
   /// clearing or confirming, kept verbatim (a justification, not personal
   /// data — the same treatment `Refund.reason` gets).
-  reviewReason        String?
+  reviewReason       String?
 
   /// One open item per (KYC file, list entry, CANONICAL subject name): a
   /// re-screen of the same customer must not manufacture a duplicate queue
