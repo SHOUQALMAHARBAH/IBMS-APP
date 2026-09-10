@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
+import { ScreeningProvidersModule } from './modules/screening-providers/screening-providers.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { ProspectModule } from './modules/prospect/prospect.module';
@@ -85,6 +86,7 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // Depends on AuthModule's exported UserRepository (system service
     // account lookup for escalation-sweep audit rows) — imported after it.
     SlaModule,
+    ScreeningProvidersModule,
     // Imported after AuthModule — see rbac.module.ts's PermissionsGuard
     // comment for why global-guard execution order depends on this.
     RbacModule,
