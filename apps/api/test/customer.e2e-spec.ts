@@ -141,6 +141,39 @@ async function createIndividualCustomer(
   return res.body as CustomerBody;
 }
 
+/**
+ * One obviously fictional `WatchlistEntry`, so the built-in screening provider
+ * has a POPULATED list to report "no match" against.
+ *
+ * Added when Part B §17 (workflow holds) landed. Before it, this file's
+ * "standard (no hit)" test passed only when db-test happened to carry entries
+ * from some earlier run: with an empty cache the provider correctly answers
+ * UNABLE_TO_SCREEN, which is now a REVIEW_REQUIRED hold and refuses the
+ * approval. The test's own premise is "screened, and nothing was found", so
+ * the fix is to make that premise true rather than to weaken the control —
+ * and the test stops depending on ambient database state either way.
+ */
+async function seedWatchlistFixtureEntry(): Promise<void> {
+  const run = await prisma.watchlistSyncRun.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'SUCCEEDED',
+      startedAt: new Date(),
+      completedAt: new Date(),
+    },
+  });
+  await prisma.watchlistEntry.create({
+    data: {
+      source: 'OFAC_SDN',
+      sourceRecordId: `e2e-customer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      fullName: 'Zzz Fictional Screening Fixture',
+      normalizedName: 'zzz fictional screening fixture',
+      canonicalTokens: ['fictional', 'fixture', 'screening', 'zzz'],
+      syncRunId: run.id,
+    },
+  });
+}
+
 describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () => {
   let app: INestApplication<App>;
 
@@ -650,6 +683,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
   describe('full KYC lifecycle — standard (no hit)', () => {
     it('submit -> run-screening -> approve activates the Customer, and a self-approval is rejected', async () => {
       const app = await boot();
+      // The premise of this test is "screened, and nothing was found" — which
+      // needs a list to have been searched. See the helper.
+      await seedWatchlistFixtureEntry();
       const sales = await makeUser(
         app,
         'kyc-owner-a',

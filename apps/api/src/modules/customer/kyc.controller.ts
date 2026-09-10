@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { KycService } from './kyc.service';
+import { ScreeningHoldService } from './screening-hold.service';
 import { KycDecisionDto } from './dto/kyc-decision.dto';
 import { ScheduleReviewDto } from './dto/schedule-review.dto';
 import { ListKycRecordsQueryDto } from './dto/list-kyc-records-query.dto';
@@ -14,7 +15,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 @ApiTags('kyc-records')
 @Controller()
 export class KycController {
-  constructor(private readonly kyc: KycService) {}
+  constructor(
+    private readonly kyc: KycService,
+    private readonly holds: ScreeningHoldService,
+  ) {}
 
   @RequirePermissions('kyc.capture')
   @Post('customers/:customerId/kyc')
@@ -55,6 +59,23 @@ export class KycController {
     return this.kyc.triggerEdd(id, user.id);
   }
 
+  /**
+   * The screening hold in force on this file (Part B §17) — what is holding
+   * it, whether a written acceptance can release it, and every release
+   * already recorded.
+   *
+   * The same permission pair as this file's own read routes (`kyc.capture`,
+   * `kyc.approve` — any-of): the approver needs to see the hold before
+   * deciding, and the officer who captured the file needs to see why their
+   * submission is stuck. No new permission — the view carries no subject PII
+   * by construction, so it adds no reach beyond reading the record itself.
+   */
+  @RequirePermissions('kyc.capture', 'kyc.approve')
+  @Get('kyc-records/:id/screening-hold')
+  screeningHold(@Param('id') id: string) {
+    return this.holds.view(id);
+  }
+
   @RequirePermissions('kyc.approve')
   @Post('kyc-records/:id/approve')
   approve(
@@ -62,7 +83,13 @@ export class KycController {
     @Body() dto: KycDecisionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.kyc.decide(id, 'APPROVED', dto.reason, user.id);
+    return this.kyc.decide(
+      id,
+      'APPROVED',
+      dto.reason,
+      user.id,
+      dto.screeningHoldReason,
+    );
   }
 
   @RequirePermissions('kyc.approve')

@@ -630,6 +630,7 @@ model KYCRecord {
   screeningMatches  ScreeningMatch[]
   riskRating        RiskRating?
   screeningRequests ScreeningRequest[]
+  holdReleases      ScreeningHoldRelease[]
 
   @@index([customerId])
   @@index([status])
@@ -3350,4 +3351,48 @@ model SlaTimer {
 
   @@index([entityType, entityId])
   @@index([dueAt])
+}
+
+/// A screening hold that a compliance user accepted in writing so a workflow
+/// could proceed (task Part B §17).
+///
+/// This exists because "the approver knew" is not a control. A REVIEW_REQUIRED
+/// hold is released only by naming, in writing, what is being accepted — and
+/// the acceptance is a row, attributable and queryable, not a line in a log
+/// that rotates. A BLOCKED hold has no release path at all and never produces
+/// one of these.
+model ScreeningHoldRelease {
+  id          String    @id @default(uuid())
+  kycRecordId String
+  kycRecord   KYCRecord @relation(fields: [kycRecordId], references: [id])
+
+  /// The level in force when it was released. Always REVIEW_REQUIRED today —
+  /// stored rather than assumed so a later policy change stays legible in the
+  /// history.
+  level      ScreeningHoldLevel
+  /// The conditions accepted, as `ScreeningHoldCondition` names. A snapshot:
+  /// re-evaluating later can give a different answer, and this is what the
+  /// releaser actually saw.
+  conditions String[]           @default([])
+  /// The evaluator's own operator-facing detail lines at release time. Free of
+  /// subject PII by construction (see `screening-hold.config.ts`).
+  detail     String
+
+  /// Mandatory. The business justification, kept verbatim — the same treatment
+  /// `ScreeningMatch.reviewReason` and `Refund.reason` get.
+  reason           String
+  releasedByUserId String
+  releasedAt       DateTime @default(now())
+
+  /// What the release let happen, so a reviewer can trace effect to cause.
+  workflow String @default("kyc_decision")
+
+  @@index([kycRecordId, releasedAt(sort: Desc)])
+  @@index([releasedByUserId])
+}
+
+enum ScreeningHoldLevel {
+  NO_HOLD
+  REVIEW_REQUIRED
+  BLOCKED
 }

@@ -6,6 +6,7 @@ import { KycService } from './kyc.service';
 import { ScreeningController } from './screening.controller';
 import { ProviderScreeningService } from './provider-screening.service';
 import { ScreeningService } from './screening.service';
+import { ScreeningHoldService } from './screening-hold.service';
 import { ScreeningMatchService } from './screening-match.service';
 import { ScreeningBatchScheduler } from './screening-batch.scheduler';
 import { KycPeriodicReviewScheduler } from './kyc-periodic-review.scheduler';
@@ -43,6 +44,7 @@ import { ProspectModule } from '../prospect/prospect.module';
     KycService,
     ScreeningService,
     ProviderScreeningService,
+    ScreeningHoldService,
     // Process 49 — the human review queue fuzzy matching feeds. Fuzzy
     // matching over-fires by design, so a person adjudicates every candidate;
     // nothing auto-blocks a customer.

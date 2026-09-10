@@ -14,6 +14,7 @@ import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { ScreeningService } from './screening.service';
+import { ScreeningHoldService } from './screening-hold.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { applyDuration } from '../../common/business-days.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
@@ -76,6 +77,7 @@ export class KycService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly screening: ScreeningService,
+    private readonly holds: ScreeningHoldService,
     private readonly sla: SlaTimerService,
   ) {}
 
@@ -250,6 +252,10 @@ export class KycService {
     decision: 'APPROVED' | 'REJECTED',
     reason: string | undefined,
     actorUserId: string,
+    /** Part B §17. The written acceptance of a REVIEW_REQUIRED screening
+     * hold. Ignored on a rejection — refusing a customer never needs a
+     * screening finding waived. */
+    screeningHoldReason?: string,
   ): Promise<KYCRecord> {
     const kyc = await this.mustFind(id);
     assertDifferentActors(
@@ -285,6 +291,13 @@ export class KycService {
           `KYCRecord ${id}: cannot record a decision from status ${kyc.status}`,
         );
       }
+      // Deliberately NOT re-gated on the screening hold (§17): reaching
+      // APPROVED means the gate already passed and its release was already
+      // recorded. Re-evaluating here would let a match confirmed AFTER the
+      // approval strand the Customer in PENDING_KYC forever, with no endpoint
+      // able to finish the tail. A post-approval finding is handled by the
+      // review queue and re-screening, not by refusing to finish a committed
+      // transition.
       await this.sla.resolve({
         entityType: 'KYCRecord',
         entityId: id,
@@ -331,6 +344,28 @@ export class KycService {
       throw new UnprocessableEntityException(
         `KYCRecord ${id}: screening has not completed — run POST /kyc-records/${id}/run-screening first.`,
       );
+    }
+
+    // Part B §17 — the screening HOLD.
+    //
+    // The check above asks only whether ScreeningResult rows exist. They do
+    // for a file whose screening came back NOT_CONFIGURED: three of them, all
+    // PENDING_INVESTIGATION. Nothing read them, so a customer nobody could
+    // screen was approved exactly like one who came back clean.
+    //
+    // This reads them. A BLOCKED hold refuses outright; a REVIEW_REQUIRED hold
+    // proceeds only against a written, attributed acceptance recorded as a
+    // ScreeningHoldRelease row.
+    //
+    // Approval only. Rejecting a customer never needs a screening finding
+    // waived, and demanding a waiver to say no would be a reason not to.
+    if (decision === 'APPROVED') {
+      await this.holds.assertClearToProceed({
+        kycRecordId: id,
+        actorUserId,
+        releaseReason: screeningHoldReason,
+        workflow: 'kyc_decision',
+      });
     }
 
     if (kyc.status !== 'COMPLIANCE_REVIEW') {
