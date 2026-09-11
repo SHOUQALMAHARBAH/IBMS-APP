@@ -76,16 +76,16 @@ describe('OrgContextService — the unscoped bypass', () => {
   });
 });
 
-describe('OrgContextService — the RLS transaction flag', () => {
+describe('OrgContextService — the RLS transaction pin', () => {
   it('is visible inside the transaction and gone after it', async () => {
     const ctx = new OrgContextService();
     await ctx.runAs('org-1', async () => {
-      expect(ctx.inScopedTransaction()).toBe(false);
-      await ctx.withScopedTransaction(() => {
-        expect(ctx.inScopedTransaction()).toBe(true);
+      expect(ctx.scopedTransactionOrg()).toBeNull();
+      await ctx.withScopedTransaction('org-1', () => {
+        expect(ctx.scopedTransactionOrg()).toBe('org-1');
         return Promise.resolve();
       });
-      expect(ctx.inScopedTransaction()).toBe(false);
+      expect(ctx.scopedTransactionOrg()).toBeNull();
     });
   });
 
@@ -98,21 +98,21 @@ describe('OrgContextService — the RLS transaction flag', () => {
     // (Postgres 42501). Every dashboard issues queries in parallel, so this
     // was not a corner case.
     const ctx = new OrgContextService();
-    let siblingSawFlag: boolean | null = null;
+    let siblingSaw: string | null = 'unset';
 
     await ctx.runAs('org-1', async () => {
       await Promise.all([
-        ctx.withScopedTransaction(async () => {
+        ctx.withScopedTransaction('org-1', async () => {
           await new Promise((r) => setTimeout(r, 10));
         }),
         (async () => {
           await new Promise((r) => setTimeout(r, 5));
-          siblingSawFlag = ctx.inScopedTransaction();
+          siblingSaw = ctx.scopedTransactionOrg();
         })(),
       ]);
     });
 
-    expect(siblingSawFlag).toBe(false);
+    expect(siblingSaw).toBeNull();
   });
 
   it('REGRESSION: outsideScopedTransaction clears the flag for work that runs on the outer client', async () => {
@@ -124,25 +124,25 @@ describe('OrgContextService — the RLS transaction flag', () => {
     // "already in that state" and reports as SUCCESS. Deactivating an account
     // silently did nothing.
     const ctx = new OrgContextService();
-    let flagInsideWork: boolean | null = null;
+    let orgInsideWork: string | null = 'unset';
 
     await ctx.runAs('org-1', () =>
-      ctx.withScopedTransaction(() =>
+      ctx.withScopedTransaction('org-1', () =>
         ctx.outsideScopedTransaction(() => {
-          flagInsideWork = ctx.inScopedTransaction();
+          orgInsideWork = ctx.scopedTransactionOrg();
           return Promise.resolve();
         }),
       ),
     );
 
-    expect(flagInsideWork).toBe(false);
+    expect(orgInsideWork).toBeNull();
   });
 
   it('outsideScopedTransaction keeps the Organization', async () => {
     const ctx = new OrgContextService();
     let org: string | null = null;
     await ctx.runAs('org-1', () =>
-      ctx.withScopedTransaction(() =>
+      ctx.withScopedTransaction('org-1', () =>
         ctx.outsideScopedTransaction(() => {
           org = ctx.currentOrNull();
           return Promise.resolve();
@@ -155,8 +155,40 @@ describe('OrgContextService — the RLS transaction flag', () => {
   it('keeps the Organization visible inside the transaction', async () => {
     const ctx = new OrgContextService();
     await ctx.runAs('org-1', () =>
-      ctx.withScopedTransaction(() => {
+      ctx.withScopedTransaction('org-1', () => {
         expect(ctx.currentOrNull()).toBe('org-1');
+        return Promise.resolve();
+      }),
+    );
+  });
+  it('pins NOTHING when the transaction never set app.current_org_id', async () => {
+    // The auth bootstrap, and any transaction touching global models only,
+    // open without `set_config` being called. Pinning an Organization there
+    // would invite the next query to reuse a connection RLS still regards as
+    // unscoped — the exact mismatch the pin exists to prevent, arrived at from
+    // the other direction.
+    const ctx = new OrgContextService();
+    let pinned: string | null = 'unset';
+    await ctx.runAs('org-1', () =>
+      ctx.withScopedTransaction(null, () => {
+        pinned = ctx.scopedTransactionOrg();
+        return Promise.resolve();
+      }),
+    );
+    expect(pinned).toBeNull();
+  });
+
+  it('pins the Organization the transaction was opened for', async () => {
+    // Reuse is keyed by WHICH Organization the connection was configured for,
+    // not merely "a transaction is open". A query for a different office must
+    // not borrow this connection: its app-layer filter and the connection's
+    // `app.current_org_id` would disagree, and the result — a rejected write or
+    // an empty read — is indistinguishable from a legitimate empty result.
+    const ctx = new OrgContextService();
+    await ctx.runAs('org-1', () =>
+      ctx.withScopedTransaction('org-1', () => {
+        expect(ctx.scopedTransactionOrg()).toBe('org-1');
+        expect(ctx.scopedTransactionOrg()).not.toBe('org-2');
         return Promise.resolve();
       }),
     );

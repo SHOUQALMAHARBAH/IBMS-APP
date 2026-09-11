@@ -62,7 +62,7 @@ interface OrgStore {
    * `$transaction` blocks would each try to open a nested transaction per
    * inner query, which Prisma does not support.
    */
-  inScopedTransaction: boolean;
+  scopedTransactionOrg: string | null;
 }
 
 @Injectable()
@@ -76,7 +76,7 @@ export class OrgContextService {
       {
         organizationId: null,
         unscopedReason: null,
-        inScopedTransaction: false,
+        scopedTransactionOrg: null,
       },
       work,
     );
@@ -87,7 +87,7 @@ export class OrgContextService {
    * Organizations, and by anything else that legitimately knows its own org. */
   runAs<T>(organizationId: string, work: () => T): T {
     return this.storage.run(
-      { organizationId, unscopedReason: null, inScopedTransaction: false },
+      { organizationId, unscopedReason: null, scopedTransactionOrg: null },
       work,
     );
   }
@@ -113,7 +113,7 @@ export class OrgContextService {
       {
         organizationId: store?.organizationId ?? null,
         unscopedReason: reason,
-        inScopedTransaction: false,
+        scopedTransactionOrg: null,
       },
       async () => await work(),
     );
@@ -143,10 +143,23 @@ export class OrgContextService {
     return this.storage.getStore() !== undefined;
   }
 
-  /** Whether a transaction with `app.current_org_id` already set is open on
-   * this async path (Phase 2 step 8). */
-  inScopedTransaction(): boolean {
-    return this.storage.getStore()?.inScopedTransaction ?? false;
+  /**
+   * The Organization an already-open RLS transaction pinned on its connection,
+   * or null if there is none on this async path.
+   *
+   * Deliberately the ORG and not a boolean. A boolean answers "is some
+   * transaction open?", which is the wrong question: a query may reuse an
+   * ambient transaction's connection ONLY if that connection's
+   * `app.current_org_id` matches the Organization the query is being filtered
+   * by. If the two disagree, the application layer filters to one office while
+   * RLS filters to another — the write is rejected or the read comes back
+   * empty, and neither is distinguishable from a legitimate empty result.
+   *
+   * Keeping the org here makes that mismatch unreachable by accident: the
+   * caller compares, and opens its own session when they differ.
+   */
+  scopedTransactionOrg(): string | null {
+    return this.storage.getStore()?.scopedTransactionOrg ?? null;
   }
 
   /**
@@ -158,7 +171,7 @@ export class OrgContextService {
    * transaction exists only to hold a `FOR UPDATE` row lock and the work is
    * meant to be separate from it.
    *
-   * Without this, that work inherited `inScopedTransaction = true`, skipped
+   * Without this, that work inherited a pinned Organization, skipped
    * opening its own session, and ran on a pooled connection with no
    * `app.current_org_id`. Reads returned nothing and — the reason this is not
    * cosmetic — `setActive`'s `updateMany` matched zero rows, which the service
@@ -171,7 +184,7 @@ export class OrgContextService {
     // `await` inside: a lazy PrismaPromise handed straight back would execute
     // after this store closed. Same trap as `runUnscoped`.
     return this.storage.run(
-      { ...store, inScopedTransaction: false },
+      { ...store, scopedTransactionOrg: null },
       async () => work(),
     );
   }
@@ -195,13 +208,21 @@ export class OrgContextService {
    * also the reason it fails CLOSED rather than leaking: the mismatch is a
    * rejection, never another tenant's rows.
    */
-  async withScopedTransaction<T>(work: () => Promise<T>): Promise<T> {
+  async withScopedTransaction<T>(
+    organizationId: string | null,
+    work: () => Promise<T>,
+  ): Promise<T> {
     const store = this.storage.getStore();
     if (!store) return work();
     // `await` inside for the same reason as `runUnscoped` above — a lazy
     // PrismaPromise handed straight back would execute after this store closed.
-    return this.storage.run({ ...store, inScopedTransaction: true }, async () =>
-      work(),
+    // `null` means the transaction opened WITHOUT `app.current_org_id` being
+    // set — the auth bootstrap, or a transaction touching global models only.
+    // Nothing may reuse that connection as if it were scoped, so nothing is
+    // pinned and the next tenant query opens its own session.
+    return this.storage.run(
+      { ...store, scopedTransactionOrg: organizationId },
+      async () => work(),
     );
   }
 }

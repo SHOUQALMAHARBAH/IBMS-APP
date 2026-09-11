@@ -62,14 +62,20 @@ export class UserSessionRepository {
     });
   }
 
+  /** Returns the number of rows actually revoked (Part V multi-tenancy item
+   * 6). A legitimate zero exists — a user may have no open sessions — so the count is
+   * reported rather than asserted; what it buys is that a caller or test can
+   * check the post-condition instead of trusting a `void` return, which is
+   * how an RLS-zero-filtered revoke passed for success in Phase 2 step 8. */
   async revokeAllForUser(
     userId: string,
     reason: SessionRevokedReason,
-  ): Promise<void> {
-    await this.prisma.client.userSession.updateMany({
+  ): Promise<number> {
+    const { count } = await this.prisma.client.userSession.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date(), revokedReason: reason },
     });
+    return count;
   }
 
   findActiveByUser(userId: string): Promise<UserSession[]> {

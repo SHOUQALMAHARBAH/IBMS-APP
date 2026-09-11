@@ -268,7 +268,9 @@ export function withOrgAwareTransactions(
         // A transaction opened during the auth bootstrap, or one on global
         // models only, has no Organization to pin — leave the variable unset so
         // RLS stays fail-closed rather than pinning it to something invented.
-        if (organizationId !== null && orgContext.unscopedReason() === null) {
+        const configured =
+          organizationId !== null && orgContext.unscopedReason() === null;
+        if (configured) {
           await (
             tx as {
               $executeRaw: (
@@ -279,7 +281,14 @@ export function withOrgAwareTransactions(
           )
             .$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
         }
-        return orgContext.withScopedTransaction(() => callback(tx));
+        // Pin the org this connection was ACTUALLY configured for — and only
+        // then. Pinning an org whose `set_config` was skipped would invite a
+        // query inside to reuse a connection RLS still sees as unscoped, which
+        // is the mismatch this pin exists to prevent.
+        return orgContext.withScopedTransaction(
+          configured ? organizationId : null,
+          () => callback(tx),
+        );
       },
       ...rest,
     );
@@ -316,14 +325,16 @@ export function withOrgAwareTransactions(
       if (
         organizationId === null ||
         orgContext.unscopedReason() !== null ||
-        orgContext.inScopedTransaction()
+        orgContext.scopedTransactionOrg() === organizationId
       ) {
         return original(...args);
       }
       return runTransaction(async (tx: unknown) => {
         const t = tx as Record<string, RawRunner> & RawCapableTx;
         await t.$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
-        return orgContext.withScopedTransaction(() => t[method](...args));
+        return orgContext.withScopedTransaction(organizationId, () =>
+          t[method](...args),
+        );
       }, RLS_SESSION_TRANSACTION_OPTIONS);
     };
   };
@@ -447,7 +458,7 @@ async function withRlsSession<T>(
 ): Promise<T> {
   return client.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
-    return orgContext.withScopedTransaction(() => run(tx));
+    return orgContext.withScopedTransaction(organizationId, () => run(tx));
   }, RLS_SESSION_TRANSACTION_OPTIONS);
 }
 
@@ -520,9 +531,15 @@ export function tenantScopeExtension(
             return query(scoped);
           }
 
-          // Already inside a transaction whose connection has the variable
-          // set — reuse it rather than nesting, which Prisma does not allow.
-          if (orgContext.inScopedTransaction()) return query(scoped);
+          // Reuse an already-open transaction's connection ONLY if it pinned
+          // the SAME Organization. If a different one is pinned, this query's
+          // application-layer filter and the connection's RLS session would
+          // disagree — the write rejected, or the read empty, in a way
+          // indistinguishable from a legitimate empty result. Comparing the org
+          // rather than a boolean makes that unreachable.
+          if (orgContext.scopedTransactionOrg() === organizationId) {
+            return query(scoped);
+          }
 
           return withRlsSession(orgContext, client, organizationId, (tx) =>
             (
