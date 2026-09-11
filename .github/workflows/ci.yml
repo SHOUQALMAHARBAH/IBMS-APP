@@ -121,6 +121,7 @@ jobs:
           POSTGRES_PASSWORD=ibms
           POSTGRES_DB=ibms_test
           DATABASE_URL=postgresql://ibms:ibms@localhost:5432/ibms_test?schema=public
+          APP_DATABASE_URL=postgresql://ibms_app:ci-only-app-role@localhost:5432/ibms_test?schema=public
           JWT_ACCESS_SECRET=ci-only-change-me-32-characters-minimum
           MFA_ENCRYPTION_KEY=jWvaaenpb1O7k9jMlLZhRTeQFNJ1jQOFTUHtzgTHNtg=
           PII_ENCRYPTION_KEYS=v1:DzVvLT8z/wNB6UZW2cglf0EEajI/+hjMXk8WlVfHphI=
@@ -130,6 +131,16 @@ jobs:
 
       - name: Database schema (prisma validate)
         run: npm run db:validate
+
+      # Must precede the migrations: 20260928100000_row_level_security GRANTs to
+      # this role and raises if it is missing. The role is what makes RLS apply
+      # at all — Postgres exempts the table owner from its own policies, so CI
+      # has to exercise the same non-owner connection production uses, or the
+      # isolation tests would pass against policies that are silently inert.
+      - name: Provision the non-owner application database role
+        run: npm run db:provision-app-role
+        env:
+          APP_DB_PASSWORD: ci-only-app-role
 
       - name: Run Prisma migrations
         run: npm run db:migrate:deploy

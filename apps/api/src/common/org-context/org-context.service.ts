@@ -50,6 +50,19 @@ export type UnscopedReason =
 interface OrgStore {
   organizationId: string | null;
   unscopedReason: UnscopedReason | null;
+  /**
+   * Multi-tenancy Phase 2 step 8 — whether a database transaction is already
+   * open on this async path, with `app.current_org_id` already set on its
+   * connection.
+   *
+   * The RLS session variable is transaction-scoped (`SET LOCAL`), so it has to
+   * be set inside the same transaction as the query it governs. Every
+   * tenant-scoped operation therefore opens one — unless one is already open,
+   * which this flag is how we know. Without it, the ~56 existing
+   * `$transaction` blocks would each try to open a nested transaction per
+   * inner query, which Prisma does not support.
+   */
+  inScopedTransaction: boolean;
 }
 
 @Injectable()
@@ -60,7 +73,11 @@ export class OrgContextService {
    * `adopt()` fills it in once the guard has authenticated the caller. */
   runForRequest<T>(work: () => T): T {
     return this.storage.run(
-      { organizationId: null, unscopedReason: null },
+      {
+        organizationId: null,
+        unscopedReason: null,
+        inScopedTransaction: false,
+      },
       work,
     );
   }
@@ -69,7 +86,10 @@ export class OrgContextService {
    * have no request to inherit an org from and instead loop over the active
    * Organizations, and by anything else that legitimately knows its own org. */
   runAs<T>(organizationId: string, work: () => T): T {
-    return this.storage.run({ organizationId, unscopedReason: null }, work);
+    return this.storage.run(
+      { organizationId, unscopedReason: null, inScopedTransaction: false },
+      work,
+    );
   }
 
   /**
@@ -82,20 +102,21 @@ export class OrgContextService {
     work: () => Promise<T>,
   ): Promise<T> {
     const store = this.storage.getStore();
-    // No store at all (a scheduler or a test calling straight in): open one.
-    if (!store) {
-      return this.storage.run(
-        { organizationId: null, unscopedReason: reason },
-        work,
-      );
-    }
-    const previous = store.unscopedReason;
-    store.unscopedReason = reason;
-    try {
-      return await work();
-    } finally {
-      store.unscopedReason = previous;
-    }
+    // A NESTED store, not a mutation of the current one. See
+    // `withScopedTransaction` below for why mutating is unsafe.
+    //
+    // The `await` inside is load-bearing and must not be "simplified" to
+    // passing `work` directly: a Prisma model method returns a LAZY
+    // PrismaPromise, so handing it straight back would close this store before
+    // the query ever runs — and the query would then execute with no bypass.
+    return this.storage.run(
+      {
+        organizationId: store?.organizationId ?? null,
+        unscopedReason: reason,
+        inScopedTransaction: false,
+      },
+      async () => await work(),
+    );
   }
 
   /** Fills in the Organization for a request whose store is already open.
@@ -120,5 +141,67 @@ export class OrgContextService {
    * request or an explicit `runAs`/`runUnscoped` block. */
   hasContext(): boolean {
     return this.storage.getStore() !== undefined;
+  }
+
+  /** Whether a transaction with `app.current_org_id` already set is open on
+   * this async path (Phase 2 step 8). */
+  inScopedTransaction(): boolean {
+    return this.storage.getStore()?.inScopedTransaction ?? false;
+  }
+
+  /**
+   * Runs `work` as if no transaction were open, so its queries open their own
+   * RLS session instead of assuming the ambient one covers them.
+   *
+   * For code that runs INSIDE a `$transaction` but deliberately issues its
+   * queries on the outer client — `UserRepository.withRoleLocked`, where the
+   * transaction exists only to hold a `FOR UPDATE` row lock and the work is
+   * meant to be separate from it.
+   *
+   * Without this, that work inherited `inScopedTransaction = true`, skipped
+   * opening its own session, and ran on a pooled connection with no
+   * `app.current_org_id`. Reads returned nothing and — the reason this is not
+   * cosmetic — `setActive`'s `updateMany` matched zero rows, which the service
+   * correctly reads as "already in that state" and reports as success. A
+   * deactivation silently did nothing. RLS is what surfaced it.
+   */
+  async outsideScopedTransaction<T>(work: () => Promise<T>): Promise<T> {
+    const store = this.storage.getStore();
+    if (!store) return work();
+    // `await` inside: a lazy PrismaPromise handed straight back would execute
+    // after this store closed. Same trap as `runUnscoped`.
+    return this.storage.run(
+      { ...store, inScopedTransaction: false },
+      async () => work(),
+    );
+  }
+
+  /**
+   * Marks a transaction as open for the duration of `work`, so operations
+   * inside it reuse that transaction's connection instead of each opening one.
+   *
+   * A NESTED `storage.run`, deliberately — NOT a mutation of the current store.
+   *
+   * Mutating was a real bug, caught by the e2e suite once RLS went live: the
+   * store is shared by everything in one request, so when a request issued
+   * queries CONCURRENTLY (every dashboard does), the first to open its RLS
+   * transaction set the flag for all of them. Its siblings then skipped opening
+   * their own, ran on a pooled connection with no `app.current_org_id` set, and
+   * were rejected by the policy's WITH CHECK with `42501` — the application
+   * layer had stamped an Organization the database could not see.
+   *
+   * A nested run scopes the flag to this transaction's own async subtree, so a
+   * concurrent sibling still sees `false` and opens its own session. Which is
+   * also the reason it fails CLOSED rather than leaking: the mismatch is a
+   * rejection, never another tenant's rows.
+   */
+  async withScopedTransaction<T>(work: () => Promise<T>): Promise<T> {
+    const store = this.storage.getStore();
+    if (!store) return work();
+    // `await` inside for the same reason as `runUnscoped` above — a lazy
+    // PrismaPromise handed straight back would execute after this store closed.
+    return this.storage.run({ ...store, inScopedTransaction: true }, async () =>
+      work(),
+    );
   }
 }

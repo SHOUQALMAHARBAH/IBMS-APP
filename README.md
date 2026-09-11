@@ -246,6 +246,17 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
   been migrated at least once (`npm run db:test:migrate:dev`). Run it before opening a PR
   to get the evidence block for the PR description in one shot — claims aren't evidence,
   this is.
+- **`scripts/provision-app-role.mjs`** (multi-tenancy Phase 2 step 8) — creates
+  `ibms_app`, the NON-OWNER database role the running API connects as. Postgres
+  exempts a table's owner from that table's own row-level security policies, so
+  connecting the API as the migration role would leave all 118 policies silently
+  inert; this role owns nothing and is therefore subject to every one of them.
+  Deliberately a script rather than a migration: a Postgres role is
+  cluster-level, creating one needs `CREATEROLE`, and its password is a
+  credential that must come from the environment.
+  `APP_DB_PASSWORD=... npm run db:provision-app-role`. Idempotent — re-running
+  updates the password. Must run BEFORE the migrations, which GRANT to the role
+  and refuse to run without it. See `docs/multi-tenancy-rls.md`.
 - **`scripts/generate-sla-policy-seed.ts`** — regenerates
   `packages/db/prisma/seed-data/sla-policies.ts` from `sla-policy-source.config.ts`, so
   the seeded SLA baseline and the governing-source table it is derived from cannot drift
@@ -420,14 +431,21 @@ build actually is today:
   at any call site, and a tenant-scoped query with no Organization in context is REFUSED
   rather than run unfiltered. Background jobs run once per ACTIVE Organization.
 
-  What does NOT exist: **the PostgreSQL Row-Level Security policies (Phase 2 step 8)** —
-  spec §1 calls for two independent layers and only the first is built, so a raw SQL
-  query, or a bug in the extension itself, has nothing behind it. Also outstanding: the
-  Part V isolation checklist (step 9), the insurer master/relationship split and
-  per-tenant email (Phase 3), and the corrected sign-up/MFA/session flow (Phase 4) —
-  until which login still resolves a user across all Organizations, because the subdomain
-  that would identify the office is not read yet. See CLAUDE.md § What's New for the
-  per-phase record.
+  **Both isolation layers now exist.** Phase 2 step 8 added the PostgreSQL
+  Row-Level Security policies — 118 of them, one per tenant-scoped table — and
+  the API connects as a NON-OWNER role (`ibms_app`) so Postgres actually applies
+  them. `APP_DATABASE_URL` must be set in every environment or layer 2 is inert;
+  the API logs an error but still boots. Raw SQL (`$queryRaw`) is protected by
+  RLS alone, since the application layer structurally cannot see inside a raw
+  query — any raw path added later must run inside the same session-variable
+  transaction. See `docs/multi-tenancy-rls.md`.
+
+  What does NOT exist: the Part V isolation checklist as automated tests
+  (step 9), the insurer master/relationship split and per-tenant email
+  (Phase 3), and the corrected sign-up/MFA/session flow (Phase 4) — until which
+  login still resolves a user across all Organizations, because the subdomain
+  that would identify the office is not read yet. See CLAUDE.md § What's New for
+  the per-phase record.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

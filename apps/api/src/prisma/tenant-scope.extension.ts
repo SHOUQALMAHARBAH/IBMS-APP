@@ -1,4 +1,4 @@
-import { Prisma, prisma } from '@ibms/db';
+import { Prisma, prisma, type PrismaClient } from '@ibms/db';
 import type { OrgContextService } from '../common/org-context/org-context.service';
 
 /**
@@ -186,8 +186,11 @@ export class MissingOrgContextError extends Error {
  * repository calls into unusable `unknown`s. `TenantPrismaClient` below keeps
  * the full generated types intact.
  */
-export function buildTenantScopedClient(orgContext: OrgContextService) {
-  return prisma.$extends(tenantScopeExtension(orgContext));
+export function buildTenantScopedClient(
+  orgContext: OrgContextService,
+  client: PrismaClient = prisma,
+) {
+  return client.$extends(tenantScopeExtension(orgContext, client));
 }
 
 export type TenantPrismaClient = ReturnType<typeof buildTenantScopedClient>;
@@ -207,6 +210,141 @@ export type TenantPrismaClient = ReturnType<typeof buildTenantScopedClient>;
 export type TenantTransactionClient = Parameters<
   Parameters<TenantPrismaClient['$transaction']>[0]
 >[0];
+
+/**
+ * Multi-tenancy Phase 2 step 8 — makes an explicit `$transaction` block set
+ * `app.current_org_id` once, for the whole block.
+ *
+ * Without this, every query inside one of the ~23 existing `$transaction`
+ * blocks would try to open its OWN transaction to set the variable — which
+ * Prisma does not allow nested, and which would defeat the point of the outer
+ * transaction anyway. Instead the variable is set once on the transaction's
+ * connection, and `withScopedTransaction` tells the per-operation hook to stop
+ * re-wrapping for the duration.
+ *
+ * Implemented as a Proxy rather than a `client` extension component because
+ * overriding a built-in like `$transaction` is not something `$extends`
+ * guarantees, and this has to be reliable: a missed case is a runtime error on
+ * a write path, not a warning.
+ *
+ * Only the callback form is handled. Nothing in this codebase uses the array
+ * form, and it would need different treatment (its promises are built before
+ * the transaction opens), so it throws rather than silently running unscoped.
+ */
+/** The two client members reached structurally below. Naming their shapes once
+ * keeps the casts out of the call sites, where they degrade to `any`. */
+type TransactionRunner = (
+  callback: (tx: unknown) => Promise<unknown>,
+  ...rest: unknown[]
+) => Promise<unknown>;
+type RawRunner = (...args: unknown[]) => Promise<unknown>;
+interface RawCapableTx {
+  $executeRaw: (q: TemplateStringsArray, ...v: unknown[]) => Promise<unknown>;
+}
+
+export function withOrgAwareTransactions(
+  client: TenantPrismaClient,
+  orgContext: OrgContextService,
+): TenantPrismaClient {
+  const runTransaction = (
+    client as unknown as { $transaction: TransactionRunner }
+  ).$transaction.bind(client) as TransactionRunner;
+  const rawRunners = client as unknown as Record<string, RawRunner>;
+  const orgAwareTransaction = (
+    arg: unknown,
+    ...rest: unknown[]
+  ): Promise<unknown> => {
+    if (Array.isArray(arg)) {
+      throw new Error(
+        'The array form of $transaction is not supported under tenant isolation: its ' +
+          'operations are built before the transaction opens, so app.current_org_id ' +
+          'cannot be set for them. Use the callback form, $transaction(async (tx) => ...).',
+      );
+    }
+    const callback = arg as (tx: unknown) => Promise<unknown>;
+    return runTransaction(
+      async (tx: unknown) => {
+        const organizationId = orgContext.currentOrNull();
+        // A transaction opened during the auth bootstrap, or one on global
+        // models only, has no Organization to pin — leave the variable unset so
+        // RLS stays fail-closed rather than pinning it to something invented.
+        if (organizationId !== null && orgContext.unscopedReason() === null) {
+          await (
+            tx as {
+              $executeRaw: (
+                q: TemplateStringsArray,
+                ...v: unknown[]
+              ) => Promise<unknown>;
+            }
+          )
+            .$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
+        }
+        return orgContext.withScopedTransaction(() => callback(tx));
+      },
+      ...rest,
+    );
+  };
+
+  /**
+   * Raw SQL — `$queryRaw`, `$executeRaw` and their `Unsafe` variants — needs the
+   * session variable just as much as a model query, and is the ONE place where
+   * it genuinely matters rather than merely belting-and-bracing.
+   *
+   * The application layer cannot filter raw SQL: `applyTenantScope` rewrites a
+   * Prisma argument object, and a raw query has none. Those ten call sites
+   * (full-text search, `FOR UPDATE` row locks, the watchlist containment query)
+   * are therefore protected by RLS ALONE — which is exactly spec §1's promise
+   * that "a raw/forgotten query without the app-layer filter still can't cross
+   * tenants". Wrapping them here is what makes that true instead of aspirational.
+   *
+   * It also caught these: the moment the policies went live, the four full-text
+   * search e2e tests started returning nothing, because their raw queries were
+   * the only reads in the system with no Organization pinned.
+   */
+  const RAW_METHODS = new Set([
+    '$queryRaw',
+    '$queryRawUnsafe',
+    '$executeRaw',
+    '$executeRawUnsafe',
+  ]);
+
+  const orgAwareRaw = (method: string) => {
+    const original: RawRunner = rawRunners[method].bind(client) as RawRunner;
+
+    return (...args: unknown[]): unknown => {
+      const organizationId = orgContext.currentOrNull();
+      if (
+        organizationId === null ||
+        orgContext.unscopedReason() !== null ||
+        orgContext.inScopedTransaction()
+      ) {
+        return original(...args);
+      }
+      return runTransaction(async (tx: unknown) => {
+        const t = tx as Record<string, RawRunner> & RawCapableTx;
+        await t.$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
+        return orgContext.withScopedTransaction(() => t[method](...args));
+      }, RLS_SESSION_TRANSACTION_OPTIONS);
+    };
+  };
+
+  const rawCache = new Map<string, (...a: unknown[]) => unknown>();
+
+  return new Proxy(client, {
+    get(target, property, receiver): unknown {
+      if (property === '$transaction') return orgAwareTransaction;
+      if (typeof property === 'string' && RAW_METHODS.has(property)) {
+        let wrapped = rawCache.get(property);
+        if (!wrapped) {
+          wrapped = orgAwareRaw(property);
+          rawCache.set(property, wrapped);
+        }
+        return wrapped;
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+}
 
 /**
  * Builds the extension. Takes the context service rather than importing a
@@ -262,18 +400,137 @@ export function applyTenantScope(
   return next;
 }
 
-export function tenantScopeExtension(orgContext: OrgContextService) {
+/**
+ * Multi-tenancy Phase 2 step 8 — the session variable the RLS policies read.
+ *
+ * The policies are `USING ("organizationId" = current_setting('app.current_org_id', true))`.
+ * `current_setting(..., true)` returns NULL when unset, and `column = NULL` is
+ * NULL, so a connection that never sets it sees NOTHING — RLS fails closed on
+ * its own, independently of anything this extension does to the `where`.
+ *
+ * It has to be `SET LOCAL` (the `true` third argument), which scopes it to the
+ * surrounding transaction. That is a CORRECTNESS requirement on a connection
+ * pool, not tidiness — a bare session-level `SET` fails two ways:
+ *
+ *   1. The `SET` and the query after it are not guaranteed the same physical
+ *      connection, so the query may run with nothing set. Merely inert: RLS
+ *      fails closed and returns no rows.
+ *   2. Worse, a stale value left on a reused pooled connection FROM A PREVIOUS
+ *      REQUEST can still be in effect when the next request's query runs before
+ *      its own `SET` takes hold. That is a genuine cross-tenant read.
+ *
+ * `SET LOCAL` has neither problem: Postgres clears it when the transaction
+ * ends, however the connection is later reused.
+ *
+ * ---------------------------------------------------------------------------
+ * DECIDED (2026-09-11): ONE TRANSACTION PER QUERY, NOT PER REQUEST
+ * ---------------------------------------------------------------------------
+ * Measured cost: roughly +4ms and ~3.7x latency on a trivial query. Operations
+ * already inside a `$transaction` pay it once for the whole block rather than
+ * per query, which is what `inScopedTransaction` is for.
+ *
+ * The alternative is one transaction per REQUEST, which amortises that cost but
+ * holds locks for the whole request and turns any mid-request failure into a
+ * full rollback. Rejected deliberately: 4ms is imperceptible in an internal
+ * back-office system, and per-request would trade a measured, tolerable cost
+ * for an unmeasured risk with no load data behind it.
+ *
+ * Do NOT switch to per-request pre-emptively — only if load testing shows the
+ * per-query cost is a real bottleneck, with numbers in hand. See
+ * docs/multi-tenancy-rls.md.
+ */
+async function withRlsSession<T>(
+  orgContext: OrgContextService,
+  client: PrismaClient,
+  organizationId: string,
+  run: (tx: unknown) => Promise<T>,
+): Promise<T> {
+  return client.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.current_org_id', ${organizationId}, true)`;
+    return orgContext.withScopedTransaction(() => run(tx));
+  }, RLS_SESSION_TRANSACTION_OPTIONS);
+}
+
+/**
+ * Timeouts for the transaction this extension opens around a single query.
+ *
+ * Prisma's interactive-transaction defaults are `maxWait` 2s / `timeout` 5s.
+ * Those are sensible for a transaction a developer wrote deliberately around a
+ * unit of work — they are NOT sensible here, because this transaction exists
+ * only to scope a session variable and wraps ONE query that previously ran with
+ * no deadline at all. Leaving the defaults silently imposes a 5-second ceiling
+ * on every query in the system.
+ *
+ * That was not hypothetical: a bulk `auditLogEntry.createManyAndReturn` from
+ * `AccessRecertificationService.startCycle` took 5837ms under load and died
+ * with `P2028: Transaction already closed`. It had no timeout before step 8.
+ *
+ * So the ceiling is raised to something that will not fire in normal operation.
+ * This does NOT change transaction semantics — the transaction still covers
+ * exactly one query — it only stops the wrapper from imposing a deadline the
+ * query never had.
+ *
+ * Transactions the APPLICATION opens are left alone: `withOrgAwareTransactions`
+ * passes the caller's own options straight through, so a deliberate
+ * `$transaction` keeps whatever bounds it chose.
+ */
+const RLS_SESSION_TRANSACTION_OPTIONS = {
+  /** Time to wait for a connection from the pool. Generous because a loaded
+   * pool is exactly when this would otherwise start failing. */
+  maxWait: 30_000,
+  /** Ceiling for the wrapped query itself. */
+  timeout: 120_000,
+} as const;
+
+/** Prisma's delegate property for a model — `KYCRecord` -> `kYCRecord`, the
+ * same lower-first rule the generated client uses. */
+function delegateKey(model: string): string {
+  return model.charAt(0).toLowerCase() + model.slice(1);
+}
+
+export function tenantScopeExtension(
+  orgContext: OrgContextService,
+  client: PrismaClient = prisma,
+) {
   return Prisma.defineExtension({
     name: 'tenant-scope',
     query: {
       $allModels: {
-        $allOperations({ model, operation, args, query }) {
+        async $allOperations({ model, operation, args, query }) {
           // `applyTenantScope` works on plain objects — Prisma's per-operation
           // argument union is not expressible there without enumerating all
           // ~2000 variants. The cast is at this single boundary rather than
           // being pushed out to call sites.
-          return query(
-            applyTenantScope(orgContext, model, operation, args) as typeof args,
+          const scoped = applyTenantScope(
+            orgContext,
+            model,
+            operation,
+            args,
+          ) as typeof args;
+
+          // Layer 1 only: a global model, or an explicitly justified bypass.
+          // Neither needs the RLS session variable — global tables carry no
+          // policy, and the bootstrap reads run before any org is known.
+          const organizationId = orgContext.currentOrNull();
+          if (
+            !TENANT_SCOPED_MODELS.has(model) ||
+            orgContext.unscopedReason() !== null ||
+            organizationId === null
+          ) {
+            return query(scoped);
+          }
+
+          // Already inside a transaction whose connection has the variable
+          // set — reuse it rather than nesting, which Prisma does not allow.
+          if (orgContext.inScopedTransaction()) return query(scoped);
+
+          return withRlsSession(orgContext, client, organizationId, (tx) =>
+            (
+              tx as Record<
+                string,
+                Record<string, (a: unknown) => Promise<unknown>>
+              >
+            )[delegateKey(model)][operation](scoped),
           );
         },
       },

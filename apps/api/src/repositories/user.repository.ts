@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import type { Role, RoleName, User, UserRoleAssignment } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrgContextService } from '../common/org-context/org-context.service';
 
 @Injectable()
 export class UserRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orgContext: OrgContextService,
+  ) {}
 
   /**
    * Multi-tenancy Phase 2 — the real unique read Phase 1 owed.
@@ -317,7 +321,17 @@ export class UserRepository {
   withRoleLocked<T>(roleId: string, work: () => Promise<T>): Promise<T> {
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Role" WHERE id = ${roleId} FOR UPDATE`;
-      return work();
+      // `work()` deliberately issues its queries on the OUTER client, not on
+      // `tx` — this transaction exists only to hold the row lock, and has
+      // always been separate from the work it serialises.
+      //
+      // Multi-tenancy Phase 2 step 8 makes that explicit. Left alone, the work
+      // would inherit "a transaction is already open", skip opening its own RLS
+      // session, and run on a pooled connection with no `app.current_org_id`.
+      // That was not theoretical: `setActive`'s `updateMany` matched zero rows,
+      // which the service reads as "already in that state" and reports as
+      // success — so deactivating an account silently did nothing.
+      return this.orgContext.outsideScopedTransaction(work);
     });
   }
 
