@@ -151,7 +151,7 @@ export class DisposalBatchService {
     await this.assertNoActiveLegalHold(batch.retentionScheduleItemId);
 
     const dpoApprovedAt = new Date();
-    const slaDueAt = this.slaTimer.computeDueAt(
+    const slaDueAt = await this.slaTimer.computeDueAt(
       DISPOSAL_BATCH_SLA_WORKFLOW,
       dpoApprovedAt,
     );

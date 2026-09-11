@@ -121,7 +121,7 @@ export class DsrService {
       dto.type as DataSubjectRequest['type'],
     );
     const receivedAt = new Date();
-    const slaDueAt = this.slaTimer.computeDueAt(workflowName, receivedAt);
+    const slaDueAt = await this.slaTimer.computeDueAt(workflowName, receivedAt);
 
     const row = await this.repo.create({
       customerId: dto.customerId ?? null,

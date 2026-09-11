@@ -374,3 +374,119 @@ describe('hasSensitiveEntityType', () => {
     ).toBe(false);
   });
 });
+
+describe('dashboard rows carry pause-aware status and provenance', () => {
+  const base = {
+    id: 't-1',
+    entityType: 'DataSubjectRequest',
+    entityId: 'dsr-1',
+    workflowName: 'dsr_access_deletion',
+    dueAt: new Date('2027-01-10T00:00:00.000Z'),
+    escalatedAt: null,
+    escalatedTo: null,
+    resolvedAt: null,
+    createdAt: new Date('2027-01-01T00:00:00.000Z'),
+  };
+  const now = new Date('2027-01-11T00:00:00.000Z');
+  const cutoff = new Date('2027-01-13T00:00:00.000Z');
+
+  it('reports a PAUSED clock as paused, where the legacy state would say breached', () => {
+    const row = deriveSlaTimerRow(
+      {
+        ...base,
+        pausedAt: new Date('2027-01-05T00:00:00.000Z'),
+        pausedTotalMs: 0,
+      },
+      now,
+      cutoff,
+    );
+    expect(row.slaStatus).toBe('PAUSED');
+    expect(row.state).toBe('breached'); // the older bucketing, kept for continuity
+    expect(row.remainingMs).toBeNull();
+  });
+
+  it('shifts the effective deadline by accumulated pause without moving dueAt', () => {
+    const row = deriveSlaTimerRow(
+      { ...base, pausedTotalMs: 3 * 24 * 3600 * 1000 },
+      now,
+      cutoff,
+    );
+    expect(row.dueAt).toBe('2027-01-10T00:00:00.000Z');
+    expect(row.effectiveDueAt).toBe('2027-01-13T00:00:00.000Z');
+    expect(row.remainingMs).toBeGreaterThan(0);
+  });
+
+  it('takes provenance from the POLICY when the timer has one', () => {
+    const row = deriveSlaTimerRow(
+      {
+        ...base,
+        slaPolicy: {
+          policyCode: 'SLA-DSR-ACCESS-DELETION',
+          sourceType: 'REGULATORY',
+          warningThreshold: 0.8,
+        },
+      },
+      now,
+      cutoff,
+    );
+    expect(row.isRegulatory).toBe(true);
+    expect(row.sourceType).toBe('REGULATORY');
+    expect(row.policyCode).toBe('SLA-DSR-ACCESS-DELETION');
+  });
+
+  it('never reports an INTERNAL_POLICY deadline as regulatory', () => {
+    const row = deriveSlaTimerRow(
+      {
+        ...base,
+        workflowName: 'sanctions_match_review',
+        slaPolicy: {
+          policyCode: 'SLA-SANCTIONS-MATCH-REVIEW',
+          sourceType: 'INTERNAL_POLICY',
+          warningThreshold: 0.8,
+        },
+      },
+      now,
+      cutoff,
+    );
+    expect(row.isRegulatory).toBe(false);
+    expect(row.sourceType).toBe('INTERNAL_POLICY');
+  });
+
+  it('falls back to the registry classification for a pre-policy timer', () => {
+    const row = deriveSlaTimerRow(base, now, cutoff);
+    expect(row.sourceType).toBeNull();
+    expect(row.policyCode).toBeNull();
+    // dsr_access_deletion is a PDPL row, so not drafted -> regulatory.
+    expect(row.isRegulatory).toBe(true);
+  });
+
+  it('honours the policy’s own warning threshold', () => {
+    const early = new Date('2027-01-05T00:00:00.000Z');
+    const lax = deriveSlaTimerRow(
+      {
+        ...base,
+        slaPolicy: {
+          policyCode: 'X',
+          sourceType: 'OPERATIONAL',
+          warningThreshold: 0.9,
+        },
+      },
+      early,
+      cutoff,
+    );
+    const strict = deriveSlaTimerRow(
+      {
+        ...base,
+        slaPolicy: {
+          policyCode: 'X',
+          sourceType: 'OPERATIONAL',
+          warningThreshold: 0.2,
+        },
+      },
+      early,
+      cutoff,
+    );
+    expect(lax.slaStatus).toBe('ON_TRACK');
+    expect(strict.slaStatus).toBe('APPROACHING_DUE');
+  });
+});

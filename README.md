@@ -246,6 +246,10 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
   been migrated at least once (`npm run db:test:migrate:dev`). Run it before opening a PR
   to get the evidence block for the PR description in one shot — claims aren't evidence,
   this is.
+- **`scripts/generate-sla-policy-seed.ts`** — regenerates
+  `packages/db/prisma/seed-data/sla-policies.ts` from `sla-policy-source.config.ts`, so
+  the seeded SLA baseline and the governing-source table it is derived from cannot drift
+  apart by hand-editing one of them. Arrived with the configurable SLA engine.
 - **`scripts/backup-restore-drill.sh`** (A.10, Part 10.4/10.5) — dumps a database
   (`db-test` by default — never dev/prod automatically), encrypts the dump
   (AES-256-CBC), decrypts and restores it into a throwaway database, verifies the
@@ -401,6 +405,20 @@ The engineering backlog spans **Part A** (security & cross-cutting infra), **Par
 (database), **Part C** (74 business processes across Domains A–H), and **Parts D–G**
 (PDPL / M-series, dashboards, bilingual UI, a final verification checklist). Where the
 build actually is today:
+
+- **Multi-tenancy — Phase 1 of 6 only (schema + backfill). NOTHING IS ENFORCED YET.**
+  `ibms-system-multitenancy-spec.md` is a scope addition on top of everything below: the
+  whole backlog was built for ONE brokerage office, and multi-tenancy is being retrofitted
+  one phase at a time, deliberately, because it changes an assumption nearly every file
+  depends on. What exists today is the `Organization` model, an `organizationId` column on
+  every tenant-scoped table with every row backfilled onto a single seeded office, and a
+  unique-constraint set that is correct per-office rather than per-platform. What does NOT
+  exist: the org-scoping query interceptor and the PostgreSQL Row-Level Security policies
+  (both Phase 2), the insurer master/relationship split and per-tenant email (Phase 3),
+  and the corrected sign-up/MFA/session flow (Phase 4). **An unscoped query still returns
+  every office's rows.** Treat this system as single-tenant until Phase 2 lands, and do
+  not read the `Organization` column as an isolation guarantee. See CLAUDE.md § What's New
+  for the per-phase record.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

@@ -83,7 +83,13 @@ export class ProviderScreeningService {
       bucket: idempotencyBucket(config.idempotencyWindowMinutes),
     });
 
-    const existing = await this.prisma.client.screeningRequest.findUnique({
+    // `findFirst`, not `findUnique`: multi-tenancy Phase 1 step 5 moved the
+    // UNIQUE from `idempotencyKey` alone to (organizationId, idempotencyKey),
+    // and `findUnique` cannot address a compound key by one of its columns.
+    // Equivalent while one Organization exists. PHASE 2 must pass the resolved
+    // organizationId here and go back to a real unique read — an unscoped read
+    // would otherwise let one office's in-flight screening resume another's.
+    const existing = await this.prisma.client.screeningRequest.findFirst({
       where: { idempotencyKey },
     });
     // Already done in this window. Returning the recorded outcome — rather
@@ -169,7 +175,8 @@ export class ProviderScreeningService {
       // before this catch existed, the loser threw an unhandled P2002 and the
       // caller saw a 500 for a screening that had in fact just succeeded.
       if (isUniqueConstraintViolation(err)) {
-        const winner = await this.prisma.client.screeningRequest.findUnique({
+        // See the note on the pre-check read above — same Phase 2 obligation.
+        const winner = await this.prisma.client.screeningRequest.findFirst({
           where: { idempotencyKey },
         });
         if (winner) return resumed(winner);

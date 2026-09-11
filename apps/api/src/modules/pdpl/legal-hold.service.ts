@@ -81,7 +81,7 @@ export class LegalHoldService {
     }
 
     const placedAt = new Date();
-    const nextReviewDueAt = this.slaTimer.computeDueAt(
+    const nextReviewDueAt = await this.slaTimer.computeDueAt(
       LEGAL_HOLD_REVIEW_SLA_WORKFLOW,
       placedAt,
     );
@@ -130,7 +130,7 @@ export class LegalHoldService {
       );
     }
 
-    const newDueAt = this.slaTimer.computeDueAt(
+    const newDueAt = await this.slaTimer.computeDueAt(
       LEGAL_HOLD_REVIEW_SLA_WORKFLOW,
       new Date(),
     );

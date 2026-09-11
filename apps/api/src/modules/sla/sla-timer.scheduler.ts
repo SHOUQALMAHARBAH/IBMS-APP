@@ -17,6 +17,22 @@ export class SlaTimerScheduler {
 
   @Cron('*/15 * * * *', { name: 'sla-timer-escalation-sweep' })
   async runSweep(): Promise<void> {
+    // BREACHES ARE RECORDED FIRST, and separately from escalation.
+    //
+    // They are different facts: escalation fires on the RAW `dueAt` and
+    // notifies somebody; a breach is the durable record that a deadline was
+    // missed, measured against the PAUSE-ADJUSTED deadline. A paused clock is
+    // not breached, and a timer whose escalation target is null still breaches.
+    // Recording it as a stamped column means every reader gets the same answer
+    // instead of each redoing the pause arithmetic and some getting it wrong.
+    try {
+      await this.slaTimer.recordBreaches();
+    } catch (err) {
+      this.logger.error(
+        `SLA breach recording failed: ${(err as Error).message}`,
+      );
+    }
+
     try {
       const escalated = await this.slaTimer.runEscalationSweep();
       if (escalated.length > 0) {

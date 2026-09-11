@@ -147,7 +147,7 @@ export class ComplaintService {
     actorUserId: string,
   ): Promise<void> {
     try {
-      const dueAt = this.slaTimer.computeDueAt(
+      const dueAt = await this.slaTimer.computeDueAt(
         COMPLAINT_SLA_WORKFLOW,
         new Date(),
       );

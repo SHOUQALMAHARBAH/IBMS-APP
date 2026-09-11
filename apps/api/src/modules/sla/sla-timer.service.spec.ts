@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
 import { SlaTimerService } from './sla-timer.service';
 import { applyDuration } from '../../common/business-days.util';
 import type { AuditService } from '../audit/audit.service';
@@ -10,6 +11,7 @@ function makeDeps(overrides?: {
   findManyResult?: unknown[];
   updateManyCount?: number;
   systemUser?: { id: string } | null;
+  policies?: Record<string, unknown>;
 }) {
   let createCounter = 0;
   const create = vi
@@ -46,43 +48,129 @@ function makeDeps(overrides?: {
     );
   const users = { findByEmail } as unknown as UserRepository;
 
+  const policies = {
+    ...policiesRepoMock(),
+    ...((overrides as { policies?: object } | undefined)?.policies ?? {}),
+  } as unknown as SlaPolicyRepository;
+
   return {
-    service: new SlaTimerService(prisma, audit, users),
+    service: new SlaTimerService(prisma, audit, users, policies),
     create,
     findMany,
     updateMany,
     record,
     findByEmail,
+    policies,
   };
 }
 
-describe('SlaTimerService.computeDueAt', () => {
-  it('applies the registry duration to the base date', () => {
+/** No SLA policies configured — every existing test exercises the
+ * registry-fallback path, which is exactly the behaviour that must keep
+ * working on a database that has not been seeded with policies. */
+function policiesRepoMock() {
+  return {
+    findActiveFor: vi.fn().mockResolvedValue(null),
+    findHolidays: vi.fn().mockResolvedValue([]),
+  } as unknown as SlaPolicyRepository;
+}
+
+describe('SlaTimerService.computeDueAt — reads the CONFIGURED policy', () => {
+  it('falls back to the registry duration when no policy is configured', async () => {
+    // The un-seeded path: behaviour must be exactly what it was before SLA
+    // policies existed.
     const { service } = makeDeps();
     const base = new Date('2026-08-26T00:00:00.000Z');
-    expect(service.computeDueAt('consent_withdrawal', base)).toEqual(
-      applyDuration(base, { value: 2, unit: 'businessDays' }),
-    );
+    await expect(
+      service.computeDueAt('consent_withdrawal', base),
+    ).resolves.toEqual(applyDuration(base, { value: 2, unit: 'businessDays' }));
   });
 
-  it('uses the regulatory-channel override duration for data_sharing_decision when requested', () => {
-    const { service } = makeDeps();
+  it('PREFERS the configured policy over the registry constant', async () => {
+    // The whole point: changing a deadline is a row update, not a deploy.
+    const { service } = makeDeps({
+      policies: {
+        findActiveFor: vi.fn().mockResolvedValue({
+          id: 'p-1',
+          durationValue: 9,
+          durationUnit: 'BUSINESS_DAYS',
+          calendarType: 'JORDAN_STANDARD',
+          customWeekendDays: [],
+          escalationEnabled: true,
+          escalations: [],
+        }),
+        findHolidays: vi.fn().mockResolvedValue([]),
+      },
+    });
     const base = new Date('2026-08-26T00:00:00.000Z');
-    expect(
+    await expect(
+      service.computeDueAt('consent_withdrawal', base),
+    ).resolves.toEqual(applyDuration(base, { value: 9, unit: 'businessDays' }));
+  });
+
+  it('applies the configured HOLIDAY calendar', async () => {
+    const { service } = makeDeps({
+      policies: {
+        findActiveFor: vi.fn().mockResolvedValue({
+          id: 'p-1',
+          durationValue: 3,
+          durationUnit: 'BUSINESS_DAYS',
+          calendarType: 'JORDAN_STANDARD',
+          customWeekendDays: [],
+          escalationEnabled: true,
+          escalations: [],
+        }),
+        findHolidays: vi
+          .fn()
+          .mockResolvedValue([
+            { observedOn: new Date('2027-01-10T00:00:00.000Z') },
+          ]),
+      },
+    });
+    const due = await service.computeDueAt(
+      'consent_withdrawal',
+      new Date('2027-01-07T00:00:00.000Z'),
+    );
+    expect(due.toISOString().slice(0, 10)).toBe('2027-01-13');
+  });
+
+  it('keeps the regulatory-channel FAST TRACK on its registry value', async () => {
+    // A policy models one duration, so serving the standard one here would
+    // LENGTHEN a deadline that exists specifically to be shorter.
+    const { service } = makeDeps({
+      policies: {
+        findActiveFor: vi.fn().mockResolvedValue({
+          id: 'p-1',
+          durationValue: 30,
+          durationUnit: 'BUSINESS_DAYS',
+          calendarType: 'JORDAN_STANDARD',
+          customWeekendDays: [],
+          escalationEnabled: true,
+          escalations: [],
+        }),
+        findHolidays: vi.fn().mockResolvedValue([]),
+      },
+    });
+    const base = new Date('2026-08-26T00:00:00.000Z');
+    await expect(
       service.computeDueAt('data_sharing_decision', base, {
         regulatoryChannel: true,
       }),
-    ).toEqual(applyDuration(base, { value: 1, unit: 'businessDays' }));
-    expect(service.computeDueAt('data_sharing_decision', base)).toEqual(
-      applyDuration(base, { value: 3, unit: 'businessDays' }),
-    );
+    ).resolves.toEqual(applyDuration(base, { value: 1, unit: 'businessDays' }));
   });
 
-  it('throws for an unknown workflow', () => {
+  it('still throws for an unknown workflow with no policy', async () => {
     const { service } = makeDeps();
-    expect(() => service.computeDueAt('not_a_workflow', new Date())).toThrow(
-      /Unknown SLA workflow/,
-    );
+    await expect(
+      service.computeDueAt('not_a_workflow', new Date()),
+    ).rejects.toThrow(/Unknown SLA workflow/);
+  });
+
+  it('computeDueAtFromRegistry stays synchronous for the default path', () => {
+    const { service } = makeDeps();
+    const base = new Date('2026-08-26T00:00:00.000Z');
+    expect(
+      service.computeDueAtFromRegistry('consent_withdrawal', base),
+    ).toEqual(applyDuration(base, { value: 2, unit: 'businessDays' }));
   });
 });
 
@@ -107,6 +195,10 @@ describe('SlaTimerService.startTimer', () => {
         workflowName: 'consent_withdrawal',
         dueAt,
         escalatedTo: null,
+        // Null because no policy is configured in this fixture. When one is,
+        // the timer records WHICH policy set its deadline, so a historical
+        // timer can still say whether it was regulatory or internal.
+        slaPolicyId: null,
       },
     });
     expect(record).toHaveBeenCalledTimes(1);
@@ -140,6 +232,7 @@ describe('SlaTimerService.startTimer', () => {
         workflowName: 'dsr_access_deletion::data_protection_officer',
         dueAt: applyDuration(dueAt, { value: -3, unit: 'businessDays' }),
         escalatedTo: 'DATA_PROTECTION_OFFICER',
+        slaPolicyId: null,
       },
     });
     expect(create).toHaveBeenNthCalledWith(2, {
@@ -149,6 +242,7 @@ describe('SlaTimerService.startTimer', () => {
         workflowName: 'dsr_access_deletion::general_manager',
         dueAt: applyDuration(dueAt, { value: 0, unit: 'businessDays' }),
         escalatedTo: 'GENERAL_MANAGER',
+        slaPolicyId: null,
       },
     });
   });
@@ -320,5 +414,117 @@ describe('SlaTimerService.runEscalationSweep', () => {
     expect(result).toEqual([]);
     expect(updateMany).not.toHaveBeenCalled();
     expect(record).not.toHaveBeenCalled();
+  });
+});
+
+describe('startTimer uses the CONFIGURED policy, not the registry constant', () => {
+  const configuredPolicy = (over: Record<string, unknown> = {}) => ({
+    id: 'p-1',
+    durationValue: 3,
+    durationUnit: 'BUSINESS_DAYS',
+    calendarType: 'JORDAN_STANDARD',
+    customWeekendDays: [],
+    escalationEnabled: true,
+    escalations: [
+      {
+        stageOrder: 0,
+        offsetValue: -2,
+        offsetUnit: 'BUSINESS_DAYS',
+        escalateTo: 'COMPLIANCE_OFFICER',
+      },
+      {
+        stageOrder: 1,
+        offsetValue: 0,
+        offsetUnit: 'BUSINESS_DAYS',
+        escalateTo: null,
+      },
+    ],
+    ...over,
+  });
+
+  it('records WHICH policy set the deadline on every timer it creates', async () => {
+    // Without this a historical timer cannot say whether the deadline it
+    // missed was regulatory or internal — the policy may have been edited
+    // since.
+    const { service, create } = makeDeps({
+      policies: {
+        findActiveFor: vi.fn().mockResolvedValue(configuredPolicy()),
+        findHolidays: vi.fn().mockResolvedValue([]),
+      },
+    });
+    await service.startTimer({
+      entityType: 'ConsentRecord',
+      entityId: 'consent-1',
+      workflowName: 'consent_withdrawal',
+      dueAt: new Date('2026-09-01T00:00:00.000Z'),
+      actorUserId: 'user-1',
+    });
+    for (const call of create.mock.calls as [
+      { data: { slaPolicyId: string } },
+    ][]) {
+      expect(call[0].data.slaPolicyId).toBe('p-1');
+    }
+  });
+
+  it('uses the POLICY escalation stages, not the registry ones', async () => {
+    // consent_withdrawal has ONE registry stage. The configured policy has
+    // two, so the count proves which source was read.
+    const { service, create } = makeDeps({
+      policies: {
+        findActiveFor: vi.fn().mockResolvedValue(configuredPolicy()),
+        findHolidays: vi.fn().mockResolvedValue([]),
+      },
+    });
+    const created = await service.startTimer({
+      entityType: 'ConsentRecord',
+      entityId: 'consent-1',
+      workflowName: 'consent_withdrawal',
+      dueAt: new Date('2026-09-01T00:00:00.000Z'),
+      actorUserId: 'user-1',
+    });
+    expect(created).toHaveLength(2);
+    const escalatedTo = (
+      create.mock.calls as [{ data: { escalatedTo: string | null } }][]
+    ).map((c) => c[0].data.escalatedTo);
+    expect(escalatedTo).toEqual(['COMPLIANCE_OFFICER', null]);
+  });
+
+  it('escalationEnabled=false keeps the DEADLINE but drops the notifications', async () => {
+    // Turning escalation off must not turn the SLA off: a queryable,
+    // sweep-checked deadline row is the whole point of the registry.
+    const { service, create } = makeDeps({
+      policies: {
+        findActiveFor: vi
+          .fn()
+          .mockResolvedValue(configuredPolicy({ escalationEnabled: false })),
+        findHolidays: vi.fn().mockResolvedValue([]),
+      },
+    });
+    const dueAt = new Date('2026-09-01T00:00:00.000Z');
+    const created = await service.startTimer({
+      entityType: 'ConsentRecord',
+      entityId: 'consent-1',
+      workflowName: 'consent_withdrawal',
+      dueAt,
+      actorUserId: 'user-1',
+    });
+    expect(created).toHaveLength(1);
+    const [call] = create.mock.calls as [
+      { data: { dueAt: Date; escalatedTo: string | null } },
+    ][];
+    expect(call[0].data.dueAt).toEqual(dueAt);
+    expect(call[0].data.escalatedTo).toBeNull();
+  });
+
+  it('falls back to registry stages when no policy is configured', async () => {
+    const { service, create } = makeDeps();
+    await service.startTimer({
+      entityType: 'ConsentRecord',
+      entityId: 'consent-1',
+      workflowName: 'consent_withdrawal',
+      dueAt: new Date('2026-09-01T00:00:00.000Z'),
+      actorUserId: 'user-1',
+    });
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });

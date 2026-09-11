@@ -290,9 +290,8 @@ describe('REGRESSION: the recurring batch has to actually re-screen', () => {
     const prisma = {
       client: {
         screeningRequest: {
-          findUnique: vi.fn(
-            ({ where }: { where: { idempotencyKey: string } }) =>
-              Promise.resolve(rows.get(where.idempotencyKey) ?? null),
+          findFirst: vi.fn(({ where }: { where: { idempotencyKey: string } }) =>
+            Promise.resolve(rows.get(where.idempotencyKey) ?? null),
           ),
           create,
         },
@@ -432,7 +431,7 @@ describe('REGRESSION: the UNIQUE constraint is the guarantee, so P2002 must resu
         screeningRequest: {
           // First read (the fast path) sees nothing — the winner has not
           // committed yet. The read AFTER the P2002 sees it.
-          findUnique: vi.fn(() =>
+          findFirst: vi.fn(() =>
             Promise.resolve(readCount++ === 0 ? null : winner),
           ),
           create: vi.fn(() =>
@@ -480,7 +479,7 @@ describe('REGRESSION: the UNIQUE constraint is the guarantee, so P2002 must resu
     const prisma = {
       client: {
         screeningRequest: {
-          findUnique: vi.fn(() => Promise.resolve(null)),
+          findFirst: vi.fn(() => Promise.resolve(null)),
           create: vi.fn(() =>
             Promise.reject(
               new Prisma.PrismaClientKnownRequestError('other', {
