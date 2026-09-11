@@ -21,6 +21,7 @@ import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'plc-1',
+    organizationId: 'org-1',
     email: 'plc@ibms.test',
     roles: ['PLACEMENT_TECHNICAL_OFFICER'],
     sessionId: 'session-1',
@@ -34,6 +35,7 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
 function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'sales-2',
+    organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
     sessionId: 'session-2',

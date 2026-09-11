@@ -151,28 +151,28 @@ enum MfaCredentialType {
 // Organization. Nothing enforces isolation yet.
 //
 // ---------------------------------------------------------------------------
-// WHY `organizationId` CARRIES A `@default` — AND WHY PHASE 2 MUST REMOVE IT
+// THE TEMPORARY `@default` IS GONE — PHASE 2 REMOVED IT (migration 20260927100000)
 // ---------------------------------------------------------------------------
-// Every tenant-scoped model below declares:
+// Through Phase 1 every tenant-scoped `organizationId` carried
+// `@default("00000000-0000-0000-0000-000000000001")`. That was a deliberate,
+// temporary device: it made the column NOT NULL from the very first migration,
+// backfilled every pre-existing row inside the same `ALTER TABLE`, and kept
+// every existing `.create()` call site compiling, which is what let Phase 1 be
+// "schema + backfill, no application change".
 //
-//     organizationId String @default("00000000-0000-0000-0000-000000000001")
+// It is now removed, because from Phase 2 onwards it would be a hazard rather
+// than a convenience: a write path the org-scoping audit missed would SILENTLY
+// succeed with the default office's id instead of failing loudly, masking
+// exactly the gap that phase exists to catch.
 //
-// The default is a DELIBERATE, TEMPORARY Phase 1 device, not a design choice:
+// `organizationId` is now supplied by `tenantScopeExtension`
+// (apps/api/src/prisma/tenant-scope.extension.ts), which injects it into every
+// query — including nested relation writes — and refuses to run a tenant-scoped
+// query at all when there is no Organization in context. Nothing in the API
+// passes it by hand.
 //
-//   * It makes the column NOT NULL from the very first migration — the database
-//     can never hold an unattributed row, which a nullable column would allow.
-//   * Postgres backfills every pre-existing row with it inside the same
-//     `ALTER TABLE ... ADD COLUMN`, so there is no separate data-migration step
-//     and no window where the table violates its own constraint.
-//   * It keeps every existing `.create()` call site across 113 services and 85
-//     repositories compiling untouched, which is what lets Phase 1 be "schema +
-//     backfill, no application change" as the spec requires.
-//
-// It is ALSO a hazard once a second Organization exists: a create() that forgets
-// to set `organizationId` would silently land in the default org instead of
-// failing loudly. Phase 2 (the org-scoping interceptor) MUST drop this default
-// in the same change that starts supplying `organizationId` explicitly. Until
-// then exactly one Organization exists, so the default is always correct.
+// The one place that still writes it explicitly is `prisma/seed.ts`, which runs
+// outside the API and therefore outside the extension.
 // ============================================================================
 
 /// Spec §2 — one brokerage office on the platform. Deliberately NOT itself
@@ -348,7 +348,7 @@ enum OrgStatus {
 /// Nothing reads this yet — the provisioning UI that sets it is Phase 4.
 model Department {
   id             String       @id @default(uuid())
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
   /// Arabic department name — the org chart renders in Arabic by default.
@@ -368,7 +368,7 @@ model Department {
 /// The raw device fingerprint is NEVER stored, only its hash.
 model TrustedDevice {
   id                    String       @id @default(uuid())
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   userId                String
   user                  User         @relation(fields: [userId], references: [id])
@@ -392,7 +392,7 @@ model TrustedDevice {
 /// history and is never updated or deleted.
 model PasswordHistoryEntry {
   id             String       @id @default(uuid())
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   userId         String
   user           User         @relation(fields: [userId], references: [id])
@@ -412,9 +412,8 @@ model PasswordHistoryEntry {
 model User {
   id                  String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization       @relation(fields: [organizationId], references: [id])
   fullName            String
   /// Spec §3.2 / §4.1.3 — email is unique WITHIN an Organization, not across
@@ -466,9 +465,8 @@ model User {
 model MfaCredential {
   id                   String            @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId       String            @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String @default(dbgenerated())
   organization         Organization      @relation(fields: [organizationId], references: [id])
   userId               String
   user                 User              @relation(fields: [userId], references: [id])
@@ -495,9 +493,8 @@ model MfaCredential {
 model RefreshToken {
   id                String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization @relation(fields: [organizationId], references: [id])
   userId            String
   user              User         @relation(fields: [userId], references: [id])
@@ -523,9 +520,8 @@ model RefreshToken {
 model UserSession {
   id             String        @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String        @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization  @relation(fields: [organizationId], references: [id])
   userId         String
   user           User          @relation(fields: [userId], references: [id])
@@ -549,9 +545,8 @@ model UserSession {
 model PasswordResetToken {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   userId         String
   user           User         @relation(fields: [userId], references: [id])
@@ -573,9 +568,8 @@ model PasswordResetToken {
 model SecurityConfig {
   id                         String       @id @default("default")
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId             String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId             String @default(dbgenerated())
   organization               Organization @relation(fields: [organizationId], references: [id])
   idleTimeoutMinutes         Int          @default(15)
   hardLogoutAfterIdleMinutes Int          @default(30)
@@ -629,9 +623,8 @@ model RolePermission {
 model UserRoleAssignment {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   userId         String
   user           User         @relation(fields: [userId], references: [id])
@@ -663,9 +656,8 @@ model UserRoleAssignment {
 model AccessRecertificationCycle {
   id             String                      @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String                      @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization                @relation(fields: [organizationId], references: [id])
   cycleLabel     String
   startedAt      DateTime                    @default(now())
@@ -679,9 +671,8 @@ model AccessRecertificationCycle {
 model AccessRecertificationItem {
   id             String                     @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String                     @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization               @relation(fields: [organizationId], references: [id])
   cycleId        String
   cycle          AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
@@ -700,9 +691,8 @@ model AccessRecertificationItem {
 model Branch {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
   nameAr         String?
@@ -716,9 +706,8 @@ model Branch {
 model Employee {
   id                               String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                   String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                   String @default(dbgenerated())
   organization                     Organization @relation(fields: [organizationId], references: [id])
   fullName                         String // computed from the 4 parts below when they're set (see composeFullName) — historical rows keep only this field, parts null
   givenName                        String? // Jordanian national-ID convention (Part F item #4) — given/father's/grandfather's/family name
@@ -755,9 +744,8 @@ model Employee {
 model SecurityAwarenessTraining {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   employeeId     String
   employee       Employee     @relation(fields: [employeeId], references: [id])
@@ -773,9 +761,8 @@ model SecurityAwarenessTraining {
 model AccessDeprovisioningChecklist {
   id                      String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization @relation(fields: [organizationId], references: [id])
   employeeId              String       @unique
   employee                Employee     @relation(fields: [employeeId], references: [id])
@@ -807,9 +794,8 @@ enum LeadStatus {
 model Lead {
   id                      String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization @relation(fields: [organizationId], references: [id])
   fullName                String
   source                  String // referral | website | social_media | campaign | tender | bank_partner | strategic_partner | ex_customer | renewal
@@ -836,9 +822,8 @@ model Lead {
 model Prospect {
   id                 String                   @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId     String                   @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String @default(dbgenerated())
   organization       Organization             @relation(fields: [organizationId], references: [id])
   leadId             String?                  @unique
   lead               Lead?                    @relation(fields: [leadId], references: [id])
@@ -882,9 +867,8 @@ enum CustomerStatus {
 model Customer {
   id                      String                   @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String                   @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization             @relation(fields: [organizationId], references: [id])
   prospectId              String?                  @unique
   prospect                Prospect?                @relation(fields: [prospectId], references: [id])
@@ -963,9 +947,8 @@ model Customer {
 model UltimateBeneficialOwner {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   customerId            String
   customer              Customer     @relation(fields: [customerId], references: [id])
@@ -994,9 +977,8 @@ model UltimateBeneficialOwner {
 model InsuredPerson {
   id             String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization       @relation(fields: [organizationId], references: [id])
   customerId     String // the contracting Customer this person is covered under
   customer       Customer           @relation(fields: [customerId], references: [id])
@@ -1037,9 +1019,8 @@ enum KycStatus {
 model KYCRecord {
   id               String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization @relation(fields: [organizationId], references: [id])
   customerId       String
   customer         Customer     @relation(fields: [customerId], references: [id])
@@ -1114,9 +1095,8 @@ enum ScreeningOutcome {
 model ScreeningResult {
   id                      String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String           @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization     @relation(fields: [organizationId], references: [id])
   kycRecordId             String
   kycRecord               KYCRecord        @relation(fields: [kycRecordId], references: [id])
@@ -1152,9 +1132,8 @@ model ScreeningResult {
 model ScreeningRequest {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   kycRecordId    String
   kycRecord      KYCRecord    @relation(fields: [kycRecordId], references: [id])
@@ -1227,9 +1206,8 @@ enum RiskLevel {
 model RiskRating {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   kycRecordId    String       @unique
   kycRecord      KYCRecord    @relation(fields: [kycRecordId], references: [id])
@@ -1260,9 +1238,8 @@ enum InteractionChannel {
 model Interaction {
   id             String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization       @relation(fields: [organizationId], references: [id])
   customerId     String
   customer       Customer           @relation(fields: [customerId], references: [id])
@@ -1308,9 +1285,8 @@ enum CrossSellStatus {
 model CrossSellOpportunity {
   id               String          @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String          @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization    @relation(fields: [organizationId], references: [id])
   customerId       String
   customer         Customer        @relation(fields: [customerId], references: [id])
@@ -1366,9 +1342,8 @@ enum UpSellStatus {
 model UpSellRecommendation {
   id                String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization @relation(fields: [organizationId], references: [id])
   customerId        String
   customer          Customer     @relation(fields: [customerId], references: [id])
@@ -1401,9 +1376,8 @@ model UpSellRecommendation {
 model RiskProfile {
   id                        String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId            String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String @default(dbgenerated())
   organization              Organization @relation(fields: [organizationId], references: [id])
   customerId                String
   customer                  Customer     @relation(fields: [customerId], references: [id])
@@ -1424,9 +1398,8 @@ model RiskProfile {
 model Asset {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   riskProfileId         String
   riskProfile           RiskProfile  @relation(fields: [riskProfileId], references: [id])
@@ -1463,9 +1436,8 @@ enum NeedsAssessmentStatus {
 model NeedsAssessment {
   id                       String                @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId           String                @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String @default(dbgenerated())
   organization             Organization          @relation(fields: [organizationId], references: [id])
   riskProfileId            String
   riskProfile              RiskProfile           @relation(fields: [riskProfileId], references: [id])
@@ -1502,9 +1474,8 @@ enum InsuranceProgramStatus {
 model InsuranceProgram {
   id                String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String                 @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization           @relation(fields: [organizationId], references: [id])
   riskProfileId     String
   riskProfile       RiskProfile            @relation(fields: [riskProfileId], references: [id])
@@ -1530,9 +1501,8 @@ model InsuranceProgram {
 model InsuranceProgramLine {
   id                 String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId     String           @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String @default(dbgenerated())
   organization       Organization     @relation(fields: [organizationId], references: [id])
   insuranceProgramId String
   insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
@@ -1565,9 +1535,8 @@ enum OpportunityStatus {
 model Opportunity {
   id                     String            @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId         String            @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId         String @default(dbgenerated())
   organization           Organization      @relation(fields: [organizationId], references: [id])
   customerId             String
   customer               Customer          @relation(fields: [customerId], references: [id])
@@ -1605,9 +1574,8 @@ model Opportunity {
 model RFQ {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   opportunityId         String
   opportunity           Opportunity  @relation(fields: [opportunityId], references: [id])
@@ -1643,9 +1611,8 @@ enum RfqInsurerStatus {
 model RFQInsurer {
   id                  String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String           @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization     @relation(fields: [organizationId], references: [id])
   rfqId               String
   rfq                 RFQ              @relation(fields: [rfqId], references: [id])
@@ -1696,9 +1663,8 @@ model RFQInsurer {
 model Quotation {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   rfqId                 String
   rfq                   RFQ          @relation(fields: [rfqId], references: [id])
@@ -1754,9 +1720,8 @@ model Quotation {
 model ComparisonMatrix {
   id              String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId  String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String @default(dbgenerated())
   organization    Organization @relation(fields: [organizationId], references: [id])
   rfqId           String       @unique
   rfq             RFQ          @relation(fields: [rfqId], references: [id])
@@ -1775,9 +1740,8 @@ model ComparisonMatrix {
 model ComparisonMatrixRow {
   id                  String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String           @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization     @relation(fields: [organizationId], references: [id])
   comparisonMatrixId  String
   comparisonMatrix    ComparisonMatrix @relation(fields: [comparisonMatrixId], references: [id])
@@ -1829,9 +1793,8 @@ model ComparisonMatrixRow {
 model Recommendation {
   id                        String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId            String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String @default(dbgenerated())
   organization              Organization @relation(fields: [organizationId], references: [id])
   opportunityId             String       @unique
   opportunity               Opportunity  @relation(fields: [opportunityId], references: [id])
@@ -1870,9 +1833,8 @@ model Recommendation {
 model ConflictOfInterestDisclosure {
   id                          String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId              String         @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId              String @default(dbgenerated())
   organization                Organization   @relation(fields: [organizationId], references: [id])
   recommendationId            String         @unique
   recommendation              Recommendation @relation(fields: [recommendationId], references: [id])
@@ -1909,9 +1871,8 @@ enum ClientDecisionType {
 model ClientDecision {
   id               String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization       @relation(fields: [organizationId], references: [id])
   opportunityId    String             @unique
   opportunity      Opportunity        @relation(fields: [opportunityId], references: [id])
@@ -1952,9 +1913,8 @@ enum PolicyStatus {
 model Policy {
   id               String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization @relation(fields: [organizationId], references: [id])
   opportunityId    String       @unique
   opportunity      Opportunity  @relation(fields: [opportunityId], references: [id])
@@ -2019,9 +1979,8 @@ model Policy {
 model PolicySchedule {
   id                  String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization @relation(fields: [organizationId], references: [id])
   policyId            String
   policy              Policy       @relation(fields: [policyId], references: [id])
@@ -2044,9 +2003,8 @@ model PolicySchedule {
 model CoverNote {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   policyId       String       @unique
   policy         Policy       @relation(fields: [policyId], references: [id])
@@ -2062,9 +2020,8 @@ model CoverNote {
 model PolicyChecking {
   id                             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                 String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                 String @default(dbgenerated())
   organization                   Organization @relation(fields: [organizationId], references: [id])
   policyId                       String       @unique
   policy                         Policy       @relation(fields: [policyId], references: [id])
@@ -2086,9 +2043,8 @@ model PolicyChecking {
 model DeliveryRecord {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   policyId              String       @unique
   policy                Policy       @relation(fields: [policyId], references: [id])
@@ -2129,9 +2085,8 @@ enum EndorsementStatus {
 model Endorsement {
   id                              String            @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                  String            @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                  String @default(dbgenerated())
   organization                    Organization      @relation(fields: [organizationId], references: [id])
   policyId                        String
   policy                          Policy            @relation(fields: [policyId], references: [id])
@@ -2170,9 +2125,8 @@ model Endorsement {
 model Cancellation {
   id               String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization @relation(fields: [organizationId], references: [id])
   endorsementId    String       @unique
   endorsement      Endorsement  @relation(fields: [endorsementId], references: [id])
@@ -2190,9 +2144,8 @@ model Cancellation {
 model Refund {
   id                           String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId               String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId               String @default(dbgenerated())
   organization                 Organization @relation(fields: [organizationId], references: [id])
   endorsementId                String       @unique
   endorsement                  Endorsement  @relation(fields: [endorsementId], references: [id])
@@ -2212,9 +2165,8 @@ model Refund {
 model CommissionReversal {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   endorsementId  String       @unique
   endorsement    Endorsement  @relation(fields: [endorsementId], references: [id])
@@ -2246,9 +2198,8 @@ enum ClaimStatus {
 model Claim {
   id                         String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId             String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId             String @default(dbgenerated())
   organization               Organization       @relation(fields: [organizationId], references: [id])
   policyId                   String
   policy                     Policy             @relation("ClaimPolicy", fields: [policyId], references: [id])
@@ -2293,9 +2244,8 @@ model Claim {
 model ClaimDocument {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   claimId        String
   claim          Claim        @relation(fields: [claimId], references: [id])
@@ -2320,9 +2270,8 @@ model ClaimDocument {
 model ClaimStatusHistory {
   id              String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId  String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String @default(dbgenerated())
   organization    Organization @relation(fields: [organizationId], references: [id])
   claimId         String
   claim           Claim        @relation(fields: [claimId], references: [id])
@@ -2349,9 +2298,8 @@ model ClaimStatusHistory {
 model Settlement {
   id                       String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId           String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String @default(dbgenerated())
   organization             Organization @relation(fields: [organizationId], references: [id])
   claimId                  String       @unique
   claim                    Claim        @relation(fields: [claimId], references: [id])
@@ -2376,9 +2324,8 @@ model Settlement {
 model ThirdPartyClaimant {
   id                      String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization @relation(fields: [organizationId], references: [id])
   claimId                 String       @unique
   claim                   Claim        @relation(fields: [claimId], references: [id])
@@ -2394,9 +2341,8 @@ model ThirdPartyClaimant {
 model Adjuster {
   id                       String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId           String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String @default(dbgenerated())
   organization             Organization @relation(fields: [organizationId], references: [id])
   claimId                  String       @unique
   claim                    Claim        @relation(fields: [claimId], references: [id])
@@ -2424,9 +2370,8 @@ model Adjuster {
 model ClaimFollowUpAlert {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   claimId        String
   claim          Claim        @relation(fields: [claimId], references: [id])
@@ -2458,9 +2403,8 @@ enum InvoiceStatus {
 model PremiumTransaction {
   id                   String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId       String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String @default(dbgenerated())
   organization         Organization @relation(fields: [organizationId], references: [id])
   policyId             String
   policy               Policy       @relation(fields: [policyId], references: [id])
@@ -2494,9 +2438,8 @@ model PremiumTransaction {
 model Invoice {
   id                 String        @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId     String        @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String @default(dbgenerated())
   organization       Organization  @relation(fields: [organizationId], references: [id])
   policyId           String?
   policy             Policy?       @relation(fields: [policyId], references: [id])
@@ -2554,9 +2497,8 @@ model Invoice {
 model Receipt {
   id               String          @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String          @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization    @relation(fields: [organizationId], references: [id])
   invoiceId        String
   invoice          Invoice         @relation(fields: [invoiceId], references: [id])
@@ -2591,9 +2533,8 @@ model Receipt {
 model Remittance {
   id               String          @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String          @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization    @relation(fields: [organizationId], references: [id])
   receiptId        String          @unique
   receipt          Receipt         @relation(fields: [receiptId], references: [id])
@@ -2622,9 +2563,8 @@ model Remittance {
 model PaymentChannel {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   ownerType      String // customer | insurer
   customerId     String?
@@ -2667,9 +2607,8 @@ model PaymentChannel {
 model CommissionAgreement {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   insurerId      String
   insurer        Insurer      @relation(fields: [insurerId], references: [id])
@@ -2711,9 +2650,8 @@ model CommissionAgreement {
 model CommissionLedgerEntry {
   id                        String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId            String               @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String @default(dbgenerated())
   organization              Organization         @relation(fields: [organizationId], references: [id])
   policyId                  String
   policy                    Policy               @relation(fields: [policyId], references: [id])
@@ -2772,9 +2710,8 @@ model CommissionLedgerEntry {
 model ReconciliationException {
   id                     String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId         String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId         String @default(dbgenerated())
   organization           Organization @relation(fields: [organizationId], references: [id])
   invoiceId              String?
   invoice                Invoice?     @relation(fields: [invoiceId], references: [id])
@@ -2801,9 +2738,8 @@ model ReconciliationException {
 model ClientFundsLedgerEntry {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   customerId     String
   customer       Customer     @relation(fields: [customerId], references: [id])
@@ -2834,9 +2770,8 @@ model ClientFundsLedgerEntry {
 model ServiceRequest {
   id                String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization @relation(fields: [organizationId], references: [id])
   customerId        String
   customer          Customer     @relation(fields: [customerId], references: [id])
@@ -2890,9 +2825,8 @@ enum ComplaintStatus {
 model Complaint {
   id                        String          @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId            String          @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String @default(dbgenerated())
   organization              Organization    @relation(fields: [organizationId], references: [id])
   customerId                String
   customer                  Customer        @relation(fields: [customerId], references: [id])
@@ -2930,9 +2864,8 @@ model Complaint {
 model ComplaintAction {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   complaintId    String
   complaint      Complaint    @relation(fields: [complaintId], references: [id])
@@ -2951,9 +2884,8 @@ model ComplaintAction {
 model EscalationRecord {
   id                String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization @relation(fields: [organizationId], references: [id])
   complaintId       String
   complaint         Complaint    @relation(fields: [complaintId], references: [id])
@@ -3000,9 +2932,8 @@ enum CommunicationDirection {
 model CommunicationLog {
   id               String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String                 @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization           @relation(fields: [organizationId], references: [id])
   customerId       String?
   channel          InteractionChannel
@@ -3040,9 +2971,8 @@ model CommunicationLog {
 model CustomerFeedback {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   customerId     String
   customer       Customer     @relation(fields: [customerId], references: [id])
@@ -3058,9 +2988,8 @@ model CustomerFeedback {
 model RetentionCase {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   customerId     String
   customer       Customer     @relation(fields: [customerId], references: [id])
@@ -3092,9 +3021,8 @@ enum RenewalStatus {
 model RenewalCase {
   id                          String        @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId              String        @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId              String @default(dbgenerated())
   organization                Organization  @relation(fields: [organizationId], references: [id])
   policyId                    String        @unique
   policy                      Policy        @relation(fields: [policyId], references: [id])
@@ -3118,9 +3046,8 @@ model RenewalCase {
 model LossRatio {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   renewalCaseId  String       @unique
   renewalCase    RenewalCase  @relation(fields: [renewalCaseId], references: [id])
@@ -3135,9 +3062,8 @@ model LossRatio {
 model RenewalRecommendation {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   renewalCaseId  String       @unique
   renewalCase    RenewalCase  @relation(fields: [renewalCaseId], references: [id])
@@ -3155,9 +3081,8 @@ model RenewalRecommendation {
 model BrokerLicense {
   id                   String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId       String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String @default(dbgenerated())
   organization         Organization @relation(fields: [organizationId], references: [id])
   licenseNumber        String
   scopeOfAuthorization String?
@@ -3173,9 +3098,8 @@ model BrokerLicense {
 model ProfessionalIndemnityPolicy {
   id                   String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId       String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String @default(dbgenerated())
   organization         Organization @relation(fields: [organizationId], references: [id])
   insurerName          String
   coverageLimit        Decimal      @db.Decimal(18, 3)
@@ -3192,9 +3116,8 @@ model ProfessionalIndemnityPolicy {
 model ProfessionalIndemnityRiskEvent {
   id                     String                       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId         String                       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId         String @default(dbgenerated())
   organization           Organization                 @relation(fields: [organizationId], references: [id])
   piPolicyId             String?
   piPolicy               ProfessionalIndemnityPolicy? @relation(fields: [piPolicyId], references: [id])
@@ -3230,9 +3153,8 @@ model ProfessionalIndemnityRiskEvent {
 model TransactionMonitoringAlert {
   id                            String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                String @default(dbgenerated())
   organization                  Organization       @relation(fields: [organizationId], references: [id])
   customerId                    String?
   customer                      Customer?          @relation(fields: [customerId], references: [id])
@@ -3366,9 +3288,8 @@ model WatchlistEntry {
 model ScreeningMatch {
   id                  String          @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String          @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization    @relation(fields: [organizationId], references: [id])
   kycRecordId         String
   kycRecord           KYCRecord       @relation(fields: [kycRecordId], references: [id])
@@ -3493,9 +3414,8 @@ model ScreeningMatch {
 model ScreeningCaseNote {
   id               String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String         @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization   @relation(fields: [organizationId], references: [id])
   screeningMatchId String
   screeningMatch   ScreeningMatch @relation(fields: [screeningMatchId], references: [id], onDelete: Cascade)
@@ -3540,9 +3460,8 @@ model WatchlistSyncRun {
 model ComplianceCalendarItem {
   id                      String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization @relation(fields: [organizationId], references: [id])
   obligationName          String
   ownerUserId             String
@@ -3564,9 +3483,8 @@ model ComplianceCalendarItem {
 model RiskRegisterItem {
   id               String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId   String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String @default(dbgenerated())
   organization     Organization @relation(fields: [organizationId], references: [id])
   riskType         String // operational | cyber | financial | compliance | reputational
   description      String
@@ -3582,9 +3500,8 @@ model RiskRegisterItem {
 model InternalAuditFinding {
   id                String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization @relation(fields: [organizationId], references: [id])
   auditPeriodLabel  String
   finding           String
@@ -3605,9 +3522,8 @@ model InternalAuditFinding {
 model InformationAsset {
   id             String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization       @relation(fields: [organizationId], references: [id])
   name           String
   assetType      String // customer_data | policy_data | document_store | backup | integration | other
@@ -3645,9 +3561,8 @@ enum IncidentClassification {
 model IncidentReport {
   id                             String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                 String                 @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                 String @default(dbgenerated())
   organization                   Organization           @relation(fields: [organizationId], references: [id])
   title                          String
   description                    String
@@ -3696,9 +3611,8 @@ enum ConsentPurpose {
 model ConsentRecord {
   id                 String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId     String         @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String @default(dbgenerated())
   organization       Organization   @relation(fields: [organizationId], references: [id])
   customerId         String?
   customer           Customer?      @relation(fields: [customerId], references: [id])
@@ -3750,9 +3664,8 @@ enum DsrStatus {
 model DataSubjectRequest {
   id                             String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                 String         @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                 String @default(dbgenerated())
   organization                   Organization   @relation(fields: [organizationId], references: [id])
   customerId                     String?
   customer                       Customer?      @relation("DsrCustomer", fields: [customerId], references: [id])
@@ -3806,9 +3719,8 @@ model DataSubjectRequest {
 model RetentionScheduleItem {
   id                        String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId            String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String @default(dbgenerated())
   organization              Organization @relation(fields: [organizationId], references: [id])
   /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
   /// the platform. A bare @unique here is not only a functional bug (two
@@ -3844,9 +3756,8 @@ model RetentionScheduleItem {
 model LegalHold {
   id                      String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String                 @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization           @relation(fields: [organizationId], references: [id])
   scope                   String // description / entity reference under hold
   reason                  String
@@ -3881,9 +3792,8 @@ enum DisposalBatchStatus {
 model DisposalBatch {
   id                      String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String                 @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization           @relation(fields: [organizationId], references: [id])
   retentionScheduleItemId String?
   retentionScheduleItem   RetentionScheduleItem? @relation(fields: [retentionScheduleItemId], references: [id])
@@ -3908,9 +3818,8 @@ model DisposalBatch {
 model CertificateOfDestruction {
   id              String        @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId  String        @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String @default(dbgenerated())
   organization    Organization  @relation(fields: [organizationId], references: [id])
   disposalBatchId String        @unique
   disposalBatch   DisposalBatch @relation(fields: [disposalBatchId], references: [id])
@@ -3925,9 +3834,8 @@ model CertificateOfDestruction {
 model CrossBorderTransferRecord {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   description           String
   destinationCountry    String
@@ -3946,9 +3854,8 @@ model CrossBorderTransferRecord {
 model Vendor {
   id                               String                   @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId                   String                   @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                   String @default(dbgenerated())
   organization                     Organization             @relation(fields: [organizationId], references: [id])
   name                             String
   vendorType                       String // insurer | reinsurer | loss_adjuster | it_cloud | printing_archiving | marketing_call_centre | other
@@ -3972,9 +3879,8 @@ model Vendor {
 model DataProcessingAgreement {
   id                  String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization @relation(fields: [organizationId], references: [id])
   vendorId            String
   vendor              Vendor       @relation(fields: [vendorId], references: [id])
@@ -4012,9 +3918,8 @@ enum DataSharingChannel {
 model DataSharingApproval {
   id                  String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization       @relation(fields: [organizationId], references: [id])
   vendorId            String?
   vendor              Vendor?            @relation(fields: [vendorId], references: [id])
@@ -4044,9 +3949,8 @@ enum DpiaOutcome {
 model DpiaScreening {
   id                       String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId           String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String @default(dbgenerated())
   organization             Organization @relation(fields: [organizationId], references: [id])
   subjectDescription       String // the product/system/campaign/vendor integration being screened
   qSensitiveData           Boolean
@@ -4073,9 +3977,8 @@ model DpiaScreening {
 model PrivacyNotice {
   id                String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId    String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String @default(dbgenerated())
   organization      Organization @relation(fields: [organizationId], references: [id])
   touchpoint        String // lead_capture | onboarding_kyc | needs_risk_assessment | rfq_market_placement | claims | group_medical_life_motor_fleet | renewal_cross_sell
   versionNumber     Int          @default(1)
@@ -4092,9 +3995,8 @@ model PrivacyNotice {
 model RopaEntry {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   processingActivity    String
   categoriesOfData      String[]
@@ -4127,9 +4029,8 @@ model RopaEntry {
 model SalesTarget {
   id                 String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId     String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String @default(dbgenerated())
   organization       Organization @relation(fields: [organizationId], references: [id])
   ownerUserId        String?
   branchId           String?
@@ -4161,9 +4062,8 @@ model SalesTarget {
 model InsurerPerformanceScore {
   id                  String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId      String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String @default(dbgenerated())
   organization        Organization @relation(fields: [organizationId], references: [id])
   insurerId           String
   insurer             Insurer      @relation(fields: [insurerId], references: [id])
@@ -4198,9 +4098,8 @@ model InsurerPerformanceScore {
 model EmployeePerformanceRecord {
   id                   String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId       String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String @default(dbgenerated())
   organization         Organization @relation(fields: [organizationId], references: [id])
   employeeId           String
   employee             Employee     @relation(fields: [employeeId], references: [id])
@@ -4225,9 +4124,8 @@ model EmployeePerformanceRecord {
 model BcpDrPlan {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   scenario       String // system_outage | office_site_loss | cyberattack_ransomware | key_staff_unavailability | insurer_service_interruption
   planDocumentId String?
@@ -4244,9 +4142,8 @@ model BcpDrPlan {
 model KnowledgeBaseArticle {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   title          String
   titleAr        String?
@@ -4264,9 +4161,8 @@ model KnowledgeBaseArticle {
 model DocumentTemplate {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   templateType   String // quotation_comparison | recommendation_report | policy_schedule_summary | invoice | certificate | complaint_acknowledgement | notification
   nameEn         String
@@ -4290,9 +4186,8 @@ model DocumentTemplate {
 model Insurer {
   id                      String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization @relation(fields: [organizationId], references: [id])
   name                    String
   nameAr                  String?
@@ -4322,9 +4217,8 @@ model Insurer {
 model InsurerProduct {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   insurerId      String
   insurer        Insurer      @relation(fields: [insurerId], references: [id])
@@ -4341,9 +4235,8 @@ model InsurerProduct {
 model InsurerSlaAgreement {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   insurerId      String
   insurer        Insurer      @relation(fields: [insurerId], references: [id])
@@ -4382,9 +4275,8 @@ enum DocumentCategory {
 model Document {
   id                       String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId           String             @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String @default(dbgenerated())
   organization             Organization       @relation(fields: [organizationId], references: [id])
   policyId                 String?
   policy                   Policy?            @relation("PolicyDocuments", fields: [policyId], references: [id])
@@ -4425,9 +4317,8 @@ model Document {
 model AuditLogEntry {
   id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId        String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String @default(dbgenerated())
   organization          Organization @relation(fields: [organizationId], references: [id])
   userId                String
   user                  User         @relation("AuditLogUser", fields: [userId], references: [id])
@@ -4459,9 +4350,8 @@ enum AccessAnomalyPatternType {
 model AccessAnomalyAlert {
   id                      String                   @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId          String                   @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String @default(dbgenerated())
   organization            Organization             @relation(fields: [organizationId], references: [id])
   userId                  String
   user                    User                     @relation("AccessAnomalyAlertUser", fields: [userId], references: [id])
@@ -4548,9 +4438,8 @@ enum SlaPolicyStatus {
 model SlaPolicy {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   /// Stable human-facing identifier, e.g. "SLA-DSR-ACCESS". Quoted in
   /// governance documents, so it must not change when the duration does.
@@ -4618,9 +4507,8 @@ model SlaPolicy {
 model SlaPolicyEscalation {
   id             String          @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String          @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization    @relation(fields: [organizationId], references: [id])
   slaPolicyId    String
   slaPolicy      SlaPolicy       @relation(fields: [slaPolicyId], references: [id], onDelete: Cascade)
@@ -4647,9 +4535,8 @@ model SlaPolicyEscalation {
 model SlaHoliday {
   id              String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId  String           @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String @default(dbgenerated())
   organization    Organization     @relation(fields: [organizationId], references: [id])
   observedOn      DateTime         @db.Date
   name            String
@@ -4675,9 +4562,8 @@ model SlaHoliday {
 model SlaTimer {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   entityType     String // polymorphic: "DataSubjectRequest" | "Complaint" | "ClaimFollowUpAlert" | ...
   entityId       String
@@ -4736,9 +4622,8 @@ model SlaTimer {
 model ScreeningHoldRelease {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
-  /// row belongs to. See the Organization model for why this carries a
-  /// temporary @default.
-  organizationId String       @default("00000000-0000-0000-0000-000000000001")
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String @default(dbgenerated())
   organization   Organization @relation(fields: [organizationId], references: [id])
   kycRecordId    String
   kycRecord      KYCRecord    @relation(fields: [kycRecordId], references: [id])

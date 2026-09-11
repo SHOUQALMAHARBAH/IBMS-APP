@@ -1,13 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { CrossSellOpportunityRepository } from '../../repositories/cross-sell-opportunity.repository';
-import { UserRepository } from '../../repositories/user.repository';
 import { CrossSellService } from './cross-sell.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as ScreeningBatchScheduler / KycPeriodicReviewScheduler /
-// AccessRecertificationScheduler.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 8 — "Automated job comparing a customer's active policies against
@@ -33,21 +28,27 @@ export class CrossSellDetectionScheduler {
 
   constructor(
     private readonly opportunities: CrossSellOpportunityRepository,
-    private readonly users: UserRepository,
     private readonly crossSell: CrossSellService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 04:00 UTC daily.
   @Cron('0 4 * * *', { name: 'cross-sell-gap-detection-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Cross-sell gap-detection sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Cross-sell gap-detection sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     let customerIds: string[];
     try {
       customerIds = await this.opportunities.findCustomerIdsWithInForcePolicy();
@@ -68,7 +69,7 @@ export class CrossSellDetectionScheduler {
       try {
         const { newlyFlagged } = await this.crossSell.runDetection(
           customerId,
-          systemUser.id,
+          systemUserId,
         );
         if (newlyFlagged.length > 0) {
           customersWithNewGaps += 1;

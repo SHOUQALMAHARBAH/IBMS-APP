@@ -1,12 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import { InsurerPerformanceService } from './insurer-performance.service';
 import { previousUtcMonthRange } from './insurer-performance.config';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as the other schedulers (e.g. UpSellDetectionScheduler).
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 60 — "a periodic job computing the score from quote-response
@@ -22,24 +18,30 @@ export class InsurerPerformanceScheduler {
   private readonly logger = new Logger(InsurerPerformanceScheduler.name);
 
   constructor(
-    private readonly users: UserRepository,
     private readonly performance: InsurerPerformanceService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 06:00 UTC on the 1st of every month.
   @Cron('0 6 1 * *', { name: 'insurer-performance-monthly' })
   async runMonthlyCompute(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Insurer performance monthly compute skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Insurer-performance scoring sweep',
+      this.logger,
+      (systemUserId) => this.computeForOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async computeForOrganization(systemUserId: string): Promise<void> {
     const period = previousUtcMonthRange(new Date());
     try {
-      await this.performance.computeScores(period, systemUser.id);
+      await this.performance.computeScores(period, systemUserId);
     } catch (err) {
       this.logger.error(
         `Insurer performance monthly compute (${period.periodLabel}) failed: ${(err as Error).message}`,

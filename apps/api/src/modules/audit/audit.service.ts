@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuditAction, AuditLogEntry, Prisma } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { TenantTransactionClient } from '../../prisma/tenant-scope.extension';
 import { AuditAnomalyDetectionService } from './audit-anomaly-detection.service';
 
 export interface RecordAuditEntryInput {
@@ -57,7 +58,7 @@ export class AuditService {
    * call `runAnomalyDetection` yourself once your `$transaction` resolves.
    */
   async recordInTransaction(
-    tx: Prisma.TransactionClient,
+    tx: TenantTransactionClient,
     input: RecordAuditEntryInput,
   ): Promise<AuditLogEntry> {
     return tx.auditLogEntry.create({

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { SlaTimerService } from './sla-timer.service';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /** Backlog A.8 — "a scheduled job that checks due timers frequently and
  * escalates" (ibms-brain/meta/lex/pdpl-sla-timers.md). Every 15 minutes is
@@ -13,10 +14,26 @@ import { SlaTimerService } from './sla-timer.service';
 export class SlaTimerScheduler {
   private readonly logger = new Logger(SlaTimerScheduler.name);
 
-  constructor(private readonly slaTimer: SlaTimerService) {}
+  constructor(
+    private readonly slaTimer: SlaTimerService,
+    private readonly perOrganization: PerOrganizationRunner,
+  ) {}
 
   @Cron('*/15 * * * *', { name: 'sla-timer-escalation-sweep' })
   async runSweep(): Promise<void> {
+    await this.perOrganization.forEach(
+      'SLA timer escalation sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
+
+  /**
+   * One Organization's SLA clock. Multi-tenancy Phase 2 (step 7) — an office's
+   * overdue timers escalate to that office's own people, attributed to that
+   * office's own service account.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     // BREACHES ARE RECORDED FIRST, and separately from escalation.
     //
     // They are different facts: escalation fires on the RAW `dueAt` and
@@ -34,7 +51,7 @@ export class SlaTimerScheduler {
     }
 
     try {
-      const escalated = await this.slaTimer.runEscalationSweep();
+      const escalated = await this.slaTimer.runEscalationSweep(systemUserId);
       if (escalated.length > 0) {
         this.logger.log(
           `Escalated ${escalated.length} overdue SLA timer(s): ${escalated

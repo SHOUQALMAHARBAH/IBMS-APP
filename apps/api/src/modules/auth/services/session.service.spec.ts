@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { OrgContextService } from '../../../common/org-context/org-context.service';
 import type { SecurityConfig, User, UserSession } from '@ibms/db';
 import { SessionService } from './session.service';
 import {
@@ -100,13 +101,19 @@ function buildService(
 
   // SessionService's constructor types expect the full repository/service
   // classes — the mocks above cover every method it actually calls.
+  // A real OrgContextService, not a mock: `validateAndTouch` now establishes
+  // the Organization itself (unscoped session lookup -> adopt), and a stub
+  // would hide whether it actually does.
+  const orgContext = new OrgContextService();
+
   const service = new SessionService(
     sessions as never,
     users as never,
     securityConfig as never,
     audit as never,
+    orgContext,
   );
-  return { service, sessions, users, securityConfig, audit };
+  return { service, sessions, users, securityConfig, audit, orgContext };
 }
 
 describe('SessionService.validateAndTouch', () => {
@@ -115,6 +122,10 @@ describe('SessionService.validateAndTouch', () => {
     const result = await service.validateAndTouch('user-1', 'session-1');
     expect(result).toEqual({
       id: 'user-1',
+      // Multi-tenancy Phase 2 — the Organization every query made on this
+      // caller's behalf is scoped to. Read off the User row this method
+      // already loads, so it costs no extra query.
+      organizationId: 'org-1',
       email: 'test@ibms.test',
       roles: [],
       sessionId: 'session-1',

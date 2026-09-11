@@ -8,22 +8,41 @@ export class UserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Multi-tenancy Phase 1 — `findFirst`, not `findUnique`.
+   * Multi-tenancy Phase 2 — the real unique read Phase 1 owed.
    *
-   * `User.email` is no longer globally unique: the constraint is now
-   * `@@unique([organizationId, email])` (spec §3.2/§4.1.3), because two
-   * brokerage offices may legitimately hold the same address. `findUnique`
-   * cannot express "by email alone" against a compound key, so this reads the
-   * first match instead.
-   *
-   * That is exactly equivalent today — Phase 1 seats exactly one Organization,
-   * so at most one row can match. It stops being equivalent the moment a
-   * second Organization exists: PHASE 2 MUST give this method the caller's
-   * resolved `organizationId` and go back to a real unique read
-   * (`findUnique({ where: { organizationId_email: { organizationId, email } } })`).
-   * Until then, login resolves no org, so there is none to pass.
+   * `User.email` is unique per Organization, not globally
+   * (`@@unique([organizationId, email])`, spec §3.2/§4.1.3), so this addresses
+   * the compound key directly instead of Phase 1's stopgap `findFirst`.
+   * Everything that already knows its Organization uses this — authenticated
+   * requests, and the schedulers, which resolve their own service account once
+   * per Organization they sweep.
    */
-  findByEmail(email: string): Promise<User | null> {
+  findByEmailInOrganization(
+    organizationId: string,
+    email: string,
+  ): Promise<User | null> {
+    return this.prisma.client.user.findUnique({
+      where: { organizationId_email: { organizationId, email } },
+    });
+  }
+
+  /**
+   * The login/signup/password-reset path ONLY — deliberately searches across
+   * every Organization, and is named so that its unscoped-ness is visible at
+   * the call site rather than hidden behind an innocuous `findByEmail`.
+   *
+   * It has to work this way in Phase 2: the caller is anonymous, so their
+   * Organization is precisely what this lookup is trying to establish. Callers
+   * must therefore run it inside `runUnscoped('auth-bootstrap')` and `adopt()`
+   * the resulting user's org immediately, so only the lookup is unscoped and
+   * everything after it is not.
+   *
+   * PHASE 4 removes the need for it: once `GET /orgs/resolve` resolves the
+   * Organization from the subdomain BEFORE the login form is shown (§4.10),
+   * login will know its org up front and can use
+   * `findByEmailInOrganization()` like everything else.
+   */
+  findByEmailAcrossOrganizations(email: string): Promise<User | null> {
     return this.prisma.client.user.findFirst({ where: { email } });
   }
 

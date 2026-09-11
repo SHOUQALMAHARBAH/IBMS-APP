@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { OrgContextService } from '../../../common/org-context/org-context.service';
 import type { RoleName } from '@ibms/db';
 import { UserSessionRepository } from '../../../repositories/user-session.repository';
 import { UserRepository } from '../../../repositories/user.repository';
@@ -18,6 +19,7 @@ export class SessionService {
     private readonly users: UserRepository,
     private readonly securityConfig: SecurityConfigService,
     private readonly audit: AuditService,
+    private readonly orgContext: OrgContextService,
   ) {}
 
   async create(params: {
@@ -43,10 +45,31 @@ export class SessionService {
     userId: string,
     sessionId: string,
   ): Promise<AuthenticatedUser> {
-    const session = await this.sessions.findById(sessionId);
+    // Multi-tenancy Phase 2 (step 7) — this method is where an anonymous
+    // request becomes an Organization's request, so it owns its own scoping
+    // rather than being wrapped wholesale by the caller.
+    //
+    // EXACTLY ONE read is unscoped: resolving the session by its id. That is
+    // unavoidable — it is the lookup that establishes which Organization the
+    // caller belongs to. Everything after it, including the audit writes
+    // below, runs scoped.
+    //
+    // An earlier version wrapped this whole method in the bypass instead. That
+    // was wrong in a way the e2e suite caught: the ACCESS_WINDOW_EXPIRED audit
+    // row was then written with no Organization, hit the column's NOT NULL and
+    // surfaced as a 500 where the caller expected a 401. A bypass must cover
+    // the reads that identify the caller, never the writes that follow.
+    const session = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.sessions.findById(sessionId),
+    );
     if (!session || session.userId !== userId || session.revokedAt) {
       throw new SessionRevokedException();
     }
+
+    // The session row carries its own Organization, so the caller's org is
+    // known from here on — and the user lookup below is now scoped by it,
+    // which means a token can never resolve a user in another Organization.
+    this.orgContext.adopt(session.organizationId);
 
     const user = await this.users.findById(userId);
     if (!user || !user.isActive) {
@@ -74,7 +97,13 @@ export class SessionService {
 
     await this.sessions.touchActivity(sessionId);
     const roles = await this.users.getRoleNames(userId);
-    return { id: user.id, email: user.email, roles, sessionId };
+    return {
+      id: user.id,
+      organizationId: user.organizationId,
+      email: user.email,
+      roles,
+      sessionId,
+    };
   }
 
   async heartbeat(sessionId: string, userId: string) {

@@ -27,6 +27,7 @@ function makePermissionsService(granted: string[]): PermissionsService {
 
 const user = (): AuthenticatedUser => ({
   id: 'u1',
+  organizationId: 'org-1',
   email: 'u1@ibms.test',
   roles: ['CLAIMS_OFFICER'],
   sessionId: 's1',

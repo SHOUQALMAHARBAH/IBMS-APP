@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from '@ibms/db';
+import { prisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';

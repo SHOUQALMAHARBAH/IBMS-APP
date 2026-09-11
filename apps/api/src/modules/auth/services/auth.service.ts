@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import type { RoleName, User } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
+import { OrganizationRepository } from '../../../repositories/organization.repository';
+import { OrgContextService } from '../../../common/org-context/org-context.service';
 import { RefreshTokenRepository } from '../../../repositories/refresh-token.repository';
 import { MfaCredentialRepository } from '../../../repositories/mfa-credential.repository';
 import { PasswordResetTokenRepository } from '../../../repositories/password-reset-token.repository';
@@ -69,13 +71,27 @@ export class AuthService {
     private readonly mfa: MfaService,
     private readonly sessions: SessionService,
     private readonly securityConfig: SecurityConfigService,
+    private readonly organizations: OrganizationRepository,
+    private readonly orgContext: OrgContextService,
   ) {}
 
   async signup(dto: SignupDto): Promise<{ id: string; email: string }> {
     const violations = this.passwords.validatePolicy(dto.password);
     if (violations.length > 0) throw new BadRequestException(violations);
 
-    const existing = await this.users.findByEmail(dto.email);
+    // Multi-tenancy Phase 2 — signup is the one anonymous path with no user to
+    // read an Organization from, so it resolves the platform's SOLE
+    // Organization and refuses if there is more than one. That refusal is the
+    // point: it makes onboarding a second office impossible until Phase 4
+    // resolves the org from the subdomain BEFORE the signup form (§4.10),
+    // rather than silently filing the new account under an arbitrary office.
+    const organizationId = await this.organizations.soleOrganizationIdOrThrow();
+    this.orgContext.adopt(organizationId);
+
+    const existing = await this.users.findByEmailInOrganization(
+      organizationId,
+      dto.email,
+    );
     if (existing)
       throw new ConflictException('An account with this email already exists');
 
@@ -93,8 +109,14 @@ export class AuthService {
     dto: LoginDto,
     meta: RequestMeta,
   ): Promise<{ mfaRequired: true; mfaChallengeToken: string } | IssuedSession> {
-    const user = await this.users.findByEmail(dto.email);
+    // Only the lookup is unscoped — working out which Organization this caller
+    // belongs to is exactly what it is for. Everything after `adopt()` (the
+    // failed-login counter, the session, the audit entry) is properly scoped.
+    const user = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.users.findByEmailAcrossOrganizations(dto.email),
+    );
     if (!user) throw new UnauthorizedException('Invalid email or password');
+    this.orgContext.adopt(user.organizationId);
 
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
       throw new ForbiddenException(
@@ -140,9 +162,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid MFA challenge');
     }
 
-    const user = await this.users.findById(payload.sub);
+    const user = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.users.findById(payload.sub),
+    );
     if (!user?.mfaEnabled)
       throw new UnauthorizedException('Invalid MFA challenge');
+    this.orgContext.adopt(user.organizationId);
     this.assertAccessWindowActive(user);
 
     const credential = await this.mfaCredentials.findActiveByUserAndType(
@@ -174,8 +199,19 @@ export class AuthService {
 
   async refresh(rawRefreshToken: string, meta: RequestMeta) {
     const tokenHash = this.tokens.hash(rawRefreshToken);
-    const stored = await this.refreshTokens.findByHash(tokenHash);
+    // A refresh token is a bearer secret: it is resolved by its value alone,
+    // at the point in the flow where the org context does not exist yet —
+    // spec §3.1's own reasoning for why these stay globally unique.
+    const stored = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.refreshTokens.findByHash(tokenHash),
+    );
     if (!stored) throw new UnauthorizedException('Invalid session');
+    const refreshingUser = await this.orgContext.runUnscoped(
+      'auth-bootstrap',
+      () => this.users.findById(stored.userId),
+    );
+    if (!refreshingUser) throw new UnauthorizedException('Invalid session');
+    this.orgContext.adopt(refreshingUser.organizationId);
 
     if (stored.revokedAt) {
       // A rotated-out refresh token was presented again — replay/theft
@@ -246,8 +282,11 @@ export class AuthService {
     dto: ForgotPasswordDto,
     ip: string | undefined,
   ): Promise<{ devResetToken?: string }> {
-    const user = await this.users.findByEmail(dto.email);
+    const user = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.users.findByEmailAcrossOrganizations(dto.email),
+    );
     if (!user) return {};
+    this.orgContext.adopt(user.organizationId);
 
     const token = this.tokens.issueOpaqueSecret();
     const expiresAt = new Date(
@@ -282,12 +321,20 @@ export class AuthService {
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
-    const stored = await this.passwordResetTokens.findByHash(
-      this.tokens.hash(dto.token),
+    const stored = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.passwordResetTokens.findByHash(this.tokens.hash(dto.token)),
     );
     if (!stored || stored.usedAt || stored.expiresAt.getTime() < Date.now()) {
       throw new BadRequestException('Invalid or expired reset token');
     }
+    const resettingUser = await this.orgContext.runUnscoped(
+      'auth-bootstrap',
+      () => this.users.findById(stored.userId),
+    );
+    if (!resettingUser) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+    this.orgContext.adopt(resettingUser.organizationId);
     const violations = this.passwords.validatePolicy(dto.newPassword);
     if (violations.length > 0) throw new BadRequestException(violations);
 

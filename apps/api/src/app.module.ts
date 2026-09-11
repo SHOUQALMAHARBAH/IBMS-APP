@@ -1,9 +1,11 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggingModule } from './common/logging/logging.module';
+import { OrgContextModule } from './common/org-context/org-context.module';
+import { OrgContextMiddleware } from './common/org-context/org-context.middleware';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -62,6 +64,10 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
 
 @Module({
   imports: [
+    // Multi-tenancy Phase 2 (step 7). Global, and listed first because
+    // PrismaService itself depends on it — every tenant-scoped query is
+    // filtered by the Organization this module carries.
+    OrgContextModule,
     // In Docker/CI, real env vars are already in process.env and these files
     // simply won't exist — ConfigModule does not error when they're missing.
     ConfigModule.forRoot({
@@ -425,4 +431,20 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * Multi-tenancy Phase 2 (step 7) — opens an Organization context for EVERY
+   * route, with no exclusions.
+   *
+   * Deliberately not narrowed to authenticated routes: the store starts empty
+   * and only becomes an Organization once `JwtStrategy` resolves one, so
+   * applying it everywhere costs an anonymous route nothing while guaranteeing
+   * there is no route whose handler runs outside a context. A route list here
+   * would be one more thing to forget when adding a controller — the exact
+   * failure mode spec §8 warns about ("a missed table is a real isolation
+   * hole"), applied to routes.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(OrgContextMiddleware).forRoutes('*');
+  }
+}

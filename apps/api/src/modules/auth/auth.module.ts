@@ -16,6 +16,7 @@ import { MfaRequiredGuard } from './guards/mfa-required.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { StepUpGuard } from './guards/step-up.guard';
 import { UserRepository } from '../../repositories/user.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { RefreshTokenRepository } from '../../repositories/refresh-token.repository';
 import { UserSessionRepository } from '../../repositories/user-session.repository';
 import { MfaCredentialRepository } from '../../repositories/mfa-credential.repository';
@@ -34,6 +35,7 @@ import { SecurityConfigRepository } from '../../repositories/security-config.rep
     SecurityConfigService,
     JwtStrategy,
     UserRepository,
+    OrganizationRepository,
     RefreshTokenRepository,
     UserSessionRepository,
     MfaCredentialRepository,

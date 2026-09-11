@@ -349,15 +349,12 @@ describe('SlaTimerService.runEscalationSweep', () => {
     createdAt: new Date('2026-07-01T00:00:00.000Z'),
   };
 
-  it('returns [] and never looks up the system user when nothing is due', async () => {
-    const { service, findByEmail, updateMany } = makeDeps({
-      findManyResult: [],
-    });
+  it('returns [] and escalates nothing when nothing is due', async () => {
+    const { service, updateMany } = makeDeps({ findManyResult: [] });
 
-    const result = await service.runEscalationSweep();
+    const result = await service.runEscalationSweep('system-1');
 
     expect(result).toEqual([]);
-    expect(findByEmail).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
 
@@ -371,7 +368,7 @@ describe('SlaTimerService.runEscalationSweep', () => {
         updateManyCount: 1,
       });
 
-      const result = await service.runEscalationSweep();
+      const result = await service.runEscalationSweep('system-1');
 
       expect(result).toEqual([{ ...overdueTimer, escalatedAt: now }]);
       expect(updateMany).toHaveBeenCalledWith({
@@ -380,7 +377,7 @@ describe('SlaTimerService.runEscalationSweep', () => {
       });
       expect(record).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: 'system-user-1',
+          userId: 'system-1',
           action: 'SLA_ESCALATED',
           entityType: 'DisposalBatch',
           entityId: 'batch-1',
@@ -397,24 +394,17 @@ describe('SlaTimerService.runEscalationSweep', () => {
       updateManyCount: 0,
     });
 
-    const result = await service.runEscalationSweep();
+    const result = await service.runEscalationSweep('system-1');
 
     expect(result).toEqual([]);
     expect(record).not.toHaveBeenCalled();
   });
 
-  it('logs and escalates nothing when the system service account is missing', async () => {
-    const { service, updateMany, record } = makeDeps({
-      findManyResult: [overdueTimer],
-      systemUser: null,
-    });
-
-    const result = await service.runEscalationSweep();
-
-    expect(result).toEqual([]);
-    expect(updateMany).not.toHaveBeenCalled();
-    expect(record).not.toHaveBeenCalled();
-  });
+  // The "no system service account" case moved OUT of this service in
+  // multi-tenancy Phase 2: `PerOrganizationRunner` resolves each Organization's
+  // own account and skips that org before ever calling this method, so the
+  // service now simply receives an id. Covered by
+  // per-organization.runner.spec.ts.
 });
 
 describe('startTimer uses the CONFIGURED policy, not the registry constant', () => {

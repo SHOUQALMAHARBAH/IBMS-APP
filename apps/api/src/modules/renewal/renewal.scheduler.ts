@@ -1,12 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import { RenewalService } from './renewal.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as CrossSellDetectionScheduler / ClaimFollowUpScheduler /
-// AccessRecertificationScheduler.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Part 3.9 — "triggered automatically at a configurable lead time before
@@ -25,22 +20,28 @@ export class RenewalScheduler {
   private readonly logger = new Logger(RenewalScheduler.name);
 
   constructor(
-    private readonly users: UserRepository,
     private readonly renewal: RenewalService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   @Cron('0 5 * * *', { name: 'renewal-lead-time-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Renewal lead-time sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Renewal lead-time sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     try {
-      await this.renewal.runSweep(systemUser.id);
+      await this.renewal.runSweep(systemUserId);
     } catch (err) {
       this.logger.error(
         `Renewal lead-time sweep failed: ${(err as Error).message}`,

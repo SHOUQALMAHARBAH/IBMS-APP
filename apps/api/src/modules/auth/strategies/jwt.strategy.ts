@@ -21,6 +21,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // CodedUnauthorizedException (idle timeout vs access-window vs revoked)
   // survives instead of collapsing into a generic 401.
   validate(payload: AccessTokenPayload): Promise<AuthenticatedUser> {
+    // `validateAndTouch` establishes the Organization itself: it resolves the
+    // session unscoped (the one lookup that cannot already know the org), then
+    // adopts that session's Organization for the rest of the request. Wrapping
+    // the call here instead would put its audit writes inside the bypass too.
     return this.sessionService.validateAndTouch(payload.sub, payload.sid);
   }
 }

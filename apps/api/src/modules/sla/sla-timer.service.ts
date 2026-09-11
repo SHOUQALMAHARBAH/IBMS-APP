@@ -22,12 +22,6 @@ import {
 } from './sla-status.config';
 import { getSlaRegistryEntry } from './sla-registry.config';
 
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as AccessRecertificationScheduler: AuditLogEntry.userId is a
-// real FK to User, so a scheduled sweep needs a real (login-disabled) row to
-// attribute its ESCALATE audit entries to.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
-
 export interface StartSlaTimerParams {
   entityType: string;
   entityId: string;
@@ -498,20 +492,16 @@ export class SlaTimerService {
    * philosophy as `WorkflowTransitionService.transition()` and
    * `maker-checker.util.ts`) so a concurrent sweep run can't double-escalate
    * the same row. Returns the rows this call actually escalated. */
-  async runEscalationSweep(): Promise<SlaTimer[]> {
+  async runEscalationSweep(systemUserId: string): Promise<SlaTimer[]> {
     const now = new Date();
+    // Multi-tenancy Phase 2 (step 7): filtered to the caller's Organization by
+    // `tenantScopeExtension`, so this sweeps ONE office's overdue timers. The
+    // scheduler calls it once per active Organization, passing that office's
+    // own service account rather than resolving a platform-wide one here.
     const due = await this.prisma.client.slaTimer.findMany({
       where: { resolvedAt: null, escalatedAt: null, dueAt: { lte: now } },
     });
     if (due.length === 0) return [];
-
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `${due.length} SLA timer(s) overdue but cannot escalate — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return [];
-    }
 
     const escalated: SlaTimer[] = [];
     for (const timer of due) {
@@ -522,7 +512,7 @@ export class SlaTimerService {
       if (result.count === 0) continue; // already escalated by a concurrent sweep
 
       await this.audit.record({
-        userId: systemUser.id,
+        userId: systemUserId,
         action: 'SLA_ESCALATED',
         entityType: timer.entityType,
         entityId: timer.entityId,

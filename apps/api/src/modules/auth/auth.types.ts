@@ -3,6 +3,12 @@ import type { RoleName } from '@ibms/db';
 /** What `JwtStrategy.validate` resolves and attaches to `req.user`. */
 export interface AuthenticatedUser {
   id: string;
+  /** Multi-tenancy Phase 2 (spec §4.10.2) — the Organization every query made
+   * on this caller's behalf is scoped to. Sourced from `User.organizationId`,
+   * which `SessionService.validateAndTouch` already loads, so it costs no
+   * extra query. Phase 4 additionally puts it in the JWT itself and checks it
+   * against the subdomain-resolved org on every request. */
+  organizationId: string;
   email: string;
   roles: RoleName[];
   sessionId: string;

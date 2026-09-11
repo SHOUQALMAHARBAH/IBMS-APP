@@ -406,19 +406,28 @@ The engineering backlog spans **Part A** (security & cross-cutting infra), **Par
 (PDPL / M-series, dashboards, bilingual UI, a final verification checklist). Where the
 build actually is today:
 
-- **Multi-tenancy — Phase 1 of 6 only (schema + backfill). NOTHING IS ENFORCED YET.**
-  `ibms-system-multitenancy-spec.md` is a scope addition on top of everything below: the
-  whole backlog was built for ONE brokerage office, and multi-tenancy is being retrofitted
-  one phase at a time, deliberately, because it changes an assumption nearly every file
-  depends on. What exists today is the `Organization` model, an `organizationId` column on
-  every tenant-scoped table with every row backfilled onto a single seeded office, and a
-  unique-constraint set that is correct per-office rather than per-platform. What does NOT
-  exist: the org-scoping query interceptor and the PostgreSQL Row-Level Security policies
-  (both Phase 2), the insurer master/relationship split and per-tenant email (Phase 3),
-  and the corrected sign-up/MFA/session flow (Phase 4). **An unscoped query still returns
-  every office's rows.** Treat this system as single-tenant until Phase 2 lands, and do
-  not read the `Organization` column as an isolation guarantee. See CLAUDE.md § What's New
-  for the per-phase record.
+- **Multi-tenancy — Phase 1 complete, Phase 2 step 7 complete (application layer).
+  THE DATABASE LAYER IS NOT BUILT YET.** `ibms-system-multitenancy-spec.md` is a scope
+  addition on top of everything below: the whole backlog was built for ONE brokerage
+  office, and multi-tenancy is being retrofitted one phase at a time, deliberately,
+  because it changes an assumption nearly every file depends on.
+
+  What exists: the `Organization` model; `organizationId` on every tenant-scoped table
+  with every row attributed; a unique-constraint set that is per-office rather than
+  per-platform; and — as of Phase 2 step 7 — **application-layer enforcement**. Every
+  Prisma query against a tenant-scoped model is filtered by the current Organization,
+  injected by `apps/api/src/prisma/tenant-scope.extension.ts` rather than written by hand
+  at any call site, and a tenant-scoped query with no Organization in context is REFUSED
+  rather than run unfiltered. Background jobs run once per ACTIVE Organization.
+
+  What does NOT exist: **the PostgreSQL Row-Level Security policies (Phase 2 step 8)** —
+  spec §1 calls for two independent layers and only the first is built, so a raw SQL
+  query, or a bug in the extension itself, has nothing behind it. Also outstanding: the
+  Part V isolation checklist (step 9), the insurer master/relationship split and
+  per-tenant email (Phase 3), and the corrected sign-up/MFA/session flow (Phase 4) —
+  until which login still resolves a user across all Organizations, because the subdomain
+  that would identify the office is not read yet. See CLAUDE.md § What's New for the
+  per-phase record.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,
