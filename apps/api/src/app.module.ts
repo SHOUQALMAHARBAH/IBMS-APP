@@ -62,6 +62,7 @@ import { DocumentModule } from './modules/supporting-operations/document.module'
 import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.module';
 import { KnowledgeBaseArticleModule } from './modules/supporting-operations/knowledge-base-article.module';
 import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -429,6 +430,7 @@ import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
     // already pre-seeded.
     KnowledgeBaseArticleModule,
     InsurerMasterModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -166,6 +166,9 @@ async function removeOfficeB(): Promise<void> {
   // Order matters: children before the rows they point at, and the
   // Organization last. A leftover child row's foreign key would otherwise pin
   // office B in place and defeat the self-heal entirely.
+  await rawPrisma.organizationEmailIntegration.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
   await rawPrisma.commissionAgreement.deleteMany({
     where: { organizationId: ORG_B_ID },
   });
@@ -582,6 +585,89 @@ describe('Part V — audit entries are scoped to their own Organization (item 12
     );
     expect(Number(visible[0].n)).toBe(0);
   });
+});
+
+describe('Part V — each office sends from its OWN mailbox (item 10, in part)', () => {
+  it("office A cannot see office B's mailbox, and neither address is shared", async () => {
+    // What this DOES prove: the sender is per-office, one office's mailbox
+    // credential is invisible to another through both layers, and there is no
+    // shared platform address anywhere in the model.
+    //
+    // What it does NOT prove, and the checklist item therefore stays open: that
+    // a delivered message actually shows the office's address in a recipient's
+    // inbox. That needs a real Microsoft 365 or Google Workspace mailbox and a
+    // live OAuth consent, neither of which exists on this project yet.
+    await rawPrisma.organizationEmailIntegration.deleteMany({
+      where: {
+        organizationId: { in: [TEST_ORGANIZATION_ID, ORG_B_ID] },
+      },
+    });
+
+    const officeAMailbox = await rawPrisma.organizationEmailIntegration.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        provider: 'MICROSOFT365',
+        connectedEmail: 'info@office-a.test',
+        oauthRefreshTokenEnc: 'key-1:aXY=:dGFn:Y2lwaGVyLWE=',
+        providerTenantId: 'tenant-a',
+      },
+    });
+    const officeBMailbox = await rawPrisma.organizationEmailIntegration.create({
+      data: {
+        organizationId: ORG_B_ID,
+        provider: 'GOOGLE_WORKSPACE',
+        connectedEmail: 'info@office-b.test',
+        oauthRefreshTokenEnc: 'key-1:aXY=:dGFn:Y2lwaGVyLWI=',
+      },
+    });
+
+    // Two different real addresses — neither is a platform address.
+    expect(officeAMailbox.connectedEmail).not.toBe(
+      officeBMailbox.connectedEmail,
+    );
+
+    // Layer 2, directly: office A's session sees ONLY its own mailbox row.
+    const visibleToA = await asAppRole<{ connectedEmail: string }>(
+      TEST_ORGANIZATION_ID,
+      `SELECT "connectedEmail" FROM "OrganizationEmailIntegration"`,
+    );
+    expect(visibleToA.map((r) => r.connectedEmail)).toEqual([
+      'info@office-a.test',
+    ]);
+
+    const visibleToB = await asAppRole<{ connectedEmail: string }>(
+      ORG_B_ID,
+      `SELECT "connectedEmail" FROM "OrganizationEmailIntegration"`,
+    );
+    expect(visibleToB.map((r) => r.connectedEmail)).toEqual([
+      'info@office-b.test',
+    ]);
+
+    // And with no Organization in the session it fails closed, like every other
+    // tenant table — this one holds a mailbox credential, so that matters more
+    // here than almost anywhere else.
+    const unscoped = await asAppRole<{ n: number }>(
+      null,
+      `SELECT count(*)::int AS n FROM "OrganizationEmailIntegration"`,
+    );
+    expect(Number(unscoped[0].n)).toBe(0);
+
+    // The API never hands the credential back, to anyone.
+    const status = await request(app!.getHttpServer())
+      .get('/admin/email-integration')
+      .set(bearer(isolationAdmin.accessToken))
+      .expect(200);
+    const serialised = JSON.stringify(status.body);
+    expect(serialised).toContain('info@office-a.test');
+    expect(serialised).not.toContain('info@office-b.test');
+    expect(serialised).not.toContain('Y2lwaGVy');
+
+    await rawPrisma.organizationEmailIntegration.deleteMany({
+      where: {
+        organizationId: { in: [TEST_ORGANIZATION_ID, ORG_B_ID] },
+      },
+    });
+  }, 60_000);
 });
 
 describe('Part V — an insurer form mapped once serves every office (item 8)', () => {

@@ -200,7 +200,7 @@ second office (`00000000-0000-0000-0000-0000000000b2`), gives both offices a
 customer with the *same* legal name — the case where a leak would be least
 obvious — and removes the second office again afterwards.
 
-Nine of the twelve checklist items are covered there:
+Nine of the twelve checklist items are covered there, plus part of a tenth:
 
 | # | Item | Covered by |
 |---|------|-----------|
@@ -212,12 +212,17 @@ Nine of the twelve checklist items are covered there:
 | 6 | A write that reports success actually wrote | the deactivation post-condition — see below |
 | 8 | A form mapped once is available, unmodified, to every other Organization | 1 test — the ONLY item here asserting a row IS shared across offices; see `docs/insurer-master-registry.md` |
 | 9 | Two offices' negotiated commission terms are invisible to each other | 1 test — both offices hold their own relationship row against ONE shared `InsurerMaster` |
+| 10 | Each office sends from its own mailbox, not a shared platform address | 1 test — **partial**: the per-office sender and the isolation of the mailbox row are proven; a delivered message has never been observed, because no real mailbox has been connected. See `docs/per-tenant-email.md` |
 | 12 | Audit rows are scoped to the correct Organization only | 2 tests |
 
-The remaining three need surface area that does not exist yet, and are listed
-here so they are not mistaken for gaps: a JWT rejected on another office's
-subdomain (Phase 4, §4.10), per-tenant email sender (Phase 3 step 11, §6), and
-legacy bulk import (Phase 5, §7).
+Item 10 is covered in part and deliberately left unticked in the spec: the
+mechanism is built and the isolation is proven, but "emails sent by Office A
+show Office A's address" cannot be asserted until a real Microsoft 365 or Google
+Workspace mailbox is connected.
+
+The remaining two need surface area that does not exist yet, and are listed here
+so they are not mistaken for gaps: a JWT rejected on another office's subdomain
+(Phase 4, §4.10) and legacy bulk import (Phase 5, §7).
 
 ### Why this suite talks to Postgres directly
 

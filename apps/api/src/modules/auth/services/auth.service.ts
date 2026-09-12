@@ -32,6 +32,7 @@ import type {
   ResetPasswordDto,
 } from '../dto/password-reset.dto';
 import type { StepUpDto } from '../dto/step-up.dto';
+import { OutboundEmailService } from '../../email/outbound-email.service';
 
 interface RequestMeta {
   userAgent?: string;
@@ -61,6 +62,7 @@ const PASSWORD_RESET_TTL_MINUTES = 60;
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly outboundEmail: OutboundEmailService,
     private readonly users: UserRepository,
     private readonly refreshTokens: RefreshTokenRepository,
     private readonly mfaCredentials: MfaCredentialRepository,
@@ -306,11 +308,35 @@ export class AuthService {
       entityId: user.id,
     });
 
-    // No email/notification provider exists in this repo yet (see A.1
-    // plan). Never log the raw token — only ever return it, and only when
-    // explicitly opted in via ENABLE_DEV_RESET_TOKEN, so local/e2e testing
-    // can exercise the full flow. NODE_ENV=production is a hard override on
-    // top of the flag — not the primary gate — so a misconfigured flag can
+    // Part I §6 — sent from THIS office's own connected mailbox, never from a
+    // platform address. The body carries a link, not the payload: the token is
+    // what the link is for, and the new password is chosen inside the platform.
+    //
+    // A send failure is logged by OutboundEmailService and deliberately NOT
+    // surfaced here: this endpoint returns the same shape whether or not the
+    // address matched an account, and reporting a mail failure for one email
+    // but not another would reintroduce exactly the account enumeration that
+    // shape exists to prevent. The reset row is already written either way, so
+    // an administrator can still see the mailbox is broken on the integration
+    // screen, and the user can retry.
+    await this.outboundEmail.send({
+      to: dto.email,
+      language: user.languagePreference,
+      actorUserId: user.id,
+      template: {
+        kind: 'password_reset',
+        params: {
+          recipientName: user.fullName,
+          resetUrl: `${this.outboundEmail.appBaseUrl}/reset-password?token=${encodeURIComponent(token.raw)}`,
+          expiresInMinutes: PASSWORD_RESET_TTL_MINUTES,
+        },
+      },
+    });
+
+    // Never log the raw token — only ever return it, and only when explicitly
+    // opted in via ENABLE_DEV_RESET_TOKEN, so local/e2e testing can exercise
+    // the full flow without a mailbox. NODE_ENV=production is a hard override
+    // on top of the flag — not the primary gate — so a misconfigured flag can
     // never leak a token in prod even if someone sets it there by mistake.
     if (
       process.env.ENABLE_DEV_RESET_TOKEN === 'true' &&

@@ -22,9 +22,10 @@ import { UserSessionRepository } from '../../repositories/user-session.repositor
 import { MfaCredentialRepository } from '../../repositories/mfa-credential.repository';
 import { PasswordResetTokenRepository } from '../../repositories/password-reset-token.repository';
 import { SecurityConfigRepository } from '../../repositories/security-config.repository';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({})],
+  imports: [EmailModule, PassportModule, JwtModule.register({})],
   controllers: [AuthController, SsoController],
   providers: [
     AuthService,

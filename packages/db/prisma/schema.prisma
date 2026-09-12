@@ -217,6 +217,7 @@ model Organization {
   adjusters                       Adjuster[]
   assets                          Asset[]
   auditLogEntries                 AuditLogEntry[]
+  emailIntegration                OrganizationEmailIntegration?
   bcpDrPlans                      BcpDrPlan[]
   branches                        Branch[]
   brokerLicenses                  BrokerLicense[]
@@ -4200,6 +4201,72 @@ model DocumentTemplate {
 ///
 /// What is genuinely different per office — the negotiated commission, the
 /// contact person, the credit terms — lives on `Insurer`, which is scoped.
+/// Part I §6 (multi-tenancy Phase 3 step 11) — the office's OWN corporate
+/// mailbox, connected by OAuth.
+///
+/// The platform never sends mail "as itself". Every outbound message leaves
+/// from the office's real authenticated account (e.g. info@alsalam-insurance.jo),
+/// which solves three things at once: recipients recognise the sender,
+/// deliverability reputation belongs to the office rather than a shared
+/// platform domain, and no bulk-sending infrastructure has to be operated at
+/// all.
+///
+/// Tenant-scoped, one row per Organization. An office's mailbox credential is
+/// about as sensitive as a row in this system gets, so it is governed by BOTH
+/// isolation layers like any other tenant table — see the RLS policy in
+/// migration 20260930100000.
+model OrganizationEmailIntegration {
+  id                   String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String                 @default(dbgenerated())
+  organization         Organization           @relation(fields: [organizationId], references: [id])
+  provider             EmailProviderKind
+  /// The mailbox messages are actually sent FROM. Stored so the address can be
+  /// shown and audited without a round trip to the provider.
+  connectedEmail       String
+  /// -- ENCRYPT. The long-lived OAuth refresh token, encrypted with the same
+  /// field-level service as national IDs (`EncryptionService`, purpose
+  /// `oauth`). Never returned by any API, never logged.
+  oauthRefreshTokenEnc String
+  /// Microsoft identifies the directory the mailbox lives in; Google does not
+  /// need it. Null for GOOGLE_WORKSPACE.
+  providerTenantId     String?
+  connectedByUserId    String?
+  connectedAt          DateTime               @default(now())
+  /// Send health. A mailbox whose consent was withdrawn at the provider fails
+  /// at send time, not at connect time, so the failure has to be recorded
+  /// where an administrator will see it.
+  lastSucceededAt      DateTime?
+  lastFailedAt         DateTime?
+  lastError            String?
+  status               EmailIntegrationStatus @default(ACTIVE)
+  updatedAt            DateTime               @updatedAt
+
+  /// One mailbox per office. Scoped rather than global: this IS the tenant key
+  /// (Phase 1 step 5 — a unique that is only `organizationId` is the one case
+  /// where scoping it means exactly this).
+  @@unique([organizationId])
+  @@index([organizationId])
+}
+
+/// Part I §6. A closed set, because "which API do we call to send this" has no
+/// sensible default — an unknown provider must fail to construct, not fall
+/// back to something.
+enum EmailProviderKind {
+  MICROSOFT365
+  GOOGLE_WORKSPACE
+}
+
+enum EmailIntegrationStatus {
+  ACTIVE
+  /// Disconnected deliberately by an administrator here.
+  REVOKED
+  /// The provider rejected the stored credential — consent withdrawn, mailbox
+  /// deleted, or the token invalidated at their end.
+  ERROR
+}
+
 model InsurerMaster {
   id           String   @id @default(uuid())
   /// Unique platform-wide, which is what makes "one row per real company"

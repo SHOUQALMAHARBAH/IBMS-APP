@@ -263,6 +263,20 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, MANAGER, EXEC, AUDITOR],
   },
   {
+    code: "email.integration.read",
+    module: "insurance-operations",
+    description:
+      "See which mailbox this office sends from and whether it is working (Part I §6). Never exposes the stored credential.",
+    roles: [ADMIN, MANAGER, EXEC],
+  },
+  {
+    code: "email.integration.manage",
+    module: "insurance-operations",
+    description:
+      "Connect, test or disconnect this office's own outbound mailbox (Part I §6). Holds the OAuth consent that lets the platform send as a real company address, so it is administrator-only.",
+    roles: [ADMIN],
+  },
+  {
     code: "insurer.form.map",
     module: "insurance-operations",
     description:
