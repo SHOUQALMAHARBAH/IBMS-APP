@@ -150,6 +150,31 @@ npm run test:e2e
 npm run db:migrate:deploy
 ```
 
+### Scheduled jobs are switched OFF in the test environment
+
+`.env.test.example` sets `SCHEDULED_JOBS=disabled`, and `ScheduledJobsGuard`
+removes every `@Cron` job at boot when it sees exactly that value. **Keep it
+set.**
+
+The e2e suite boots the real `AppModule`, so without it all 19 cron jobs fire
+during a run, on wall-clock time, against shared `db-test` state — and the
+watchlist sync downloads the real OFAC and UN sanctions lists while it is at
+it. A full run starting at 11:59:40 was broken by exactly that: the twice-daily
+watchlist cron fired at 12:00:00, published a real ~1011-record generation, and
+`watchlist-sync.e2e-spec.ts`'s 10-record fixture was then correctly refused by
+the plausibility floor several minutes later. The SLA escalation sweep runs
+every fifteen minutes, so it lands inside any run longer than that.
+
+A suite whose result depends on what time of day it started is not telling you
+about your code. `watchlist-sync.e2e-spec.ts` asserts the scheduler registry is
+empty, so if the variable ever stops reaching the test process you get one
+legible failure instead of confusing ones in unrelated specs.
+
+Any value other than the exact word `disabled` — unset, misspelt, `false`,
+`0` — leaves the jobs **running**. That direction is deliberate: a deployment
+that silently stopped re-screening customers against sanctions lists would be a
+compliance failure, not an inconvenience.
+
 `db:test:migrate:dev` and `db:migrate:deploy` apply the same migration files under
 `packages/db/prisma/migrations/` to different databases — nothing is copied or
 regenerated between them, only re-applied. CI (`.github/workflows/ci.yml`) does the

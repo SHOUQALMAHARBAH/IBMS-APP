@@ -384,3 +384,31 @@ different rules.
   UNIQUE constraint rather than a preceding read.
 * `ibms-brain/meta/lex/sensitive-data-handling.md` — why these views carry
   identifiers rather than names.
+
+## Fetching the free lists: timeout and retry
+
+`OfacSdnFetcher` and `UnConsolidatedFetcher` download multi-megabyte public
+files on a twice-daily schedule. Until 2026-09-12 they used a bare `fetch(url)`
+with **no timeout and no retry**, which is a worse gap in production than in
+tests: a stalled connection hung the sync indefinitely rather than failing it,
+and a single transient 503 from `treasury.gov` meant the sanctions list quietly
+did not refresh that cycle. Measured the same day, `treasury.gov` took **9.4
+seconds just to return its redirect**.
+
+They now use `fetchTextWithRetry`: a 120-second whole-request budget (tunable
+via `WATCHLIST_FETCH_TIMEOUT_MS`) and 2 retries with jittered backoff
+(`WATCHLIST_FETCH_MAX_RETRIES`), retrying a timeout, a transport error, a 5xx or
+a 429, and failing fast on a 4xx. **The timeout covers the body read, not just
+the headers** — a large CSV can stall halfway through streaming, and releasing
+the abort signal once headers arrive would leave that stall unbounded, which is
+the exact hang this replaces.
+
+What a retry here cannot do is turn a truncated download into a good one. That
+is the plausibility floor's job: it refuses to publish a generation drastically
+smaller than the one in force, so a half-read list never silently replaces a
+complete one.
+
+**The nightly sync does not run in the test environment.** `SCHEDULED_JOBS=disabled`
+in `.env.test` removes every cron job at boot — see the README. Without it the
+sync fires mid-suite against the live endpoints and publishes a real generation,
+which then breaks fixture-based specs through the plausibility floor.

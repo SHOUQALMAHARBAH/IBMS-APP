@@ -63,6 +63,7 @@ import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.mod
 import { KnowledgeBaseArticleModule } from './modules/supporting-operations/knowledge-base-article.module';
 import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
 import { EmailModule } from './modules/email/email.module';
+import { ScheduledJobsGuard } from './common/scheduled-jobs.guard';
 
 @Module({
   imports: [
@@ -433,7 +434,7 @@ import { EmailModule } from './modules/email/email.module';
     EmailModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [ScheduledJobsGuard, AppService],
 })
 export class AppModule implements NestModule {
   /**

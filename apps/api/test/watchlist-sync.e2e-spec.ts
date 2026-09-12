@@ -13,6 +13,7 @@ import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -204,6 +205,23 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
+  });
+
+  it('runs with every scheduled job removed — nothing fires mid-suite', async () => {
+    // This spec was broken once by exactly that: a full run starting at
+    // 11:59:40 had the twice-daily watchlist cron fire at 12:00:00, perform a
+    // REAL sanctions download and publish a ~1011-record generation, after
+    // which this file's 10-record fixture was correctly refused by the
+    // plausibility floor. The assertion that failed was a safety control doing
+    // its job on state a background job had changed underneath it.
+    //
+    // Asserted here rather than trusted, because the failure mode is silent:
+    // if `SCHEDULED_JOBS=disabled` ever stops reaching the test process, every
+    // symptom is a confusing failure in some unrelated spec hours later.
+    const app = await boot();
+    const jobs = app.get(SchedulerRegistry).getCronJobs();
+
+    expect([...jobs.keys()]).toEqual([]);
   });
 
   it('syncs both free sanctions lists, and a customer whose name matches one gets flagged HIT on screening', async () => {
