@@ -41,6 +41,7 @@ import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
 import type { AttachPolicyDocumentsDto } from './dto/attach-policy-documents.dto';
 import type { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
+import { insurerIdentity } from '../../repositories/insurer-identity';
 
 interface PolicyScheduleView {
   id: string;
@@ -335,7 +336,7 @@ export class PolicyService {
       opportunityId: policy.opportunityId,
       customerId: policy.customerId,
       insurerId: policy.insurerId,
-      insurer: policy.insurer,
+      insurer: policy.insurer === null ? null : insurerIdentity(policy.insurer),
       policyNumber: policy.policyNumber,
       insuranceLine: policy.insuranceLine,
       status: policy.status,

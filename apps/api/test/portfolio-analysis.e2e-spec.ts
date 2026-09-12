@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -146,9 +147,7 @@ describe('Portfolio Analysis (e2e) — backlog Part C #62', () => {
     // asserted EXACTLY, even against db-test's cumulative book — only
     // byClientSegment (CORPORATE/INDIVIDUAL, a closed 2-value set shared by
     // the whole book) needs a before/after delta instead.
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Portfolio E2E Insurer') },
-    });
+    const insurer = await makeInsurer(uniqueLabel('Portfolio E2E Insurer'));
     const branch = await prisma.branch.create({
       data: { name: uniqueLabel('Portfolio E2E Branch') },
     });

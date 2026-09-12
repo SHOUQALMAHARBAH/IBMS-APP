@@ -200,7 +200,7 @@ second office (`00000000-0000-0000-0000-0000000000b2`), gives both offices a
 customer with the *same* legal name — the case where a leak would be least
 obvious — and removes the second office again afterwards.
 
-Eight of the twelve checklist items are covered there:
+Nine of the twelve checklist items are covered there:
 
 | # | Item | Covered by |
 |---|------|-----------|
@@ -210,13 +210,14 @@ Eight of the twelve checklist items are covered there:
 | 4 | `ibms_app` has no `SUPERUSER`, no `BYPASSRLS`, owns no tables | 2 tests — read off the role's own attributes, plus every table having RLS **and** a policy |
 | 5 | Cross-org `INSERT` rejected by `WITH CHECK`; cross-org `UPDATE`/`DELETE` by primary key affects zero rows | 3 tests |
 | 6 | A write that reports success actually wrote | the deactivation post-condition — see below |
-| 9 | Two offices' negotiated commission terms are invisible to each other | 1 test |
+| 8 | A form mapped once is available, unmodified, to every other Organization | 1 test — the ONLY item here asserting a row IS shared across offices; see `docs/insurer-master-registry.md` |
+| 9 | Two offices' negotiated commission terms are invisible to each other | 1 test — both offices hold their own relationship row against ONE shared `InsurerMaster` |
 | 12 | Audit rows are scoped to the correct Organization only | 2 tests |
 
-The remaining four need surface area that does not exist yet, and are listed
+The remaining three need surface area that does not exist yet, and are listed
 here so they are not mistaken for gaps: a JWT rejected on another office's
-subdomain (Phase 4, §4.10), `InsurerFormTemplate` sharing (Phase 3, §5),
-per-tenant email sender (Phase 3, §6), and legacy bulk import (Phase 5, §7).
+subdomain (Phase 4, §4.10), per-tenant email sender (Phase 3 step 11, §6), and
+legacy bulk import (Phase 5, §7).
 
 ### Why this suite talks to Postgres directly
 

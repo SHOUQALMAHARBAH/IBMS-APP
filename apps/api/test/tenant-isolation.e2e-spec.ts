@@ -170,6 +170,16 @@ async function removeOfficeB(): Promise<void> {
     where: { organizationId: ORG_B_ID },
   });
   await rawPrisma.insurer.deleteMany({ where: { organizationId: ORG_B_ID } });
+  // `InsurerMaster.legalName` is globally unique, so a master left behind by a
+  // crashed run would collide with the next run's fixture rather than simply
+  // taking up space. Masters are global and shared, so only the ones this
+  // suite names are removed — never a sweep of the table.
+  await rawPrisma.insurerMaster.deleteMany({
+    where: { legalName: { startsWith: 'Cross-Office Mapped Insurer ' } },
+  });
+  await rawPrisma.insurerMaster.deleteMany({
+    where: { legalName: 'Shared Insurer plc' },
+  });
   await rawPrisma.ultimateBeneficialOwner.deleteMany({
     where: { organizationId: ORG_B_ID },
   });
@@ -574,10 +584,117 @@ describe('Part V — audit entries are scoped to their own Organization (item 12
   });
 });
 
+describe('Part V — an insurer form mapped once serves every office (item 8)', () => {
+  it("office B reads office A's mapping unmodified, without re-mapping it", async () => {
+    // §5's actual promise: the company's IDENTITY and its mapped submission
+    // form are GLOBAL, so the second office to deal with an insurer inherits
+    // the first office's work. This is the one Part V item where the correct
+    // answer is that a row IS visible across offices — every other item here
+    // asserts the opposite, which is exactly why it is worth pinning: a
+    // well-meaning `organizationId` added to `InsurerFormTemplate` would pass
+    // every other test in this file and silently break this promise.
+    const master = await rawPrisma.insurerMaster.create({
+      data: {
+        legalName: `Cross-Office Mapped Insurer ${Date.now()}`,
+        legalNameAr: 'شركة تأمين مشتركة',
+        linesOffered: ['MOTOR'],
+      },
+    });
+
+    // Each office holds its OWN relationship row against that one master.
+    await rawPrisma.insurer.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        insurerMasterId: master.id,
+      },
+    });
+    await rawPrisma.insurer.create({
+      data: { organizationId: ORG_B_ID, insurerMasterId: master.id },
+    });
+
+    // Office A maps the form, through the real API.
+    const mapped = await request(app!.getHttpServer())
+      .post(`/insurer-masters/${master.id}/form-templates`)
+      .set(bearer(isolationAdmin.accessToken))
+      .send({
+        insuranceLine: 'MOTOR',
+        sourceDocumentRef: 'shared-motor-form.pdf',
+        fields: [
+          {
+            fieldKey: 'insured_full_name',
+            labelEn: 'Insured full name',
+            labelAr: 'اسم المؤمن له',
+            dataType: 'TEXT',
+            isRequired: true,
+            displayOrder: 0,
+          },
+        ],
+      })
+      .expect(201);
+    const templateId = (mapped.body as { id: string }).id;
+
+    // Read it back on the APP role inside OFFICE B's session — the connection
+    // the API uses, with `app.current_org_id` set to the other office. If the
+    // template were tenant-scoped in either layer, this returns nothing.
+    const visible = await asAppRole<{
+      id: string;
+      insuranceLine: string;
+      version: number;
+      sourceDocumentRef: string | null;
+    }>(
+      ORG_B_ID,
+      `SELECT id, "insuranceLine", version, "sourceDocumentRef"
+         FROM "InsurerFormTemplate" WHERE id = '${templateId}'`,
+    );
+    expect(visible).toHaveLength(1);
+    expect(visible[0].insuranceLine).toBe('MOTOR');
+    expect(visible[0].version).toBe(1);
+    expect(visible[0].sourceDocumentRef).toBe('shared-motor-form.pdf');
+
+    // Unmodified means the FIELDS too — a template with no fields is not a
+    // usable form, so visibility of the parent row alone would prove nothing.
+    const fields = await asAppRole<{
+      fieldKey: string;
+      labelAr: string | null;
+    }>(
+      ORG_B_ID,
+      `SELECT "fieldKey", "labelAr" FROM "InsurerFormField"
+        WHERE "templateId" = '${templateId}' ORDER BY "displayOrder"`,
+    );
+    expect(fields.map((f) => f.fieldKey)).toEqual(['insured_full_name']);
+    expect(fields[0].labelAr).toBe('اسم المؤمن له');
+
+    // And both offices genuinely point at the SAME company, rather than having
+    // each minted a rival copy of it.
+    const sharing = await ownerQuery<{ n: number }>(
+      `SELECT count(DISTINCT "organizationId")::int AS n
+         FROM "Insurer" WHERE "insurerMasterId" = '${master.id}'`,
+    );
+    expect(Number(sharing[0].n)).toBe(2);
+
+    await rawPrisma.insurerFormField.deleteMany({ where: { templateId } });
+    await rawPrisma.insurerFormTemplate.deleteMany({
+      where: { id: templateId },
+    });
+    await rawPrisma.insurer.deleteMany({
+      where: { insurerMasterId: master.id },
+    });
+    await rawPrisma.insurerMaster.deleteMany({ where: { id: master.id } });
+  }, 60_000);
+});
+
 describe("Part V — two offices' commercial terms with the same insurer (item 9)", () => {
   it("office B's commission agreement is invisible to office A", async () => {
+    // Both offices deal with the SAME real company, which after the Part I §5
+    // split means they share one global `InsurerMaster` row. That is the point:
+    // the identity is shared, the negotiated terms below are not.
+    const sharedMaster = await rawPrisma.insurerMaster.upsert({
+      where: { legalName: 'Shared Insurer plc' },
+      update: {},
+      create: { legalName: 'Shared Insurer plc', linesOffered: ['MOTOR'] },
+    });
     const insurerB = await rawPrisma.insurer.create({
-      data: { organizationId: ORG_B_ID, name: 'Shared Insurer plc' },
+      data: { organizationId: ORG_B_ID, insurerMasterId: sharedMaster.id },
     });
     const agreementB = await rawPrisma.commissionAgreement.create({
       data: {

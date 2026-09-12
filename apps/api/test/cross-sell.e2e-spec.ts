@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -150,9 +151,9 @@ describe('Cross-Selling (e2e) — backlog Part C #8', () => {
     customerId: string,
     insuranceLine: string,
   ): Promise<void> {
-    const insurer = await prisma.insurer.create({
-      data: { name: `XS Test Insurer ${Math.random().toString(36).slice(2)}` },
-    });
+    const insurer = await makeInsurer(
+      `XS Test Insurer ${Math.random().toString(36).slice(2)}`,
+    );
     const opportunity = await prisma.opportunity.create({
       data: { customerId },
     });

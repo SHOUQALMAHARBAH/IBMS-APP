@@ -256,6 +256,20 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, MANAGER, EXEC],
   },
   {
+    code: "insurer.master.read",
+    module: "insurance-operations",
+    description:
+      "Read the GLOBAL insurer master registry and the form mappings shared across every Organization (Part I §5). Carries no per-office commercial terms — those are on the tenant-scoped Insurer row.",
+    roles: [SALES, PLACEMENT, MANAGER, EXEC, AUDITOR],
+  },
+  {
+    code: "insurer.form.map",
+    module: "insurance-operations",
+    description:
+      "Map an insurer's official submission form for one product line (Part I §5). Platform-wide in effect: the mapping becomes the form every other office submits against, which is why it is not granted to the roles that merely consume it.",
+    roles: [PLACEMENT, ADMIN],
+  },
+  {
     code: "rfq.insurer.update",
     module: "insurance-operations",
     description: "Update an insurer's RFQ response status",

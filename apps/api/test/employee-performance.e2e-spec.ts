@@ -7,6 +7,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -229,9 +230,9 @@ describe('Employee Performance (e2e) — backlog Part C #61', () => {
         employeeId: employee.id,
       },
     });
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Employee Performance E2E Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Employee Performance E2E Insurer'),
+    );
 
     const periodLabel = uniqueLabel('2020-06');
     const periodStart = '2020-06-01';

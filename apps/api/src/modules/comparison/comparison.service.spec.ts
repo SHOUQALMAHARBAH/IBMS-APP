@@ -25,11 +25,12 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   };
 }
 
-const insurer = (id: string, name: string) => ({
+// Post Part I §5 split: the company's name is on the global InsurerMaster,
+// and the office's own row carries only what differs per office.
+const insurer = (id: string, legalName: string) => ({
   id,
-  name,
-  nameAr: null,
   financialStrengthRating: null,
+  insurerMaster: { legalName, legalNameAr: null },
 });
 
 function submission(id: string, insurerId: string, status = 'SENT') {

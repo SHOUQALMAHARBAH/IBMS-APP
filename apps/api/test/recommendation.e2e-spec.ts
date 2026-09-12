@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -154,11 +155,9 @@ async function buildOpportunity(
   });
   const insurerIds: string[] = [];
   for (let i = 0; i < insurerCount; i += 1) {
-    const insurer = await prisma.insurer.create({
-      data: {
-        name: `Rec E2E ${tag} ins ${i} ${Math.random().toString(36).slice(2, 6)}`,
-      },
-    });
+    const insurer = await makeInsurer(
+      `Rec E2E ${tag} ins ${i} ${Math.random().toString(36).slice(2, 6)}`,
+    );
     await prisma.rFQInsurer.create({
       data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
     });

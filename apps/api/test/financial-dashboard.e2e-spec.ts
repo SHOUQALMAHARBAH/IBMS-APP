@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -191,9 +192,9 @@ describe('Financial Dashboard (e2e) — backlog Part E / Process #64', () => {
     // history — every section here reads `createdAt < asOf` with no lower
     // bound, so scoping by insurerId (like the Claims Dashboard e2e test)
     // isolates cleanly across all four sections.
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Financial Dashboard E2E Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Financial Dashboard E2E Insurer'),
+    );
     const customer = await prisma.customer.create({
       data: {
         customerType: 'CORPORATE',
@@ -352,9 +353,9 @@ describe('Financial Dashboard (e2e) — backlog Part E / Process #64', () => {
       data: { branchId: branch.id },
     });
 
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Financial Dashboard E2E Branch Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Financial Dashboard E2E Branch Insurer'),
+    );
     const customer = await prisma.customer.create({
       data: {
         customerType: 'INDIVIDUAL',

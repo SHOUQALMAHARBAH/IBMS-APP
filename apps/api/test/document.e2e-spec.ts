@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -106,9 +107,9 @@ async function makePolicy(ownerUserId: string) {
       ownerUserId,
     },
   });
-  const insurer = await prisma.insurer.create({
-    data: { name: `Doc E2E ins ${Math.random().toString(36).slice(2, 8)}` },
-  });
+  const insurer = await makeInsurer(
+    `Doc E2E ins ${Math.random().toString(36).slice(2, 8)}`,
+  );
   const opp = await prisma.opportunity.create({
     data: { customerId: customer.id },
   });

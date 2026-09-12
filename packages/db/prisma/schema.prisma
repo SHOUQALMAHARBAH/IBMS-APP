@@ -4191,21 +4191,120 @@ model DocumentTemplate {
 /// Insurer Database): products, classes, contact persons, underwriters,
 /// claims contacts, commission agreements, credit terms, SLAs, financial
 /// strength, performance history.
+/// Part I §5 (multi-tenancy) — GLOBAL, like `Role`/`Permission` and the
+/// watchlist cache (§3.1): one row per real-world insurance company, shared by
+/// every Organization on the platform. Deliberately carries NO
+/// `organizationId`, so `tenantScopeExtension` leaves it unfiltered and no RLS
+/// policy applies — two offices dealing with the same insurer must see the
+/// same company, not two divergent copies of it.
+///
+/// What is genuinely different per office — the negotiated commission, the
+/// contact person, the credit terms — lives on `Insurer`, which is scoped.
+model InsurerMaster {
+  id           String   @id @default(uuid())
+  /// Unique platform-wide, which is what makes "one row per real company"
+  /// enforceable rather than a convention. Divergent duplicate records are the
+  /// exact failure §5 exists to prevent.
+  legalName    String   @unique
+  legalNameAr  String?
+  /// e.g. ["MOTOR","LIFE","MARINE","HEALTH"] — what this company writes at
+  /// all, distinct from `InsurerProduct`, which is what ONE office actually
+  /// places with them.
+  linesOffered String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  formTemplates InsurerFormTemplate[]
+  relationships Insurer[]
+}
+
+/// Part I §5 — an insurer's official submission form for one product line,
+/// mapped ONCE by whoever first deals with that insurer+line and then reused,
+/// unmodified, by every other Organization. Global for the same reason as
+/// `InsurerMaster`: re-mapping the same PDF per office is the duplicated work
+/// this model removes.
+///
+/// Before a mapping exists the uploaded file is just an unstructured
+/// `Document`; it becomes a live e-form only once its fields are defined.
+model InsurerFormTemplate {
+  id                String        @id @default(uuid())
+  insurerMasterId   String
+  insurerMaster     InsurerMaster @relation(fields: [insurerMasterId], references: [id])
+  insuranceLine     String
+  version           Int           @default(1)
+  /// The originally uploaded PDF/Word this mapping was derived from.
+  sourceDocumentRef String?
+  createdAt         DateTime      @default(now())
+
+  fields InsurerFormField[]
+
+  /// One version of a given line's form per insurer. A re-map is a NEW
+  /// version, never an edit of the one other offices are already submitting
+  /// against.
+  @@unique([insurerMasterId, insuranceLine, version])
+  @@index([insurerMasterId])
+}
+
+/// Part I §5 — one mapped field of an insurer's form. `labelAr` alongside
+/// `labelEn` because the platform's primary language is Arabic; it is optional
+/// only because the source form may be English-only, in which case there is no
+/// Arabic label to record rather than an empty one to invent.
+model InsurerFormField {
+  id           String               @id @default(uuid())
+  templateId   String
+  template     InsurerFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  fieldKey     String
+  labelEn      String
+  labelAr      String?
+  dataType     InsurerFormFieldType
+  isRequired   Boolean              @default(false)
+  /// Only meaningful for ENUM fields; empty for every other type.
+  options      String[]
+  displayOrder Int
+
+  @@unique([templateId, fieldKey])
+  @@index([templateId])
+}
+
+/// Part I §5 renders this as a bare `String` with the values in a comment. An
+/// enum instead, so an unmappable type is unrepresentable rather than caught at
+/// read time by whatever renders the form.
+enum InsurerFormFieldType {
+  TEXT
+  NUMBER
+  DATE
+  ENUM
+  BOOLEAN
+}
+
+/// Part I §5 — ONE OFFICE'S working relationship with a master insurer, not
+/// the insurer itself. The company's identity moved to `InsurerMaster`; what
+/// stays here is what genuinely differs per office and must never be visible
+/// to another one: the negotiated commercial terms and the named contacts.
 model Insurer {
-  id                      String       @id @default(uuid())
+  id              String        @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId          String       @default(dbgenerated())
-  organization            Organization @relation(fields: [organizationId], references: [id])
-  name                    String
-  nameAr                  String?
-  contactEmail            String?
-  contactPhone            String?
-  claimsContact           String?
+  organizationId  String        @default(dbgenerated())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  insurerMasterId String
+  insurerMaster   InsurerMaster @relation(fields: [insurerMasterId], references: [id])
+
+  /// Part I §10.2 — three DIFFERENT people, not one generic contact: pricing
+  /// and RFQ, claims, and underwriting.
+  rfqContactName          String?
+  rfqContactEmail         String?
+  /// Not in §5's model. Kept so the migration does not silently drop the
+  /// existing `Insurer.contactPhone` column's data — §10.2's list is a
+  /// minimum, and step 10 is explicitly a column-by-column migration.
+  rfqContactPhone         String?
+  claimsContactName       String?
+  claimsContactEmail      String?
   underwriterContact      String? // Part 4.1 "underwriters"
   creditTermsDays         Int? // narrative process 31 "Credit Terms"
   financialStrengthRating String? // narrative process 31 "Financial Strength"
-  createdAt               DateTime     @default(now())
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
 
   products             InsurerProduct[]
   slaAgreements        InsurerSlaAgreement[]
@@ -4217,7 +4316,11 @@ model Insurer {
   paymentChannels      PaymentChannel[]
   performanceScores    InsurerPerformanceScore[]
 
+  /// One relationship row per office per real insurer. Without this an office
+  /// could hold two divergent sets of commercial terms for the same company.
+  @@unique([organizationId, insurerMasterId])
   @@index([organizationId])
+  @@index([insurerMasterId])
 }
 
 /// Narrative process 31 — "Products / Classes" per insurer, the lines of

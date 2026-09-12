@@ -61,6 +61,7 @@ import { InformationAssetModule } from './modules/supporting-operations/informat
 import { DocumentModule } from './modules/supporting-operations/document.module';
 import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.module';
 import { KnowledgeBaseArticleModule } from './modules/supporting-operations/knowledge-base-article.module';
+import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
 
 @Module({
   imports: [
@@ -427,6 +428,7 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // categories. No new permission, no migration — kb.publish was
     // already pre-seeded.
     KnowledgeBaseArticleModule,
+    InsurerMasterModule,
   ],
   controllers: [AppController],
   providers: [AppService],

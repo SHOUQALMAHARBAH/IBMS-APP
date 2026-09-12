@@ -5,6 +5,7 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildQuotationComparisonHtml } from './quotation-comparison.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { insurerName } from '../../repositories/insurer-identity';
 
 const QUOTATION_COMPARISON_TEMPLATE_TYPE = 'quotation_comparison';
 
@@ -66,7 +67,7 @@ export class QuotationComparisonDocumentService {
         customerLegalName: customer.legalName,
         builtAt: view.builtAt,
         rows: view.rows.map((r) => ({
-          insurerName: r.quotation.insurer.name,
+          insurerName: insurerName(r.quotation.insurer),
           isCurrentVersion: r.quotation.isCurrentVersion,
           premium: r.quotation.premium,
           currency: r.quotation.currency,

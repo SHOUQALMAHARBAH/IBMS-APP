@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -118,9 +119,7 @@ describe('Insurer Performance (e2e) — backlog Part C #60', () => {
       'ip-outsider',
       'SALES_RELATIONSHIP_OFFICER',
     );
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Insurer Gate Check') },
-    });
+    const insurer = await makeInsurer(uniqueLabel('Insurer Gate Check'));
 
     await request(app.getHttpServer())
       .post('/insurer-performance/compute')
@@ -144,9 +143,7 @@ describe('Insurer Performance (e2e) — backlog Part C #60', () => {
       'ip-manager-bad',
       'BRANCH_DEPARTMENT_MANAGER',
     );
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Insurer Partial Period') },
-    });
+    const insurer = await makeInsurer(uniqueLabel('Insurer Partial Period'));
 
     await request(app.getHttpServer())
       .post('/insurer-performance/compute')
@@ -162,9 +159,7 @@ describe('Insurer Performance (e2e) — backlog Part C #60', () => {
       'ip-manager-default',
       'BRANCH_DEPARTMENT_MANAGER',
     );
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Insurer Default Period') },
-    });
+    const insurer = await makeInsurer(uniqueLabel('Insurer Default Period'));
 
     const res = await request(app.getHttpServer())
       .post('/insurer-performance/compute')
@@ -184,15 +179,11 @@ describe('Insurer Performance (e2e) — backlog Part C #60', () => {
       'BRANCH_DEPARTMENT_MANAGER',
     );
 
-    const insurerA = await prisma.insurer.create({
-      data: { name: uniqueLabel('Insurer A') },
-    });
-    const insurerB = await prisma.insurer.create({
-      data: { name: uniqueLabel('Insurer B') },
-    });
-    const insurerC = await prisma.insurer.create({
-      data: { name: uniqueLabel('Insurer C — no activity this period') },
-    });
+    const insurerA = await makeInsurer(uniqueLabel('Insurer A'));
+    const insurerB = await makeInsurer(uniqueLabel('Insurer B'));
+    const insurerC = await makeInsurer(
+      uniqueLabel('Insurer C — no activity this period'),
+    );
 
     const customer = await prisma.customer.create({
       data: {

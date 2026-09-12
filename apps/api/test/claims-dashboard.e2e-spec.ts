@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -155,9 +156,9 @@ describe('Claims Dashboard (e2e) — backlog Part E / Process #64', () => {
     // history — there is no lower bound on `createdAt` for this dashboard
     // (unlike a period-range filter), so a historical date window alone
     // cannot isolate; insurerId scoping does.
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Claims Dashboard E2E Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Claims Dashboard E2E Insurer'),
+    );
     const customer = await prisma.customer.create({
       data: {
         customerType: 'CORPORATE',
@@ -291,9 +292,9 @@ describe('Claims Dashboard (e2e) — backlog Part E / Process #64', () => {
       data: { branchId: branch.id },
     });
 
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Claims Dashboard E2E Branch Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Claims Dashboard E2E Branch Insurer'),
+    );
     const customer = await prisma.customer.create({
       data: {
         customerType: 'CORPORATE',

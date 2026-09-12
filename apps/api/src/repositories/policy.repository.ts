@@ -9,12 +9,7 @@ import type {
   Prisma,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
-
-const INSURER_IDENTITY_SELECT = {
-  id: true,
-  name: true,
-  nameAr: true,
-} as const;
+import { INSURER_IDENTITY_SELECT } from './insurer-identity';
 
 const POLICY_INCLUDE = {
   insurer: { select: INSURER_IDENTITY_SELECT },

@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -157,9 +158,7 @@ describe('Quotation negotiation & immutability (e2e) — backlog Part C #15', ()
         insuranceLine: 'Property All Risks',
       },
     });
-    const insurer = await prisma.insurer.create({
-      data: { name: `Negotiation Test Insurer ${suffix}` },
-    });
+    const insurer = await makeInsurer(`Negotiation Test Insurer ${suffix}`);
     await prisma.rFQInsurer.create({
       data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
     });

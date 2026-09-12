@@ -288,22 +288,44 @@ async function ensureDocumentTemplates(): Promise<void> {
  * has no unique key to upsert nested `products`/`slaAgreements` against
  * without either duplicating them or hand-rolling per-child reconciliation,
  * neither of which is worth it for sample data.
+ *
+ * Part I §5 (Phase 3 step 10): the company's IDENTITY is now global
+ * (`InsurerMaster`, shared by every office) and only this office's
+ * relationship with it is tenant-scoped. The master is upserted on its unique
+ * legal name — a second office seeded later must attach to the SAME master,
+ * not mint a rival copy of the same company, which is the whole point of the
+ * split.
  */
 async function ensureSampleInsurers(): Promise<void> {
   let created = 0;
   for (const insurer of SAMPLE_INSURERS) {
+    const master = await prisma.insurerMaster.upsert({
+      where: { legalName: insurer.name },
+      update: {},
+      create: {
+        legalName: insurer.name,
+        legalNameAr: insurer.nameAr,
+        linesOffered: [
+          ...new Set(insurer.products.map((p) => p.insuranceLine)),
+        ].sort(),
+      },
+    });
     const existing = await prisma.insurer.findFirst({
-      where: { name: insurer.name },
+      where: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        insurerMasterId: master.id,
+      },
     });
     if (existing) continue;
     await prisma.insurer.create({
       data: {
         organizationId: DEFAULT_ORGANIZATION_ID,
-        name: insurer.name,
-        nameAr: insurer.nameAr,
-        contactEmail: insurer.contactEmail,
-        contactPhone: insurer.contactPhone,
-        claimsContact: insurer.claimsContact,
+        insurerMasterId: master.id,
+        // Part I §10.2 — three distinct contacts, not one generic one. The
+        // sample data carries an address for each.
+        rfqContactEmail: insurer.contactEmail,
+        rfqContactPhone: insurer.contactPhone,
+        claimsContactEmail: insurer.claimsContact,
         underwriterContact: insurer.underwriterContact,
         creditTermsDays: insurer.creditTermsDays,
         financialStrengthRating: insurer.financialStrengthRating,

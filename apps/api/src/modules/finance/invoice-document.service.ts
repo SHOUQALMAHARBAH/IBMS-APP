@@ -6,6 +6,7 @@ import { DocumentTemplateRepository } from '../../repositories/document-template
 import { PdfRendererService } from '../document-generation/pdf-renderer.service';
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildInvoiceHtml } from './invoice-document.template';
+import { insurerName } from '../../repositories/insurer-identity';
 
 const INVOICE_TEMPLATE_TYPE = 'invoice';
 
@@ -78,7 +79,7 @@ export class InvoiceDocumentService {
         customerLegalName: customer.legalName,
         policyNumber: policy?.policyNumber ?? null,
         insuranceLine: policy?.insuranceLine ?? null,
-        insurerName: policy?.insurer?.name ?? null,
+        insurerName: policy?.insurer ? insurerName(policy.insurer) : null,
         invoiceDate: invoice.createdAt,
         dueDate: invoice.dueDate,
         premiumAmount: invoice.premiumAmount,
