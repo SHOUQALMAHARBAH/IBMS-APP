@@ -241,6 +241,30 @@ describe('Broker Recommendation (e2e) — backlog Part C #16', () => {
       .expect(403);
 
     // 2. Draft — both gate flags snapshot true.
+    // Part V cross-cutting item 3 (Phase 6) — "submitting a Recommendation
+    // with an empty rationale is rejected by the API even if a valid
+    // comparison matrix exists". Everything needed for a valid submission is
+    // in place at this point, so the ONLY reason each of these is refused is
+    // the rationale itself — which is what makes the assertion meaningful
+    // rather than a restatement of DTO validation.
+    //
+    // §10.3's rule is that the officer must always say WHY in their own words,
+    // even when they are simply agreeing with the system's own suggestion. A
+    // whitespace-only string is the interesting case: it is non-empty until
+    // something trims it, and it carries no rationale at all.
+    for (const emptyish of ['', '   ', '\n\t ']) {
+      await request(app.getHttpServer())
+        .post('/recommendations')
+        .set(bearer(placement.accessToken))
+        .send({
+          opportunityId,
+          recommendedQuotationId,
+          rationale: emptyish,
+          rationaleFactors: FACTORS,
+        })
+        .expect(400);
+    }
+
     const drafted = await request(app.getHttpServer())
       .post('/recommendations')
       .set(bearer(placement.accessToken))

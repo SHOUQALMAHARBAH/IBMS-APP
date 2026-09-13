@@ -835,3 +835,144 @@ describe("Part V — two offices' commercial terms with the same insurer (item 9
     // not this test passes.
   });
 });
+
+/**
+ * Part V multi-tenancy item 7 — Phase 6.
+ *
+ * Scheduled to Phase 4 when this suite was written, and testable now that
+ * Phase 4 built `TenantMatchGuard`. The guard is the second opinion on which
+ * office a request belongs to: the session says one thing, the address it
+ * arrived on says another, and a disagreement is a hard 403.
+ *
+ * Both halves matter. A guard that refuses everything would pass the first
+ * assertion and make the system unreachable, so the same token on its OWN
+ * office's subdomain has to keep working.
+ */
+describe('Part V — a session is refused on another office’s subdomain (item 7)', () => {
+  it("office A's token is rejected on office B's subdomain, and accepted on its own", async () => {
+    // Mismatch: a real, registered subdomain belonging to a DIFFERENT office
+    // than the one the session was issued for.
+    const mismatched = await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer(officeA.accessToken))
+      .set('Host', `${ORG_B_SUBDOMAIN}.ibms-app.example`)
+      .expect(403);
+    expect((mismatched.body as { code?: string }).code).toBe('TENANT_MISMATCH');
+
+    // The same token, same request, on its own office's subdomain.
+    await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer(officeA.accessToken))
+      .set('Host', 'default.ibms-app.example')
+      .expect(200);
+  });
+
+  it('a host naming no office is skipped rather than refused', async () => {
+    // Every local, CI and e2e request looks like this. Refusing them would
+    // make the system unreachable outside production DNS while proving
+    // nothing: with no subdomain there is no second opinion to disagree with.
+    await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer(officeA.accessToken))
+      .set('Host', 'localhost:4000')
+      .expect(200);
+  });
+
+  it('an unknown but well-formed subdomain is skipped, not refused', async () => {
+    // Refusing would turn the guard into a way to probe which office labels
+    // are registered, which §4.10.4 rules out. A 200 here is the deliberate
+    // answer, not an oversight.
+    await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer(officeA.accessToken))
+      .set('Host', 'no-such-office-at-all.ibms-app.example')
+      .expect(200);
+  });
+
+  it('records the mismatch as a security event against the session’s own office', async () => {
+    await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer(officeA.accessToken))
+      .set('Host', `${ORG_B_SUBDOMAIN}.ibms-app.example`)
+      .expect(403);
+
+    const rows = await ownerQuery<{
+      organizationId: string;
+      afterValue: { reason?: string; requestedOrganizationId?: string } | null;
+    }>(
+      `SELECT "organizationId", "afterValue" FROM "AuditLogEntry"
+       WHERE "userId" = '${officeA.id}' AND "action" = 'LOGIN_FAILED'
+       ORDER BY "occurredAt" DESC LIMIT 1`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].afterValue?.reason).toBe('TENANT_MISMATCH');
+    // Written against the office whose user actually did this — the one that
+    // can act on it — naming the office the token was carried TO.
+    expect(rows[0].organizationId).toBe(TEST_ORGANIZATION_ID);
+    expect(rows[0].afterValue?.requestedOrganizationId).toBe(ORG_B_ID);
+  });
+});
+
+/**
+ * Part V multi-tenancy item 11 — Phase 6.
+ *
+ * Scheduled to Phase 5 when this suite was written, and testable now that
+ * Phase 5 built the importer. The item asks specifically about a file
+ * carrying a "spoofed/incorrect org identifier", so that is what is uploaded.
+ */
+describe('Part V — a bulk import cannot write into another office (item 11)', () => {
+  it('ignores an organizationId column naming office B and writes into office A', async () => {
+    const spoofed = `Spoofed Import ${Date.now()}`;
+    const csv = [
+      'Client Name,Kind,organizationId,organisation_id,org',
+      `${spoofed},CORPORATE,${ORG_B_ID},${ORG_B_ID},${ORG_B_ID}`,
+    ].join('\n');
+
+    await request(app!.getHttpServer())
+      .post('/imports/customers')
+      .set(bearer(isolationAdmin.accessToken))
+      .field(
+        'mapping',
+        JSON.stringify({ legalName: 'Client Name', customerType: 'Kind' }),
+      )
+      .attach('file', Buffer.from(csv, 'utf8'), 'spoofed.csv')
+      .expect(201);
+
+    // Read as the OWNER, which sees every office — so this asserts where the
+    // row actually landed, not merely where the caller can see it.
+    const rows = await ownerQuery<{ organizationId: string }>(
+      `SELECT "organizationId" FROM "Customer" WHERE "legalName" = '${spoofed}'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].organizationId).toBe(TEST_ORGANIZATION_ID);
+
+    // Nothing at all reached office B.
+    const inB = await ownerQuery<{ n: string }>(
+      `SELECT count(*)::text AS n FROM "Customer" WHERE "organizationId" = '${ORG_B_ID}' AND "legalName" = '${spoofed}'`,
+    );
+    expect(inB[0].n).toBe('0');
+  });
+
+  it('refuses a mapping that tries to name organizationId as an importable field', async () => {
+    // The stronger statement: there is no way to ASK for it either. The field
+    // allow-list has no organizationId, so a mapping naming one is refused
+    // outright rather than quietly ignored.
+    await request(app!.getHttpServer())
+      .post('/imports/customers')
+      .set(bearer(isolationAdmin.accessToken))
+      .field(
+        'mapping',
+        JSON.stringify({
+          legalName: 'Client Name',
+          customerType: 'Kind',
+          organizationId: 'organizationId',
+        }),
+      )
+      .attach(
+        'file',
+        Buffer.from('Client Name,Kind,organizationId\nX,CORPORATE,y', 'utf8'),
+        'spoofed2.csv',
+      )
+      .expect(422);
+  });
+});
