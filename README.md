@@ -255,6 +255,7 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run db:studio` | Prisma Studio (dev DB) |
 | `npm run db:seed` | Seed the dev DB — the 11 roles + full permission grid (`packages/db/prisma/seed.ts`), idempotent |
 | `npm run db:test:seed` | Same seed, against `db-test` |
+| `npm run seed:demo -w api` | Demo data for two Organizations — employees, leads, ~500 customers and full sales-to-policy pipelines — created through the real HTTP API, **dev DB only** (never `.env.test`). Scale is env-configurable; accounts come back with MFA off, so sign in with the password and pair an authenticator at Settings → Security. See `apps/api/scripts/README-SEED-DEMO.md` |
 
 ## `scripts/`
 

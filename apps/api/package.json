@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "dotenv -e ../../.env.test -- vitest run --config ./test/vitest-e2e.config.ts",
     "test:contract": "dotenv -e ../../.env.test -- vitest run --config ./test/vitest-contract.config.ts",
-    "test:smoke": "dotenv -e ../../.env.test -- bash scripts/smoke.sh"
+    "test:smoke": "dotenv -e ../../.env.test -- bash scripts/smoke.sh",
+    "seed:demo": "dotenv -e ../../.env -- vitest run --config ./scripts/seed-demo.vitest.config.ts"
   },
   "dependencies": {
     "@ibms/db": "0.0.0",
