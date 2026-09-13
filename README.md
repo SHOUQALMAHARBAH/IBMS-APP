@@ -442,8 +442,7 @@ The engineering backlog spans **Part A** (security & cross-cutting infra), **Par
 (PDPL / M-series, dashboards, bilingual UI, a final verification checklist). Where the
 build actually is today:
 
-- **Multi-tenancy — Phase 1 complete, Phase 2 step 7 complete (application layer).
-  THE DATABASE LAYER IS NOT BUILT YET.** `ibms-system-multitenancy-spec.md` is a scope
+- **Multi-tenancy — Phases 1-6 complete.** `MULTI-TENANCY-SPEC.md` is a scope
   addition on top of everything below: the whole backlog was built for ONE brokerage
   office, and multi-tenancy is being retrofitted one phase at a time, deliberately,
   because it changes an assumption nearly every file depends on.
@@ -457,7 +456,7 @@ build actually is today:
   rather than run unfiltered. Background jobs run once per ACTIVE Organization.
 
   **Both isolation layers now exist.** Phase 2 step 8 added the PostgreSQL
-  Row-Level Security policies — 118 of them, one per tenant-scoped table — and
+  Row-Level Security policies — 119 of them, one per tenant-scoped table — and
   the API connects as a NON-OWNER role (`ibms_app`) so Postgres actually applies
   them. `APP_DATABASE_URL` must be set in every environment or layer 2 is inert;
   the API logs an error but still boots. Raw SQL (`$queryRaw`) is protected by
@@ -465,12 +464,22 @@ build actually is today:
   query — any raw path added later must run inside the same session-variable
   transaction. See `docs/multi-tenancy-rls.md`.
 
-  What does NOT exist: the Part V isolation checklist as automated tests
-  (step 9), the insurer master/relationship split and per-tenant email
-  (Phase 3), and the corrected sign-up/MFA/session flow (Phase 4) — until which
-  login still resolves a user across all Organizations, because the subdomain
-  that would identify the office is not read yet. See CLAUDE.md § What's New for
-  the per-phase record.
+  Everything that paragraph used to list as missing has since shipped: the Part V
+  checklist runs as automated tests across two real Organizations (Phase 2 step 9,
+  extended in Phase 6), the insurer master/relationship split and per-tenant email
+  landed in Phase 3, and the corrected sign-up/MFA/session flow — including
+  subdomain-scoped tenant resolution — landed in Phase 4.
+
+  What does NOT exist, and is not a defect to chase: whether Microsoft Graph and
+  Gmail accept the live payloads (needs a real OAuth consent, which cannot be
+  faked — everything around it is proven), and the `dpoAlternateApproverUserId`
+  fallback, which has no consumer, so in the one edge case it exists for a
+  destruction batch cannot be approved by anyone. That second one is an
+  AVAILABILITY gap, never a safety one: the failure is a stuck batch, never a
+  wrongly-approved one, and it is logged as a known gap rather than patched
+  because letting a non-DPO approve changes a dual-control path. Fuzzy sanctions
+  matching beyond the curated transliteration table (§10.1) is deferred by
+  decision. See CLAUDE.md § What's New for the per-phase record.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,
