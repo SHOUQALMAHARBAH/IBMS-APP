@@ -77,6 +77,19 @@ const commercialFrontOffice: PermissionSeed[] = [
     roles: [SALES, MANAGER, EXEC],
   },
   {
+    code: "customer.bulk-import",
+    module: "customer",
+    description:
+      "Load an office legacy customer file (Part III §7) — a bulk write path, distinct from creating one customer",
+    // Deliberately NOT customer.create, which Sales holds. Creating one
+    // customer at intake and loading an office entire back-book are different
+    // acts: this one writes hundreds of rows in a single unreviewed
+    // transaction and marks every one of them as never having passed KYC.
+    // It is a platform-onboarding action, so it sits with the administrator
+    // who onboards the office, not with the officers who work the book.
+    roles: [ADMIN],
+  },
+  {
     code: "customer.create",
     module: "commercial-front-office",
     description: "Create a Customer (individual/corporate)",

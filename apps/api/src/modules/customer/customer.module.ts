@@ -6,6 +6,8 @@ import { KycService } from './kyc.service';
 import { ScreeningController } from './screening.controller';
 import { ProviderScreeningService } from './provider-screening.service';
 import { ScreeningService } from './screening.service';
+import { LegacyImportService } from './legacy-import.service';
+import { LegacyImportController } from './legacy-import.controller';
 import { ScreeningHoldService } from './screening-hold.service';
 import { ScreeningOperationsService } from './screening-operations.service';
 import { ScreeningCaseService } from './screening-case.service';
@@ -40,11 +42,17 @@ import { ProspectModule } from '../prospect/prospect.module';
     // ProspectModule's own leadId validation against LeadModule).
     ProspectModule,
   ],
-  controllers: [CustomerController, KycController, ScreeningController],
+  controllers: [
+    CustomerController,
+    KycController,
+    ScreeningController,
+    LegacyImportController,
+  ],
   providers: [
     CustomerService,
     KycService,
     ScreeningService,
+    LegacyImportService,
     ProviderScreeningService,
     ScreeningHoldService,
     ScreeningOperationsService,

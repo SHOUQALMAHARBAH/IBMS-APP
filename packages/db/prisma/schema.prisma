@@ -969,6 +969,13 @@ model Customer {
   // channel explicitly). Language already lives in `languagePreference`.
   preferredContactChannel InteractionChannel?
   status                  CustomerStatus           @default(PENDING_KYC)
+  /// Part III §7 — how this record entered the system. LEGACY_IMPORT rows came
+  /// from an office's pre-platform spreadsheet and did NOT go through this
+  /// system own maker/checker KYC, so they must never be read as if they had.
+  /// The import leaves them at status PENDING_KYC with a DRAFT KYCRecord;
+  /// this column is the provenance that says WHY, and survives the file later
+  /// being completed properly.
+  source                  CustomerSource           @default(PLATFORM)
   classification          DataClassification       @default(CONFIDENTIAL)
   ownerUserId             String
   createdAt               DateTime                 @default(now())
@@ -1069,6 +1076,14 @@ model InsuredPerson {
 /// terminal for THIS row (same pattern as Lead's CONVERTED_TO_PROSPECT): the
 /// actual re-KYC cycle is a new KYCRecord for the same Customer, not a loop
 /// back on this one.
+/// Part III §7 — provenance for a Customer row.
+enum CustomerSource {
+  /// Created through this platform own intake flow.
+  PLATFORM
+  /// Loaded from an office legacy system by the bulk importer.
+  LEGACY_IMPORT
+}
+
 enum KycStatus {
   DRAFT
   SUBMITTED

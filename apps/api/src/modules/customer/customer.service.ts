@@ -118,6 +118,9 @@ export class CustomerService {
       languagePreference: customer.languagePreference,
       preferredContactChannel: customer.preferredContactChannel,
       status: customer.status,
+      // Part III §7 — provenance travels with the record. A reader has to be
+      // able to tell a LEGACY_IMPORT row from one that came through intake.
+      source: customer.source,
       classification: customer.classification,
       ownerUserId: customer.ownerUserId,
       createdAt: customer.createdAt,
@@ -311,6 +314,9 @@ export class CustomerService {
       languagePreference: customer.languagePreference,
       preferredContactChannel: customer.preferredContactChannel,
       status: customer.status,
+      // Part III §7 — provenance travels with the record. A reader has to be
+      // able to tell a LEGACY_IMPORT row from one that came through intake.
+      source: customer.source,
       classification: customer.classification,
       ownerUserId: customer.ownerUserId,
       createdAt: customer.createdAt,
