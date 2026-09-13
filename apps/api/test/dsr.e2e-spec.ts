@@ -471,6 +471,15 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .post(`/dsr/${del.id}/partially-fulfil`)
       .set(bearer(dpo.accessToken))
       .send({
+        // Deliberately the RAW uuid, and load-bearing as such.
+        // `retentionScheduleReference` is guarded by NO_FULL_ACCOUNT_NUMBER,
+        // and under the old 9+-digit rule this line failed about one run in 32
+        // — 3.11% of v4 uuids contain a run of 9+ digits — which is very
+        // likely the "non-reproducing dsr failure" the workspace history
+        // records more than once. The guard now exempts canonical uuids, so
+        // this is deterministic; keeping a real id here is what proves that
+        // exemption end to end, through the DTO, rather than only in a unit
+        // test of the regex.
         retentionScheduleReference: hold.id,
         partialFulfilmentJustification: 'Active Legal Hold on this file.',
       })

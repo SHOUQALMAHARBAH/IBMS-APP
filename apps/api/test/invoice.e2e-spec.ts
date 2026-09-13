@@ -1131,7 +1131,8 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
         ownerType: 'customer',
         customerId,
         channelType: 'bank_transfer',
-        label: 'Client account 0123456789',
+        // 16 digits — see the guard's 12-digit floor (ISO/IEC 7812).
+        label: 'Client account 0123456789012345',
       })
       .expect(400);
     await request(app.getHttpServer())

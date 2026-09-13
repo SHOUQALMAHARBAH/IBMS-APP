@@ -176,14 +176,17 @@ describe('Customer Feedback (e2e) — backlog Part C #45', () => {
       .expect(201);
     expect((maxScore.body as FeedbackBody).score).toBe(5);
 
-    // a full account number in comments -> 400 (the shared DTO guard)
+    // a full account number in comments -> 400 (the shared DTO guard).
+    // 16 digits: the guard's floor is 12, the ISO/IEC 7812 PAN minimum, so the
+    // fixture has to be an actually account-shaped number rather than merely a
+    // longish one.
     await request(app.getHttpServer())
       .post('/feedback')
       .set(bearer(sales.accessToken))
       .send({
         customerId: customer.id,
         context: 'post_claim',
-        comments: 'Please refund my JOD to account 0123456789.',
+        comments: 'Please refund my JOD to account 0123456789012345.',
       })
       .expect(400);
 

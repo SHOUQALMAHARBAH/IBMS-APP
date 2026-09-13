@@ -22,7 +22,11 @@ const CONSENT_SCAN_TAKE = 1000;
 const DSR_SCAN_TAKE = 500;
 const INCIDENT_SCAN_TAKE = 500;
 const DPIA_SCAN_TAKE = 500;
-const CROSS_BORDER_RECENT_TAKE = 50;
+/** The register shows only the most recent transfers, never the whole
+ * history. Exported because a test asserting on this list has to know it is
+ * capped: a "grew by one" assertion silently becomes unfalsifiable once the
+ * table holds this many rows. */
+export const CROSS_BORDER_RECENT_TAKE = 50;
 
 const CLOSED_DSR_STATUS = 'CLOSED';
 const CLOSED_INCIDENT_STATUS = 'CLOSED';

@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { CROSS_BORDER_RECENT_TAKE } from '../src/modules/pdpl/dpo-workspace.service';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -193,8 +194,20 @@ describe('DPO Workspace (e2e) — backlog Part D §5.1, Process #52 item #9', ()
     );
     expect(after.legalHoldRegister.find((h) => h.id === hold.id)).toBeTruthy();
 
+    // The register returns only the CROSS_BORDER_RECENT_TAKE most recent rows,
+    // and db-test is cumulative. Once the table holds that many, a bare
+    // "grew by one" assertion can never hold again — it went permanently red
+    // on 2026-09-13, at 51 rows against a cap of 50, having quietly been a
+    // count over a capped list all along (`project_claim_closure_c29_status`:
+    // never a global count in an e2e). Below the cap this still demands real
+    // growth; at the cap it demands the register stays full. The assertion
+    // that carries the actual meaning is the id lookup directly below, which
+    // holds either way because the register is ordered most-recent-first.
     expect(after.crossBorderTransferRegister.length).toBeGreaterThanOrEqual(
-      before.crossBorderTransferRegister.length + 1,
+      Math.min(
+        before.crossBorderTransferRegister.length + 1,
+        CROSS_BORDER_RECENT_TAKE,
+      ),
     );
     expect(
       after.crossBorderTransferRegister.find((t) => t.id === transfer.id),
