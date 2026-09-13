@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DpoWorkspaceService } from './dpo-workspace.service';
+import {
+  DSR_QUEUE_TAKE,
+  INCIDENT_REGISTER_TAKE,
+  DpoWorkspaceService,
+} from './dpo-workspace.service';
 import type { ConsentRecordRepository } from '../../repositories/consent-record.repository';
 import type { DsrRepository } from '../../repositories/dsr.repository';
 import type { IncidentRepository } from '../../repositories/incident.repository';
@@ -7,21 +11,6 @@ import type { DpiaScreeningRepository } from '../../repositories/dpia-screening.
 import type { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import type { CrossBorderTransferRepository } from '../../repositories/cross-border-transfer.repository';
 import type { AuditService } from '../audit/audit.service';
-
-const consentRow = (over: Record<string, unknown> = {}) => ({
-  id: 'c-1',
-  customerId: 'cust-1',
-  insuredPersonId: null,
-  leadId: null,
-  purpose: 'MARKETING',
-  isMarketing: true,
-  granted: true,
-  consentTextVersion: 'v1',
-  grantedAt: new Date('2026-09-01T00:00:00.000Z'),
-  withdrawnAt: null,
-  createdAt: new Date('2026-09-01T00:00:00.000Z'),
-  ...over,
-});
 
 const dsrRow = (over: Record<string, unknown> = {}) => ({
   id: 'dsr-1',
@@ -108,24 +97,23 @@ const dpiaRow = (over: Record<string, unknown> = {}) => ({
 });
 
 function makeService() {
+  // The closed rows these mocks used to include are gone on purpose: excluding
+  // them is the DATABASE's job now, not the service's. A mock that still
+  // handed back a CLOSED row would be asserting against a query that can no
+  // longer return one, and would quietly re-authorise the in-memory filter
+  // whose removal is the entire fix.
   const consentRecords = {
-    findMany: vi.fn().mockResolvedValue([consentRow()]),
+    countByConsentState: vi.fn().mockResolvedValue({
+      activeCount: 1,
+      withdrawnCount: 0,
+      declinedCount: 0,
+    }),
   };
   const dsr = {
-    findMany: vi
-      .fn()
-      .mockResolvedValue([
-        dsrRow(),
-        dsrRow({ id: 'dsr-closed', status: 'CLOSED' }),
-      ]),
+    findOpenQueue: vi.fn().mockResolvedValue([dsrRow()]),
   };
   const incidents = {
-    findMany: vi
-      .fn()
-      .mockResolvedValue([
-        incidentRow(),
-        incidentRow({ id: 'inc-closed', status: 'CLOSED' }),
-      ]),
+    findOpenRegister: vi.fn().mockResolvedValue([incidentRow()]),
   };
   const dpia = { findMany: vi.fn().mockResolvedValue([dpiaRow()]) };
   const legalHolds = { findMany: vi.fn().mockResolvedValue([legalHoldRow()]) };
@@ -156,7 +144,7 @@ function makeService() {
 }
 
 describe('DpoWorkspaceService.getSummary', () => {
-  it('aggregates all six registers and excludes closed DSRs/incidents', async () => {
+  it('aggregates all six registers', async () => {
     const { service } = makeService();
     const summary = await service.getSummary('u-dpo');
 
@@ -185,6 +173,21 @@ describe('DpoWorkspaceService.getSummary', () => {
       expect.any(Number),
     );
     expect(legalHolds.findMany).toHaveBeenCalledWith({ active: true });
+  });
+
+  it('asks the database for the OPEN sets, and for consent asks for a count', async () => {
+    // The unit-level half of the 2026-09-13 fix. Reading a recent window and
+    // filtering afterwards meant an open item older than the window never
+    // reached the DPO at all, and a consent figure that described a page
+    // rather than the table. The service must therefore delegate both, and
+    // these are the calls that prove it does.
+    const { service, dsr, incidents, consentRecords } = makeService();
+    await service.getSummary('u-dpo');
+    expect(dsr.findOpenQueue).toHaveBeenCalledWith(DSR_QUEUE_TAKE);
+    expect(incidents.findOpenRegister).toHaveBeenCalledWith(
+      INCIDENT_REGISTER_TAKE,
+    );
+    expect(consentRecords.countByConsentState).toHaveBeenCalledTimes(1);
   });
 
   it('records a sensitive READ audit row with per-register counts, not the underlying data', async () => {
