@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { Role, RoleName, User, UserRoleAssignment } from '@ibms/db';
+import type {
+  MfaMethod,
+  Role,
+  RoleName,
+  User,
+  UserRoleAssignment,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrgContextService } from '../common/org-context/org-context.service';
 
@@ -50,6 +56,63 @@ export class UserRepository {
     return this.prisma.client.user.findFirst({ where: { email } });
   }
 
+  /**
+   * Part II §4.3.2 — enrolment is complete only once one live code verified.
+   *
+   * The four facts move together for the same reason `setPassword` clears
+   * `mustChangePassword` in one write: a half-applied enrolment is either a
+   * user who cannot get in, or a user whose second factor is not really on.
+   */
+  completeMfaEnrollment(id: string, method: MfaMethod): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id },
+      data: {
+        mfaEnabled: true,
+        mfaMethod: method,
+        mfaEnrolledAt: new Date(),
+        mfaEnrollmentPending: false,
+      },
+    });
+  }
+
+  /** Part II §4.2 — an admin-provisioned account starts owing BOTH onboarding
+   * steps: rotate the temporary password, then enrol a second factor. */
+  markOnboardingRequired(id: string): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id },
+      data: { mustChangePassword: true, mfaEnrollmentPending: true },
+    });
+  }
+
+  /** Part II §4.4.3 — the password was proven, so the counter starts over even
+   * when the login resolves to an onboarding step rather than a session. */
+  async resetFailedLoginAttempts(id: string): Promise<void> {
+    await this.prisma.client.user.updateMany({
+      where: { id },
+      data: { failedLoginAttempts: 0 },
+    });
+  }
+
+  /**
+   * Part II §4.3.1/§4.7 — stores a new password hash and closes out whatever
+   * onboarding state prompted it.
+   *
+   * `mustChangePassword` is cleared here rather than by the caller: the flag and
+   * the hash have to move together, or a crash between the two leaves the user
+   * either permanently stuck on the change screen or holding a new password the
+   * system still refuses to let them past.
+   */
+  setPassword(id: string, passwordHash: string): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        mustChangePassword: false,
+      },
+    });
+  }
+
   findById(id: string): Promise<User | null> {
     return this.prisma.client.user.findUnique({ where: { id } });
   }
@@ -93,6 +156,12 @@ export class UserRepository {
     });
   }
 
+  /**
+   * Self-service signup. Unlike `provision`, this account owes no password
+   * rotation: the person who will use it is the person who chose the password,
+   * so there is no admin-known secret to close out. MFA enrolment is still
+   * required — `MfaRequiredGuard` enforces that for everyone.
+   */
   create(data: {
     fullName: string;
     email: string;
@@ -100,7 +169,13 @@ export class UserRepository {
     languagePreference?: 'AR' | 'EN';
   }): Promise<User> {
     return this.prisma.client.user.create({
-      data: { ...data, passwordUpdatedAt: new Date() },
+      data: {
+        ...data,
+        passwordUpdatedAt: new Date(),
+        // Explicit, because the column DEFAULTS to true for the provisioning
+        // case. A self-service signup has no admin-known password to rotate.
+        mustChangePassword: false,
+      },
     });
   }
 
@@ -117,6 +192,11 @@ export class UserRepository {
     email: string;
     passwordHash: string;
     languagePreference?: 'AR' | 'EN';
+    /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
+    departmentId?: string;
+    /** Part II §4.2.2 — the organizational location, likewise required by the
+     * DTO and likewise distinct from both Department and Role. */
+    branchId?: string;
     roleIds: string[];
     accessValidFrom?: Date;
     accessValidUntil?: Date;
@@ -126,6 +206,11 @@ export class UserRepository {
       data: {
         ...user,
         passwordUpdatedAt: new Date(),
+        // Part II §4.2.3 — an admin-provisioned account owes BOTH onboarding
+        // steps. The admin knows the temporary password, which is exactly the
+        // residual risk §4.3.1 exists to close, and no second factor exists yet.
+        mustChangePassword: true,
+        mfaEnrollmentPending: true,
         roles: { create: roleIds.map((roleId) => ({ roleId })) },
       },
     });

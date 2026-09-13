@@ -409,4 +409,214 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
       })
       .expect(409);
   });
+
+  /**
+   * Spec §4.1.2 vs §4.2.2 — two columns can hold one person's department, and
+   * linking an account to an employee record is the one moment they meet.
+   * Before this, linking copied neither and compared neither.
+   *
+   * The rule: the Employee record wins once it states a department; an
+   * employee with none adopts the account's; a genuine disagreement is refused
+   * rather than silently resolved.
+   */
+  describe('department reconciliation on link', () => {
+    async function makeDepartment(
+      app: INestApplication<App>,
+      adminToken: string,
+      label: string,
+    ): Promise<string> {
+      const res = await request(app.getHttpServer())
+        .post('/admin/departments')
+        .set(bearer(adminToken))
+        .send({ name: uniqueLabel(label) })
+        .expect(201);
+      return (res.body as { id: string }).id;
+    }
+
+    async function makeBranch(
+      app: INestApplication<App>,
+      adminToken: string,
+    ): Promise<string> {
+      const res = await request(app.getHttpServer())
+        .post('/admin/branches')
+        .set(bearer(adminToken))
+        .send({ name: uniqueLabel('hr-branch') })
+        .expect(201);
+      return (res.body as { id: string }).id;
+    }
+
+    async function provisionInDepartment(
+      app: INestApplication<App>,
+      adminToken: string,
+      departmentId: string,
+      branchId: string,
+    ): Promise<string> {
+      const res = await request(app.getHttpServer())
+        .post('/admin/users')
+        .set(bearer(adminToken))
+        .send({
+          fullName: 'Linked Account',
+          email: uniqueEmail('hr-dept-link'),
+          password: 'Another-Correct-Horse-7!',
+          departmentId,
+          branchId,
+          roles: ['SALES_RELATIONSHIP_OFFICER'],
+        })
+        .expect(201);
+      return (res.body as { id: string }).id;
+    }
+
+    it("an employee with no department adopts the linked account's", async () => {
+      const app = await boot();
+      const admin = await makeUser(
+        app,
+        'hr-dept-adopt',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const departmentId = await makeDepartment(
+        app,
+        admin.accessToken,
+        'hr-adopt-dept',
+      );
+      const branchId = await makeBranch(app, admin.accessToken);
+      const userId = await provisionInDepartment(
+        app,
+        admin.accessToken,
+        departmentId,
+        branchId,
+      );
+
+      const created = (
+        await request(app.getHttpServer())
+          .post('/employees')
+          .set(bearer(admin.accessToken))
+          .send({
+            ...splitName(uniqueLabel('Adopting Employee')),
+            nationalId: '9911223344',
+            hireDate: '2021-03-01',
+            userId,
+          })
+          .expect(201)
+      ).body as { id: string };
+
+      const row = await prisma.employee.findUniqueOrThrow({
+        where: { id: created.id },
+      });
+      expect(row.departmentId).toBe(departmentId);
+    });
+
+    it('refuses the link when the two name different departments, and writes nothing', async () => {
+      const app = await boot();
+      const admin = await makeUser(
+        app,
+        'hr-dept-clash',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const accountDepartment = await makeDepartment(
+        app,
+        admin.accessToken,
+        'hr-clash-account',
+      );
+      const employeeDepartment = await makeDepartment(
+        app,
+        admin.accessToken,
+        'hr-clash-employee',
+      );
+      const branchId = await makeBranch(app, admin.accessToken);
+      const userId = await provisionInDepartment(
+        app,
+        admin.accessToken,
+        accountDepartment,
+        branchId,
+      );
+
+      const nationalId = '9955667788';
+      await request(app.getHttpServer())
+        .post('/employees')
+        .set(bearer(admin.accessToken))
+        .send({
+          ...splitName(uniqueLabel('Clashing Employee')),
+          nationalId,
+          hireDate: '2021-03-01',
+          departmentId: employeeDepartment,
+          userId,
+        })
+        .expect(409);
+
+      // Nothing half-written: no employee row, and the account is still free
+      // to be linked to the right one.
+      const orphans = await prisma.employee.findMany({
+        where: { departmentId: employeeDepartment },
+      });
+      expect(orphans).toHaveLength(0);
+      const account = await prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+      });
+      expect(account.employeeId).toBeNull();
+      expect(account.departmentId).toBe(accountDepartment);
+    });
+
+    it('allows the link when both name the same department, and leaves it alone', async () => {
+      const app = await boot();
+      const admin = await makeUser(
+        app,
+        'hr-dept-agree',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const departmentId = await makeDepartment(
+        app,
+        admin.accessToken,
+        'hr-agree-dept',
+      );
+      const branchId = await makeBranch(app, admin.accessToken);
+      const userId = await provisionInDepartment(
+        app,
+        admin.accessToken,
+        departmentId,
+        branchId,
+      );
+
+      const created = (
+        await request(app.getHttpServer())
+          .post('/employees')
+          .set(bearer(admin.accessToken))
+          .send({
+            ...splitName(uniqueLabel('Agreeing Employee')),
+            nationalId: '9977553311',
+            hireDate: '2021-03-01',
+            departmentId,
+            userId,
+          })
+          .expect(201)
+      ).body as { id: string };
+
+      const row = await prisma.employee.findUniqueOrThrow({
+        where: { id: created.id },
+      });
+      expect(row.departmentId).toBe(departmentId);
+      const account = await prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+      });
+      expect(account.employeeId).toBe(created.id);
+    });
+
+    it("refuses a department that is not this office's (422)", async () => {
+      const app = await boot();
+      const admin = await makeUser(
+        app,
+        'hr-dept-unknown',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      await request(app.getHttpServer())
+        .post('/employees')
+        .set(bearer(admin.accessToken))
+        .send({
+          ...splitName(uniqueLabel('Unknown Dept Employee')),
+          nationalId: '9944332211',
+          hireDate: '2021-03-01',
+          departmentId: '00000000-0000-0000-0000-0000000000ff',
+        })
+        .expect(422);
+    });
+  });
 });

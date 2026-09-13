@@ -18,6 +18,10 @@ export interface CreateEmployeeInput {
   familyName: string;
   nationalIdEnc: string;
   position?: string;
+  /** Spec §4.1.2 — the org-chart department. Optional: an employee can be
+   * recorded before HR has placed them, and a linked account's own
+   * `departmentId` is adopted by `linkUser` when this is left unset. */
+  departmentId?: string;
   hireDate: Date;
   licensedRole?: string;
   confidentialityAgreementSignedAt?: Date;
@@ -35,6 +39,27 @@ export interface CreateTrainingInput {
   dueAt?: Date;
   completedAt?: Date;
 }
+
+/**
+ * The outcome of `EmployeeRepository.linkUser`. A discriminated union rather
+ * than a thrown error: the department rule is a repository-level invariant,
+ * but which HTTP status each outcome deserves is the service's call.
+ */
+export type LinkUserResult =
+  | {
+      outcome: 'LINKED';
+      user: User;
+      /** True when the employee had no department and took the account's. */
+      departmentAdoptedFromAccount: boolean;
+    }
+  | { outcome: 'USER_NOT_FOUND' }
+  | { outcome: 'EMPLOYEE_NOT_FOUND' }
+  | { outcome: 'ALREADY_LINKED' }
+  | {
+      outcome: 'DEPARTMENT_CONFLICT';
+      employeeDepartmentId: string;
+      userDepartmentId: string;
+    };
 
 export interface DeprovisioningChecklistUpdate {
   systemAccessRevokedAt?: Date;
@@ -77,14 +102,98 @@ export class EmployeeRepository {
     });
   }
 
-  /** Links an existing `User` account to this employee — the FK #61 relies
-   * on. Caller must have already confirmed the user has no employeeId set
-   * (a plain FK update, not a race-guarded one — HR onboarding is a rare,
-   * low-concurrency action with a human on both ends). */
-  linkUser(employeeId: string, userId: string): Promise<User> {
-    return this.prisma.client.user.update({
-      where: { id: userId },
-      data: { employeeId },
+  /**
+   * Links an existing `User` account to this employee — the FK #61 relies on —
+   * AND reconciles the two `departmentId` columns in the same transaction.
+   *
+   * Two columns can hold one person's department: `Employee.departmentId`
+   * (spec §4.1.2, the org chart) and `User.departmentId` (§4.2.2, what the
+   * admin picked when provisioning, which happens before an `Employee` row
+   * usually exists). Linking is the one moment they meet, and until now it
+   * copied neither and compared neither — so the day anything started writing
+   * `Employee.departmentId`, the two could disagree permanently with nothing
+   * to notice. The rule, read side in `common/department.util.ts`:
+   *
+   *   - employee has none, account has one  -> the employee ADOPTS it;
+   *   - both set and equal                  -> nothing to do;
+   *   - both set and DIFFERENT              -> refuse the link (the caller
+   *     turns this into a 409). Silently picking a winner here is exactly the
+   *     silent divergence this exists to prevent, and a human has to say which
+   *     is right;
+   *   - neither set                         -> nothing to do.
+   *
+   * One interactive transaction, the `terminate()` shape above (itself the
+   * `retention-case.repository.ts` precedent) — a deliberate local exception
+   * to this codebase's no-`$transaction` convention, needed because reading
+   * both rows and writing one has to be atomic.
+   *
+   * The adopt step is a status-conditional write, not a check-then-act
+   * (`race-safe-invariants.md`): it re-asserts `departmentId: null` in its own
+   * `where`, so a concurrent writer that filled the column in between our read
+   * and our write cannot be silently overwritten — a 0-row result sends us
+   * back to re-read and re-decide rather than trusting what we read first.
+   */
+  linkUser(employeeId: string, userId: string): Promise<LinkUserResult> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { employeeId: true, departmentId: true },
+      });
+      if (!user) return { outcome: 'USER_NOT_FOUND' as const };
+      if (user.employeeId) return { outcome: 'ALREADY_LINKED' as const };
+
+      const employee = await tx.employee.findUnique({
+        where: { id: employeeId },
+        select: { departmentId: true },
+      });
+      if (!employee) return { outcome: 'EMPLOYEE_NOT_FOUND' as const };
+
+      let departmentAdoptedFromAccount = false;
+      if (user.departmentId !== null) {
+        if (
+          employee.departmentId !== null &&
+          employee.departmentId !== user.departmentId
+        ) {
+          return {
+            outcome: 'DEPARTMENT_CONFLICT' as const,
+            employeeDepartmentId: employee.departmentId,
+            userDepartmentId: user.departmentId,
+          };
+        }
+        if (employee.departmentId === null) {
+          const adopted = await tx.employee.updateMany({
+            where: { id: employeeId, departmentId: null },
+            data: { departmentId: user.departmentId },
+          });
+          if (adopted.count === 0) {
+            // Someone set it between our read and our write. Re-read and
+            // apply the same rule to what is actually there now.
+            const current = await tx.employee.findUniqueOrThrow({
+              where: { id: employeeId },
+              select: { departmentId: true },
+            });
+            if (current.departmentId !== user.departmentId) {
+              return {
+                outcome: 'DEPARTMENT_CONFLICT' as const,
+                employeeDepartmentId: current.departmentId as string,
+                userDepartmentId: user.departmentId,
+              };
+            }
+          } else {
+            departmentAdoptedFromAccount = true;
+          }
+        }
+      }
+
+      const linked = await tx.user.update({
+        where: { id: userId },
+        data: { employeeId },
+      });
+      return {
+        outcome: 'LINKED' as const,
+        user: linked,
+        departmentAdoptedFromAccount,
+      };
     });
   }
 

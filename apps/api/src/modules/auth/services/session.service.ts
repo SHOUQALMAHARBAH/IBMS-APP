@@ -12,6 +12,18 @@ import {
 } from '../auth.exceptions';
 import { requiresHardwareToken, type AuthenticatedUser } from '../auth.types';
 
+/**
+ * Part II §4.1.5 — the hard cap on one sign-in, regardless of activity ("e.g.
+ * 12h" in the spec).
+ *
+ * Not on `SecurityConfig`: that model carries the knobs an office's own
+ * administrator tunes, and a per-office setting that could be raised to a year
+ * would quietly undo the control. Deployment-level, overridable for a test.
+ */
+export const ABSOLUTE_SESSION_HOURS = Number(
+  process.env.ABSOLUTE_SESSION_HOURS ?? 12,
+);
+
 @Injectable()
 export class SessionService {
   constructor(
@@ -29,10 +41,18 @@ export class SessionService {
     ipAddress?: string;
   }) {
     const config = await this.securityConfig.get();
+    const now = Date.now();
     const expiresAt = new Date(
-      Date.now() + config.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+      now + config.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
     );
-    return this.sessions.create({ ...params, expiresAt });
+    return this.sessions.create({
+      ...params,
+      expiresAt,
+      idleExpiresAt: new Date(now + config.idleTimeoutMinutes * 60 * 1000),
+      absoluteExpiresAt: new Date(
+        now + ABSOLUTE_SESSION_HOURS * 60 * 60 * 1000,
+      ),
+    });
   }
 
   /**
@@ -88,14 +108,35 @@ export class SessionService {
       throw new AccessWindowExpiredException();
     }
 
-    const config = await this.securityConfig.get();
-    const idleMs = config.idleTimeoutMinutes * 60 * 1000;
-    if (Date.now() - session.lastActivityAt.getTime() > idleMs) {
+    // Part II §4.5 — either ceiling elapsing REVOKES the session. This is a
+    // genuine termination, not a screen lock: the client is then sent to the
+    // full email+password screen, never to an MFA-code-only one, because a
+    // code-only resume would let anyone sitting at the unlocked machine back in
+    // without ever proving they know the password.
+    const now = Date.now();
+    if (session.absoluteExpiresAt.getTime() <= now) {
       await this.sessions.revoke(sessionId, 'idle_timeout');
       throw new SessionIdleTimeoutException();
     }
 
-    await this.sessions.touchActivity(sessionId);
+    const config = await this.securityConfig.get();
+    const idleMs = config.idleTimeoutMinutes * 60 * 1000;
+    // Both the STORED ceiling and the one recomputed from the CURRENT config,
+    // whichever bites first. The stored value alone would let a session keep an
+    // old, longer window after an administrator shortens the office's timeout —
+    // the new setting would not apply until that session's next request, which
+    // is the one moment it most needs to. Recomputing alone would ignore a
+    // ceiling already written down. Taking the earlier of the two is the only
+    // reading that can never extend a session.
+    const idleExpired =
+      session.idleExpiresAt.getTime() <= now ||
+      now - session.lastActivityAt.getTime() > idleMs;
+    if (idleExpired) {
+      await this.sessions.revoke(sessionId, 'idle_timeout');
+      throw new SessionIdleTimeoutException();
+    }
+
+    await this.sessions.touchActivity(sessionId, new Date(now + idleMs));
     const roles = await this.users.getRoleNames(userId);
     return {
       id: user.id,
@@ -135,6 +176,14 @@ export class SessionService {
 
   logout(sessionId: string): Promise<void> {
     return this.sessions.revoke(sessionId, 'logout');
+  }
+
+  revokeAllForUserExcept(
+    userId: string,
+    keepSessionId: string,
+    reason: 'password_changed',
+  ): Promise<number> {
+    return this.sessions.revokeAllForUserExcept(userId, keepSessionId, reason);
   }
 
   revokeAllForUser(

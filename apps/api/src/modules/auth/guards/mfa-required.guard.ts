@@ -8,7 +8,10 @@ import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { SKIP_MFA_REQUIRED_KEY } from '../decorators/skip-mfa-required.decorator';
 import { UserRepository } from '../../../repositories/user.repository';
-import { MfaRequiredException } from '../auth.exceptions';
+import {
+  MfaRequiredException,
+  OnboardingIncompleteException,
+} from '../auth.exceptions';
 import type { AuthenticatedUser } from '../auth.types';
 
 /**
@@ -41,6 +44,19 @@ export class MfaRequiredGuard implements CanActivate {
     if (!request.user) return true; // JwtAuthGuard will have already rejected this request
 
     const user = await this.users.findById(request.user.id);
+
+    // Part II §4.3 — the onboarding wizard is uninterruptible: until BOTH steps
+    // are done, no other API call succeeds. The password step comes first, so
+    // it is checked first; a user who still owes it should never be told about
+    // an MFA step they have not reached.
+    //
+    // In the normal flow this is belt-and-braces — a user owing the password
+    // change is never issued a session at all (§4.3.1). It matters for the case
+    // that is not the normal flow: an administrator setting the flag on an
+    // account that is already signed in somewhere.
+    if (user?.mustChangePassword) {
+      throw new OnboardingIncompleteException();
+    }
     if (!user?.mfaEnabled) {
       throw new MfaRequiredException();
     }

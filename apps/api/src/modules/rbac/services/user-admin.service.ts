@@ -17,6 +17,8 @@ import {
   segregationSignal,
   type SegregationSignal,
 } from '../checker-roles.config';
+import { DepartmentRepository } from '../../../repositories/department.repository';
+import { BranchRepository } from '../../../repositories/branch.repository';
 
 /** A book-wide admin list is a console view, not a report — capped like every
  * other unbounded read in this codebase (`ANALYTICS_POLICY_LIMIT` et al). */
@@ -57,6 +59,8 @@ export class UserAdminService {
   private readonly logger = new Logger(UserAdminService.name);
 
   constructor(
+    private readonly departments: DepartmentRepository,
+    private readonly branches: BranchRepository,
     private readonly users: UserRepository,
     private readonly passwords: PasswordService,
     private readonly permissions: PermissionsService,
@@ -108,6 +112,27 @@ export class UserAdminService {
       );
     }
 
+    // Part II §4.2.2 — the Department must exist, and the tenant-scoped read
+    // means it must exist in THIS office: an Office A admin naming an Office B
+    // department id gets the same "unknown" answer as one naming a department
+    // that does not exist anywhere, which is the only answer that leaks nothing.
+    const department = await this.departments.findById(dto.departmentId);
+    if (!department) {
+      throw new UnprocessableEntityException(
+        "Unknown department. Pick one of this office's own departments.",
+      );
+    }
+
+    // §4.2.2 — Branch is validated exactly like Department, and for the same
+    // reason: the tenant-scoped read means an Office A admin naming an Office B
+    // branch id gets "unknown", never a hint that the row exists elsewhere.
+    const branch = await this.branches.findById(dto.branchId);
+    if (!branch) {
+      throw new UnprocessableEntityException(
+        "Unknown branch. Pick one of this office's own branches.",
+      );
+    }
+
     const passwordHash = await this.passwords.hash(dto.password);
     let user: User;
     try {
@@ -116,6 +141,8 @@ export class UserAdminService {
         email: dto.email,
         passwordHash,
         languagePreference: dto.languagePreference,
+        departmentId: department.id,
+        branchId: branch.id,
         roleIds: roles.map((r) => r.id),
         accessValidFrom,
         accessValidUntil,
@@ -146,6 +173,16 @@ export class UserAdminService {
         email: user.email,
         fullName: user.fullName,
         roles: requested,
+        // §4.2.4 names these explicitly — "who created, for whom, which
+        // role(s), WHICH DEPARTMENT/BRANCH, which Organization". Both ids and
+        // both names: an id alone is unreadable in an audit export years
+        // later, and a rename would silently rewrite history if only the id
+        // were kept. The Organization is not repeated here — every
+        // AuditLogEntry row is already tenant-scoped by its own column.
+        departmentId: department.id,
+        departmentName: department.name,
+        branchId: branch.id,
+        branchName: branch.name,
         accessValidFrom: accessValidFrom?.toISOString() ?? null,
         accessValidUntil: accessValidUntil?.toISOString() ?? null,
       },

@@ -64,6 +64,7 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
 import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
 import { EmailModule } from './modules/email/email.module';
 import { ScheduledJobsGuard } from './common/scheduled-jobs.guard';
+import { OrganizationModule } from './modules/organization/organization.module';
 
 @Module({
   imports: [
@@ -432,6 +433,7 @@ import { ScheduledJobsGuard } from './common/scheduled-jobs.guard';
     KnowledgeBaseArticleModule,
     InsurerMasterModule,
     EmailModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [ScheduledJobsGuard, AppService],

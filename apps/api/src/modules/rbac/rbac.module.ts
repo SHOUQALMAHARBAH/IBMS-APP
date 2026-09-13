@@ -3,8 +3,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { RbacController } from './controllers/rbac.controller';
 import { AccessRecertificationController } from './controllers/access-recertification.controller';
 import { UserAdminController } from './controllers/user-admin.controller';
+import { OrgStructureController } from './controllers/org-structure.controller';
 import { PermissionsService } from './services/permissions.service';
 import { UserAdminService } from './services/user-admin.service';
+import { OrgStructureService } from './services/org-structure.service';
 import { AccessRecertificationService } from './services/access-recertification.service';
 import { AccessRecertificationScheduler } from './services/access-recertification.scheduler';
 import { PermissionsGuard } from './guards/permissions.guard';
@@ -14,6 +16,8 @@ import { AccessRecertificationRepository } from '../../repositories/access-recer
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { SlaModule } from '../sla/sla.module';
+import { DepartmentRepository } from '../../repositories/department.repository';
+import { BranchRepository } from '../../repositories/branch.repository';
 
 @Module({
   // AuthModule exports UserRepository — reused here (the scheduler needs it
@@ -26,10 +30,14 @@ import { SlaModule } from '../sla/sla.module';
     RbacController,
     AccessRecertificationController,
     UserAdminController,
+    OrgStructureController,
   ],
   providers: [
+    DepartmentRepository,
+    BranchRepository,
     PermissionsService,
     UserAdminService,
+    OrgStructureService,
     AccessRecertificationService,
     AccessRecertificationScheduler,
     RoleRepository,

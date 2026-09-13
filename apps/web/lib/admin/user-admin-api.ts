@@ -34,11 +34,24 @@ export interface AdminUser {
   roles: RoleName[];
 }
 
+/** Part II §4.2.2 — a Branch or a Department, as the provisioning form's two
+ * org-structure dropdowns see them. */
+export interface OrgUnit {
+  id: string;
+  name: string;
+  nameAr: string | null;
+}
+
 export interface ProvisionUserInput {
   fullName: string;
   email: string;
   password: string;
   languagePreference?: 'AR' | 'EN';
+  /** Part II §4.2.2 — REQUIRED, and three separate axes: Department is what
+   * the person does, Branch is where they sit, Role is what the system lets
+   * them do. The form must not present any two of them as one field. */
+  departmentId: string;
+  branchId: string;
   roles: RoleName[];
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window. */
   accessValidFrom?: string;
@@ -53,6 +66,28 @@ export function listUsers(
 
 export function provisionUser(input: ProvisionUserInput): Promise<AdminUser> {
   return apiPost('/admin/users', input);
+}
+
+export function listDepartments(): Promise<OrgUnit[]> {
+  return apiGet('/admin/departments');
+}
+
+export function createDepartment(input: {
+  name: string;
+  nameAr?: string;
+}): Promise<OrgUnit> {
+  return apiPost('/admin/departments', input);
+}
+
+export function listBranches(): Promise<OrgUnit[]> {
+  return apiGet('/admin/branches');
+}
+
+export function createBranch(input: {
+  name: string;
+  nameAr?: string;
+}): Promise<OrgUnit> {
+  return apiPost('/admin/branches', input);
 }
 
 export function grantRole(

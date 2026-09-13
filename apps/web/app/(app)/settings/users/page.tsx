@@ -6,11 +6,14 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   ROLE_NAMES,
   grantRole,
+  listBranches,
+  listDepartments,
   listUsers,
   provisionUser,
   revokeRole,
   setUserActive,
   type AdminUser,
+  type OrgUnit,
   type RoleName,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
@@ -53,6 +56,12 @@ export default function UserAdminPage() {
   const [password, setPassword] = useState('');
   const [roles, setRoles] = useState<RoleName[]>([]);
   const [grantChoice, setGrantChoice] = useState<RoleName>(ROLE_NAMES[0]);
+  // Part II §4.2.2 — Department and Branch are required, and are deliberately
+  // rendered as their own labelled dropdowns rather than folded in with Roles.
+  const [departments, setDepartments] = useState<OrgUnit[]>([]);
+  const [branches, setBranches] = useState<OrgUnit[]>([]);
+  const [departmentId, setDepartmentId] = useState('');
+  const [branchId, setBranchId] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +95,23 @@ export default function UserAdminPage() {
     })();
   }, [user, load]);
 
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+    void (async () => {
+      try {
+        const [depts, brs] = await Promise.all([
+          listDepartments(),
+          listBranches(),
+        ]);
+        setDepartments(depts);
+        setBranches(brs);
+      } catch {
+        // The form's own error line covers a failed submit; an empty dropdown
+        // is self-explanatory and must not blank the user list beside it.
+      }
+    })();
+  }, [user, isAdmin]);
+
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setActionError(null);
@@ -112,12 +138,16 @@ export default function UserAdminPage() {
         fullName: fullName.trim(),
         email: email.trim(),
         password,
+        departmentId,
+        branchId,
         roles,
       });
       setFullName('');
       setEmail('');
       setPassword('');
       setRoles([]);
+      setDepartmentId('');
+      setBranchId('');
     });
   }
 
@@ -182,6 +212,38 @@ export default function UserAdminPage() {
               required
             />
           </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            {isArabic ? 'القسم' : 'Department'}
+            <select
+              aria-label="Department"
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              required
+            >
+              <option value="">{isArabic ? '— اختر —' : '— select —'}</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {isArabic ? (d.nameAr ?? d.name) : d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            {isArabic ? 'الفرع' : 'Branch'}
+            <select
+              aria-label="Branch"
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              required
+            >
+              <option value="">{isArabic ? '— اختر —' : '— select —'}</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {isArabic ? (b.nameAr ?? b.name) : b.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <fieldset style={{ border: '1px solid #e5e7eb', padding: '0.5rem' }}>
             <legend>{isArabic ? 'الأدوار' : 'Roles'}</legend>
             {ROLE_NAMES.map((role) => (
@@ -204,7 +266,7 @@ export default function UserAdminPage() {
           </fieldset>
           <button
             type="submit"
-            disabled={busy || roles.length === 0}
+            disabled={busy || roles.length === 0 || !departmentId || !branchId}
             style={{ marginTop: '0.3rem' }}
           >
             {busy

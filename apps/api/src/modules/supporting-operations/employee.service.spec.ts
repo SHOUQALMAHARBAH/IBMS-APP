@@ -3,9 +3,11 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { EmployeeService } from './employee.service';
 import type { EmployeeRepository } from '../../repositories/employee.repository';
+import type { DepartmentRepository } from '../../repositories/department.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
@@ -45,11 +47,20 @@ function baseChecklist(over: Record<string, unknown> = {}) {
   };
 }
 
-function makeService(over: { repo?: Record<string, unknown> } = {}) {
+function makeService(
+  over: {
+    repo?: Record<string, unknown>;
+    departments?: Record<string, unknown>;
+  } = {},
+) {
   const repo = {
     findUserById: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(baseEmployee()),
-    linkUser: vi.fn().mockResolvedValue({ id: 'user-1', employeeId: 'emp-1' }),
+    linkUser: vi.fn().mockResolvedValue({
+      outcome: 'LINKED',
+      user: { id: 'user-1', employeeId: 'emp-1' },
+      departmentAdoptedFromAccount: false,
+    }),
     findById: vi.fn().mockResolvedValue(baseEmployee()),
     findByIdWithRelations: vi.fn().mockResolvedValue({
       ...baseEmployee(),
@@ -116,15 +127,30 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
   };
   const sessions = { revokeAllForUser: vi.fn().mockResolvedValue(undefined) };
 
+  const departments = {
+    findById: vi.fn().mockResolvedValue({ id: 'dept-1', name: 'Claims' }),
+    ...(over.departments ?? {}),
+  };
+
   const service = new EmployeeService(
     repo as unknown as EmployeeRepository,
+    departments as unknown as DepartmentRepository,
     audit as unknown as AuditService,
     encryption as unknown as EncryptionService,
     reveal as unknown as SensitiveFieldRevealService,
     slaTimers as unknown as SlaTimerService,
     sessions as unknown as SessionService,
   );
-  return { service, repo, audit, encryption, reveal, slaTimers, sessions };
+  return {
+    service,
+    repo,
+    departments,
+    audit,
+    encryption,
+    reveal,
+    slaTimers,
+    sessions,
+  };
 }
 
 const CREATE_DTO: CreateEmployeeDto = {
@@ -166,6 +192,80 @@ describe('EmployeeService.create', () => {
     });
     await service.create({ ...CREATE_DTO, userId: 'user-1' }, 'actor-1');
     expect(repo.linkUser).toHaveBeenCalledWith('emp-1', 'user-1');
+  });
+
+  it('validates a supplied departmentId against this office (422)', async () => {
+    const { service } = makeService({
+      departments: { findById: vi.fn().mockResolvedValue(null) },
+    });
+    await expect(
+      service.create({ ...CREATE_DTO, departmentId: 'other-office' }, 'a-1'),
+    ).rejects.toThrow(UnprocessableEntityException);
+  });
+
+  it('passes the org-chart department through to the created row', async () => {
+    const { service, repo } = makeService();
+    await service.create({ ...CREATE_DTO, departmentId: 'dept-1' }, 'a-1');
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ departmentId: 'dept-1' }),
+    );
+  });
+
+  it('refuses to create anything when the employee and the account name different departments', async () => {
+    // The pre-check exists so a rejected link leaves NO employee row behind —
+    // `linkUser` would also refuse, but only after the row was written.
+    const { service, repo } = makeService({
+      repo: {
+        findUserById: vi.fn().mockResolvedValue({
+          id: 'user-1',
+          employeeId: null,
+          departmentId: 'dept-account',
+        }),
+      },
+    });
+    await expect(
+      service.create(
+        { ...CREATE_DTO, userId: 'user-1', departmentId: 'dept-1' },
+        'actor-1',
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(repo.linkUser).not.toHaveBeenCalled();
+  });
+
+  it('allows the link when both name the SAME department', async () => {
+    const { service, repo } = makeService({
+      repo: {
+        findUserById: vi.fn().mockResolvedValue({
+          id: 'user-1',
+          employeeId: null,
+          departmentId: 'dept-1',
+        }),
+      },
+    });
+    await service.create(
+      { ...CREATE_DTO, userId: 'user-1', departmentId: 'dept-1' },
+      'actor-1',
+    );
+    expect(repo.linkUser).toHaveBeenCalledWith('emp-1', 'user-1');
+  });
+
+  it('surfaces a late DEPARTMENT_CONFLICT from linkUser rather than returning a half-linked employee', async () => {
+    const { service } = makeService({
+      repo: {
+        findUserById: vi
+          .fn()
+          .mockResolvedValue({ id: 'user-1', employeeId: null }),
+        linkUser: vi.fn().mockResolvedValue({
+          outcome: 'DEPARTMENT_CONFLICT',
+          employeeDepartmentId: 'dept-1',
+          userDepartmentId: 'dept-2',
+        }),
+      },
+    });
+    await expect(
+      service.create({ ...CREATE_DTO, userId: 'user-1' }, 'actor-1'),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('404s when the given userId does not exist', async () => {

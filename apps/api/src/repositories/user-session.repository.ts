@@ -8,7 +8,11 @@ export type SessionRevokedReason =
   | 'access_window_expired'
   | 'admin_revoked'
   | 'refresh_reuse_detected'
-  | 'password_reset';
+  | 'password_reset'
+  /// Part II §4.7.4 — a self-service password change revokes every OTHER
+  /// session. Distinct from `password_reset` (the forgot-password flow) so the
+  /// audit trail says which of the two happened.
+  | 'password_changed';
 
 @Injectable()
 export class UserSessionRepository {
@@ -28,16 +32,27 @@ export class UserSessionRepository {
     userId: string;
     refreshTokenId?: string;
     expiresAt: Date;
+    /** Part II §4.1.5 — moves forward on activity. */
+    idleExpiresAt: Date;
+    /** Part II §4.1.5 — never moves, whatever the user does. */
+    absoluteExpiresAt: Date;
     userAgent?: string;
     ipAddress?: string;
   }): Promise<UserSession> {
     return this.prisma.client.userSession.create({ data });
   }
 
-  touchActivity(id: string): Promise<UserSession> {
+  /**
+   * Records activity and pushes the idle ceiling out.
+   *
+   * `absoluteExpiresAt` is deliberately NOT touched: it is the cap that a busy
+   * user cannot extend by being busy, which is the only thing separating it
+   * from `idleExpiresAt`.
+   */
+  touchActivity(id: string, idleExpiresAt: Date): Promise<UserSession> {
     return this.prisma.client.userSession.update({
       where: { id },
-      data: { lastActivityAt: new Date() },
+      data: { lastActivityAt: new Date(), idleExpiresAt },
     });
   }
 
@@ -73,6 +88,25 @@ export class UserSessionRepository {
   ): Promise<number> {
     const { count } = await this.prisma.client.userSession.updateMany({
       where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
+    return count;
+  }
+
+  /**
+   * Part II §4.7.4 — revokes every OTHER live session for a user.
+   *
+   * The session that made the change is spared deliberately: logging someone
+   * out of the screen they just used would make a routine password change feel
+   * like a failure. Returns the count, so the caller can report and assert it.
+   */
+  async revokeAllForUserExcept(
+    userId: string,
+    keepSessionId: string,
+    reason: SessionRevokedReason,
+  ): Promise<number> {
+    const { count } = await this.prisma.client.userSession.updateMany({
+      where: { userId, id: { not: keepSessionId }, revokedAt: null },
       data: { revokedAt: new Date(), revokedReason: reason },
     });
     return count;

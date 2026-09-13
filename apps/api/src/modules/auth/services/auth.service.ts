@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { RoleName, User } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
@@ -20,6 +21,8 @@ import { MfaService } from './mfa.service';
 import { SessionService } from './session.service';
 import { SecurityConfigService } from './security-config.service';
 import { requiresHardwareToken } from '../auth.types';
+import { TrustedDeviceService } from './trusted-device.service';
+import { PasswordHistoryRepository } from '../../../repositories/password-history.repository';
 import type { SignupDto } from '../dto/signup.dto';
 import type { LoginDto } from '../dto/login.dto';
 import type {
@@ -32,7 +35,19 @@ import type {
   ResetPasswordDto,
 } from '../dto/password-reset.dto';
 import type { StepUpDto } from '../dto/step-up.dto';
+import type {
+  ChangePasswordDto,
+  ForceChangePasswordDto,
+} from '../dto/password-change.dto';
 import { OutboundEmailService } from '../../email/outbound-email.service';
+
+/** Part II §4.3.1 — the purpose token that reaches the mandatory password
+ * change and nothing else. */
+const ONBOARDING_PURPOSE = 'onboarding';
+const ONBOARDING_TTL_MINUTES = 15;
+
+/** Part II §4.7.3 — "reject reuse of, e.g., the last 5 passwords". */
+const PASSWORD_HISTORY_DEPTH = 5;
 
 interface RequestMeta {
   userAgent?: string;
@@ -63,6 +78,8 @@ const PASSWORD_RESET_TTL_MINUTES = 60;
 export class AuthService {
   constructor(
     private readonly outboundEmail: OutboundEmailService,
+    private readonly trustedDevices: TrustedDeviceService,
+    private readonly passwordHistory: PasswordHistoryRepository,
     private readonly users: UserRepository,
     private readonly refreshTokens: RefreshTokenRepository,
     private readonly mfaCredentials: MfaCredentialRepository,
@@ -107,10 +124,27 @@ export class AuthService {
     return { id: user.id, email: user.email };
   }
 
+  /**
+   * Part II §4.3.1 — the password step of onboarding deliberately hands back a
+   * purpose token, NOT a session: "response is MUST_CHANGE_PASSWORD, not a
+   * session token". It reaches exactly one endpoint,
+   * `POST /auth/password/force-change`, and expires quickly.
+   */
+  private onboardingToken(userId: string): string {
+    return this.tokens.signShortLivedPurposeToken(
+      { sub: userId, purpose: ONBOARDING_PURPOSE },
+      ONBOARDING_TTL_MINUTES,
+    );
+  }
+
   async login(
     dto: LoginDto,
     meta: RequestMeta,
-  ): Promise<{ mfaRequired: true; mfaChallengeToken: string } | IssuedSession> {
+  ): Promise<
+    | { mfaRequired: true; mfaChallengeToken: string }
+    | { outcome: 'MUST_CHANGE_PASSWORD'; onboardingToken: string }
+    | IssuedSession
+  > {
     // Only the lookup is unscoped — working out which Organization this caller
     // belongs to is exactly what it is for. Everything after `adopt()` (the
     // failed-login counter, the session, the audit entry) is properly scoped.
@@ -139,15 +173,179 @@ export class AuthService {
       throw new ForbiddenException('This account is disabled');
     this.assertAccessWindowActive(user);
 
+    // The password counts as proven from here, so the failed-attempt counter is
+    // cleared even when the outcome below is an onboarding step rather than a
+    // session — otherwise someone stuck mid-onboarding accumulates failures
+    // from a password that was in fact correct.
+    await this.users.resetFailedLoginAttempts(user.id);
+
+    // Part II §4.3.1 — the mandatory first password change outranks everything
+    // else, including MFA. The admin who provisioned this account knows the
+    // temporary password; nothing else may happen until it is rotated.
+    if (user.mustChangePassword) {
+      await this.audit.record({
+        userId: user.id,
+        action: 'LOGIN',
+        entityType: 'User',
+        entityId: user.id,
+        afterValue: { outcome: 'MUST_CHANGE_PASSWORD' },
+      });
+      return {
+        outcome: 'MUST_CHANGE_PASSWORD' as const,
+        onboardingToken: this.onboardingToken(user.id),
+      };
+    }
+
+    const roles = await this.users.getRoleNames(user.id);
+
+    // Part II §4.4 — a live trust on THIS device lets a standard role skip the
+    // prompt. Never for an always-MFA role, and never without a password first:
+    // this shortens the second factor, it never replaces the first.
     if (user.mfaEnabled) {
-      const mfaChallengeToken = this.tokens.signShortLivedPurposeToken(
-        { sub: user.id, purpose: MFA_CHALLENGE_PURPOSE },
-        MFA_CHALLENGE_TTL_MINUTES,
-      );
-      return { mfaRequired: true, mfaChallengeToken };
+      const skip = await this.trustedDevices.maySkipMfa(user.id, roles, {
+        fingerprint: dto.deviceFingerprint,
+        userAgent: meta.userAgent,
+        ipAddress: meta.ipAddress,
+      });
+      if (!skip) {
+        const mfaChallengeToken = this.tokens.signShortLivedPurposeToken(
+          { sub: user.id, purpose: MFA_CHALLENGE_PURPOSE },
+          MFA_CHALLENGE_TTL_MINUTES,
+        );
+        return { mfaRequired: true, mfaChallengeToken };
+      }
     }
 
     return this.issueSession(user, meta);
+  }
+
+  /**
+   * Part II §4.3.1 — the one mandatory password change, consuming the
+   * onboarding token issued by `login`.
+   *
+   * Valid ONLY while `mustChangePassword` is true. Once it is false this
+   * endpoint is closed and §4.7's self-service change is the way in, which
+   * requires the current password — so a leaked onboarding token cannot be
+   * replayed later to set a password without knowing the old one.
+   */
+  async forceChangePassword(
+    dto: ForceChangePasswordDto,
+    meta: RequestMeta,
+  ): Promise<IssuedSession> {
+    let payload: { sub: string; purpose: string };
+    try {
+      payload = this.tokens.verifyPurposeToken(dto.onboardingToken);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired onboarding token');
+    }
+    if (payload.purpose !== ONBOARDING_PURPOSE) {
+      throw new UnauthorizedException('Invalid onboarding token');
+    }
+
+    const user = await this.orgContext.runUnscoped('auth-bootstrap', () =>
+      this.users.findById(payload.sub),
+    );
+    if (!user) throw new UnauthorizedException('Invalid onboarding token');
+    this.orgContext.adopt(user.organizationId);
+
+    if (!user.mustChangePassword) {
+      throw new ForbiddenException(
+        'The mandatory password change has already been completed; use the self-service change instead',
+      );
+    }
+    if (!user.isActive)
+      throw new ForbiddenException('This account is disabled');
+
+    await this.applyNewPassword(user, dto.newPassword);
+
+    await this.audit.record({
+      userId: user.id,
+      action: 'PASSWORD_RESET_COMPLETED',
+      entityType: 'User',
+      entityId: user.id,
+      afterValue: { reason: 'mandatory_first_change' },
+    });
+
+    // Reloaded so the session is issued against the post-change state — in
+    // particular `mustChangePassword`, which the onboarding guard reads.
+    const updated = await this.users.findById(user.id);
+    return this.issueSession(updated ?? user, meta);
+  }
+
+  /**
+   * Part II §4.7 — self-service password change, available from Settings once
+   * onboarding is done.
+   */
+  async changePassword(
+    userId: string,
+    sessionId: string,
+    dto: ChangePasswordDto,
+  ): Promise<{ otherSessionsRevoked: number }> {
+    const user = await this.users.findById(userId);
+    if (!user) throw new UnauthorizedException();
+
+    const currentOk = await this.passwords.verify(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+    if (!currentOk) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    await this.applyNewPassword(user, dto.newPassword);
+
+    // §4.7.4 — every OTHER session is revoked. The one that made the change
+    // survives, so the user is not logged out of the screen they are looking
+    // at; anyone else holding a session for this account is.
+    const revoked = await this.sessions.revokeAllForUserExcept(
+      userId,
+      sessionId,
+      'password_changed',
+    );
+    // A password change is the moment to stop trusting devices that were
+    // trusted under the old one.
+    await this.trustedDevices.revokeAllForUser(userId, 'password_changed');
+
+    await this.audit.record({
+      userId,
+      action: 'PASSWORD_RESET_COMPLETED',
+      entityType: 'User',
+      entityId: userId,
+      afterValue: { reason: 'self_service', otherSessionsRevoked: revoked },
+    });
+    return { otherSessionsRevoked: revoked };
+  }
+
+  /**
+   * Shared by the mandatory and self-service changes: policy check, reuse
+   * check, hash, history append.
+   *
+   * §4.3.1.4 and §4.7.3 both require the new password to be absent from the
+   * user's `PasswordHistoryEntry` rows — reusing the temporary password the
+   * admin set would defeat the mandatory change entirely.
+   */
+  private async applyNewPassword(
+    user: User,
+    newPassword: string,
+  ): Promise<void> {
+    this.passwords.assertMeetsPolicy(newPassword);
+
+    const history = await this.passwordHistory.recentForUser(
+      user.id,
+      PASSWORD_HISTORY_DEPTH,
+    );
+    for (const previous of [{ passwordHash: user.passwordHash }, ...history]) {
+      if (await this.passwords.verify(newPassword, previous.passwordHash)) {
+        throw new UnprocessableEntityException(
+          `This password has been used before. Choose one you have not used in your last ${PASSWORD_HISTORY_DEPTH} passwords.`,
+        );
+      }
+    }
+
+    const passwordHash = await this.passwords.hash(newPassword);
+    // The OLD hash is what goes into history: the new one is live on the user.
+    await this.passwordHistory.append(user.id, user.passwordHash);
+    await this.users.setPassword(user.id, passwordHash);
   }
 
   async verifyMfaChallenge(
@@ -189,6 +387,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid authentication code');
     }
     await this.mfaCredentials.touchLastUsed(credential.id);
+
+    // Part II §4.4.2 — the trust grant belongs HERE, right after a verified
+    // second factor, and nowhere else: granting it on a password-only step
+    // would let a stolen password mint its own MFA bypass.
+    if (dto.trustDevice) {
+      const roles = await this.users.getRoleNames(user.id);
+      await this.trustedDevices.trust(user.id, roles, {
+        fingerprint: dto.deviceFingerprint,
+        userAgent: meta.userAgent,
+        ipAddress: meta.ipAddress,
+      });
+    }
+
     await this.audit.record({
       userId: user.id,
       action: 'MFA_VERIFIED',
@@ -251,7 +462,10 @@ export class AuthService {
     await this.sessions.linkRefreshToken(session.id, newStored.id);
 
     const accessToken = this.tokens.signAccessToken(
-      { sub: stored.userId, sid: session.id },
+      // The refreshed token carries the SESSION's Organization, not one the
+      // caller supplied — a refresh must not be a way to re-issue a token for a
+      // different office.
+      { sub: stored.userId, sid: session.id, org: session.organizationId },
       config.accessTokenTtlMinutes,
     );
     return { accessToken, refreshToken: next.raw, refreshTokenExpiresAt };
@@ -426,14 +640,38 @@ export class AuthService {
         'Invalid code — check your authenticator app and try again',
       );
     }
+    // Part II §4.3.2.4 — only NOW is enrolment complete. The live code is what
+    // marks it, not the act of scanning the QR: an account flipped to
+    // `mfaEnabled` at enrolment-start would be one whose authenticator may
+    // never have worked, and the user would discover that at their next login,
+    // locked out, with no way back in.
     await this.mfaCredentials.activate(credential.id);
-    await this.users.setMfaEnabled(userId, true);
+    await this.users.completeMfaEnrollment(userId, 'TOTP_APP');
     await this.audit.record({
       userId,
       action: 'MFA_ENROLLED',
       entityType: 'User',
       entityId: userId,
+      afterValue: { method: 'TOTP_APP' },
     });
+  }
+
+  /** Part II §4.4 — this user's live trusted devices. Never exposes the stored
+   * fingerprint hash: it identifies a specific machine, and the user already
+   * knows which of their own devices these are from the label and dates. */
+  async listTrustedDevices(userId: string) {
+    const devices = await this.trustedDevices.list(userId);
+    return devices.map((d) => ({
+      id: d.id,
+      label: d.label,
+      trustedAt: d.trustedAt,
+      expiresAt: d.expiresAt,
+      lastUsedAt: d.lastUsedAt,
+    }));
+  }
+
+  async revokeTrustedDevice(userId: string, deviceId: string): Promise<void> {
+    await this.trustedDevices.revoke(userId, deviceId, userId);
   }
 
   async disableTotp(userId: string, dto: MfaDisableDto): Promise<void> {
@@ -595,7 +833,7 @@ export class AuthService {
       ipAddress: meta.ipAddress,
     });
     const accessToken = this.tokens.signAccessToken(
-      { sub: user.id, sid: session.id },
+      { sub: user.id, sid: session.id, org: user.organizationId },
       config.accessTokenTtlMinutes,
     );
     await this.users.recordSuccessfulLogin(user.id);

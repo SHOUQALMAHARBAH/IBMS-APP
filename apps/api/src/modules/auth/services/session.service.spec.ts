@@ -35,6 +35,10 @@ function makeSession(overrides: Partial<UserSession> = {}): UserSession {
     lastActivityAt: new Date(),
     lastStepUpAt: null,
     expiresAt: new Date(Date.now() + 999_999),
+    // Part II §4.1.5 — the two ceilings the service now reads. Far enough out
+    // that a fixture which does not care about expiry is simply live.
+    idleExpiresAt: new Date(Date.now() + 999_999),
+    absoluteExpiresAt: new Date(Date.now() + 9_999_999),
     revokedAt: null,
     revokedReason: null,
     ipAddress: null,
@@ -48,6 +52,11 @@ function makeUser(overrides: Partial<User> = {}): User {
     id: 'user-1',
     organizationId: 'org-1',
     fullName: 'Test User',
+    mustChangePassword: false,
+    mfaMethod: null,
+    mfaEnrolledAt: null,
+    mfaEnrollmentPending: false,
+    departmentId: null,
     email: 'test@ibms.test',
     passwordHash: 'x',
     passwordUpdatedAt: new Date(),
@@ -130,7 +139,12 @@ describe('SessionService.validateAndTouch', () => {
       roles: [],
       sessionId: 'session-1',
     });
-    expect(sessions.touchActivity).toHaveBeenCalledWith('session-1');
+    // Part II §4.1.5 — the idle ceiling moves forward with the activity, so the
+    // stored value is written here rather than recomputed on every later read.
+    expect(sessions.touchActivity).toHaveBeenCalledWith(
+      'session-1',
+      expect.any(Date),
+    );
   });
 
   it('rejects when the session does not exist', async () => {

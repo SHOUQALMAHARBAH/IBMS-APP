@@ -128,6 +128,13 @@ enum AuthProvider {
 /// Part 10.1 — MFA factor type. WEBAUTHN is schema-reserved for the
 /// hardware-token fast-follow (mandatory for privileged roles / Compliance
 /// / DPO) — no enrollment/verification path exists for it yet.
+/// Part II §4.1.3.
+enum MfaMethod {
+  TOTP_APP
+  SMS
+  EMAIL
+}
+
 enum MfaCredentialType {
   TOTP
   WEBAUTHN
@@ -358,6 +365,7 @@ model Department {
   updatedAt      DateTime     @updatedAt
 
   employees Employee[]
+  users     User[]
 
   @@index([organizationId])
 }
@@ -411,36 +419,71 @@ model PasswordHistoryEntry {
 /// Part 5.1, Part 10.1 — a system user. MFA/session details live at the
 /// auth-provider layer; this table is the authorization anchor.
 model User {
-  id                  String             @id @default(uuid())
+  id                   String             @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId      String             @default(dbgenerated())
-  organization        Organization       @relation(fields: [organizationId], references: [id])
-  fullName            String
+  organizationId       String             @default(dbgenerated())
+  organization         Organization       @relation(fields: [organizationId], references: [id])
+  fullName             String
   /// Spec §3.2 / §4.1.3 — email is unique WITHIN an Organization, not across
   /// the platform. The global `@unique` was dropped: two brokerage offices may
   /// legitimately employ people whose addresses follow the same pattern, or in
   /// an edge case the exact same address (a shared accountant, a contractor
   /// working for both), and the two must not collide. See `@@unique` below.
-  email               String
-  passwordHash        String
-  passwordUpdatedAt   DateTime?
-  isActive            Boolean            @default(true)
-  languagePreference  LanguagePreference @default(AR)
-  branchId            String?
-  branch              Branch?            @relation(fields: [branchId], references: [id])
-  employeeId          String?            @unique
-  employee            Employee?          @relation(fields: [employeeId], references: [id])
-  authProvider        AuthProvider       @default(LOCAL)
-  mfaEnabled          Boolean            @default(false)
-  lastLoginAt         DateTime?
-  failedLoginAttempts Int                @default(0)
-  lockedUntil         DateTime? // Part 10.1 — automatic lockout after repeated failed logins
+  email                String
+  passwordHash         String
+  passwordUpdatedAt    DateTime?
+  /// Part II §4.3.1 — forces exactly ONE password change, on first login,
+  /// before any other action. The admin who provisioned the account knows the
+  /// temporary password, and that is the residual risk this closes.
+  ///
+  /// Defaults TRUE because an admin-provisioned account is the case that must
+  /// not be forgotten. Self-service signup sets it to false explicitly: that
+  /// user chose their own password and has nothing to rotate. Migration
+  /// 20261001100000 backfills every pre-existing row to false — they have been
+  /// using their own passwords for months, and flipping them all into forced
+  /// rotation on deploy would lock out the entire system at once.
+  mustChangePassword   Boolean            @default(true)
+  isActive             Boolean            @default(true)
+  languagePreference   LanguagePreference @default(AR)
+  branchId             String?
+  branch               Branch?            @relation(fields: [branchId], references: [id])
+  /// Part II §4.2.2 — the functional grouping an admin picks when provisioning,
+  /// as a field SEPARATE from Branch (a location) and from Role (what the
+  /// person may do). §4.1.2 also links Department from `Employee`, which is the
+  /// org-chart view; this is the account-provisioning view, and it mirrors
+  /// `branchId` directly above because §4.2.2 describes the admin filling both
+  /// on the same form. A provisioned account frequently has no `Employee` row
+  /// yet, so without this the required field would have nowhere to land.
+  departmentId         String?
+  department           Department?        @relation(fields: [departmentId], references: [id])
+  employeeId           String?            @unique
+  employee             Employee?          @relation(fields: [employeeId], references: [id])
+  authProvider         AuthProvider       @default(LOCAL)
+  mfaEnabled           Boolean            @default(false)
+  /// Part II §4.3.2. TOTP_APP is the default and preferred method — the code is
+  /// generated on the device, so there is no "send" round trip. SMS/EMAIL exist
+  /// only as a lost-device fallback, never as the primary method.
+  mfaMethod            MfaMethod?
+  mfaEnrolledAt        DateTime?
+  /// Part II §4.3.2 — true between "account provisioned" and "one live code
+  /// verified". While it is true the user reaches the enrollment screen and
+  /// nothing else.
+  ///
+  /// The TOTP secret itself is NOT here, although §4.1.3 sketches a
+  /// `mfaSecretEnc` column on User: it already lives on `MfaCredential.secretEnc`,
+  /// which predates this phase, is already field-level encrypted, and supports
+  /// several credentials per user plus the WebAuthn fast-follow. Moving it up to
+  /// User would be a strictly worse model adopted only to match a sketch.
+  mfaEnrollmentPending Boolean            @default(false)
+  lastLoginAt          DateTime?
+  failedLoginAttempts  Int                @default(0)
+  lockedUntil          DateTime? // Part 10.1 — automatic lockout after repeated failed logins
   // External Auditor (Part 5.1) — time-boxed access
-  accessValidFrom     DateTime?
-  accessValidUntil    DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  accessValidFrom      DateTime?
+  accessValidUntil     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   roles               UserRoleAssignment[]
   auditLogEntries     AuditLogEntry[]             @relation("AuditLogUser")
@@ -458,6 +501,11 @@ model User {
   @@unique([organizationId, email])
   @@index([email])
   @@index([organizationId])
+  /// Declared, not just created in SQL — Prisma does not index a foreign key
+  /// automatically on Postgres, and an undeclared index shows up forever as
+  /// drift that `migrate diff` wants to DROP (the same trap Phase 1 hit with
+  /// `SlaTimer.slaPolicyId`).
+  @@index([departmentId])
 }
 
 /// Part 10.1 — a single enrolled MFA factor. A user may hold more than one
@@ -519,23 +567,31 @@ model RefreshToken {
 /// `SecurityConfig.idleTimeoutMinutes` or past `User.accessValidUntil` is
 /// rejected AND the session is revoked here (not just refused at login).
 model UserSession {
-  id             String        @id @default(uuid())
+  id                String        @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId String        @default(dbgenerated())
-  organization   Organization  @relation(fields: [organizationId], references: [id])
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  refreshTokenId String?       @unique
-  refreshToken   RefreshToken? @relation(fields: [refreshTokenId], references: [id])
-  createdAt      DateTime      @default(now())
-  lastActivityAt DateTime      @default(now())
-  lastStepUpAt   DateTime? // Part 10.1 — forced re-auth before sensitive actions
-  expiresAt      DateTime
-  revokedAt      DateTime?
-  revokedReason  String? // idle_timeout | logout | access_window_expired | admin_revoked | refresh_reuse_detected
-  ipAddress      String?
-  userAgent      String?
+  organizationId    String        @default(dbgenerated())
+  organization      Organization  @relation(fields: [organizationId], references: [id])
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+  refreshTokenId    String?       @unique
+  refreshToken      RefreshToken? @relation(fields: [refreshTokenId], references: [id])
+  createdAt         DateTime      @default(now())
+  lastActivityAt    DateTime      @default(now())
+  lastStepUpAt      DateTime? // Part 10.1 — forced re-auth before sensitive actions
+  /// Part II §4.1.5 — two independent ceilings, because they answer different
+  /// questions. `idleExpiresAt` moves forward on every authenticated request
+  /// and is what "you have been away too long" means; `absoluteExpiresAt` never
+  /// moves and caps how long one sign-in can live no matter how busy the user
+  /// is. Either one elapsing fully revokes the session (§4.5) — it is a session
+  /// termination, not a screen lock.
+  idleExpiresAt     DateTime      @default(now())
+  absoluteExpiresAt DateTime      @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  revokedReason     String? // idle_timeout | logout | access_window_expired | admin_revoked | refresh_reuse_detected
+  ipAddress         String?
+  userAgent         String?
 
   @@index([userId])
   @@index([organizationId])

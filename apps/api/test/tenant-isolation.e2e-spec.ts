@@ -8,6 +8,38 @@ import { prisma, rawPrisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
+ * Part II §4.2.2 — provisioning now requires a Department, as a field distinct
+ * from Role, plus the Branch §4.2.2 requires beside it. Created on demand,
+ * through the admin endpoints rather than a raw insert, for this office.
+ */
+let provisioningOrgUnits: {
+  departmentId: string;
+  branchId: string;
+} | null = null;
+async function orgUnitsForProvisioning(
+  app: INestApplication<App>,
+  adminAccessToken: string,
+): Promise<{ departmentId: string; branchId: string }> {
+  if (provisioningOrgUnits) return provisioningOrgUnits;
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const department = await request(app.getHttpServer())
+    .post('/admin/departments')
+    .set(bearer(adminAccessToken))
+    .send({ name: `Spec Department ${suffix}` })
+    .expect(201);
+  const branch = await request(app.getHttpServer())
+    .post('/admin/branches')
+    .set(bearer(adminAccessToken))
+    .send({ name: `Spec Branch ${suffix}` })
+    .expect(201);
+  provisioningOrgUnits = {
+    departmentId: (department.body as { id: string }).id,
+    branchId: (branch.body as { id: string }).id,
+  };
+  return provisioningOrgUnits;
+}
+
+/**
  * Multi-tenancy Phase 2 step 9 — the Part V "Multi-tenancy" checklist, run as
  * real tests across TWO Organizations.
  *
@@ -517,6 +549,7 @@ describe('Part V — a write that reports success actually wrote (item 6)', () =
         fullName: 'To Be Disabled',
         email,
         password: PASSWORD,
+        ...(await orgUnitsForProvisioning(app!, admin.accessToken)),
         roles: ['SALES_RELATIONSHIP_OFFICER'],
       })
       .expect(201);
