@@ -20,6 +20,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -43,7 +44,7 @@ export default function UserAdminPage() {
   const { user, isLoading } = useAuth();
   const { language } = useLanguage();
   const isArabic = language === 'AR';
-  const isAdmin = !!user && user.roles.includes('SYSTEM_SECURITY_ADMINISTRATOR');
+  const isAdmin = hasPermission(user, 'user.manage');
 
   const [rows, setRows] = useState<AdminUser[] | null>(null);
   const [total, setTotal] = useState(0);

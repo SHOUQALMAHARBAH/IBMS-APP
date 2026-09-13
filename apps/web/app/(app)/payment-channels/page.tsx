@@ -12,8 +12,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const FINANCE_ROLE = 'FINANCE_COLLECTIONS_OFFICER';
 const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'];
 
 const cellStyle: CSSProperties = {
@@ -35,7 +35,7 @@ const labelStyle: CSSProperties = {
 export default function PaymentChannelsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.includes(FINANCE_ROLE);
+  const canManage = hasPermission(user, 'payment-channel.manage');
 
   const [rows, setRows] = useState<PaymentChannel[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

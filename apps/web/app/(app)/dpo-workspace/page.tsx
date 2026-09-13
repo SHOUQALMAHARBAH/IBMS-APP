@@ -10,8 +10,11 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const ROLES = ['DATA_PROTECTION_OFFICER'];
+const ROLES = [
+  'dpo-workspace.view',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -22,14 +25,11 @@ const cell: CSSProperties = {
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function DpoWorkspacePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canView = hasAny(user?.roles, ROLES);
+  const canView = hasAnyPermission(user, ROLES);
 
   const [summary, setSummary] = useState<DpoWorkspaceSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

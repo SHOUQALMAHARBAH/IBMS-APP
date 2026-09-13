@@ -18,11 +18,11 @@ import {
   labelStyle,
 } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
 // Client-side hint only — the backend enforces needs-assessment.create /
 // risk-profile.create on POST regardless (same convention as
 // leads/page.tsx's CAN_CREATE_LEAD_ROLES).
-const CAN_START_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 function NewNeedsAssessmentFlow() {
   const router = useRouter();
@@ -223,7 +223,7 @@ export default function NewNeedsAssessmentPage() {
 
   if (isLoading || !user) return null;
 
-  const canStart = user.roles.some((role) => CAN_START_ROLES.includes(role));
+  const canStart = hasPermission(user, 'needs-assessment.create');
 
   return (
     <main style={pageStyle}>

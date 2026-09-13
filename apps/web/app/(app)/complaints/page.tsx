@@ -19,6 +19,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
 const LOG_ROLES = [
   'SALES_RELATIONSHIP_OFFICER',
@@ -27,8 +28,12 @@ const LOG_ROLES = [
   'COMPLIANCE_OFFICER',
   'BRANCH_DEPARTMENT_MANAGER',
 ];
-const ESCALATE_ROLES = ['BRANCH_DEPARTMENT_MANAGER', 'COMPLIANCE_OFFICER'];
-const CLOSE_ROLES = ['BRANCH_DEPARTMENT_MANAGER'];
+const ESCALATE_ROLES = [
+  'complaint.escalate',
+];
+const CLOSE_ROLES = [
+  'complaint.close',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -49,16 +54,13 @@ function slaLabel(c: Complaint): string {
   return `due ${c.sla.dueAt.slice(0, 10)}`;
 }
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function ComplaintsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canLog = hasAny(user?.roles, LOG_ROLES);
-  const canEscalate = hasAny(user?.roles, ESCALATE_ROLES);
-  const canClose = hasAny(user?.roles, CLOSE_ROLES);
+  const canLog = hasAnyPermission(user, LOG_ROLES);
+  const canEscalate = hasAnyPermission(user, ESCALATE_ROLES);
+  const canClose = hasAnyPermission(user, CLOSE_ROLES);
 
   const [rows, setRows] = useState<Complaint[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

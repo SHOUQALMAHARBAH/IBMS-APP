@@ -14,9 +14,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const FINANCE_ROLE = 'FINANCE_COLLECTIONS_OFFICER';
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -49,7 +48,7 @@ export default function BankReconciliationPage() {
   const { user, isLoading } = useAuth();
   const canReconcile =
     !!user &&
-    (user.roles.includes(FINANCE_ROLE) || user.roles.includes(MANAGER_ROLE));
+    hasPermission(user, 'reconciliation-exception.investigate');
 
   const [rows, setRows] = useState<ReconciliationException[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

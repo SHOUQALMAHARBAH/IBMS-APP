@@ -24,6 +24,7 @@ import {
   labelStyle,
 } from '../../../components/auth/auth-form.styles';
 import { pageStyle, sectionStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 import {
   siteCardStyle,
   summaryFigureLabelStyle,
@@ -32,10 +33,6 @@ import {
   summaryPanelStyle,
 } from '../../../components/risk-profile/risk-profile.styles';
 
-const CAN_EDIT_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-];
 
 function Figure({ label, value }: { label: string; value: string }) {
   return (
@@ -92,7 +89,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const canEdit =
-    user?.roles.some((role) => CAN_EDIT_ROLES.includes(role)) ?? false;
+    hasPermission(user, 'risk-profile.create');
 
   const load = useCallback(async () => {
     try {

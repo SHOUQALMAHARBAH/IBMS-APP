@@ -15,12 +15,8 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MANAGE_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -39,7 +35,7 @@ export default function RenewalCasesPage() {
   const { user, isLoading } = useAuth();
   const { language } = useLanguage();
   const isArabic = language === 'AR';
-  const canManage = !!user && user.roles.some((r) => MANAGE_ROLES.includes(r));
+  const canManage = hasPermission(user, 'renewal.manage');
 
   const [rows, setRows] = useState<RenewalCase[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

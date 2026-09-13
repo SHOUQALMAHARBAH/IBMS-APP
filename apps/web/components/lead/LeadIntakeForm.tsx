@@ -11,9 +11,10 @@ import { ApiError } from '../../lib/auth/api-client';
 import { useAuth } from '../../lib/auth/auth-context';
 import { buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../auth/auth-form.styles';
 import { checkboxRowStyle, fieldStyle, formRowStyle, sectionStyle } from './lead.styles';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../lib/i18n/language-context';
 import type { TranslationKey } from '../../lib/i18n/translations';
+import { hasPermission } from '../../lib/auth/permissions';
 
 const SOURCE_LABEL_KEY: Record<LeadSource, TranslationKey> = {
   referral: 'leadSourceReferral',
@@ -85,7 +86,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
       <h2 style={{ marginTop: 0 }}>{t('leadsNewLeadHeading')}</h2>
       <PrivacyNoticeDisplay
         touchpoint="lead_capture"
-        canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+        canRead={hasPermission(user, 'privacy-notice.read')}
       />
       <form onSubmit={(e) => void handleSubmit(e)}>
         <div style={formRowStyle}>

@@ -13,12 +13,12 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { StartCyclePanel } from '../../../components/access-recertification/StartCyclePanel';
 import { RecertificationItemsTable } from '../../../components/access-recertification/RecertificationItemsTable';
 import { pageStyle } from '../../../components/access-recertification/access-recertification.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 // Roles the seeded permission grid grants `access-recertification.cycle.start`
 // to (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
 // so the "Start a cycle" form isn't offered to someone who'll just get a 403.
 // The backend remains the sole source of truth.
-const CAN_START_CYCLE_ROLES = ['SYSTEM_SECURITY_ADMINISTRATOR', 'COMPLIANCE_OFFICER'];
 
 export default function AccessRecertificationPage() {
   const router = useRouter();
@@ -56,7 +56,7 @@ export default function AccessRecertificationPage() {
 
   if (isLoading || !user) return null;
 
-  const canStartCycle = user.roles.some((role) => CAN_START_CYCLE_ROLES.includes(role));
+  const canStartCycle = hasPermission(user, 'access-recertification.cycle.start');
 
   function handleItemDecided(result: RecertificationDecisionResult) {
     // Only patch the fields the decision endpoint actually returns — it's

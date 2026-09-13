@@ -59,6 +59,12 @@ const meSchema = {
     fullName: { type: 'string' as const },
     languagePreference: { type: 'string' as const },
     roles: { type: 'array' as const, items: { type: 'string' as const } },
+    /** Part IV §10.4 — the caller's RESOLVED permission codes, sorted. The
+     * single source the frontend drives every conditional render from. */
+    permissions: {
+      type: 'array' as const,
+      items: { type: 'string' as const },
+    },
     mfaEnabled: { type: 'boolean' as const },
     mfaPolicySatisfied: { type: 'boolean' as const },
     accessValidUntil: { type: 'string' as const, nullable: true },
@@ -70,6 +76,7 @@ const meSchema = {
     'id',
     'email',
     'fullName',
+    'permissions',
     'roles',
     'mfaEnabled',
     'mfaPolicySatisfied',

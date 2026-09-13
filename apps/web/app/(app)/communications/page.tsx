@@ -14,13 +14,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const SEND_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -38,7 +33,7 @@ export default function CommunicationsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const canSend =
-    !!user && user.roles.some((r) => SEND_ROLES.includes(r));
+    hasPermission(user, 'communication.send');
 
   const [rows, setRows] = useState<Communication[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

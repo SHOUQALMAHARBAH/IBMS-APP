@@ -22,9 +22,8 @@ import {
 } from '../../../components/cross-sell/cross-sell.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
-const CAN_SCAN_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
 
 function OpportunityRow({
   opportunity,
@@ -145,9 +144,9 @@ function OpportunityRow({
 
 function CrossSellForCustomer({ customerId }: { customerId: string }) {
   const { user } = useAuth();
-  const canConvert = user?.roles.includes(CAN_CONVERT_ROLE) ?? false;
+  const canConvert = hasPermission(user, 'cross-sell.convert');
   const canScan =
-    user?.roles.some((role) => CAN_SCAN_ROLES.includes(role)) ?? false;
+    hasPermission(user, 'cross-sell.detect');
 
   const [opportunities, setOpportunities] = useState<
     CrossSellOpportunity[] | null

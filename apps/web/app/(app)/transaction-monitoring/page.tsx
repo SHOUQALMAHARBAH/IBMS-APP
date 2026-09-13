@@ -16,8 +16,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MONITOR_ROLE = 'COMPLIANCE_OFFICER';
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -34,7 +34,7 @@ const head: CSSProperties = {
 export default function TransactionMonitoringPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canMonitor = !!user && user.roles.includes(MONITOR_ROLE);
+  const canMonitor = hasPermission(user, 'aml.monitor');
 
   const [rows, setRows] = useState<TransactionMonitoringAlert[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

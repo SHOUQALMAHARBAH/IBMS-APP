@@ -1084,6 +1084,26 @@ const pdpl: PermissionSeed[] = [
     roles: [DPO],
   },
   {
+    code: "privacy-notice.read",
+    module: "pdpl",
+    description:
+      "Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)",
+    // The roles that stand in front of a data subject at the moment their
+    // data is collected, and therefore have to be able to show them the
+    // notice: Sales at lead/customer intake, Placement at risk assessment and
+    // RFQ, Claims at first notification. DPO and Compliance are here because
+    // they own the notices and their own admin screen reads through the same
+    // endpoints — holding publish does not imply read, the grid is flat.
+    //
+    // Reading was previously authorised by consent.manage, which is
+    // held by the same touchpoint roles. That worked, but it made a
+    // WRITE permission on a DIFFERENT resource the gate for this read, so the
+    // two would silently drift apart the day either changed for its own
+    // reasons. Nobody may read a notice who could not already; this only
+    // names the reason correctly.
+    roles: [SALES, PLACEMENT, CLAIMS, DPO, COMPLIANCE],
+  },
+  {
     code: "privacy-notice.publish",
     module: "pdpl",
     description: "Publish a version-controlled bilingual privacy notice",

@@ -25,10 +25,9 @@ import {
   profileFieldValueStyle,
 } from '../../../../components/prospect/prospect.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 export default function NeedsAssessmentDetailPage() {
   const router = useRouter();
@@ -92,8 +91,8 @@ export default function NeedsAssessmentDetailPage() {
   if (isLoading || !user) return null;
 
   const isCreator = assessment?.createdByUserId === user.id;
-  const isManager = user.roles.includes(MANAGER_ROLE);
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isManager = hasPermission(user, 'needs-assessment.approve');
+  const isPlacement = hasPermission(user, 'program.assemble');
   const inReview =
     assessment?.status === 'PENDING_REVIEW' || assessment?.status === 'REVIEWED';
 
@@ -126,7 +125,7 @@ export default function NeedsAssessmentDetailPage() {
           />
           <PrivacyNoticeDisplay
             touchpoint="needs_risk_assessment"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={coveragePreviewStyle}>

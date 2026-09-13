@@ -12,14 +12,12 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -42,10 +40,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 export default function SalesPerformancePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const isManager = hasAny(user?.roles, [
-    'BRANCH_DEPARTMENT_MANAGER',
-    'EXECUTIVE_MANAGEMENT',
-  ]);
+  const isManager = hasPermission(user, 'sales-target.manage');
 
   const [ownerUserId, setOwnerUserId] = useState('');
   const [branchId, setBranchId] = useState('');

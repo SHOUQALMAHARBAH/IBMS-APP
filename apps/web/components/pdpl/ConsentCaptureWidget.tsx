@@ -10,6 +10,7 @@ import {
   type ConsentRecord,
 } from '../../lib/pdpl/consent-api';
 import { ApiError } from '../../lib/auth/api-client';
+import { hasPermission } from '../../lib/auth/permissions';
 
 // Part D §5.1 — the shared, reusable consent-capture control mounted at each
 // of the backlog's named touchpoints that already has an existing customer-
@@ -19,12 +20,6 @@ import { ApiError } from '../../lib/auth/api-client';
 // Claims and Group Medical/Life & Motor Fleet remain deliberate, documented
 // gaps — see README § Known gaps — no Claims web UI and no InsuredPerson
 // CRUD exist yet for a widget to attach to.
-const CONSENT_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'DATA_PROTECTION_OFFICER',
-];
 
 interface Props {
   purpose: string;
@@ -42,7 +37,7 @@ export function ConsentCaptureWidget({
   insuredPersonId,
 }: Props) {
   const { user } = useAuth();
-  const canManage = !!user && user.roles.some((r) => CONSENT_ROLES.includes(r));
+  const canManage = hasPermission(user, 'consent.manage');
 
   // undefined = still loading (avoids a flash of "not captured yet").
   const [record, setRecord] = useState<ConsentRecord | null | undefined>(

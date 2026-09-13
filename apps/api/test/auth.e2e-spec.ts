@@ -20,6 +20,7 @@ interface MeBody {
   email: string;
   mfaEnabled: boolean;
   languagePreference: 'AR' | 'EN';
+  permissions: string[];
 }
 interface ForgotPasswordBody {
   devResetToken?: string;
@@ -115,6 +116,13 @@ describe('Auth (e2e)', () => {
       const meBody = me.body as MeBody;
       expect(meBody.email).toBe(email);
       expect(meBody.mfaEnabled).toBe(false);
+      // Part IV §10.4 — the resolved permission set ships with the identity,
+      // so the frontend has one source to render from. A fresh signup holds no
+      // roles at all, so the correct answer here is an empty array, NOT a
+      // missing field: the UI must be able to tell "no permissions" from "the
+      // server did not say", and only one of those is safe to render from.
+      expect(Array.isArray(meBody.permissions)).toBe(true);
+      expect(meBody.permissions).toEqual([]);
 
       const refreshed = await agent.post('/auth/refresh').expect(200);
       const refreshedBody = refreshed.body as { accessToken: string };

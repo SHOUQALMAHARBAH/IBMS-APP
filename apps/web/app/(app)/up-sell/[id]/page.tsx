@@ -25,11 +25,11 @@ import {
   upSellFigureRowStyle,
 } from '../../../../components/up-sell/up-sell.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../../lib/i18n/format';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
 export default function UpSellRecommendationDetailPage() {
   const router = useRouter();
@@ -89,7 +89,7 @@ export default function UpSellRecommendationDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const canConvert = user.roles.includes(CAN_CONVERT_ROLE);
+  const canConvert = hasPermission(user, 'up-sell.convert');
 
   return (
     <main style={pageStyle}>
@@ -128,7 +128,7 @@ export default function UpSellRecommendationDetailPage() {
           />
           <PrivacyNoticeDisplay
             touchpoint="renewal_cross_sell"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={upSellFigureRowStyle}>

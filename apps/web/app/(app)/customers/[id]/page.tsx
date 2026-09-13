@@ -23,10 +23,11 @@ import {
 } from '../../../../components/prospect/prospect.styles';
 import { repeatableRowStyle } from '../../../../components/customer/customer.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../../lib/customer/customer-api';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -139,35 +140,12 @@ export default function CustomerProfilePage() {
   // Client-side hint only (same convention as CAN_CREATE_CUSTOMER_ROLES) —
   // the backend enforces needs-assessment.create / risk-profile.* on write
   // regardless.
-  const canStartNeedsAssessment = user.roles.includes('SALES_RELATIONSHIP_OFFICER');
-  const canOpenRiskSurvey = user.roles.some((role) =>
-    ['SALES_RELATIONSHIP_OFFICER', 'PLACEMENT_TECHNICAL_OFFICER'].includes(role),
-  );
-  const canOpenInsuranceProgram = user.roles.some((role) =>
-    [
-      'SALES_RELATIONSHIP_OFFICER',
-      'PLACEMENT_TECHNICAL_OFFICER',
-      'BRANCH_DEPARTMENT_MANAGER',
-      'EXECUTIVE_MANAGEMENT',
-    ].includes(role),
-  );
-  const canOpenCrossSell = user.roles.some((role) =>
-    [
-      'SALES_RELATIONSHIP_OFFICER',
-      'BRANCH_DEPARTMENT_MANAGER',
-      'EXECUTIVE_MANAGEMENT',
-    ].includes(role),
-  );
+  const canStartNeedsAssessment = hasPermission(user, 'needs-assessment.create');
+  const canOpenRiskSurvey = hasPermission(user, 'risk-profile.create');
+  const canOpenInsuranceProgram = hasPermission(user, 'program.read');
+  const canOpenCrossSell = hasPermission(user, 'cross-sell.read');
   const canOpenUpSell = canOpenCrossSell;
-  const canOpenCrm = user.roles.some((role) =>
-    [
-      'SALES_RELATIONSHIP_OFFICER',
-      'BRANCH_DEPARTMENT_MANAGER',
-      'EXECUTIVE_MANAGEMENT',
-      'COMPLIANCE_OFFICER',
-      'EXTERNAL_AUDITOR',
-    ].includes(role),
-  );
+  const canOpenCrm = hasPermission(user, 'customer.360-view.read');
 
   return (
     <main style={pageStyle}>
@@ -201,7 +179,7 @@ export default function CustomerProfilePage() {
           />
           <PrivacyNoticeDisplay
             touchpoint="onboarding_kyc"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={profileGridStyle}>

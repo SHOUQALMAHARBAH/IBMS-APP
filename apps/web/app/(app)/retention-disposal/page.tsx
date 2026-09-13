@@ -27,11 +27,20 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const SCHEDULE_ROLES = ['COMPLIANCE_OFFICER', 'DATA_PROTECTION_OFFICER'];
-const LEGAL_HOLD_ROLES = ['DATA_PROTECTION_OFFICER'];
-const DISPOSE_NOMINATE_ROLES = ['BRANCH_DEPARTMENT_MANAGER'];
-const DISPOSE_APPROVE_ROLES = ['DATA_PROTECTION_OFFICER'];
+const SCHEDULE_ROLES = [
+  'retention-schedule.manage',
+];
+const LEGAL_HOLD_ROLES = [
+  'legal-hold.manage',
+];
+const DISPOSE_NOMINATE_ROLES = [
+  'retention.dispose.nominate',
+];
+const DISPOSE_APPROVE_ROLES = [
+  'retention.dispose.approve',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -42,17 +51,14 @@ const cell: CSSProperties = {
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function RetentionDisposalPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManageSchedule = hasAny(user?.roles, SCHEDULE_ROLES);
-  const canManageHolds = hasAny(user?.roles, LEGAL_HOLD_ROLES);
-  const canNominate = hasAny(user?.roles, DISPOSE_NOMINATE_ROLES);
-  const canApprove = hasAny(user?.roles, DISPOSE_APPROVE_ROLES);
+  const canManageSchedule = hasAnyPermission(user, SCHEDULE_ROLES);
+  const canManageHolds = hasAnyPermission(user, LEGAL_HOLD_ROLES);
+  const canNominate = hasAnyPermission(user, DISPOSE_NOMINATE_ROLES);
+  const canApprove = hasAnyPermission(user, DISPOSE_APPROVE_ROLES);
 
   const [schedule, setSchedule] = useState<RetentionScheduleItem[] | null>(null);
   const [holds, setHolds] = useState<LegalHold[] | null>(null);

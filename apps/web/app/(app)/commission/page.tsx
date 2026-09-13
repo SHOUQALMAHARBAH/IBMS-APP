@@ -13,9 +13,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 
 function pct(v: string): string {
   const n = Number(v);
@@ -38,8 +37,7 @@ export default function CommissionRatesPage() {
   const { user, isLoading } = useAuth();
   const canManage =
     !!user &&
-    (user.roles.includes(COMPLIANCE_ROLE) ||
-      user.roles.includes(MANAGER_ROLE));
+    hasPermission(user, 'commission-rate.manage');
 
   const [rows, setRows] = useState<CommissionAgreement[] | null>(null);
   const [insurers, setInsurers] = useState<Insurer[]>([]);

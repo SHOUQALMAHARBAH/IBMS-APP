@@ -32,12 +32,12 @@ import {
   rfqTableStyle,
 } from '../../../../components/rfq/rfq.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../../../lib/i18n/translations';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 // The medium of a broker<->insurer exchange. The API accepts the full
 // InteractionChannel enum; this is the practical subset for placement work.
@@ -217,7 +217,7 @@ export default function RfqDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isPlacement = hasPermission(user, 'rfq.insurer.update');
   const shortlistedIds = new Set(
     rfq?.insurerSubmissions.map((s) => s.insurerId) ?? [],
   );
@@ -260,7 +260,7 @@ export default function RfqDetailPage() {
           />
           <PrivacyNoticeDisplay
             touchpoint="rfq_market_placement"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <h2 style={{ marginTop: '2rem' }}>{t('rfqSubmissionsHeading')}</h2>

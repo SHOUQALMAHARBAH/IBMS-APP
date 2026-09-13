@@ -22,20 +22,20 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
 const REPORT_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-  'SYSTEM_SECURITY_ADMINISTRATOR',
-  'DATA_PROTECTION_OFFICER',
+  'incident.report',
 ];
-const CONTAIN_ROLES = ['SYSTEM_SECURITY_ADMINISTRATOR', 'COMPLIANCE_OFFICER'];
-const CLASSIFY_ROLES = ['DATA_PROTECTION_OFFICER', 'EXECUTIVE_MANAGEMENT'];
-const NOTIFY_REGULATOR_ROLES = ['DATA_PROTECTION_OFFICER', 'COMPLIANCE_OFFICER'];
+const CONTAIN_ROLES = [
+  'incident.contain',
+];
+const CLASSIFY_ROLES = [
+  'incident.classify',
+];
+const NOTIFY_REGULATOR_ROLES = [
+  'incident.notify-regulator',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -47,25 +47,24 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function IncidentsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canReport = hasAny(user?.roles, REPORT_ROLES);
-  const canContain = hasAny(user?.roles, CONTAIN_ROLES);
-  const canClassify = hasAny(user?.roles, CLASSIFY_ROLES);
-  // incident.classify is shared by DPO (classify) and Executive Management
-  // (co-sign) — a review MINOR: showing the Classify buttons to an
-  // Executive-Management-only user (or the Co-sign button to a DPO-only
-  // user) offers a control the server will always 403, since the role
-  // split is enforced beyond the coarse permission. Split visibility by the
-  // SPECIFIC role each sub-action actually needs.
-  const isDpo = hasAny(user?.roles, ['DATA_PROTECTION_OFFICER']);
-  const isExec = hasAny(user?.roles, ['EXECUTIVE_MANAGEMENT']);
-  const canNotifyRegulators = hasAny(user?.roles, NOTIFY_REGULATOR_ROLES);
+  const canReport = hasAnyPermission(user, REPORT_ROLES);
+  const canContain = hasAnyPermission(user, CONTAIN_ROLES);
+  const canClassify = hasAnyPermission(user, CLASSIFY_ROLES);
+  // §10.4 has exactly one documented exception in this app, and it is here.
+  // Classify and co-sign BOTH require incident.classify, so the permission
+  // cannot distinguish them — but they are a maker/checker pair (DPO
+  // classifies, Executive Management co-signs, assertDifferentActors enforces
+  // it). Gating both on the shared permission would offer each user a control
+  // the server will always refuse, which is the very thing §10.4 exists to
+  // prevent. So these two stay ROLE checks deliberately: the role is the
+  // finer-grained fact here, not a stale copy of the grid.
+  const isDpo = !!user && user.roles.includes('DATA_PROTECTION_OFFICER');
+  const isExec = !!user && user.roles.includes('EXECUTIVE_MANAGEMENT');
+  const canNotifyRegulators = hasAnyPermission(user, NOTIFY_REGULATOR_ROLES);
 
   const [incidents, setIncidents] = useState<IncidentReport[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

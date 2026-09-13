@@ -7,12 +7,12 @@ import { type Prospect } from '../../../../lib/prospect/prospect-api';
 import { ProspectConversionForm } from '../../../../components/prospect/ProspectConversionForm';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
 // Roles the seeded permission grid grants `prospect.capture` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
 // same convention as leads/page.tsx's CAN_CREATE_LEAD_ROLES. The backend
 // independently enforces this on POST /prospects regardless.
-const CAN_CAPTURE_PROSPECT_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 function ConvertProspectForm() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function NewProspectPage() {
 
   if (isLoading || !user) return null;
 
-  const canCaptureProspect = user.roles.some((role) => CAN_CAPTURE_PROSPECT_ROLES.includes(role));
+  const canCaptureProspect = hasPermission(user, 'prospect.capture');
 
   return (
     <main style={pageStyle}>

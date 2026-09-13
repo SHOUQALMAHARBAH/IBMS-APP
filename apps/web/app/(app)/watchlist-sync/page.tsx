@@ -12,8 +12,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MONITOR_ROLE = 'COMPLIANCE_OFFICER';
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -30,7 +30,7 @@ const head: CSSProperties = {
 export default function WatchlistSyncPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.includes(MONITOR_ROLE);
+  const canManage = hasPermission(user, 'sanctions-pep.screen');
 
   const [runs, setRuns] = useState<WatchlistSyncRun[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

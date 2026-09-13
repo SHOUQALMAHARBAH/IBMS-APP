@@ -12,8 +12,11 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const ROLES = ['DATA_PROTECTION_OFFICER'];
+const ROLES = [
+  'cross-border-transfer.approve',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -23,14 +26,11 @@ const cell: CSSProperties = {
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function CrossBorderTransfersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = hasAny(user?.roles, ROLES);
+  const canManage = hasAnyPermission(user, ROLES);
 
   const [records, setRecords] = useState<CrossBorderTransferRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

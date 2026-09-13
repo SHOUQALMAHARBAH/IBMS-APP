@@ -20,16 +20,17 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
 const LOG_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'CLAIMS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'DATA_PROTECTION_OFFICER',
+  'dsr.log',
 ];
-const HANDLE_ROLES = ['DATA_PROTECTION_OFFICER'];
-const CLOSE_ROLES = ['DATA_PROTECTION_OFFICER'];
+const HANDLE_ROLES = [
+  'dsr.handle',
+];
+const CLOSE_ROLES = [
+  'dsr.close',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -43,16 +44,13 @@ const head: CSSProperties = {
   borderBottom: '2px solid #d1d5db',
 };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function DsrPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canLog = hasAny(user?.roles, LOG_ROLES);
-  const canHandle = hasAny(user?.roles, HANDLE_ROLES);
-  const canClose = hasAny(user?.roles, CLOSE_ROLES);
+  const canLog = hasAnyPermission(user, LOG_ROLES);
+  const canHandle = hasAnyPermission(user, HANDLE_ROLES);
+  const canClose = hasAnyPermission(user, CLOSE_ROLES);
 
   const [rows, setRows] = useState<DataSubjectRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

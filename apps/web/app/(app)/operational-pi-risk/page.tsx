@@ -26,9 +26,14 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const RISK_REGISTER_ROLE = ['COMPLIANCE_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
-const PI_POLICY_ROLE = ['COMPLIANCE_OFFICER'];
+const RISK_REGISTER_ROLE = [
+  'risk-register.manage',
+];
+const PI_POLICY_ROLE = [
+  'pi-policy.manage',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -40,15 +45,12 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function OperationalPiRiskPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManageRiskRegister = hasAny(user?.roles, RISK_REGISTER_ROLE);
-  const canManagePiPolicy = hasAny(user?.roles, PI_POLICY_ROLE);
+  const canManageRiskRegister = hasAnyPermission(user, RISK_REGISTER_ROLE);
+  const canManagePiPolicy = hasAnyPermission(user, PI_POLICY_ROLE);
 
   const [risks, setRisks] = useState<RiskRegisterItem[] | null>(null);
   const [risksError, setRisksError] = useState<string | null>(null);

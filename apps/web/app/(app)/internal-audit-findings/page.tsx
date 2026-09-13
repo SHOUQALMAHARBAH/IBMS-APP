@@ -13,9 +13,14 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const RECORD_ROLE = ['COMPLIANCE_OFFICER'];
-const CLOSE_ROLE = ['COMPLIANCE_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
+const RECORD_ROLE = [
+  'internal-audit.record',
+];
+const CLOSE_ROLE = [
+  'internal-audit.close',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -27,15 +32,12 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function InternalAuditFindingsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canRecord = hasAny(user?.roles, RECORD_ROLE);
-  const canClose = hasAny(user?.roles, CLOSE_ROLE);
+  const canRecord = hasAnyPermission(user, RECORD_ROLE);
+  const canClose = hasAnyPermission(user, CLOSE_ROLE);
 
   const [findings, setFindings] = useState<InternalAuditFinding[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

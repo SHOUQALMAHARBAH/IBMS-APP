@@ -14,9 +14,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
 const REQUEST_TYPES = ['certificate', 'copy', 'change', 'other'];
 
 const cell: CSSProperties = {
@@ -43,7 +42,7 @@ export default function ServiceRequestsPage() {
   const { user, isLoading } = useAuth();
   const canManage =
     !!user &&
-    (user.roles.includes(SALES_ROLE) || user.roles.includes(MANAGER_ROLE));
+    hasPermission(user, 'service-request.manage');
 
   const [rows, setRows] = useState<ServiceRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

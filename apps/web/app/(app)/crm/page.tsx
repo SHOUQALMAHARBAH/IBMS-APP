@@ -26,19 +26,12 @@ import {
 } from '../../../components/crm/crm.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
 // of the `customer.360-view.read` roles: Placement/Claims/Finance can log a
 // touchpoint but cannot read the 360° timeline back).
-const CAN_LOG_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-];
 
 function TimelineList({ view }: { view: Customer360View }) {
   const { language } = useLanguage();
@@ -81,7 +74,7 @@ interface ViewError {
 
 function CrmForCustomer({ customerId }: { customerId: string }) {
   const { user } = useAuth();
-  const canLog = user?.roles.some((role) => CAN_LOG_ROLES.includes(role)) ?? false;
+  const canLog = hasPermission(user, 'interaction.log');
 
   const [view, setView] = useState<Customer360View | null>(null);
   const [viewError, setViewError] = useState<ViewError | null>(null);

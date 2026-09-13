@@ -15,12 +15,8 @@ import {
   type SlaPolicy,
   type SlaPolicyStatus,
 } from "../../../lib/sla/sla-policy-api";
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MANAGE_ROLES = [
-  "COMPLIANCE_OFFICER",
-  "BRANCH_DEPARTMENT_MANAGER",
-  "EXECUTIVE_MANAGEMENT",
-];
 const STATUSES: (SlaPolicyStatus | "ALL")[] = [
   "ALL",
   "ACTIVE",
@@ -60,7 +56,7 @@ export default function SlaPoliciesPage() {
   const { user, isLoading } = useAuth();
   const { language } = useLanguage();
   const isArabic = language === "AR";
-  const canManage = !!user && user.roles.some((r) => MANAGE_ROLES.includes(r));
+  const canManage = hasPermission(user, 'sla.policy.manage');
 
   const [status, setStatus] = useState<SlaPolicyStatus | "ALL">("ACTIVE");
   const [rows, setRows] = useState<SlaPolicy[] | null>(null);

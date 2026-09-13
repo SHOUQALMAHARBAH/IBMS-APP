@@ -1,3 +1,4 @@
+import { PermissionsModule } from '../rbac/permissions.module';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -35,6 +36,7 @@ import { OrganizationModule } from '../organization/organization.module';
     EmailModule,
     PassportModule,
     JwtModule.register({}),
+    PermissionsModule,
   ],
   controllers: [AuthController, SsoController],
   providers: [

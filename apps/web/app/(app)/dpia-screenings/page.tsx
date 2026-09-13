@@ -14,8 +14,11 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const ROLES = ['DATA_PROTECTION_OFFICER'];
+const ROLES = [
+  'dpia.review',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -25,9 +28,6 @@ const cell: CSSProperties = {
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 const INITIAL_ANSWERS = {
   qSensitiveData: false,
@@ -48,7 +48,7 @@ const QUESTIONS: { key: keyof typeof INITIAL_ANSWERS; label: string }[] = [
 export default function DpiaScreeningsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = hasAny(user?.roles, ROLES);
+  const canManage = hasAnyPermission(user, ROLES);
 
   const [rows, setRows] = useState<DpiaScreening[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

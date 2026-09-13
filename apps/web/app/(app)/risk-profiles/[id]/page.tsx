@@ -6,11 +6,8 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import { RiskSurvey } from '../../../../components/risk-profile/RiskSurvey';
 import type { RiskProfileWithSurvey } from '../../../../lib/risk-profile/risk-profile-api';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const CAN_EDIT_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-];
 
 export default function RiskProfileSurveyPage() {
   const router = useRouter();
@@ -25,7 +22,7 @@ export default function RiskProfileSurveyPage() {
 
   if (isLoading || !user) return null;
 
-  const canEdit = user.roles.some((role) => CAN_EDIT_ROLES.includes(role));
+  const canEdit = hasPermission(user, 'risk-profile.create');
 
   return (
     <main style={pageStyle}>

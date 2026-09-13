@@ -14,6 +14,7 @@ import { createOpportunity } from '../../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { hasPermission } from '../../../../lib/auth/permissions';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -26,7 +27,6 @@ import {
   programTableStyle,
 } from '../../../../components/insurance-program/insurance-program.styles';
 
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 export default function InsuranceProgramDetailPage() {
   const router = useRouter();
@@ -108,7 +108,7 @@ export default function InsuranceProgramDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isPlacement = hasPermission(user, 'program.assemble');
   const ctx = program?.context;
 
   return (

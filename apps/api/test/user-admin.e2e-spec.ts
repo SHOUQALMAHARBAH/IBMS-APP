@@ -422,6 +422,52 @@ describe('User admin / provisioning (e2e)', () => {
   });
 
   /**
+   * Part IV §10.4 — the frontend renders from the caller's RESOLVED permission
+   * set, so that set has to be genuinely resolved from the grid rather than a
+   * constant or an echo of the role names.
+   */
+  it('resolves /auth/me permissions from the grid, differently per role', async () => {
+    await appPromise;
+    const admin = await makeUser(
+      app,
+      'ua-perms-admin',
+      'SYSTEM_SECURITY_ADMINISTRATOR',
+    );
+    const officer = await makeUser(
+      app,
+      'ua-perms-officer',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const adminMe = (
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set(bearer(admin.accessToken))
+        .expect(200)
+    ).body as { permissions: string[]; roles: string[] };
+    const officerMe = (
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set(bearer(officer.accessToken))
+        .expect(200)
+    ).body as { permissions: string[]; roles: string[] };
+
+    // The administrator holds the permission the admin screens gate on...
+    expect(adminMe.permissions).toContain('user.manage');
+    // ...and the Sales Officer does not. Without this half the assertion would
+    // pass against a stub that returned every code in the catalogue.
+    expect(officerMe.permissions).not.toContain('user.manage');
+    expect(officerMe.permissions).toContain('lead.create');
+
+    // Permission codes, not role names — the whole point of §10.4 is that the
+    // UI stops branching on roles, so returning them here would defeat it.
+    expect(adminMe.permissions).not.toContain('SYSTEM_SECURITY_ADMINISTRATOR');
+    // Sorted and unique, so the response is stable between calls.
+    expect(adminMe.permissions).toEqual([...adminMe.permissions].sort());
+    expect(new Set(adminMe.permissions).size).toBe(adminMe.permissions.length);
+  });
+
+  /**
    * Part II §4.2.2 — the org-structure lookups the provisioning form depends
    * on. Before these endpoints existed, `departmentId` was a required field
    * whose only possible source was a hand-written INSERT: the requirement was

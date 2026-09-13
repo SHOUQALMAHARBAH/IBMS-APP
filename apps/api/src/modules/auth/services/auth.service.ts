@@ -8,6 +8,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type { RoleName, User } from '@ibms/db';
+import { PermissionsService } from '../../rbac/services/permissions.service';
 import { UserRepository } from '../../../repositories/user.repository';
 import { OrganizationRepository } from '../../../repositories/organization.repository';
 import { OrgContextService } from '../../../common/org-context/org-context.service';
@@ -89,6 +90,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly mfa: MfaService,
     private readonly sessions: SessionService,
+    private readonly permissionsService: PermissionsService,
     private readonly securityConfig: SecurityConfigService,
     private readonly organizations: OrganizationRepository,
     private readonly orgContext: OrgContextService,
@@ -744,6 +746,14 @@ export class AuthService {
     const roles = await this.users.getRoleNames(userId);
     const config = await this.securityConfig.get();
     const stepUpFresh = await this.sessions.isStepUpFresh(sessionId);
+    // Part IV §10.4 — the single source the frontend drives every conditional
+    // render from. Roles alone are not enough: the permission grid is what
+    // actually decides what an action requires, and a UI branching on role
+    // names re-implements that mapping in a second place, where it drifts.
+    // Sorted so the response is stable and diffable.
+    const permissions = [
+      ...(await this.permissionsService.getCodesForRoles(roles)),
+    ].sort();
 
     return {
       id: user.id,
@@ -751,6 +761,7 @@ export class AuthService {
       fullName: user.fullName,
       languagePreference: user.languagePreference,
       roles,
+      permissions,
       mfaEnabled: user.mfaEnabled,
       mfaPolicySatisfied: this.mfaPolicySatisfied(user, roles),
       accessValidUntil: user.accessValidUntil,

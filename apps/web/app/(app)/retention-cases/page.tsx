@@ -14,8 +14,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MANAGE_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -32,7 +32,7 @@ const head: CSSProperties = {
 export default function RetentionCasesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.some((r) => MANAGE_ROLES.includes(r));
+  const canManage = hasPermission(user, 'retention-case.manage');
 
   const [rows, setRows] = useState<RetentionCase[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

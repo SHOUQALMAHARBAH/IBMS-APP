@@ -14,8 +14,8 @@ import { ApiError } from "../../../lib/auth/api-client";
 import { errorStyle } from "../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../components/lead/lead.styles";
 import { useLanguage } from "../../../lib/i18n/language-context";
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const REVIEW_ROLES = ["COMPLIANCE_OFFICER"];
 const STATUSES: ScreeningMatchStatus[] = ["pending", "confirmed", "cleared"];
 /** Mirrors the DTO's own floor, so the button disables instead of the server
  * rejecting a too-short reason after a round trip. */
@@ -38,7 +38,7 @@ export default function ScreeningMatchesPage() {
   const { user, isLoading } = useAuth();
   const { language } = useLanguage();
   const isArabic = language === "AR";
-  const canReview = !!user && user.roles.some((r) => REVIEW_ROLES.includes(r));
+  const canReview = hasPermission(user, 'sanctions-pep.screen');
 
   const [status, setStatus] = useState<ScreeningMatchStatus>("pending");
   const [rows, setRows] = useState<ScreeningMatch[] | null>(null);

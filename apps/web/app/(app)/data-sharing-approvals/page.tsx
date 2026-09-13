@@ -15,15 +15,14 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
 
 const REQUEST_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
+  'data-sharing.request',
 ];
-const APPROVE_ROLES = ['DATA_PROTECTION_OFFICER'];
+const APPROVE_ROLES = [
+  'data-sharing.approve',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -33,15 +32,12 @@ const cell: CSSProperties = {
 };
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function DataSharingApprovalsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canRequest = hasAny(user?.roles, REQUEST_ROLES);
-  const canApprove = hasAny(user?.roles, APPROVE_ROLES);
+  const canRequest = hasAnyPermission(user, REQUEST_ROLES);
+  const canApprove = hasAnyPermission(user, APPROVE_ROLES);
 
   const [rows, setRows] = useState<DataSharingApproval[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

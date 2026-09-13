@@ -19,8 +19,8 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MANAGE_ROLE = 'COMPLIANCE_OFFICER';
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -48,7 +48,7 @@ const labelStyle: CSSProperties = {
 export default function RegulatoryCompliancePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.includes(MANAGE_ROLE);
+  const canManage = hasPermission(user, 'license.manage');
 
   const [license, setLicense] = useState<BrokerLicense | null>(null);
   const [licenseLoadError, setLicenseLoadError] = useState<string | null>(null);
