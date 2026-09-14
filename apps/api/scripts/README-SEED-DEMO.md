@@ -100,9 +100,27 @@ scan the QR with any TOTP app, and enter one code; after that the account works
 normally. (`/auth/me` and the two enrolment endpoints are the only routes
 reachable before you do, which is what makes this possible.)
 
-Do NOT leave an account with MFA enabled but no authenticator paired — the
-script used to do that, and it locks the account out permanently, because the
-TOTP secret it generated for its own API calls is never shown to anyone.
+Do NOT leave an account with MFA enabled but no authenticator paired — it
+locks the account out permanently, because the TOTP secret the script
+generated for its own API calls is never shown to anyone.
+
+**This went wrong once, and the guardrails below exist because of it.** The
+first full run finished about an hour before `releaseActorsForHumanLogin` was
+written, so all sixteen accounts were handed back enrolled and unusable while
+the report read `0 failures`. Three things now make that hard to repeat:
+
+- The release runs **after the whole seed**, not at the end of each office's
+  happy path. An actor is locked from the moment its enrolment returns, so
+  every line between there and the release is a window in which one throw
+  strands eight real accounts — and an office-level failure is caught and
+  logged as a single line, which would never read "and nobody can sign in".
+- It finds the accounts **by email**, not from the in-memory actor map. That
+  map holds only actors whose whole create-login-enrol attempt succeeded, and
+  enrolment is two HTTP calls: an actor that enrolled and then failed to
+  verify owns a credential the map never recorded.
+- The run **ends by re-reading the database** and fails, naming names, if any
+  demo account is still `mfaEnabled` or still owns a credential. Without that
+  the damage is silent, which is exactly how it shipped.
 
 The report (and the console output) lists one login per RBAC role per
 office, all sharing the password `DemoPass#2026!` — for example
@@ -143,7 +161,10 @@ if the script is extended:
    and enrol over that session, which is what every e2e spec's `makeUser` does.
 2. **Demo accounts were left locked out.** Consequence of the fix above: the
    enrolment secret is generated in-process and discarded, so MFA is now
-   switched back off at the end of the run.
+   switched back off at the end of the run. The first version of that release
+   was written after the full run had already happened and was never applied
+   to it — see "MFA on first sign-in" above for what that cost and what now
+   prevents it.
 3. **~1 pipeline in 3 died at the RFQ.** The line was picked from the
    *insurer's* list, but an RFQ's `insuranceLine` is validated against the
    lines the Opportunity's Insurance Programme designed — which come from the

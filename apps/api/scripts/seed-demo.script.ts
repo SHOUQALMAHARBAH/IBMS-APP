@@ -122,6 +122,14 @@ const ORG_B_SUBDOMAIN = 'demo-office-b';
 const ORG_B_LEGAL_NAME = 'Rawabi Insurance Brokerage (demo)';
 const ORG_B_LEGAL_NAME_AR = 'شركة الروابي لوساطة التأمين (تجريبي)';
 
+/** Both offices in one place: the MFA release and its post-condition check run
+ * after any office-level abort, so they cannot read the loop variable that
+ * seeds them. */
+const DEMO_ORGS = [
+  { orgId: ORG_A_ID, orgSlug: ORG_A_SLUG },
+  { orgId: ORG_B_ID, orgSlug: ORG_B_SLUG },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
@@ -352,6 +360,14 @@ type ActorKey =
   | 'sales' | 'placement' | 'policyCheck' | 'claims'
   | 'finance' | 'compliance' | 'manager' | 'admin';
 
+/** The ONE definition of a demo actor's address. `ensureActor` creates the
+ * account under it and `releaseActorsForHumanLogin` finds it again by it, so a
+ * rename cannot leave the release hunting for accounts that no longer answer
+ * to that name — which would strand them behind MFA, silently. */
+function actorEmail(orgSlug: string, key: ActorKey): string {
+  return `demo.${key}@${orgSlug}.ibms.internal`;
+}
+
 const ACTOR_ROLE_DEFS: ActorRoleDef[] = [
   { key: 'sales', role: RoleName.SALES_RELATIONSHIP_OFFICER, label: 'Sales Relationship Officer' },
   { key: 'placement', role: RoleName.PLACEMENT_TECHNICAL_OFFICER, label: 'Placement Technical Officer' },
@@ -411,7 +427,7 @@ async function ensureActor(
   orgSlug: string,
   def: ActorRoleDef,
 ): Promise<{ id: string; email: string; label: string }> {
-  const email = `demo.${def.key}@${orgSlug}.ibms.internal`;
+  const email = actorEmail(orgSlug, def.key);
   let user = await rawPrisma.user.findFirst({ where: { organizationId: orgId, email } });
   if (!user) {
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
@@ -514,15 +530,77 @@ async function enrolMfa(app: INestApplication<App>, token: string): Promise<void
  * in with the password alone, lands on `/settings/security`, scans the QR and
  * enrols their own authenticator. Every other screen 403s until they do —
  * which is Part II §4.3.2's forced-enrolment rule doing its job, not a fault.
+ *
+ * Two things about HOW this runs are load-bearing, and both are here because
+ * the first version got them wrong and handed back sixteen unusable accounts.
+ *
+ * It runs after the whole seed, never at the end of the happy path. An actor
+ * is locked from the moment `enrolMfa` returns, so every line between there
+ * and here is a window in which a throw strands eight real accounts — and
+ * `seedOrganization`'s caller catches office-level failures and carries on,
+ * so that damage would surface as one line about an office and never as "and
+ * nobody can sign in any more".
+ *
+ * It finds the accounts by EMAIL rather than from the in-memory `Actors` map.
+ * That map holds only the actors whose whole create-login-enrol attempt
+ * succeeded, and `enrolMfa` is two HTTP calls: an actor that enrolled and then
+ * failed to verify owns a credential the map never recorded. Keying on the
+ * address the account is created under reaches those too, and reaches an
+ * office whose seeding never started.
  */
-async function releaseActorsForHumanLogin(actors: Actors): Promise<void> {
-  const ids = Object.values(actors).map((a) => a.id);
-  if (ids.length === 0) return;
-  await rawPrisma.mfaCredential.deleteMany({ where: { userId: { in: ids } } });
-  await rawPrisma.user.updateMany({
-    where: { id: { in: ids } },
-    data: { mfaEnabled: false, mustChangePassword: false },
-  });
+async function releaseActorsForHumanLogin(): Promise<void> {
+  for (const { orgId, orgSlug } of DEMO_ORGS) {
+    const emails = ACTOR_ROLE_DEFS.map((def) => actorEmail(orgSlug, def.key));
+    const users = await rawPrisma.user.findMany({
+      where: { organizationId: orgId, email: { in: emails } },
+      select: { id: true },
+    });
+    if (users.length === 0) continue;
+    const ids = users.map((u) => u.id);
+    await rawPrisma.mfaCredential.deleteMany({
+      where: { userId: { in: ids } },
+    });
+    await rawPrisma.user.updateMany({
+      where: { id: { in: ids } },
+      data: { mfaEnabled: false, mustChangePassword: false },
+    });
+  }
+}
+
+/** The post-condition the release above never had: every demo actor that would
+ * still meet a prompt it cannot answer. Checked at the end of every run and
+ * treated as a failure, because the damage is otherwise silent — a run can
+ * report "1,292 rows, 0 failures" and hand back sixteen accounts nobody can
+ * sign into, which is exactly what happened once. */
+async function findLockedDemoActors(): Promise<string[]> {
+  const locked: string[] = [];
+  for (const { orgId, orgSlug } of DEMO_ORGS) {
+    const emails = ACTOR_ROLE_DEFS.map((def) => actorEmail(orgSlug, def.key));
+    const users = await rawPrisma.user.findMany({
+      where: { organizationId: orgId, email: { in: emails } },
+      select: {
+        id: true,
+        email: true,
+        mfaEnabled: true,
+        mustChangePassword: true,
+      },
+    });
+    const credentials = await rawPrisma.mfaCredential.findMany({
+      where: { userId: { in: users.map((u) => u.id) } },
+      select: { userId: true },
+    });
+    const credentialled = new Set(credentials.map((c) => c.userId));
+    for (const user of users) {
+      if (
+        user.mfaEnabled ||
+        user.mustChangePassword ||
+        credentialled.has(user.id)
+      ) {
+        locked.push(user.email);
+      }
+    }
+  }
+  return locked;
 }
 
 async function ensureActors(
@@ -1245,10 +1323,6 @@ async function seedOrganization(
   await seedIncidents(app, actors, NUM.incidentsPerOrg, tally);
   await seedVendors(app, actors, NUM.vendorsPerOrg, tally);
 
-  // Last thing, after every API call this office needs is done.
-  console.log('- releasing actor logins for human sign-in (MFA reset)...');
-  await releaseActorsForHumanLogin(actors);
-
   return {
     orgId,
     orgSlug,
@@ -1269,6 +1343,9 @@ async function seedOrganization(
 it('seeds demo data for two Organizations through the real API', async () => {
   const tally = newTally();
   const app = await createTestApp();
+  // Captured rather than allowed to propagate, so the release below still runs
+  // and can never replace the error that actually caused it.
+  let fatal: Error | undefined;
   try {
     console.log('Running preflight checks...');
     await preflight();
@@ -1359,8 +1436,36 @@ it('seeds demo data for two Organizations through the real API', async () => {
       ),
     );
     console.log(`Full report written to ${reportPath}`);
-  } finally {
-    await app.close();
-    await rawPrisma.$disconnect();
+  } catch (err) {
+    fatal = err instanceof Error ? err : new Error(String(err));
+  }
+
+  // Reached on every path — the catch above swallows anything the body threw.
+  // Deliberately not a `finally`: throwing out of one is `no-unsafe-finally`,
+  // and it would swallow the real error on its way past.
+  console.log('');
+  console.log('Releasing actor logins for human sign-in (MFA reset)...');
+  await releaseActorsForHumanLogin();
+  const stillLocked = await findLockedDemoActors();
+  const totalActors = DEMO_ORGS.length * ACTOR_ROLE_DEFS.length;
+  console.log(
+    stillLocked.length === 0
+      ? `All ${totalActors} demo accounts released — password-only sign-in, ` +
+          'MFA enrolment on first login.'
+      : `!!! ${stillLocked.length} demo account(s) STILL LOCKED.`,
+  );
+
+  await app.close();
+  await rawPrisma.$disconnect();
+
+  if (fatal) throw fatal;
+  if (stillLocked.length > 0) {
+    throw new Error(
+      `Seeding finished, but ${stillLocked.length} demo account(s) are still ` +
+        `behind a six-digit prompt nobody can answer: ` +
+        `${stillLocked.join(', ')}. Their TOTP secret was generated in this ` +
+        `process and never shown to anyone. Clear MfaCredential and set ` +
+        `mfaEnabled = false for them before demoing.`,
+    );
   }
 }, 30 * 60_000);
