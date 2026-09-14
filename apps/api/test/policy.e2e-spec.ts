@@ -1162,3 +1162,160 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     if (testError) throw new Error(JSON.stringify(testError));
   });
 });
+
+/**
+ * The book-wide `GET /policies` — added so a Policy Checking Officer has a
+ * work surface at all. Before this, the endpoint refused any call that did
+ * not name exactly one opportunity or customer, which left the role whose
+ * whole job is Process 20 QC with no way to find a policy it had not already
+ * been handed the id for.
+ *
+ * The assertions below are scoped to ids this test created. `db-test` is
+ * cumulative, so a global count would be meaningless here.
+ */
+describe('Policy list (e2e) — book-wide GET /policies', () => {
+  it('scopes an owner-limited role to its own book, and lets a cross-book role see both', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'pl-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const salesA = await makeUser(app, 'pl-sa', 'SALES_RELATIONSHIP_OFFICER');
+    const salesB = await makeUser(app, 'pl-sb', 'SALES_RELATIONSHIP_OFFICER');
+    const checker = await makeUser(app, 'pl-chk', 'POLICY_CHECKING_OFFICER');
+
+    // Two policies on two customers with two different owners. Both are
+    // PLACED by the placement officer, who reaches the whole book — so
+    // ownership comes from the Customer, never from who did the placing.
+    const policyA = await issuedPolicy(
+      app,
+      plc.accessToken,
+      salesA.userId,
+      'own-a',
+    );
+    const policyB = await issuedPolicy(
+      app,
+      plc.accessToken,
+      salesB.userId,
+      'own-b',
+    );
+
+    const idsFor = async (token: string, qs = ''): Promise<string[]> => {
+      const res = await request(app.getHttpServer())
+        .get(`/policies${qs}`)
+        .set(bearer(token))
+        .expect(200);
+      return (res.body as PolicyBody[]).map((p) => p.id);
+    };
+
+    // Sales A sees its own and NOT Sales B's. Asserting BOTH halves matters:
+    // "does not contain B" alone would also pass if the list came back empty.
+    const seenByA = await idsFor(salesA.accessToken);
+    expect(seenByA).toContain(policyA);
+    expect(seenByA).not.toContain(policyB);
+
+    const seenByB = await idsFor(salesB.accessToken);
+    expect(seenByB).toContain(policyB);
+    expect(seenByB).not.toContain(policyA);
+
+    // The Policy Checking Officer works the whole book (Process 20 QC).
+    const seenByChecker = await idsFor(checker.accessToken);
+    expect(seenByChecker).toContain(policyA);
+    expect(seenByChecker).toContain(policyB);
+  });
+
+  it('filters by status and by search, in the query rather than after the cap', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'pl-f-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const checker = await makeUser(app, 'pl-f-chk', 'POLICY_CHECKING_OFFICER');
+    const policyId = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'filt',
+    );
+
+    const row = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      include: { customer: { select: { legalName: true } } },
+    });
+    expect(row.status).toBe('ISSUED');
+
+    const ids = async (qs: string): Promise<string[]> => {
+      const res = await request(app.getHttpServer())
+        .get(`/policies?${qs}`)
+        .set(bearer(checker.accessToken))
+        .expect(200);
+      return (res.body as PolicyBody[]).map((p) => p.id);
+    };
+
+    // Matching status includes it; a different status excludes it.
+    expect(await ids('status=ISSUED')).toContain(policyId);
+    expect(await ids('status=CANCELLED')).not.toContain(policyId);
+
+    // Search hits the customer's legal name and the policy number.
+    expect(
+      await ids(`search=${encodeURIComponent(row.customer.legalName)}`),
+    ).toContain(policyId);
+    expect(
+      await ids(`search=${encodeURIComponent(row.policyNumber as string)}`),
+    ).toContain(policyId);
+    expect(await ids('search=definitely-no-such-policy-xyz')).not.toContain(
+      policyId,
+    );
+
+    // Status and search compose rather than overriding one another.
+    expect(
+      await ids(
+        `status=ISSUED&search=${encodeURIComponent(row.customer.legalName)}`,
+      ),
+    ).toContain(policyId);
+    expect(
+      await ids(
+        `status=CANCELLED&search=${encodeURIComponent(row.customer.legalName)}`,
+      ),
+    ).not.toContain(policyId);
+  });
+
+  it('still refuses two scopes at once, and still gates on policy.read', async () => {
+    const app = await boot();
+    const plc = await makeUser(app, 'pl-g-plc', 'PLACEMENT_TECHNICAL_OFFICER');
+    const checker = await makeUser(app, 'pl-g-chk', 'POLICY_CHECKING_OFFICER');
+    const policyId = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'gate',
+    );
+    const row = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { customerId: true, opportunityId: true },
+    });
+
+    // Two scopes are two different questions — answering one silently would
+    // be worse than refusing.
+    const both = await request(app.getHttpServer())
+      .get(
+        `/policies?opportunityId=${row.opportunityId}&customerId=${row.customerId}`,
+      )
+      .set(bearer(checker.accessToken))
+      .expect(422);
+    expect(JSON.stringify(both.body)).toContain('at most one');
+
+    // Each scope on its own still works, unchanged.
+    await request(app.getHttpServer())
+      .get(`/policies?customerId=${row.customerId}`)
+      .set(bearer(checker.accessToken))
+      .expect(200);
+
+    // An unknown status is refused by the DTO rather than silently ignored.
+    await request(app.getHttpServer())
+      .get('/policies?status=NOT_A_STATUS')
+      .set(bearer(checker.accessToken))
+      .expect(400);
+
+    // A role with no policy.read at all cannot reach the list.
+    const dpo = await makeUser(app, 'pl-g-dpo', 'DATA_PROTECTION_OFFICER');
+    await request(app.getHttpServer())
+      .get('/policies')
+      .set(bearer(dpo.accessToken))
+      .expect(403);
+  });
+});

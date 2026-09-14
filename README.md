@@ -117,6 +117,23 @@ already give).
   **`/settings/security` is deliberately ungated**: it is self-service MFA enrolment, and
   `MfaRequiredGuard` 403s every other screen until a user enrols, so gating it on the
   admin-only `security-config.read` would lock out ten of the eleven roles.
+* **A status enum becomes readable text in exactly one place.**
+  `lib/policy/policy-status.ts` exports a `Record<PolicyStatus, TranslationKey>`,
+  so adding a status is a compile error rather than a raw token on a screen.
+  The policy list and policy detail pages both read it. They previously did
+  not: the detail page carried its own `Record<string, string>` pair listing
+  two statuses that do not exist (`PLACEMENT_REQUESTED`, `CHECKED`) and missing
+  four that do — including `ACTIVE`, the state every completed policy ends in,
+  which therefore rendered as the literal token in both languages. Follow the
+  same shape for any other enum a user reads.
+* **`GET /policies` answers three questions.** With `opportunityId`, the one
+  policy placed from it; with `customerId`, that customer's policies; with
+  neither, the book-wide list behind `/policies` — filtered **in the query** to
+  what the caller may see (whole book for Placement / Manager / Executive /
+  Policy Checking, own-customers-only for everyone else) and capped at
+  `POLICY_LIST_TAKE`. The cap is only safe because the filtering happens in
+  SQL; filtering a capped read afterwards lets the cap decide what the caller
+  cannot see. Supplying both scopes is still refused.
 * **`e2e/fixtures/role-permissions.ts` is generated** from
   `packages/db/prisma/seed-data/permissions.ts`. 71 of 74 Playwright specs mock
   `/auth/me`, and the UI renders off `permissions`, so each spec returns a realistic set

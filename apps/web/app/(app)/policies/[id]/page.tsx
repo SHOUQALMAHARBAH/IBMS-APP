@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
@@ -31,31 +32,11 @@ interface PolicyDetail {
   updatedAt: string;
 }
 
-const STATUS_LABEL_MAP: Record<string, string> = {
-  PLACEMENT_REQUESTED: 'Placement Requested',
-  PLACEMENT_CONFIRMED: 'Placement Confirmed',
-  ISSUED: 'Issued',
-  CHECKED: 'Checked',
-  DELIVERED: 'Delivered',
-  CANCELLED: 'Cancelled',
-  EXPIRED: 'Expired',
-};
-
-const STATUS_LABEL_MAP_AR: Record<string, string> = {
-  PLACEMENT_REQUESTED: 'طلب وضع',
-  PLACEMENT_CONFIRMED: 'وضع مؤكد',
-  ISSUED: 'صادر',
-  CHECKED: 'تم الفحص',
-  DELIVERED: 'تم التسليم',
-  CANCELLED: 'ملغي',
-  EXPIRED: 'منتهي الصلاحية',
-};
-
 export default function PolicyDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [policy, setPolicy] = useState<PolicyDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -130,8 +111,13 @@ export default function PolicyDetailPage() {
     );
   }
 
-  const statusLabels = isArabic ? STATUS_LABEL_MAP_AR : STATUS_LABEL_MAP;
-  const displayStatus = statusLabels[policy.status] || policy.status;
+  // One shared, enum-exact mapping (lib/policy/policy-status.ts) rather than
+  // the two local Record<string, string> maps this page used to carry. Those
+  // listed PLACEMENT_REQUESTED and CHECKED — neither is a real PolicyStatus —
+  // and omitted CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED and ACTIVE, so a
+  // completed policy showed the literal token "ACTIVE" in both languages.
+  const statusKey = policyStatusLabelKey(policy.status);
+  const displayStatus = statusKey ? t(statusKey) : policy.status;
 
   return (
     <div style={pageStyle}>

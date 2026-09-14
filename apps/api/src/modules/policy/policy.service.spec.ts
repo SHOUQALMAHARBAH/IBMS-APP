@@ -133,6 +133,7 @@ function makeDeps(opts: Opts = {}) {
     .fn()
     .mockResolvedValue(opts.existingPolicy ?? null);
   const findManyByCustomerId = vi.fn().mockResolvedValue([policyRow()]);
+  const findManyForActor = vi.fn().mockResolvedValue([policyRow()]);
   const createIssuanceArtifacts = vi
     .fn()
     .mockImplementation(
@@ -187,6 +188,7 @@ function makeDeps(opts: Opts = {}) {
     findById,
     findByOpportunityId,
     findManyByCustomerId,
+    findManyForActor,
     createIssuanceArtifacts,
     attachDocuments,
   } as unknown as PolicyRepository;
@@ -296,6 +298,7 @@ function makeDeps(opts: Opts = {}) {
       findById,
       findByOpportunityId,
       findManyByCustomerId,
+      findManyForActor,
       createIssuanceArtifacts,
       attachDocuments,
       findOpportunityById,
@@ -685,11 +688,44 @@ describe('PolicyService', () => {
   });
 
   describe('list / get', () => {
-    it('422 when neither scope is provided', async () => {
-      const { service } = makeDeps();
-      await expect(service.list({}, placement())).rejects.toThrow(
-        UnprocessableEntityException,
+    it('with no scope, returns the book-wide list filtered to the caller', async () => {
+      // This replaces an older test that asserted a 422 here. Refusing an
+      // unscoped list left the Policy Checking Officer — whose whole job is
+      // Process 20 QC — with no way to reach a policy it had not already been
+      // handed the id for. The refusal for BOTH scopes at once is unchanged
+      // and still covered by the test below.
+      const { service, mocks } = makeDeps();
+
+      await expect(service.list({}, placement())).resolves.toHaveLength(1);
+
+      // Placement works the whole book, so no owner filter is applied.
+      expect(mocks.findManyForActor).toHaveBeenCalledWith({
+        ownerUserId: null,
+        status: undefined,
+        search: undefined,
+      });
+    });
+
+    it('pins an owner-limited caller to its own book, and passes the filters through', async () => {
+      const { service, mocks } = makeDeps();
+
+      await service.list(
+        { status: 'ISSUED', search: 'Rawabi' },
+        {
+          ...placement(),
+          id: 'sales-1',
+          roles: ['SALES_RELATIONSHIP_OFFICER'],
+        },
       );
+
+      // The visibility rule reaches the repository as a QUERY filter — if it
+      // were applied to the rows afterwards, the cap would silently decide
+      // what this caller cannot see.
+      expect(mocks.findManyForActor).toHaveBeenCalledWith({
+        ownerUserId: 'sales-1',
+        status: 'ISSUED',
+        search: 'Rawabi',
+      });
     });
 
     it('422 when both scopes are provided', async () => {

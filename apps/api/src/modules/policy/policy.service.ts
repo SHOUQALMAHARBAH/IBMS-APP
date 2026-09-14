@@ -98,6 +98,9 @@ export interface PolicyView {
   id: string;
   opportunityId: string;
   customerId: string;
+  /** Identity only. The book-wide list must name the client each policy
+   * belongs to; `customerId` alone cannot. */
+  customer: { id: string; legalName: string } | null;
   insurerId: string;
   insurer: { id: string; name: string; nameAr: string | null } | null;
   policyNumber: string | null;
@@ -162,8 +165,11 @@ function isUniqueViolation(err: unknown): boolean {
  *    schedule) without re-transitioning.
  *  - `attachDocuments` — add documents to the policy's electronic Insurance
  *    File (Part 4.2) at any lifecycle stage.
- *  - `list` / `get` — read, scoped to exactly one of `opportunityId` /
- *    `customerId`.
+ *  - `list` / `get` — read. `list` takes AT MOST one of `opportunityId` /
+ *    `customerId`; with neither it returns the book-wide list, filtered in
+ *    the query to what the caller may see (the Policy Checking Officer's
+ *    work surface — without it, the role whose whole job is Process 20 QC
+ *    has no way to find a policy it was not handed the id for).
  *
  * `Policy` IS a `WorkflowTransitionService` entity — its `status` moves only
  * through the engine. `place` / `recordIssuance` are single-actor Placement
@@ -335,6 +341,9 @@ export class PolicyService {
       id: policy.id,
       opportunityId: policy.opportunityId,
       customerId: policy.customerId,
+      customer: policy.customer
+        ? { id: policy.customer.id, legalName: policy.customer.legalName }
+        : null,
       insurerId: policy.insurerId,
       insurer: policy.insurer === null ? null : insurerIdentity(policy.insurer),
       policyNumber: policy.policyNumber,
@@ -708,10 +717,29 @@ export class PolicyService {
     const scopes = [query.opportunityId, query.customerId].filter(
       (v) => v != null,
     );
-    if (scopes.length !== 1) {
+    if (scopes.length > 1) {
       throw new UnprocessableEntityException(
-        'Provide exactly one of opportunityId or customerId.',
+        'Provide at most one of opportunityId or customerId.',
       );
+    }
+
+    if (scopes.length === 0) {
+      // The book-wide list: the Policy Checking Officer's work surface, and
+      // the only route to a policy for a caller with no customer in hand.
+      //
+      // Visibility is the SAME rule the two scoped branches enforce via
+      // `assertCustomerVisible`, expressed as a query filter instead of a
+      // per-row check: a caller who works the whole book passes `null`,
+      // everyone else is pinned to Customers they own. It has to be part of
+      // the query — filtering a capped read afterwards would let the cap
+      // decide what the caller cannot see, which is exactly the
+      // `DpoWorkspaceService` defect.
+      const rows = await this.policies.findManyForActor({
+        ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,
+        status: query.status,
+        search: query.search,
+      });
+      return rows.map((r) => this.toView(r));
     }
 
     if (query.opportunityId) {

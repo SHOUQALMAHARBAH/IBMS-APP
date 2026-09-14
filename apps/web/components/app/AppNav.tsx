@@ -68,6 +68,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { href: '/risk-profiles', labelKey: 'navRiskSurveys', permissions: ['risk-profile.read'] },
       { href: '/insurance-programs', labelKey: 'navInsurancePrograms', permissions: ['program.read'] },
       { href: '/opportunities', labelKey: 'navRfqMarket', permissions: ['opportunity.read'] },
+      { href: '/policies', labelKey: 'navPolicies', permissions: ['policy.read'] },
       { href: '/cross-sell', labelKey: 'navCrossSell', permissions: ['cross-sell.read'] },
       { href: '/up-sell', labelKey: 'navUpSell', permissions: ['up-sell.read'] },
       { href: '/crm', labelKey: 'navCrm', permissions: ['customer.360-view.read'] },

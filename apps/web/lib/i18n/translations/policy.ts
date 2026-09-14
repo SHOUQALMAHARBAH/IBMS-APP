@@ -234,6 +234,43 @@ export const POLICY = {
     commissionStatusCalculated: 'مُحسوبة',
     commissionStatusApproved: 'موافق عليها',
     commissionStatusRejected: 'مرفوضة',
+    // policies/page.tsx — the book-wide policy list (Process 20 work surface)
+    policiesListHeading: 'الوثائق',
+    policiesListIntro:
+      'كل وثيقة يمكنك الاطلاع عليها. استخدم الحالة أو البحث للوصول إلى وثيقة بعينها.',
+    policiesSearchLabel: 'بحث',
+    policiesSearchPlaceholder: 'رقم الوثيقة أو فرع التأمين أو اسم العميل',
+    policiesStatusFilterLabel: 'الحالة',
+    policiesStatusAll: 'كل الحالات',
+    policiesNoneYet:
+      'لا توجد وثائق لعرضها. تظهر الوثيقة هنا بعد وضع فرصة مقبولة من العميل وإصدارها.',
+    policiesNoneMatch: 'لا توجد وثيقة تطابق هذا البحث. جرّب رقم وثيقة أو اسم عميل آخر.',
+    policiesNoPermission:
+      'لا تملك صلاحية policy.read اللازمة لعرض الوثائق. راجع مسؤول النظام.',
+    policiesLoadError: 'تعذر تحميل الوثائق — حاول مرة أخرى.',
+    policiesCapNotice:
+      'تعرض هذه القائمة أحدث {count} وثيقة. ضيّق البحث أو الحالة للوصول إلى وثائق أقدم.',
+    policiesCountLabel: 'عدد الوثائق المعروضة: {count}',
+    policiesViewAria: 'عرض الوثيقة {name}',
+    policiesNoNumberYet: 'لم يصدر رقم بعد',
+    policiesCustomerLabel: 'العميل',
+    policiesLineLabel: 'فرع التأمين',
+    // PolicyStatus, one key per enum member. The `policyStatus*` set further
+    // up is a DIFFERENT, older vocabulary (Draft / Issuance pending /
+    // Delivery pending) with no members for DISCREPANCY, VERIFIED, ISSUED or
+    // DELIVERED — and, checked at the time of writing, no consumers at all,
+    // which is why it drifted from the enum unnoticed. These are keyed to the
+    // real enum and consumed through a Record<PolicyStatus, TranslationKey>,
+    // so a new status becomes a compile error rather than a raw token on screen.
+    policyStatePlacementConfirmed: 'وضع مؤكد',
+    policyStateIssued: 'صادرة',
+    policyStateCheckingInProgress: 'قيد الفحص',
+    policyStateDiscrepancy: 'يوجد اختلاف',
+    policyStateVerified: 'مُدقَّقة',
+    policyStateDelivered: 'مُسلَّمة',
+    policyStateActive: 'سارية',
+    policyStateCancelled: 'ملغاة',
+    policyStateExpired: 'منتهية',
   },
   EN: {
     // PolicySection.tsx
@@ -469,5 +506,38 @@ export const POLICY = {
     commissionStatusCalculated: 'Calculated',
     commissionStatusApproved: 'Approved',
     commissionStatusRejected: 'Rejected',
+    // policies/page.tsx — the book-wide policy list (Process 20 work surface)
+    policiesListHeading: 'Policies',
+    policiesListIntro:
+      'Every policy you can see. Filter by status or search to reach a specific one.',
+    policiesSearchLabel: 'Search',
+    policiesSearchPlaceholder: 'Policy number, insurance line, or client name',
+    policiesStatusFilterLabel: 'Status',
+    policiesStatusAll: 'All statuses',
+    policiesNoneYet:
+      'No policies to show. A policy appears here once an accepted opportunity has been placed and issued.',
+    policiesNoneMatch:
+      'No policy matches that search. Try a different policy number or client name.',
+    policiesNoPermission:
+      "You don't hold the policy.read permission needed to view policies. Ask your system administrator.",
+    policiesLoadError: 'Could not load policies — try again.',
+    policiesCapNotice:
+      'Showing the most recent {count} policies. Narrow the search or status to reach older ones.',
+    policiesCountLabel: 'Showing {count} policies',
+    policiesViewAria: 'View policy {name}',
+    policiesNoNumberYet: 'No number issued yet',
+    policiesCustomerLabel: 'Client',
+    policiesLineLabel: 'Insurance line',
+    // See the AR note above: keyed to the real PolicyStatus enum, unlike the
+    // older `policyStatus*` set.
+    policyStatePlacementConfirmed: 'Placement confirmed',
+    policyStateIssued: 'Issued',
+    policyStateCheckingInProgress: 'Checking in progress',
+    policyStateDiscrepancy: 'Discrepancy',
+    policyStateVerified: 'Verified',
+    policyStateDelivered: 'Delivered',
+    policyStateActive: 'Active',
+    policyStateCancelled: 'Cancelled',
+    policyStateExpired: 'Expired',
   },
 } as const;
