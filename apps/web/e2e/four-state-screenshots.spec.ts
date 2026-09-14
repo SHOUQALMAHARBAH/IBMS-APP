@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F item #8 — "Four-state (loading/empty/error/populated) screenshot
 // evidence per screen" — a verification DISCIPLINE overlay on items #1-7,
@@ -37,7 +38,7 @@ async function mockAuth(
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, languagePreference } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, languagePreference, permissions: permissionsForRoles(roles) } }),
   );
 }
 

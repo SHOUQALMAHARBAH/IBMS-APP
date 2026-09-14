@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Screening provider + data health.
 //
@@ -32,7 +33,7 @@ async function mockAuth(page: Page, languagePreference: "AR" | "EN" = "EN") {
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], languagePreference },
+      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], permissions: permissionsForRoles(["COMPLIANCE_OFFICER"]), languagePreference },
     }),
   );
 }

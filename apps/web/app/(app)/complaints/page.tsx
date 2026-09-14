@@ -21,13 +21,16 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 
-const LOG_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-];
+// A permission code, like the two below it — NOT the role list this used to
+// hold. §10.4 converted `ESCALATE_ROLES`/`CLOSE_ROLES` and missed this one, so
+// role NAMES were being compared against permission CODES: `hasAnyPermission`
+// could never match, and the log form was hidden from everybody. `tsc` cannot
+// catch it because both sides are `string[]`.
+//
+// `complaint.log` is seeded to exactly the five roles that were listed here
+// (Sales, Claims, Finance, Compliance, Branch/Department Manager), so this
+// restores the intended behaviour rather than changing who may log a complaint.
+const LOG_PERMISSIONS = ['complaint.log'];
 const ESCALATE_ROLES = [
   'complaint.escalate',
 ];
@@ -58,7 +61,7 @@ function slaLabel(c: Complaint): string {
 export default function ComplaintsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canLog = hasAnyPermission(user, LOG_ROLES);
+  const canLog = hasAnyPermission(user, LOG_PERMISSIONS);
   const canEscalate = hasAnyPermission(user, ESCALATE_ROLES);
   const canClose = hasAnyPermission(user, CLOSE_ROLES);
 

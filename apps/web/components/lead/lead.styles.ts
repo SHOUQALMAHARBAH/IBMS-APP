@@ -1,24 +1,39 @@
 import type { CSSProperties } from 'react';
 
+/*
+ * Originally the Lead module's own styles; imported by 83 files across the
+ * whole app, which made it the de-facto design system by accident. Rather
+ * than leave that undeclared, it is now an explicit token consumer: every
+ * value below reads a variable from globals.css, so the pages that already
+ * import `pageStyle`/`cardStyle`/`sectionStyle` inherit the real design
+ * without being edited one by one.
+ *
+ * New screens should compose `components/ui` primitives instead of importing
+ * these; these exist to carry the existing 83 consumers, and the export
+ * names and shapes are deliberately unchanged so none of them break.
+ */
+
 export const pageStyle: CSSProperties = {
-  maxWidth: '75rem',
+  maxWidth: 'var(--content-max)',
   margin: '0 auto',
-  padding: '2rem',
+  padding: 'var(--space-8)',
 };
 
 export const sectionStyle: CSSProperties = {
-  marginTop: '2rem',
-  padding: '1.5rem',
-  border: '1px solid rgba(128,128,128,0.3)',
-  borderRadius: '0.5rem',
+  marginTop: 'var(--space-8)',
+  padding: 'var(--space-6)',
+  background: 'var(--surface-card)',
+  border: '1px solid var(--border-default)',
+  borderRadius: 'var(--radius-lg)',
+  boxShadow: 'var(--shadow-sm)',
 };
 
 export const formRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: '1rem',
+  gap: 'var(--space-4)',
   alignItems: 'flex-end',
-  marginTop: '1rem',
+  marginTop: 'var(--space-4)',
 };
 
 export const fieldStyle: CSSProperties = { flex: '1 1 12rem' };
@@ -26,64 +41,73 @@ export const fieldStyle: CSSProperties = { flex: '1 1 12rem' };
 export const checkboxRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.5rem',
-  marginTop: '1rem',
+  gap: 'var(--space-2)',
+  marginTop: 'var(--space-4)',
 };
 
 export const boardStyle: CSSProperties = {
   display: 'flex',
-  gap: '1rem',
-  marginTop: '1rem',
+  gap: 'var(--space-4)',
+  marginTop: 'var(--space-4)',
   overflowX: 'auto',
-  paddingBottom: '0.5rem',
+  paddingBottom: 'var(--space-2)',
 };
 
 export const columnStyle: CSSProperties = {
   flex: '1 1 12rem',
   minWidth: '14rem',
-  border: '1px solid rgba(128,128,128,0.3)',
-  borderRadius: '0.5rem',
-  padding: '0.75rem',
-  background: 'rgba(128,128,128,0.05)',
+  border: '1px solid var(--border-default)',
+  borderRadius: 'var(--radius-lg)',
+  padding: 'var(--space-3)',
+  background: 'var(--surface-sunken)',
 };
 
 export const columnHeaderStyle: CSSProperties = {
-  fontSize: '0.85rem',
-  fontWeight: 'bold',
-  opacity: 0.8,
-  marginBottom: '0.75rem',
+  fontSize: 'var(--text-xs)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  color: 'var(--ink-muted)',
+  marginBottom: 'var(--space-3)',
   display: 'flex',
   justifyContent: 'space-between',
 };
 
 export const cardStyle: CSSProperties = {
-  border: '1px solid rgba(128,128,128,0.3)',
-  borderRadius: '0.4rem',
-  padding: '0.6rem',
-  marginBottom: '0.6rem',
-  background: 'var(--background)',
+  border: '1px solid var(--border-default)',
+  borderRadius: 'var(--radius-md)',
+  padding: 'var(--space-3)',
+  marginBottom: 'var(--space-2)',
+  background: 'var(--surface-card)',
+  boxShadow: 'var(--shadow-sm)',
 };
 
 export const cardMetaStyle: CSSProperties = {
-  fontSize: '0.75rem',
-  opacity: 0.7,
-  marginTop: '0.2rem',
+  fontSize: 'var(--text-xs)',
+  color: 'var(--ink-muted)',
+  marginTop: 'var(--space-1)',
 };
 
 export const cardActionsStyle: CSSProperties = {
   display: 'flex',
-  gap: '0.4rem',
+  gap: 'var(--space-2)',
   flexWrap: 'wrap',
-  marginTop: '0.5rem',
+  marginTop: 'var(--space-2)',
 };
 
 export const smallButtonStyle: CSSProperties = {
-  padding: '0.3rem 0.6rem',
-  fontSize: '0.8rem',
+  padding: 'var(--space-1) var(--space-3)',
+  fontFamily: 'inherit',
+  fontSize: 'var(--text-sm)',
+  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
+  color: 'var(--ink-primary)',
+  background: 'var(--surface-card)',
+  border: '1px solid var(--border-default)',
+  borderRadius: 'var(--radius-md)',
   cursor: 'pointer',
 };
 
 export const emptyColumnStyle: CSSProperties = {
-  fontSize: '0.8rem',
-  opacity: 0.6,
+  fontSize: 'var(--text-sm)',
+  color: 'var(--ink-muted)',
 };

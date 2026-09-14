@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F — Bilingual UI (backlog Part 11), item #2: "full RTL layout for
 // Arabic ... navigation, forms, tables ... genuinely mirrored, not just
@@ -28,7 +29,7 @@ async function mockAuth(page: Page, languagePreference: "AR" | "EN") {
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], languagePreference },
+      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], permissions: permissionsForRoles(["COMPLIANCE_OFFICER"]), languagePreference },
     }),
   );
 }

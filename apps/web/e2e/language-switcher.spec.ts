@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F — Bilingual UI (backlog Part 11), item #1: "instant language switch
 // without losing session context + a persistent per-user language
@@ -30,7 +31,7 @@ async function mockAuth(page: Page, languagePreference: "AR" | "EN") {
     if (route.request().method() !== "GET") return route.fallback();
     return route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ["SALES_RELATIONSHIP_OFFICER"], languagePreference: currentLanguage },
+      json: { ...ME_BASE, roles: ["SALES_RELATIONSHIP_OFFICER"], permissions: permissionsForRoles(["SALES_RELATIONSHIP_OFFICER"]), languagePreference: currentLanguage },
     });
   });
   await page.route("**/auth/me/language", async (route) => {
@@ -38,7 +39,7 @@ async function mockAuth(page: Page, languagePreference: "AR" | "EN") {
     currentLanguage = body.languagePreference;
     return route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ["SALES_RELATIONSHIP_OFFICER"], languagePreference: currentLanguage },
+      json: { ...ME_BASE, roles: ["SALES_RELATIONSHIP_OFFICER"], permissions: permissionsForRoles(["SALES_RELATIONSHIP_OFFICER"]), languagePreference: currentLanguage },
     });
   });
   await page.route("http://localhost:4000/leads**", (route) =>

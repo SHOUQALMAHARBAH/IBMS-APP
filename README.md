@@ -89,6 +89,39 @@ ibms-app/
   .github/workflows/ CI
 ```
 
+### Frontend design system (web)
+
+`apps/web` styles with **CSS custom properties + inline `style` objects** — there is no
+Tailwind, no CSS modules and no third-party component library, and adding one was
+considered and deliberately rejected (retrofitting across 1,116 inline style objects and
+92 pages is a mechanical rewrite with real regression risk for no gain tokens do not
+already give).
+
+* **`app/globals.css`** holds every token: colour, spacing, type scale, radii, elevation,
+  focus ring, light + dark themes, RTL conventions, reduced-motion. The palette is
+  **sampled from the approved login design**, not invented — brand `#3b6790`, hero
+  gradient `#273a4e -> #33516d`, page surface `#f4f6fa`, ink ramp
+  `#26303e / #525e6f / #828c9a`. Re-sample rather than approximate if it is revisited.
+* **`components/ui/`** is the primitive set — `Button`, `Card`/`PageHeader`, `Table`,
+  `Field` (+ `TextInput`/`Select`/`TextArea`), `Badge`, `EmptyState`, `ErrorState`,
+  `Skeleton`/`SkeletonList`. New screens compose these; they cover the four states
+  (loading / empty / error / populated) every data screen owes.
+* **Two `.styles.ts` modules are the app's chokepoints** — `components/lead/lead.styles.ts`
+  (imported by 83 pages) and `components/auth/auth-form.styles.ts` (87). They became the
+  de-facto design system by accident, so a customers page importing `cardStyle` from a
+  *lead* folder is normal here. Both now read tokens only, and their **export names and
+  shapes must stay stable** — changing one restyles (or breaks) dozens of pages at once.
+* **The sidebar renders from permissions, not roles.** `components/app/AppNav.tsx` gates
+  each of its 69 links on `user.permissions` from `/auth/me`, grouped under 9 bilingual
+  headings, with codes taken from each destination route's own `@RequirePermissions`.
+  **`/settings/security` is deliberately ungated**: it is self-service MFA enrolment, and
+  `MfaRequiredGuard` 403s every other screen until a user enrols, so gating it on the
+  admin-only `security-config.read` would lock out ten of the eleven roles.
+* **`e2e/fixtures/role-permissions.ts` is generated** from
+  `packages/db/prisma/seed-data/permissions.ts`. 71 of 74 Playwright specs mock
+  `/auth/me`, and the UI renders off `permissions`, so each spec returns a realistic set
+  via `permissionsForRoles(roles)`. Regenerate it when the seed grid changes.
+
 `features/` (web) and `controllers/`, `services/` (api) are still empty scaffolding — no
 feature has needed them over its own `modules/` subfolder yet. `modules/`/`repositories/`
 (api) and `lib/`/`components/` (web) now also carry the first real business features (Lead

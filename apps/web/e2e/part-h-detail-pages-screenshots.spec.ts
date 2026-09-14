@@ -1,4 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import { permissionsForRoles } from './fixtures/role-permissions';
+
+// The two roles these detail pages are captured as. Previously lowercase
+// placeholders ('sales'/'manager') that match no seeded RoleName, so the
+// mock resolved to an empty permission set and the captured sidebar was bare.
+const ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
 
 /**
  * Part H Phase 2 Verification — Bilingual Detail Pages Screenshots
@@ -27,7 +33,12 @@ async function mockAuth(page: Page, languagePreference: 'AR' | 'EN' = 'EN') {
   await page.route('**/auth/me', (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, languagePreference, roles: ['sales', 'manager'] },
+      json: {
+        ...ME_BASE,
+        languagePreference,
+        roles: ROLES,
+        permissions: permissionsForRoles(ROLES),
+      },
     }),
   );
 }

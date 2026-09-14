@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Configurable SLA policies (task Part A).
 //
@@ -31,7 +32,7 @@ async function mockAuth(
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles, languagePreference },
+      json: { ...ME_BASE, roles, languagePreference, permissions: permissionsForRoles(roles) },
     }),
   );
 }

@@ -1,13 +1,189 @@
+/*
+ * IBMS design tokens.
+ *
+ * The palette is sampled directly from the approved login-screen design
+ * (Screenshot 2026-08-24) rather than invented: the hero gradient
+ * (#273a4e -> #33516d), the primary action colour (#3b6790), the page
+ * surface (#f4f6fa) and the ink ramp (#26303e / #525e6f / #828c9a) are the
+ * literal values measured out of that comp. Keep them that way — a "close
+ * enough" brand blue is how a system drifts away from its own design.
+ *
+ * Everything downstream (components/*.styles.ts, the primitives in
+ * components/ui/) reads these variables and never hard-codes a colour, so a
+ * palette change happens here once. See the frontend directive §6
+ * (consistency across the whole system).
+ *
+ * RTL: the app renders Arabic right-to-left, so component styles use CSS
+ * LOGICAL properties (inline-start/end, not left/right). Anything physical
+ * here has to hold in both directions.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  /* --- brand ramp, built around the sampled #3b6790 ------------------- */
+  --brand-50: #eaf0f6;
+  --brand-100: #dde8f2;
+  --brand-200: #c3d5e7;
+  --brand-300: #9bb9d3;
+  --brand-400: #6d97ba;
+  --brand-500: #4c7ea8;
+  --brand-600: #3b6790;
+  --brand-700: #33566f;
+  --brand-800: #2c455a;
+  --brand-900: #243447;
+
+  /* --- the navy hero/nav surface -------------------------------------- */
+  --nav-bg: #243447;
+  --nav-gradient-from: #273a4e;
+  --nav-gradient-to: #33516d;
+  --nav-ink: #f4f6fa;
+  --nav-ink-muted: #9bb9d3;
+  --nav-item-hover: rgba(255, 255, 255, 0.08);
+  --nav-item-active: #3b6790;
+  --nav-divider: rgba(255, 255, 255, 0.12);
+
+  /* --- surfaces -------------------------------------------------------- */
+  --surface-page: #f4f6fa;
+  --surface-card: #ffffff;
+  --surface-sunken: #eef1f6;
+  --surface-hover: #f7f9fc;
+
+  /* --- ink ------------------------------------------------------------- */
+  --ink-primary: #26303e;
+  --ink-secondary: #525e6f;
+  --ink-muted: #828c9a;
+  --ink-inverse: #f4f6fa;
+  --ink-brand: #3b6790;
+
+  /* --- borders --------------------------------------------------------- */
+  --border-subtle: #e6e9ef;
+  --border-default: #dadee4;
+  --border-strong: #c3c9d3;
+
+  /* --- semantic: each is a tint + an ink that passes contrast on it ---- */
+  --info-bg: #eaf0f6;
+  --info-ink: #3b5872;
+  --info-border: #c3d5e7;
+  --success-bg: #e8f3ec;
+  --success-ink: #1f6b3f;
+  --success-border: #bfdccb;
+  --warning-bg: #fdf3e3;
+  --warning-ink: #8a5a10;
+  --warning-border: #f0dcb8;
+  --danger-bg: #fbeaea;
+  --danger-ink: #a32828;
+  --danger-border: #efc9c9;
+
+  /* --- focus ----------------------------------------------------------- */
+  --focus-ring: 0 0 0 3px rgba(59, 103, 144, 0.35);
+
+  /* --- spacing --------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* --- type scale ------------------------------------------------------ */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* --- radii ----------------------------------------------------------- */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 999px;
+
+  /* --- elevation ------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(38, 48, 62, 0.06);
+  --shadow-md: 0 1px 3px rgba(38, 48, 62, 0.08), 0 4px 12px rgba(38, 48, 62, 0.06);
+  --shadow-lg: 0 8px 28px rgba(38, 48, 62, 0.12);
+
+  /* --- layout ---------------------------------------------------------- */
+  --sidebar-width: 15.5rem;
+  --content-max: 78rem;
+
+  /* --- motion ---------------------------------------------------------- */
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms ease;
+
+  /* Back-compat: the stock starter exposed these two and some code still
+     reads them. Keep them pointed at the real tokens rather than deleting
+     them out from under a component that has not been migrated yet. */
+  --background: var(--surface-page);
+  --foreground: var(--ink-primary);
 }
 
+/*
+ * Dark mode. Only the colour tokens are redefined — spacing, type, radii and
+ * elevation are theme-independent, so they stay defined once above.
+ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+
+    --surface-page: #161d26;
+    --surface-card: #1e2733;
+    --surface-sunken: #131920;
+    --surface-hover: #263141;
+
+    --ink-primary: #e8ecf2;
+    --ink-secondary: #a9b4c2;
+    --ink-muted: #7c8898;
+    --ink-inverse: #1a222c;
+    --ink-brand: #9bb9d3;
+
+    --border-subtle: #26303d;
+    --border-default: #313d4c;
+    --border-strong: #43515f;
+
+    --nav-bg: #131920;
+    --nav-gradient-from: #131920;
+    --nav-gradient-to: #1c2836;
+
+    --info-bg: #1c2a38;
+    --info-ink: #a8c6e0;
+    --info-border: #2c445b;
+    --success-bg: #16291e;
+    --success-ink: #86c9a1;
+    --success-border: #244c33;
+    --warning-bg: #2b2115;
+    --warning-ink: #e0b571;
+    --warning-border: #4d3a1c;
+    --danger-bg: #2c1a1a;
+    --danger-ink: #e59a9a;
+    --danger-border: #522c2c;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5);
   }
+}
+
+/* --- base ------------------------------------------------------------- */
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
 }
 
 html {
@@ -24,17 +200,14 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink-primary);
+  background: var(--surface-page);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans Arabic', 'Segoe UI Arabic', sans-serif;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
 }
 
 a {
@@ -42,8 +215,60 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+h1,
+h2,
+h3,
+h4 {
+  color: var(--ink-primary);
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-semibold);
+}
+
+h1 { font-size: var(--text-2xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+h4 { font-size: var(--text-md); }
+
+/*
+ * One focus style for the whole app. :focus-visible only, so a mouse click
+ * does not leave a ring behind but every keyboard path shows one — the
+ * accessibility suite asserts on this.
+ */
+:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+/*
+ * Arabic renders RTL. Component styles use logical properties so they mirror
+ * for free; this only has to fix the things that cannot be expressed that
+ * way. Numerals stay LTR inside an RTL paragraph (a policy number or an
+ * amount reads the same in both languages).
+ */
+[dir='rtl'] .ltr-numerals,
+[dir='rtl'] [data-numeric] {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
+}
+
+/* Shared keyframe for the Skeleton primitive. */
+@keyframes ibms-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }

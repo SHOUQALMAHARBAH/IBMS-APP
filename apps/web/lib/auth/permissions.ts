@@ -20,11 +20,26 @@ import type { MeResponse } from './auth-api';
  * Permission codes are the same strings `@RequirePermissions` uses, so a UI
  * check and its endpoint's guard read the same word.
  */
+/**
+ * Reads the resolved codes off the user, treating a missing or malformed
+ * `permissions` field as GRANTING NOTHING.
+ *
+ * The type says `string[]`, but this value crosses the network from
+ * `/auth/me`, and a caller that is still loading, a stubbed response, or an
+ * older cached payload can all arrive without it. Failing closed is the only
+ * safe direction: an absent permission set must hide a control, never reveal
+ * one — and it must not throw, because this runs inside the render path of
+ * every authenticated screen.
+ */
+function codesOf(user: Pick<MeResponse, 'permissions'> | null | undefined): readonly string[] {
+  return Array.isArray(user?.permissions) ? user.permissions : [];
+}
+
 export function hasPermission(
   user: Pick<MeResponse, 'permissions'> | null | undefined,
   code: string,
 ): boolean {
-  return !!user && user.permissions.includes(code);
+  return codesOf(user).includes(code);
 }
 
 /** True when the user holds AT LEAST ONE of these — for a control that several
@@ -34,5 +49,6 @@ export function hasAnyPermission(
   user: Pick<MeResponse, 'permissions'> | null | undefined,
   codes: readonly string[],
 ): boolean {
-  return !!user && codes.some((code) => user.permissions.includes(code));
+  const granted = codesOf(user);
+  return codes.some((code) => granted.includes(code));
 }
