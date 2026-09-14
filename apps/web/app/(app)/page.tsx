@@ -6,63 +6,54 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
 import { pageStyle } from '../../components/lead/lead.styles';
 import { homeCardBlurbStyle, homeCardStyle, homeGridStyle } from '../../components/app/app.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 
-const MODULES: { href: string; title: string; blurb: string }[] = [
-  {
-    href: '/leads',
-    title: 'Leads',
-    blurb: 'Capture a lead from any acquisition source and move it through the pipeline.',
-  },
-  {
-    href: '/prospects',
-    title: 'Prospects',
-    blurb: 'Qualify a converted lead and record its business profile.',
-  },
-  {
-    href: '/customers',
-    title: 'Customers',
-    blurb: 'Onboard individual and corporate customers, capture UBOs, and run KYC screening.',
-  },
+// Module scope has no translator, so each card carries its title and blurb
+// KEYS and the component resolves them. Titles reuse the sidebar's own nav
+// keys so a module is called the same thing in both places.
+const MODULES: { href: string; titleKey: TranslationKey; blurbKey: TranslationKey }[] = [
+  { href: '/leads', titleKey: 'navLeads', blurbKey: 'homeLeadsBlurb' },
+  { href: '/prospects', titleKey: 'navProspects', blurbKey: 'homeProspectsBlurb' },
+  { href: '/customers', titleKey: 'navCustomers', blurbKey: 'homeCustomersBlurb' },
   {
     href: '/customers/kyc-queue',
-    title: 'KYC compliance queue',
-    blurb: 'Review and approve pending KYC records before a customer is activated.',
+    titleKey: 'homeKycQueueTitle',
+    blurbKey: 'homeKycQueueBlurb',
   },
   {
     href: '/access-recertification',
-    title: 'Access recertification',
-    blurb: 'Run and complete the periodic access-review cycle.',
+    titleKey: 'navAccessRecertification',
+    blurbKey: 'homeAccessRecertBlurb',
   },
-  {
-    href: '/settings/security',
-    title: 'Security',
-    blurb: 'Manage multi-factor authentication and review your session policy.',
-  },
+  { href: '/settings/security', titleKey: 'navSecurity', blurbKey: 'homeSecurityBlurb' },
 ];
 
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Welcome, {user.fullName}</h1>
+      <h1>{t('homeWelcome', { name: user.fullName })}</h1>
       <p style={{ opacity: 0.8 }}>
-        Insurance Brokerage Management System. Signed in as{' '}
-        {user.roles.length > 0 ? user.roles.join(', ') : 'no role assigned'}.
+        {t('homeSignedInAs', {
+          roles: user.roles.length > 0 ? user.roles.join(', ') : t('homeNoRole'),
+        })}
       </p>
 
       <div style={homeGridStyle}>
         {MODULES.map((m) => (
           <Link key={m.href} href={m.href} style={homeCardStyle}>
-            <strong>{m.title}</strong>
-            <span style={homeCardBlurbStyle}>{m.blurb}</span>
+            <strong>{t(m.titleKey)}</strong>
+            <span style={homeCardBlurbStyle}>{t(m.blurbKey)}</span>
           </Link>
         ))}
       </div>

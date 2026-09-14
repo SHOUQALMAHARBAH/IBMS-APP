@@ -12,6 +12,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -23,6 +24,7 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function EmployeesPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -44,7 +46,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -57,17 +59,17 @@ export default function EmployeesPage() {
           ? "You don't hold the employee.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load employees — try again.',
+            : t('empLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -94,7 +96,7 @@ export default function EmployeesPage() {
       await load();
     } catch (err) {
       setCreateError(
-        err instanceof ApiError ? err.message : 'Could not create the employee record.',
+        err instanceof ApiError ? err.message : t('empCreateError'),
       );
     }
   }
@@ -103,7 +105,7 @@ export default function EmployeesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Employees</h1>
+      <h1>{t('empHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         Employee records, licensing/certification tracking, and security
         awareness training (Part 8.2).
@@ -117,16 +119,16 @@ export default function EmployeesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No employees recorded yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('empNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
             <thead>
               <tr>
-                <th style={head}>Name</th>
-                <th style={head}>Position</th>
-                <th style={head}>Licensed role</th>
-                <th style={head}>Hire date</th>
-                <th style={head}>Terminated</th>
+                <th style={head}>{t('empColName')}</th>
+                <th style={head}>{t('empColPosition')}</th>
+                <th style={head}>{t('empColLicensedRole')}</th>
+                <th style={head}>{t('empColHireDate')}</th>
+                <th style={head}>{t('empColTerminated')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -141,7 +143,7 @@ export default function EmployeesPage() {
                   <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
                   <td style={cell}>{row.terminationDate ? 'Yes' : 'No'}</td>
                   <td style={cell}>
-                    <Link href={`/employees/${row.id}`}>View</Link>
+                    <Link href={`/employees/${row.id}`}>{t('empViewButton')}</Link>
                   </td>
                 </tr>
               ))}
@@ -149,7 +151,7 @@ export default function EmployeesPage() {
           </table>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('empLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
@@ -210,7 +212,7 @@ export default function EmployeesPage() {
           <input
             value={licensedRole}
             onChange={(e) => setLicensedRole(e.target.value)}
-            placeholder="e.g. CBJ-licensed Broker Representative"
+            placeholder={t('empLicensedRolePlaceholder')}
           />
         </label>
         {createError ? (

@@ -64,9 +64,9 @@ test("lists retention cases with reason/status and the open form", async ({
   await expect(
     page.getByRole("heading", { name: "Customer retention" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "lapse_risk" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Lapse risk" })).toBeVisible();
   await expect(
-    page.getByRole("cell", { name: "renewal_inactivity" }),
+    page.getByRole("cell", { name: "Renewal inactivity" }),
   ).toBeVisible();
   await expect(page.getByLabel("Reason")).toBeVisible();
   await expect(

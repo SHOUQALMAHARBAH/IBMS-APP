@@ -17,7 +17,7 @@ import { formatDate } from '../../../lib/i18n/format';
 export default function NeedsAssessmentsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [assessments, setAssessments] = useState<NeedsAssessment[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -32,33 +32,33 @@ export default function NeedsAssessmentsPage() {
           ? "You don't hold the needs-assessment.read permission, so there's nothing to show here."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load needs assessments — try again.',
+            : t('naLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Needs assessments</h1>
+      <h1>{t('naHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 5 — a structured risk questionnaire that recommends a coverage list, then a
         review and approval gate. Start one from a customer&apos;s profile.
       </p>
 
-      {assessments === null && !loadError ? <p>Loading…</p> : null}
+      {assessments === null && !loadError ? <p>{t('naLoading')}</p> : null}
       {loadError ? (
         <p role="alert" style={errorStyle}>
           {loadError}
@@ -66,7 +66,7 @@ export default function NeedsAssessmentsPage() {
       ) : null}
       {assessments !== null && !loadError ? (
         assessments.length === 0 ? (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>No needs assessments yet.</p>
+          <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('naNone')}</p>
         ) : (
           <div style={listGridStyle}>
             {assessments.map((assessment) => (

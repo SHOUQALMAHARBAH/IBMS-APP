@@ -27,9 +27,11 @@ import {
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
 import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 
 export default function NeedsAssessmentDetailPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
@@ -52,24 +54,24 @@ export default function NeedsAssessmentDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This needs assessment could not be found — it may not exist, or you may not have access to it.'
+          ? t('nadNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this needs assessment — try again.',
+            : t('nadLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function handleSubmitForReview() {
     if (!assessment) return;
@@ -81,7 +83,7 @@ export default function NeedsAssessmentDetailPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : 'Could not submit for review — try again.',
+          : t('nadSubmitError'),
       );
     } finally {
       setSubmitting(false);
@@ -114,13 +116,13 @@ export default function NeedsAssessmentDetailPage() {
 
       {assessment ? (
         <>
-          <h1>Needs assessment</h1>
+          <h1>{t('nadHeading')}</h1>
           <p style={{ opacity: 0.8 }}>Status: {assessment.status}</p>
 
           <ConsentCaptureWidget
             customerId={assessment.customerId}
             purpose="UNDERWRITING"
-            label="Needs & risk assessment consent"
+            label={t('nadConsent')}
             defaultConsentTextVersion="underwriting-notice-v1"
           />
           <PrivacyNoticeDisplay
@@ -129,7 +131,7 @@ export default function NeedsAssessmentDetailPage() {
           />
 
           <div style={coveragePreviewStyle}>
-            <strong>Recommended coverage</strong>
+            <strong>{t('nadRecommendedCoverage')}</strong>
             {assessment.recommendedCoverageLines.length === 0 ? (
               <p style={{ opacity: 0.6, margin: '0.5rem 0 0' }}>
                 No coverage lines recommended from the current answers.
@@ -147,13 +149,13 @@ export default function NeedsAssessmentDetailPage() {
 
           <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
             <div>
-              <div style={profileFieldLabelStyle}>Reviewed by</div>
+              <div style={profileFieldLabelStyle}>{t('nadReviewedBy')}</div>
               <div style={profileFieldValueStyle}>
                 {assessment.reviewedByUserId ?? '—'}
               </div>
             </div>
             <div>
-              <div style={profileFieldLabelStyle}>Approved by</div>
+              <div style={profileFieldLabelStyle}>{t('nadApprovedBy')}</div>
               <div style={profileFieldValueStyle}>
                 {assessment.approvedByUserId ?? '—'}
               </div>
@@ -174,7 +176,7 @@ export default function NeedsAssessmentDetailPage() {
                 style={buttonStyle}
                 onClick={() => void handleSubmitForReview()}
               >
-                {submitting ? 'Submitting…' : 'Submit for review'}
+                {submitting ? t('nadSubmitting') : t('nadSubmitButton')}
               </button>
               {actionError ? (
                 <p role="alert" style={errorStyle}>
@@ -219,7 +221,7 @@ export default function NeedsAssessmentDetailPage() {
           ) : null}
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Answers</h2>
+            <h2>{t('nadAnswers')}</h2>
             <ul>
               {questions.map((q) => (
                 <li key={q.id}>

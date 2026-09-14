@@ -13,6 +13,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 
 const cell: CSSProperties = {
@@ -30,6 +31,7 @@ const head: CSSProperties = {
 export default function WatchlistSyncPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage = hasPermission(user, 'sanctions-pep.screen');
 
   const [runs, setRuns] = useState<WatchlistSyncRun[] | null>(null);
@@ -49,20 +51,20 @@ export default function WatchlistSyncPage() {
           ? "You don't hold the sanctions-pep.screen permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the sync status — try again.',
+            : t('wsLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -72,7 +74,7 @@ export default function WatchlistSyncPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('wsActionError'),
       );
     } finally {
       setBusy(false);
@@ -108,21 +110,18 @@ export default function WatchlistSyncPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Sanctions &amp; PEP watchlist sync</h1>
+      <h1>{t('wsHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Two free public sanctions lists (OFAC SDN, UN Consolidated) are
-        synced locally every 12 hours — the lists&apos; own real-world
-        refresh cadence — and every ACTIVE customer is re-screened against
-        them every 4 hours. Both can also be run on demand here.
+        {t('wsIntro')}
       </p>
 
       {canManage ? (
         <div style={{ display: 'flex', gap: '0.6rem', margin: '1rem 0' }}>
           <button type="button" disabled={busy} onClick={() => void sync()}>
-            Sync watchlists now
+            {t('wsSyncButton')}
           </button>
           <button type="button" disabled={busy} onClick={() => void batch()}>
-            Run recurring screening batch now
+            {t('wsRunBatchButton')}
           </button>
         </div>
       ) : null}
@@ -141,17 +140,17 @@ export default function WatchlistSyncPage() {
 
       {runs ? (
         runs.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No sync has run yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('wsNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Source</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>Records</th>
-                  <th style={head}>Started</th>
-                  <th style={head}>Completed</th>
+                  <th style={head}>{t('wsColSource')}</th>
+                  <th style={head}>{t('wsColStatus')}</th>
+                  <th style={head}>{t('wsColRecords')}</th>
+                  <th style={head}>{t('wsColStarted')}</th>
+                  <th style={head}>{t('wsColCompleted')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,7 +169,12 @@ export default function WatchlistSyncPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('wsLoading')}</p>
+      )}
     </main>
   );
 }

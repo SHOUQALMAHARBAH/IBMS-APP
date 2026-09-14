@@ -66,14 +66,14 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadCustomers(searchTerm);
     })();
-  }, [user, searchTerm, loadCustomers]);
+  }, [user, searchTerm, loadCustomers, t]);
 
   if (isLoading || !user) return null;
 

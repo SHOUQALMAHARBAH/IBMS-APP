@@ -16,6 +16,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -27,6 +28,7 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function InformationAssetsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -44,7 +46,7 @@ export default function InformationAssetsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -57,17 +59,17 @@ export default function InformationAssetsPage() {
           ? "You don't hold the information-asset.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load information assets — try again.',
+            : t('iassetLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -79,7 +81,7 @@ export default function InformationAssetsPage() {
       await load();
     } catch (err) {
       setFormError(
-        err instanceof ApiError ? err.message : 'Could not create the information asset.',
+        err instanceof ApiError ? err.message : t('iassetCreateError'),
       );
     }
   }
@@ -96,7 +98,7 @@ export default function InformationAssetsPage() {
       setEditingId(null);
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not update the asset.');
+      setFormError(err instanceof ApiError ? err.message : t('iassetUpdateError'));
     }
   }
 
@@ -104,7 +106,7 @@ export default function InformationAssetsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Information Assets</h1>
+      <h1>{t('iassetHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         The ISO 27001 Clause 8.1 asset inventory — every information asset
         (a data store, a document repository, a backup, an integration)
@@ -119,15 +121,15 @@ export default function InformationAssetsPage() {
 
       {assets ? (
         assets.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No information assets recorded yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('iassetNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
             <thead>
               <tr>
-                <th style={head}>Name</th>
-                <th style={head}>Type</th>
-                <th style={head}>Classification</th>
-                <th style={head}>Owner</th>
+                <th style={head}>{t('iassetColName')}</th>
+                <th style={head}>{t('iassetColType')}</th>
+                <th style={head}>{t('iassetColClassification')}</th>
+                <th style={head}>{t('iassetColOwner')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -164,7 +166,7 @@ export default function InformationAssetsPage() {
           </table>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('iassetLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>

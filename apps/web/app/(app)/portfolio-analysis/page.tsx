@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -21,16 +22,17 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
+  const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ opacity: 0.6 }}>No issued policies yet.</p>;
+    return <p style={{ opacity: 0.6 }}>{t('paNone')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
       <thead>
         <tr>
-          <th style={head}>Key</th>
-          <th style={head}>Policies</th>
-          <th style={head}>Total issued premium (JOD)</th>
+          <th style={head}>{t('dashColKey')}</th>
+          <th style={head}>{t('dashColPolicies')}</th>
+          <th style={head}>{t('dashTotalIssuedPremium')}</th>
         </tr>
       </thead>
       <tbody>
@@ -49,6 +51,7 @@ function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
 }
 
 export default function PortfolioAnalysisPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -57,7 +60,7 @@ export default function PortfolioAnalysisPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -70,26 +73,25 @@ export default function PortfolioAnalysisPage() {
           ? "You don't hold the portfolio-analysis.view permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load portfolio analysis — try again.',
+            : t('paLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Portfolio Analysis</h1>
+      <h1>{t('paHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The issued book, broken down by line, insurer, client segment, and
-        geography (branch).
+        {t('paIntro')}
       </p>
 
       {loadError ? (
@@ -105,27 +107,27 @@ export default function PortfolioAnalysisPage() {
           </p>
 
           <section style={sectionStyle}>
-            <h2>By line</h2>
+            <h2>{t('paByLine')}</h2>
             <BreakdownTable rows={summary.byLine} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>By insurer</h2>
+            <h2>{t('paByInsurer')}</h2>
             <BreakdownTable rows={summary.byInsurer} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>By client segment</h2>
+            <h2>{t('paByClientSegment')}</h2>
             <BreakdownTable rows={summary.byClientSegment} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>By geography (branch)</h2>
+            <h2>{t('paByGeography')}</h2>
             <BreakdownTable rows={summary.byGeography} />
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

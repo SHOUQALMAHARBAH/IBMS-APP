@@ -13,7 +13,7 @@ import { formatDateTime } from '../../../../lib/i18n/format';
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const { user, isLoading, refreshUser, clearUser } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [enrollment, setEnrollment] = useState<MfaEnrollResponse | null>(null);
   const [code, setCode] = useState('');
@@ -23,7 +23,7 @@ export default function SecuritySettingsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
@@ -33,7 +33,7 @@ export default function SecuritySettingsPage() {
     try {
       setEnrollment(await enrollTotp());
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not start MFA enrollment.');
+      setError(err instanceof ApiError ? err.message : t('secEnrollError'));
     } finally {
       setIsBusy(false);
     }
@@ -48,10 +48,10 @@ export default function SecuritySettingsPage() {
       await verifyTotpEnrollment({ credentialId: enrollment.credentialId, code });
       setEnrollment(null);
       setCode('');
-      setMessage('Multi-factor authentication is now enabled on your account.');
+      setMessage(t('secEnabledMessage'));
       await refreshUser();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Invalid code — try again.');
+      setError(err instanceof ApiError ? err.message : t('secInvalidCode'));
     } finally {
       setIsBusy(false);
     }
@@ -65,12 +65,12 @@ export default function SecuritySettingsPage() {
 
   return (
     <main style={{ maxWidth: '32rem', margin: '0 auto', padding: '2rem' }}>
-      <h1>Security</h1>
+      <h1>{t('secHeading')}</h1>
 
       <section style={{ marginTop: '2rem' }}>
-        <h2>Multi-factor authentication</h2>
+        <h2>{t('secMfaHeading')}</h2>
         <p>
-          Status: <strong>{user.mfaEnabled ? 'Enabled' : 'Not enrolled — required before you can use most of IBMS'}</strong>
+          Status: <strong>{user.mfaEnabled ? t('secEnabled') : t('secNotEnrolled')}</strong>
         </p>
         {!user.mfaPolicySatisfied && user.mfaEnabled ? (
           <p style={{ fontSize: '0.85rem', opacity: 0.8 }}>
@@ -83,8 +83,8 @@ export default function SecuritySettingsPage() {
 
         {user.mfaEnabled ? null : enrollment ? (
           <div>
-            <p>Scan this QR code with your authenticator app, then enter the 6-digit code it shows.</p>
-            <Image src={enrollment.qrCodeDataUrl} alt="MFA enrollment QR code" width={200} height={200} unoptimized />
+            <p>{t('secScanInstruction')}</p>
+            <Image src={enrollment.qrCodeDataUrl} alt={t('secQrAlt')} width={200} height={200} unoptimized />
             <form onSubmit={(e) => void handleVerify(e)}>
               <label htmlFor="code" style={labelStyle}>
                 Authentication code
@@ -105,19 +105,19 @@ export default function SecuritySettingsPage() {
                 </p>
               ) : null}
               <button type="submit" disabled={isBusy} style={buttonStyle}>
-                {isBusy ? 'Verifying…' : 'Verify and enable'}
+                {isBusy ? t('secVerifyingButton') : t('secVerifyButton')}
               </button>
             </form>
           </div>
         ) : (
           <button type="button" onClick={() => void handleStartEnrollment()} disabled={isBusy} style={buttonStyle}>
-            {isBusy ? 'Starting…' : 'Enroll authenticator app'}
+            {isBusy ? t('secStartingButton') : t('secEnrollButton')}
           </button>
         )}
       </section>
 
       <section style={{ marginTop: '2rem' }}>
-        <h2>Session</h2>
+        <h2>{t('secSession')}</h2>
         <p>Idle timeout: {user.idleTimeoutMinutes} minutes</p>
         <p>Automatic sign-out after: {user.hardLogoutAfterIdleMinutes} minutes idle</p>
         {user.accessValidUntil ? <p>Your access to IBMS ends: {formatDateTime(user.accessValidUntil, language)}</p> : null}

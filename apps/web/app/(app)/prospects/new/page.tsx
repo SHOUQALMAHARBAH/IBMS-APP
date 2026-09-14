@@ -8,6 +8,7 @@ import { ProspectConversionForm } from '../../../../components/prospect/Prospect
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 // Roles the seeded permission grid grants `prospect.capture` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
@@ -50,12 +51,13 @@ function ConvertProspectForm() {
 }
 
 export default function NewProspectPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
@@ -63,7 +65,7 @@ export default function NewProspectPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Qualify prospect</h1>
+      <h1>{t('prosnHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 2 — convert a qualified lead into a prospect and capture its qualification
         profile (sector, activity, size, location, contact, products of interest, expected

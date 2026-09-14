@@ -96,8 +96,15 @@ test("a table's column order visually reverses in Arabic — same DOM order, mir
 
   await mockAuth(page, "AR");
   await page.reload();
-  const firstHeaderRtl = await page.getByRole("columnheader", { name: "Source" }).boundingBox();
-  const lastHeaderRtl = await page.getByRole("columnheader", { name: "Completed" }).boundingBox();
+  // The page is genuinely translated now, so in Arabic the headers ARE
+  // Arabic — asserting the English names here would only have worked while
+  // the screen was English-only, which is the thing this test denies.
+  const firstHeaderRtl = await page
+    .getByRole("columnheader", { name: "المصدر" })
+    .boundingBox();
+  const lastHeaderRtl = await page
+    .getByRole("columnheader", { name: "وقت الانتهاء" })
+    .boundingBox();
   if (!firstHeaderRtl || !lastHeaderRtl) throw new Error("header cells not found");
   // RTL: same DOM order, but native <table> column mirroring (a standard
   // browser behavior once `direction` inherits as rtl) now renders "Source"

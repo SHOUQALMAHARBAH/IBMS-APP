@@ -16,6 +16,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const REQUEST_ROLES = [
   'data-sharing.request',
@@ -36,6 +37,7 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 export default function DataSharingApprovalsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canRequest = hasAnyPermission(user, REQUEST_ROLES);
   const canApprove = hasAnyPermission(user, APPROVE_ROLES);
 
@@ -59,20 +61,20 @@ export default function DataSharingApprovalsPage() {
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load data-sharing requests — try again.',
+          : t('dsaLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -82,7 +84,7 @@ export default function DataSharingApprovalsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('dsaActionError'),
       );
     } finally {
       setBusy(false);
@@ -109,13 +111,9 @@ export default function DataSharingApprovalsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Third Parties &amp; Data Sharing</h1>
+      <h1>{t('dsaHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        A one-off data-sharing path separate from the standing vendor
-        relationship. Sharing with a named vendor requires that vendor to
-        be risk-tiered and data-share ready first, unless the channel is a
-        recognized regulatory one (e.g. the CBJ portal) — still subject to
-        classification and secure-channel checks either way.
+        {t('dsaIntro')}
       </p>
 
       {actionError ? (
@@ -137,7 +135,7 @@ export default function DataSharingApprovalsPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Description
             <input
-              aria-label="Data sharing description"
+              aria-label={t('dsaDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
@@ -145,9 +143,9 @@ export default function DataSharingApprovalsPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Vendor ID (optional)
+            {t('dsaVendorIdLabel')}
             <input
-              aria-label="Vendor ID"
+              aria-label={t('dsaVendorIdLabel')}
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
             />
@@ -155,7 +153,7 @@ export default function DataSharingApprovalsPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Classification
             <select
-              aria-label="Data classification"
+              aria-label={t('dsaClassificationLabel')}
               value={classification}
               onChange={(e) => setClassification(e.target.value)}
             >
@@ -169,7 +167,7 @@ export default function DataSharingApprovalsPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Channel
             <select
-              aria-label="Sharing channel"
+              aria-label={t('dsaChannelLabel')}
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
             >
@@ -186,28 +184,28 @@ export default function DataSharingApprovalsPage() {
               checked={isRegulatoryChannel}
               onChange={(e) => setIsRegulatoryChannel(e.target.checked)}
             />
-            Regulatory channel
+            {t('dsaRegulatoryChannelLabel')}
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Request share'}
+            {busy ? t('dsaSavingButton') : t('dsaRequestButton')}
           </button>
         </form>
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No data-sharing requests yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('dsaNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Description</th>
-                  <th style={head}>Classification</th>
-                  <th style={head}>Channel</th>
-                  <th style={head}>SLA due</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('dsaDescriptionLabel')}</th>
+                  <th style={head}>{t('dsaClassificationLabel')}</th>
+                  <th style={head}>{t('dsaChannelLabel')}</th>
+                  <th style={head}>{t('dsaColSlaDue')}</th>
+                  <th style={head}>{t('dsaColStatus')}</th>
+                  <th style={head}>{t('dsaColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,14 +226,14 @@ export default function DataSharingApprovalsPage() {
                             disabled={busy}
                             onClick={() => void run(() => approveDataSharingApproval(r.id))}
                           >
-                            Approve
+                            {t('dsaApproveButton')}
                           </button>
                           <button
                             type="button"
                             disabled={busy}
                             onClick={() => void run(() => declineDataSharingApproval(r.id))}
                           >
-                            Decline
+                            {t('dsaDeclineButton')}
                           </button>
                         </div>
                       ) : (
@@ -249,7 +247,7 @@ export default function DataSharingApprovalsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dsaLoading')}</p>
       )}
     </main>
   );

@@ -15,6 +15,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 
 const cellStyle: CSSProperties = {
@@ -46,6 +47,7 @@ function parseLines(
 export default function BankReconciliationPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canReconcile =
     !!user &&
     hasPermission(user, 'reconciliation-exception.investigate');
@@ -74,20 +76,20 @@ export default function BankReconciliationPage() {
           ? "You don't hold the reconciliation-exception.investigate permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load reconciliation exceptions — try again.',
+            : t('brLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function runDetect(ev: React.FormEvent) {
     ev.preventDefault();
@@ -98,7 +100,7 @@ export default function BankReconciliationPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'Detection failed — try again.',
+        err instanceof ApiError ? err.message : t('brDetectError'),
       );
     } finally {
       setBusy(false);
@@ -113,7 +115,7 @@ export default function BankReconciliationPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('brActionError'),
       );
     } finally {
       setBusy(false);
@@ -124,13 +126,9 @@ export default function BankReconciliationPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Bank reconciliation</h1>
+      <h1>{t('brHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Compare an insurer&rsquo;s statement against the broker&rsquo;s record
-        (net premium = premium &minus; commission). Every non-zero variance
-        raises an exception with the exact amount &mdash; it is never written
-        off. Investigate and close each one with a written explanation; the
-        figure is never adjusted.
+        {t('brIntro')}
       </p>
 
       {canReconcile ? (
@@ -140,7 +138,7 @@ export default function BankReconciliationPage() {
           >
             Statement lines &mdash; one <code>invoiceId, amount</code> per line
             <textarea
-              aria-label="Statement lines"
+              aria-label={t('brStatementLinesLabel')}
               value={statement}
               onChange={(e) => setStatement(e.target.value)}
               rows={5}
@@ -149,7 +147,7 @@ export default function BankReconciliationPage() {
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.5rem' }}>
-            {busy ? 'Running…' : 'Run reconciliation'}
+            {busy ? t('brRunningButton') : t('brRunButton')}
           </button>
         </form>
       ) : null}
@@ -172,25 +170,25 @@ export default function BankReconciliationPage() {
         </p>
       ) : null}
 
-      <h2>Open exceptions</h2>
+      <h2>{t('brOpenExceptions')}</h2>
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No open reconciliation exceptions.</p>
+          <p style={{ opacity: 0.6 }}>{t('brNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
               <thead>
                 <tr>
-                  <th style={headCellStyle}>Invoice</th>
+                  <th style={headCellStyle}>{t('brColInvoice')}</th>
                   <th style={{ ...headCellStyle, textAlign: 'end' }}>
-                    Statement
+                    {t('brColStatement')}
                   </th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>Broker</th>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>{t('brColBroker')}</th>
                   <th style={{ ...headCellStyle, textAlign: 'end' }}>
-                    Variance
+                    {t('brColVariance')}
                   </th>
-                  <th style={headCellStyle}>Status</th>
-                  <th style={headCellStyle}>Action</th>
+                  <th style={headCellStyle}>{t('brColStatus')}</th>
+                  <th style={headCellStyle}>{t('brColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,12 +224,12 @@ export default function BankReconciliationPage() {
                                 )
                               }
                             >
-                              Investigate
+                              {t('brInvestigateButton')}
                             </button>
                           ) : null}
                           <input
                             aria-label={`Resolution note for ${r.id}`}
-                            placeholder="Resolution note (min 10 chars)"
+                            placeholder={t('brResolutionNoteAria')}
                             value={notes[r.id] ?? ''}
                             onChange={(e) =>
                               setNotes((n) => ({ ...n, [r.id]: e.target.value }))
@@ -247,7 +245,7 @@ export default function BankReconciliationPage() {
                               }))
                             }
                           >
-                            <option value="">Resume invoice as…</option>
+                            <option value="">{t('brResumeInvoiceAs')}</option>
                             <option value="RECONCILED">RECONCILED</option>
                           </select>
                           <button
@@ -264,7 +262,7 @@ export default function BankReconciliationPage() {
                               )
                             }
                           >
-                            Resolve
+                            {t('brResolveButton')}
                           </button>
                         </div>
                       ) : null}
@@ -276,7 +274,7 @@ export default function BankReconciliationPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('brLoading')}</p>
       )}
     </main>
   );

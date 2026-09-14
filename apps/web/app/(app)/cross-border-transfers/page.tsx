@@ -13,6 +13,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const ROLES = [
   'cross-border-transfer.approve',
@@ -30,6 +31,7 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 export default function CrossBorderTransfersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage = hasAnyPermission(user, ROLES);
 
   const [records, setRecords] = useState<CrossBorderTransferRecord[] | null>(null);
@@ -51,20 +53,20 @@ export default function CrossBorderTransfersPage() {
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the cross-border transfer register — try again.',
+          : t('cbtLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -74,7 +76,7 @@ export default function CrossBorderTransfersPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('cbtActionError'),
       );
     } finally {
       setBusy(false);
@@ -100,13 +102,9 @@ export default function CrossBorderTransfersPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Cross-Border Transfer</h1>
+      <h1>{t('cbtHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Any transfer of personal data outside Jordan is blocked unless
-        exactly one of three legal bases is recorded (a recognized
-        statutory exception, Standard Contractual Clauses, or explicit
-        purpose-specific consent). Logging a transfer here is the same act
-        as approving it — only a Data Protection Officer may do so.
+        {t('cbtIntro')}
       </p>
 
       {actionError ? (
@@ -128,7 +126,7 @@ export default function CrossBorderTransfersPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Description
             <input
-              aria-label="Transfer description"
+              aria-label={t('cbtDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
@@ -137,7 +135,7 @@ export default function CrossBorderTransfersPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Destination country
             <input
-              aria-label="Destination country"
+              aria-label={t('cbtDestinationLabel')}
               value={destinationCountry}
               onChange={(e) => setDestinationCountry(e.target.value)}
               required
@@ -146,7 +144,7 @@ export default function CrossBorderTransfersPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Legal basis
             <select
-              aria-label="Legal basis"
+              aria-label={t('cbtLegalBasisLabel')}
               value={legalBasis}
               onChange={(e) => setLegalBasis(e.target.value)}
             >
@@ -158,32 +156,32 @@ export default function CrossBorderTransfersPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Evidence reference (optional)
+            {t('cbtEvidenceRefLabel')}
             <input
-              aria-label="Legal basis evidence reference"
+              aria-label={t('cbtEvidenceRefLabel')}
               value={evidenceRef}
               onChange={(e) => setEvidenceRef(e.target.value)}
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Log transfer'}
+            {busy ? t('cbtSavingButton') : t('cbtLogButton')}
           </button>
         </form>
       ) : null}
 
       {records ? (
         records.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No cross-border transfers logged yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('cbtNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Destination</th>
-                  <th style={head}>Legal basis</th>
-                  <th style={head}>Description</th>
-                  <th style={head}>Approved by</th>
-                  <th style={head}>Transferred at</th>
+                  <th style={head}>{t('cbtColDestination')}</th>
+                  <th style={head}>{t('cbtLegalBasisLabel')}</th>
+                  <th style={head}>{t('cbtDescriptionLabel')}</th>
+                  <th style={head}>{t('cbtColApprovedBy')}</th>
+                  <th style={head}>{t('cbtColTransferredAt')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,7 +199,7 @@ export default function CrossBorderTransfersPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('cbtLoading')}</p>
       )}
     </main>
   );

@@ -73,6 +73,7 @@ interface ViewError {
 }
 
 function CrmForCustomer({ customerId }: { customerId: string }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const canLog = hasPermission(user, 'interaction.log');
 
@@ -99,19 +100,19 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
           status === 403
             ? "You don't hold the customer.360-view.read permission, so the 360° timeline isn't shown here."
             : status === 404
-              ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+              ? t('crmCustomerNotFound')
               : err instanceof ApiError
                 ? err.message
-                : 'Could not load this customer view — try again.',
+                : t('crmLoadError'),
       });
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function submit() {
     setLogError(null);
@@ -121,7 +122,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     if (occurredAt) {
       const parsed = new Date(occurredAt);
       if (Number.isNaN(parsed.getTime())) {
-        setLogError('Enter a valid date and time, or leave the date blank.');
+        setLogError(t('crmInvalidDate'));
         return;
       }
       occurredAtIso = parsed.toISOString();
@@ -144,7 +145,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
           ? "You don't hold the interaction.log permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not log the interaction — try again.',
+            : t('crmLogError'),
       );
     } finally {
       setSubmitting(false);
@@ -161,7 +162,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!view && !viewError) return <p>Loading…</p>;
+  if (!view && !viewError) return <p>{t('crmLoading')}</p>;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -184,7 +185,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
 
       {canLog ? (
         <div style={crmPanelStyle}>
-          <strong>Log an interaction</strong>
+          <strong>{t('crmLogHeading')}</strong>
           <div style={crmFormRowStyle}>
             <div>
               <label htmlFor="crm-channel" style={cardMetaStyle}>
@@ -214,7 +215,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
                 id="crm-summary"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="e.g. Called to confirm the renewal terms"
+                placeholder={t('crmDetailPlaceholder')}
                 style={{ width: '100%' }}
               />
             </div>
@@ -236,11 +237,11 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
               style={{ ...buttonStyle, width: 'auto' }}
               onClick={() => void submit()}
             >
-              {submitting ? 'Logging…' : 'Log interaction'}
+              {submitting ? t('crmLogging') : t('crmLogButton')}
             </button>
           </div>
           {logOk ? (
-            <p style={{ ...cardMetaStyle, opacity: 1 }}>Interaction logged.</p>
+            <p style={{ ...cardMetaStyle, opacity: 1 }}>{t('crmLogged')}</p>
           ) : null}
           {logError ? (
             <p role="alert" style={errorStyle}>
@@ -254,7 +255,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         </p>
       ) : null}
 
-      <h3 style={{ marginTop: '1.5rem' }}>Timeline</h3>
+      <h3 style={{ marginTop: '1.5rem' }}>{t('crmTimeline')}</h3>
       {view ? (
         <TimelineList view={view} />
       ) : (
@@ -292,18 +293,19 @@ function CrmFlow() {
 }
 
 export default function CrmPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Relationship (CRM)</h1>
+      <h1>{t('crmHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 10 — log every customer touchpoint (meeting, call, email,
         WhatsApp, visit, proposal, renewal, claim, complaint) and see the

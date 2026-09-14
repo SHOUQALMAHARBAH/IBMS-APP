@@ -78,14 +78,14 @@ export default function PoliciesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadPolicies(searchTerm, status);
     })();
-  }, [user, searchTerm, status, loadPolicies]);
+  }, [user, searchTerm, status, loadPolicies, t]);
 
   if (isLoading || !user) return null;
 

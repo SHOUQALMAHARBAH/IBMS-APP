@@ -68,7 +68,7 @@ function statusStyle(status: string): CSSProperties {
 export default function ScreeningHealthPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const isArabic = language === "AR";
 
   const [health, setHealth] = useState<ScreeningHealth | null>(null);
@@ -94,23 +94,19 @@ export default function ScreeningHealthPage() {
       setOverview(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? isArabic
-            ? "لا تملك صلاحية sanctions-pep.screen."
-            : "You don't hold the sanctions-pep.screen permission."
+          ? t('shYouDonTHoldThe')
           : err instanceof ApiError
             ? err.message
-            : isArabic
-              ? "تعذّر تحميل حالة الفحص — حاول مرة أخرى."
-              : "Could not load screening health — try again.",
+            : t('shCouldNotLoadScreeningHealth'),
       );
     } finally {
       setLoaded(true);
     }
-  }, [isArabic]);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push("/login");
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     // Async IIFE rather than a bare `void load()` — the same shape every other
@@ -119,7 +115,7 @@ export default function ScreeningHealthPage() {
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
@@ -147,12 +143,10 @@ export default function ScreeningHealthPage() {
   return (
     <main style={pageStyle}>
       <h1>
-        {isArabic ? "حالة فحص العقوبات والأشخاص السياسيين" : "Screening health"}
+        {t('shScreeningHealth')}
       </h1>
       <p style={{ opacity: 0.75, maxWidth: "46rem" }}>
-        {isArabic
-          ? "يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مهيأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية."
-          : "Which provider actually performs screening, whether its data is current, and what it covers. NOT_CONFIGURED or UNAVAILABLE means screening did not happen — it is not a negative result."}
+        {t('shWhichProviderActuallyPerformsScreening')}
       </p>
 
       {loadError ? (
@@ -163,7 +157,7 @@ export default function ScreeningHealthPage() {
 
       {!loaded ? (
         <p style={{ opacity: 0.6 }}>
-          {isArabic ? "جارٍ التحميل…" : "Loading…"}
+          {t('shLoading')}
         </p>
       ) : null}
 
@@ -171,10 +165,10 @@ export default function ScreeningHealthPage() {
         <>
           <section style={card}>
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "المزوّد" : "Provider"}
+              {t('shProvider')}
             </h2>
             <div style={row}>
-              <span>{isArabic ? "الحالة" : "Status"}</span>
+              <span>{t('shStatus')}</span>
               <span
                 style={statusStyle(health.status)}
                 data-status={health.status}
@@ -183,31 +177,25 @@ export default function ScreeningHealthPage() {
               </span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "الحالة التفصيلية" : "State"}</span>
+              <span>{t('shState')}</span>
               <span data-state={health.state}>{health.state}</span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "النوع" : "Type"}</span>
+              <span>{t('shType')}</span>
               <span>{providerLabel(health.provider)}</span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "المصادقة" : "Authentication"}</span>
+              <span>{t('shAuthentication')}</span>
               <span data-auth={String(health.authenticationValid)}>
                 {health.authenticationValid === true
-                  ? isArabic
-                    ? "مقبولة"
-                    : "Accepted"
+                  ? t('shAccepted')
                   : health.authenticationValid === false
-                    ? isArabic
-                      ? "مرفوضة"
-                      : "Rejected"
-                    : isArabic
-                      ? "لا تنطبق"
-                      : "Not applicable"}
+                    ? t('shRejected')
+                    : t('shNotApplicable')}
               </span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "الاسم" : "Name"}</span>
+              <span>{t('shName')}</span>
               <span>{health.providerName}</span>
             </div>
             <p style={{ marginBottom: 0, opacity: 0.85 }}>{health.detail}</p>
@@ -223,26 +211,24 @@ export default function ScreeningHealthPage() {
 
           <section style={card}>
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "القدرات والتغطية" : "Capabilities"}
+              {t('shCapabilities')}
             </h2>
             <p style={{ opacity: 0.75, marginTop: 0 }}>
-              {isArabic
-                ? "«مدعوم» يعني أنّ المحوّل ينفّذها، و«مهيّأ» يعني أنّ هذا النشر وفّر ما تحتاجه، و«فعّال» يعني أنّها تعمل الآن. الخلط بين الثلاثة هو ما يجعل نظاماً يدّعي تغطية لا يملكها."
-                : "“Supported” means the adapter implements it; “Configured” means this deployment supplied what it needs; “Operational” means it works right now. Conflating the three is how a system claims coverage it does not have."}
+              {t('shSupportedMeansTheAdapterImplements')}
             </p>
             <div style={{ overflowX: "auto" }}>
               <table style={{ borderCollapse: "collapse", minWidth: "34rem" }}>
                 <thead>
                   <tr>
                     <th style={headCell}>
-                      {isArabic ? "القدرة" : "Capability"}
+                      {t('shCapability')}
                     </th>
-                    <th style={headCell}>{isArabic ? "مدعوم" : "Supported"}</th>
+                    <th style={headCell}>{t('shSupported')}</th>
                     <th style={headCell}>
-                      {isArabic ? "مهيّأ" : "Configured"}
+                      {t('shConfigured')}
                     </th>
                     <th style={headCell}>
-                      {isArabic ? "فعّال" : "Operational"}
+                      {t('shOperational')}
                     </th>
                   </tr>
                 </thead>
@@ -277,23 +263,21 @@ export default function ScreeningHealthPage() {
             </div>
             {!health.pepOperational ? (
               <p role="alert" style={{ ...errorStyle, marginTop: "0.75rem" }}>
-                {isArabic
-                  ? "فحص الأشخاص السياسيين (PEP) غير فعّال. لا يجوز اعتبار أي عميل «خالياً» من هذه الناحية."
-                  : "PEP screening is NOT operational. No customer may be represented as clear of PEP status."}
+                {t('shPepScreeningIsNotOperational')}
               </p>
             ) : null}
           </section>
 
           <section style={card}>
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "البيانات" : "Dataset"}
+              {t('shDataset')}
             </h2>
             <div style={row}>
-              <span>{isArabic ? "الإصدار" : "Version"}</span>
+              <span>{t('shVersion')}</span>
               <span>{health.datasetVersion ?? "—"}</span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "آخر تحديث" : "Last updated"}</span>
+              <span>{t('shLastUpdated')}</span>
               <span>
                 {health.datasetUpdatedAt
                   ? health.datasetUpdatedAt.slice(0, 16).replace("T", " ")
@@ -301,46 +285,38 @@ export default function ScreeningHealthPage() {
               </span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "وقت الفحص" : "Checked at"}</span>
+              <span>{t('shCheckedAt')}</span>
               <span>{health.checkedAt.slice(0, 16).replace("T", " ")}</span>
             </div>
           </section>
 
           <section style={card}>
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "قواعد المطابقة" : "Matching rules"}
+              {t('shMatchingRules')}
             </h2>
             <p style={{ opacity: 0.75, marginTop: 0 }}>
-              {isArabic
-                ? "هذه العتبات قابلة للتهيئة وتمثّل قرار مخاطر يخصّ الشركة — وليست قاعدة تنظيمية."
-                : "These thresholds are configurable and represent the broker’s own risk appetite. They are not a regulatory rule."}
+              {t('shTheseThresholdsAreConfigurableAnd')}
             </p>
             <div style={row}>
-              <span>{isArabic ? "مرتفع" : "High"}</span>
+              <span>{t('shHigh')}</span>
               <span>{health.thresholds.high}</span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "مراجعة" : "Review"}</span>
+              <span>{t('shReview')}</span>
               <span>{health.thresholds.review}</span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "تجاهل دون" : "Discard below"}</span>
+              <span>{t('shDiscardBelow')}</span>
               <span>{health.thresholds.low}</span>
             </div>
             <div style={row}>
               <span>
-                {isArabic
-                  ? "إرسال أرقام الهوية للمزوّد"
-                  : "Send identifiers to provider"}
+                {t('shSendIdentifiersToProvider')}
               </span>
               <span>
                 {health.sendIdentifiers
-                  ? isArabic
-                    ? "نعم"
-                    : "Yes"
-                  : isArabic
-                    ? "لا"
-                    : "No"}
+                  ? t('shYes')
+                  : t('shNo')}
               </span>
             </div>
             {health.thresholdProblems.length > 0 ? (
@@ -361,29 +337,23 @@ export default function ScreeningHealthPage() {
                 : `Screening attempts (last ${overview.windowDays} days)`}
             </h2>
             <p style={{ opacity: 0.75, marginTop: 0 }}>
-              {isArabic
-                ? "فحص الاتصال يجيب: هل المزوّد متاح الآن؟ هذه الأرقام تجيب: كم عميلاً تم فحصه فعلاً؟"
-                : "A health check answers whether the provider is reachable. These numbers answer how many customers were actually screened."}
+              {t('shAHealthCheckAnswersWhether')}
             </p>
             {overview.attempts.total === 0 ? (
               <p data-testid="ops-attempts-empty" style={{ opacity: 0.7 }}>
-                {isArabic
-                  ? "لا توجد عمليات فحص مسجّلة في هذه الفترة."
-                  : "No screening attempts recorded in this window."}
+                {t('shNoScreeningAttemptsRecordedIn')}
               </p>
             ) : (
               <>
                 <div style={row}>
-                  <span>{isArabic ? "الإجمالي" : "Total"}</span>
+                  <span>{t('shTotal')}</span>
                   <span data-testid="ops-attempts-total">
                     {overview.attempts.total}
                   </span>
                 </div>
                 <div style={row}>
                   <strong>
-                    {isArabic
-                      ? "لم تُنتج نتيجة قابلة للاستخدام"
-                      : "Did not produce a usable answer"}
+                    {t('shDidNotProduceAUsable')}
                   </strong>
                   <strong
                     data-testid="ops-unresolved-rate"
@@ -412,9 +382,7 @@ export default function ScreeningHealthPage() {
                     role="alert"
                     style={{ ...errorStyle, marginTop: "0.75rem" }}
                   >
-                    {isArabic
-                      ? "لم يتم فحص هؤلاء العملاء — ولم يُعتبروا خالين من المطابقة. راجع الأسباب أدناه."
-                      : "These customers were NOT screened — and were not treated as clear. See the reasons below."}
+                    {t('shTheseCustomersWereNotScreened')}
                   </p>
                 ) : null}
               </>
@@ -425,16 +393,16 @@ export default function ScreeningHealthPage() {
           {overview.attempts.recentUnresolved.length > 0 ? (
             <section style={card} data-testid="ops-failures">
               <h2 style={{ marginTop: 0 }}>
-                {isArabic ? "أحدث الإخفاقات" : "Most recent failures"}
+                {t('shMostRecentFailures')}
               </h2>
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
-                    <th style={headCell}>{isArabic ? "النتيجة" : "Outcome"}</th>
+                    <th style={headCell}>{t('shOutcome')}</th>
                     <th style={headCell}>
-                      {isArabic ? "المزوّد" : "Provider"}
+                      {t('shProvider2')}
                     </th>
-                    <th style={headCell}>{isArabic ? "السبب" : "Reason"}</th>
+                    <th style={headCell}>{t('shReason')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -454,15 +422,11 @@ export default function ScreeningHealthPage() {
           {/* ---------------- holds and case workload ---------------- */}
           <section style={card} data-testid="ops-holds">
             <h2 style={{ marginTop: 0 }}>
-              {isArabic
-                ? "الملفات الموقوفة وقائمة العمل"
-                : "Holds and case workload"}
+              {t('shHoldsAndCaseWorkload')}
             </h2>
             <div style={row}>
               <span>
-                {isArabic
-                  ? "ملفات قابلة للقرار موقوفة حالياً"
-                  : "Decidable files currently held"}
+                {t('shDecidableFilesCurrentlyHeld')}
               </span>
               <strong data-testid="ops-active-holds">
                 {overview.holds.activeHolds} / {overview.holds.decidableFiles}
@@ -480,7 +444,7 @@ export default function ScreeningHealthPage() {
             </div>
             <div style={row}>
               <span>
-                {isArabic ? "مطابقات قيد الانتظار" : "Pending matches"}
+                {t('shPendingMatches')}
               </span>
               <span data-testid="ops-pending-matches">
                 {overview.matchQueue.pending}
@@ -498,9 +462,9 @@ export default function ScreeningHealthPage() {
                 <thead>
                   <tr>
                     <th style={headCell}>
-                      {isArabic ? "حالة الحالة" : "Case state"}
+                      {t('shCaseState')}
                     </th>
-                    <th style={headCell}>{isArabic ? "العدد" : "Count"}</th>
+                    <th style={headCell}>{t('shCount')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -516,7 +480,7 @@ export default function ScreeningHealthPage() {
               </table>
             ) : (
               <p style={{ opacity: 0.7 }} data-testid="ops-cases-empty">
-                {isArabic ? "لا توجد حالات مفتوحة." : "No open cases."}
+                {t('shNoOpenCases')}
               </p>
             )}
             {overview.holds.configurationProblems.length > 0 ? (
@@ -529,14 +493,10 @@ export default function ScreeningHealthPage() {
           {/* ---------------- dataset generations ---------------- */}
           <section style={card} data-testid="ops-datasets">
             <h2 style={{ marginTop: 0 }}>
-              {isArabic
-                ? "إصدارات قوائم العقوبات"
-                : "Sanctions list generations"}
+              {t('shSanctionsListGenerations')}
             </h2>
             <p style={{ opacity: 0.75, marginTop: 0 }}>
-              {isArabic
-                ? "يقرأ الفحص الإصدار المنشور فقط. الإصدار قيد التنزيل غير مرئي إطلاقاً."
-                : "A screening reads only the PUBLISHED generation. One still downloading is invisible to it."}
+              {t('shAScreeningReadsOnlyThe')}
             </p>
             {overview.datasets.length === 0 ? (
               <p
@@ -544,18 +504,16 @@ export default function ScreeningHealthPage() {
                 style={errorStyle}
                 data-testid="ops-datasets-empty"
               >
-                {isArabic
-                  ? "لا يوجد أي إصدار — لم تكتمل أي مزامنة بعد، ولا يمكن اعتبار أي عميل خالياً من المطابقة."
-                  : "No generation exists — no sync has completed, and no customer can be treated as clear."}
+                {t('shNoGenerationExistsNoSync')}
               </p>
             ) : (
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
-                    <th style={headCell}>{isArabic ? "المصدر" : "Source"}</th>
-                    <th style={headCell}>{isArabic ? "الحالة" : "Status"}</th>
-                    <th style={headCell}>{isArabic ? "السجلات" : "Records"}</th>
-                    <th style={headCell}>{isArabic ? "جديدة" : "Added"}</th>
+                    <th style={headCell}>{t('shSource')}</th>
+                    <th style={headCell}>{t('shStatus2')}</th>
+                    <th style={headCell}>{t('shRecords')}</th>
+                    <th style={headCell}>{t('shAdded')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -575,7 +533,7 @@ export default function ScreeningHealthPage() {
                         ) : null}
                         {d.rollbackReason ? (
                           <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
-                            {isArabic ? "تراجع: " : "Rolled back: "}
+                            {t('shRolledBack')}
                             {d.rollbackReason}
                           </div>
                         ) : null}
@@ -592,31 +550,31 @@ export default function ScreeningHealthPage() {
           {/* ---------------- schedules ---------------- */}
           <section style={card} data-testid="ops-schedules">
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "المهام الدورية" : "Recurring work"}
+              {t('shRecurringWork')}
             </h2>
             <div style={row}>
               <span>
-                {isArabic ? "إعادة الفحص الدورية" : "Recurring re-screen"}
+                {t('shRecurringReScreen')}
               </span>
               <span data-testid="ops-next-rescreen">
                 {overview.schedules.rescreenBatch.nextRunAt ??
-                  (isArabic ? "غير معروف" : "unknown")}
+                  (t('shUnknown'))}
               </span>
             </div>
             <div style={row}>
-              <span>{isArabic ? "مزامنة القوائم" : "List sync"}</span>
+              <span>{t('shListSync')}</span>
               <span data-testid="ops-next-sync">
                 {overview.schedules.listSync.nextRunAt ??
-                  (isArabic ? "غير معروف" : "unknown")}
+                  (t('shUnknown2'))}
               </span>
             </div>
             <div style={row}>
               <span>
-                {isArabic ? "آخر مزامنة ناجحة" : "Last successful sync"}
+                {t('shLastSuccessfulSync')}
               </span>
               <span data-testid="ops-last-sync-success">
                 {overview.schedules.listSync.lastSuccessAt ??
-                  (isArabic ? "لا يوجد" : "never")}
+                  (t('shNever'))}
               </span>
             </div>
           </section>
@@ -624,21 +582,19 @@ export default function ScreeningHealthPage() {
           {/* ---------------- sync history ---------------- */}
           <section style={card} data-testid="ops-sync-history">
             <h2 style={{ marginTop: 0 }}>
-              {isArabic ? "سجل المزامنة" : "Sync history"}
+              {t('shSyncHistory')}
             </h2>
             {overview.listSync.length === 0 ? (
               <p style={{ opacity: 0.7 }} data-testid="ops-sync-empty">
-                {isArabic
-                  ? "لم تُشغَّل أي مزامنة بعد."
-                  : "No sync has run yet."}
+                {t('shNoSyncHasRunYet')}
               </p>
             ) : (
               <table style={{ borderCollapse: "collapse", width: "100%" }}>
                 <thead>
                   <tr>
-                    <th style={headCell}>{isArabic ? "المصدر" : "Source"}</th>
-                    <th style={headCell}>{isArabic ? "الحالة" : "Status"}</th>
-                    <th style={headCell}>{isArabic ? "السجلات" : "Records"}</th>
+                    <th style={headCell}>{t('shSource2')}</th>
+                    <th style={headCell}>{t('shStatus3')}</th>
+                    <th style={headCell}>{t('shRecords2')}</th>
                   </tr>
                 </thead>
                 <tbody>

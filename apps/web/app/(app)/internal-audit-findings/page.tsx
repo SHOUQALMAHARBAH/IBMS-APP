@@ -14,6 +14,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const RECORD_ROLE = [
   'internal-audit.record',
@@ -36,6 +37,7 @@ const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', ga
 export default function InternalAuditFindingsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canRecord = hasAnyPermission(user, RECORD_ROLE);
   const canClose = hasAnyPermission(user, CLOSE_ROLE);
 
@@ -59,20 +61,20 @@ export default function InternalAuditFindingsPage() {
           ? "You don't hold the internal-audit.record/internal-audit.close permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load internal audit findings — try again.',
+            : t('iafLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -81,7 +83,7 @@ export default function InternalAuditFindingsPage() {
       await fn();
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'That action failed — try again.');
+      setActionError(err instanceof ApiError ? err.message : t('iafActionError'));
     } finally {
       setBusy(false);
     }
@@ -100,12 +102,9 @@ export default function InternalAuditFindingsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Internal Audit Findings</h1>
+      <h1>{t('iafHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Record audit findings, track the remediation path, and close once
-        resolved. Only Compliance may record a finding or update its
-        remediation plan; Compliance or a Branch/Department Manager may
-        close it.
+        {t('iafIntro')}
       </p>
 
       {actionError ? (
@@ -124,7 +123,7 @@ export default function InternalAuditFindingsPage() {
           <label style={labelStyle}>
             Audit period
             <input
-              aria-label="Audit period label"
+              aria-label={t('iafAuditPeriodLabel')}
               value={auditPeriodLabel}
               onChange={(e) => setAuditPeriodLabel(e.target.value)}
               required
@@ -133,28 +132,32 @@ export default function InternalAuditFindingsPage() {
           <label style={labelStyle}>
             Finding
             <input
-              aria-label="Finding"
+              aria-label={t('iafFindingLabel')}
               value={finding}
               onChange={(e) => setFinding(e.target.value)}
               required
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Record finding'}
+            {busy ? t('iafSavingButton') : t('iafRecordButton')}
           </button>
         </form>
       ) : null}
 
-      {findings ? (
+      {findings && findings.length === 0 ? (
+        <p style={{ opacity: 0.6 }}>{t('iafNone')}</p>
+      ) : null}
+
+      {findings && findings.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
             <thead>
               <tr>
-                <th style={head}>Audit period</th>
-                <th style={head}>Finding</th>
-                <th style={head}>Remediation</th>
-                <th style={head}>Status</th>
-                <th style={head}>Action</th>
+                <th style={head}>{t('iafAuditPeriodLabel')}</th>
+                <th style={head}>{t('iafColFinding')}</th>
+                <th style={head}>{t('iafColRemediation')}</th>
+                <th style={head}>{t('iafColStatus')}</th>
+                <th style={head}>{t('iafColAction')}</th>
               </tr>
             </thead>
             <tbody>
@@ -170,7 +173,7 @@ export default function InternalAuditFindingsPage() {
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
                             aria-label={`Remediation action for ${f.id}`}
-                            placeholder="remediation action"
+                            placeholder={t('iafRemediationActionLabel')}
                             value={remediationDrafts[f.id] ?? ''}
                             onChange={(e) =>
                               setRemediationDrafts((d) => ({ ...d, [f.id]: e.target.value }))
@@ -188,7 +191,7 @@ export default function InternalAuditFindingsPage() {
                               )
                             }
                           >
-                            Save remediation
+                            {t('iafSaveRemediationButton')}
                           </button>
                         </div>
                       ) : null}
@@ -198,7 +201,7 @@ export default function InternalAuditFindingsPage() {
                           disabled={busy}
                           onClick={() => void run(() => closeInternalAuditFinding(f.id))}
                         >
-                          Close
+                          {t('iafCloseButton')}
                         </button>
                       ) : null}
                       {f.status === 'closed' ? '—' : null}
@@ -209,7 +212,12 @@ export default function InternalAuditFindingsPage() {
             </tbody>
           </table>
         </div>
-      ) : null}
+      ) : loadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('iafLoading')}</p>
+      )}
     </main>
   );
 }

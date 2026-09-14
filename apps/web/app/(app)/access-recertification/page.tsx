@@ -14,13 +14,15 @@ import { StartCyclePanel } from '../../../components/access-recertification/Star
 import { RecertificationItemsTable } from '../../../components/access-recertification/RecertificationItemsTable';
 import { pageStyle } from '../../../components/access-recertification/access-recertification.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 // Roles the seeded permission grid grants `access-recertification.cycle.start`
 // to (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
-// so the "Start a cycle" form isn't offered to someone who'll just get a 403.
+// so the t('acrStartCycleButton') form isn't offered to someone who'll just get a 403.
 // The backend remains the sole source of truth.
 
 export default function AccessRecertificationPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -38,21 +40,21 @@ export default function AccessRecertificationPage() {
           ? "You don't hold the access-recertification.review permission, so there's nothing to show here."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load your review queue — try again.',
+            : t('acrLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadItems();
     })();
-  }, [user, loadItems]);
+  }, [user, loadItems, t]);
 
   if (isLoading || !user) return null;
 
@@ -74,7 +76,7 @@ export default function AccessRecertificationPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Access recertification</h1>
+      <h1>{t('acrHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Part 5.1 — periodic (quarterly) review of who holds access. Confirm, revoke, or flag each
         item below; a System/Security Administrator&apos;s own access is included and reviewed the
@@ -84,8 +86,8 @@ export default function AccessRecertificationPage() {
       {canStartCycle ? <StartCyclePanel onCycleStarted={() => void loadItems()} /> : null}
 
       <section style={{ marginTop: '2rem' }}>
-        <h2>Your review queue</h2>
-        {items === null && !loadError ? <p>Loading…</p> : null}
+        <h2>{t('acrQueueHeading')}</h2>
+        {items === null && !loadError ? <p>{t('acrLoading')}</p> : null}
         {loadError ? (
           <p role="alert" style={errorStyle}>
             {loadError}

@@ -54,7 +54,7 @@ function sourceBadgeStyle(isRegulatory: boolean): CSSProperties {
 export default function SlaPoliciesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const isArabic = language === "AR";
   const canManage = hasPermission(user, 'sla.policy.manage');
 
@@ -76,29 +76,25 @@ export default function SlaPoliciesPage() {
         setRows(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? isArabic
-              ? "لا تملك صلاحية sla.policy.read."
-              : "You don't hold the sla.policy.read permission."
+            ? t('slapYouDonTHoldThe')
             : err instanceof ApiError
               ? err.message
-              : isArabic
-                ? "تعذّر تحميل سياسات مستوى الخدمة — حاول مرة أخرى."
-                : "Could not load SLA policies — try again.",
+              : t('slapCouldNotLoadSlaPolicies'),
         );
       }
     },
-    [isArabic],
+    [t],
   );
 
   useEffect(() => {
     if (!isLoading && !user) router.push("/login");
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load(status);
     })();
-  }, [user, status, load]);
+  }, [user, status, load, t]);
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setBusy(true);
@@ -110,9 +106,7 @@ export default function SlaPoliciesPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : isArabic
-            ? "فشل تنفيذ الإجراء — حاول مرة أخرى."
-            : "That action failed — try again.",
+          : t('slapThatActionFailedTryAgain'),
       );
     } finally {
       setBusy(false);
@@ -158,11 +152,9 @@ export default function SlaPoliciesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>{isArabic ? "سياسات مستوى الخدمة" : "SLA policies"}</h1>
+      <h1>{t('slapSlaPolicies')}</h1>
       <p style={{ opacity: 0.75, maxWidth: "50rem" }}>
-        {isArabic
-          ? "كل مهلة زمنية في النظام قابلة للتهيئة من هنا دون تغيير في الشيفرة. الأهم: يوضّح هذا الجدول مصدر كل مهلة — «تنظيمي» يعني أنّ هناك نصاً قانونياً يوجبها ويُذكر مرجعه، وأي تصنيف آخر يعني أنّها هدف داخلي وليست إلزاماً قانونياً."
-          : "Every deadline in the system is configured here, with no code change. More importantly, this table states where each deadline COMES FROM: “Regulatory” means an instrument requires it and names that instrument; any other classification means it is an internal target, not a legal obligation."}
+        {t('slapEveryDeadlineInTheSystem')}
       </p>
 
       <div style={{ display: "flex", gap: "0.4rem", margin: "1rem 0" }}>
@@ -193,19 +185,19 @@ export default function SlaPoliciesPage() {
       {rows ? (
         rows.length === 0 ? (
           <p style={{ opacity: 0.6 }}>
-            {isArabic ? "لا توجد سياسات." : "No policies."}
+            {t('slapNoPolicies')}
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", minWidth: "72rem" }}>
               <thead>
                 <tr>
-                  <th style={head}>{isArabic ? "العملية" : "Process"}</th>
-                  <th style={head}>{isArabic ? "المهلة" : "Duration"}</th>
-                  <th style={head}>{isArabic ? "المصدر" : "Source"}</th>
-                  <th style={head}>{isArabic ? "التقويم" : "Calendar"}</th>
-                  <th style={head}>{isArabic ? "الحالة" : "Status"}</th>
-                  <th style={head}>{isArabic ? "إجراء" : "Action"}</th>
+                  <th style={head}>{t('slapProcess')}</th>
+                  <th style={head}>{t('slapDuration')}</th>
+                  <th style={head}>{t('slapSource')}</th>
+                  <th style={head}>{t('slapCalendar')}</th>
+                  <th style={head}>{t('slapStatus')}</th>
+                  <th style={head}>{t('slapAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,24 +246,16 @@ export default function SlaPoliciesPage() {
                       </span>
                       {!p.isRegulatory ? (
                         <div style={{ fontSize: "0.78rem", opacity: 0.7 }}>
-                          {isArabic
-                            ? "ليست إلزاماً قانونياً"
-                            : "Not a legal requirement"}
+                          {t('slapNotALegalRequirement')}
                         </div>
                       ) : null}
                     </td>
                     <td style={cell}>
                       {p.calendarType === "CONTINUOUS_24_7"
-                        ? isArabic
-                          ? "على مدار الساعة"
-                          : "24/7"
+                        ? t('slap247')
                         : p.calendarType === "CUSTOM"
-                          ? isArabic
-                            ? "مخصّص"
-                            : "Custom"
-                          : isArabic
-                            ? "أيام العمل (الأردن)"
-                            : "Jordan working days"}
+                          ? t('slapCustom')
+                          : t('slapJordanWorkingDays')}
                     </td>
                     <td style={cell}>{p.status}</td>
                     <td style={cell}>
@@ -297,7 +281,7 @@ export default function SlaPoliciesPage() {
                               })
                             }
                           >
-                            {isArabic ? "حفظ" : "Save"}
+                            {t('slapSave')}
                           </button>
                           {p.status === "ACTIVE" ? (
                             <button
@@ -307,7 +291,7 @@ export default function SlaPoliciesPage() {
                                 void run(() => deactivateSlaPolicy(p.id))
                               }
                             >
-                              {isArabic ? "إيقاف" : "Deactivate"}
+                              {t('slapDeactivate')}
                             </button>
                           ) : (
                             <button
@@ -317,13 +301,13 @@ export default function SlaPoliciesPage() {
                                 void run(() => activateSlaPolicy(p.id))
                               }
                             >
-                              {isArabic ? "تفعيل" : "Activate"}
+                              {t('slapActivate')}
                             </button>
                           )}
                         </div>
                       ) : (
                         <span style={{ opacity: 0.6 }}>
-                          {isArabic ? "للاطلاع فقط" : "Read only"}
+                          {t('slapReadOnly')}
                         </span>
                       )}
                     </td>
@@ -333,7 +317,12 @@ export default function SlaPoliciesPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('slapLoading')}</p>
+      )}
     </main>
   );
 }

@@ -10,11 +10,13 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 export default function PolicyDashboardPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -31,7 +33,7 @@ export default function PolicyDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -54,10 +56,10 @@ export default function PolicyDashboardPage() {
           ? "You don't hold the dashboard.policy.view permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the Policy Dashboard — try again.',
+            : t('dpolLoadError'),
       );
     }
-  }, [branchId, insuranceLine, insurerId, periodLabel, periodStart, periodEnd, renewalWindowDays]);
+  }, [branchId, insuranceLine, insurerId, periodLabel, periodStart, periodEnd, renewalWindowDays, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -66,7 +68,7 @@ export default function PolicyDashboardPage() {
     })();
     // Filters apply on explicit "Apply filters" submit only — see below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, t]);
 
   function applyFilters(ev: React.FormEvent) {
     ev.preventDefault();
@@ -77,12 +79,9 @@ export default function PolicyDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Policy Dashboard</h1>
+      <h1>{t('dpolHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Active policies and expiring policies are a live snapshot as of now
-        (the renewal window applies to expiring policies only). New policies
-        issued and cancelled policies (with reasons) are scoped to the
-        selected period, which defaults to the previous calendar month.
+        {t('dpolIntro')}
       </p>
 
       <form
@@ -90,26 +89,26 @@ export default function PolicyDashboardPage() {
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Branch ID
-          <input aria-label="Branch ID filter" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          {t('dashBranchIdLabel')}
+          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurance line
+          {t('dashInsuranceLineLabel')}
           <input
-            aria-label="Insurance line filter"
+            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurer ID
-          <input aria-label="Insurer ID filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          {t('dashInsurerIdLabel')}
+          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Period label
           <input
-            aria-label="Period label"
+            aria-label={t('dashPeriodLabel')}
             placeholder="e.g. 2026-08"
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
@@ -118,8 +117,8 @@ export default function PolicyDashboardPage() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Period start
           <input
-            aria-label="Period start"
-            placeholder="YYYY-MM-DD"
+            aria-label={t('dashPeriodStart')}
+            placeholder={t('dashDatePlaceholder')}
             value={periodStart}
             onChange={(e) => setPeriodStart(e.target.value)}
           />
@@ -127,22 +126,22 @@ export default function PolicyDashboardPage() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Period end
           <input
-            aria-label="Period end"
-            placeholder="YYYY-MM-DD"
+            aria-label={t('dashPeriodEnd')}
+            placeholder={t('dashDatePlaceholder')}
             value={periodEnd}
             onChange={(e) => setPeriodEnd(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Renewal window (days)
+          {t('dpolRenewalWindowLabel')}
           <input
-            aria-label="Renewal window in days"
+            aria-label={t('dpolRenewalWindowAria')}
             placeholder="90"
             value={renewalWindowDays}
             onChange={(e) => setRenewalWindowDays(e.target.value)}
           />
         </label>
-        <button type="submit">Apply filters</button>
+        <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
       {loadError ? (
@@ -159,32 +158,32 @@ export default function PolicyDashboardPage() {
           </p>
 
           <section style={sectionStyle}>
-            <h2>Active policies</h2>
+            <h2>{t('dpolActivePolicies')}</h2>
             <div style={statStyle}>{summary.activePoliciesCount}</div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Expiring policies (within renewal window)</h2>
+            <h2>{t('dpolExpiringPolicies')}</h2>
             <div style={statStyle}>{summary.expiringPoliciesCount}</div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>New policies issued</h2>
+            <h2>{t('dpolNewIssued')}</h2>
             <div style={statStyle}>{summary.newPoliciesIssuedCount}</div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Cancelled policies</h2>
+            <h2>{t('dpolCancelled')}</h2>
             {summary.cancelledPolicies.length === 0 ? (
-              <p>No cancellations in this period.</p>
+              <p>{t('dpolNoCancellations')}</p>
             ) : (
               <table style={{ borderCollapse: 'collapse', width: '100%' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Policy</th>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Line</th>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Reason</th>
-                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Cancelled at</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColPolicy')}</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColLine')}</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColReason')}</th>
+                    <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dpolColCancelledAt')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -208,7 +207,7 @@ export default function PolicyDashboardPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

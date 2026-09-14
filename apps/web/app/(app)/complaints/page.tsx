@@ -20,6 +20,8 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 
 // A permission code, like the two below it — NOT the role list this used to
 // hold. §10.4 converted `ESCALATE_ROLES`/`CLOSE_ROLES` and missed this one, so
@@ -50,17 +52,34 @@ const head: CSSProperties = {
   borderBottom: '2px solid #d1d5db',
 };
 
-function slaLabel(c: Complaint): string {
-  if (!c.sla) return '—';
-  if (c.sla.resolvedAt) return 'resolved';
-  if (c.sla.breached) return `BREACHED (due ${c.sla.dueAt.slice(0, 10)})`;
-  return `due ${c.sla.dueAt.slice(0, 10)}`;
+/** ComplaintStatus -> label key. Typed against the union so a new status is
+ * a compile error rather than a raw token on screen. */
+const STATUS_LABEL_KEY: Record<Complaint['status'], TranslationKey> = {
+  LOGGED: 'complaintsStatusLogged',
+  ASSIGNED: 'complaintsStatusAssigned',
+  IN_PROGRESS: 'complaintsStatusInProgress',
+  ESCALATED: 'complaintsStatusEscalated',
+  RESOLVED: 'complaintsStatusResolved',
+  CLOSED: 'complaintsStatusClosed',
+};
+
+function slaLabel(
+  c: Complaint,
+  t: (k: TranslationKey, p?: Record<string, string | number>) => string,
+): string {
+  if (!c.sla) return t('complaintsSlaNone');
+  if (c.sla.resolvedAt) return t('complaintsSlaResolved');
+  const date = c.sla.dueAt.slice(0, 10);
+  return c.sla.breached
+    ? t('complaintsSlaBreached', { date })
+    : t('complaintsSlaDue', { date });
 }
 
 
 export default function ComplaintsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canLog = hasAnyPermission(user, LOG_PERMISSIONS);
   const canEscalate = hasAnyPermission(user, ESCALATE_ROLES);
   const canClose = hasAnyPermission(user, CLOSE_ROLES);
@@ -84,23 +103,23 @@ export default function ComplaintsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the complaint.log permission."
+          ? t('complaintsNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load complaints — try again.',
+            : t('complaintsLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   // Part F item #7 — the customer's own languagePreference decides the
   // document's language server-side; no picker here for a first pass
@@ -122,7 +141,7 @@ export default function ComplaintsPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : 'Could not generate the acknowledgement — try again.',
+          : t('complaintsAckError'),
       );
     }
   }
@@ -135,7 +154,7 @@ export default function ComplaintsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('complaintsActionError'),
       );
     } finally {
       setBusy(false);
@@ -166,13 +185,9 @@ export default function ComplaintsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Complaints</h1>
+      <h1>{t('complaintsHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Customer complaints, optionally linked to a claim under dispute. Each is
-        tracked against a resolution SLA (a 10-business-day working target). A
-        complaint that cannot be resolved internally is escalated to the
-        Insurance Dispute Resolution Committee. Closure needs a supervisor
-        sign-off by a different person than the one who resolved it.
+        {t('complaintsIntro')}
       </p>
 
       {canLog ? (
@@ -181,18 +196,18 @@ export default function ComplaintsPage() {
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '32rem' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Customer ID
+            {t('complaintsCustomerIdLabel')}
             <input
-              aria-label="Customer ID"
+              aria-label={t('complaintsCustomerIdLabel')}
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               required
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Issue
+            {t('complaintsIssueLabel')}
             <textarea
-              aria-label="Issue"
+              aria-label={t('complaintsIssueLabel')}
               dir="auto"
               value={issue}
               onChange={(e) => setIssue(e.target.value)}
@@ -201,9 +216,9 @@ export default function ComplaintsPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Category (optional)
+            {t('complaintsCategoryLabel')}
             <select
-              aria-label="Category"
+              aria-label={t('complaintsCategoryAria')}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -216,15 +231,15 @@ export default function ComplaintsPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Disputed claim ID (optional)
+            {t('complaintsClaimIdLabel')}
             <input
-              aria-label="Disputed claim ID"
+              aria-label={t('complaintsClaimIdLabel')}
               value={claimId}
               onChange={(e) => setClaimId(e.target.value)}
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : 'Log complaint'}
+            {busy ? t('complaintsSavingButton') : t('complaintsLogButton')}
           </button>
         </form>
       ) : null}
@@ -242,18 +257,18 @@ export default function ComplaintsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No complaints.</p>
+          <p style={{ opacity: 0.6 }}>{t('complaintsNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Customer</th>
-                  <th style={head}>Issue</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>SLA</th>
-                  <th style={head}>Escalations</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('complaintsColCustomer')}</th>
+                  <th style={head}>{t('complaintsColIssue')}</th>
+                  <th style={head}>{t('complaintsColStatus')}</th>
+                  <th style={head}>{t('complaintsColSla')}</th>
+                  <th style={head}>{t('complaintsColEscalations')}</th>
+                  <th style={head}>{t('complaintsColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,8 +278,8 @@ export default function ComplaintsPage() {
                     <td style={cell}>
                       <bdi>{c.issue}</bdi>
                     </td>
-                    <td style={cell}>{c.status}</td>
-                    <td style={cell}>{slaLabel(c)}</td>
+                    <td style={cell}>{t(STATUS_LABEL_KEY[c.status])}</td>
+                    <td style={cell}>{slaLabel(c, t)}</td>
                     <td style={cell}>{c.escalations.length || '—'}</td>
                     <td style={cell}>
                       {canLog ? (
@@ -273,7 +288,7 @@ export default function ComplaintsPage() {
                           onClick={() => void downloadAcknowledgement(c.id)}
                           style={{ marginBottom: '0.4rem' }}
                         >
-                          Download acknowledgement (PDF)
+                          {t('complaintsDownloadAckButton')}
                         </button>
                       ) : null}
                       {c.isClosed ? (
@@ -281,8 +296,8 @@ export default function ComplaintsPage() {
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '16rem' }}>
                           <input
-                            aria-label={`Text for ${c.id}`}
-                            placeholder="assignee id / action / resolution / reason"
+                            aria-label={t('complaintsTextAria', { id: c.id })}
+                            placeholder={t('complaintsTextPlaceholder')}
                             dir="auto"
                             value={text[c.id] ?? ''}
                             onChange={(e) => setVal(c.id, e.target.value)}
@@ -296,7 +311,7 @@ export default function ComplaintsPage() {
                                   void run(() => assignComplaint(c.id, val(c.id)))
                                 }
                               >
-                                Assign
+                                {t('complaintsAssignButton')}
                               </button>
                             ) : null}
                             {canLog &&
@@ -307,7 +322,7 @@ export default function ComplaintsPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => startComplaint(c.id))}
                               >
-                                Start
+                                {t('complaintsStartButton')}
                               </button>
                             ) : null}
                             {canLog && c.status === 'IN_PROGRESS' ? (
@@ -320,7 +335,7 @@ export default function ComplaintsPage() {
                                   )
                                 }
                               >
-                                Add action
+                                {t('complaintsAddActionButton')}
                               </button>
                             ) : null}
                             {canLog &&
@@ -333,7 +348,7 @@ export default function ComplaintsPage() {
                                   void run(() => resolveComplaint(c.id, val(c.id)))
                                 }
                               >
-                                Resolve
+                                {t('complaintsResolveButton')}
                               </button>
                             ) : null}
                             {canEscalate && c.status === 'IN_PROGRESS' ? (
@@ -348,7 +363,7 @@ export default function ComplaintsPage() {
                                   )
                                 }
                               >
-                                Escalate
+                                {t('complaintsEscalateButton')}
                               </button>
                             ) : null}
                             {canClose && c.status === 'RESOLVED' ? (
@@ -357,7 +372,7 @@ export default function ComplaintsPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => closeComplaint(c.id))}
                               >
-                                Close
+                                {t('complaintsCloseButton')}
                               </button>
                             ) : null}
                           </div>
@@ -371,7 +386,7 @@ export default function ComplaintsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('complaintsLoading')}</p>
       )}
     </main>
   );

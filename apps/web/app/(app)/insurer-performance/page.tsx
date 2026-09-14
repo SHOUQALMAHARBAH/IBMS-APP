@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -41,6 +42,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function InsurerPerformancePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -57,7 +59,7 @@ export default function InsurerPerformancePage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   async function onLookup(e: FormEvent) {
     e.preventDefault();
@@ -71,7 +73,7 @@ export default function InsurerPerformancePage() {
           ? "You don't hold the insurer-performance.view permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load insurer performance — try again.',
+            : t('ipLoadError'),
       );
     } finally {
       setHasLookedUp(true);
@@ -94,11 +96,11 @@ export default function InsurerPerformancePage() {
               periodEnd: computePeriodEnd,
             },
       );
-      setComputeMessage('Score computed.');
+      setComputeMessage(t('ipComputed'));
       setHistory(await listInsurerPerformance({ insurerId }));
     } catch (err) {
       setComputeError(
-        err instanceof ApiError ? err.message : 'Could not compute the score.',
+        err instanceof ApiError ? err.message : t('ipComputeError'),
       );
     }
   }
@@ -109,23 +111,22 @@ export default function InsurerPerformancePage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Insurer Performance</h1>
+      <h1>{t('ipHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Quote-response speed, claims service, price competitiveness, and
-        service quality, scored monthly per insurer.
+        {t('ipIntro')}
       </p>
 
       <form onSubmit={onLookup} style={formStyle}>
-        <h2>Look up an insurer</h2>
+        <h2>{t('ipLookUp')}</h2>
         <label style={labelStyle}>
-          Insurer ID
+          {t('dashInsurerIdLabel')}
           <input
             value={insurerId}
             onChange={(e) => setInsurerId(e.target.value)}
             required
           />
         </label>
-        <button type="submit">View performance</button>
+        <button type="submit">{t('ipViewButton')}</button>
       </form>
 
       {loadError ? (
@@ -137,25 +138,25 @@ export default function InsurerPerformancePage() {
       {latest ? (
         <>
           <div style={statRow}>
-            <Stat label="Quote response" value={latest.quoteResponseScore} />
-            <Stat label="Claims service" value={latest.claimsServiceScore} />
-            <Stat label="Price" value={latest.priceScore} />
-            <Stat label="Service quality" value={latest.serviceQualityScore} />
+            <Stat label={t('diepQuoteResponse')} value={latest.quoteResponseScore} />
+            <Stat label={t('diepClaimsService')} value={latest.claimsServiceScore} />
+            <Stat label={t('diepPrice')} value={latest.priceScore} />
+            <Stat label={t('diepServiceQuality')} value={latest.serviceQualityScore} />
           </div>
           <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
             Most recent period: {latest.periodLabel} (computed{' '}
             {latest.computedAt.replace('T', ' ').slice(0, 16)}).
           </p>
 
-          <h2>History</h2>
+          <h2>{t('dashHistory')}</h2>
           <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
             <thead>
               <tr>
-                <th style={head}>Period</th>
-                <th style={head}>Quote response</th>
-                <th style={head}>Claims service</th>
-                <th style={head}>Price</th>
-                <th style={head}>Service quality</th>
+                <th style={head}>{t('dashColPeriod')}</th>
+                <th style={head}>{t('diepQuoteResponse')}</th>
+                <th style={head}>{t('diepClaimsService')}</th>
+                <th style={head}>{t('diepPrice')}</th>
+                <th style={head}>{t('diepServiceQuality')}</th>
               </tr>
             </thead>
             <tbody>
@@ -172,25 +173,25 @@ export default function InsurerPerformancePage() {
           </table>
         </>
       ) : hasLookedUp && !loadError ? (
-        <p style={{ opacity: 0.6 }}>No score has been computed yet for this insurer.</p>
+        <p style={{ opacity: 0.6 }}>{t('ipNoScore')}</p>
       ) : null}
 
       <form onSubmit={onCompute} style={formStyle}>
-        <h2>Compute now</h2>
+        <h2>{t('ipComputeNow')}</h2>
         <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
           Uses the Insurer ID above. Leave the period fields blank to score
           the UTC calendar month that just ended (what the monthly job
           itself does).
         </p>
         <label style={labelStyle}>
-          Period label (optional)
+          {t('ipPeriodOptionalLabel')}
           <input
             value={computePeriodLabel}
             onChange={(e) => setComputePeriodLabel(e.target.value)}
           />
         </label>
         <label style={labelStyle}>
-          Period start (optional)
+          {t('ipPeriodStartOptionalLabel')}
           <input
             type="date"
             value={computePeriodStart}
@@ -198,7 +199,7 @@ export default function InsurerPerformancePage() {
           />
         </label>
         <label style={labelStyle}>
-          Period end (optional)
+          {t('ipPeriodEndOptionalLabel')}
           <input
             type="date"
             value={computePeriodEnd}
@@ -206,7 +207,7 @@ export default function InsurerPerformancePage() {
           />
         </label>
         <button type="submit" disabled={!insurerId}>
-          Compute
+          {t('ipComputeButton')}
         </button>
         {computeError ? (
           <p role="alert" style={errorStyle}>

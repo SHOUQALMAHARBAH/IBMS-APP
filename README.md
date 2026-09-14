@@ -30,10 +30,12 @@ asset value has grown materially past the property Sum Insured designed into the
 touchpoint as an `Interaction` and serve the aggregated 360° customer view: interactions
 plus policies, claims and complaints merged into one timeline; the latter three are empty
 until Domains B/C/E land).
-Everything else — Domains B–H
-(policy, claims, finance, service, compliance/risk, management, supporting ops), and
-Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
-**not started**. See § Scope status for the full picture and § Known gaps for the
+This paragraph predates Domains B–H (policy,
+claims, finance, service, compliance/risk, management, supporting ops) and Parts D–F
+(PDPL/DSR/retention, dashboards, bilingual/RTL UI), all of which have since been built —
+**§ Scope status below is the authority, not this summary.** Part G's final verification
+checklist has still not been run as a formal, evidence-attached gate. See § Scope status
+for the full picture and § Known gaps for the
 deferred edges of each built item; `meta/context/data-model.md` in ibms-brain is the
 logical data model this is built against. A minimal signed-in navigation shell (a sidebar
 plus a `Welcome` landing at `/`) ties the built screens together; the original `/`
@@ -124,8 +126,36 @@ already give).
   not: the detail page carried its own `Record<string, string>` pair listing
   two statuses that do not exist (`PLACEMENT_REQUESTED`, `CHECKED`) and missing
   four that do — including `ACTIVE`, the state every completed policy ends in,
-  which therefore rendered as the literal token in both languages. Follow the
-  same shape for any other enum a user reads.
+  which therefore rendered as the literal token in both languages.
+  `lib/lead/lead-status.ts` is the same fix for `LeadStatus`, whose detail page
+  listed four of five statuses and rendered `DISQUALIFIED` raw. Sixteen
+  `Record<Enum, TranslationKey>` maps now cover the enums a user reads. Follow
+  the same shape for any other one.
+* **Every screen under `app/(app)/` is bilingual — 89 of 89.** Copy lives in
+  `lib/i18n/translations/`, one namespaced dictionary per domain (`nav`, `leads`,
+  `customers`, `rfq`, `policy`, `complaints`, `customer-service`, `pdpl`, `finance`,
+  `compliance-screening`, `compliance-risk`, `dashboards`, `operations`,
+  `detail-pages`, plus `common`), merged into one flat `TranslationKey` union by
+  `lib/i18n/translations.ts`. **2,410 keys per language, AR and EN in exact parity.**
+  Key names are semantic and per-domain prefixed (`leadsAddButton`, never the English
+  phrase); Arabic is written as Arabic, not translated from the English, and an
+  unsourced term is marked `TODO(arabic-terminology)` in place rather than guessed.
+  Add a new screen's copy to the dictionary its domain already owns — a page-local
+  `Record<string, string>` of labels is the exact defect the status modules above
+  exist to prevent, and `tsc` cannot see it.
+  **Two open gaps, both deliberate and both the next commit's work.** The 403
+  permission-denied branch is still hard-coded English at **54 sites across 48
+  pages** even though the AR+EN keys for those messages exist — all 54
+  `*NoPermission` keys are currently unreferenced — along with ~25 stragglers
+  (`audit-trail` renders five `<label>`s in English beside Arabic `aria-label`s;
+  `Record a new …` headings on `employees`/`vendors`/`bcp-dr-plans`/
+  `information-assets`/`documents`; `Timers`/`Workflow`/`Entity` on
+  `sla-dashboard`). And `customer-service.ts` re-declares four `commChannel*` keys
+  `rfq.ts` already owns and spreads later, so `rfqs/[id]` renders "Phone call"/
+  "Customer portal" instead of its own "Call"/"Portal" — the first collisions the
+  prefix convention was supposed to make impossible. Separately, `policy.ts` has
+  161 unreferenced keys, orphaned before this work when the policy screens moved to
+  `pold*` in `detail-pages.ts` — pre-existing debt, not a regression.
 * **`GET /policies` answers three questions.** With `opportunityId`, the one
   policy placed from it; with `customerId`, that customer's policies; with
   neither, the book-wide list behind `/policies` — filtered **in the query** to
@@ -1044,9 +1074,11 @@ build actually is today:
   ("every dashboard filterable by branch/line of business/insurer/time period, and
   renderable in either language") resolves as: the filter half is honestly satisfied
   per-dashboard (each of Part E's six sections above documents exactly which
-  dimensions apply, not a blanket checkbox); the bilingual half is NOT satisfied
-  anywhere in the app and is explicitly Part F's own unbuilt scope, not something Part
-  E's dashboards could close. **PART E IS NOW COMPLETE.** The
+  dimensions apply, not a blanket checkbox); the bilingual half was NOT satisfied
+  anywhere in the app when Part E landed and was explicitly Part F's own scope, not
+  something Part E's dashboards could close — **it is satisfied now**: all fourteen
+  dashboard pages render from `lib/i18n/translations/dashboards.ts`, closing that
+  bullet from the Part F side rather than the Part E one. **PART E IS NOW COMPLETE.** The
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.

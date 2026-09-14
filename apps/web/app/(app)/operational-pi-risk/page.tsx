@@ -27,6 +27,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const RISK_REGISTER_ROLE = [
   'risk-register.manage',
@@ -49,6 +50,7 @@ const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', ga
 export default function OperationalPiRiskPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManageRiskRegister = hasAnyPermission(user, RISK_REGISTER_ROLE);
   const canManagePiPolicy = hasAnyPermission(user, PI_POLICY_ROLE);
 
@@ -85,10 +87,10 @@ export default function OperationalPiRiskPage() {
           ? "You don't hold the risk-register.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the risk register — try again.',
+            : t('opRegisterLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   const loadPolicies = useCallback(async () => {
     try {
@@ -101,10 +103,10 @@ export default function OperationalPiRiskPage() {
           ? "You don't hold the pi-policy.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the PI policy record — try again.',
+            : t('opPiLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -117,14 +119,14 @@ export default function OperationalPiRiskPage() {
           ? "You don't hold the pi-policy.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load PI risk events — try again.',
+            : t('opEventsLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
@@ -132,7 +134,7 @@ export default function OperationalPiRiskPage() {
       await loadPolicies();
       await loadEvents();
     })();
-  }, [user, loadRisks, loadPolicies, loadEvents]);
+  }, [user, loadRisks, loadPolicies, loadEvents, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -143,7 +145,7 @@ export default function OperationalPiRiskPage() {
       await loadPolicies();
       await loadEvents();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'That action failed — try again.');
+      setActionError(err instanceof ApiError ? err.message : t('opActionError'));
     } finally {
       setBusy(false);
     }
@@ -183,12 +185,9 @@ export default function OperationalPiRiskPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Operational &amp; Professional Indemnity Risk</h1>
+      <h1>{t('opHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        A generic risk register across operational / cyber / financial /
-        compliance / reputational exposures, plus the broker&apos;s own
-        Professional Indemnity policy and the risk events tracked against
-        it — a broker without valid PI cover is itself a licensing breach.
+        {t('opIntro')}
       </p>
 
       {actionError ? (
@@ -197,7 +196,7 @@ export default function OperationalPiRiskPage() {
         </p>
       ) : null}
 
-      <h2>Risk register</h2>
+      <h2>{t('opRegisterHeading')}</h2>
       {risksError ? (
         <p role="alert" style={errorStyle}>
           {risksError}
@@ -208,7 +207,7 @@ export default function OperationalPiRiskPage() {
           <label style={labelStyle}>
             Risk type
             <select
-              aria-label="Risk type"
+              aria-label={t('opRiskTypeLabel')}
               value={riskType}
               onChange={(e) => setRiskType(e.target.value)}
             >
@@ -222,14 +221,14 @@ export default function OperationalPiRiskPage() {
           <label style={labelStyle}>
             Description
             <input
-              aria-label="Risk description"
+              aria-label={t('opRiskDescriptionLabel')}
               value={riskDescription}
               onChange={(e) => setRiskDescription(e.target.value)}
               required
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Log risk'}
+            {busy ? t('opSavingButton') : t('opLogRiskButton')}
           </button>
         </form>
       ) : null}
@@ -237,14 +236,21 @@ export default function OperationalPiRiskPage() {
         <table style={{ borderCollapse: 'collapse', minWidth: '50rem' }}>
           <thead>
             <tr>
-              <th style={head}>Type</th>
-              <th style={head}>Description</th>
-              <th style={head}>Mitigation</th>
-              <th style={head}>Status</th>
-              <th style={head}>Action</th>
+              <th style={head}>{t('opColType')}</th>
+              <th style={head}>{t('opRiskDescriptionLabel')}</th>
+              <th style={head}>{t('opColMitigation')}</th>
+              <th style={head}>{t('opColStatus')}</th>
+              <th style={head}>{t('opColAction')}</th>
             </tr>
           </thead>
           <tbody>
+            {risks.length === 0 ? (
+              <tr>
+                <td style={cell} colSpan={5}>
+                  {t('opNoRisks')}
+                </td>
+              </tr>
+            ) : null}
             {risks.map((r) => (
               <tr key={r.id}>
                 <td style={cell}>{r.riskType}</td>
@@ -256,7 +262,7 @@ export default function OperationalPiRiskPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '14rem' }}>
                       <input
                         aria-label={`Mitigation for ${r.id}`}
-                        placeholder="mitigation action"
+                        placeholder={t('opMitigationActionLabel')}
                         value={mitigationDrafts[r.id] ?? ''}
                         onChange={(e) =>
                           setMitigationDrafts((d) => ({ ...d, [r.id]: e.target.value }))
@@ -272,14 +278,14 @@ export default function OperationalPiRiskPage() {
                             )
                           }
                         >
-                          Save mitigation
+                          {t('opSaveMitigationButton')}
                         </button>
                         <button
                           type="button"
                           disabled={busy}
                           onClick={() => void run(() => closeRiskRegisterItem(r.id))}
                         >
-                          Close
+                          {t('opCloseButton')}
                         </button>
                       </div>
                     </div>
@@ -293,7 +299,7 @@ export default function OperationalPiRiskPage() {
         </table>
       ) : null}
 
-      <h2>Professional Indemnity policy</h2>
+      <h2>{t('opPiHeading')}</h2>
       {policiesError ? (
         <p role="alert" style={errorStyle}>
           {policiesError}
@@ -304,7 +310,7 @@ export default function OperationalPiRiskPage() {
           <label style={labelStyle}>
             Insurer
             <input
-              aria-label="PI insurer name"
+              aria-label={t('opPiInsurerLabel')}
               dir="auto"
               value={insurerName}
               onChange={(e) => setInsurerName(e.target.value)}
@@ -312,9 +318,9 @@ export default function OperationalPiRiskPage() {
             />
           </label>
           <label style={labelStyle}>
-            Coverage limit (JOD)
+            {t('opPiCoverageLimitLabel')}
             <input
-              aria-label="PI coverage limit"
+              aria-label={t('opPiCoverageLimitLabel')}
               value={coverageLimit}
               onChange={(e) => setCoverageLimit(e.target.value)}
               placeholder="1000000.000"
@@ -324,7 +330,7 @@ export default function OperationalPiRiskPage() {
           <label style={labelStyle}>
             Expires
             <input
-              aria-label="PI expires at"
+              aria-label={t('opPiExpiresAtLabel')}
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
@@ -332,7 +338,7 @@ export default function OperationalPiRiskPage() {
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Log PI policy'}
+            {busy ? 'Saving…' : t('opLogPiButton')}
           </button>
         </form>
       ) : null}
@@ -340,15 +346,22 @@ export default function OperationalPiRiskPage() {
         <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>
           <thead>
             <tr>
-              <th style={head}>Insurer</th>
-              <th style={head}>Coverage limit</th>
-              <th style={head}>Expires</th>
-              <th style={head}>Claims history</th>
-              <th style={head}>Status</th>
-              {canManagePiPolicy ? <th style={head}>Action</th> : null}
+              <th style={head}>{t('opColInsurer')}</th>
+              <th style={head}>{t('opColCoverageLimit')}</th>
+              <th style={head}>{t('opExpires')}</th>
+              <th style={head}>{t('opColClaimsHistory')}</th>
+              <th style={head}>{t('opColStatus')}</th>
+              {canManagePiPolicy ? <th style={head}>{t('opColAction')}</th> : null}
             </tr>
           </thead>
           <tbody>
+            {policies.length === 0 ? (
+              <tr>
+                <td style={cell} colSpan={5}>
+                  {t('opNoPiPolicy')}
+                </td>
+              </tr>
+            ) : null}
             {policies.map((p) => (
               <tr key={p.id}>
                 <td style={cell}>
@@ -366,7 +379,7 @@ export default function OperationalPiRiskPage() {
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
                       <input
                         aria-label={`Claims history for ${p.id}`}
-                        placeholder="claims history summary"
+                        placeholder={t('opClaimsHistoryLabel')}
                         value={claimsHistoryDrafts[p.id] ?? ''}
                         onChange={(e) =>
                           setClaimsHistoryDrafts((d) => ({ ...d, [p.id]: e.target.value }))
@@ -381,7 +394,7 @@ export default function OperationalPiRiskPage() {
                           )
                         }
                       >
-                        Save
+                        {t('opSaveButton')}
                       </button>
                     </div>
                   </td>
@@ -392,7 +405,7 @@ export default function OperationalPiRiskPage() {
         </table>
       ) : null}
 
-      <h2>PI risk events</h2>
+      <h2>{t('opEventsHeading')}</h2>
       {eventsError ? (
         <p role="alert" style={errorStyle}>
           {eventsError}
@@ -403,22 +416,22 @@ export default function OperationalPiRiskPage() {
           <label style={labelStyle}>
             Description
             <input
-              aria-label="PI risk event description"
+              aria-label={t('opEventDescriptionLabel')}
               value={eventDescription}
               onChange={(e) => setEventDescription(e.target.value)}
               required
             />
           </label>
           <label style={labelStyle}>
-            PI policy id (optional — defaults to the current one)
+            {t('opEventPolicyIdLabel')}
             <input
-              aria-label="PI risk event policy id"
+              aria-label={t('opEventPolicyIdLabel')}
               value={eventPiPolicyId}
               onChange={(e) => setEventPiPolicyId(e.target.value)}
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Log risk event'}
+            {busy ? 'Saving…' : t('opLogEventButton')}
           </button>
         </form>
       ) : null}
@@ -426,18 +439,25 @@ export default function OperationalPiRiskPage() {
         <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>
           <thead>
             <tr>
-              <th style={head}>Description</th>
-              <th style={head}>Source</th>
-              <th style={head}>Mitigation</th>
-              {canManagePiPolicy ? <th style={head}>Action</th> : null}
+              <th style={head}>{t('opRiskDescriptionLabel')}</th>
+              <th style={head}>{t('opColSource')}</th>
+              <th style={head}>{t('opColMitigation')}</th>
+              {canManagePiPolicy ? <th style={head}>{t('opColAction')}</th> : null}
             </tr>
           </thead>
           <tbody>
+            {events.length === 0 ? (
+              <tr>
+                <td style={cell} colSpan={4}>
+                  {t('opNoEvents')}
+                </td>
+              </tr>
+            ) : null}
             {events.map((ev) => (
               <tr key={ev.id}>
                 <td style={cell}>{ev.description}</td>
                 <td style={cell}>
-                  {ev.isAutoLogged ? 'Policy Checking discrepancy' : 'manual'}
+                  {ev.isAutoLogged ? t('opSourcePolicyCheckingDiscrepancy') : 'manual'}
                 </td>
                 <td style={cell}>{ev.mitigationAction ?? '—'}</td>
                 {canManagePiPolicy ? (
@@ -472,7 +492,12 @@ export default function OperationalPiRiskPage() {
             ))}
           </tbody>
         </table>
-      ) : null}
+      ) : eventsError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('opLoading')}</p>
+      )}
     </main>
   );
 }

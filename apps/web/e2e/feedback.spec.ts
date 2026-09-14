@@ -65,7 +65,7 @@ test("lists feedback with score/comments and the log form", async ({
   await expect(
     page.getByRole("cell", { name: "The adjuster was responsive throughout." }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "post_issuance" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "After policy issuance" })).toBeVisible();
   await expect(page.getByLabel("Context")).toBeVisible();
   await expect(page.getByLabel("Score")).toBeVisible();
   await expect(

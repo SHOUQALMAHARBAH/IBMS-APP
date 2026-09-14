@@ -32,6 +32,7 @@ import {
   summaryGridStyle,
   summaryPanelStyle,
 } from '../../../components/risk-profile/risk-profile.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -44,6 +45,7 @@ function Figure({ label, value }: { label: string; value: string }) {
 }
 
 function ConsolidatedPanel({ survey }: { survey: ConsolidatedSurvey }) {
+  const { t } = useLanguage();
   const c = survey.consolidated;
   return (
     <div style={summaryPanelStyle}>
@@ -53,27 +55,28 @@ function ConsolidatedPanel({ survey }: { survey: ConsolidatedSurvey }) {
         from. Program assembly itself is Process 7.
       </p>
       <div style={summaryGridStyle}>
-        <Figure label="Property (JOD)" value={c.propertySumInsured} />
+        <Figure label={t('rpColProperty')} value={c.propertySumInsured} />
         <Figure
-          label="Business Interruption (JOD)"
+          label={t('rpColBusinessInterruption')}
           value={c.businessInterruptionSumInsured}
         />
-        <Figure label="Total (JOD)" value={c.totalSumInsured} />
+        <Figure label={t('rpColTotal')} value={c.totalSumInsured} />
         <Figure
-          label="Indemnity period"
+          label={t('rpColIndemnityPeriod')}
           value={
             c.indemnityPeriodMonths == null
               ? '—'
               : `${c.indemnityPeriodMonths} months`
           }
         />
-        <Figure label="Fleet vehicles" value={String(c.fleetVehicleCount)} />
+        <Figure label={t('rpColFleetVehicles')} value={String(c.fleetVehicleCount)} />
       </div>
     </div>
   );
 }
 
 function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user } = useAuth();
 
@@ -105,19 +108,19 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
         err instanceof ApiError && err.status === 403
           ? "You don't hold the risk-profile.read permission, so there's nothing to show here."
           : err instanceof ApiError && err.status === 404
-            ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+            ? t('rpCustomerNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load risk profiles — try again.',
+              : t('rpLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function handleAddSite(e: FormEvent) {
     e.preventDefault();
@@ -136,7 +139,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
       setCreateError(
         err instanceof ApiError
           ? err.message
-          : 'Could not add the site — try again.',
+          : t('rpAddSiteError'),
       );
     } finally {
       setCreating(false);
@@ -150,7 +153,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!profiles) return <p>Loading…</p>;
+  if (!profiles) return <p>{t('rpLoading')}</p>;
 
   return (
     <>
@@ -159,7 +162,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
       ) : null}
 
       <section style={{ marginTop: '1.5rem' }}>
-        <h2>Sites / locations</h2>
+        <h2>{t('rpSitesHeading')}</h2>
         {profiles.length === 0 ? (
           <p style={{ opacity: 0.6 }}>
             No risk profile yet for this customer — add the first site below.
@@ -188,7 +191,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
 
       {canEdit ? (
         <form onSubmit={(e) => void handleAddSite(e)} style={sectionStyle}>
-          <h2 style={{ marginTop: 0 }}>Add a site / location</h2>
+          <h2 style={{ marginTop: 0 }}>{t('rpAddSiteHeading')}</h2>
           <label htmlFor="rp-site" style={labelStyle}>
             Site label (optional)
           </label>
@@ -197,7 +200,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
             value={siteLabel}
             onChange={(e) => setSiteLabel(e.target.value)}
             style={inputStyle}
-            placeholder="e.g. Head office, Aqaba warehouse"
+            placeholder={t('rpSitePlaceholder')}
           />
           <label htmlFor="rp-claims" style={labelStyle}>
             Prior claims history summary (optional)
@@ -213,7 +216,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
             disabled={creating}
             style={{ ...buttonStyle, width: 'auto' }}
           >
-            {creating ? 'Adding…' : 'Add site'}
+            {creating ? t('rpAddingButton') : t('rpAddSiteButton')}
           </button>
           {createError ? (
             <p role="alert" style={errorStyle}>
@@ -251,18 +254,19 @@ function RiskProfilesFlow() {
 }
 
 export default function RiskProfilesPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Risk surveys</h1>
+      <h1>{t('rpSurveysHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 6 — the detailed asset survey per location, deriving the Sum
         Insured and indemnity period, consolidated across sites for a

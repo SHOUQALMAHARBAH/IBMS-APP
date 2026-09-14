@@ -56,7 +56,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   if (loadError) {
     return (
@@ -137,7 +137,7 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 

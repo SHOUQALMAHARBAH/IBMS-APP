@@ -13,6 +13,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -33,23 +34,24 @@ function messageFor(err: unknown, permission: string, fallback: string): string 
 }
 
 function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
+  const { t } = useLanguage();
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
         <thead>
           <tr>
-            <th style={head}>Occurred</th>
-            <th style={head}>Action</th>
-            <th style={head}>Entity</th>
-            <th style={head}>User</th>
-            <th style={head}>Sensitive</th>
+            <th style={head}>{t('atColOccurred')}</th>
+            <th style={head}>{t('atColAction')}</th>
+            <th style={head}>{t('atColEntity')}</th>
+            <th style={head}>{t('atColUser')}</th>
+            <th style={head}>{t('atColSensitive')}</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
               <td style={cell} colSpan={5}>
-                No entries.
+                {t('atNone')}
               </td>
             </tr>
           ) : (
@@ -74,6 +76,7 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
 export default function AuditTrailPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   const [browseEntityType, setBrowseEntityType] = useState('');
   const [browseEntityId, setBrowseEntityId] = useState('');
@@ -94,7 +97,7 @@ export default function AuditTrailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   async function runBrowse(ev: React.FormEvent) {
     ev.preventDefault();
@@ -109,7 +112,7 @@ export default function AuditTrailPage() {
       );
     } catch (err) {
       setBrowseRows(null);
-      setBrowseError(messageFor(err, 'audit-log.read', 'Could not browse the audit log — try again.'));
+      setBrowseError(messageFor(err, 'audit-log.read', t('atLogLoadError')));
     } finally {
       setBrowseBusy(false);
     }
@@ -123,7 +126,7 @@ export default function AuditTrailPage() {
       setWfRows(await getWorkflowHistory(wfEntityType, wfEntityId));
     } catch (err) {
       setWfRows(null);
-      setWfError(messageFor(err, 'workflow-history.read', 'Could not load workflow history — try again.'));
+      setWfError(messageFor(err, 'workflow-history.read', t('atWorkflowLoadError')));
     } finally {
       setWfBusy(false);
     }
@@ -137,7 +140,7 @@ export default function AuditTrailPage() {
       setDocHistory(await getDocumentHistory(documentId));
     } catch (err) {
       setDocHistory(null);
-      setDocError(messageFor(err, 'document-history.read', 'Could not load document history — try again.'));
+      setDocError(messageFor(err, 'document-history.read', t('atDocumentLoadError')));
     } finally {
       setDocBusy(false);
     }
@@ -147,21 +150,18 @@ export default function AuditTrailPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Audit Trail</h1>
+      <h1>{t('atHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The External Auditor&rsquo;s read-only lens (Part 5.1): logs,
-        document history, and workflow-state transition history for a
-        defined engagement period. Access itself is time-boxed via each
-        user&rsquo;s own account settings, not configured here.
+        {t('atIntro')}
       </p>
 
       <section style={sectionStyle}>
-        <h2>Audit log</h2>
+        <h2>{t('atAuditLogHeading')}</h2>
         <form onSubmit={runBrowse} style={formStyle}>
           <label>
             Entity type{' '}
             <input
-              aria-label="Entity type"
+              aria-label={t('atEntityTypeLabel')}
               value={browseEntityType}
               onChange={(e) => setBrowseEntityType(e.target.value)}
             />
@@ -169,13 +169,13 @@ export default function AuditTrailPage() {
           <label>
             Entity id{' '}
             <input
-              aria-label="Entity id"
+              aria-label={t('atEntityIdLabel')}
               value={browseEntityId}
               onChange={(e) => setBrowseEntityId(e.target.value)}
             />
           </label>
           <button type="submit" disabled={browseBusy}>
-            {browseBusy ? 'Loading…' : 'Browse'}
+            {browseBusy ? t('atLoading') : 'Browse'}
           </button>
         </form>
         {browseError ? (
@@ -187,12 +187,12 @@ export default function AuditTrailPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2>Workflow history</h2>
+        <h2>{t('atWorkflowHistoryHeading')}</h2>
         <form onSubmit={runWorkflowHistory} style={formStyle}>
           <label>
             Entity type{' '}
             <input
-              aria-label="Workflow entity type"
+              aria-label={t('atWorkflowEntityTypeLabel')}
               value={wfEntityType}
               onChange={(e) => setWfEntityType(e.target.value)}
               required
@@ -201,14 +201,14 @@ export default function AuditTrailPage() {
           <label>
             Entity id{' '}
             <input
-              aria-label="Workflow entity id"
+              aria-label={t('atWorkflowEntityIdLabel')}
               value={wfEntityId}
               onChange={(e) => setWfEntityId(e.target.value)}
               required
             />
           </label>
           <button type="submit" disabled={wfBusy}>
-            {wfBusy ? 'Loading…' : 'Look up'}
+            {wfBusy ? 'Loading…' : t('atLookUpButton')}
           </button>
         </form>
         {wfError ? (
@@ -220,12 +220,12 @@ export default function AuditTrailPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2>Document history</h2>
+        <h2>{t('atDocumentHistoryHeading')}</h2>
         <form onSubmit={runDocumentHistory} style={formStyle}>
           <label>
             Document id{' '}
             <input
-              aria-label="Document id"
+              aria-label={t('atDocumentIdLabel')}
               value={documentId}
               onChange={(e) => setDocumentId(e.target.value)}
               required
@@ -242,17 +242,17 @@ export default function AuditTrailPage() {
         ) : null}
         {docHistory ? (
           <>
-            <h3>Versions</h3>
+            <h3>{t('atColVersions')}</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Version</th>
-                    <th style={head}>File</th>
-                    <th style={head}>Category</th>
-                    <th style={head}>Classification</th>
-                    <th style={head}>Uploaded by</th>
-                    <th style={head}>Created</th>
+                    <th style={head}>{t('atColVersion')}</th>
+                    <th style={head}>{t('atColFile')}</th>
+                    <th style={head}>{t('atColCategory')}</th>
+                    <th style={head}>{t('atColClassification')}</th>
+                    <th style={head}>{t('atColUploadedBy')}</th>
+                    <th style={head}>{t('atColCreated')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -272,7 +272,7 @@ export default function AuditTrailPage() {
                 </tbody>
               </table>
             </div>
-            <h3>Audit trail</h3>
+            <h3>{t('atHeading')}</h3>
             <AuditLogTable rows={docHistory.auditTrail} />
           </>
         ) : null}

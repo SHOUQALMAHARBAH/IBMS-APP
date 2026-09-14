@@ -16,7 +16,7 @@ import { formatDate } from '../../../lib/i18n/format';
 
 function ProgramsForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [programs, setPrograms] = useState<InsuranceProgram[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -30,19 +30,19 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
         err instanceof ApiError && err.status === 403
           ? "You don't hold the program.read permission, so there's nothing to show here."
           : err instanceof ApiError && err.status === 404
-            ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+            ? t('iprogCustomerNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load insurance programs — try again.',
+              : t('iprogLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   if (loadError) {
     return (
@@ -51,7 +51,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!programs) return <p>Loading…</p>;
+  if (!programs) return <p>{t('iprogLoading')}</p>;
 
   if (programs.length === 0) {
     return (
@@ -110,18 +110,19 @@ function InsuranceProgramsFlow() {
 }
 
 export default function InsuranceProgramsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Insurance programs</h1>
+      <h1>{t('iprogHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 7 — a multi-line Insurance Program assembled from an approved
         needs assessment&apos;s coverage list and the risk survey&apos;s

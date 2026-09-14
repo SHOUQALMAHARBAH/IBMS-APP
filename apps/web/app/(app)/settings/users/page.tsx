@@ -42,7 +42,7 @@ const head: CSSProperties = {
 export default function UserAdminPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
 
@@ -79,22 +79,20 @@ export default function UserAdminPage() {
             : "You don't hold the user.manage permission."
           : err instanceof ApiError
             ? err.message
-            : isArabic
-              ? 'تعذّر تحميل المستخدمين — حاول مرة أخرى.'
-              : 'Could not load users — try again.',
+            : t('usrCouldNotLoadUsersTry'),
       );
     }
-  }, [isArabic]);
+  }, [isArabic, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   useEffect(() => {
     if (!user || !isAdmin) return;
@@ -111,7 +109,7 @@ export default function UserAdminPage() {
         // is self-explanatory and must not blank the user list beside it.
       }
     })();
-  }, [user, isAdmin]);
+  }, [user, isAdmin, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -123,9 +121,7 @@ export default function UserAdminPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : isArabic
-            ? 'فشل الإجراء — حاول مرة أخرى.'
-            : 'That action failed — try again.',
+          : t('usrThatActionFailedTryAgain'),
       );
     } finally {
       setBusy(false);
@@ -164,11 +160,9 @@ export default function UserAdminPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>{isArabic ? 'المستخدمون والأدوار' : 'Users & roles'}</h1>
+      <h1>{t('usrUsersRoles')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {isArabic
-          ? 'يُنشئ التسجيل الذاتي حساباً بلا أي دور — ومن ثمّ بلا أي صلاحية. تُمنح الأدوار من هنا فقط. إلغاء الدور يسجّل تاريخ الإلغاء ولا يحذف السجل.'
-          : 'Self-service signup creates an account with no roles — and therefore no permissions. Roles are granted only here. Revoking stamps the withdrawal date; the grant record is never deleted.'}
+        {t('usrSelfServiceSignupCreatesAn')}
       </p>
 
       {isAdmin ? (
@@ -182,18 +176,18 @@ export default function UserAdminPage() {
           }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {isArabic ? 'الاسم الكامل' : 'Full name'}
+            {t('usrFullName')}
             <input
-              aria-label="Full name"
+              aria-label={t('usrFullName')}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {isArabic ? 'البريد الإلكتروني' : 'Email'}
+            {t('usrEmail')}
             <input
-              aria-label="Email"
+              aria-label={t('usrEmail')}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -201,9 +195,7 @@ export default function UserAdminPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {isArabic
-              ? 'كلمة المرور (١٢ محرفاً على الأقل، مع حرف كبير وصغير ورقم ورمز)'
-              : 'Password (min. 12 chars, with upper, lower, digit and symbol)'}
+            {t('usrPasswordMin12CharsWith')}
             <input
               aria-label="Password"
               type="password"
@@ -214,14 +206,14 @@ export default function UserAdminPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {isArabic ? 'القسم' : 'Department'}
+            {t('usrDepartment')}
             <select
-              aria-label="Department"
+              aria-label={t('usrDepartment')}
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
               required
             >
-              <option value="">{isArabic ? '— اختر —' : '— select —'}</option>
+              <option value="">{t('usrSelect')}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {isArabic ? (d.nameAr ?? d.name) : d.name}
@@ -230,14 +222,14 @@ export default function UserAdminPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {isArabic ? 'الفرع' : 'Branch'}
+            {t('usrBranch')}
             <select
-              aria-label="Branch"
+              aria-label={t('usrBranch')}
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
               required
             >
-              <option value="">{isArabic ? '— اختر —' : '— select —'}</option>
+              <option value="">{t('usrSelect2')}</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {isArabic ? (b.nameAr ?? b.name) : b.name}
@@ -246,7 +238,7 @@ export default function UserAdminPage() {
             </select>
           </label>
           <fieldset style={{ border: '1px solid #e5e7eb', padding: '0.5rem' }}>
-            <legend>{isArabic ? 'الأدوار' : 'Roles'}</legend>
+            <legend>{t('usrRoles')}</legend>
             {ROLE_NAMES.map((role) => (
               <label
                 key={role}
@@ -271,18 +263,12 @@ export default function UserAdminPage() {
             style={{ marginTop: '0.3rem' }}
           >
             {busy
-              ? isArabic
-                ? 'جارٍ الحفظ…'
-                : 'Saving…'
-              : isArabic
-                ? 'إنشاء المستخدم'
-                : 'Provision user'}
+              ? t('usrSaving')
+              : t('usrProvisionUser')}
           </button>
           {roles.length === 0 ? (
             <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
-              {isArabic
-                ? 'اختر دوراً واحداً على الأقل — الحساب بلا دور لا يستطيع فعل شيء.'
-                : 'Pick at least one role — a zero-role account can do nothing.'}
+              {t('usrPickAtLeastOneRole')}
             </p>
           ) : null}
         </form>
@@ -302,7 +288,7 @@ export default function UserAdminPage() {
       {rows ? (
         rows.length === 0 ? (
           <p style={{ opacity: 0.6 }}>
-            {isArabic ? 'لا يوجد مستخدمون.' : 'No users.'}
+            {t('usrNoUsers')}
           </p>
         ) : (
           <>
@@ -315,11 +301,11 @@ export default function UserAdminPage() {
               <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>{isArabic ? 'الاسم' : 'Name'}</th>
-                    <th style={head}>{isArabic ? 'البريد' : 'Email'}</th>
-                    <th style={head}>{isArabic ? 'الأدوار' : 'Roles'}</th>
-                    <th style={head}>{isArabic ? 'نشط' : 'Active'}</th>
-                    <th style={head}>{isArabic ? 'إجراء' : 'Action'}</th>
+                    <th style={head}>{t('usrName')}</th>
+                    <th style={head}>{t('usrEmail2')}</th>
+                    <th style={head}>{t('usrRoles2')}</th>
+                    <th style={head}>{t('usrActive')}</th>
+                    <th style={head}>{t('usrAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -330,7 +316,7 @@ export default function UserAdminPage() {
                       <td style={cell}>
                         {u.roles.length === 0 ? (
                           <span style={{ opacity: 0.6 }}>
-                            {isArabic ? '— بلا دور' : '— none'}
+                            {t('usrNone')}
                           </span>
                         ) : (
                           u.roles.map((role) => (
@@ -348,7 +334,7 @@ export default function UserAdminPage() {
                                     void run(() => revokeRole(u.id, role))
                                   }
                                 >
-                                  {isArabic ? 'إلغاء' : 'Revoke'}
+                                  {t('usrRevoke')}
                                 </button>
                               ) : null}
                             </span>
@@ -357,12 +343,8 @@ export default function UserAdminPage() {
                       </td>
                       <td style={cell}>
                         {u.isActive
-                          ? isArabic
-                            ? 'نعم'
-                            : 'Yes'
-                          : isArabic
-                            ? 'لا'
-                            : 'No'}
+                          ? t('usrYes')
+                          : t('usrNo')}
                       </td>
                       <td style={cell}>
                         {isAdmin ? (
@@ -393,7 +375,7 @@ export default function UserAdminPage() {
                                 void run(() => grantRole(u.id, grantChoice))
                               }
                             >
-                              {isArabic ? 'منح' : 'Grant'}
+                              {t('usrGrant')}
                             </button>
                             <button
                               type="button"
@@ -403,12 +385,8 @@ export default function UserAdminPage() {
                               }
                             >
                               {u.isActive
-                                ? isArabic
-                                  ? 'تعطيل'
-                                  : 'Deactivate'
-                                : isArabic
-                                  ? 'تفعيل'
-                                  : 'Activate'}
+                                ? t('usrDeactivate')
+                                : t('usrActivate')}
                             </button>
                           </div>
                         ) : null}
@@ -420,7 +398,9 @@ export default function UserAdminPage() {
             </div>
           </>
         )
-      ) : null}
+      ) : loadError ? null : (
+        <p>{t('usrLoading')}</p>
+      )}
     </main>
   );
 }

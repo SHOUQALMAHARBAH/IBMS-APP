@@ -23,6 +23,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const REPORT_ROLES = [
   'incident.report',
@@ -51,6 +52,7 @@ const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', ga
 export default function IncidentsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canReport = hasAnyPermission(user, REPORT_ROLES);
   const canContain = hasAnyPermission(user, CONTAIN_ROLES);
   const canClassify = hasAnyPermission(user, CLASSIFY_ROLES);
@@ -89,20 +91,20 @@ export default function IncidentsPage() {
           ? "You don't hold the incident.report permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load incidents — try again.',
+            : t('incLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -111,7 +113,7 @@ export default function IncidentsPage() {
       await fn();
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'That action failed — try again.');
+      setActionError(err instanceof ApiError ? err.message : t('incActionError'));
     } finally {
       setBusy(false);
     }
@@ -140,13 +142,9 @@ export default function IncidentsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Incident Management</h1>
+      <h1>{t('incHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Reported &rarr; Contained (4-hour target for critical) &rarr; Impact
-        Assessed &rarr; Classified (Material needs a Data Protection Officer
-        AND a separate Executive Management co-sign) &rarr; Notified &rarr;
-        Recovered &rarr; Closed (root cause mandatory). One incident may
-        trigger more than one regulator&apos;s notification obligation.
+        {t('incIntro')}
       </p>
 
       {actionError ? (
@@ -165,16 +163,16 @@ export default function IncidentsPage() {
           <label style={labelStyle}>
             Title
             <input
-              aria-label="Incident title"
+              aria-label={t('incTitleLabel')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
             />
           </label>
           <label style={labelStyle}>
-            Description
+            {t('incDescriptionLabel')}
             <input
-              aria-label="Incident description"
+              aria-label={t('incDescriptionLabel')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
@@ -183,7 +181,7 @@ export default function IncidentsPage() {
           <label style={labelStyle}>
             Severity
             <select
-              aria-label="Severity"
+              aria-label={t('incColSeverity')}
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
             >
@@ -195,7 +193,7 @@ export default function IncidentsPage() {
             </select>
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Report incident'}
+            {busy ? t('incSavingButton') : t('incReportButton')}
           </button>
         </form>
       ) : null}
@@ -205,11 +203,11 @@ export default function IncidentsPage() {
           <table style={{ borderCollapse: 'collapse', minWidth: '70rem' }}>
             <thead>
               <tr>
-                <th style={head}>Title</th>
-                <th style={head}>Severity</th>
-                <th style={head}>Status</th>
-                <th style={head}>Classification</th>
-                <th style={head}>Action</th>
+                <th style={head}>{t('incColTitle')}</th>
+                <th style={head}>{t('incColSeverity')}</th>
+                <th style={head}>{t('incColStatus')}</th>
+                <th style={head}>{t('incColClassification')}</th>
+                <th style={head}>{t('incColAction')}</th>
               </tr>
             </thead>
             <tbody>
@@ -226,12 +224,12 @@ export default function IncidentsPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '20rem' }}>
                       {canContain && inc.status === 'REPORTED' ? (
                         <button type="button" disabled={busy} onClick={() => void run(() => containIncident(inc.id))}>
-                          Contain
+                          {t('incContainButton')}
                         </button>
                       ) : null}
                       {canContain && inc.status === 'CONTAINED' ? (
                         <button type="button" disabled={busy} onClick={() => void run(() => assessIncidentImpact(inc.id))}>
-                          Assess impact
+                          {t('incAssessButton')}
                         </button>
                       ) : null}
                       {isDpo && inc.status === 'IMPACT_ASSESSED' ? (
@@ -241,14 +239,14 @@ export default function IncidentsPage() {
                             disabled={busy}
                             onClick={() => void run(() => classifyIncident(inc.id, 'MATERIAL'))}
                           >
-                            Classify Material
+                            {t('incClassifyMaterialButton')}
                           </button>
                           <button
                             type="button"
                             disabled={busy}
                             onClick={() => void run(() => classifyIncident(inc.id, 'NON_MATERIAL'))}
                           >
-                            Classify Non-Material
+                            {t('incClassifyNonMaterialButton')}
                           </button>
                         </div>
                       ) : null}
@@ -257,7 +255,7 @@ export default function IncidentsPage() {
                       inc.classification === 'MATERIAL' &&
                       !inc.seniorManagementCoSignUserId ? (
                         <button type="button" disabled={busy} onClick={() => void run(() => coSignIncident(inc.id))}>
-                          Co-sign (Senior Management)
+                          {t('incCoSignButton')}
                         </button>
                       ) : null}
                       {canClassify &&
@@ -268,7 +266,7 @@ export default function IncidentsPage() {
                           disabled={busy}
                           onClick={() => void run(() => notifyIncidentSeniorManagement(inc.id))}
                         >
-                          Notify Senior Management
+                          {t('incNotifySeniorButton')}
                         </button>
                       ) : null}
                       {canNotifyRegulators && inc.status === 'CLASSIFIED' ? (
@@ -293,7 +291,7 @@ export default function IncidentsPage() {
                               )
                             }
                           >
-                            Notify regulators
+                            {t('incNotifyRegulatorsButton')}
                           </button>
                         </div>
                       ) : null}
@@ -305,19 +303,19 @@ export default function IncidentsPage() {
                           disabled={busy}
                           onClick={() => void run(() => notifyIncidentAffectedSubjects(inc.id))}
                         >
-                          Notify affected subjects
+                          {t('incNotifySubjectsButton')}
                         </button>
                       ) : null}
                       {canContain && inc.status === 'NOTIFIED' ? (
                         <button type="button" disabled={busy} onClick={() => void run(() => recoverIncident(inc.id))}>
-                          Recover
+                          {t('incRecoverButton')}
                         </button>
                       ) : null}
                       {canContain && inc.status === 'RECOVERED' ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
                             aria-label={`Root cause analysis for ${inc.id}`}
-                            placeholder="root cause analysis"
+                            placeholder={t('incRootCauseLabel')}
                             value={rootCauseDrafts[inc.id] ?? ''}
                             onChange={(e) =>
                               setRootCauseDrafts((d) => ({ ...d, [inc.id]: e.target.value }))
@@ -332,7 +330,7 @@ export default function IncidentsPage() {
                               )
                             }
                           >
-                            Close
+                            {t('incCloseButton')}
                           </button>
                         </div>
                       ) : null}
@@ -344,7 +342,12 @@ export default function IncidentsPage() {
             </tbody>
           </table>
         </div>
-      ) : null}
+      ) : loadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('incLoading')}</p>
+      )}
     </main>
   );
 }

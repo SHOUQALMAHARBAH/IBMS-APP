@@ -49,7 +49,7 @@ function Figure({ label, value }: { label: string; value: string }) {
 export default function FinancialReportPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<FinancialReportSummary | null>(null);
@@ -66,40 +66,37 @@ export default function FinancialReportPage() {
           ? "You don't hold the financial-report.view permission, so there's nothing to show here."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the financial report — try again.',
+            : t('frLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load(asOf);
     })();
-  }, [user, asOf, load]);
+  }, [user, asOf, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Financial report</h1>
+      <h1>{t('frHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The consolidated financial dashboard — client receivables and ageing,
-        what is owed to and remitted from insurers, the commission income
-        roll-up (earned / paid / outstanding / reversed), and the book&rsquo;s
-        result by line of business and client segment.
+        {t('frIntro')}
       </p>
 
       <label
         style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
       >
-        As of
+        {t('frAsOf')}
         <input
           type="date"
-          aria-label="As of date"
+          aria-label={t('frAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
@@ -114,17 +111,17 @@ export default function FinancialReportPage() {
 
       {!data ? (
         loadError ? null : (
-          <p>Loading&hellip;</p>
+          <p>{t('frLoading')}</p>
         )
       ) : (
         <>
           <section style={sectionStyle}>
-            <h2>Client receivables</h2>
+            <h2>{t('frClientReceivables')}</h2>
             <Figure
-              label="Outstanding total"
+              label={t('frOutstandingTotal')}
               value={data.receivables.outstandingTotal}
             />
-            <Figure label="Current" value={data.receivables.current} />
+            <Figure label={t('frCurrent')} value={data.receivables.current} />
             <Figure label="1–30 days" value={data.receivables.d1_30} />
             <Figure label="31–60 days" value={data.receivables.d31_60} />
             <Figure label="61–90 days" value={data.receivables.d61_90} />
@@ -136,13 +133,13 @@ export default function FinancialReportPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Insurer payables</h2>
+            <h2>{t('frInsurerPayables')}</h2>
             <Figure
-              label="Outstanding (collected, not remitted)"
+              label={t('frOutstandingCollectedNotRemitted')}
               value={data.payables.outstandingAmount}
             />
             <Figure
-              label="Remitted to date"
+              label={t('frRemittedToDate')}
               value={data.payables.remittedAmount}
             />
             <p style={{ opacity: 0.6, fontSize: '0.9rem' }}>
@@ -151,18 +148,18 @@ export default function FinancialReportPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Commission income</h2>
-            <Figure label="Earned (gross)" value={data.commission.earned} />
-            <Figure label="VAT" value={data.commission.vat} />
-            <Figure label="Gross (incl. VAT)" value={data.commission.gross} />
-            <Figure label="Reversed (clawed back)" value={data.commission.reversed} />
+            <h2>{t('frCommissionIncome')}</h2>
+            <Figure label={t('frEarnedGross')} value={data.commission.earned} />
+            <Figure label={t('frVat')} value={data.commission.vat} />
+            <Figure label={t('frGrossInclVat')} value={data.commission.gross} />
+            <Figure label={t('frReversedClawedBack')} value={data.commission.reversed} />
             <Figure
-              label="Net earned (after clawbacks)"
+              label={t('frNetEarnedAfterClawbacks')}
               value={data.commission.netEarned}
             />
-            <Figure label="Paid (reconciled)" value={data.commission.paid} />
+            <Figure label={t('frPaidReconciled')} value={data.commission.paid} />
             <Figure
-              label="Outstanding (still to collect)"
+              label={t('frOutstandingStillToCollect')}
               value={data.commission.outstanding}
             />
             {data.commission.byInsurer.length > 0 ? (
@@ -172,11 +169,11 @@ export default function FinancialReportPage() {
                 >
                   <thead>
                     <tr>
-                      <th style={{ ...head, textAlign: 'start' }}>Insurer</th>
-                      <th style={head}>Earned</th>
-                      <th style={head}>Paid</th>
-                      <th style={head}>Outstanding</th>
-                      <th style={head}>Reversed</th>
+                      <th style={{ ...head, textAlign: 'start' }}>{t('frColInsurer')}</th>
+                      <th style={head}>{t('frEarned')}</th>
+                      <th style={head}>{t('frPaid')}</th>
+                      <th style={head}>{t('frOutstanding')}</th>
+                      <th style={head}>{t('frReversed')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -198,7 +195,7 @@ export default function FinancialReportPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Book result by line</h2>
+            <h2>{t('frBookResultByLine')}</h2>
             <p style={{ opacity: 0.65, fontSize: '0.9rem', maxWidth: '44rem' }}>
               &ldquo;Net position&rdquo; is the book&rsquo;s underwriting result
               &mdash; premium written less claims paid less commission &mdash;
@@ -207,7 +204,7 @@ export default function FinancialReportPage() {
               out more than it took in premium.
             </p>
             <ProfitTable rows={data.profitability.byLine} />
-            <h2 style={{ marginTop: '1.25rem' }}>Book result by client segment</h2>
+            <h2 style={{ marginTop: '1.25rem' }}>{t('frBookResultBySegment')}</h2>
             <ProfitTable rows={data.profitability.bySegment} />
           </section>
         </>
@@ -221,20 +218,20 @@ function ProfitTable({
 }: {
   rows: FinancialReportSummary['profitability']['byLine'];
 }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   if (rows.length === 0)
-    return <p style={{ opacity: 0.6 }}>No written policies.</p>;
+    return <p style={{ opacity: 0.6 }}>{t('frNoPolicies')}</p>;
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
         <thead>
           <tr>
-            <th style={{ ...head, textAlign: 'start' }}>Group</th>
-            <th style={head}>Premium written</th>
-            <th style={head}>Claims paid</th>
-            <th style={head}>Commission</th>
-            <th style={head}>Net position</th>
-            <th style={head}>Policies</th>
+            <th style={{ ...head, textAlign: 'start' }}>{t('frColGroup')}</th>
+            <th style={head}>{t('frColPremiumWritten')}</th>
+            <th style={head}>{t('frColClaimsPaid')}</th>
+            <th style={head}>{t('frColCommission')}</th>
+            <th style={head}>{t('frColNetPosition')}</th>
+            <th style={head}>{t('frColPolicies')}</th>
           </tr>
         </thead>
         <tbody>

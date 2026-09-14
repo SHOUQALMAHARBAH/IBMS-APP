@@ -10,11 +10,13 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 export default function SalesDashboardPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -30,7 +32,7 @@ export default function SalesDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -52,10 +54,10 @@ export default function SalesDashboardPage() {
           ? "You don't hold the dashboard.sales.view permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the Sales Dashboard — try again.',
+            : t('dsalLoadError'),
       );
     }
-  }, [branchId, insuranceLine, insurerId, periodLabel, periodStart, periodEnd]);
+  }, [branchId, insuranceLine, insurerId, periodLabel, periodStart, periodEnd, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -64,7 +66,7 @@ export default function SalesDashboardPage() {
     })();
     // Filters apply on explicit "Apply filters" submit only — see below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, t]);
 
   function applyFilters(ev: React.FormEvent) {
     ev.preventDefault();
@@ -75,11 +77,9 @@ export default function SalesDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Sales Dashboard</h1>
+      <h1>{t('dsalHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        New leads and conversion rate, premium written (new vs. renewal),
-        commission income, and cross-sell/up-sell opportunity conversion.
-        Defaults to the previous calendar month.
+        {t('dsalIntro')}
       </p>
 
       <form
@@ -87,26 +87,26 @@ export default function SalesDashboardPage() {
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Branch ID
-          <input aria-label="Branch ID filter" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          {t('dashBranchIdLabel')}
+          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurance line
+          {t('dashInsuranceLineLabel')}
           <input
-            aria-label="Insurance line filter"
+            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurer ID
-          <input aria-label="Insurer ID filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          {t('dashInsurerIdLabel')}
+          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Period label
           <input
-            aria-label="Period label"
+            aria-label={t('dashPeriodLabel')}
             placeholder="e.g. 2026-08"
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
@@ -115,8 +115,8 @@ export default function SalesDashboardPage() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Period start
           <input
-            aria-label="Period start"
-            placeholder="YYYY-MM-DD"
+            aria-label={t('dashPeriodStart')}
+            placeholder={t('dashDatePlaceholder')}
             value={periodStart}
             onChange={(e) => setPeriodStart(e.target.value)}
           />
@@ -124,13 +124,13 @@ export default function SalesDashboardPage() {
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
           Period end
           <input
-            aria-label="Period end"
-            placeholder="YYYY-MM-DD"
+            aria-label={t('dashPeriodEnd')}
+            placeholder={t('dashDatePlaceholder')}
             value={periodEnd}
             onChange={(e) => setPeriodEnd(e.target.value)}
           />
         </label>
-        <button type="submit">Apply filters</button>
+        <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
       {loadError ? (
@@ -147,84 +147,84 @@ export default function SalesDashboardPage() {
           </p>
 
           <section style={sectionStyle}>
-            <h2>Leads</h2>
+            <h2>{t('kpiLeads')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.leads.newLeadsCount}</div>
-                <div>New leads</div>
+                <div>{t('dsalNewLeads')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.leads.convertedToProspectCount}</div>
-                <div>Converted to Prospect</div>
+                <div>{t('dsalConvertedToProspect')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.leads.conversionRatePercent}%</div>
-                <div>Conversion rate</div>
+                <div>{t('dsalConversionRate')}</div>
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Premium written</h2>
+            <h2>{t('dsalPremiumWritten')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.premiumWritten.newJod}</div>
-                <div>New business (JOD)</div>
+                <div>{t('dsalNewBusiness')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.premiumWritten.renewalJod}</div>
-                <div>Renewal (JOD)</div>
+                <div>{t('dsalRenewal')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.premiumWritten.totalJod}</div>
-                <div>Total (JOD)</div>
+                <div>{t('dsalTotal')}</div>
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Commission income</h2>
+            <h2>{t('dsalCommissionIncome')}</h2>
             <div style={statStyle}>{summary.commissionIncomeJod} JOD</div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Cross-sell conversion</h2>
+            <h2>{t('dsalCrossSellConversion')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.crossSell.totalCount}</div>
-                <div>Opportunities</div>
+                <div>{t('dsalOpportunities')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.crossSell.convertedCount}</div>
-                <div>Converted</div>
+                <div>{t('dsalConverted')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.crossSell.conversionRatePercent}%</div>
-                <div>Conversion rate</div>
+                <div>{t('dsalConversionRate')}</div>
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Up-sell conversion</h2>
+            <h2>{t('dsalUpSellConversion')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.upSell.totalCount}</div>
-                <div>Recommendations</div>
+                <div>{t('dsalRecommendations')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.upSell.convertedCount}</div>
-                <div>Converted</div>
+                <div>{t('dsalConverted')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.upSell.conversionRatePercent}%</div>
-                <div>Conversion rate</div>
+                <div>{t('dsalConversionRate')}</div>
               </div>
             </div>
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

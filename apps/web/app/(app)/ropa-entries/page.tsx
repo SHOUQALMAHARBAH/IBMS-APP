@@ -13,6 +13,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const ROLES = [
   'ropa.manage',
@@ -37,6 +38,7 @@ function splitList(value: string): string[] {
 export default function RopaEntriesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage = hasAnyPermission(user, ROLES);
 
   const [rows, setRows] = useState<RopaEntry[] | null>(null);
@@ -60,20 +62,20 @@ export default function RopaEntriesPage() {
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load the RoPA register — try again.',
+          : t('ropaLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -83,7 +85,7 @@ export default function RopaEntriesPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('ropaActionError'),
       );
     } finally {
       setBusy(false);
@@ -118,7 +120,7 @@ export default function RopaEntriesPage() {
       setExportedCount(summary.entryCount);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'The export failed — try again.',
+        err instanceof ApiError ? err.message : t('ropaExportError'),
       );
     } finally {
       setBusy(false);
@@ -129,10 +131,9 @@ export default function RopaEntriesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Records of Processing Activities</h1>
+      <h1>{t('ropaHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        An exportable register documenting every processing activity, its
-        data categories, purposes, recipients, and retention period.
+        {t('ropaIntro')}
       </p>
 
       {actionError ? (
@@ -160,16 +161,16 @@ export default function RopaEntriesPage() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               Processing activity
               <input
-                aria-label="Processing activity"
+                aria-label={t('ropaActivityLabel')}
                 value={processingActivity}
                 onChange={(e) => setProcessingActivity(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Categories of data (comma-separated)
+              {t('ropaDataCategoriesLabel')}
               <input
-                aria-label="Categories of data"
+                aria-label={t('ropaColDataCategories')}
                 value={categoriesOfData}
                 onChange={(e) => setCategoriesOfData(e.target.value)}
                 required
@@ -178,25 +179,25 @@ export default function RopaEntriesPage() {
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               Purpose
               <input
-                aria-label="Purpose"
+                aria-label={t('ropaPurposeLabel')}
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Recipients (comma-separated)
+              {t('ropaRecipientsLabel')}
               <input
-                aria-label="Recipients"
+                aria-label={t('ropaColRecipients')}
                 value={recipients}
                 onChange={(e) => setRecipients(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Retention period (months, optional)
+              {t('ropaRetentionMonthsLabel')}
               <input
-                aria-label="Retention period months"
+                aria-label={t('ropaRetentionMonthsLabel')}
                 type="number"
                 min={1}
                 value={retentionPeriodMonths}
@@ -204,28 +205,28 @@ export default function RopaEntriesPage() {
               />
             </label>
             <button type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Add entry'}
+              {busy ? t('ropaSavingButton') : t('ropaAddButton')}
             </button>
           </form>
           <button type="button" disabled={busy} onClick={() => void doExport()}>
-            Export register
+            {t('ropaExportButton')}
           </button>
         </>
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No RoPA entries yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('ropaNone')}</p>
         ) : (
-          <div style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label="RoPA register">
+          <div style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={t('ropaHeading')}>
             <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Activity</th>
-                  <th style={head}>Data categories</th>
-                  <th style={head}>Purpose</th>
-                  <th style={head}>Recipients</th>
-                  <th style={head}>Retention (months)</th>
+                  <th style={head}>{t('ropaColActivity')}</th>
+                  <th style={head}>{t('ropaColDataCategories')}</th>
+                  <th style={head}>{t('ropaPurposeLabel')}</th>
+                  <th style={head}>{t('ropaColRecipients')}</th>
+                  <th style={head}>{t('ropaColRetentionMonths')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,7 +244,7 @@ export default function RopaEntriesPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('ropaLoading')}</p>
       )}
     </main>
   );

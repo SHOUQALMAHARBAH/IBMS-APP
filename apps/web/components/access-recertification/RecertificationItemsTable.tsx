@@ -20,6 +20,7 @@ import {
   tdStyle,
   thStyle,
 } from './access-recertification.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
 
 const ADMIN_ROLE = 'SYSTEM_SECURITY_ADMINISTRATOR';
 
@@ -35,11 +36,12 @@ interface RecertificationItemsTableProps {
 }
 
 export function RecertificationItemsTable({ items, onItemDecided }: RecertificationItemsTableProps) {
+  const { t } = useLanguage();
   const [decidingItemId, setDecidingItemId] = useState<string | null>(null);
   const [decideErrors, setDecideErrors] = useState<Record<string, string>>({});
 
   if (items.length === 0) {
-    return <p style={emptyStateStyle}>No access-recertification items are currently assigned to you for review.</p>;
+    return <p style={emptyStateStyle}>{t('acrNone')}</p>;
   }
 
   async function handleDecide(item: RecertificationItem, decision: RecertificationDecision) {

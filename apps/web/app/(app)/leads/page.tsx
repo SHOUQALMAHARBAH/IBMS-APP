@@ -43,14 +43,14 @@ export default function LeadsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadLeads();
     })();
-  }, [user, loadLeads]);
+  }, [user, loadLeads, t]);
 
   if (isLoading || !user) return null;
 

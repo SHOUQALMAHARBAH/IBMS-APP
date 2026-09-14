@@ -10,6 +10,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -39,16 +40,17 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 function StatusTable({ counts }: { counts: Record<string, number> }) {
+  const { t } = useLanguage();
   const entries = Object.entries(counts);
   if (entries.length === 0) {
-    return <p style={{ opacity: 0.6 }}>No records yet.</p>;
+    return <p style={{ opacity: 0.6 }}>{t('kpiNone')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '20rem' }}>
       <thead>
         <tr>
-          <th style={head}>Status</th>
-          <th style={head}>Count</th>
+          <th style={head}>{t('kpiColStatus')}</th>
+          <th style={head}>{t('kpiColCount')}</th>
         </tr>
       </thead>
       <tbody>
@@ -64,6 +66,7 @@ function StatusTable({ counts }: { counts: Record<string, number> }) {
 }
 
 export default function KpiDashboardPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -72,7 +75,7 @@ export default function KpiDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
@@ -86,20 +89,19 @@ export default function KpiDashboardPage() {
             ? "You don't hold the kpi-dashboard.view permission."
             : err instanceof ApiError
               ? err.message
-              : 'Could not load the KPI dashboard — try again.',
+              : t('kpiLoadError'),
         );
       }
     })();
-  }, [user]);
+  }, [user, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>General KPI Dashboard</h1>
+      <h1>{t('kpiHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        A live, book-wide snapshot across every module — Sales, Policy,
-        Claims, Finance, Customer Service, and Compliance &amp; Risk.
+        {t('kpiIntro')}
       </p>
 
       {loadError ? (
@@ -115,31 +117,31 @@ export default function KpiDashboardPage() {
           </p>
 
           <section style={sectionStyle}>
-            <h2>Sales</h2>
+            <h2>{t('kpiSales')}</h2>
             <div style={statRow}>
-              <Stat label="Customers" value={summary.sales.totalCustomers} />
+              <Stat label={t('kpiCustomers')} value={summary.sales.totalCustomers} />
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', marginTop: '0.75rem' }}>
               <div>
-                <h3>Leads</h3>
+                <h3>{t('kpiLeads')}</h3>
                 <StatusTable counts={summary.sales.leadsByStatus} />
               </div>
               <div>
-                <h3>Prospects</h3>
+                <h3>{t('kpiProspects')}</h3>
                 <StatusTable counts={summary.sales.prospectsByStatus} />
               </div>
               <div>
-                <h3>Opportunities</h3>
+                <h3>{t('kpiOpportunities')}</h3>
                 <StatusTable counts={summary.sales.opportunitiesByStatus} />
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Policy</h2>
+            <h2>{t('kpiPolicy')}</h2>
             <div style={statRow}>
               <Stat
-                label="Total issued premium (JOD)"
+                label={t('kpiTotalIssuedPremium')}
                 value={summary.policy.totalIssuedPremiumJod}
               />
             </div>
@@ -149,19 +151,19 @@ export default function KpiDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Claims</h2>
+            <h2>{t('kpiClaims')}</h2>
             <StatusTable counts={summary.claims.claimsByStatus} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>Finance</h2>
+            <h2>{t('kpiFinance')}</h2>
             <div style={statRow}>
               <Stat
-                label="Outstanding invoiced (JOD)"
+                label={t('kpiOutstandingInvoiced')}
                 value={summary.finance.outstandingInvoicedJod}
               />
               <Stat
-                label="Commission this month (JOD)"
+                label={t('kpiCommissionThisMonth')}
                 value={summary.finance.commissionThisMonthJod}
               />
             </div>
@@ -171,10 +173,10 @@ export default function KpiDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Customer Service</h2>
+            <h2>{t('kpiCustomerService')}</h2>
             <div style={statRow}>
               <Stat
-                label="Open service requests"
+                label={t('kpiOpenServiceRequests')}
                 value={summary.customerService.openServiceRequests}
               />
             </div>
@@ -184,25 +186,25 @@ export default function KpiDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Compliance &amp; Risk</h2>
+            <h2>{t('kpiComplianceRisk')}</h2>
             <div style={statRow}>
               <Stat
-                label="Open risk register items"
+                label={t('kpiOpenRiskItems')}
                 value={summary.complianceRisk.openRiskRegisterItems}
               />
               <Stat
-                label="Open incidents"
+                label={t('kpiOpenIncidents')}
                 value={summary.complianceRisk.openIncidents}
               />
               <Stat
-                label="Open internal audit findings"
+                label={t('kpiOpenAuditFindings')}
                 value={summary.complianceRisk.openInternalAuditFindings}
               />
             </div>
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

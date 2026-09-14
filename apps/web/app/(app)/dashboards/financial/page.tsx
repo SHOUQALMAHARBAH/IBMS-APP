@@ -11,25 +11,27 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 function ProfitabilityTable({ title, rows }: { title: string; rows: ProfitabilityRow[] }) {
+  const { t } = useLanguage();
   return (
     <section style={sectionStyle}>
       <h3>{title}</h3>
       {rows.length === 0 ? (
-        <p>No data.</p>
+        <p>{t('dashNoData')}</p>
       ) : (
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Group</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Premium (JOD)</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Claims (JOD)</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Commission (JOD)</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Net position (JOD)</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dashColGroup')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dfinColPremium')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dfinColClaims')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dfinColCommission')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dfinColNetPosition')}</th>
             </tr>
           </thead>
           <tbody>
@@ -52,6 +54,7 @@ function ProfitabilityTable({ title, rows }: { title: string; rows: Profitabilit
 }
 
 export default function FinancialDashboardPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -65,7 +68,7 @@ export default function FinancialDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -85,10 +88,10 @@ export default function FinancialDashboardPage() {
           ? "You don't hold the dashboard.financial.view permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the Financial Dashboard — try again.',
+            : t('dfinLoadError'),
       );
     }
-  }, [branchId, insuranceLine, insurerId, asOf]);
+  }, [branchId, insuranceLine, insurerId, asOf, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -97,7 +100,7 @@ export default function FinancialDashboardPage() {
     })();
     // Filters apply on explicit "Apply filters" submit only — see below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, t]);
 
   function applyFilters(ev: React.FormEvent) {
     ev.preventDefault();
@@ -108,11 +111,9 @@ export default function FinancialDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Financial Dashboard</h1>
+      <h1>{t('dfinHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Receivables and payables are a point-in-time snapshot as of a
-        reference date (default today). Commission and profitability are
-        current-state and ignore the reference date.
+        {t('dfinIntro')}
       </p>
 
       <form
@@ -120,27 +121,27 @@ export default function FinancialDashboardPage() {
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Branch ID
-          <input aria-label="Branch ID filter" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          {t('dashBranchIdLabel')}
+          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurance line
+          {t('dashInsuranceLineLabel')}
           <input
-            aria-label="Insurance line filter"
+            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurer ID
-          <input aria-label="Insurer ID filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          {t('dashInsurerIdLabel')}
+          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          As of
-          <input aria-label="As of date" placeholder="YYYY-MM-DD" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+          {t('dashAsOf')}
+          <input aria-label={t('dashAsOfDateAria')} placeholder={t('dashDatePlaceholder')} value={asOf} onChange={(e) => setAsOf(e.target.value)} />
         </label>
-        <button type="submit">Apply filters</button>
+        <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
       {loadError ? (
@@ -154,7 +155,7 @@ export default function FinancialDashboardPage() {
           <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>As of {summary.asOf.slice(0, 10)}.</p>
 
           <section style={sectionStyle}>
-            <h2>Receivables (ageing)</h2>
+            <h2>{t('dfinReceivables')}</h2>
             <div style={statStyle}>{summary.receivables.totals.outstandingTotal} JOD</div>
             <div style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem' }}>
               <div>Current: {summary.receivables.totals.current}</div>
@@ -166,7 +167,7 @@ export default function FinancialDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Payables to insurers</h2>
+            <h2>{t('dfinPayables')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.payables.totals.outstandingAmount} JOD</div>
@@ -180,31 +181,31 @@ export default function FinancialDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Commission income</h2>
+            <h2>{t('dfinCommissionIncome')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.commission.earned} JOD</div>
-                <div>Earned</div>
+                <div>{t('dfinEarned')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.commission.outstanding} JOD</div>
-                <div>Outstanding</div>
+                <div>{t('dfinOutstanding')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.commission.paid} JOD</div>
-                <div>Paid</div>
+                <div>{t('dfinPaid')}</div>
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Profitability</h2>
-            <ProfitabilityTable title="By line" rows={summary.profitability.byLine} />
-            <ProfitabilityTable title="By client segment" rows={summary.profitability.bySegment} />
+            <h2>{t('dfinProfitability')}</h2>
+            <ProfitabilityTable title={t('dfinByLine')} rows={summary.profitability.byLine} />
+            <ProfitabilityTable title={t('dfinByClientSegment')} rows={summary.profitability.bySegment} />
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

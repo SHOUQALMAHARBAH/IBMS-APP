@@ -39,13 +39,13 @@ function RfqList({
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   if (loadError) {
     return (
@@ -127,7 +127,7 @@ export default function RfqsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 

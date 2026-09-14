@@ -16,6 +16,7 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -28,6 +29,7 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function EmployeeDetailPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const params = useParams<{ id: string }>();
@@ -45,7 +47,7 @@ export default function EmployeeDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -58,17 +60,17 @@ export default function EmployeeDetailPage() {
           ? "You don't hold the employee.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this employee — try again.',
+            : t('empdLoadError'),
       );
     }
-  }, [employeeId]);
+  }, [employeeId, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onReveal(e: FormEvent) {
     e.preventDefault();
@@ -77,7 +79,7 @@ export default function EmployeeDetailPage() {
       const result = await revealEmployeeField(employeeId, revealReason);
       setRevealedValue(result.value);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not reveal the field.');
+      setActionError(err instanceof ApiError ? err.message : t('empdRevealError'));
     }
   }
 
@@ -93,7 +95,7 @@ export default function EmployeeDetailPage() {
       setTrainingDueAt('');
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not record the training.');
+      setActionError(err instanceof ApiError ? err.message : t('empdRecordTrainingError'));
     }
   }
 
@@ -103,7 +105,7 @@ export default function EmployeeDetailPage() {
       await completeTraining(employeeId, trainingId);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not complete the training.');
+      setActionError(err instanceof ApiError ? err.message : t('empdCompleteTrainingError'));
     }
   }
 
@@ -113,7 +115,7 @@ export default function EmployeeDetailPage() {
       await terminateEmployee(employeeId);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not terminate this employee.');
+      setActionError(err instanceof ApiError ? err.message : t('empdTerminateError'));
     }
   }
 
@@ -129,7 +131,7 @@ export default function EmployeeDetailPage() {
       await updateDeprovisioningChecklist(employeeId, { [field]: true });
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not update the checklist.');
+      setActionError(err instanceof ApiError ? err.message : t('empdChecklistUpdateError'));
     }
   }
 
@@ -139,7 +141,7 @@ export default function EmployeeDetailPage() {
       await completeDeprovisioningChecklist(employeeId);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not complete the checklist.');
+      setActionError(err instanceof ApiError ? err.message : t('empdChecklistCompleteError'));
     }
   }
 
@@ -147,7 +149,7 @@ export default function EmployeeDetailPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Employee</h1>
+      <h1>{t('empdHeading')}</h1>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -192,7 +194,7 @@ export default function EmployeeDetailPage() {
             </p>
 
             <form onSubmit={onReveal} style={formStyle}>
-              <h3>Reveal national ID</h3>
+              <h3>{t('empdRevealNationalId')}</h3>
               <label style={labelStyle}>
                 Reason (Part 10.6, min. 10 characters)
                 <input
@@ -201,7 +203,7 @@ export default function EmployeeDetailPage() {
                   required
                 />
               </label>
-              <button type="submit">Reveal</button>
+              <button type="submit">{t('empdReveal')}</button>
               {revealedValue ? <p>Full value: {revealedValue}</p> : null}
             </form>
 
@@ -219,16 +221,16 @@ export default function EmployeeDetailPage() {
           ) : null}
 
           <section style={sectionStyle}>
-            <h2>Security awareness training</h2>
+            <h2>{t('empdTrainingHeading')}</h2>
             {employee.trainings.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No training recorded yet.</p>
+              <p style={{ opacity: 0.6 }}>{t('empdNoTraining')}</p>
             ) : (
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Training</th>
-                    <th style={head}>Due</th>
-                    <th style={head}>Completed</th>
+                    <th style={head}>{t('empdColTraining')}</th>
+                    <th style={head}>{t('empdColDue')}</th>
+                    <th style={head}>{t('empdColCompleted')}</th>
                     <th style={head} />
                   </tr>
                 </thead>
@@ -252,7 +254,7 @@ export default function EmployeeDetailPage() {
             )}
 
             <form onSubmit={onRecordTraining} style={formStyle}>
-              <h3>Assign training</h3>
+              <h3>{t('empdAssignTrainingHeading')}</h3>
               <label style={labelStyle}>
                 Training name
                 <input
@@ -269,13 +271,13 @@ export default function EmployeeDetailPage() {
                   onChange={(e) => setTrainingDueAt(e.target.value)}
                 />
               </label>
-              <button type="submit">Assign</button>
+              <button type="submit">{t('empdAssignButton')}</button>
             </form>
           </section>
 
           {employee.deprovisioningChecklist ? (
             <section style={sectionStyle}>
-              <h2>Access de-provisioning checklist</h2>
+              <h2>{t('empdDeprovisioningHeading')}</h2>
               <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
                 Triggered {employee.deprovisioningChecklist.triggeredAt.replace('T', ' ').slice(0, 16)}
                 {' — '}due the same business day (24h escalation to IT
@@ -334,7 +336,7 @@ export default function EmployeeDetailPage() {
           ) : null}
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('empdLoading')}</p>
       )}
     </main>
   );

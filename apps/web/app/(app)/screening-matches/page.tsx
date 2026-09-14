@@ -36,8 +36,7 @@ const head: CSSProperties = {
 export default function ScreeningMatchesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
-  const isArabic = language === "AR";
+  const { t } = useLanguage();
   const canReview = hasPermission(user, 'sanctions-pep.screen');
 
   const [status, setStatus] = useState<ScreeningMatchStatus>("pending");
@@ -58,29 +57,25 @@ export default function ScreeningMatchesPage() {
         setRows(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? isArabic
-              ? "لا تملك صلاحية sanctions-pep.screen."
-              : "You don't hold the sanctions-pep.screen permission."
+            ? t('smYouDonTHoldThe')
             : err instanceof ApiError
               ? err.message
-              : isArabic
-                ? "تعذّر تحميل قائمة المطابقات — حاول مرة أخرى."
-                : "Could not load the match queue — try again.",
+              : t('smCouldNotLoadTheMatch'),
         );
       }
     },
-    [isArabic],
+    [t],
   );
 
   useEffect(() => {
     if (!isLoading && !user) router.push("/login");
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load(status);
     })();
-  }, [user, status, load]);
+  }, [user, status, load, t]);
 
   // An EMPTY queue is ambiguous: "nothing matched" and "nothing was ever
   // checked" look identical on this screen, and the second is the state every
@@ -95,7 +90,7 @@ export default function ScreeningMatchesPage() {
         setWatchlistReady(null); // unknown; say nothing rather than guess
       }
     })();
-  }, [user]);
+  }, [user, t]);
 
   async function decide(
     id: string,
@@ -111,9 +106,7 @@ export default function ScreeningMatchesPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : isArabic
-            ? "فشل تسجيل القرار — حاول مرة أخرى."
-            : "Recording that decision failed — try again.",
+          : t('smRecordingThatDecisionFailedTry'),
       );
     } finally {
       setBusy(false);
@@ -125,12 +118,10 @@ export default function ScreeningMatchesPage() {
   return (
     <main style={pageStyle}>
       <h1>
-        {isArabic ? "مطابقات العقوبات للمراجعة" : "Sanctions match review"}
+        {t('smSanctionsMatchReview')}
       </h1>
       <p style={{ opacity: 0.75, maxWidth: "46rem" }}>
-        {isArabic
-          ? "تُقارن الأسماء مع قوائم OFAC والأمم المتحدة المحدَّثة تلقائياً، مع مطابقة تقريبية تشمل اختلافات كتابة الاسم بالحروف اللاتينية والأسماء الرباعية. المطابقة هنا سؤال وليست حكماً — لا يوقف النظام أي عميل تلقائياً؛ القرار قرار مسؤول الامتثال."
-          : "Names are checked against the synced OFAC and UN sanctions lists using fuzzy matching, which covers romanisation variants (Mohammed / Muhammad) and Jordan’s four-part naming convention against shorter list entries. A match here is a QUESTION, not a verdict — nothing is blocked automatically; the decision is a Compliance Officer’s."}
+        {t('smNamesAreCheckedAgainstThe')}
       </p>
 
       <div style={{ display: "flex", gap: "0.4rem", margin: "1rem 0" }}>
@@ -157,9 +148,7 @@ export default function ScreeningMatchesPage() {
             borderRadius: 4,
           }}
         >
-          {isArabic
-            ? "قائمة العقوبات المحلية فارغة — لم تُنفَّذ المزامنة بعد. لم يُفحص أي عميل فعلياً، والقائمة الفارغة هنا لا تعني عدم وجود تطابقات. شغّل POST /watchlist-sync/run."
-            : "The local sanctions list is EMPTY — the sync has never run. No customer has actually been screened, and an empty queue here does NOT mean there are no matches. Run POST /watchlist-sync/run."}
+          {t('smTheLocalSanctionsListIs')}
         </p>
       ) : null}
 
@@ -178,35 +167,27 @@ export default function ScreeningMatchesPage() {
         rows.length === 0 ? (
           <p style={{ opacity: 0.6 }}>
             {status === "pending"
-              ? isArabic
-                ? "لا توجد مطابقات بانتظار المراجعة."
-                : "Nothing awaiting review."
-              : isArabic
-                ? "لا توجد سجلات."
-                : "No records."}
+              ? t('smNothingAwaitingReview')
+              : t('smNoRecords')}
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", minWidth: "62rem" }}>
               <thead>
                 <tr>
-                  <th style={head}>{isArabic ? "العميل" : "Customer"}</th>
+                  <th style={head}>{t('smCustomer')}</th>
                   <th style={head}>
-                    {isArabic ? "الاسم المطابِق" : "Matched name"}
+                    {t('smMatchedName')}
                   </th>
                   <th style={head}>
-                    {isArabic ? "سجل القائمة" : "List entry"}
+                    {t('smListEntry')}
                   </th>
-                  <th style={head}>{isArabic ? "النوع" : "Type"}</th>
-                  <th style={head}>{isArabic ? "رُصد في" : "Detected"}</th>
+                  <th style={head}>{t('smType')}</th>
+                  <th style={head}>{t('smDetected')}</th>
                   <th style={head}>
                     {status === "pending"
-                      ? isArabic
-                        ? "القرار"
-                        : "Decision"
-                      : isArabic
-                        ? "المراجعة"
-                        : "Review"}
+                      ? t('smDecision')
+                      : t('smReview')}
                   </th>
                 </tr>
               </thead>
@@ -217,7 +198,7 @@ export default function ScreeningMatchesPage() {
                       {r.customerLegalName}
                       {r.isEdd ? (
                         <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                          {isArabic ? "عناية معززة" : "EDD"}
+                          {t('smEdd')}
                         </div>
                       ) : null}
                     </td>
@@ -229,9 +210,7 @@ export default function ScreeningMatchesPage() {
                       </div>
                       {r.listEntryDelisted ? (
                         <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                          {isArabic
-                            ? "رُفع من القائمة المصدر — القرار قائم"
-                            : "No longer on the source list — decision stands"}
+                          {t('smNoLongerOnTheSource')}
                         </div>
                       ) : null}
                     </td>
@@ -256,9 +235,7 @@ export default function ScreeningMatchesPage() {
                             }
                             rows={2}
                             placeholder={
-                              isArabic
-                                ? "سبب القرار (١٠ أحرف على الأقل)"
-                                : "Reason for the decision (min. 10 characters)"
+                              t('smReasonForTheDecisionMin')
                             }
                             style={{ minWidth: "18rem" }}
                           />
@@ -271,9 +248,7 @@ export default function ScreeningMatchesPage() {
                               }
                               onClick={() => void decide(r.id, "cleared")}
                             >
-                              {isArabic
-                                ? "مطابقة خاطئة"
-                                : "Clear (false positive)"}
+                              {t('smClearFalsePositive')}
                             </button>
                             <button
                               type="button"
@@ -283,15 +258,13 @@ export default function ScreeningMatchesPage() {
                               }
                               onClick={() => void decide(r.id, "confirmed")}
                             >
-                              {isArabic ? "تأكيد المطابقة" : "Confirm match"}
+                              {t('smConfirmMatch')}
                             </button>
                           </div>
                         </div>
                       ) : (
                         <span style={{ opacity: 0.6 }}>
-                          {isArabic
-                            ? "مسؤول الامتثال فقط"
-                            : "Compliance Officer only"}
+                          {t('smComplianceOfficerOnly')}
                         </span>
                       )}
                     </td>
@@ -301,7 +274,12 @@ export default function ScreeningMatchesPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('smLoading')}</p>
+      )}
     </main>
   );
 }

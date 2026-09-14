@@ -19,14 +19,23 @@ import { LEADS } from './translations/leads';
 import { CUSTOMERS } from './translations/customers';
 import { RFQ } from './translations/rfq';
 import { POLICY } from './translations/policy';
+import { COMPLAINTS } from './translations/complaints';
+import { CUSTOMER_SERVICE } from './translations/customer-service';
+import { PDPL } from './translations/pdpl';
+import { FINANCE } from './translations/finance';
+import { COMPLIANCE_SCREENING } from './translations/compliance-screening';
+import { COMPLIANCE_RISK } from './translations/compliance-risk';
+import { DASHBOARDS } from './translations/dashboards';
+import { OPERATIONS } from './translations/operations';
+import { DETAIL_PAGES } from './translations/detail-pages';
 
 export type Language = 'AR' | 'EN';
 
 export const LANGUAGES: readonly Language[] = ['AR', 'EN'];
 
 const translations = {
-  AR: { ...COMMON.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR },
-  EN: { ...COMMON.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN },
+  AR: { ...COMMON.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR },
+  EN: { ...COMMON.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN },
 } as const;
 
 export type TranslationKey = keyof (typeof translations)['EN'];

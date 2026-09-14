@@ -14,6 +14,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 
 function pct(v: string): string {
@@ -35,6 +36,7 @@ const headCellStyle: CSSProperties = {
 export default function CommissionRatesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage =
     !!user &&
     hasPermission(user, 'commission-rate.manage');
@@ -67,21 +69,21 @@ export default function CommissionRatesPage() {
           ? "You don't hold the commission-rate.manage permission, so there's nothing to show here."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the commission rate table — try again.',
+            : t('crateLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -104,7 +106,7 @@ export default function CommissionRatesPage() {
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not open the rate window — try again.',
+          : t('crateOpenError'),
       );
     } finally {
       setBusy(false);
@@ -115,12 +117,9 @@ export default function CommissionRatesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Commission rates</h1>
+      <h1>{t('crateHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        The governed commission-rate table, by insurer and insurance line. A
-        rate change opens a new window and closes the prior one at the same
-        instant — only one window is ever open per pair. Finance applies these
-        rates to policies; Compliance and Managers alter the table.
+        {t('crateIntro')}
       </p>
 
       {canManage ? (
@@ -137,12 +136,12 @@ export default function CommissionRatesPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             Insurer
             <select
-              aria-label="Insurer"
+              aria-label={t('crateInsurerLabel')}
               value={insurerId}
               onChange={(e) => setInsurerId(e.target.value)}
               required
             >
-              <option value="">Select an insurer…</option>
+              <option value="">{t('crateSelectInsurer')}</option>
               {insurers.map((i) => (
                 <option key={i.id} value={i.id}>
                   {i.name}
@@ -153,17 +152,17 @@ export default function CommissionRatesPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             Insurance line
             <input
-              aria-label="Insurance line"
+              aria-label={t('crateLineLabel')}
               value={insuranceLine}
               onChange={(e) => setInsuranceLine(e.target.value)}
-              placeholder="Property All Risks"
+              placeholder={t('crateLinePlaceholder')}
               required
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            Rate %
+            {t('crateRateLabel')}
             <input
-              aria-label="Rate percent"
+              aria-label={t('crateRateAria')}
               value={ratePercent}
               onChange={(e) => setRatePercent(e.target.value)}
               placeholder="15"
@@ -172,9 +171,9 @@ export default function CommissionRatesPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            VAT %
+            {t('crateVatLabel')}
             <input
-              aria-label="VAT rate percent"
+              aria-label={t('crateVatAria')}
               value={vatRatePercent}
               onChange={(e) => setVatRatePercent(e.target.value)}
               placeholder="16"
@@ -185,13 +184,13 @@ export default function CommissionRatesPage() {
             Effective from
             <input
               type="date"
-              aria-label="Effective from"
+              aria-label={t('crateEffectiveFromLabel')}
               value={effectiveFrom}
               onChange={(e) => setEffectiveFrom(e.target.value)}
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Open rate window'}
+            {busy ? t('crateSavingButton') : t('crateOpenWindowButton')}
           </button>
         </form>
       ) : null}
@@ -209,19 +208,19 @@ export default function CommissionRatesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No commission agreements yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('crateNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '42rem' }}>
               <thead>
                 <tr>
-                  <th style={headCellStyle}>Insurer</th>
-                  <th style={headCellStyle}>Insurance line</th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>Rate</th>
-                  <th style={{ ...headCellStyle, textAlign: 'end' }}>VAT</th>
-                  <th style={headCellStyle}>Effective from</th>
-                  <th style={headCellStyle}>Effective to</th>
-                  <th style={headCellStyle}>Status</th>
+                  <th style={headCellStyle}>{t('crateInsurerLabel')}</th>
+                  <th style={headCellStyle}>{t('crateLineLabel')}</th>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>{t('crateColRate')}</th>
+                  <th style={{ ...headCellStyle, textAlign: 'end' }}>{t('crateColVat')}</th>
+                  <th style={headCellStyle}>{t('crateEffectiveFromLabel')}</th>
+                  <th style={headCellStyle}>{t('crateColEffectiveTo')}</th>
+                  <th style={headCellStyle}>{t('crateColStatus')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -244,7 +243,7 @@ export default function CommissionRatesPage() {
                       {r.effectiveTo ? r.effectiveTo.slice(0, 10) : '—'}
                     </td>
                     <td style={cellStyle}>
-                      {r.isOpen ? <strong>Open</strong> : 'Closed'}
+                      {r.isOpen ? <strong>{t('crateOpen')}</strong> : 'Closed'}
                     </td>
                   </tr>
                 ))}
@@ -253,7 +252,7 @@ export default function CommissionRatesPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('crateLoading')}</p>
       )}
     </main>
   );

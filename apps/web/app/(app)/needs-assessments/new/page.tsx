@@ -19,12 +19,14 @@ import {
 } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 // Client-side hint only — the backend enforces needs-assessment.create /
 // risk-profile.create on POST regardless (same convention as
 // leads/page.tsx's CAN_CREATE_LEAD_ROLES).
 
 function NewNeedsAssessmentFlow() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
@@ -55,20 +57,20 @@ function NewNeedsAssessmentFlow() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+          ? t('nanCustomerNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load risk profiles — try again.',
+            : t('nanLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     if (!customerId) return;
     void (async () => {
       await loadProfiles();
     })();
-  }, [customerId, loadProfiles]);
+  }, [customerId, loadProfiles, t]);
 
   async function handleCreateProfile(e: FormEvent) {
     e.preventDefault();
@@ -88,7 +90,7 @@ function NewNeedsAssessmentFlow() {
       setProfileError(
         err instanceof ApiError
           ? err.message
-          : 'Could not create the risk profile — try again.',
+          : t('nanCreateError'),
       );
     } finally {
       setCreatingProfile(false);
@@ -124,7 +126,7 @@ function NewNeedsAssessmentFlow() {
       ) : null}
 
       <section style={sectionStyle}>
-        <h2 style={{ marginTop: 0 }}>Risk profile</h2>
+        <h2 style={{ marginTop: 0 }}>{t('nanRiskProfileLabel')}</h2>
         <p style={{ opacity: 0.8 }}>
           Pick the location this assessment covers, or add one. The detailed asset survey
           and Sum Insured derivation live under{' '}
@@ -158,9 +160,9 @@ function NewNeedsAssessmentFlow() {
             </select>
           </div>
         ) : profiles ? (
-          <p style={{ opacity: 0.6 }}>No risk profile yet — add one below.</p>
+          <p style={{ opacity: 0.6 }}>{t('nanNoRiskProfile')}</p>
         ) : (
-          <p>Loading risk profiles…</p>
+          <p>{t('nanLoadingRiskProfiles')}</p>
         )}
 
         <form onSubmit={(e) => void handleCreateProfile(e)} style={{ marginTop: '1rem' }}>
@@ -172,7 +174,7 @@ function NewNeedsAssessmentFlow() {
             value={siteLabel}
             onChange={(e) => setSiteLabel(e.target.value)}
             style={inputStyle}
-            placeholder="e.g. Head office, Aqaba warehouse"
+            placeholder={t('nanSitePlaceholder')}
           />
           <label htmlFor="rp-claims" style={labelStyle}>
             Prior claims history summary (optional)
@@ -188,7 +190,7 @@ function NewNeedsAssessmentFlow() {
             disabled={creatingProfile}
             style={{ ...buttonStyle, width: 'auto' }}
           >
-            {creatingProfile ? 'Adding…' : 'Add risk profile'}
+            {creatingProfile ? t('nanAdding') : t('nanAddButton')}
           </button>
           {profileError ? (
             <p role="alert" style={errorStyle}>
@@ -214,12 +216,13 @@ function NewNeedsAssessmentFlow() {
 }
 
 export default function NewNeedsAssessmentPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
@@ -234,7 +237,7 @@ export default function NewNeedsAssessmentPage() {
       >
         ← All needs assessments
       </button>
-      <h1>New needs assessment</h1>
+      <h1>{t('nanHeading')}</h1>
       {canStart ? (
         <Suspense fallback={null}>
           <NewNeedsAssessmentFlow />

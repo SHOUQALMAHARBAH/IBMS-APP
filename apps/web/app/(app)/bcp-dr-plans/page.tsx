@@ -15,6 +15,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -32,6 +33,7 @@ function isOverdue(nextTestDueAt: string | null): boolean {
 }
 
 export default function BcpDrPlansPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -48,7 +50,7 @@ export default function BcpDrPlansPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -61,17 +63,17 @@ export default function BcpDrPlansPage() {
           ? "You don't hold the bcp-dr.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load BCP/DR plans — try again.',
+            : t('bcpLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -86,7 +88,7 @@ export default function BcpDrPlansPage() {
       setRpoHours('');
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not create the plan.');
+      setActionError(err instanceof ApiError ? err.message : t('bcpCreateError'));
     }
   }
 
@@ -102,7 +104,7 @@ export default function BcpDrPlansPage() {
       setTestingId(null);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not record the test.');
+      setActionError(err instanceof ApiError ? err.message : t('bcpRecordTestError'));
     }
   }
 
@@ -110,7 +112,7 @@ export default function BcpDrPlansPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Business Continuity &amp; Disaster Recovery</h1>
+      <h1>{t('bcpHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         A plan (with RTO/RPO and test history) for each of the five named
         scenarios: system outage, office/site loss, cyberattack/ransomware,
@@ -139,10 +141,10 @@ export default function BcpDrPlansPage() {
               <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>RTO (hrs)</th>
-                    <th style={head}>RPO (hrs)</th>
-                    <th style={head}>Last tested</th>
-                    <th style={head}>Next test due</th>
+                    <th style={head}>{t('bcpColRto')}</th>
+                    <th style={head}>{t('bcpColRpo')}</th>
+                    <th style={head}>{t('bcpColLastTested')}</th>
+                    <th style={head}>{t('bcpColNextTestDue')}</th>
                     <th style={head} />
                   </tr>
                 </thead>
@@ -190,7 +192,7 @@ export default function BcpDrPlansPage() {
           </section>
         ))
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('bcpLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>

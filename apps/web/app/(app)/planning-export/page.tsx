@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -23,16 +24,17 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 function BreakdownTable({ rows }: { rows: PlanningExportBreakdownRow[] }) {
+  const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ opacity: 0.6 }}>No issued policies yet.</p>;
+    return <p style={{ opacity: 0.6 }}>{t('pexNoPolicies')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
       <thead>
         <tr>
-          <th style={head}>Key</th>
-          <th style={head}>Policies</th>
-          <th style={head}>Total issued premium (JOD)</th>
+          <th style={head}>{t('dashColKey')}</th>
+          <th style={head}>{t('dashColPolicies')}</th>
+          <th style={head}>{t('dashTotalIssuedPremium')}</th>
         </tr>
       </thead>
       <tbody>
@@ -49,6 +51,7 @@ function BreakdownTable({ rows }: { rows: PlanningExportBreakdownRow[] }) {
 }
 
 export default function PlanningExportPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -59,7 +62,7 @@ export default function PlanningExportPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   async function onGenerate(e: FormEvent) {
     e.preventDefault();
@@ -74,7 +77,7 @@ export default function PlanningExportPage() {
           ? "You don't hold the planning-export.generate permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not generate the export — try again.',
+            : t('pexExportError'),
       );
     } finally {
       setIsGenerating(false);
@@ -85,20 +88,18 @@ export default function PlanningExportPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Strategic Planning Inputs</h1>
+      <h1>{t('pexHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Exports the current portfolio (by line, insurer, client segment, and
-        geography) plus one period&apos;s insurer performance scores, for
-        feeding into a planning cycle.
+        {t('pexIntro')}
       </p>
 
       <form onSubmit={onGenerate} style={formStyle}>
         <label style={labelStyle}>
-          Market period (optional)
+          {t('pexMarketPeriodLabel')}
           <input
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
-            placeholder="YYYY-MM"
+            placeholder={t('dashMonthPlaceholder')}
           />
         </label>
         <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
@@ -106,7 +107,7 @@ export default function PlanningExportPage() {
           Portfolio data is always the current book, regardless of period.
         </p>
         <button type="submit" disabled={isGenerating}>
-          {isGenerating ? 'Generating…' : 'Generate export'}
+          {isGenerating ? t('pexGeneratingButton') : t('pexGenerateButton')}
         </button>
       </form>
 
@@ -124,22 +125,22 @@ export default function PlanningExportPage() {
           </p>
 
           <section style={sectionStyle}>
-            <h2>Portfolio — by line</h2>
+            <h2>{t('pexPortfolioByLine')}</h2>
             <BreakdownTable rows={summary.portfolio.byLine} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>Portfolio — by insurer</h2>
+            <h2>{t('pexPortfolioByInsurer')}</h2>
             <BreakdownTable rows={summary.portfolio.byInsurer} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>Portfolio — by client segment</h2>
+            <h2>{t('pexPortfolioBySegment')}</h2>
             <BreakdownTable rows={summary.portfolio.byClientSegment} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>Portfolio — by geography (branch)</h2>
+            <h2>{t('pexPortfolioByGeography')}</h2>
             <BreakdownTable rows={summary.portfolio.byGeography} />
           </section>
 
@@ -147,17 +148,17 @@ export default function PlanningExportPage() {
             <h2>Market — insurer performance ({summary.periodLabel})</h2>
             {summary.market.length === 0 ? (
               <p style={{ opacity: 0.6 }}>
-                No insurer performance scores for this period yet.
+                {t('pexNoInsurerScores')}
               </p>
             ) : (
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Insurer ID</th>
-                    <th style={head}>Quote response</th>
-                    <th style={head}>Claims service</th>
-                    <th style={head}>Price</th>
-                    <th style={head}>Service quality</th>
+                    <th style={head}>{t('diepColInsurerId')}</th>
+                    <th style={head}>{t('diepQuoteResponse')}</th>
+                    <th style={head}>{t('diepClaimsService')}</th>
+                    <th style={head}>{t('diepPrice')}</th>
+                    <th style={head}>{t('diepServiceQuality')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -175,7 +176,9 @@ export default function PlanningExportPage() {
             )}
           </section>
         </>
-      ) : null}
+      ) : error ? null : (
+        <p>{t('pexLoading')}</p>
+      )}
     </main>
   );
 }

@@ -92,7 +92,16 @@ test("lists complaints with SLA + escalation state and the log form", async ({
       name: "The settlement was 200 JOD below the assessed amount",
     }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "ESCALATED" })).toBeVisible();
+  // The status column now renders a label, not the raw enum token
+  // (directive §2). Asserting "Escalated" rather than "ESCALATED" is the
+  // point of the change, not an accommodation to it.
+  await expect(page.getByRole("cell", { name: "Escalated" })).toBeVisible();
+  // `exact` matters: getByRole name matching is case-INSENSITIVE by default,
+  // so a bare "ESCALATED" would still match the "Escalated" label and this
+  // assertion would prove nothing.
+  await expect(
+    page.getByRole("cell", { name: "ESCALATED", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Category")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Log complaint" }),

@@ -126,7 +126,7 @@ export default function RfqDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -134,7 +134,7 @@ export default function RfqDetailPage() {
       await load();
       await loadComms();
     })();
-  }, [user, load, loadComms]);
+  }, [user, load, loadComms, t]);
 
   async function changeStatus(submissionId: string, toStatus: RfqInsurerStatus) {
     setRowError(null);

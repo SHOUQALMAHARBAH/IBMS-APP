@@ -20,6 +20,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 
 const cell: CSSProperties = {
@@ -48,6 +49,7 @@ const labelStyle: CSSProperties = {
 export default function RegulatoryCompliancePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage = hasPermission(user, 'license.manage');
 
   const [license, setLicense] = useState<BrokerLicense | null>(null);
@@ -78,13 +80,13 @@ export default function RegulatoryCompliancePage() {
         err instanceof ApiError && err.status === 403
           ? "You don't hold the license.manage permission."
           : err instanceof ApiError && err.status === 404
-            ? 'No broker license record exists yet.'
+            ? t('rcNoLicense')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load the broker license — try again.',
+              : t('rcLicenseLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   const loadItems = useCallback(async () => {
     try {
@@ -97,21 +99,21 @@ export default function RegulatoryCompliancePage() {
           ? "You don't hold the compliance-calendar.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the compliance calendar — try again.',
+            : t('rcCalendarLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadLicense();
       await loadItems();
     })();
-  }, [user, loadLicense, loadItems]);
+  }, [user, loadLicense, loadItems, t]);
   // A @code-reviewer MINOR: renew() replaces every field, so pre-filling
   // the form from the current record (rather than starting blank) stops an
   // officer who only means to push out expiresAt from silently wiping a
@@ -138,7 +140,7 @@ export default function RegulatoryCompliancePage() {
       await loadItems();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('rcActionError'),
       );
     } finally {
       setBusy(false);
@@ -180,15 +182,12 @@ export default function RegulatoryCompliancePage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Regulatory compliance</h1>
+      <h1>{t('rcHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The broker&apos;s own CBJ license status — new business is
-        automatically blocked once it lapses — plus a calendar of regulatory
-        obligations with owner, due date, and evidence-of-submission
-        tracking.
+        {t('rcIntro')}
       </p>
 
-      <h2>Broker license</h2>
+      <h2>{t('rcLicenseHeading')}</h2>
       {licenseLoadError ? (
         <p role="alert" style={errorStyle}>
           {licenseLoadError}
@@ -199,18 +198,18 @@ export default function RegulatoryCompliancePage() {
           <table style={{ borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
-                <td style={cell}>License number</td>
+                <td style={cell}>{t('rcLicenseNumberLabel')}</td>
                 <td style={cell}>{license.licenseNumber}</td>
               </tr>
               <tr>
-                <td style={cell}>Status</td>
+                <td style={cell}>{t('rcColStatus')}</td>
                 <td style={cell}>
                   {license.status}
                   {license.isCurrentlyLapsed ? ' (currently lapsed)' : ''}
                 </td>
               </tr>
               <tr>
-                <td style={cell}>Expires</td>
+                <td style={cell}>{t('rcExpires')}</td>
                 <td style={cell}>{license.expiresAt.slice(0, 10)}</td>
               </tr>
             </tbody>
@@ -222,7 +221,7 @@ export default function RegulatoryCompliancePage() {
               onClick={() => void run(() => markBrokerLicenseLapsed())}
               style={{ marginTop: '0.5rem' }}
             >
-              Mark lapsed
+              {t('rcMarkLapsedButton')}
             </button>
           ) : null}
         </div>
@@ -233,7 +232,7 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             License number
             <input
-              aria-label="License number"
+              aria-label={t('rcLicenseNumberLabel')}
               value={licenseNumber}
               onChange={(e) => setLicenseNumber(e.target.value)}
               required
@@ -242,7 +241,7 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             Scope of authorization
             <input
-              aria-label="Scope of authorization"
+              aria-label={t('rcScopeLabel')}
               value={scopeOfAuthorization}
               onChange={(e) => setScopeOfAuthorization(e.target.value)}
             />
@@ -250,7 +249,7 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             Issued at
             <input
-              aria-label="Issued at"
+              aria-label={t('rcIssuedAtLabel')}
               type="date"
               value={issuedAt}
               onChange={(e) => setIssuedAt(e.target.value)}
@@ -259,7 +258,7 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             Expires at
             <input
-              aria-label="Expires at"
+              aria-label={t('rcExpiresAtLabel')}
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
@@ -267,18 +266,18 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : license ? 'Renew license' : 'Create license'}
+            {busy ? t('rcSavingButton') : license ? t('rcRenewButton') : t('rcCreateButton')}
           </button>
         </form>
       ) : null}
 
-      <h2 style={{ marginTop: '2rem' }}>Compliance calendar</h2>
+      <h2 style={{ marginTop: '2rem' }}>{t('rcCalendarHeading')}</h2>
       {canManage ? (
         <form onSubmit={submitItem} style={formStyle}>
           <label style={labelStyle}>
             Obligation
             <input
-              aria-label="Obligation"
+              aria-label={t('rcObligationLabel')}
               value={obligationName}
               onChange={(e) => setObligationName(e.target.value)}
               required
@@ -287,7 +286,7 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             Owner user ID
             <input
-              aria-label="Owner user ID"
+              aria-label={t('rcOwnerUserIdLabel')}
               value={ownerUserId}
               onChange={(e) => setOwnerUserId(e.target.value)}
               required
@@ -296,7 +295,7 @@ export default function RegulatoryCompliancePage() {
           <label style={labelStyle}>
             Due date
             <input
-              aria-label="Due date"
+              aria-label={t('rcDueDateLabel')}
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
@@ -304,7 +303,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : 'Add obligation'}
+            {busy ? 'Saving…' : t('rcAddObligationButton')}
           </button>
         </form>
       ) : null}
@@ -322,17 +321,17 @@ export default function RegulatoryCompliancePage() {
 
       {items ? (
         items.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No compliance calendar items.</p>
+          <p style={{ opacity: 0.6 }}>{t('rcNoCalendarItems')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Obligation</th>
-                  <th style={head}>Due</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>Evidence</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('rcObligationLabel')}</th>
+                  <th style={head}>{t('rcColDue')}</th>
+                  <th style={head}>{t('rcColStatus')}</th>
+                  <th style={head}>{t('rcColEvidence')}</th>
+                  <th style={head}>{t('rcColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -359,7 +358,7 @@ export default function RegulatoryCompliancePage() {
                                 [it.id]: e.target.value,
                               }))
                             }
-                            placeholder="Evidence ref"
+                            placeholder={t('rcEvidenceRefLabel')}
                             style={{ width: '9rem' }}
                           />
                           <button
@@ -374,7 +373,7 @@ export default function RegulatoryCompliancePage() {
                               )
                             }
                           >
-                            Record submission
+                            {t('rcRecordSubmissionButton')}
                           </button>
                         </div>
                       ) : null}
@@ -385,7 +384,12 @@ export default function RegulatoryCompliancePage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : itemsLoadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('rcLoading')}</p>
+      )}
     </main>
   );
 }

@@ -14,6 +14,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const ROLES = [
   'privacy-notice.publish',
@@ -31,6 +32,7 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 export default function PrivacyNoticesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage = hasAnyPermission(user, ROLES);
 
   const [rows, setRows] = useState<PrivacyNotice[] | null>(null);
@@ -51,20 +53,20 @@ export default function PrivacyNoticesPage() {
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : 'Could not load privacy notices — try again.',
+          : t('pnLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -74,7 +76,7 @@ export default function PrivacyNoticesPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('pnActionError'),
       );
     } finally {
       setBusy(false);
@@ -94,11 +96,9 @@ export default function PrivacyNoticesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Notices</h1>
+      <h1>{t('pnHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Bilingual, version-controlled privacy notice text for each
-        touchpoint. Publishing IS the act — there is no draft state, and
-        each publish for a touchpoint is a new, immutable version.
+        {t('pnIntro')}
       </p>
 
       {actionError ? (
@@ -120,7 +120,7 @@ export default function PrivacyNoticesPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             Touchpoint
             <select
-              aria-label="Touchpoint"
+              aria-label={t('pnTouchpointLabel')}
               value={touchpoint}
               onChange={(e) => setTouchpoint(e.target.value)}
             >
@@ -132,9 +132,9 @@ export default function PrivacyNoticesPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Text (English)
+            {t('pnTextEnLabel')}
             <textarea
-              aria-label="Notice text (English)"
+              aria-label={t('pnTextEnLabel')}
               value={textEn}
               onChange={(e) => setTextEn(e.target.value)}
               required
@@ -143,9 +143,9 @@ export default function PrivacyNoticesPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Text (Arabic)
+            {t('pnTextArLabel')}
             <textarea
-              aria-label="Notice text (Arabic)"
+              aria-label={t('pnTextArLabel')}
               dir="rtl"
               value={textAr}
               onChange={(e) => setTextAr(e.target.value)}
@@ -155,24 +155,24 @@ export default function PrivacyNoticesPage() {
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Publishing…' : 'Publish new version'}
+            {busy ? t('pnPublishingButton') : t('pnPublishButton')}
           </button>
         </form>
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No privacy notices published yet.</p>
+          <p style={{ opacity: 0.6 }}>{t('pnNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Touchpoint</th>
-                  <th style={head}>Version</th>
-                  <th style={head}>Published</th>
-                  <th style={head}>Legally reviewed</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('pnTouchpointLabel')}</th>
+                  <th style={head}>{t('pnColVersion')}</th>
+                  <th style={head}>{t('pnColPublished')}</th>
+                  <th style={head}>{t('pnColLegallyReviewed')}</th>
+                  <th style={head}>{t('pnColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,7 +189,7 @@ export default function PrivacyNoticesPage() {
                           disabled={busy}
                           onClick={() => void run(() => recordPrivacyNoticeLegalReview(n.id))}
                         >
-                          Record legal review
+                          {t('pnRecordLegalReviewButton')}
                         </button>
                       ) : (
                         '—'
@@ -202,7 +202,7 @@ export default function PrivacyNoticesPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('pnLoading')}</p>
       )}
     </main>
   );

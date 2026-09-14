@@ -38,6 +38,7 @@ const headCellStyle: CSSProperties = {
 export default function InsurerAccountingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
@@ -55,41 +56,38 @@ export default function InsurerAccountingPage() {
           ? "You don't hold the insurer-accounting.read permission, so there's nothing to show here."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the payables report — try again.',
+            : t('iaLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load(asOf);
     })();
-  }, [user, asOf, load]);
+  }, [user, asOf, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Insurer accounting</h1>
+      <h1>{t('iaHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        What the broker owes each insurer — the net premium (premium less
-        commission) that has been collected from the client but not yet remitted
-        — alongside the amount remitted to date. Rows are ordered worst-first
-        (the oldest unremitted obligation first).
+        {t('iaIntro')}
       </p>
 
       <label
         style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
       >
-        As of
+        {t('iaAsOf')}
         <input
           type="date"
-          aria-label="As of date"
+          aria-label={t('iaAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
@@ -105,19 +103,19 @@ export default function InsurerAccountingPage() {
       {data ? (
         data.rows.length === 0 ? (
           <p style={{ opacity: 0.6 }}>
-            Nothing owed to or remitted from any insurer yet.
+            {t('iaNone')}
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Insurer</th>
-                  <th style={headCellStyle}>Outstanding</th>
-                  <th style={headCellStyle}>Invoices</th>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Oldest</th>
-                  <th style={headCellStyle}>Remitted to date</th>
-                  <th style={headCellStyle}>Remittances</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('iaColInsurer')}</th>
+                  <th style={headCellStyle}>{t('iaColOutstanding')}</th>
+                  <th style={headCellStyle}>{t('iaColInvoices')}</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('iaColOldest')}</th>
+                  <th style={headCellStyle}>{t('iaColRemittedToDate')}</th>
+                  <th style={headCellStyle}>{t('iaColRemittances')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +137,7 @@ export default function InsurerAccountingPage() {
                   <td
                     style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
                   >
-                    Total
+                    {t('iaColTotal')}
                   </td>
                   <td style={{ ...cellStyle, fontWeight: 600 }}>
                     {formatMoney(data.totals.outstandingAmount, language)}
@@ -160,7 +158,7 @@ export default function InsurerAccountingPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('iaLoading')}</p>
       )}
     </main>
   );

@@ -17,6 +17,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -28,6 +29,7 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function DocumentsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -47,7 +49,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async (pid: string) => {
     try {
@@ -60,10 +62,10 @@ export default function DocumentsPage() {
           ? "You don't hold the document.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load documents — try again.',
+            : t('docLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   async function onLookup(e: FormEvent) {
     e.preventDefault();
@@ -89,7 +91,7 @@ export default function DocumentsPage() {
       setVersioningId(null);
       await load(policyId);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not create a new version.');
+      setActionError(err instanceof ApiError ? err.message : t('docVersionError'));
     }
   }
 
@@ -102,7 +104,7 @@ export default function DocumentsPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : "Could not unlock — you may not hold document.delete-override.",
+          : t('docUnlockError'),
       );
     }
   }
@@ -113,7 +115,7 @@ export default function DocumentsPage() {
       await deleteDocument(id);
       await load(policyId);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not delete the document.');
+      setActionError(err instanceof ApiError ? err.message : t('docDeleteError'));
     }
   }
 
@@ -127,10 +129,10 @@ export default function DocumentsPage() {
     } catch (err) {
       setSummaryError(
         err instanceof ApiError && err.status === 404
-          ? 'Policy not found.'
+          ? t('docPolicyNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not compute the classification summary.',
+            : t('docComputeError'),
       );
     }
   }
@@ -139,7 +141,7 @@ export default function DocumentsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Documents</h1>
+      <h1>{t('docHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
         The Part 4.2 electronic Insurance File — version control and the
         deletion lock override for one policy&apos;s documents.
@@ -150,7 +152,7 @@ export default function DocumentsPage() {
           Policy ID
           <input value={policyId} onChange={(e) => setPolicyId(e.target.value)} required />
         </label>
-        <button type="submit">Look up documents</button>
+        <button type="submit">{t('docLookUp')}</button>
       </form>
 
       {loadError ? (
@@ -166,16 +168,16 @@ export default function DocumentsPage() {
 
       {documents ? (
         documents.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No documents recorded for this policy.</p>
+          <p style={{ opacity: 0.6 }}>{t('docNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
             <thead>
               <tr>
-                <th style={head}>File</th>
-                <th style={head}>Category</th>
-                <th style={head}>Classification</th>
-                <th style={head}>Version</th>
-                <th style={head}>Deletion</th>
+                <th style={head}>{t('docColFile')}</th>
+                <th style={head}>{t('docColCategory')}</th>
+                <th style={head}>{t('docColClassification')}</th>
+                <th style={head}>{t('docColVersion')}</th>
+                <th style={head}>{t('docColDeletion')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -186,7 +188,7 @@ export default function DocumentsPage() {
                   <td style={cell}>{doc.category}</td>
                   <td style={cell}>{doc.classification}</td>
                   <td style={cell}>{doc.versionNumber}</td>
-                  <td style={cell}>{doc.deletionLocked ? 'Locked' : 'Unlocked'}</td>
+                  <td style={cell}>{doc.deletionLocked ? 'Locked' : t('docUnlocked')}</td>
                   <td style={cell}>
                     {versioningId === doc.id ? null : (
                       <button type="button" onClick={() => startVersion(doc)}>
@@ -245,7 +247,7 @@ export default function DocumentsPage() {
             </select>
           </label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit">Save version</button>
+            <button type="submit">{t('docSaveVersionButton')}</button>
             <button type="button" onClick={() => setVersioningId(null)}>
               Cancel
             </button>
@@ -254,7 +256,7 @@ export default function DocumentsPage() {
       ) : null}
 
       <form onSubmit={onLookupSummary} style={formStyle}>
-        <h2>Policy file classification</h2>
+        <h2>{t('docPolicyClassification')}</h2>
         <p style={{ opacity: 0.75 }}>
           The highest classification present across a policy&apos;s electronic
           file — never averaged.
@@ -263,7 +265,7 @@ export default function DocumentsPage() {
           Policy ID
           <input value={summaryPolicyId} onChange={(e) => setSummaryPolicyId(e.target.value)} required />
         </label>
-        <button type="submit">Compute</button>
+        <button type="submit">{t('docComputeButton')}</button>
         {summaryError ? (
           <p role="alert" style={errorStyle}>
             {summaryError}
@@ -274,7 +276,9 @@ export default function DocumentsPage() {
             {summary.documentCount} document(s) — highest classification:{' '}
             <strong>{summary.highestClassification ?? 'none'}</strong>
           </p>
-        ) : null}
+        ) : loadError ? null : (
+        <p>{t('docLoading')}</p>
+      )}
       </form>
     </main>
   );

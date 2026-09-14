@@ -23,6 +23,7 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -33,6 +34,7 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 export default function VendorDetailPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const params = useParams<{ id: string }>();
@@ -48,7 +50,7 @@ export default function VendorDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -63,10 +65,10 @@ export default function VendorDetailPage() {
           ? "You don't hold the vendor.manage permission."
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this vendor — try again.',
+            : t('vendLoadError'),
       );
     }
-  }, [vendorId]);
+  }, [vendorId, t]);
 
   const loadDpas = useCallback(async () => {
     try {
@@ -82,14 +84,14 @@ export default function VendorDetailPage() {
       await load();
       await loadDpas();
     })();
-  }, [user, load, loadDpas]);
+  }, [user, load, loadDpas, t]);
 
   async function onSetRiskTier() {
     setActionError(null);
     try {
       setVendor(await setVendorRiskTier(vendorId, riskTier));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not set the risk tier.');
+      setActionError(err instanceof ApiError ? err.message : t('vendTierError'));
     }
   }
 
@@ -98,7 +100,7 @@ export default function VendorDetailPage() {
     try {
       setVendor(await recordVendorAnnualReview(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not record the annual review.');
+      setActionError(err instanceof ApiError ? err.message : t('vendReviewError'));
     }
   }
 
@@ -107,7 +109,7 @@ export default function VendorDetailPage() {
     try {
       setVendor(await terminateVendor(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not terminate this vendor.');
+      setActionError(err instanceof ApiError ? err.message : t('vendTerminateError'));
     }
   }
 
@@ -116,7 +118,7 @@ export default function VendorDetailPage() {
     try {
       setVendor(await revokeVendorAccess(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not revoke access.');
+      setActionError(err instanceof ApiError ? err.message : t('vendRevokeError'));
     }
   }
 
@@ -125,7 +127,7 @@ export default function VendorDetailPage() {
     try {
       setReadiness(await getVendorDataShareReadiness(vendorId));
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not compute readiness.');
+      setActionError(err instanceof ApiError ? err.message : t('vendReadinessError'));
     }
   }
 
@@ -135,7 +137,7 @@ export default function VendorDetailPage() {
       await createVendorDpa(vendorId);
       await loadDpas();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not create a Data Processing Agreement.');
+      setActionError(err instanceof ApiError ? err.message : t('vendDpaCreateError'));
     }
   }
 
@@ -145,7 +147,7 @@ export default function VendorDetailPage() {
       await signDpa(id);
       await loadDpas();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not sign the agreement.');
+      setActionError(err instanceof ApiError ? err.message : t('vendDpaSignError'));
     }
   }
 
@@ -158,7 +160,7 @@ export default function VendorDetailPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : "Could not record DPO approval — you may not hold dpa.approve.",
+          : t('vendDpaApproveError'),
       );
     }
   }
@@ -167,7 +169,7 @@ export default function VendorDetailPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Vendor</h1>
+      <h1>{t('vendHeading')}</h1>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -211,7 +213,7 @@ export default function VendorDetailPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Risk tiering</h2>
+            <h2>{t('vendRiskTiering')}</h2>
             <label>
               Risk tier
               <select
@@ -234,14 +236,14 @@ export default function VendorDetailPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Data-share readiness</h2>
+            <h2>{t('vendDataShareReadiness')}</h2>
             <button type="button" onClick={onCheckReadiness}>
               Check readiness
             </button>
             {readiness ? (
               <p>
                 {readiness.ready ? (
-                  'Ready for a data share or access grant.'
+                  t('vendReady')
                 ) : (
                   <>
                     Not ready: {readiness.reasons.join(' ')}
@@ -252,7 +254,7 @@ export default function VendorDetailPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Data Processing Agreements</h2>
+            <h2>{t('vendDpaHeading')}</h2>
             <button type="button" onClick={onCreateDpa}>
               Create a new DPA
             </button>
@@ -260,8 +262,8 @@ export default function VendorDetailPage() {
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem', marginTop: '0.5rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Signed</th>
-                    <th style={head}>DPO approved</th>
+                    <th style={head}>{t('vendColSigned')}</th>
+                    <th style={head}>{t('vendColDpoApproved')}</th>
                     <th style={head} />
                   </tr>
                 </thead>
@@ -287,12 +289,12 @@ export default function VendorDetailPage() {
                 </tbody>
               </table>
             ) : (
-              <p style={{ opacity: 0.6 }}>No Data Processing Agreements on file.</p>
+              <p style={{ opacity: 0.6 }}>{t('vendNoDpas')}</p>
             )}
           </section>
 
           <section style={sectionStyle}>
-            <h2>Termination</h2>
+            <h2>{t('vendTermination')}</h2>
             <button type="button" onClick={onTerminate}>
               Terminate (confirm data return/destruction)
             </button>{' '}
@@ -302,7 +304,7 @@ export default function VendorDetailPage() {
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('vendLoading')}</p>
       )}
     </main>
   );
