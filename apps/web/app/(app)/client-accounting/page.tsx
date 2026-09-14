@@ -51,7 +51,7 @@ export default function ClientAccountingPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the client-accounting.read permission, so there's nothing to show here."
+          ? t('caNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('caLoadError'),

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useLanguage } from '../../../lib/i18n/language-context';
 import Link from 'next/link';
 import { forgotPassword } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
@@ -16,6 +17,7 @@ import {
 } from '../../../components/auth/auth-form.styles';
 
 export default function ForgotPasswordPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function ForgotPasswordPage() {
       setMessage(res.message);
       setDevResetLink(res.devResetToken ? `/reset-password?token=${encodeURIComponent(res.devResetToken)}` : null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong — try again.');
+      setError(err instanceof ApiError ? err.message : t('authGenericError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -43,21 +45,21 @@ export default function ForgotPasswordPage() {
   return (
     <main style={pageStyle}>
       <div style={cardStyle}>
-        <h1 style={{ marginTop: 0 }}>Forgot password</h1>
+        <h1 style={{ marginTop: 0 }}>{t('authForgotHeading')}</h1>
         {message ? (
           <>
             <p style={successStyle}>{message}</p>
             {devResetLink ? (
               <p style={{ fontSize: '0.85rem' }}>
-                Dev mode — no email provider configured yet:{' '}
-                <Link href={devResetLink}>continue to reset password</Link>
+                {t('authDevModeNotice')}{' '}
+                <Link href={devResetLink}>{t('authDevModeLink')}</Link>
               </p>
             ) : null}
           </>
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)}>
             <label htmlFor="email" style={labelStyle}>
-              Email
+              {t('authEmailLabel')}
             </label>
             <input
               id="email"
@@ -75,12 +77,12 @@ export default function ForgotPasswordPage() {
               </p>
             ) : null}
             <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-              {isSubmitting ? 'Sending…' : 'Send reset link'}
+              {isSubmitting ? t('authSending') : t('authSendResetLinkButton')}
             </button>
           </form>
         )}
         <p style={helperLinkStyle}>
-          <Link href="/login">Back to sign in</Link>
+          <Link href="/login">{t('authBackToSignIn')}</Link>
         </p>
       </div>
     </main>

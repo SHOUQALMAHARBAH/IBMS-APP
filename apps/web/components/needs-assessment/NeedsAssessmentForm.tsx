@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import {
   createNeedsAssessment,
   getQuestionnaire,
@@ -43,6 +44,7 @@ export function NeedsAssessmentForm({
   initialAnswers,
   onSaved,
 }: NeedsAssessmentFormProps) {
+  const { t } = useLanguage();
   const [questions, setQuestions] = useState<NeedsAssessmentQuestion[] | null>(null);
   const [answers, setAnswers] = useState<Answers>(initialAnswers ?? {});
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +62,11 @@ export function NeedsAssessmentForm({
         setError(
           err instanceof ApiError
             ? err.message
-            : 'Could not load the questionnaire — try again.',
+            : t('nadQuestionnaireLoadError'),
         );
       }
     })();
-  }, []);
+  }, [t]);
 
   function setAnswer(id: string, value: boolean | number) {
     setAnswers((current) => ({ ...current, [id]: value }));
@@ -87,18 +89,18 @@ export function NeedsAssessmentForm({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not save the needs assessment — try again.',
+          : t('nadSaveError'),
       );
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  if (!questions && !error) return <p>Loading questionnaire…</p>;
+  if (!questions && !error) return <p>{t('nadLoadingQuestionnaire')}</p>;
 
   return (
     <section style={sectionStyle}>
-      <h2 style={{ marginTop: 0 }}>Risk questionnaire</h2>
+      <h2 style={{ marginTop: 0 }}>{t('nadRiskQuestionnaire')}</h2>
       <form onSubmit={(e) => void handleSubmit(e)}>
         {(questions ?? []).map((q) => {
           const value = answers[q.id];
@@ -130,7 +132,7 @@ export function NeedsAssessmentForm({
                     checked={value === true}
                     onChange={() => setAnswer(q.id, true)}
                   />
-                  Yes
+                  {t('commonYes')}
                 </label>
                 <label style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                   <input
@@ -138,9 +140,7 @@ export function NeedsAssessmentForm({
                     name={`q-${q.id}`}
                     checked={value === false}
                     onChange={() => setAnswer(q.id, false)}
-                  />
-                  No
-                </label>
+                  />{t('commonNo')}</label>
               </div>
             </fieldset>
           );
@@ -148,7 +148,7 @@ export function NeedsAssessmentForm({
 
         <button type="submit" disabled={isSubmitting || !questions} style={buttonStyle}>
           {isSubmitting
-            ? 'Saving…'
+            ? t('usrSaving')
             : mode === 'create'
               ? 'Save draft & see recommended cover'
               : 'Save questionnaire'}

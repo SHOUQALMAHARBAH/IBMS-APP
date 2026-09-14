@@ -104,7 +104,7 @@ export function FinanceSection({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Could not generate the invoice — try again.",
+          : t('polFinInvoiceError'),
       );
     }
   }
@@ -234,7 +234,7 @@ export function FinanceSection({
             onClick={() => void downloadDocument(invoice.id)}
             style={{ ...buttonStyle, width: "auto", marginTop: "0.4rem" }}
           >
-            Download invoice (PDF)
+            {t('policyDownloadInvoiceButton')}
           </button>
         </div>
       ) : (

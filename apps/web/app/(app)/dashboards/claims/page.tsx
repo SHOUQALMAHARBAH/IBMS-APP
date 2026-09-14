@@ -86,7 +86,7 @@ export default function ClaimsDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dashboard.claims.view permission."
+          ? t('dclmNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('dclmLoadError'),

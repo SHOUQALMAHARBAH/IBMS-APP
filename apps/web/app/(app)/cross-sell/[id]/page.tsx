@@ -202,7 +202,7 @@ export default function CrossSellOpportunityDetailPage() {
                       )
                     }
                   >
-                    Confirm dismiss
+                    {t('xsConfirmDismiss')}
                   </button>
                   <button
                     type="button"

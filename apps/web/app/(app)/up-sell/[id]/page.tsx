@@ -134,7 +134,7 @@ export default function UpSellRecommendationDetailPage() {
           <div style={upSellFigureRowStyle}>
             <div>
               <div style={profileFieldLabelStyle}>
-                Designed Sum Insured (JOD)
+                {t('upsDesignedSumInsured')}
               </div>
               <div style={profileFieldValueStyle}>
                 {recommendation.currentSumInsured}
@@ -142,7 +142,7 @@ export default function UpSellRecommendationDetailPage() {
             </div>
             <div>
               <div style={profileFieldLabelStyle}>
-                Current asset value (JOD)
+                {t('upsCurrentAssetValue')}
               </div>
               <div style={profileFieldValueStyle}>
                 {recommendation.currentAssetValue}
@@ -221,7 +221,7 @@ export default function UpSellRecommendationDetailPage() {
                       )
                     }
                   >
-                    Confirm dismiss
+                    {t('upsConfirmDismiss')}
                   </button>
                   <button
                     type="button"

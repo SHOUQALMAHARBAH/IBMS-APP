@@ -90,7 +90,7 @@ function OpportunityRow({
           {dismissing ? (
             <>
               <label htmlFor={`reason-${opportunity.id}`} style={cardMetaStyle}>
-                Why is this gap not being pursued?
+                {t('xsWhyNotPursued')}
               </label>
               <input
                 id={`reason-${opportunity.id}`}
@@ -111,7 +111,7 @@ function OpportunityRow({
                   )
                 }
               >
-                Confirm dismiss
+                {t('xsConfirmDismiss')}
               </button>
               <button
                 type="button"
@@ -164,7 +164,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the cross-sell.read permission, so there's nothing to show here."
+          ? t('xsNoPermission')
           : err instanceof ApiError && err.status === 404
             ? t('xsCustomerNotFound')
             : err instanceof ApiError
@@ -190,7 +190,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the cross-sell.detect permission."
+          ? t('xsNoPermissionDetect')
           : err instanceof ApiError
             ? err.message
             : t('xsScanError'),
@@ -253,9 +253,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
 
       {opportunities.length === 0 ? (
         <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          No cross-sell opportunities for this customer. The nightly scan flags
-          a gap when the customer holds an in-force policy but is missing a
-          benchmark line.
+          {t('xsNoOpportunities')}
         </p>
       ) : (
         <div style={{ marginTop: '1rem' }}>

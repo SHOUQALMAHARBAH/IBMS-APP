@@ -70,7 +70,7 @@ export default function InsurerPerformancePage() {
       setHistory(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the insurer-performance.view permission."
+          ? t('ipNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('ipLoadError'),
@@ -179,9 +179,7 @@ export default function InsurerPerformancePage() {
       <form onSubmit={onCompute} style={formStyle}>
         <h2>{t('ipComputeNow')}</h2>
         <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
-          Uses the Insurer ID above. Leave the period fields blank to score
-          the UTC calendar month that just ended (what the monthly job
-          itself does).
+          {t('ipComputeNote')}
         </p>
         <label style={labelStyle}>
           {t('ipPeriodOptionalLabel')}

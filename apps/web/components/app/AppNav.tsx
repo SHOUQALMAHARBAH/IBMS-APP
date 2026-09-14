@@ -276,7 +276,7 @@ export function AppNav() {
   }
 
   return (
-    <nav aria-label="Primary" style={sidebarStyle}>
+    <nav aria-label={t('navPrimaryAria')} style={sidebarStyle}>
       <Link href="/" style={brandStyle}>
         IBMS
       </Link>

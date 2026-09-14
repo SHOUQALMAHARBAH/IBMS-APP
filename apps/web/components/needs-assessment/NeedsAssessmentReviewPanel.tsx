@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import {
   approveNeedsAssessment,
   rejectNeedsAssessment,
@@ -27,6 +28,7 @@ export function NeedsAssessmentReviewPanel({
   assessment,
   onChanged,
 }: NeedsAssessmentReviewPanelProps) {
+  const { t } = useLanguage();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function NeedsAssessmentReviewPanel({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not complete that action — try again.',
+          : t('nadActionError'),
       );
     } finally {
       setBusy(null);
@@ -51,12 +53,12 @@ export function NeedsAssessmentReviewPanel({
   const needsReason = reason.trim().length === 0;
 
   return (
-    <section style={reviewPanelStyle} aria-label="Review and approval">
-      <h2 style={{ marginTop: 0 }}>Review &amp; approval</h2>
+    <section style={reviewPanelStyle} aria-label={t('nadReviewPanelHeading')}>
+      <h2 style={{ marginTop: 0 }}>{t('nadReviewApprovalHeading')}</h2>
       <p style={{ opacity: 0.8 }}>
         {assessment.status === 'PENDING_REVIEW'
-          ? 'Record your review of the recommended cover, then approve or reject it. It cannot be linked to an opportunity or RFQ until approved.'
-          : 'This assessment has been reviewed. Approve it to release it, or send it back for changes.'}
+          ? t('nadPendingReviewNote')
+          : t('nadReviewedNote')}
       </p>
 
       <div style={reviewActionsStyle}>
@@ -69,7 +71,7 @@ export function NeedsAssessmentReviewPanel({
               void run('review', () => reviewNeedsAssessment(assessment.id))
             }
           >
-            {busy === 'review' ? 'Recording…' : 'Mark reviewed'}
+            {busy === 'review' ? t('nadRecording') : 'Mark reviewed'}
           </button>
         ) : null}
         {assessment.status === 'REVIEWED' ? (
@@ -81,14 +83,12 @@ export function NeedsAssessmentReviewPanel({
               void run('approve', () => approveNeedsAssessment(assessment.id))
             }
           >
-            {busy === 'approve' ? 'Approving…' : 'Approve'}
+            {busy === 'approve' ? t('nadApproving') : t('kycQueueApproveButton')}
           </button>
         ) : null}
       </div>
 
-      <label htmlFor="na-review-reason" style={labelStyle}>
-        Reason (required to return for changes or reject)
-      </label>
+      <label htmlFor="na-review-reason" style={labelStyle}>{t('nadReviewReasonLabel')}</label>
       <input
         id="na-review-reason"
         value={reason}
@@ -107,7 +107,7 @@ export function NeedsAssessmentReviewPanel({
             )
           }
         >
-          {busy === 'return' ? 'Returning…' : 'Return for changes'}
+          {busy === 'return' ? t('nadReturning') : 'Return for changes'}
         </button>
         <button
           type="button"
@@ -119,7 +119,7 @@ export function NeedsAssessmentReviewPanel({
             )
           }
         >
-          {busy === 'reject' ? 'Rejecting…' : 'Reject'}
+          {busy === 'reject' ? t('nadRejecting') : t('kycQueueRejectButton')}
         </button>
       </div>
 

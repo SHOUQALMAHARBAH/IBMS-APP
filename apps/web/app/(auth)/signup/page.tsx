@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useLanguage } from '../../../lib/i18n/language-context';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signup } from '../../../lib/auth/auth-api';
@@ -16,6 +17,7 @@ import {
 } from '../../../components/auth/auth-form.styles';
 
 export default function SignupPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,7 +33,7 @@ export default function SignupPage() {
       await signup({ fullName, email, password });
       router.push('/login');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong — try again.');
+      setError(err instanceof ApiError ? err.message : t('authGenericError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -40,10 +42,10 @@ export default function SignupPage() {
   return (
     <main style={pageStyle}>
       <div style={cardStyle}>
-        <h1 style={{ marginTop: 0 }}>Create an account</h1>
+        <h1 style={{ marginTop: 0 }}>{t('authCreateAccountHeading')}</h1>
         <form onSubmit={(e) => void handleSubmit(e)}>
           <label htmlFor="fullName" style={labelStyle}>
-            Full name
+            {t('authFullNameLabel')}
           </label>
           <input
             id="fullName"
@@ -53,7 +55,7 @@ export default function SignupPage() {
             style={inputStyle}
           />
           <label htmlFor="email" style={labelStyle}>
-            Email
+            {t('authEmailLabel')}
           </label>
           <input
             id="email"
@@ -65,7 +67,7 @@ export default function SignupPage() {
             style={inputStyle}
           />
           <label htmlFor="password" style={labelStyle}>
-            Password
+            {t('authPasswordLabel')}
           </label>
           <input
             id="password"
@@ -78,7 +80,7 @@ export default function SignupPage() {
             style={inputStyle}
           />
           <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>
-            At least 12 characters, with an uppercase letter, lowercase letter, digit, and symbol.
+            {t('authPasswordRule')}
           </p>
           {error ? (
             <p role="alert" style={errorStyle}>
@@ -86,10 +88,10 @@ export default function SignupPage() {
             </p>
           ) : null}
           <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-            {isSubmitting ? 'Creating account…' : 'Sign up'}
+            {isSubmitting ? t('authCreatingAccount') : t('authSignUpButton')}
           </button>
           <p style={helperLinkStyle}>
-            Already have an account? <Link href="/login">Sign in</Link>
+            {t('authAlreadyHaveAccount')} <Link href="/login">{t('authSignInButton')}</Link>
           </p>
         </form>
       </div>

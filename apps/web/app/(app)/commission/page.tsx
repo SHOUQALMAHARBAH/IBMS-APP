@@ -66,7 +66,7 @@ export default function CommissionRatesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the commission-rate.manage permission, so there's nothing to show here."
+          ? t('crateNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('crateLoadError'),
@@ -134,7 +134,7 @@ export default function CommissionRatesPage() {
           }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            Insurer
+            {t('crateInsurerLabel')}
             <select
               aria-label={t('crateInsurerLabel')}
               value={insurerId}
@@ -150,7 +150,7 @@ export default function CommissionRatesPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            Insurance line
+            {t('crateLineLabel')}
             <input
               aria-label={t('crateLineLabel')}
               value={insuranceLine}
@@ -181,7 +181,7 @@ export default function CommissionRatesPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            Effective from
+            {t('crateEffectiveFromLabel')}
             <input
               type="date"
               aria-label={t('crateEffectiveFromLabel')}

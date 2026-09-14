@@ -43,12 +43,14 @@ export default function DpoWorkspacePage() {
     } catch (err) {
       setSummary(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not load the DPO Workspace — try again.',
+        err instanceof ApiError && err.status === 403
+          ? t('dpowNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('dpowLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');

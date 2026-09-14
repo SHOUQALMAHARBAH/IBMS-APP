@@ -56,7 +56,7 @@ export default function EmployeesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the employee.manage permission."
+          ? t('empNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('empLoadError'),
@@ -107,8 +107,7 @@ export default function EmployeesPage() {
     <main style={pageStyle}>
       <h1>{t('empHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Employee records, licensing/certification tracking, and security
-        awareness training (Part 8.2).
+        {t('empIntro')}
       </p>
 
       {loadError ? (
@@ -155,9 +154,9 @@ export default function EmployeesPage() {
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new employee</h2>
+        <h2>{t('empCreateHeading')}</h2>
         <label style={labelStyle}>
-          Given name
+          {t('empGivenName')}
           <input
             dir="auto"
             value={givenName}
@@ -166,11 +165,11 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Father&apos;s name (optional)
+          {t('empFatherName')}
           <input dir="auto" value={fatherName} onChange={(e) => setFatherName(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          Grandfather&apos;s name (optional)
+          {t('empGrandfatherName')}
           <input
             dir="auto"
             value={grandfatherName}
@@ -178,7 +177,7 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Family name
+          {t('empFamilyName')}
           <input
             dir="auto"
             value={familyName}
@@ -187,7 +186,7 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          National ID
+          {t('empNationalId')}
           <input
             value={nationalId}
             onChange={(e) => setNationalId(e.target.value)}
@@ -195,11 +194,11 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Position (optional)
+          {t('empPosition')}
           <input value={position} onChange={(e) => setPosition(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          Hire date
+          {t('empHireDate')}
           <input
             type="date"
             value={hireDate}
@@ -208,7 +207,7 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Licensed role (optional)
+          {t('empLicensedRole')}
           <input
             value={licensedRole}
             onChange={(e) => setLicensedRole(e.target.value)}
@@ -220,7 +219,7 @@ export default function EmployeesPage() {
             {createError}
           </p>
         ) : null}
-        <button type="submit">Record employee</button>
+        <button type="submit">{t('empSubmitButton')}</button>
       </form>
     </main>
   );

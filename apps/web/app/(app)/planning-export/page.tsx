@@ -74,7 +74,7 @@ export default function PlanningExportPage() {
       setSummary(null);
       setError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the planning-export.generate permission."
+          ? t('pexNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('pexExportError'),
@@ -103,8 +103,7 @@ export default function PlanningExportPage() {
           />
         </label>
         <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
-          Leave blank to score the UTC calendar month that just ended.
-          Portfolio data is always the current book, regardless of period.
+          {t('pexPeriodNote')}
         </p>
         <button type="submit" disabled={isGenerating}>
           {isGenerating ? t('pexGeneratingButton') : t('pexGenerateButton')}

@@ -74,9 +74,11 @@ export default function DpiaScreeningsPage() {
     } catch (err) {
       setRows(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('dpiaLoadError'),
+        err instanceof ApiError && err.status === 403
+          ? t('dpiaNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('dpiaLoadError'),
       );
     }
   }, [t]);
@@ -141,7 +143,7 @@ export default function DpiaScreeningsPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Subject
+            {t('dpiaSubjectFieldLabel')}
             <input
               aria-label={t('dpiaSubjectLabel')}
               value={subjectDescription}

@@ -98,7 +98,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         status,
         message:
           status === 403
-            ? "You don't hold the customer.360-view.read permission, so the 360° timeline isn't shown here."
+            ? t('crmNoPermission')
             : status === 404
               ? t('crmCustomerNotFound')
               : err instanceof ApiError
@@ -142,7 +142,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLogError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the interaction.log permission."
+          ? t('crmNoPermissionLog')
           : err instanceof ApiError
             ? err.message
             : t('crmLogError'),
@@ -208,7 +208,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             </div>
             <div style={{ flex: '1 1 20rem' }}>
               <label htmlFor="crm-summary" style={cardMetaStyle}>
-                What happened?
+                {t('crmWhatHappened')}
               </label>
               <br />
               <input
@@ -221,7 +221,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             </div>
             <div>
               <label htmlFor="crm-occurred" style={cardMetaStyle}>
-                When (optional — defaults to now)
+                {t('crmWhenOptional')}
               </label>
               <br />
               <input
@@ -260,8 +260,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         <TimelineList view={view} />
       ) : (
         <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          The 360° timeline needs the <code>customer.360-view.read</code>{' '}
-          permission. You can still log interactions above.
+          {t('crmTimelineNeedsPermission')}
         </p>
       )}
     </div>

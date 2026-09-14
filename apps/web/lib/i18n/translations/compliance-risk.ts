@@ -91,7 +91,14 @@ export const COMPLIANCE_RISK = {
     rcLicenseLoadError: 'تعذّر تحميل ترخيص الوسيط — حاول مرة أخرى.',
     rcCalendarLoadError: 'تعذّر تحميل تقويم الالتزامات — حاول مرة أخرى.',
     rcActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    rcNoPermission: 'لا تملك الصلاحية اللازمة لعرض شاشة الالتزام التنظيمي.',
+    rcNoPermission: 'لا تملك صلاحية license.manage اللازمة لعرض شاشة الالتزام التنظيمي.',
+    rcNoPermissionCalendar: 'لا تملك صلاحية compliance-calendar.manage اللازمة لعرض تقويم الالتزام.',
+    rcDueDate: 'تاريخ الاستحقاق',
+    rcOwnerUserId: 'معرّف المستخدم المالك',
+    rcExpiresAt: 'تاريخ الانتهاء',
+    rcIssuedAt: 'تاريخ الإصدار',
+    rcScopeOfAuth: 'نطاق التفويض',
+    rcLicenseNumber: 'رقم الترخيص',
 
     // ---- Operational & PI risk (#53-54) ------------------------------------
     opHeading: 'المخاطر التشغيلية ومخاطر المسؤولية المهنية',
@@ -100,6 +107,10 @@ export const COMPLIANCE_RISK = {
     opRegisterHeading: 'سجل المخاطر',
     opRiskTypeLabel: 'نوع الخطر',
     opRiskDescriptionLabel: 'وصف الخطر',
+    opEventDescriptionFieldLabel: 'الوصف',
+    opPiExpiresFieldLabel: 'تنتهي في',
+    opPiInsurerFieldLabel: 'شركة التأمين',
+    opRiskDescriptionFieldLabel: 'الوصف',
     opColType: 'النوع',
     opColMitigation: 'إجراء التخفيف',
     opColStatus: 'الحالة',
@@ -134,13 +145,15 @@ export const COMPLIANCE_RISK = {
     opPiLoadError: 'تعذّر تحميل سجل وثيقة المسؤولية المهنية — حاول مرة أخرى.',
     opEventsLoadError: 'تعذّر تحميل أحداث مخاطر المسؤولية المهنية — حاول مرة أخرى.',
     opActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    opNoPermission: 'لا تملك الصلاحية اللازمة لعرض سجل المخاطر.',
+    opNoPermission: 'لا تملك صلاحية risk-register.manage اللازمة لعرض سجل المخاطر.',
+    opNoPermissionPi: 'لا تملك صلاحية pi-policy.manage اللازمة لعرض وثيقة المسؤولية المهنية.',
 
     // ---- Incident management (#55) -----------------------------------------
     incHeading: 'إدارة الحوادث',
     incIntro:
       'مُبلَّغ عنه ← جرى احتواؤه (بهدف أربع ساعات للحوادث الحرجة) ← جرى تقييم أثره ← مُصنَّف (ويستوجب التصنيف المادي اعتماد مسؤول حماية البيانات مع توقيع منفصل من الإدارة التنفيذية) ← جرى الإبلاغ ← جرى التعافي ← مغلق (وتحليل السبب الجذري إلزامي). وقد يستوجب الحادث الواحد الإبلاغ إلى أكثر من جهة رقابية.',
     incTitleLabel: 'عنوان الحادث',
+    incTitleFieldLabel: 'العنوان',
     incDescriptionLabel: 'وصف الحادث',
     incColTitle: 'العنوان',
     incColSeverity: 'درجة الخطورة',
@@ -208,6 +221,7 @@ export const COMPLIANCE_RISK = {
     iafIntro:
       'تسجيل ملاحظات التدقيق، ومتابعة مسار المعالجة، والإغلاق عند الانتهاء. ولا يجوز إلا للالتزام تسجيل ملاحظة أو تعديل خطة معالجتها؛ ويجوز للالتزام أو لمدير الفرع/الدائرة إغلاقها.',
     iafAuditPeriodLabel: 'الفترة التدقيقية',
+    iafAuditPeriodFieldLabel: 'فترة التدقيق',
     iafFindingLabel: 'الملاحظة',
     iafColFinding: 'الملاحظة',
     iafColRemediation: 'المعالجة',
@@ -222,7 +236,7 @@ export const COMPLIANCE_RISK = {
     iafNone: 'لا توجد ملاحظات تدقيق داخلي مسجّلة بعد.',
     iafLoadError: 'تعذّر تحميل ملاحظات التدقيق الداخلي — حاول مرة أخرى.',
     iafActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
-    iafNoPermission: 'لا تملك الصلاحية اللازمة لعرض ملاحظات التدقيق الداخلي.',
+    iafNoPermission: 'لا تملك صلاحية internal-audit.record/internal-audit.close اللازمة لعرض ملاحظات التدقيق الداخلي.',
 
     // ---- Audit trail (Part 5.1) ----------------------------------------------
     atHeading: 'سجل التدقيق',
@@ -250,11 +264,12 @@ export const COMPLIANCE_RISK = {
     atWorkflowEntityIdLabel: 'معرّف كيان سير العمل',
     atDocumentIdLabel: 'معرّف المستند',
     atLookUpButton: 'بحث',
+    atBrowseButton: 'تصفح',
     atLoading: 'جارٍ التحميل…',
     atLogLoadError: 'تعذّر تصفّح سجل التدقيق — حاول مرة أخرى.',
     atWorkflowLoadError: 'تعذّر تحميل تاريخ سير العمل — حاول مرة أخرى.',
     atDocumentLoadError: 'تعذّر تحميل تاريخ المستند — حاول مرة أخرى.',
-    atNoPermission: 'لا تملك صلاحية audit-log.read اللازمة لعرض سجل التدقيق.',
+    atNoPermissionFor: 'لا تملك صلاحية {permission} اللازمة لعرض هذا المحتوى.',
   },
   EN: {
     tmHeading: 'AML/CFT transaction monitoring',
@@ -328,7 +343,14 @@ export const COMPLIANCE_RISK = {
     rcLicenseLoadError: 'Could not load the broker license — try again.',
     rcCalendarLoadError: 'Could not load the compliance calendar — try again.',
     rcActionError: 'That action failed — try again.',
-    rcNoPermission: "You don't hold the permission needed to view regulatory compliance.",
+    rcNoPermission: "You don't hold the license.manage permission.",
+    rcNoPermissionCalendar: "You don't hold the compliance-calendar.manage permission.",
+    rcDueDate: 'Due date',
+    rcOwnerUserId: 'Owner user ID',
+    rcExpiresAt: 'Expires at',
+    rcIssuedAt: 'Issued at',
+    rcScopeOfAuth: 'Scope of authorization',
+    rcLicenseNumber: 'License number',
 
     opHeading: 'Operational & Professional Indemnity Risk',
     opIntro:
@@ -336,6 +358,10 @@ export const COMPLIANCE_RISK = {
     opRegisterHeading: 'Risk register',
     opRiskTypeLabel: 'Risk type',
     opRiskDescriptionLabel: 'Risk description',
+    opEventDescriptionFieldLabel: 'Description',
+    opPiExpiresFieldLabel: 'Expires',
+    opPiInsurerFieldLabel: 'Insurer',
+    opRiskDescriptionFieldLabel: 'Description',
     opColType: 'Type',
     opColMitigation: 'Mitigation',
     opColStatus: 'Status',
@@ -370,12 +396,14 @@ export const COMPLIANCE_RISK = {
     opPiLoadError: 'Could not load the PI policy record — try again.',
     opEventsLoadError: 'Could not load PI risk events — try again.',
     opActionError: 'That action failed — try again.',
-    opNoPermission: "You don't hold the permission needed to view the risk register.",
+    opNoPermission: "You don't hold the risk-register.manage permission.",
+    opNoPermissionPi: "You don't hold the pi-policy.manage permission.",
 
     incHeading: 'Incident Management',
     incIntro:
       "Reported → Contained (4-hour target for critical) → Impact Assessed → Classified (Material needs a Data Protection Officer AND a separate Executive Management co-sign) → Notified → Recovered → Closed (root cause mandatory). One incident may trigger more than one regulator's notification obligation.",
     incTitleLabel: 'Incident title',
+    incTitleFieldLabel: 'Title',
     incDescriptionLabel: 'Incident description',
     incColTitle: 'Title',
     incColSeverity: 'Severity',
@@ -439,6 +467,7 @@ export const COMPLIANCE_RISK = {
     iafIntro:
       'Record audit findings, track the remediation path, and close once resolved. Only Compliance may record a finding or update its remediation plan; Compliance or a Branch/Department Manager may close it.',
     iafAuditPeriodLabel: 'Audit period label',
+    iafAuditPeriodFieldLabel: 'Audit period',
     iafFindingLabel: 'Finding',
     iafColFinding: 'Finding',
     iafColRemediation: 'Remediation',
@@ -453,7 +482,7 @@ export const COMPLIANCE_RISK = {
     iafNone: 'No internal audit findings recorded yet.',
     iafLoadError: 'Could not load internal audit findings — try again.',
     iafActionError: 'That action failed — try again.',
-    iafNoPermission: "You don't hold the permission needed to view internal audit findings.",
+    iafNoPermission: "You don't hold the internal-audit.record/internal-audit.close permission.",
 
     atHeading: 'Audit Trail',
     atIntro:
@@ -480,10 +509,11 @@ export const COMPLIANCE_RISK = {
     atWorkflowEntityIdLabel: 'Workflow entity id',
     atDocumentIdLabel: 'Document id',
     atLookUpButton: 'Look up',
+    atBrowseButton: 'Browse',
     atLoading: 'Loading…',
     atLogLoadError: 'Could not browse the audit log — try again.',
     atWorkflowLoadError: 'Could not load workflow history — try again.',
     atDocumentLoadError: 'Could not load document history — try again.',
-    atNoPermission: "You don't hold the audit-log.read permission.",
+    atNoPermissionFor: "You don't hold the {permission} permission.",
   },
 } as const;

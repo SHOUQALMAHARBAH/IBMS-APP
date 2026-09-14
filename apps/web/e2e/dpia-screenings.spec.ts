@@ -67,9 +67,17 @@ test("a user without the permission sees a friendly message", async ({ page }) =
   );
 
   await page.goto("/dpia-screenings");
+  // The screen's own translated 403 copy, not the API's English message.
+  // This page used to pass `err.message` straight through, so the raw
+  // server string reached the user in both languages — and this test
+  // asserted exactly that. The absence check is what makes it a proof:
+  // without it the old behaviour satisfies the new assertion too.
+  await expect(
+    page.getByText("dpia.review permission", { exact: false }),
+  ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("dpia-screenings screen has no serious/critical accessibility violations @a11y", async ({

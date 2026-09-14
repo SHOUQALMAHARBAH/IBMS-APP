@@ -10,6 +10,7 @@ export const NAV = {
     signedInAs: 'تسجيل الدخول باسم',
     noRoleAssigned: 'لم يتم تعيين دور',
     signOut: 'تسجيل الخروج',
+    navPrimaryAria: 'التنقّل الرئيسي',
 
     navHome: 'الرئيسية',
     navLeads: 'العملاء المحتملون',
@@ -98,6 +99,7 @@ export const NAV = {
     signedInAs: 'Signed in as',
     noRoleAssigned: 'No role assigned',
     signOut: 'Sign out',
+    navPrimaryAria: 'Primary',
 
     navHome: 'Home',
     navLeads: 'Leads',

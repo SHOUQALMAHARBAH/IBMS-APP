@@ -1501,6 +1501,7 @@ test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page 
   await page.goto("/rfqs/rfq-1");
   await expect(page.getByRole("heading", { name: "Correspondence" })).toBeVisible();
   await page.getByLabel("Direction").selectOption("INBOUND");
+  await page.getByLabel("Channel").selectOption("CALL");
   await page.getByLabel("Exchange").fill("Please send 3 years of loss history for site 2.");
   await page.getByRole("button", { name: "Log exchange" }).click();
 
@@ -1508,6 +1509,17 @@ test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page 
   await expect(
     page.getByText("Please send 3 years of loss history for site 2."),
   ).toBeVisible();
+
+  // This screen's own channel wording, not the communications screen's. Four
+  // `commChannel*` keys were declared in BOTH rfq.ts and customer-service.ts,
+  // and the merge in translations.ts spreads customer-service last — so this
+  // row rendered "Phone call" and "Customer portal" instead. `exact` matters:
+  // a substring match on "Call" is satisfied by "Phone call" and would have
+  // passed against the bug.
+  const logRow = page.getByRole("row").filter({ hasText: "Please send 3 years" });
+  await expect(logRow.getByText("Call", { exact: true })).toBeVisible();
+  await expect(logRow.getByText("Phone call")).toHaveCount(0);
+  await expect(logRow.getByText("Inbound", { exact: true })).toBeVisible();
 });
 
 test("a non-Placement user sees the list but no create controls", async ({ page }) => {

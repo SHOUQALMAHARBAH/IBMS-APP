@@ -99,9 +99,11 @@ export default function RetentionDisposalPage() {
       setHolds(null);
       setBatches(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('rdLoadError'),
+        err instanceof ApiError && err.status === 403
+          ? t('rdNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('rdLoadError'),
       );
     }
   }, [t]);
@@ -200,7 +202,7 @@ export default function RetentionDisposalPage() {
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Record category
+              {t('rdRecordCategoryLabel')}
               <input
                 aria-label={t('rdRecordCategoryLabel')}
                 value={category}
@@ -209,7 +211,7 @@ export default function RetentionDisposalPage() {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Retention period (months)
+              {t('rdRetentionMonthsLabel')}
               <input
                 aria-label={t('rdRetentionMonthsLabel')}
                 type="number"
@@ -317,7 +319,7 @@ export default function RetentionDisposalPage() {
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Scope
+              {t('rdScopeFieldLabel')}
               <input
                 aria-label={t('rdScopeAria')}
                 value={holdScope}
@@ -359,7 +361,7 @@ export default function RetentionDisposalPage() {
               />
             </label>
             <button type="submit" disabled={busy}>
-              {busy ? 'Saving…' : t('rdPlaceHoldButton')}
+              {busy ? t('commonSaving') : t('rdPlaceHoldButton')}
             </button>
           </form>
         ) : null}
@@ -437,7 +439,7 @@ export default function RetentionDisposalPage() {
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Record category ID (optional)
+              {t('rdBatchCategoryIdFieldLabel')}
               <input
                 aria-label={t('rdBatchCategoryIdLabel')}
                 value={nominateCategoryId}
@@ -445,7 +447,7 @@ export default function RetentionDisposalPage() {
               />
             </label>
             <button type="submit" disabled={busy}>
-              {busy ? 'Saving…' : t('rdNominateBatchButton')}
+              {busy ? t('commonSaving') : t('rdNominateBatchButton')}
             </button>
           </form>
         ) : null}

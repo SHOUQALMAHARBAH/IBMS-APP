@@ -51,9 +51,11 @@ export default function CrossBorderTransfersPage() {
     } catch (err) {
       setRecords(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('cbtLoadError'),
+        err instanceof ApiError && err.status === 403
+          ? t('cbtNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('cbtLoadError'),
       );
     }
   }, [t]);
@@ -124,7 +126,7 @@ export default function CrossBorderTransfersPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Description
+            {t('cbtDescriptionFieldLabel')}
             <input
               aria-label={t('cbtDescriptionLabel')}
               value={description}
@@ -133,7 +135,7 @@ export default function CrossBorderTransfersPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Destination country
+            {t('cbtDestinationLabel')}
             <input
               aria-label={t('cbtDestinationLabel')}
               value={destinationCountry}
@@ -142,7 +144,7 @@ export default function CrossBorderTransfersPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Legal basis
+            {t('cbtLegalBasisLabel')}
             <select
               aria-label={t('cbtLegalBasisLabel')}
               value={legalBasis}

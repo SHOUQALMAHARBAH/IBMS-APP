@@ -134,7 +134,7 @@ export default function NeedsAssessmentDetailPage() {
             <strong>{t('nadRecommendedCoverage')}</strong>
             {assessment.recommendedCoverageLines.length === 0 ? (
               <p style={{ opacity: 0.6, margin: '0.5rem 0 0' }}>
-                No coverage lines recommended from the current answers.
+                {t('nadNoCoverageLines')}
               </p>
             ) : (
               <ul style={coverageTagListStyle}>
@@ -195,7 +195,7 @@ export default function NeedsAssessmentDetailPage() {
 
           {inReview && !isManager ? (
             <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
-              Awaiting review and approval by a Branch/Department Manager.
+              {t('nadAwaitingManager')}
             </p>
           ) : null}
 
@@ -209,14 +209,13 @@ export default function NeedsAssessmentDetailPage() {
                 )
               }
             >
-              Assemble insurance program →
+              {t('nadAssembleProgramButton')}
             </button>
           ) : null}
 
           {assessment.status === 'APPROVED' && !isPlacement ? (
             <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
-              Approved — a Placement/Technical Officer can now assemble the
-              insurance program.
+              {t('nadApprovedPlacementNote')}
             </p>
           ) : null}
 

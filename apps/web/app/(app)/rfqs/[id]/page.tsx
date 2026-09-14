@@ -53,16 +53,16 @@ const RFQ_INSURER_STATUS_LABEL_KEY: Record<RfqInsurerStatus, TranslationKey> = {
 };
 
 const COMM_DIRECTION_BADGE_LABEL_KEY: Record<CommunicationDirection, TranslationKey> = {
-  INBOUND: 'commDirectionInboundBadge',
-  OUTBOUND: 'commDirectionOutboundBadge',
+  INBOUND: 'rfqCommDirectionInboundBadge',
+  OUTBOUND: 'rfqCommDirectionOutboundBadge',
 };
 
 const COMM_CHANNEL_LABEL_KEY: Record<(typeof COMM_CHANNELS)[number], TranslationKey> = {
-  EMAIL: 'commChannelEmail',
-  CALL: 'commChannelCall',
-  PORTAL: 'commChannelPortal',
-  MEETING: 'commChannelMeeting',
-  OTHER: 'commChannelOther',
+  EMAIL: 'rfqCommChannelEmail',
+  CALL: 'rfqCommChannelCall',
+  PORTAL: 'rfqCommChannelPortal',
+  MEETING: 'rfqCommChannelMeeting',
+  OTHER: 'rfqCommChannelOther',
 };
 
 function fmt(value: string | null, language: Language): string {

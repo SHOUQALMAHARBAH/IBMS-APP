@@ -67,9 +67,7 @@ export default function NewProspectPage() {
     <main style={pageStyle}>
       <h1>{t('prosnHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 2 — convert a qualified lead into a prospect and capture its qualification
-        profile (sector, activity, size, location, contact, products of interest, expected
-        premium).
+        {t('prosnIntro')}
       </p>
       {canCaptureProspect ? (
         <Suspense fallback={null}>
@@ -77,7 +75,7 @@ export default function NewProspectPage() {
         </Suspense>
       ) : (
         <p role="alert" style={errorStyle}>
-          You don&apos;t hold the prospect.capture permission, so there&apos;s nothing to do here.
+          {t('prosnNoPermission')}
         </p>
       )}
     </main>

@@ -87,7 +87,7 @@ export default function SecuritySettingsPage() {
             <Image src={enrollment.qrCodeDataUrl} alt={t('secQrAlt')} width={200} height={200} unoptimized />
             <form onSubmit={(e) => void handleVerify(e)}>
               <label htmlFor="code" style={labelStyle}>
-                Authentication code
+                {t('secAuthCodeLabel')}
               </label>
               <input
                 id="code"
@@ -124,7 +124,7 @@ export default function SecuritySettingsPage() {
       </section>
 
       <button type="button" onClick={() => void handleLogout()} style={{ ...buttonStyle, marginTop: '2rem' }}>
-        Sign out
+        {t('signOut')}
       </button>
     </main>
   );

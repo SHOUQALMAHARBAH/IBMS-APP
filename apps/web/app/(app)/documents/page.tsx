@@ -59,7 +59,7 @@ export default function DocumentsPage() {
       setDocuments(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the document.manage permission."
+          ? t('docNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('docLoadError'),
@@ -143,13 +143,12 @@ export default function DocumentsPage() {
     <main style={pageStyle}>
       <h1>{t('docHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The Part 4.2 electronic Insurance File — version control and the
-        deletion lock override for one policy&apos;s documents.
+        {t('docIntro')}
       </p>
 
       <form onSubmit={onLookup} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
         <label style={labelStyle}>
-          Policy ID
+          {t('docPolicyIdLabel')}
           <input value={policyId} onChange={(e) => setPolicyId(e.target.value)} required />
         </label>
         <button type="submit">{t('docLookUp')}</button>
@@ -188,20 +187,20 @@ export default function DocumentsPage() {
                   <td style={cell}>{doc.category}</td>
                   <td style={cell}>{doc.classification}</td>
                   <td style={cell}>{doc.versionNumber}</td>
-                  <td style={cell}>{doc.deletionLocked ? 'Locked' : t('docUnlocked')}</td>
+                  <td style={cell}>{doc.deletionLocked ? t('docLocked') : t('docUnlocked')}</td>
                   <td style={cell}>
                     {versioningId === doc.id ? null : (
                       <button type="button" onClick={() => startVersion(doc)}>
-                        New version
+                        {t('docNewVersionButton')}
                       </button>
                     )}
                     {doc.deletionLocked ? (
                       <button type="button" onClick={() => onUnlock(doc.id)}>
-                        Unlock for deletion
+                        {t('docUnlockButton')}
                       </button>
                     ) : (
                       <button type="button" onClick={() => onDelete(doc.id)}>
-                        Delete
+                        {t('commonDelete')}
                       </button>
                     )}
                   </td>
@@ -220,13 +219,13 @@ export default function DocumentsPage() {
           }}
           style={formStyle}
         >
-          <h2>Record a new version</h2>
+          <h2>{t('docVersionHeading')}</h2>
           <label style={labelStyle}>
-            File name
+            {t('docFileName')}
             <input value={versionFileName} onChange={(e) => setVersionFileName(e.target.value)} required />
           </label>
           <label style={labelStyle}>
-            Storage reference
+            {t('docStorageReference')}
             <input
               value={versionStorageRef}
               onChange={(e) => setVersionStorageRef(e.target.value)}
@@ -234,7 +233,7 @@ export default function DocumentsPage() {
             />
           </label>
           <label style={labelStyle}>
-            Classification
+            {t('docColClassification')}
             <select
               value={versionClassification}
               onChange={(e) => setVersionClassification(e.target.value as DataClassification)}
@@ -258,11 +257,10 @@ export default function DocumentsPage() {
       <form onSubmit={onLookupSummary} style={formStyle}>
         <h2>{t('docPolicyClassification')}</h2>
         <p style={{ opacity: 0.75 }}>
-          The highest classification present across a policy&apos;s electronic
-          file — never averaged.
+          {t('docClassificationSummaryIntro')}
         </p>
         <label style={labelStyle}>
-          Policy ID
+          {t('docPolicyIdLabel')}
           <input value={summaryPolicyId} onChange={(e) => setSummaryPolicyId(e.target.value)} required />
         </label>
         <button type="submit">{t('docComputeButton')}</button>

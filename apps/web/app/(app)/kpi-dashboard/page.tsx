@@ -86,7 +86,7 @@ export default function KpiDashboardPage() {
         setSummary(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? "You don't hold the kpi-dashboard.view permission."
+            ? t('kpiNoPermission')
             : err instanceof ApiError
               ? err.message
               : t('kpiLoadError'),

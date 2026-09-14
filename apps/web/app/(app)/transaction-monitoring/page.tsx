@@ -58,7 +58,7 @@ export default function TransactionMonitoringPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the aml.monitor permission."
+          ? t('tmNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('tmLoadError'),
@@ -147,7 +147,7 @@ export default function TransactionMonitoringPage() {
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
             >
-              Pattern
+              {t('tmPatternLabel')}
               <select
                 aria-label={t('tmPatternLabel')}
                 value={patternType}
@@ -163,7 +163,7 @@ export default function TransactionMonitoringPage() {
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
             >
-              Detail
+              {t('tmDetailLabel')}
               <textarea
                 aria-label={t('tmDetailLabel')}
                 value={detailText}

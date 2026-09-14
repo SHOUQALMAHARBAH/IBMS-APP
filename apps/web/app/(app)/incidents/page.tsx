@@ -88,7 +88,7 @@ export default function IncidentsPage() {
       setIncidents(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the incident.report permission."
+          ? t('incNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('incLoadError'),
@@ -161,7 +161,7 @@ export default function IncidentsPage() {
       {canReport ? (
         <form onSubmit={submit} style={formStyle}>
           <label style={labelStyle}>
-            Title
+            {t('incTitleFieldLabel')}
             <input
               aria-label={t('incTitleLabel')}
               value={title}
@@ -179,7 +179,7 @@ export default function IncidentsPage() {
             />
           </label>
           <label style={labelStyle}>
-            Severity
+            {t('incColSeverity')}
             <select
               aria-label={t('incColSeverity')}
               value={severity}

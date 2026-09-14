@@ -59,7 +59,7 @@ export default function PaymentChannelsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the payment-channel.manage permission, so there's nothing to show here."
+          ? t('pcNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('pcLoadError'),
@@ -145,7 +145,7 @@ export default function PaymentChannelsPage() {
           }}
         >
           <label style={labelStyle}>
-            Owner
+            {t('pcOwnerFieldLabel')}
             <select
               aria-label={t('pcOwnerTypeAria')}
               value={ownerType}
@@ -165,7 +165,7 @@ export default function PaymentChannelsPage() {
             />
           </label>
           <label style={labelStyle}>
-            Channel type
+            {t('pcChannelTypeLabel')}
             <select
               aria-label={t('pcChannelTypeLabel')}
               value={channelType}
@@ -179,7 +179,7 @@ export default function PaymentChannelsPage() {
             </select>
           </label>
           <label style={labelStyle}>
-            Label
+            {t('pcLabelLabel')}
             <input
               aria-label={t('pcLabelLabel')}
               value={label}
@@ -189,7 +189,7 @@ export default function PaymentChannelsPage() {
             />
           </label>
           <label style={labelStyle}>
-            Bank name
+            {t('pcBankNameLabel')}
             <input
               aria-label={t('pcBankNameLabel')}
               value={bankName}

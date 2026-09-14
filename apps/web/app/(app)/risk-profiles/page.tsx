@@ -106,7 +106,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the risk-profile.read permission, so there's nothing to show here."
+          ? t('rpNoPermission')
           : err instanceof ApiError && err.status === 404
             ? t('rpCustomerNotFound')
             : err instanceof ApiError
@@ -165,7 +165,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
         <h2>{t('rpSitesHeading')}</h2>
         {profiles.length === 0 ? (
           <p style={{ opacity: 0.6 }}>
-            No risk profile yet for this customer — add the first site below.
+            {t('rpNoProfileYet')}
           </p>
         ) : (
           profiles.map((profile) => (
@@ -193,7 +193,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
         <form onSubmit={(e) => void handleAddSite(e)} style={sectionStyle}>
           <h2 style={{ marginTop: 0 }}>{t('rpAddSiteHeading')}</h2>
           <label htmlFor="rp-site" style={labelStyle}>
-            Site label (optional)
+            {t('rpSiteLabelField')}
           </label>
           <input
             id="rp-site"
@@ -203,7 +203,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
             placeholder={t('rpSitePlaceholder')}
           />
           <label htmlFor="rp-claims" style={labelStyle}>
-            Prior claims history summary (optional)
+            {t('rpPriorClaimsField')}
           </label>
           <input
             id="rp-claims"
@@ -268,9 +268,7 @@ export default function RiskProfilesPage() {
     <main style={pageStyle}>
       <h1>{t('rpSurveysHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 6 — the detailed asset survey per location, deriving the Sum
-        Insured and indemnity period, consolidated across sites for a
-        multi-site client.
+        {t('rpSurveysIntro')}
       </p>
       <Suspense fallback={null}>
         <RiskProfilesFlow />

@@ -77,6 +77,7 @@ function DocumentRowsEditor({
   rows: PolicyDocumentInput[];
   setRows: (rows: PolicyDocumentInput[]) => void;
 }) {
+  const { t } = useLanguage();
   function update(i: number, patch: Partial<PolicyDocumentInput>) {
     setRows(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
@@ -142,9 +143,7 @@ function DocumentRowsEditor({
         type="button"
         style={{ ...buttonStyle, width: 'auto' }}
         onClick={() => setRows([...rows, emptyDocRow()])}
-      >
-        Add document
-      </button>
+      >{t('policyAddDocumentButton')}</button>
     </div>
   );
 }
@@ -318,7 +317,7 @@ export function PolicySection({
         isPlacement ? (
           <div style={{ marginTop: '1rem', maxWidth: '30rem' }}>
             <div style={quoteFieldStyle}>
-              <label htmlFor="pol-inception">Inception date</label>
+              <label htmlFor="pol-inception">{t('policyInceptionDateLabel')}</label>
               <input
                 id="pol-inception"
                 type="date"
@@ -327,7 +326,7 @@ export function PolicySection({
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="pol-expiry">Expiry date (optional)</label>
+              <label htmlFor="pol-expiry">{t('policyExpiryDateLabel')}</label>
               <input
                 id="pol-expiry"
                 type="date"
@@ -350,11 +349,11 @@ export function PolicySection({
                 })
               }
             >
-              {busy ? 'Placing…' : 'Place policy'}
+              {busy ? t('policyPlacingButton') : 'Place policy'}
             </button>
           </div>
         ) : (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>No policy placed yet.</p>
+          <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('policyNoneYet')}</p>
         )
       ) : (
         <div style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
@@ -400,9 +399,9 @@ export function PolicySection({
 
           {policy.status === 'PLACEMENT_CONFIRMED' && isPlacement ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
-              <strong>Record insurer issuance</strong>
+              <strong>{t('policyRecordIssuanceHeading')}</strong>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-number">Policy number</label>
+                <label htmlFor="pol-number">{t('policyPolicyNumberLabel')}</label>
                 <input
                   id="pol-number"
                   value={policyNumber}
@@ -410,7 +409,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-issued-premium">Issued premium</label>
+                <label htmlFor="pol-issued-premium">{t('policyIssuedPremiumLabel')}</label>
                 <input
                   id="pol-issued-premium"
                   inputMode="decimal"
@@ -420,7 +419,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-limits">Limits (JSON)</label>
+                <label htmlFor="pol-limits">{t('policyLimitsLabel')}</label>
                 <textarea
                   id="pol-limits"
                   rows={3}
@@ -428,13 +427,11 @@ export function PolicySection({
                   onChange={(e) => setLimitsText(e.target.value)}
                 />
                 {limits === null ? (
-                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>
-                    Must be a non-empty JSON object.
-                  </span>
+                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>{t('policyMustBeJsonObject')}</span>
                 ) : null}
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-sums-insured">Sums insured (JSON)</label>
+                <label htmlFor="pol-sums-insured">{t('policySumsInsuredLabel')}</label>
                 <textarea
                   id="pol-sums-insured"
                   rows={3}
@@ -442,13 +439,11 @@ export function PolicySection({
                   onChange={(e) => setSumsInsuredText(e.target.value)}
                 />
                 {sumsInsured === null ? (
-                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>
-                    Must be a non-empty JSON object.
-                  </span>
+                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>{t('policyMustBeJsonObject')}</span>
                 ) : null}
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-perils">Named perils (comma-separated)</label>
+                <label htmlFor="pol-perils">{t('policyNamedPerilsLabel')}</label>
                 <input
                   id="pol-perils"
                   value={namedPerilsText}
@@ -456,16 +451,14 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-extensions">Extensions (comma-separated)</label>
+                <label htmlFor="pol-extensions">{t('policyExtensionsLabel')}</label>
                 <input
                   id="pol-extensions"
                   value={extensionsText}
                   onChange={(e) => setExtensionsText(e.target.value)}
                 />
               </div>
-              <p style={{ fontWeight: 600, marginTop: '0.6rem' }}>
-                Issued documents
-              </p>
+              <p style={{ fontWeight: 600, marginTop: '0.6rem' }}>{t('policyIssuedDocumentsHeading')}</p>
               <DocumentRowsEditor rows={issuanceDocs} setRows={setIssuanceDocs} />
               <button
                 type="button"
@@ -489,14 +482,14 @@ export function PolicySection({
                   )
                 }
               >
-                {busy ? 'Recording…' : 'Record issuance'}
+                {busy ? t('policyIssuingButton') : t('policyIssueButton')}
               </button>
             </div>
           ) : null}
 
           {policy.schedules.length > 0 ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Coverage schedule</p>
+              <p style={{ fontWeight: 600 }}>{t('policyCoverageScheduleHeading')}</p>
               {policy.schedules.map((s) => (
                 <div key={s.id} style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
                   Effective {formatDate(s.effectiveFrom, language)}
@@ -514,7 +507,7 @@ export function PolicySection({
                 onClick={() => void downloadDocument(policy.id)}
                 style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
               >
-                Download schedule summary (PDF)
+                {t('policyDownloadScheduleButton')}
               </button>
               <button
                 type="button"
@@ -525,15 +518,13 @@ export function PolicySection({
                   marginTop: '0.4rem',
                   marginInlineStart: '0.5rem',
                 }}
-              >
-                Download certificate (PDF)
-              </button>
+              >{t('policyDownloadCertificate')}</button>
             </div>
           ) : null}
 
           {policy.documents.length > 0 ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Electronic file documents</p>
+              <p style={{ fontWeight: 600 }}>{t('policyElectronicFileHeading')}</p>
               <ul style={{ margin: '0.3rem 0' }}>
                 {policy.documents.map((d) => (
                   <li key={d.id} style={{ fontSize: '0.9rem' }}>
@@ -546,7 +537,7 @@ export function PolicySection({
 
           {isPlacement && policy.status !== 'PLACEMENT_CONFIRMED' ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Attach a document</p>
+              <p style={{ fontWeight: 600 }}>{t('policyAttachDocumentHeading')}</p>
               <DocumentRowsEditor rows={attachDocs} setRows={setAttachDocs} />
               <button
                 type="button"
@@ -595,9 +586,7 @@ export function PolicySection({
                 </p>
               ) : null}
               {policy.checking.discrepancyLoggedAsPiRiskEvent ? (
-                <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>
-                  A Professional Indemnity risk event has been logged.
-                </p>
+                <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>{t('policyPiRiskEventLogged')}</p>
               ) : null}
               <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', opacity: 0.6 }}>
                 Checked by {policy.checking.checkedByUserId ?? '—'}
@@ -614,12 +603,10 @@ export function PolicySection({
                 {policy.checking ? 'Re-run the quality-control check' : 'Quality-control check'}
               </strong>
               <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.2rem 0' }}>
-                Enter the Requested Coverage — the system compares it line-by-line
-                against the issued schedule. A discrepancy blocks Delivery and
-                logs a PI risk event. You cannot check a policy you placed.
+                {t('policyRequestedCoverageNote')}
               </p>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-limits">Requested limits (JSON)</label>
+                <label htmlFor="chk-limits">{t('policyRequestedLimitsLabel')}</label>
                 <textarea
                   id="chk-limits"
                   rows={3}
@@ -628,7 +615,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-sums">Requested sums insured (JSON)</label>
+                <label htmlFor="chk-sums">{t('policyRequestedSumsLabel')}</label>
                 <textarea
                   id="chk-sums"
                   rows={3}
@@ -637,7 +624,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-perils">Requested named perils (comma-separated)</label>
+                <label htmlFor="chk-perils">{t('policyRequestedPerilsLabel')}</label>
                 <input
                   id="chk-perils"
                   value={chkPerilsText}
@@ -645,7 +632,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-extensions">Requested extensions (comma-separated)</label>
+                <label htmlFor="chk-extensions">{t('policyRequestedExtensionsLabel')}</label>
                 <input
                   id="chk-extensions"
                   value={chkExtensionsText}
@@ -672,14 +659,14 @@ export function PolicySection({
                   })
                 }
               >
-                {busy ? 'Checking…' : 'Run check'}
+                {busy ? t('policyCheckingButton') : 'Run check'}
               </button>
             </div>
           ) : null}
 
           {policy.delivery ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Delivery</p>
+              <p style={{ fontWeight: 600 }}>{t('policyDeliveryHeading')}</p>
               <p style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
                 {policy.delivery.method} · to {policy.delivery.recipient} ·{' '}
                 {formatDate(policy.delivery.deliveredAt, language)}
@@ -699,18 +686,16 @@ export function PolicySection({
                       onOpportunityChanged();
                     })
                   }
-                >
-                  Acknowledge receipt
-                </button>
+                >{t('policyAcknowledgeReceiptButton')}</button>
               ) : null}
             </div>
           ) : null}
 
           {canDeliver && !policy.delivery && policy.status === 'VERIFIED' ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '30rem' }}>
-              <strong>Record delivery</strong>
+              <strong>{t('policyRecordDeliveryButtonText')}</strong>
               <div style={quoteFieldStyle}>
-                <label htmlFor="del-method">Method</label>
+                <label htmlFor="del-method">{t('financeMethodLabel')}</label>
                 <select
                   id="del-method"
                   value={deliveryMethod}
@@ -726,7 +711,7 @@ export function PolicySection({
                 </select>
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="del-recipient">Recipient</label>
+                <label htmlFor="del-recipient">{t('policyDeliveryRecipientLabel')}</label>
                 <input
                   id="del-recipient"
                   value={deliveryRecipient}
@@ -749,7 +734,7 @@ export function PolicySection({
                   })
                 }
               >
-                {busy ? 'Recording…' : 'Record delivery'}
+                {busy ? t('policyIssuingButton') : t('policyRecordDeliveryButton')}
               </button>
             </div>
           ) : null}

@@ -30,7 +30,7 @@ export default function ProspectsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the prospect.read permission, so there's nothing to show here."
+          ? t('prosNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('prosLoadError'),
@@ -60,8 +60,7 @@ export default function ProspectsPage() {
     <main style={pageStyle}>
       <h1>{t('prosHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 2 — qualified leads that have been converted into prospects. Convert a lead from
-        the pipeline board to add one here.
+        {t('prosIntro')}
       </p>
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>

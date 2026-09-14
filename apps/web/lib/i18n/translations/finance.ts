@@ -75,7 +75,7 @@ export const FINANCE = {
     crateLoading: 'جارٍ التحميل…',
     crateLoadError: 'تعذّر تحميل جدول نسب العمولة — حاول مرة أخرى.',
     crateOpenError: 'تعذّر فتح نافذة النسبة — حاول مرة أخرى.',
-    crateNoPermission: 'لا تملك الصلاحية اللازمة لعرض جدول نسب العمولة.',
+    crateNoPermission: 'لا تملك صلاحية commission-rate.manage اللازمة لعرض جدول نسب العمولة.',
 
     // ---- Payment channels (#38) -----------------------------------------
     pcHeading: 'قنوات الدفع',
@@ -83,6 +83,7 @@ export const FINANCE = {
       'قنوات الدفع المعتمدة للعملاء (الأموال الواردة، على سند قبض) ولشركات التأمين (الأموال الصادرة، على إشعار توريد). تتولّى المالية صيانة هذه القائمة، وتصبح القناة قابلة للاستخدام فور إضافتها وتظل كذلك حتى تُعطَّل. ولا يُحفظ من رقم الحساب سوى آخر أرقام منه.',
     pcOwnerLabel: 'الجهة المالكة',
     pcOwnerTypeAria: 'نوع الجهة المالكة',
+    pcOwnerFieldLabel: 'المالك',
     pcOwnerIdLabel: 'معرّف الجهة المالكة',
     pcOwnerIdAria: 'معرّف الجهة المالكة',
     pcCustomer: 'عميل',
@@ -231,13 +232,14 @@ export const FINANCE = {
     crateLoading: 'Loading…',
     crateLoadError: 'Could not load the commission rate table — try again.',
     crateOpenError: 'Could not open the rate window — try again.',
-    crateNoPermission: "You don't hold the permission needed to view the commission rate table.",
+    crateNoPermission: "You don't hold the commission-rate.manage permission.",
 
     pcHeading: 'Payment channels',
     pcIntro:
       'The approved payment channels for customers (money in, on a collection receipt) and insurers (money out, on a remittance). Finance maintains this list; a channel is usable the moment it is added and stays so until it is disabled. Only the last few digits of an account are ever stored.',
     pcOwnerLabel: 'Owner',
     pcOwnerTypeAria: 'Owner type',
+    pcOwnerFieldLabel: 'Owner',
     pcOwnerIdLabel: 'Owner ID',
     pcOwnerIdAria: 'Owner id',
     pcCustomer: 'Customer',

@@ -14,6 +14,7 @@
 // prefixes its own keys (`nav*`, `leads*`, `customers*`, ...) so the merged
 // flat namespace never collides.
 import { COMMON } from './translations/common';
+import { AUTH } from './translations/auth';
 import { NAV } from './translations/nav';
 import { LEADS } from './translations/leads';
 import { CUSTOMERS } from './translations/customers';
@@ -34,8 +35,8 @@ export type Language = 'AR' | 'EN';
 export const LANGUAGES: readonly Language[] = ['AR', 'EN'];
 
 const translations = {
-  AR: { ...COMMON.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR },
-  EN: { ...COMMON.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN },
+  AR: { ...COMMON.AR, ...AUTH.AR, ...NAV.AR, ...LEADS.AR, ...CUSTOMERS.AR, ...RFQ.AR, ...POLICY.AR, ...COMPLAINTS.AR, ...CUSTOMER_SERVICE.AR, ...PDPL.AR, ...FINANCE.AR, ...COMPLIANCE_SCREENING.AR, ...COMPLIANCE_RISK.AR, ...DASHBOARDS.AR, ...OPERATIONS.AR, ...DETAIL_PAGES.AR },
+  EN: { ...COMMON.EN, ...AUTH.EN, ...NAV.EN, ...LEADS.EN, ...CUSTOMERS.EN, ...RFQ.EN, ...POLICY.EN, ...COMPLAINTS.EN, ...CUSTOMER_SERVICE.EN, ...PDPL.EN, ...FINANCE.EN, ...COMPLIANCE_SCREENING.EN, ...COMPLIANCE_RISK.EN, ...DASHBOARDS.EN, ...OPERATIONS.EN, ...DETAIL_PAGES.EN },
 } as const;
 
 export type TranslationKey = keyof (typeof translations)['EN'];

@@ -67,7 +67,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       setEmployeeRecords(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the insurer-performance.view / employee-performance.view permissions."
+          ? t('diepNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('diepLoadError'),
@@ -103,7 +103,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Period label
+          {t('dashPeriodLabel')}
           <input
             aria-label={t('dashPeriodLabel')}
             placeholder="e.g. 2026-08"

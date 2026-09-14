@@ -78,7 +78,7 @@ export default function RegulatoryCompliancePage() {
       setLicense(null);
       setLicenseLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the license.manage permission."
+          ? t('rcNoPermission')
           : err instanceof ApiError && err.status === 404
             ? t('rcNoLicense')
             : err instanceof ApiError
@@ -96,7 +96,7 @@ export default function RegulatoryCompliancePage() {
       setItems(null);
       setItemsLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the compliance-calendar.manage permission."
+          ? t('rcNoPermissionCalendar')
           : err instanceof ApiError
             ? err.message
             : t('rcCalendarLoadError'),
@@ -230,7 +230,7 @@ export default function RegulatoryCompliancePage() {
       {canManage ? (
         <form onSubmit={submitLicense} style={formStyle}>
           <label style={labelStyle}>
-            License number
+            {t('rcLicenseNumber')}
             <input
               aria-label={t('rcLicenseNumberLabel')}
               value={licenseNumber}
@@ -239,7 +239,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <label style={labelStyle}>
-            Scope of authorization
+            {t('rcScopeOfAuth')}
             <input
               aria-label={t('rcScopeLabel')}
               value={scopeOfAuthorization}
@@ -247,7 +247,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <label style={labelStyle}>
-            Issued at
+            {t('rcIssuedAt')}
             <input
               aria-label={t('rcIssuedAtLabel')}
               type="date"
@@ -256,7 +256,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <label style={labelStyle}>
-            Expires at
+            {t('rcExpiresAt')}
             <input
               aria-label={t('rcExpiresAtLabel')}
               type="date"
@@ -275,7 +275,7 @@ export default function RegulatoryCompliancePage() {
       {canManage ? (
         <form onSubmit={submitItem} style={formStyle}>
           <label style={labelStyle}>
-            Obligation
+            {t('rcObligationLabel')}
             <input
               aria-label={t('rcObligationLabel')}
               value={obligationName}
@@ -284,7 +284,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <label style={labelStyle}>
-            Owner user ID
+            {t('rcOwnerUserId')}
             <input
               aria-label={t('rcOwnerUserIdLabel')}
               value={ownerUserId}
@@ -293,7 +293,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <label style={labelStyle}>
-            Due date
+            {t('rcDueDate')}
             <input
               aria-label={t('rcDueDateLabel')}
               type="date"
@@ -303,7 +303,7 @@ export default function RegulatoryCompliancePage() {
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : t('rcAddObligationButton')}
+            {busy ? t('rcSavingButton') : t('rcAddObligationButton')}
           </button>
         </form>
       ) : null}

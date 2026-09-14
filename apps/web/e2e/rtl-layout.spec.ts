@@ -58,7 +58,7 @@ test("the sidebar renders on the opposite screen edge in Arabic vs. English — 
   await mockAuth(page, "EN");
   await mockStatus(page);
   await page.goto("/watchlist-sync");
-  const nav = page.getByRole("navigation", { name: "Primary" });
+  const nav = page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ });
   await expect(nav).toBeVisible();
   const ltrBox = await nav.boundingBox();
   if (!ltrBox) throw new Error("nav has no bounding box");

@@ -62,7 +62,7 @@ export default function VendorDetailPage() {
       setVendor(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the vendor.manage permission."
+          ? t('vendNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('vendLoadError'),
@@ -188,34 +188,35 @@ export default function VendorDetailPage() {
             <h2>
               <bdi>{vendor.name}</bdi>
             </h2>
-            <p>Type: {vendor.vendorType}</p>
+            <p>{t('vendTypeLabel')} {vendor.vendorType}</p>
             <p>
-              Risk tier: <strong>{vendor.riskTier ?? 'unassigned'}</strong>
+              {t('vendRiskTierLabel')}{' '}
+              <strong>{vendor.riskTier ?? t('vendUnassigned')}</strong>
             </p>
             <p>
-              Annual review due:{' '}
+              {t('vendAnnualReviewDue')}{' '}
               {vendor.annualReviewDueAt
                 ? vendor.annualReviewDueAt.replace('T', ' ').slice(0, 16)
-                : 'not scheduled'}
+                : t('vendNotScheduled')}
             </p>
             <p>
-              Termination confirmed:{' '}
+              {t('vendTerminationConfirmed')}{' '}
               {vendor.terminationDataReturnConfirmedAt
                 ? vendor.terminationDataReturnConfirmedAt.replace('T', ' ').slice(0, 16)
-                : 'not terminated'}
+                : t('vendNotTerminated')}
             </p>
             <p>
-              Access revoked:{' '}
+              {t('vendAccessRevoked')}{' '}
               {vendor.accessRevokedAt
                 ? vendor.accessRevokedAt.replace('T', ' ').slice(0, 16)
-                : 'not revoked'}
+                : t('vendNotRevoked')}
             </p>
           </section>
 
           <section style={sectionStyle}>
             <h2>{t('vendRiskTiering')}</h2>
             <label>
-              Risk tier
+              {t('vendRiskTierField')}
               <select
                 value={riskTier}
                 onChange={(e) => setRiskTierValue(e.target.value as RiskTier)}
@@ -228,17 +229,17 @@ export default function VendorDetailPage() {
               </select>
             </label>{' '}
             <button type="button" onClick={onSetRiskTier}>
-              Set tier
+              {t('vendSetTierButton')}
             </button>{' '}
             <button type="button" onClick={onRecordAnnualReview}>
-              Record annual review completed
+              {t('vendRecordAnnualReviewButton')}
             </button>
           </section>
 
           <section style={sectionStyle}>
             <h2>{t('vendDataShareReadiness')}</h2>
             <button type="button" onClick={onCheckReadiness}>
-              Check readiness
+              {t('vendCheckReadinessButton')}
             </button>
             {readiness ? (
               <p>
@@ -256,7 +257,7 @@ export default function VendorDetailPage() {
           <section style={sectionStyle}>
             <h2>{t('vendDpaHeading')}</h2>
             <button type="button" onClick={onCreateDpa}>
-              Create a new DPA
+              {t('vendCreateDpaButton')}
             </button>
             {dpas && dpas.length > 0 ? (
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem', marginTop: '0.5rem' }}>
@@ -270,17 +271,17 @@ export default function VendorDetailPage() {
                 <tbody>
                   {dpas.map((dpa) => (
                     <tr key={dpa.id}>
-                      <td style={cell}>{dpa.signedAt ? dpa.signedAt.slice(0, 10) : 'unsigned'}</td>
-                      <td style={cell}>{dpa.dpoApprovedByUserId ? 'yes' : 'no'}</td>
+                      <td style={cell}>{dpa.signedAt ? dpa.signedAt.slice(0, 10) : t('vendUnsigned')}</td>
+                      <td style={cell}>{dpa.dpoApprovedByUserId ? t('vendYes') : t('vendNo')}</td>
                       <td style={cell}>
                         {!dpa.signedAt ? (
                           <button type="button" onClick={() => onSignDpa(dpa.id)}>
-                            Sign
+                            {t('vendSignButton')}
                           </button>
                         ) : null}{' '}
                         {dpa.signedAt && !dpa.dpoApprovedByUserId ? (
                           <button type="button" onClick={() => onDpoApprove(dpa.id)}>
-                            DPO approve
+                            {t('vendDpoApproveButton')}
                           </button>
                         ) : null}
                       </td>
@@ -296,10 +297,10 @@ export default function VendorDetailPage() {
           <section style={sectionStyle}>
             <h2>{t('vendTermination')}</h2>
             <button type="button" onClick={onTerminate}>
-              Terminate (confirm data return/destruction)
+              {t('vendTerminateButton')}
             </button>{' '}
             <button type="button" onClick={onRevokeAccess}>
-              Revoke access
+              {t('vendRevokeAccessButton')}
             </button>
           </section>
         </>

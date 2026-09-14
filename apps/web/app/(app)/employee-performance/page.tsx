@@ -74,7 +74,7 @@ export default function EmployeePerformancePage() {
       setHistory(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the employee-performance.view permission."
+          ? t('epNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('epLoadError'),
@@ -214,9 +214,7 @@ export default function EmployeePerformancePage() {
       <form onSubmit={onCompute} style={formStyle}>
         <h2>{t('epComputeNow')}</h2>
         <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
-          Uses the Employee ID above. Leave the period fields blank to score
-          the UTC calendar month that just ended (what the monthly job
-          itself does).
+          {t('epComputeNote')}
         </p>
         <label style={labelStyle}>
           {t('ipPeriodOptionalLabel')}

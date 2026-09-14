@@ -63,7 +63,7 @@ export default function FinancialReportPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the financial-report.view permission, so there's nothing to show here."
+          ? t('frNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('frLoadError'),

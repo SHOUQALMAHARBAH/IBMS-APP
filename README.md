@@ -131,31 +131,40 @@ already give).
   listed four of five statuses and rendered `DISQUALIFIED` raw. Sixteen
   `Record<Enum, TranslationKey>` maps now cover the enums a user reads. Follow
   the same shape for any other one.
-* **Every screen under `app/(app)/` is bilingual — 89 of 89.** Copy lives in
-  `lib/i18n/translations/`, one namespaced dictionary per domain (`nav`, `leads`,
-  `customers`, `rfq`, `policy`, `complaints`, `customer-service`, `pdpl`, `finance`,
-  `compliance-screening`, `compliance-risk`, `dashboards`, `operations`,
+* **Every screen is bilingual — 93 of 93**, the 89 under `app/(app)/` plus the four
+  `(auth)` screens that render before anyone is signed in. Copy lives in
+  `lib/i18n/translations/`, one namespaced dictionary per domain (`auth`, `nav`,
+  `leads`, `customers`, `rfq`, `policy`, `complaints`, `customer-service`, `pdpl`,
+  `finance`, `compliance-screening`, `compliance-risk`, `dashboards`, `operations`,
   `detail-pages`, plus `common`), merged into one flat `TranslationKey` union by
-  `lib/i18n/translations.ts`. **2,410 keys per language, AR and EN in exact parity.**
+  `lib/i18n/translations.ts`. **2,705 keys per language, AR and EN in exact parity.**
   Key names are semantic and per-domain prefixed (`leadsAddButton`, never the English
   phrase); Arabic is written as Arabic, not translated from the English, and an
   unsourced term is marked `TODO(arabic-terminology)` in place rather than guessed.
   Add a new screen's copy to the dictionary its domain already owns — a page-local
   `Record<string, string>` of labels is the exact defect the status modules above
   exist to prevent, and `tsc` cannot see it.
-  **Two open gaps, both deliberate and both the next commit's work.** The 403
-  permission-denied branch is still hard-coded English at **54 sites across 48
-  pages** even though the AR+EN keys for those messages exist — all 54
-  `*NoPermission` keys are currently unreferenced — along with ~25 stragglers
-  (`audit-trail` renders five `<label>`s in English beside Arabic `aria-label`s;
-  `Record a new …` headings on `employees`/`vendors`/`bcp-dr-plans`/
-  `information-assets`/`documents`; `Timers`/`Workflow`/`Entity` on
-  `sla-dashboard`). And `customer-service.ts` re-declares four `commChannel*` keys
-  `rfq.ts` already owns and spreads later, so `rfqs/[id]` renders "Phone call"/
-  "Customer portal" instead of its own "Call"/"Portal" — the first collisions the
-  prefix convention was supposed to make impossible. Separately, `policy.ts` has
-  161 unreferenced keys, orphaned before this work when the policy screens moved to
-  `pold*` in `detail-pages.ts` — pre-existing debt, not a regression.
+  **The 403 permission-denied branch is wired**, at 86 `t('*NoPermission*')` call
+  sites across 74 files; no `*NoPermission` key is left unreferenced. The shape is
+  always `err.status === 403 ? t('<screen>NoPermission') : err.message`, so the
+  translated string is reached only for a permission denial and a real API error
+  still surfaces its own message.
+  **The merged namespace is now tested, not assumed.** `translations.test.ts` asserts
+  three things the prefix convention only promised: every dictionary file on disk is
+  covered, every key is declared in exactly one file, and every file is at exact AR/EN
+  parity. It was written because four `commChannel*` keys were declared in **both**
+  `rfq.ts` and `customer-service.ts` — the later spread won, so `rfqs/[id]` rendered
+  the communications screen's "Phone call"/"Customer portal" instead of its own
+  "Call"/"Portal". `tsc` cannot see a collision: both sides are `string`, and the
+  merged object is simply the last writer's value. The RFQ set is renamed `rfqComm*`.
+  **Two things are known-open and deliberately not in that pass.** Thirteen
+  `placeholder="…"` example hints are still literal English (`"file name"` and
+  `"storage reference"` on `PolicySection`, `"e.g. Manufacturing"` and two more on
+  `ProspectConversionForm`, plus six others) — form hint text, a category no pass has
+  claimed yet. And `policy.ts` still carries 98 unreferenced keys (down from 161),
+  orphaned before this work when the policy screens moved to `pold*` in
+  `detail-pages.ts` — pre-existing debt, not a regression; 159 keys are unreferenced
+  across all sixteen dictionaries, 98 of them there.
 * **`GET /policies` answers three questions.** With `opportunityId`, the one
   policy placed from it; with `customerId`, that customer's policies; with
   neither, the book-wide list behind `/policies` — filtered **in the query** to

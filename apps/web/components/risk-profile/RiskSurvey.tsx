@@ -168,9 +168,7 @@ export function RiskSurvey({
     <section style={sectionStyle}>
       <h2 style={{ marginTop: 0 }}>{t('rsAssetSurvey')}</h2>
       <p style={{ opacity: 0.8 }}>
-        Process 6 — the detailed building / equipment / stock / annual-profit /
-        fleet survey for this location. The Sum Insured and indemnity period
-        below are derived from it.
+        {t('rsSurveyIntro')}
       </p>
 
       <div style={summaryPanelStyle}>
@@ -198,9 +196,7 @@ export function RiskSurvey({
       </div>
 
       {assets.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          No assets surveyed yet for this location.
-        </p>
+        <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('rpNoAssetsYet')}</p>
       ) : (
         <table style={assetTableStyle}>
           <thead>
@@ -248,9 +244,7 @@ export function RiskSurvey({
       {canEdit ? (
         <form onSubmit={(e) => void handleAddAsset(e)} style={assetFormStyle}>
           <div style={assetFieldStyle}>
-            <label htmlFor="asset-type" style={labelStyle}>
-              Asset type
-            </label>
+            <label htmlFor="asset-type" style={labelStyle}>{t('rpAssetType')}</label>
             <select
               id="asset-type"
               value={assetType}
@@ -266,9 +260,7 @@ export function RiskSurvey({
           </div>
 
           <div style={assetFieldStyle}>
-            <label htmlFor="asset-description" style={labelStyle}>
-              Description (optional)
-            </label>
+            <label htmlFor="asset-description" style={labelStyle}>{t('rpAssetDescription')}</label>
             <input
               id="asset-description"
               value={description}
@@ -279,9 +271,7 @@ export function RiskSurvey({
 
           {isVehicle ? (
             <div style={assetFieldStyle}>
-              <label htmlFor="asset-fleet" style={labelStyle}>
-                Number of vehicles
-              </label>
+              <label htmlFor="asset-fleet" style={labelStyle}>{t('rpVehicleCount')}</label>
               <input
                 id="asset-fleet"
                 type="number"
@@ -294,9 +284,7 @@ export function RiskSurvey({
           ) : (
             <>
               <div style={assetFieldStyle}>
-                <label htmlFor="asset-declared" style={labelStyle}>
-                  Declared value (JOD)
-                </label>
+                <label htmlFor="asset-declared" style={labelStyle}>{t('rpDeclaredValue')}</label>
                 <input
                   id="asset-declared"
                   inputMode="decimal"
@@ -307,9 +295,7 @@ export function RiskSurvey({
                 />
               </div>
               <div style={assetFieldStyle}>
-                <label htmlFor="asset-profit" style={labelStyle}>
-                  Annual gross profit (JOD)
-                </label>
+                <label htmlFor="asset-profit" style={labelStyle}>{t('rpAnnualGrossProfit')}</label>
                 <input
                   id="asset-profit"
                   inputMode="decimal"
@@ -320,9 +306,7 @@ export function RiskSurvey({
                 />
               </div>
               <div style={assetFieldStyle}>
-                <label htmlFor="asset-indemnity" style={labelStyle}>
-                  Indemnity period (months)
-                </label>
+                <label htmlFor="asset-indemnity" style={labelStyle}>{t('rpIndemnityPeriod')}</label>
                 <input
                   id="asset-indemnity"
                   type="number"

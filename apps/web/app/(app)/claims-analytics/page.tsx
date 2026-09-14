@@ -58,7 +58,7 @@ export default function ClaimsAnalyticsPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the claims-analytics.view permission, so there's nothing to show here."
+          ? t('claNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('claLoadError'),
@@ -90,7 +90,7 @@ export default function ClaimsAnalyticsPage() {
       </p>
 
       <label style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}>
-        Group by
+        {t('claGroupBy')}
         <select
           aria-label={t('claGroupBy')}
           value={groupBy}

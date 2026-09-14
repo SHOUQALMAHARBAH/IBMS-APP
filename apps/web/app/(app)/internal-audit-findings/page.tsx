@@ -58,7 +58,7 @@ export default function InternalAuditFindingsPage() {
       setFindings(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the internal-audit.record/internal-audit.close permission."
+          ? t('iafNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('iafLoadError'),
@@ -121,7 +121,7 @@ export default function InternalAuditFindingsPage() {
       {canRecord ? (
         <form onSubmit={submit} style={formStyle}>
           <label style={labelStyle}>
-            Audit period
+            {t('iafAuditPeriodFieldLabel')}
             <input
               aria-label={t('iafAuditPeriodLabel')}
               value={auditPeriodLabel}
@@ -130,7 +130,7 @@ export default function InternalAuditFindingsPage() {
             />
           </label>
           <label style={labelStyle}>
-            Finding
+            {t('iafFindingLabel')}
             <input
               aria-label={t('iafFindingLabel')}
               value={finding}

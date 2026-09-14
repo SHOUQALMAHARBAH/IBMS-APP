@@ -58,7 +58,7 @@ export default function VendorsPage() {
       setVendors(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the vendor.manage permission."
+          ? t('venNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('venLoadError'),
@@ -113,11 +113,7 @@ export default function VendorsPage() {
     <main style={pageStyle}>
       <h1>{t('venHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The shared vendor register — Procurement&apos;s general
-        (&ldquo;other&rdquo;) vendors alongside Vendor Management&apos;s
-        risk-tiered ones (insurer, reinsurer, loss adjuster, IT/cloud,
-        printing/archiving, marketing/call-centre). Open a vendor for risk
-        tiering, Data Processing Agreements, and termination.
+        {t('venIntro')}
       </p>
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
@@ -197,13 +193,13 @@ export default function VendorsPage() {
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new vendor</h2>
+        <h2>{t('venCreateHeading')}</h2>
         <label style={labelStyle}>
-          Name
+          {t('venColName')}
           <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label style={labelStyle}>
-          Type
+          {t('venColType')}
           <select
             value={vendorType}
             onChange={(e) => setVendorType(e.target.value as VendorType)}
@@ -220,7 +216,7 @@ export default function VendorsPage() {
             {formError}
           </p>
         ) : null}
-        <button type="submit">Record vendor</button>
+        <button type="submit">{t('venSubmitButton')}</button>
       </form>
     </main>
   );

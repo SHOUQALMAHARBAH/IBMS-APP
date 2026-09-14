@@ -69,8 +69,7 @@ function AssembleFlow() {
   if (!needsAssessmentId) {
     return (
       <p role="alert" style={errorStyle}>
-        No needs assessment selected — open an approved needs assessment and
-        assemble the program from there.
+        {t('iprognNoAssessmentSelected')}
       </p>
     );
   }
@@ -94,16 +93,15 @@ function AssembleFlow() {
 
       {!isApproved ? (
         <p role="alert" style={errorStyle}>
-          A program can only be assembled from an <strong>approved</strong>{' '}
-          needs assessment. This one is {assessment.status}.
+          {t('iprognOnlyApproved')} <strong>{t('iprognApprovedWord')}</strong>.{' '}
+          {t('iprognThisOneIs', { status: assessment.status })}
         </p>
       ) : null}
 
       <h2 style={{ marginTop: '1.5rem' }}>{t('iprognCoverageLines')}</h2>
       {assessment.recommendedCoverageLines.length === 0 ? (
         <p style={{ opacity: 0.6 }}>
-          This needs assessment recommends no coverage lines — nothing to
-          assemble.
+          {t('iprognNoLines')}
         </p>
       ) : (
         <ul style={coverageTagListStyle}>

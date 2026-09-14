@@ -53,7 +53,7 @@ export default function PolicyDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dashboard.policy.view permission."
+          ? t('dpolNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('dpolLoadError'),
@@ -106,16 +106,16 @@ export default function PolicyDashboardPage() {
           <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Period label
+          {t('dashPeriodLabel')}
           <input
             aria-label={t('dashPeriodLabel')}
-            placeholder="e.g. 2026-08"
+            placeholder={t('dashPeriodLabelPlaceholder')}
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Period start
+          {t('dashPeriodStart')}
           <input
             aria-label={t('dashPeriodStart')}
             placeholder={t('dashDatePlaceholder')}
@@ -124,7 +124,7 @@ export default function PolicyDashboardPage() {
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Period end
+          {t('dashPeriodEnd')}
           <input
             aria-label={t('dashPeriodEnd')}
             placeholder={t('dashDatePlaceholder')}

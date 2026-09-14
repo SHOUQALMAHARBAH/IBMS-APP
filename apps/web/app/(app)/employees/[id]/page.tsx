@@ -57,7 +57,7 @@ export default function EmployeeDetailPage() {
       setEmployee(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the employee.manage permission."
+          ? t('empdNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('empdLoadError'),
@@ -165,38 +165,38 @@ export default function EmployeeDetailPage() {
             </h2>
             {employee.givenName ? (
               <p>
-                Given name: <bdi>{employee.givenName}</bdi>
+                {t('empdGivenName')} <bdi>{employee.givenName}</bdi>
                 {employee.fatherName ? (
                   <>
                     {' '}
-                    — Father&apos;s name: <bdi>{employee.fatherName}</bdi>
+                    — {t('empdFatherName')} <bdi>{employee.fatherName}</bdi>
                   </>
                 ) : null}
                 {employee.grandfatherName ? (
                   <>
                     {' '}
-                    — Grandfather&apos;s name: <bdi>{employee.grandfatherName}</bdi>
+                    — {t('empdGrandfatherName')} <bdi>{employee.grandfatherName}</bdi>
                   </>
                 ) : null}
                 {' '}
-                — Family name: <bdi>{employee.familyName}</bdi>
+                — {t('empdFamilyName')} <bdi>{employee.familyName}</bdi>
               </p>
             ) : null}
-            <p>National ID: {employee.nationalId}</p>
-            <p>Position: {employee.position ?? '—'}</p>
-            <p>Licensed role: {employee.licensedRole ?? '—'}</p>
-            <p>Hire date: {employee.hireDate?.slice(0, 10) ?? '—'}</p>
+            <p>{t('empdNationalIdLabel')} {employee.nationalId}</p>
+            <p>{t('empdPositionLabel')} {employee.position ?? '—'}</p>
+            <p>{t('empdLicensedRoleLabel')} {employee.licensedRole ?? '—'}</p>
+            <p>{t('empdHireDateLabel')} {employee.hireDate?.slice(0, 10) ?? '—'}</p>
             <p>
-              Status:{' '}
+              {t('empdStatusLabel')}{' '}
               {employee.terminationDate
-                ? `Terminated ${employee.terminationDate.slice(0, 10)}`
-                : 'Active'}
+                ? t('empdTerminatedOn', { date: employee.terminationDate.slice(0, 10) })
+                : t('empdActive')}
             </p>
 
             <form onSubmit={onReveal} style={formStyle}>
               <h3>{t('empdRevealNationalId')}</h3>
               <label style={labelStyle}>
-                Reason (Part 10.6, min. 10 characters)
+                {t('empdRevealReason')}
                 <input
                   value={revealReason}
                   onChange={(e) => setRevealReason(e.target.value)}
@@ -204,12 +204,12 @@ export default function EmployeeDetailPage() {
                 />
               </label>
               <button type="submit">{t('empdReveal')}</button>
-              {revealedValue ? <p>Full value: {revealedValue}</p> : null}
+              {revealedValue ? <p>{t('empdFullValue')} {revealedValue}</p> : null}
             </form>
 
             {!employee.terminationDate ? (
               <button type="button" onClick={onTerminate}>
-                Terminate employment
+                {t('empdTerminateButton')}
               </button>
             ) : null}
           </section>
@@ -235,15 +235,15 @@ export default function EmployeeDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {employee.trainings.map((t) => (
-                    <tr key={t.id}>
-                      <td style={cell}>{t.trainingName}</td>
-                      <td style={cell}>{t.dueAt?.slice(0, 10) ?? '—'}</td>
-                      <td style={cell}>{t.completedAt?.slice(0, 10) ?? '—'}</td>
+                  {employee.trainings.map((training) => (
+                    <tr key={training.id}>
+                      <td style={cell}>{training.trainingName}</td>
+                      <td style={cell}>{training.dueAt?.slice(0, 10) ?? '—'}</td>
+                      <td style={cell}>{training.completedAt?.slice(0, 10) ?? '—'}</td>
                       <td style={cell}>
-                        {!t.completedAt ? (
-                          <button type="button" onClick={() => onCompleteTraining(t.id)}>
-                            Mark complete
+                        {!training.completedAt ? (
+                          <button type="button" onClick={() => onCompleteTraining(training.id)}>
+                            {t('empdMarkComplete')}
                           </button>
                         ) : null}
                       </td>
@@ -256,7 +256,7 @@ export default function EmployeeDetailPage() {
             <form onSubmit={onRecordTraining} style={formStyle}>
               <h3>{t('empdAssignTrainingHeading')}</h3>
               <label style={labelStyle}>
-                Training name
+                {t('empdTrainingName')}
                 <input
                   value={trainingName}
                   onChange={(e) => setTrainingName(e.target.value)}
@@ -264,7 +264,7 @@ export default function EmployeeDetailPage() {
                 />
               </label>
               <label style={labelStyle}>
-                Due date (optional)
+                {t('empdTrainingDueDate')}
                 <input
                   type="date"
                   value={trainingDueAt}
@@ -285,42 +285,42 @@ export default function EmployeeDetailPage() {
               </p>
               <ul>
                 <li>
-                  System access revoked:{' '}
+                  {t('empdSystemAccessRevoked')}{' '}
                   {employee.deprovisioningChecklist.systemAccessRevokedAt ? (
-                    'Yes'
+                    t('empdYes')
                   ) : (
                     <button type="button" onClick={() => onTickChecklistItem('systemAccessRevoked')}>
-                      Mark done
+                      {t('empdMarkDone')}
                     </button>
                   )}
                 </li>
                 <li>
-                  Physical access revoked:{' '}
+                  {t('empdPhysicalAccessRevoked')}{' '}
                   {employee.deprovisioningChecklist.physicalAccessRevokedAt ? (
-                    'Yes'
+                    t('empdYes')
                   ) : (
                     <button type="button" onClick={() => onTickChecklistItem('physicalAccessRevoked')}>
-                      Mark done
+                      {t('empdMarkDone')}
                     </button>
                   )}
                 </li>
                 <li>
-                  Device returned:{' '}
+                  {t('empdDeviceReturned')}{' '}
                   {employee.deprovisioningChecklist.deviceReturnedAt ? (
-                    'Yes'
+                    t('empdYes')
                   ) : (
                     <button type="button" onClick={() => onTickChecklistItem('deviceReturned')}>
-                      Mark done
+                      {t('empdMarkDone')}
                     </button>
                   )}
                 </li>
                 <li>
-                  Knowledge transfer done:{' '}
+                  {t('empdKnowledgeTransferDone')}{' '}
                   {employee.deprovisioningChecklist.knowledgeTransferDoneAt ? (
-                    'Yes'
+                    t('empdYes')
                   ) : (
                     <button type="button" onClick={() => onTickChecklistItem('knowledgeTransferDone')}>
-                      Mark done
+                      {t('empdMarkDone')}
                     </button>
                   )}
                 </li>
@@ -329,7 +329,7 @@ export default function EmployeeDetailPage() {
                 <p>Completed {employee.deprovisioningChecklist.completedAt.replace('T', ' ').slice(0, 16)}.</p>
               ) : (
                 <button type="button" onClick={onCompleteChecklist}>
-                  Complete checklist
+                  {t('empdCompleteChecklist')}
                 </button>
               )}
             </section>

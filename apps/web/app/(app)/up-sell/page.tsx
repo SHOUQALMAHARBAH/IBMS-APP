@@ -101,7 +101,7 @@ function RecommendationRow({
                 htmlFor={`reason-${recommendation.id}`}
                 style={cardMetaStyle}
               >
-                Why is the increase not being pursued?
+                {t('upsWhyNotPursued')}
               </label>
               <input
                 id={`reason-${recommendation.id}`}
@@ -125,7 +125,7 @@ function RecommendationRow({
                   )
                 }
               >
-                Confirm dismiss
+                {t('upsConfirmDismiss')}
               </button>
               <button
                 type="button"
@@ -178,7 +178,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the up-sell.read permission, so there's nothing to show here."
+          ? t('upsNoPermission')
           : err instanceof ApiError && err.status === 404
             ? t('upsCustomerNotFound')
             : err instanceof ApiError
@@ -203,7 +203,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the up-sell.detect permission."
+          ? t('upsNoPermissionDetect')
           : err instanceof ApiError
             ? err.message
             : t('upsScanError'),

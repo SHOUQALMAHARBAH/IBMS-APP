@@ -70,7 +70,7 @@ export default function PortfolioAnalysisPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the portfolio-analysis.view permission."
+          ? t('paNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('paLoadError'),

@@ -75,7 +75,7 @@ export default function SalesPerformancePage() {
         setPerformance(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? "You don't hold the dashboard.sales.view permission."
+            ? t('spNoPermission')
             : err instanceof ApiError
               ? err.message
               : t('spLoadError'),

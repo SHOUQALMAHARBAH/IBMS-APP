@@ -74,15 +74,13 @@ export default function UserAdminPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? isArabic
-            ? 'لا تملك صلاحية user.manage.'
-            : "You don't hold the user.manage permission."
+          ? t('usrNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('usrCouldNotLoadUsersTry'),
       );
     }
-  }, [isArabic, t]);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -197,7 +195,7 @@ export default function UserAdminPage() {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             {t('usrPasswordMin12CharsWith')}
             <input
-              aria-label="Password"
+              aria-label={t('usrPasswordAria')}
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

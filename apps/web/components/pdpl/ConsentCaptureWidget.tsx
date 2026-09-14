@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import { useAuth } from '../../lib/auth/auth-context';
 import {
   confirmConsentWithdrawal,
@@ -36,6 +37,7 @@ export function ConsentCaptureWidget({
   customerId,
   insuredPersonId,
 }: Props) {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const canManage = hasPermission(user, 'consent.manage');
 
@@ -62,13 +64,13 @@ export function ConsentCaptureWidget({
       setRecord(null);
       setError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the consent.manage permission."
+          ? t('consWidgetNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load consent status.',
+            : t('consStatusLoadError'),
       );
     }
-  }, [customerId, insuredPersonId, purpose]);
+  }, [customerId, insuredPersonId, purpose, t]);
 
   useEffect(() => {
     if (!canManage) return;
@@ -91,7 +93,7 @@ export function ConsentCaptureWidget({
       await load();
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : 'The capture failed — try again.',
+        err instanceof ApiError ? err.message : t('consCaptureFailed'),
       );
     } finally {
       setBusy(false);
@@ -108,7 +110,7 @@ export function ConsentCaptureWidget({
       await load();
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : 'The withdrawal failed — try again.',
+        err instanceof ApiError ? err.message : t('consWithdrawError'),
       );
     } finally {
       setBusy(false);
@@ -149,7 +151,7 @@ export function ConsentCaptureWidget({
         </p>
       ) : null}
       {record === undefined ? (
-        <p style={{ fontSize: '0.85rem', opacity: 0.6 }}>Loading…</p>
+        <p style={{ fontSize: '0.85rem', opacity: 0.6 }}>{t('consLoading')}</p>
       ) : record?.isActive ? (
         <div
           style={{
@@ -164,7 +166,7 @@ export function ConsentCaptureWidget({
             {record.consentTextVersion})
           </span>
           <button type="button" disabled={busy} onClick={() => void withdraw()}>
-            {busy ? 'Withdrawing…' : 'Withdraw'}
+            {busy ? t('consWithdrawing') : 'Withdraw'}
           </button>
         </div>
       ) : (
@@ -173,8 +175,8 @@ export function ConsentCaptureWidget({
             {record?.withdrawnAt
               ? `Previously withdrawn ${record.withdrawnAt.slice(0, 10)}.`
               : record
-                ? 'Previously declined.'
-                : 'No decision captured yet.'}
+                ? t('consPreviouslyDeclined')
+                : t('consNoDecisionYet')}
           </p>
           <label
             style={{
@@ -183,9 +185,7 @@ export function ConsentCaptureWidget({
               gap: '0.2rem',
               fontSize: '0.85rem',
             }}
-          >
-            Consent text version
-            <input
+          >{t('consTextVersionLabel')}<input
               aria-label={`${label} — consent text version`}
               value={consentTextVersion}
               onChange={(e) => setConsentTextVersion(e.target.value)}
@@ -197,14 +197,14 @@ export function ConsentCaptureWidget({
               disabled={busy || !consentTextVersion.trim()}
               onClick={() => void capture('grant')}
             >
-              Grant
+              {t('consGrant')}
             </button>
             <button
               type="button"
               disabled={busy || !consentTextVersion.trim()}
               onClick={() => void capture('decline')}
             >
-              Decline
+              {t('consDecline')}
             </button>
           </div>
         </div>

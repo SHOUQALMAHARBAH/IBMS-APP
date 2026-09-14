@@ -177,16 +177,24 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
   });
 });
 
-test("a user without the schedule permission sees the underlying error message", async ({
+test("a user without the schedule permission sees the translated 403 message", async ({
   page,
 }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   await mockRegister(page, { scheduleStatus: 403 });
 
   await page.goto("/retention-disposal");
+  // The screen's own translated 403 copy, not the API's English message.
+  // This page used to pass `err.message` straight through, so the raw
+  // server string reached the user in both languages — and this test
+  // asserted exactly that. The absence check is what makes it a proof:
+  // without it the old behaviour satisfies the new assertion too.
+  await expect(
+    page.getByText("retention/disposal register", { exact: false }),
+  ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("retention-disposal screen has no serious/critical accessibility violations @a11y", async ({

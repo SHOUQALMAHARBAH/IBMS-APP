@@ -56,7 +56,7 @@ export default function InformationAssetsPage() {
       setAssets(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the information-asset.manage permission."
+          ? t('iassetNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('iassetLoadError'),
@@ -108,9 +108,7 @@ export default function InformationAssetsPage() {
     <main style={pageStyle}>
       <h1>{t('iassetHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The ISO 27001 Clause 8.1 asset inventory — every information asset
-        (a data store, a document repository, a backup, an integration)
-        with its owner and classification.
+        {t('iassetIntro')}
       </p>
 
       {loadError ? (
@@ -170,13 +168,13 @@ export default function InformationAssetsPage() {
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new information asset</h2>
+        <h2>{t('iassetCreateHeading')}</h2>
         <label style={labelStyle}>
-          Name
+          {t('iassetColName')}
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label style={labelStyle}>
-          Type
+          {t('iassetColType')}
           <select value={assetType} onChange={(e) => setAssetType(e.target.value as AssetType)}>
             {ASSET_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -186,7 +184,7 @@ export default function InformationAssetsPage() {
           </select>
         </label>
         <label style={labelStyle}>
-          Owner user ID
+          {t('iassetOwnerUserId')}
           <input
             value={ownerUserId}
             onChange={(e) => setOwnerUserId(e.target.value)}
@@ -194,7 +192,7 @@ export default function InformationAssetsPage() {
           />
         </label>
         <label style={labelStyle}>
-          Classification
+          {t('iassetColClassification')}
           <select
             value={classification}
             onChange={(e) => setClassification(e.target.value as DataClassification)}
@@ -211,7 +209,7 @@ export default function InformationAssetsPage() {
             {formError}
           </p>
         ) : null}
-        <button type="submit">Record asset</button>
+        <button type="submit">{t('iassetSubmitButton')}</button>
       </form>
     </main>
   );

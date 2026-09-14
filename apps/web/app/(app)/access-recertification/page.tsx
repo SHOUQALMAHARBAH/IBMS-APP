@@ -37,7 +37,7 @@ export default function AccessRecertificationPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the access-recertification.review permission, so there's nothing to show here."
+          ? t('acrNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('acrLoadError'),

@@ -135,7 +135,7 @@ function NewNeedsAssessmentFlow() {
             onClick={() => router.push(`/risk-profiles?customerId=${customerId}`)}
             style={{ textDecoration: 'underline', cursor: 'pointer' }}
           >
-            Risk surveys
+            {t('nanRiskSurveysLink')}
           </button>
           .
         </p>
@@ -143,7 +143,7 @@ function NewNeedsAssessmentFlow() {
         {profiles && profiles.length > 0 ? (
           <div>
             <label htmlFor="rp-select" style={labelStyle}>
-              Existing risk profile
+              {t('nanExistingProfile')}
             </label>
             <select
               id="rp-select"
@@ -167,7 +167,7 @@ function NewNeedsAssessmentFlow() {
 
         <form onSubmit={(e) => void handleCreateProfile(e)} style={{ marginTop: '1rem' }}>
           <label htmlFor="rp-site" style={labelStyle}>
-            New risk profile — site label (optional)
+            {t('nanNewProfileSite')}
           </label>
           <input
             id="rp-site"
@@ -177,7 +177,7 @@ function NewNeedsAssessmentFlow() {
             placeholder={t('nanSitePlaceholder')}
           />
           <label htmlFor="rp-claims" style={labelStyle}>
-            Prior claims history summary (optional)
+            {t('nanPriorClaims')}
           </label>
           <input
             id="rp-claims"
@@ -208,7 +208,7 @@ function NewNeedsAssessmentFlow() {
         />
       ) : (
         <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          Select or add a risk profile to start the questionnaire.
+          {t('nanSelectToStart')}
         </p>
       )}
     </>
@@ -244,8 +244,7 @@ export default function NewNeedsAssessmentPage() {
         </Suspense>
       ) : (
         <p role="alert" style={errorStyle}>
-          You don&apos;t hold the needs-assessment.create permission, so there&apos;s
-          nothing to do here.
+          {t('nanNoPermission')}
         </p>
       )}
     </main>

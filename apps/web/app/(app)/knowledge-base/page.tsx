@@ -56,7 +56,7 @@ export default function KnowledgeBasePage() {
       setArticles(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the kb.publish permission."
+          ? t('kbNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('kbLoadError'),
@@ -118,9 +118,7 @@ export default function KnowledgeBasePage() {
     <main style={pageStyle}>
       <h1>{t('kbHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Product knowledge, insurer appetite, rate guides, and regulatory
-        updates for staff. Each article may be published in English,
-        Arabic, or both.
+        {t('kbIntro')}
       </p>
 
       {loadError ? (
@@ -192,7 +190,7 @@ export default function KnowledgeBasePage() {
       <form onSubmit={onCreate} style={formStyle}>
         <h2>{t('kbPublishSection')}</h2>
         <label style={labelStyle}>
-          Title (English)
+          {t('kbTitleEn')}
           <input value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label style={labelStyle}>
@@ -210,7 +208,7 @@ export default function KnowledgeBasePage() {
           </select>
         </label>
         <label style={labelStyle}>
-          Body (English, optional)
+          {t('kbBodyEn')}
           <textarea value={bodyEn} onChange={(e) => setBodyEn(e.target.value)} rows={4} />
         </label>
         <label style={labelStyle}>

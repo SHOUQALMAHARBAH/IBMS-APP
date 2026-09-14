@@ -60,9 +60,11 @@ export default function RopaEntriesPage() {
     } catch (err) {
       setRows(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('ropaLoadError'),
+        err instanceof ApiError && err.status === 403
+          ? t('ropaNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('ropaLoadError'),
       );
     }
   }, [t]);
@@ -159,7 +161,7 @@ export default function RopaEntriesPage() {
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Processing activity
+              {t('ropaActivityLabel')}
               <input
                 aria-label={t('ropaActivityLabel')}
                 value={processingActivity}
@@ -177,7 +179,7 @@ export default function RopaEntriesPage() {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Purpose
+              {t('ropaPurposeLabel')}
               <input
                 aria-label={t('ropaPurposeLabel')}
                 value={purpose}

@@ -51,9 +51,11 @@ export default function PrivacyNoticesPage() {
     } catch (err) {
       setRows(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('pnLoadError'),
+        err instanceof ApiError && err.status === 403
+          ? t('pnNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('pnLoadError'),
       );
     }
   }, [t]);
@@ -118,7 +120,7 @@ export default function PrivacyNoticesPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Touchpoint
+            {t('pnTouchpointLabel')}
             <select
               aria-label={t('pnTouchpointLabel')}
               value={touchpoint}

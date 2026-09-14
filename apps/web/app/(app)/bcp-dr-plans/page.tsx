@@ -60,7 +60,7 @@ export default function BcpDrPlansPage() {
       setCoverage(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the bcp-dr.manage permission."
+          ? t('bcpNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('bcpLoadError'),
@@ -114,9 +114,7 @@ export default function BcpDrPlansPage() {
     <main style={pageStyle}>
       <h1>{t('bcpHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        A plan (with RTO/RPO and test history) for each of the five named
-        scenarios: system outage, office/site loss, cyberattack/ransomware,
-        key-staff unavailability, insurer-side service interruption.
+        {t('bcpIntro')}
       </p>
 
       {loadError ? (
@@ -135,7 +133,7 @@ export default function BcpDrPlansPage() {
           <section key={entry.scenario} style={sectionStyle}>
             <h2>
               {entry.scenario}{' '}
-              {entry.hasPlan ? null : <span style={{ color: '#b91c1c' }}>— no plan on file</span>}
+              {entry.hasPlan ? null : <span style={{ color: '#b91c1c' }}>{t('bcpNoPlanOnFile')}</span>}
             </h2>
             {entry.plans.length > 0 ? (
               <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
@@ -175,12 +173,12 @@ export default function BcpDrPlansPage() {
                               onChange={(e) => setNextTestDueAt(e.target.value)}
                             />{' '}
                             <button type="button" onClick={() => submitTest(plan.id)}>
-                              Save
+                              {t('commonSave')}
                             </button>
                           </>
                         ) : (
                           <button type="button" onClick={() => startTest(plan)}>
-                            Record test
+                            {t('bcpRecordTestButton')}
                           </button>
                         )}
                       </td>
@@ -196,9 +194,9 @@ export default function BcpDrPlansPage() {
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new plan</h2>
+        <h2>{t('bcpCreateHeading')}</h2>
         <label style={labelStyle}>
-          Scenario
+          {t('bcpScenario')}
           <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
             {BCP_DR_SCENARIOS.map((s) => (
               <option key={s} value={s}>
@@ -208,14 +206,14 @@ export default function BcpDrPlansPage() {
           </select>
         </label>
         <label style={labelStyle}>
-          RTO (hours)
+          {t('bcpRtoHours')}
           <input type="number" min={0} value={rtoHours} onChange={(e) => setRtoHours(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          RPO (hours)
+          {t('bcpRpoHours')}
           <input type="number" min={0} value={rpoHours} onChange={(e) => setRpoHours(e.target.value)} />
         </label>
-        <button type="submit">Record plan</button>
+        <button type="submit">{t('bcpSubmitButton')}</button>
       </form>
     </main>
   );

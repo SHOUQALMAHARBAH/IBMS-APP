@@ -85,7 +85,7 @@ export default function FinancialDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dashboard.financial.view permission."
+          ? t('dfinNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('dfinLoadError'),

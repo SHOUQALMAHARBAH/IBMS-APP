@@ -189,8 +189,7 @@ export default function InsuranceProgramDetailPage() {
           <div style={programPanelStyle}>
             <strong>{t('iprogdDerivedSi')}</strong>
             <p style={{ opacity: 0.7, margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
-              A re-assembly would seed the Property All Risks and Business
-              Interruption lines from these figures.
+              {t('iprogdReassemblyNote')}
             </p>
             <div
               style={{
@@ -268,7 +267,7 @@ export default function InsuranceProgramDetailPage() {
                       )
                     }
                   >
-                    Re-assemble from current results
+                    {t('iprogdReassembleButton')}
                   </button>
                 </>
               ) : null}
@@ -280,7 +279,7 @@ export default function InsuranceProgramDetailPage() {
                     style={buttonStyle}
                     onClick={() => void takeToMarket()}
                   >
-                    {busy ? 'Working…' : t('iprogdToMarketButton')}
+                    {busy ? t('commonWorking') : t('iprogdToMarketButton')}
                   </button>
                   <button
                     type="button"
@@ -293,7 +292,7 @@ export default function InsuranceProgramDetailPage() {
                       )
                     }
                   >
-                    Reopen for revision
+                    {t('iprogdReopenButton')}
                   </button>
                 </>
               ) : null}

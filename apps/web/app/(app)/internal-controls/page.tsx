@@ -26,9 +26,6 @@ const leftCell: CSSProperties = { ...cell, textAlign: 'start' };
 const leftHead: CSSProperties = { ...head, textAlign: 'start' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
-const NO_PERMISSION =
-  "You don't hold the internal-controls.view permission, so there's nothing to show here.";
-
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div
@@ -70,7 +67,7 @@ export default function InternalControlsPage() {
       setReport(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? NO_PERMISSION
+          ? t('icNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('icRunError'),

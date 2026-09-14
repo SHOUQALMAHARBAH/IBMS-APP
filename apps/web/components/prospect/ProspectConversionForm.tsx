@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import { convertLeadToProspect, type Prospect } from '../../lib/prospect/prospect-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle, inputStyle, labelStyle } from '../auth/auth-form.styles';
@@ -27,6 +28,7 @@ export function ProspectConversionForm({
   defaultCompanyName,
   onProspectCreated,
 }: ProspectConversionFormProps) {
+  const { t } = useLanguage();
   const [companyName, setCompanyName] = useState(defaultCompanyName ?? '');
   const [sector, setSector] = useState('');
   const [activity, setActivity] = useState('');
@@ -63,7 +65,7 @@ export function ProspectConversionForm({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Could not convert this lead to a prospect — try again.',
+          : t('prosnConvertError'),
       );
     } finally {
       setIsSubmitting(false);
@@ -72,13 +74,11 @@ export function ProspectConversionForm({
 
   return (
     <section style={sectionStyle}>
-      <h2 style={{ marginTop: 0 }}>Qualification details</h2>
+      <h2 style={{ marginTop: 0 }}>{t('prosnQualificationHeading')}</h2>
       <form onSubmit={(e) => void handleSubmit(e)}>
         <div style={formRowStyle}>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-company-name" style={labelStyle}>
-              Company name
-            </label>
+            <label htmlFor="prospect-company-name" style={labelStyle}>{t('prosnCompanyName')}</label>
             <input
               id="prospect-company-name"
               required
@@ -89,9 +89,7 @@ export function ProspectConversionForm({
             />
           </div>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-sector" style={labelStyle}>
-              Sector (optional)
-            </label>
+            <label htmlFor="prospect-sector" style={labelStyle}>{t('prosnSector')}</label>
             <input
               id="prospect-sector"
               value={sector}
@@ -103,9 +101,7 @@ export function ProspectConversionForm({
         </div>
         <div style={formRowStyle}>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-activity" style={labelStyle}>
-              Activity (optional)
-            </label>
+            <label htmlFor="prospect-activity" style={labelStyle}>{t('prosnActivity')}</label>
             <input
               id="prospect-activity"
               value={activity}
@@ -114,9 +110,7 @@ export function ProspectConversionForm({
             />
           </div>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-employee-count" style={labelStyle}>
-              Employee count (optional)
-            </label>
+            <label htmlFor="prospect-employee-count" style={labelStyle}>{t('prosnEmployeeCount')}</label>
             <input
               id="prospect-employee-count"
               type="number"
@@ -129,9 +123,7 @@ export function ProspectConversionForm({
         </div>
         <div style={formRowStyle}>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-business-size" style={labelStyle}>
-              Business size (optional)
-            </label>
+            <label htmlFor="prospect-business-size" style={labelStyle}>{t('prosnBusinessSize')}</label>
             <input
               id="prospect-business-size"
               value={businessSize}
@@ -141,9 +133,7 @@ export function ProspectConversionForm({
             />
           </div>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-location" style={labelStyle}>
-              Location (optional)
-            </label>
+            <label htmlFor="prospect-location" style={labelStyle}>{t('prosnLocation')}</label>
             <input
               id="prospect-location"
               dir="auto"
@@ -155,9 +145,7 @@ export function ProspectConversionForm({
         </div>
         <div style={formRowStyle}>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-contact-person" style={labelStyle}>
-              Contact person (optional)
-            </label>
+            <label htmlFor="prospect-contact-person" style={labelStyle}>{t('prosnContactPerson')}</label>
             <input
               id="prospect-contact-person"
               dir="auto"
@@ -167,9 +155,7 @@ export function ProspectConversionForm({
             />
           </div>
           <div style={fieldStyle}>
-            <label htmlFor="prospect-expected-premium" style={labelStyle}>
-              Expected premium, JOD (optional)
-            </label>
+            <label htmlFor="prospect-expected-premium" style={labelStyle}>{t('prosnExpectedPremium')}</label>
             <input
               id="prospect-expected-premium"
               inputMode="decimal"
@@ -182,9 +168,7 @@ export function ProspectConversionForm({
         </div>
         <div style={formRowStyle}>
           <div style={{ ...fieldStyle, flexBasis: '100%' }}>
-            <label htmlFor="prospect-products" style={labelStyle}>
-              Products of interest (optional, comma-separated)
-            </label>
+            <label htmlFor="prospect-products" style={labelStyle}>{t('prosnProductsOfInterest')}</label>
             <input
               id="prospect-products"
               value={productsOfInterest}
@@ -195,7 +179,7 @@ export function ProspectConversionForm({
           </div>
         </div>
         <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-          {isSubmitting ? 'Converting…' : 'Convert to prospect'}
+          {isSubmitting ? t('prosnConverting') : t('leadMoveToConvertedToProspect')}
         </button>
         {error ? (
           <p role="alert" style={errorStyle}>

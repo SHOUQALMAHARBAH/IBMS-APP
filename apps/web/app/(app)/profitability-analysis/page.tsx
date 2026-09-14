@@ -78,7 +78,7 @@ export default function ProfitabilityAnalysisPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the profitability-analysis.view permission."
+          ? t('praNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('praLoadError'),

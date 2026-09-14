@@ -101,7 +101,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         dir="auto"
         value={insuranceLine}
         onChange={(e) => setInsuranceLine(e.target.value)}
-        placeholder="Property All Risks"
+        placeholder={t('rfqLinePlaceholder')}
         style={{ minWidth: '20rem', marginTop: '0.35rem' }}
       />
 

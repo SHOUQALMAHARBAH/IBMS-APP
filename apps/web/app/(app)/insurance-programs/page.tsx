@@ -28,7 +28,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the program.read permission, so there's nothing to show here."
+          ? t('iprogNoPermission')
           : err instanceof ApiError && err.status === 404
             ? t('iprogCustomerNotFound')
             : err instanceof ApiError
@@ -56,8 +56,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
   if (programs.length === 0) {
     return (
       <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-        No insurance program yet for this customer — assemble one from an
-        approved needs assessment.
+        {t('iprogNoneForCustomer')}
       </p>
     );
   }

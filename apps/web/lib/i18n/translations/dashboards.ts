@@ -27,6 +27,7 @@ export const DASHBOARDS = {
     dashPeriodLabel: 'تسمية الفترة',
     dashPeriodStart: 'بداية الفترة',
     dashPeriodEnd: 'نهاية الفترة',
+    dashPeriodLabelPlaceholder: 'مثال: 2026-08',
     dashApplyFilters: 'تطبيق عوامل التصفية',
     dashAsOf: 'كما في',
     dashAsOfDateAria: 'تاريخ الرصيد',
@@ -90,7 +91,7 @@ export const DASHBOARDS = {
     spSaveTargetError: 'تعذّر حفظ الحصة المستهدفة.',
     spReviseButton: 'تعديل الحصة',
     spSetButton: 'تحديد الحصة',
-    spNoPermission: 'لا تملك الصلاحية اللازمة لعرض أداء المبيعات.',
+    spNoPermission: 'لا تملك صلاحية dashboard.sales.view اللازمة لعرض أداء المبيعات.',
 
     // ---- Sales dashboard ----------------------------------------------------
     dsalHeading: 'لوحة المبيعات',
@@ -213,7 +214,7 @@ export const DASHBOARDS = {
     diepRenewalRate: 'معدّل التجديد',
     diepCrossSellRate: 'معدّل البيع المتبادل',
     diepLoadError: 'تعذّر تحميل لوحة أداء شركات التأمين والموظفين — حاول مرة أخرى.',
-    diepNoPermission: 'لا تملك الصلاحية اللازمة لعرض هذه اللوحة.',
+    diepNoPermission: 'لا تملك صلاحيتَي insurer-performance.view و employee-performance.view اللازمتين لعرض هذه اللوحة.',
 
     // ---- Insurer performance (#60) ----------------------------------------------
     ipHeading: 'أداء شركة التأمين',
@@ -231,6 +232,7 @@ export const DASHBOARDS = {
     ipComputeError: 'تعذّر احتساب الدرجة.',
     ipLoadError: 'تعذّر تحميل أداء شركة التأمين — حاول مرة أخرى.',
     ipNoPermission: 'لا تملك صلاحية insurer-performance.view اللازمة لعرض هذه الشاشة.',
+    ipComputeNote: 'يستخدم معرّف شركة التأمين أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
 
     // ---- Employee performance (#61) -----------------------------------------------
     epHeading: 'أداء الموظفين',
@@ -248,6 +250,7 @@ export const DASHBOARDS = {
     epComputeError: 'تعذّر احتساب السجل.',
     epLoadError: 'تعذّر تحميل أداء الموظف — حاول مرة أخرى.',
     epNoPermission: 'لا تملك صلاحية employee-performance.view اللازمة لعرض هذه الشاشة.',
+    epComputeNote: 'يستخدم معرّف الموظف أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
 
     // ---- Portfolio analysis (#62) --------------------------------------------------
     paHeading: 'تحليل المحفظة',
@@ -291,6 +294,7 @@ export const DASHBOARDS = {
     pexLoading: 'جارٍ التحميل…',
     pexNoPolicies: 'لا توجد وثائق صادرة بعد.',
     pexNoPermission: 'لا تملك صلاحية planning-export.generate اللازمة لعرض هذه الشاشة.',
+    pexPeriodNote: 'اتركه فارغاً لاحتساب الشهر الميلادي المنتهي بتوقيت UTC. بيانات المحفظة تعكس دائماً الدفتر الحالي بغضّ النظر عن الفترة.',
 
     // ---- Executive Dashboard — CONVERTED, not rewritten ----------------
     // This screen was already bilingual via inline ternaries; the Arabic
@@ -335,6 +339,7 @@ export const DASHBOARDS = {
     dashPeriodLabel: 'Period label',
     dashPeriodStart: 'Period start',
     dashPeriodEnd: 'Period end',
+    dashPeriodLabelPlaceholder: 'e.g. 2026-08',
     dashApplyFilters: 'Apply filters',
     dashAsOf: 'As of',
     dashAsOfDateAria: 'As of date',
@@ -396,7 +401,7 @@ export const DASHBOARDS = {
     spSaveTargetError: 'Could not save the target.',
     spReviseButton: 'Revise target',
     spSetButton: 'Set target',
-    spNoPermission: "You don't hold the permission needed to view sales performance.",
+    spNoPermission: "You don't hold the dashboard.sales.view permission.",
 
     dsalHeading: 'Sales Dashboard',
     dsalIntro:
@@ -513,7 +518,7 @@ export const DASHBOARDS = {
     diepRenewalRate: 'Renewal rate',
     diepCrossSellRate: 'Cross-sell rate',
     diepLoadError: 'Could not load the Insurer & Employee Performance Dashboard — try again.',
-    diepNoPermission: "You don't hold the permission needed to view this dashboard.",
+    diepNoPermission: "You don't hold the insurer-performance.view / employee-performance.view permissions.",
 
     ipHeading: 'Insurer Performance',
     ipIntro:
@@ -530,6 +535,7 @@ export const DASHBOARDS = {
     ipComputeError: 'Could not compute the score.',
     ipLoadError: 'Could not load insurer performance — try again.',
     ipNoPermission: "You don't hold the insurer-performance.view permission.",
+    ipComputeNote: 'Uses the Insurer ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
 
     epHeading: 'Employee Performance',
     epIntro:
@@ -546,6 +552,7 @@ export const DASHBOARDS = {
     epComputeError: 'Could not compute the record.',
     epLoadError: 'Could not load employee performance — try again.',
     epNoPermission: "You don't hold the employee-performance.view permission.",
+    epComputeNote: 'Uses the Employee ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
 
     paHeading: 'Portfolio Analysis',
     paIntro:
@@ -586,6 +593,7 @@ export const DASHBOARDS = {
     pexLoading: 'Loading…',
     pexNoPolicies: 'No issued policies yet.',
     pexNoPermission: "You don't hold the planning-export.generate permission.",
+    pexPeriodNote: 'Leave blank to score the UTC calendar month that just ended. Portfolio data is always the current book, regardless of period.',
 
     // ---- Executive Dashboard — CONVERTED, not rewritten ----------------
     // This screen was already bilingual via inline ternaries; the Arabic

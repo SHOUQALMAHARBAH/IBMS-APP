@@ -84,7 +84,7 @@ export default function OperationalPiRiskPage() {
       setRisks(null);
       setRisksError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the risk-register.manage permission."
+          ? t('opNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('opRegisterLoadError'),
@@ -100,7 +100,7 @@ export default function OperationalPiRiskPage() {
       setPolicies(null);
       setPoliciesError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the pi-policy.manage permission."
+          ? t('opNoPermissionPi')
           : err instanceof ApiError
             ? err.message
             : t('opPiLoadError'),
@@ -116,7 +116,7 @@ export default function OperationalPiRiskPage() {
       setEvents(null);
       setEventsError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the pi-policy.manage permission."
+          ? t('opNoPermissionPi')
           : err instanceof ApiError
             ? err.message
             : t('opEventsLoadError'),
@@ -205,7 +205,7 @@ export default function OperationalPiRiskPage() {
       {canManageRiskRegister ? (
         <form onSubmit={submitRisk} style={formStyle}>
           <label style={labelStyle}>
-            Risk type
+            {t('opRiskTypeLabel')}
             <select
               aria-label={t('opRiskTypeLabel')}
               value={riskType}
@@ -219,7 +219,7 @@ export default function OperationalPiRiskPage() {
             </select>
           </label>
           <label style={labelStyle}>
-            Description
+            {t('opRiskDescriptionFieldLabel')}
             <input
               aria-label={t('opRiskDescriptionLabel')}
               value={riskDescription}
@@ -308,7 +308,7 @@ export default function OperationalPiRiskPage() {
       {canManagePiPolicy ? (
         <form onSubmit={submitPolicy} style={formStyle}>
           <label style={labelStyle}>
-            Insurer
+            {t('opPiInsurerFieldLabel')}
             <input
               aria-label={t('opPiInsurerLabel')}
               dir="auto"
@@ -328,7 +328,7 @@ export default function OperationalPiRiskPage() {
             />
           </label>
           <label style={labelStyle}>
-            Expires
+            {t('opPiExpiresFieldLabel')}
             <input
               aria-label={t('opPiExpiresAtLabel')}
               type="date"
@@ -338,7 +338,7 @@ export default function OperationalPiRiskPage() {
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : t('opLogPiButton')}
+            {busy ? t('commonSaving') : t('opLogPiButton')}
           </button>
         </form>
       ) : null}
@@ -414,7 +414,7 @@ export default function OperationalPiRiskPage() {
       {canManagePiPolicy ? (
         <form onSubmit={submitEvent} style={formStyle}>
           <label style={labelStyle}>
-            Description
+            {t('opEventDescriptionFieldLabel')}
             <input
               aria-label={t('opEventDescriptionLabel')}
               value={eventDescription}
@@ -431,7 +431,7 @@ export default function OperationalPiRiskPage() {
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : t('opLogEventButton')}
+            {busy ? t('commonSaving') : t('opLogEventButton')}
           </button>
         </form>
       ) : null}

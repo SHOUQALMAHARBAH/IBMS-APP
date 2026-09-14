@@ -29,7 +29,7 @@ export default function NeedsAssessmentsPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the needs-assessment.read permission, so there's nothing to show here."
+          ? t('naNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('naLoadError'),

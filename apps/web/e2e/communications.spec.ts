@@ -44,7 +44,7 @@ const COMMUNICATIONS = [
   {
     id: "comm-2",
     customerId: "11111111-1111-1111-1111-111111111111",
-    channel: "EMAIL",
+    channel: "CALL",
     templateId: "promo-v1",
     languageUsed: "AR",
     direction: "OUTBOUND",
@@ -82,6 +82,14 @@ test("lists communications with the marketing flag and the send form", async ({
     page.getByRole("cell", { name: "Your renewal documents" }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "New motor product" })).toBeVisible();
+
+  // This screen's own channel wording. `rfq.ts` used to re-declare four
+  // `commChannel*` keys that this dictionary owns; the rename that resolved
+  // the collision moved the RFQ screen off them, and this asserts the
+  // communications wording survived it. Both rows' channels are checked so
+  // the column is genuinely exercised, not just present.
+  await expect(page.getByRole("cell", { name: "Phone call", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Email", exact: true })).toBeVisible();
   await expect(page.getByLabel("Channel")).toBeVisible();
   await expect(page.getByLabel("Marketing")).toBeVisible();
   await expect(

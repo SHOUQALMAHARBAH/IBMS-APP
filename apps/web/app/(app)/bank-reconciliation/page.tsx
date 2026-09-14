@@ -73,7 +73,7 @@ export default function BankReconciliationPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the reconciliation-exception.investigate permission."
+          ? t('brNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('brLoadError'),

@@ -48,7 +48,7 @@ export default function WatchlistSyncPage() {
       setRuns(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the sanctions-pep.screen permission."
+          ? t('wsNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('wsLoadError'),

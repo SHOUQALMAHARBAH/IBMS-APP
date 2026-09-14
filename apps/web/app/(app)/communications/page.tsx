@@ -209,7 +209,7 @@ export default function CommunicationsPage() {
               {busy ? t('commSendingButton') : t('commLogButton')}
             </button>
             <button type="button" onClick={() => void checkConsent()}>
-              Check marketing consent
+              {t('commCheckConsentButton')}
             </button>
           </div>
           {consent ? (

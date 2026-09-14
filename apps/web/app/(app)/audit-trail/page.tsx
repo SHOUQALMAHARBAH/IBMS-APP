@@ -25,9 +25,9 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.75rem 0' };
 
-function messageFor(err: unknown, permission: string, fallback: string): string {
+function messageFor(err: unknown, noPermission: string, fallback: string): string {
   return err instanceof ApiError && err.status === 403
-    ? `You don't hold the ${permission} permission.`
+    ? noPermission
     : err instanceof ApiError
       ? err.message
       : fallback;
@@ -112,7 +112,7 @@ export default function AuditTrailPage() {
       );
     } catch (err) {
       setBrowseRows(null);
-      setBrowseError(messageFor(err, 'audit-log.read', t('atLogLoadError')));
+      setBrowseError(messageFor(err, t('atNoPermissionFor', { permission: 'audit-log.read' }), t('atLogLoadError')));
     } finally {
       setBrowseBusy(false);
     }
@@ -126,7 +126,7 @@ export default function AuditTrailPage() {
       setWfRows(await getWorkflowHistory(wfEntityType, wfEntityId));
     } catch (err) {
       setWfRows(null);
-      setWfError(messageFor(err, 'workflow-history.read', t('atWorkflowLoadError')));
+      setWfError(messageFor(err, t('atNoPermissionFor', { permission: 'workflow-history.read' }), t('atWorkflowLoadError')));
     } finally {
       setWfBusy(false);
     }
@@ -140,7 +140,7 @@ export default function AuditTrailPage() {
       setDocHistory(await getDocumentHistory(documentId));
     } catch (err) {
       setDocHistory(null);
-      setDocError(messageFor(err, 'document-history.read', t('atDocumentLoadError')));
+      setDocError(messageFor(err, t('atNoPermissionFor', { permission: 'document-history.read' }), t('atDocumentLoadError')));
     } finally {
       setDocBusy(false);
     }
@@ -159,7 +159,7 @@ export default function AuditTrailPage() {
         <h2>{t('atAuditLogHeading')}</h2>
         <form onSubmit={runBrowse} style={formStyle}>
           <label>
-            Entity type{' '}
+            {t('atEntityTypeLabel')}{' '}
             <input
               aria-label={t('atEntityTypeLabel')}
               value={browseEntityType}
@@ -167,7 +167,7 @@ export default function AuditTrailPage() {
             />
           </label>
           <label>
-            Entity id{' '}
+            {t('atEntityIdLabel')}{' '}
             <input
               aria-label={t('atEntityIdLabel')}
               value={browseEntityId}
@@ -175,7 +175,7 @@ export default function AuditTrailPage() {
             />
           </label>
           <button type="submit" disabled={browseBusy}>
-            {browseBusy ? t('atLoading') : 'Browse'}
+            {browseBusy ? t('atLoading') : t('atBrowseButton')}
           </button>
         </form>
         {browseError ? (
@@ -190,7 +190,7 @@ export default function AuditTrailPage() {
         <h2>{t('atWorkflowHistoryHeading')}</h2>
         <form onSubmit={runWorkflowHistory} style={formStyle}>
           <label>
-            Entity type{' '}
+            {t('atWorkflowEntityTypeLabel')}{' '}
             <input
               aria-label={t('atWorkflowEntityTypeLabel')}
               value={wfEntityType}
@@ -199,7 +199,7 @@ export default function AuditTrailPage() {
             />
           </label>
           <label>
-            Entity id{' '}
+            {t('atWorkflowEntityIdLabel')}{' '}
             <input
               aria-label={t('atWorkflowEntityIdLabel')}
               value={wfEntityId}
@@ -208,7 +208,7 @@ export default function AuditTrailPage() {
             />
           </label>
           <button type="submit" disabled={wfBusy}>
-            {wfBusy ? 'Loading…' : t('atLookUpButton')}
+            {wfBusy ? t('atLoading') : t('atLookUpButton')}
           </button>
         </form>
         {wfError ? (
@@ -223,7 +223,7 @@ export default function AuditTrailPage() {
         <h2>{t('atDocumentHistoryHeading')}</h2>
         <form onSubmit={runDocumentHistory} style={formStyle}>
           <label>
-            Document id{' '}
+            {t('atDocumentIdLabel')}{' '}
             <input
               aria-label={t('atDocumentIdLabel')}
               value={documentId}
@@ -232,7 +232,7 @@ export default function AuditTrailPage() {
             />
           </label>
           <button type="submit" disabled={docBusy}>
-            {docBusy ? 'Loading…' : 'Look up'}
+            {docBusy ? t('atLoading') : t('atLookUpButton')}
           </button>
         </form>
         {docError ? (

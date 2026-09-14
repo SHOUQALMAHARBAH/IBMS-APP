@@ -73,7 +73,7 @@ export default function DsrPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dsr.log permission."
+          ? t('dsrNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('dsrLoadError'),
@@ -135,7 +135,7 @@ export default function DsrPage() {
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Customer ID
+            {t('dsrCustomerIdLabel')}
             <input
               aria-label={t('dsrCustomerIdLabel')}
               value={customerId}
@@ -144,7 +144,7 @@ export default function DsrPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Type
+            {t('dsrTypeLabel')}
             <select
               aria-label={t('dsrTypeLabel')}
               value={type}

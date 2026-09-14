@@ -157,7 +157,7 @@ export default function SlaDashboardPage() {
             <div
               style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}
             >
-              <Stat label="Timers" value={t!.total} />
+              <Stat label={tr('slaDashColTimers')} value={t!.total} />
               <Stat label={tr('slaDashOnTrack')} value={t!.onTrack} />
               <Stat label={tr('slaDashDueSoon')} value={t!.dueSoon} />
               <Stat label={tr('slaDashBreached')} value={t!.breached} />
@@ -271,7 +271,7 @@ export default function SlaDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Timers</h2>
+            <h2>{tr('slaDashColTimers')}</h2>
             <label
               style={{
                 display: 'inline-flex',
@@ -298,8 +298,8 @@ export default function SlaDashboardPage() {
               <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
                 <thead>
                   <tr>
-                    <th style={leftHead}>Workflow</th>
-                    <th style={leftHead}>Entity</th>
+                    <th style={leftHead}>{tr('slaDashColWorkflow')}</th>
+                    <th style={leftHead}>{tr('slaDashColEntity')}</th>
                     <th style={leftHead}>{tr('slaDashColState')}</th>
                     <th style={head}>{tr('slaDashColDue')}</th>
                     <th style={head}>{tr('slaDashOverdue')}</th>

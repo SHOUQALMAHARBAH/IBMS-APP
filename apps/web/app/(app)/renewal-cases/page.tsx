@@ -51,15 +51,13 @@ export default function RenewalCasesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? isArabic
-            ? 'لا تملك صلاحية renewal.read.'
-            : "You don't hold the renewal.read permission."
+          ? t('renNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('renCouldNotLoadRenewalCases'),
       );
     }
-  }, [isArabic, t]);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');

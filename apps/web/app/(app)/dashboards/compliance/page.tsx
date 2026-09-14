@@ -55,7 +55,7 @@ export default function ComplianceDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dashboard.compliance.view permission."
+          ? t('dcmpNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('dcmpLoadError'),

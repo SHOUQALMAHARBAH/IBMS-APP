@@ -53,7 +53,7 @@ export default function InsurerAccountingPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the insurer-accounting.read permission, so there's nothing to show here."
+          ? t('iaNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('iaLoadError'),

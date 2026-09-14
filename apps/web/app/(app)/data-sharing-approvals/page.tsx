@@ -59,9 +59,11 @@ export default function DataSharingApprovalsPage() {
     } catch (err) {
       setRows(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : t('dsaLoadError'),
+        err instanceof ApiError && err.status === 403
+          ? t('dsaNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('dsaLoadError'),
       );
     }
   }, [t]);
@@ -133,7 +135,7 @@ export default function DataSharingApprovalsPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Description
+            {t('dsaDescriptionFieldLabel')}
             <input
               aria-label={t('dsaDescriptionLabel')}
               value={description}
@@ -151,7 +153,7 @@ export default function DataSharingApprovalsPage() {
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Classification
+            {t('dsaClassificationFieldLabel')}
             <select
               aria-label={t('dsaClassificationLabel')}
               value={classification}
@@ -165,7 +167,7 @@ export default function DataSharingApprovalsPage() {
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Channel
+            {t('dsaChannelFieldLabel')}
             <select
               aria-label={t('dsaChannelLabel')}
               value={channel}

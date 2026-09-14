@@ -60,7 +60,7 @@ export default function ConsentPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the consent.manage permission."
+          ? t('consNoPermission')
           : err instanceof ApiError
             ? err.message
             : t('consLoadError'),
@@ -168,7 +168,7 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Data subject
+            {t('consDataSubjectFieldLabel')}
             <select
               aria-label={t('consDataSubjectKindLabel')}
               value={ownerKind}
@@ -207,7 +207,7 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Purpose
+            {t('consPurposeLabel')}
             <select
               aria-label={t('consPurposeLabel')}
               value={purpose}
@@ -223,7 +223,7 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Decision
+            {t('consDecisionLabel')}
             <select
               aria-label={t('consDecisionLabel')}
               value={decision}
@@ -236,7 +236,7 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Consent text version
+            {t('consTextVersionLabel')}
             <input
               aria-label={t('consTextVersionLabel')}
               placeholder={t('consTextVersionPlaceholder')}
@@ -258,7 +258,7 @@ export default function ConsentPage() {
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
         >
-          Filter by customer ID
+          {t('consFilterLabel')}
           <input
             aria-label={t('consFilterLabel')}
             value={filterCustomerId}

@@ -50,7 +50,7 @@ async function mockAuth(page: Page, languagePreference: "AR" | "EN") {
 test("defaults to the account's stored language and applies dir/lang on load", async ({ page }) => {
   await mockAuth(page, "AR");
   await page.goto("/leads");
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ })).toBeVisible();
 
   await expect.poll(() => page.evaluate(() => document.documentElement.dir)).toBe("rtl");
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe("ar");
@@ -60,7 +60,7 @@ test("defaults to the account's stored language and applies dir/lang on load", a
 test("switching language is instant (no reload) and persists via PATCH /auth/me/language", async ({ page }) => {
   await mockAuth(page, "AR");
   await page.goto("/leads");
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ })).toBeVisible();
 
   let patchCalled = false;
   page.on("request", (req) => {
@@ -78,14 +78,14 @@ test("switching language is instant (no reload) and persists via PATCH /auth/me/
 
   // a fresh load now reflects the persisted (mocked-server) preference
   await page.reload();
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ })).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.dir)).toBe("ltr");
 });
 
 test("language switcher has no serious/critical accessibility violations @a11y", async ({ page }) => {
   await mockAuth(page, "EN");
   await page.goto("/leads");
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
