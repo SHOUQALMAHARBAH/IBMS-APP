@@ -164,7 +164,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
       <section style={{ marginTop: '1.5rem' }}>
         <h2>{t('rpSitesHeading')}</h2>
         {profiles.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {t('rpNoProfileYet')}
           </p>
         ) : (

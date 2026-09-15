@@ -169,7 +169,7 @@ export default function DpiaScreeningsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('dpiaNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('dpiaNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>

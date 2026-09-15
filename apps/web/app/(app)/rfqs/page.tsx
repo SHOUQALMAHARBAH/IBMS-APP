@@ -56,7 +56,7 @@ function RfqList({
   }
   if (!rfqs) return <p>{t('commonLoading')}</p>;
   if (rfqs.length === 0) {
-    return <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('rfqListNone')}</p>;
+    return <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('rfqListNone')}</p>;
   }
 
   return (

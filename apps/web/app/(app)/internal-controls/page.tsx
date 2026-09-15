@@ -128,7 +128,7 @@ export default function InternalControlsPage() {
                 }
               />
             </div>
-            <p style={{ opacity: 0.6, fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
               Generated {report.generatedAt.replace('T', ' ').slice(0, 16)}.
             </p>
           </section>
@@ -190,7 +190,7 @@ export default function InternalControlsPage() {
                         {p.dormant ? (
                           <span
                             title={t('icNoWriter')}
-                            style={{ opacity: 0.6 }}
+                            style={{ color: 'var(--ink-secondary)' }}
                           >
                             {' '}
                             (dormant)

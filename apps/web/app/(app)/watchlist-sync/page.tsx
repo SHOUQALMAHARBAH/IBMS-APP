@@ -140,7 +140,7 @@ export default function WatchlistSyncPage() {
 
       {runs ? (
         runs.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('wsNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('wsNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>

@@ -224,7 +224,7 @@ export default function PaymentChannelsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('pcNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('pcNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>

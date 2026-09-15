@@ -24,7 +24,7 @@ const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
   const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ opacity: 0.6 }}>{t('paNone')}</p>;
+    return <p style={{ color: 'var(--ink-secondary)' }}>{t('paNone')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
@@ -102,7 +102,7 @@ export default function PortfolioAnalysisPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
             Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
           </p>
 

@@ -191,7 +191,7 @@ export default function FeedbackPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('fbNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('fbNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>

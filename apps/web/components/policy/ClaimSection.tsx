@@ -950,7 +950,7 @@ export function ClaimSection({
       ) : null}
 
       {rows.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('policyNoClaimsYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('policyNoClaimsYet')}</p>
       ) : (
         rows.map((c) => (
           <div key={c.id} style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
@@ -1035,7 +1035,7 @@ export function ClaimSection({
                 )}
               </p>
             ) : null}
-            <p style={{ opacity: 0.6, fontSize: '0.8rem', margin: '0.4rem 0' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
               {coverageLabel(c, language)}
             </p>
             {canRegister && c.status === 'NOTIFIED' ? (

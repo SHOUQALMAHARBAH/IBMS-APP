@@ -118,7 +118,7 @@ export default function EmployeesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('empNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('empNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
             <thead>

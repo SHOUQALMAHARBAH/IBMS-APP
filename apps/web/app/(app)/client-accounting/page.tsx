@@ -100,7 +100,7 @@ export default function ClientAccountingPage() {
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('caNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('caNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>

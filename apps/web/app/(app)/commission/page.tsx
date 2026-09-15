@@ -208,7 +208,7 @@ export default function CommissionRatesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('crateNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('crateNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '42rem' }}>

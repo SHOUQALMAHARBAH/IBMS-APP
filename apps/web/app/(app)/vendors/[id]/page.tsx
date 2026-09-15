@@ -290,7 +290,7 @@ export default function VendorDetailPage() {
                 </tbody>
               </table>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('vendNoDpas')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('vendNoDpas')}</p>
             )}
           </section>
 

@@ -119,7 +119,7 @@ export default function InformationAssetsPage() {
 
       {assets ? (
         assets.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('iassetNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('iassetNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
             <thead>

@@ -265,7 +265,7 @@ export default function UserAdminPage() {
               : t('usrProvisionUser')}
           </button>
           {roles.length === 0 ? (
-            <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
               {t('usrPickAtLeastOneRole')}
             </p>
           ) : null}
@@ -285,12 +285,12 @@ export default function UserAdminPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {t('usrNoUsers')}
           </p>
         ) : (
           <>
-            <p style={{ opacity: 0.6 }}>
+            <p style={{ color: 'var(--ink-secondary)' }}>
               {isArabic
                 ? `${rows.length} من ${total}`
                 : `${rows.length} of ${total}`}
@@ -313,7 +313,7 @@ export default function UserAdminPage() {
                       <td style={cell}>{u.email}</td>
                       <td style={cell}>
                         {u.roles.length === 0 ? (
-                          <span style={{ opacity: 0.6 }}>
+                          <span style={{ color: 'var(--ink-secondary)' }}>
                             {t('usrNone')}
                           </span>
                         ) : (

@@ -24,7 +24,7 @@ const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 function BreakdownTable({ rows }: { rows: ProfitabilityBreakdownRow[] }) {
   const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ opacity: 0.6 }}>{t('praNone')}</p>;
+    return <p style={{ color: 'var(--ink-secondary)' }}>{t('praNone')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
@@ -110,7 +110,7 @@ export default function ProfitabilityAnalysisPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
             Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
           </p>
 

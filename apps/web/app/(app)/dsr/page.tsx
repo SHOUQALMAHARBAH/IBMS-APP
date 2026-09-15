@@ -176,7 +176,7 @@ export default function DsrPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('dsrNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('dsrNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>

@@ -67,9 +67,9 @@ export function PrivacyNoticeDisplay({ touchpoint, canRead }: Props) {
           {error}
         </p>
       ) : notice === undefined ? (
-        <p style={{ opacity: 0.6 }}>{t('consLoading')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('consLoading')}</p>
       ) : notice === null ? (
-        <p style={{ opacity: 0.6 }}>{t('pnNoneForTouchpoint')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('pnNoneForTouchpoint')}</p>
       ) : (
         <details>
           <summary>

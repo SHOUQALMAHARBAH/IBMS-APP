@@ -133,7 +133,7 @@ export default function NeedsAssessmentDetailPage() {
           <div style={coveragePreviewStyle}>
             <strong>{t('nadRecommendedCoverage')}</strong>
             {assessment.recommendedCoverageLines.length === 0 ? (
-              <p style={{ opacity: 0.6, margin: '0.5rem 0 0' }}>
+              <p style={{ color: 'var(--ink-secondary)', margin: '0.5rem 0 0' }}>
                 {t('nadNoCoverageLines')}
               </p>
             ) : (

@@ -102,8 +102,19 @@ already give).
 * **`app/globals.css`** holds every token: colour, spacing, type scale, radii, elevation,
   focus ring, light + dark themes, RTL conventions, reduced-motion. The palette is
   **sampled from the approved login design**, not invented — brand `#3b6790`, hero
-  gradient `#273a4e -> #33516d`, page surface `#f4f6fa`, ink ramp
-  `#26303e / #525e6f / #828c9a`. Re-sample rather than approximate if it is revisited.
+  gradient `#273a4e -> #33516d`, page surface `#f4f6fa`, ink ramp `#26303e / #525e6f`.
+  Re-sample rather than approximate if it is revisited. **One deliberate departure:**
+  `--ink-muted` was sampled at `#828c9a`, which fails WCAG AA on every surface in the
+  file (3.41:1 on a white card, and a card is as light as a background gets, so there
+  was nothing to darken but the ink). It is `#656d7b` — 5.22 / 4.82 / 4.61 on
+  card / page / sunken; dark is `#8b95a4`, worst case 4.98. Primary and secondary are
+  untouched.
+* **Never mute text with `opacity`.** It composites toward whatever is behind the
+  element, so the rendered colour is one no token declares and axe measures the blend:
+  `opacity: 0.6` on `--ink-primary` reads as `#787f89` over the page surface, 3.73:1.
+  That pattern was 20 of the 51 contrast violations the first full `test:a11y` run
+  found. Use `--ink-secondary` (6.09:1) or `--ink-muted`. `opacity` on a *disabled
+  control* is fine — axe exempts those, and `components/ui/Button.tsx` still uses it.
 * **`components/ui/`** is the primitive set — `Button`, `Card`/`PageHeader`, `Table`,
   `Field` (+ `TextInput`/`Select`/`TextArea`), `Badge`, `EmptyState`, `ErrorState`,
   `Skeleton`/`SkeletonList`. New screens compose these; they cover the four states
@@ -332,8 +343,8 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run test:contract` | API contract tests — validates real responses against the OpenAPI schema generated from `@nestjs/swagger` decorators (`apps/api/test/contract.contract-spec.ts`) — needs a reachable `DATABASE_URL` |
 | `npm run test:security` | Dependency audit (`npm audit --audit-level=high`), repo-wide |
 | `npm run test:smoke` | `bash scripts/smoke.sh api` — dispatches to the api service's smoke test (see below) |
-| `npm run e2e` | Playwright functional e2e (web) — excludes `@a11y`-tagged specs |
-| `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — only `@a11y`-tagged specs |
+| `npm run e2e` | Playwright functional e2e (web) — **excludes** `@a11y`-tagged specs (`--grep-invert @a11y`) |
+| `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — **only** `@a11y`-tagged specs. A separate gate: a green `npm run e2e` says nothing about accessibility, so run both and report both counts |
 | `npm run db:validate` | `prisma validate` — schema is internally valid (not a drift check; that's `db:migrate:status`) |
 | `npm run db:migrate:dev` | Create/apply a migration against the dev DB (`packages/db`) |
 | `npm run db:migrate:deploy` | Apply existing migrations to the dev DB, no schema drift (also used for CI/prod) |

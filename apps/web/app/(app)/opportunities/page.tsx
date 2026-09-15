@@ -69,7 +69,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
 
   if (opportunities.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('oppListNoneYet')}</p>
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('oppListNoneYet')}</p>
     );
   }
 

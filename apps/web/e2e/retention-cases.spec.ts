@@ -98,7 +98,14 @@ test("retention screen has no serious/critical accessibility violations @a11y", 
   await mockRetentionCases(page);
 
   await page.goto("/retention-cases");
-  await expect(page.getByRole("cell", { name: "lapse_risk" })).toBeVisible();
+  // The LABEL, not the raw enum token. This assertion still read "lapse_risk"
+  // after the bilingual pass relabelled it — the non-@a11y test above was
+  // corrected and this copy was not, and `npm run e2e` is
+  // `--grep-invert @a11y`, so nothing ran it until the a11y suite did.
+  await expect(page.getByRole("cell", { name: "Lapse risk" })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "lapse_risk", exact: true }),
+  ).toHaveCount(0);
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter(

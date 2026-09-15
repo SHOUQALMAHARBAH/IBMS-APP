@@ -321,7 +321,7 @@ export default function RegulatoryCompliancePage() {
 
       {items ? (
         items.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('rcNoCalendarItems')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('rcNoCalendarItems')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>

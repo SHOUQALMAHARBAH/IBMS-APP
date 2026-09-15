@@ -173,7 +173,7 @@ export default function BankReconciliationPage() {
       <h2>{t('brOpenExceptions')}</h2>
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('brNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('brNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>

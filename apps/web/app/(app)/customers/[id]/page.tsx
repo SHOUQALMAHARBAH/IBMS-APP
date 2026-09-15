@@ -281,7 +281,7 @@ export default function CustomerProfilePage() {
           {customer.customerType === 'CORPORATE' ? (
             <section style={{ marginTop: '2rem' }}>
               <h2>{t('customerUbosHeading')}</h2>
-              {ubos.length === 0 ? <p style={{ opacity: 0.6 }}>{t('customerUbosNone')}</p> : null}
+              {ubos.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUbosNone')}</p> : null}
               {ubos.map((u) => (
                 <div key={u.id} style={repeatableRowStyle}>
                   <strong>
@@ -296,7 +296,7 @@ export default function CustomerProfilePage() {
 
           <section style={{ marginTop: '2rem' }}>
             <h2>{t('customerDocumentsHeading')}</h2>
-            {documents.length === 0 ? <p style={{ opacity: 0.6 }}>{t('customerDocumentsNone')}</p> : null}
+            {documents.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerDocumentsNone')}</p> : null}
             {documents.map((d) => (
               <div key={d.id} style={repeatableRowStyle}>
                 <strong>{d.fileName}</strong> — {d.classification}
@@ -318,7 +318,7 @@ export default function CustomerProfilePage() {
                 {t('customerNeedsAssessmentStartButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerNeedsAssessmentNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerNeedsAssessmentNoPermission')}</p>
             )}
           </section>
 
@@ -336,7 +336,7 @@ export default function CustomerProfilePage() {
                 {t('customerRiskSurveyOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerRiskSurveyNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerRiskSurveyNoPermission')}</p>
             )}
           </section>
 
@@ -354,7 +354,7 @@ export default function CustomerProfilePage() {
                 {t('customerInsuranceProgramOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerInsuranceProgramNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerInsuranceProgramNoPermission')}</p>
             )}
           </section>
 
@@ -372,7 +372,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrossSellOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerCrossSellNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrossSellNoPermission')}</p>
             )}
           </section>
 
@@ -390,7 +390,7 @@ export default function CustomerProfilePage() {
                 {t('customerUpSellOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerUpSellNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUpSellNoPermission')}</p>
             )}
           </section>
 
@@ -406,7 +406,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrmOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerCrmNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrmNoPermission')}</p>
             )}
           </section>
         </>

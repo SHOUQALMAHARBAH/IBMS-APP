@@ -126,7 +126,7 @@ export default function FinancialReportPage() {
             <Figure label="31–60 days" value={data.receivables.d31_60} />
             <Figure label="61–90 days" value={data.receivables.d61_90} />
             <Figure label="90+ days" value={data.receivables.d90_plus} />
-            <p style={{ opacity: 0.6, fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem' }}>
               {data.receivables.invoiceCount} invoice(s) across{' '}
               {data.receivables.customerCount} customer(s).
             </p>
@@ -142,7 +142,7 @@ export default function FinancialReportPage() {
               label={t('frRemittedToDate')}
               value={data.payables.remittedAmount}
             />
-            <p style={{ opacity: 0.6, fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem' }}>
               Across {data.payables.insurerCount} insurer(s).
             </p>
           </section>
@@ -196,7 +196,7 @@ export default function FinancialReportPage() {
 
           <section style={sectionStyle}>
             <h2>{t('frBookResultByLine')}</h2>
-            <p style={{ opacity: 0.65, fontSize: '0.9rem', maxWidth: '44rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem', maxWidth: '44rem' }}>
               &ldquo;Net position&rdquo; is the book&rsquo;s underwriting result
               &mdash; premium written less claims paid less commission &mdash;
               not the brokerage&rsquo;s own margin (that is
@@ -220,7 +220,7 @@ function ProfitTable({
 }) {
   const { language, t } = useLanguage();
   if (rows.length === 0)
-    return <p style={{ opacity: 0.6 }}>{t('frNoPolicies')}</p>;
+    return <p style={{ color: 'var(--ink-secondary)' }}>{t('frNoPolicies')}</p>;
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ borderCollapse: 'collapse', minWidth: '46rem' }}>

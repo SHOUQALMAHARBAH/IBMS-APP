@@ -212,7 +212,7 @@ export default function OpportunityDetailPage() {
           {rfqs === null ? (
             <p>{t('commonLoading')}</p>
           ) : rfqs.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('oppRfqsNone')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('oppRfqsNone')}</p>
           ) : (
             <div style={{ marginTop: '1rem' }}>
               {rfqs.map((rfq) => (

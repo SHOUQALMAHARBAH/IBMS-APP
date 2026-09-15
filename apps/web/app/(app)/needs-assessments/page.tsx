@@ -66,7 +66,7 @@ export default function NeedsAssessmentsPage() {
       ) : null}
       {assessments !== null && !loadError ? (
         assessments.length === 0 ? (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('naNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('naNone')}</p>
         ) : (
           <div style={listGridStyle}>
             {assessments.map((assessment) => (

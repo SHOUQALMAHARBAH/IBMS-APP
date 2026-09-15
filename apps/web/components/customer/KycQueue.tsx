@@ -129,7 +129,7 @@ export function KycQueue({ items, onItemChanged }: KycQueueProps) {
   }
 
   if (items.length === 0) {
-    return <p style={{ opacity: 0.6 }}>{t("kycQueueEmpty")}</p>;
+    return <p style={{ color: 'var(--ink-secondary)' }}>{t("kycQueueEmpty")}</p>;
   }
 
   return (

@@ -37,7 +37,7 @@ function TimelineList({ view }: { view: Customer360View }) {
   const { language } = useLanguage();
   if (view.timeline.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
         Nothing on this customer&apos;s timeline yet. Log the first interaction
         above — policies, claims and complaints will appear here too once those
         modules exist.
@@ -259,7 +259,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
       {view ? (
         <TimelineList view={view} />
       ) : (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
           {t('crmTimelineNeedsPermission')}
         </p>
       )}

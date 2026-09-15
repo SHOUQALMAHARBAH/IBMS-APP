@@ -141,7 +141,7 @@ export default function ExecutiveDashboardPage() {
 
       {summary && h ? (
         <>
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {t('execPeriodAsOf', {
               period: summary.periodLabel,
               asOf: summary.asOf.slice(0, 10),
@@ -230,7 +230,7 @@ export default function ExecutiveDashboardPage() {
                 }
               />
             </div>
-            <p style={{ opacity: 0.6, marginTop: '0.5rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', marginTop: '0.5rem' }}>
               {t('execExceptionsOpenAmlCftAlerts')}
             </p>
           </section>

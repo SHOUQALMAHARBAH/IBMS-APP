@@ -195,7 +195,7 @@ export default function TransactionMonitoringPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('tmNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('tmNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>

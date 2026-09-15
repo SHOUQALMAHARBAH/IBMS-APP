@@ -187,7 +187,7 @@ export default function ServiceRequestsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('srNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('srNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>

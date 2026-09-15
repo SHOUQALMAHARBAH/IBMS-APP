@@ -208,7 +208,7 @@ export default function EmployeePerformancePage() {
           </table>
         </>
       ) : hasLookedUp && !loadError ? (
-        <p style={{ opacity: 0.6 }}>{t('epNoRecord')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('epNoRecord')}</p>
       ) : null}
 
       <form onSubmit={onCompute} style={formStyle}>

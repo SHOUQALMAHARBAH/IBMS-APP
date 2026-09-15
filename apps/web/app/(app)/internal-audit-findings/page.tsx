@@ -145,7 +145,7 @@ export default function InternalAuditFindingsPage() {
       ) : null}
 
       {findings && findings.length === 0 ? (
-        <p style={{ opacity: 0.6 }}>{t('iafNone')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('iafNone')}</p>
       ) : null}
 
       {findings && findings.length > 0 ? (

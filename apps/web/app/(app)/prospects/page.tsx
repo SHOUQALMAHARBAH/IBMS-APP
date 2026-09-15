@@ -87,7 +87,7 @@ export default function ProspectsPage() {
       ) : null}
       {prospects !== null && !loadError ? (
         prospects.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {searchTerm ? t('prosNoneMatch') : t('prosNone')}
           </p>
         ) : (

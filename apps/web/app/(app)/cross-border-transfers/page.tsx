@@ -173,7 +173,7 @@ export default function CrossBorderTransfersPage() {
 
       {records ? (
         records.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('cbtNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('cbtNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>

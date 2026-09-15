@@ -273,7 +273,7 @@ export function CommissionSection({
           {t('commissionCalculateButton')}
         </button>
       ) : (
-        <p style={{ opacity: 0.6 }}>{t('commissionNoneYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('commissionNoneYet')}</p>
       )}
     </section>
   );

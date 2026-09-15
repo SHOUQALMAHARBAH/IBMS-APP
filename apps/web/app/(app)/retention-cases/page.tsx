@@ -185,7 +185,7 @@ export default function RetentionCasesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('retNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('retNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>

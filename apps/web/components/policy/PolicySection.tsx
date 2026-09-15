@@ -353,7 +353,7 @@ export function PolicySection({
             </button>
           </div>
         ) : (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('policyNoneYet')}</p>
+          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('policyNoneYet')}</p>
         )
       ) : (
         <div style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
@@ -588,7 +588,7 @@ export function PolicySection({
               {policy.checking.discrepancyLoggedAsPiRiskEvent ? (
                 <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>{t('policyPiRiskEventLogged')}</p>
               ) : null}
-              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', opacity: 0.6 }}>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>
                 Checked by {policy.checking.checkedByUserId ?? '—'}
                 {policy.checking.checkedAt
                   ? ` on ${formatDateTime(policy.checking.checkedAt, language)}`

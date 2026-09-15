@@ -26,7 +26,7 @@ const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', ga
 function BreakdownTable({ rows }: { rows: PlanningExportBreakdownRow[] }) {
   const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ opacity: 0.6 }}>{t('pexNoPolicies')}</p>;
+    return <p style={{ color: 'var(--ink-secondary)' }}>{t('pexNoPolicies')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
@@ -118,7 +118,7 @@ export default function PlanningExportPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
             Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)} —
             market period {summary.periodLabel}.
           </p>
@@ -146,7 +146,7 @@ export default function PlanningExportPage() {
           <section style={sectionStyle}>
             <h2>Market — insurer performance ({summary.periodLabel})</h2>
             {summary.market.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>
+              <p style={{ color: 'var(--ink-secondary)' }}>
                 {t('pexNoInsurerScores')}
               </p>
             ) : (

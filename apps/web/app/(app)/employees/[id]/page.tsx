@@ -223,7 +223,7 @@ export default function EmployeeDetailPage() {
           <section style={sectionStyle}>
             <h2>{t('empdTrainingHeading')}</h2>
             {employee.trainings.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>{t('empdNoTraining')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('empdNoTraining')}</p>
             ) : (
               <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
                 <thead>

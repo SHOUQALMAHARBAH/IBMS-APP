@@ -55,7 +55,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
 
   if (programs.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
         {t('iprogNoneForCustomer')}
       </p>
     );

@@ -263,7 +263,7 @@ export default function SalesPerformancePage() {
           ) : null}
         </>
       ) : loadError ? null : hasLookedUp ? null : isManager ? (
-        <p style={{ opacity: 0.6 }}>{t('spPickFirst')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('spPickFirst')}</p>
       ) : (
         <p>{t('dashLoading')}</p>
       )}

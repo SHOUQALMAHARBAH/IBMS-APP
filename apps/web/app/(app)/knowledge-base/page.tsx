@@ -129,7 +129,7 @@ export default function KnowledgeBasePage() {
 
       {articles ? (
         articles.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('kbNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('kbNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
             <thead>

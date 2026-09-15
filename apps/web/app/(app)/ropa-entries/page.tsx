@@ -218,7 +218,7 @@ export default function RopaEntriesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('ropaNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('ropaNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }} tabIndex={0} role="region" aria-label={t('ropaHeading')}>
             <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>

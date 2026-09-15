@@ -257,7 +257,7 @@ export default function ComplaintsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('complaintsNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('complaintsNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>

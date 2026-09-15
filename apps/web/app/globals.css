@@ -4,9 +4,23 @@
  * The palette is sampled directly from the approved login-screen design
  * (Screenshot 2026-08-24) rather than invented: the hero gradient
  * (#273a4e -> #33516d), the primary action colour (#3b6790), the page
- * surface (#f4f6fa) and the ink ramp (#26303e / #525e6f / #828c9a) are the
- * literal values measured out of that comp. Keep them that way — a "close
- * enough" brand blue is how a system drifts away from its own design.
+ * surface (#f4f6fa) and the ink ramp (#26303e / #525e6f) are the literal
+ * values measured out of that comp. Keep them that way — a "close enough"
+ * brand blue is how a system drifts away from its own design.
+ *
+ * ONE deliberate departure: --ink-muted was sampled at #828c9a, which fails
+ * WCAG AA 1.4.3 on every surface in this file — 3.41:1 on a white card, and
+ * a card is as light as a background gets, so there was nothing to darken
+ * but the ink. It is #656d7b here, the lightest value that clears 4.5:1
+ * against all of them (5.22:1 on a card, 4.82:1 on the page, 4.61:1 on the
+ * sunken surface, which is the worst case). Primary and secondary are
+ * untouched.
+ *
+ * Never mute text with `opacity`. It composites toward whatever is behind
+ * the element, so the rendered colour is one this file never declared and
+ * axe measures the blend, not the token: `opacity: 0.6` on --ink-primary
+ * reads as #787f89 over the page surface, which is 3.73:1. Reach for
+ * --ink-secondary (6.09:1) or --ink-muted instead.
  *
  * Everything downstream (components/*.styles.ts, the primitives in
  * components/ui/) reads these variables and never hard-codes a colour, so a
@@ -52,7 +66,7 @@
   /* --- ink ------------------------------------------------------------- */
   --ink-primary: #26303e;
   --ink-secondary: #525e6f;
-  --ink-muted: #828c9a;
+  --ink-muted: #656d7b;
   --ink-inverse: #f4f6fa;
   --ink-brand: #3b6790;
 
@@ -147,7 +161,7 @@
 
     --ink-primary: #e8ecf2;
     --ink-secondary: #a9b4c2;
-    --ink-muted: #7c8898;
+    --ink-muted: #8b95a4;
     --ink-inverse: #1a222c;
     --ink-brand: #9bb9d3;
 

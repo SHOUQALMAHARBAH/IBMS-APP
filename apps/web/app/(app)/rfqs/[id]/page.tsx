@@ -264,11 +264,11 @@ export default function RfqDetailPage() {
           />
 
           <h2 style={{ marginTop: '2rem' }}>{t('rfqSubmissionsHeading')}</h2>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
             {t('rfqSubmissionsHint')}
           </p>
           {rfq.insurerSubmissions.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rfqSubmissionsNone')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rfqSubmissionsNone')}</p>
           ) : (
             <table style={rfqTableStyle}>
               <thead>
@@ -372,7 +372,7 @@ export default function RfqDetailPage() {
                         ))}
                       {insurers.filter((i) => !shortlistedIds.has(i.id))
                         .length === 0 ? (
-                        <span style={{ opacity: 0.6 }}>
+                        <span style={{ color: 'var(--ink-secondary)' }}>
                           {t('rfqAllInsurersAlreadyOnRfq')}
                         </span>
                       ) : null}
@@ -431,7 +431,7 @@ export default function RfqDetailPage() {
           {comms === null ? (
             <p>{t('commonLoading')}</p>
           ) : comms.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rfqCorrespondenceNone')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rfqCorrespondenceNone')}</p>
           ) : (
             <table style={rfqTableStyle}>
               <thead>

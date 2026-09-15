@@ -236,7 +236,7 @@ export default function RetentionDisposalPage() {
         ) : null}
         {schedule ? (
           schedule.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rdNoScheduleItems')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoScheduleItems')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
@@ -367,7 +367,7 @@ export default function RetentionDisposalPage() {
         ) : null}
         {holds ? (
           holds.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rdNoHolds')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoHolds')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
@@ -453,7 +453,7 @@ export default function RetentionDisposalPage() {
         ) : null}
         {batches ? (
           batches.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rdNoBatches')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoBatches')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>

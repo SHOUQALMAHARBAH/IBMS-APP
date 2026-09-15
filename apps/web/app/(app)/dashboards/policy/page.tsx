@@ -152,7 +152,7 @@ export default function PolicyDashboardPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
             Period {summary.periodLabel} ({summary.periodStart.slice(0, 10)} –{' '}
             {summary.periodEnd.slice(0, 10)}). Renewal window: {summary.renewalWindowDays} days.
           </p>

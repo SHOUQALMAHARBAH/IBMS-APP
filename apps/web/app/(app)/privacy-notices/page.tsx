@@ -164,7 +164,7 @@ export default function PrivacyNoticesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('pnNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('pnNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>

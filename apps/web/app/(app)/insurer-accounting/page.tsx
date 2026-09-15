@@ -102,7 +102,7 @@ export default function InsurerAccountingPage() {
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {t('iaNone')}
           </p>
         ) : (

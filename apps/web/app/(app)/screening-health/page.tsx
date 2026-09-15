@@ -156,7 +156,7 @@ export default function ScreeningHealthPage() {
       ) : null}
 
       {!loaded ? (
-        <p style={{ opacity: 0.6 }}>
+        <p style={{ color: 'var(--ink-secondary)' }}>
           {t('shLoading')}
         </p>
       ) : null}

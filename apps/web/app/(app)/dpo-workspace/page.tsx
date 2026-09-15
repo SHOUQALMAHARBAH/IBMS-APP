@@ -95,7 +95,7 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowDsrQueue')}</h2>
             {summary.dsrQueue.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>{t('dpowNoOpenDsr')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoOpenDsr')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
@@ -129,7 +129,7 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowIncidentRegister')}</h2>
             {summary.incidentRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>{t('dpowNoOpenIncidents')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoOpenIncidents')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
@@ -157,7 +157,7 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowDpiaRegister')}</h2>
             {summary.dpiaRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>{t('dpowNoDpiaAwaiting')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoDpiaAwaiting')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
@@ -185,7 +185,7 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowHoldRegister')}</h2>
             {summary.legalHoldRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>{t('dpowNoHolds')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoHolds')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
@@ -211,7 +211,7 @@ export default function DpoWorkspacePage() {
           <section style={sectionStyle}>
             <h2>{t('dpowCbtRegister')}</h2>
             {summary.crossBorderTransferRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>{t('dpowNoCbt')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoCbt')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>

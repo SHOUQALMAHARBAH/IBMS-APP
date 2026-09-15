@@ -171,7 +171,7 @@ export default function SlaDashboardPage() {
                 value={`${(Number(t!.breachRate) * 100).toFixed(1)}%`}
               />
             </div>
-            <p style={{ opacity: 0.6, fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
               &ldquo;Due soon&rdquo; = unresolved and due within{' '}
               {formatSlaDuration(summary.dueSoonWindow)}. Breach rate =
               late-or-breached over all timers that have reached a deadline.
@@ -211,7 +211,7 @@ export default function SlaDashboardPage() {
                           {w.drafted ? (
                             <span
                               title={tr('slaDashDraftNote')}
-                              style={{ opacity: 0.6 }}
+                              style={{ color: 'var(--ink-secondary)' }}
                             >
                               {' '}
                               (drafted)

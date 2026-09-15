@@ -173,7 +173,7 @@ export default function InsurerPerformancePage() {
           </table>
         </>
       ) : hasLookedUp && !loadError ? (
-        <p style={{ opacity: 0.6 }}>{t('ipNoScore')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('ipNoScore')}</p>
       ) : null}
 
       <form onSubmit={onCompute} style={formStyle}>

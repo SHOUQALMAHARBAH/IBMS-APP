@@ -165,7 +165,7 @@ export default function ScreeningMatchesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {status === "pending"
               ? t('smNothingAwaitingReview')
               : t('smNoRecords')}
@@ -263,7 +263,7 @@ export default function ScreeningMatchesPage() {
                           </div>
                         </div>
                       ) : (
-                        <span style={{ opacity: 0.6 }}>
+                        <span style={{ color: 'var(--ink-secondary)' }}>
                           {t('smComplianceOfficerOnly')}
                         </span>
                       )}

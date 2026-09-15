@@ -112,7 +112,7 @@ export default function ClaimsAnalyticsPage() {
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('claNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('claNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>

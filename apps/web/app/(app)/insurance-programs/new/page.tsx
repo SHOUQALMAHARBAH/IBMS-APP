@@ -100,7 +100,7 @@ function AssembleFlow() {
 
       <h2 style={{ marginTop: '1.5rem' }}>{t('iprognCoverageLines')}</h2>
       {assessment.recommendedCoverageLines.length === 0 ? (
-        <p style={{ opacity: 0.6 }}>
+        <p style={{ color: 'var(--ink-secondary)' }}>
           {t('iprognNoLines')}
         </p>
       ) : (

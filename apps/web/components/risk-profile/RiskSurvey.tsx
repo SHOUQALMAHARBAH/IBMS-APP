@@ -196,7 +196,7 @@ export function RiskSurvey({
       </div>
 
       {assets.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('rpNoAssetsYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('rpNoAssetsYet')}</p>
       ) : (
         <table style={assetTableStyle}>
           <thead>

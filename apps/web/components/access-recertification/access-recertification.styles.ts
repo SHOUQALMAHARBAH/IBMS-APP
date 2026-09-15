@@ -60,8 +60,8 @@ export const roleBadgeStyle: CSSProperties = {
 
 export const adminBadgeStyle: CSSProperties = {
   ...roleBadgeStyle,
-  borderColor: '#d33',
-  color: '#d33',
+  borderColor: 'var(--danger-ink)',
+  color: 'var(--danger-ink)',
   fontWeight: 'bold',
 };
 

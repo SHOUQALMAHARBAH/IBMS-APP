@@ -110,7 +110,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         <div style={cardMetaStyle}>{t('rfqNewShortlistHint')}</div>
         <div style={insurerPickerStyle}>
           {insurers.length === 0 ? (
-            <span style={{ opacity: 0.6 }}>{t('rfqNewNoInsurersOnFile')}</span>
+            <span style={{ color: 'var(--ink-secondary)' }}>{t('rfqNewNoInsurersOnFile')}</span>
           ) : (
             insurers.map((insurer) => (
               <label

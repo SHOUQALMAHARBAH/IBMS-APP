@@ -215,7 +215,7 @@ export default function InsuranceProgramDetailPage() {
 
           <h2 style={{ marginTop: '2rem' }}>{t('iprogdLines')}</h2>
           {program.lines.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('iprogdNoLines')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('iprogdNoLines')}</p>
           ) : (
             <table style={programTableStyle}>
               <thead>

@@ -153,7 +153,7 @@ export default function ClaimsDashboardPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>As of {summary.asOf.slice(0, 10)}.</p>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>As of {summary.asOf.slice(0, 10)}.</p>
 
           <section style={sectionStyle}>
             <h2>{t('dclmOpenVsClosed')}</h2>

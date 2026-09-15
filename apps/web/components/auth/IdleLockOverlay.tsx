@@ -90,7 +90,7 @@ export function IdleLockOverlay({ user, onLockedOut }: IdleLockOverlayProps) {
           </>
         ) : null}
         {error ? (
-          <p role="alert" style={{ color: '#d33', fontSize: '0.9rem' }}>
+          <p role="alert" style={{ color: 'var(--danger-ink)', fontSize: '0.9rem' }}>
             {error}
           </p>
         ) : null}

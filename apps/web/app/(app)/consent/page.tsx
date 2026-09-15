@@ -282,7 +282,7 @@ export default function ConsentPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>{t('consNone')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('consNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>

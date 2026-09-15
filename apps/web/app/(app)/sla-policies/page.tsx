@@ -184,7 +184,7 @@ export default function SlaPoliciesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
+          <p style={{ color: 'var(--ink-secondary)' }}>
             {t('slapNoPolicies')}
           </p>
         ) : (
@@ -306,7 +306,7 @@ export default function SlaPoliciesPage() {
                           )}
                         </div>
                       ) : (
-                        <span style={{ opacity: 0.6 }}>
+                        <span style={{ color: 'var(--ink-secondary)' }}>
                           {t('slapReadOnly')}
                         </span>
                       )}

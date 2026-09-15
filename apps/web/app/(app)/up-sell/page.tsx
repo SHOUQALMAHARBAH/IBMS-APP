@@ -269,7 +269,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
       ) : null}
 
       {recommendations.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
           No up-sell recommendations for this customer. The nightly scan raises
           one when a customer&apos;s surveyed asset value grows materially past
           their designed property Sum Insured.

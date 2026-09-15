@@ -160,7 +160,7 @@ function NewNeedsAssessmentFlow() {
             </select>
           </div>
         ) : profiles ? (
-          <p style={{ opacity: 0.6 }}>{t('nanNoRiskProfile')}</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('nanNoRiskProfile')}</p>
         ) : (
           <p>{t('nanLoadingRiskProfiles')}</p>
         )}
@@ -207,7 +207,7 @@ function NewNeedsAssessmentFlow() {
           onSaved={handleSaved}
         />
       ) : (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
           {t('nanSelectToStart')}
         </p>
       )}
