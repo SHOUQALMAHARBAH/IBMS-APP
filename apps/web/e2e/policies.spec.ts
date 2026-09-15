@@ -150,7 +150,7 @@ test("the status filter and the search box each reach the API as a query param",
   await page.getByLabel("Status").selectOption("DISCREPANCY");
   await expect.poll(() => seen.some((s) => s.includes("status=DISCREPANCY"))).toBe(true);
 
-  await page.getByLabel("Search").fill("Rawabi");
+  await page.getByLabel("Search", { exact: true }).fill("Rawabi");
   await page.getByRole("button", { name: "Search" }).click();
   await expect.poll(() => seen.some((s) => s.includes("search=Rawabi"))).toBe(true);
 

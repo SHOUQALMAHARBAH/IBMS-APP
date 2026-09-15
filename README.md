@@ -1227,6 +1227,50 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### OPEN, client-facing — the sidebar is organised, but not yet "major modules only"
+
+The Frontend & UX Engineering Directive §5 asks for a sidebar holding "only the
+small number of major, top-level modules" a role actually works in, and says
+plainly that a sidebar which scrolls to show its own items "is a sign something
+secondary crept in as a top-level entry and needs to move inside a page
+instead." Its acceptance checklist repeats it: a secondary or contextual entity
+must be reachable only from the record it belongs to.
+
+The sidebar pass shipped on this branch groups (11 sections), collapses, adds a
+search box and orders sections per role. A Branch/Department Manager now lands
+on roughly 8 visible links instead of 43, and the rail no longer scrolls. That
+makes the navigation **usable**; it does not make it **short**. All 43 entries
+are still top-level entries, so the checklist line above remains UNMET, and
+this is deliberate rather than overlooked.
+
+Closing it is a separate pass, and it is page work rather than navigation work:
+
+- Fold contextual entries into the record that owns them — `/customers/kyc-queue`
+  into Customers being the clearest candidate.
+- Consolidate the reporting cluster. Three sidebar entries currently cover two
+  concepts (`/insurer-performance`, `/employee-performance`,
+  `/dashboards/insurer-employee-performance`), and `/sales-performance` sits
+  beside `/dashboards/sales`.
+
+It needs client sign-off on exactly which screens merge, because it changes
+pages people already use. It is **not** simple deletion: all 14 screens in the
+reporting cluster are substantial (132–274 lines each), so none is a §4
+link-only waypoint that could just go. Not scoped, not started — do not
+self-select it.
+
+Two smaller findings from the same analysis, also open:
+
+- **The insurer/employee-performance overlap above** is recorded here rather
+  than fixed, on the same reasoning.
+- **Per-user, usage-based ordering does not exist and cannot yet.** Section
+  order is a fixed, role-informed list in `AppNav.tsx`. There is no page-view
+  telemetry in `apps/web`, and `AuditLogEntry`'s `READ` action is written at
+  only 27 deliberate sites weighted towards reporting screens, so ordering by
+  it would rank dashboards top purely because dashboards are what log reads. A
+  Manager does not hold `audit-log.read` either. Real ordering needs its own
+  data-collection decision with the DPO involved, since it is employee
+  monitoring.
+
 ### 2026-09-09 — gap-closing pass (what changed, and what to re-read here)
 
 A pass over `IMPROVEMENTS.md` closed several long-standing gaps and found a

@@ -61,6 +61,64 @@ export const navGroupLabelStyle: CSSProperties = {
   color: 'var(--nav-ink-muted)',
 };
 
+/*
+ * The same heading, now as a <summary>. `display` is deliberately left alone:
+ * <summary> is `display: list-item`, and overriding it (to flex, say, for a
+ * count badge on the end) REMOVES the disclosure marker in Chrome. Keeping the
+ * marker is worth more than the badge — the browser draws it, and it points
+ * the correct way under `dir="rtl"` with no work from us, which a
+ * hand-rolled chevron would not. Focus comes from globals.css's single
+ * `:focus-visible` rule.
+ */
+export const navGroupSummaryStyle: CSSProperties = {
+  ...navGroupLabelStyle,
+  cursor: 'pointer',
+  // `outside` (the default for a list-item) puts the marker in the margin,
+  // where it clips against the rail edge in RTL and forces an indent so deep
+  // that the group's own items end up further LEFT than their heading —
+  // hierarchy read backwards. `inside` makes the marker the first inline box,
+  // so the heading starts just after it and navGroupItemsStyle can sit a
+  // hair further in, which is the way round a reader expects.
+  listStylePosition: 'inside',
+  // A group header is not a text selection target — double-clicking one to
+  // open it should not leave the label highlighted.
+  userSelect: 'none',
+};
+
+/** Holds a group's links, indented just past its heading text so the nesting
+ *  reads as nesting. */
+export const navGroupItemsStyle: CSSProperties = {
+  paddingInlineStart: 'var(--space-3)',
+};
+
+/** Wraps the search field. Full-bleed inside the rail's own padding. */
+export const navSearchWrapStyle: CSSProperties = {
+  padding: '0 var(--space-2)',
+  marginBottom: 'var(--space-3)',
+};
+
+/*
+ * The app's standard control surface on the navy rail, rather than a
+ * transparent input tinted with `--nav-ink`. Two reasons, both measured
+ * rather than aesthetic: `--surface-card` is the ground the global
+ * `::placeholder` colour (`--ink-muted`) was contrast-checked against in
+ * both themes, and a transparent input would need a border token of its own
+ * to clear WCAG 1.4.11 against the gradient — the same problem the auth card
+ * hit, which took `--ink-muted` at 4.99:1 to solve.
+ */
+export const navSearchInputStyle: CSSProperties = {
+  width: '100%',
+  fontSize: 'var(--text-sm)',
+  padding: 'var(--space-2) var(--space-3)',
+};
+
+/** The "N matches" / no-results line under the field. */
+export const navSearchStatusStyle: CSSProperties = {
+  padding: 'var(--space-1) var(--space-2) 0',
+  fontSize: 'var(--text-xs)',
+  color: 'var(--nav-ink-muted)',
+};
+
 export const navLinkStyle: CSSProperties = {
   display: 'block',
   padding: 'var(--space-2) var(--space-3)',

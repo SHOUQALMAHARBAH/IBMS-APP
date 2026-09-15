@@ -109,7 +109,7 @@ test("the search box re-fetches with a search querystring and renders the filter
   await expect(page.getByText("Ahmad Al-Fulani")).toBeVisible();
   await expect(page.getByText("Sara Odeh")).toBeVisible();
 
-  await page.getByLabel("Search").fill("Sara");
+  await page.getByLabel("Search", { exact: true }).fill("Sara");
   await page.getByRole("button", { name: "Search" }).click();
 
   await expect(page.getByText("Sara Odeh")).toBeVisible();

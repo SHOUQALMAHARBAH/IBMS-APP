@@ -133,7 +133,7 @@ test("the search box re-fetches with a search querystring and renders the filter
   await expect(page.getByText("Ready Trading Co.")).toBeVisible();
   await expect(page.getByText("Nour Trading")).toBeVisible();
 
-  await page.getByLabel("Search").fill("Nour");
+  await page.getByLabel("Search", { exact: true }).fill("Nour");
   await page.getByRole("button", { name: "Search" }).click();
 
   await expect(page.getByText("Nour Trading")).toBeVisible();

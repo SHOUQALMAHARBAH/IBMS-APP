@@ -69,7 +69,7 @@ test("the search box re-fetches with a search querystring and renders the filter
   await expect(page.getByRole("cell", { name: "Acme Office Supplies" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Nour Printing House" })).toBeVisible();
 
-  await page.getByLabel("Search").fill("Nour");
+  await page.getByLabel("Search", { exact: true }).fill("Nour");
   await page.getByRole("button", { name: "Search" }).click();
 
   await expect(page.getByRole("cell", { name: "Nour Printing House" })).toBeVisible();

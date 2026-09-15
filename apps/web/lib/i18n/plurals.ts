@@ -174,6 +174,14 @@ const AR: PluralDictionary = {
     many: '{count} ملفاً مسجّلاً.',
     other: '{count} ملف مسجّل.',
   },
+  navSearchMatches: {
+    zero: 'لا توجد نتائج',
+    one: 'نتيجة واحدة',
+    two: 'نتيجتان',
+    few: '{count} نتائج',
+    many: '{count} نتيجة',
+    other: '{count} نتيجة',
+  },
   claimFollowUpBusinessDays: {
     one: 'لا استجابة من المؤمِّن بعد يوم عمل واحد من التسجيل',
     two: 'لا استجابة من المؤمِّن بعد يومَي عمل من التسجيل',
@@ -219,6 +227,10 @@ const EN: PluralDictionary = {
   claimFilesOnRecord: {
     one: '{count} file on record.',
     other: '{count} files on record.',
+  },
+  navSearchMatches: {
+    one: '{count} match',
+    other: '{count} matches',
   },
   claimFollowUpBusinessDays: {
     one: 'No insurer response {count} business day after registration',
