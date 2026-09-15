@@ -57,6 +57,25 @@ jobs:
           echo "db-test never became healthy" >&2
           exit 1
 
+      # Multi-tenancy Phase 2 — must precede the migrations, exactly as in
+      # ci.yml's backend job: 20260928100000_row_level_security GRANTs to this
+      # role and RAISEs if it is missing, because RLS is pointless without a
+      # non-owner role for Postgres to apply it to.
+      #
+      # Through dotenv because this workflow has no job-level DATABASE_URL —
+      # every database step here reads the .env.test written above (the db
+      # workspace's own migrate:test:deploy/seed:test scripts do the same), and
+      # provision-app-role.mjs takes its connection from DATABASE_URL.
+      #
+      # The role is cluster-level, not database-level, so it also still exists
+      # when the drill restores the dump into its throwaway database — and
+      # pg_dump emits this migration's `GRANT ... TO ibms_app` statements,
+      # which would error on restore against a cluster that has never had it.
+      - name: Provision the non-owner application database role
+        run: npx dotenv -e .env.test -- npm run db:provision-app-role
+        env:
+          APP_DB_PASSWORD: ci-only-app-role
+
       - name: Run Prisma migrations (db-test)
         run: npm run db:test:migrate:deploy
 
