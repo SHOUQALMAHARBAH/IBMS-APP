@@ -94,7 +94,7 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
     );
 
     // Navigate directly to detail page
-    await page.goto('http://localhost:3000/leads/lead-1', { waitUntil: 'domcontentloaded' });
+    await page.goto('/leads/lead-1', { waitUntil: 'domcontentloaded' });
 
     // Wait for h1 to appear
     await page.waitForSelector('h1', { timeout: 10000 });
@@ -125,7 +125,7 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
     );
 
     // Navigate directly to detail page
-    await page.goto('http://localhost:3000/leads/lead-1', { waitUntil: 'domcontentloaded' });
+    await page.goto('/leads/lead-1', { waitUntil: 'domcontentloaded' });
 
     // Wait for h1 to appear
     await page.waitForSelector('h1', { timeout: 10000 });
@@ -156,7 +156,7 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
     );
 
     // Navigate directly to detail page
-    await page.goto('http://localhost:3000/policies/policy-1', { waitUntil: 'domcontentloaded' });
+    await page.goto('/policies/policy-1', { waitUntil: 'domcontentloaded' });
 
     // Wait for h1 to appear
     await page.waitForSelector('h1', { timeout: 10000 });
@@ -187,7 +187,7 @@ test.describe('Part H — Detail Pages (Bilingual Verification)', () => {
     );
 
     // Navigate directly to detail page
-    await page.goto('http://localhost:3000/policies/policy-1', { waitUntil: 'domcontentloaded' });
+    await page.goto('/policies/policy-1', { waitUntil: 'domcontentloaded' });
 
     // Wait for h1 to appear
     await page.waitForSelector('h1', { timeout: 10000 });
