@@ -181,13 +181,29 @@ already give).
   screen disagreeing is the defect this closed. Four `label=` props on
   `/financial-report` (`"1–30 days"` and its siblings) were the last on-screen
   literals, sitting between two `Figure`s that already read from the dictionary.
-  **Still open, and a different shape of work:** English interleaved with
-  interpolations — **29 sites across 14 files** (`JOD` on four dashboards, `minutes`
-  on `/settings/security`, `{n} invoice(s) across {m} customer(s).`). A bare-JSX-text
-  scan cannot see these, because the text node itself contains `{`. The pluralisation
-  half is not a key-wiring job: these sites use `count === 1 ? '' : 's'`, and Arabic
-  has more plural forms than that expresses, so it needs a plural rule in
-  `translate()`.
+  English interleaved with interpolations was the last category — **32 sites across
+  17 files**, invisible to a bare-JSX-text scan because the text node itself contains
+  `{`. All are wired; the app now has **no English left outside the dictionaries**.
+* **Count-dependent copy goes through `tPlural()`, never a ternary.**
+  `count === 1 ? '' : 's'` cannot express Arabic: `Intl.PluralRules('ar')` selects
+  between **six** categories (zero / one / two / few / many / other) where English
+  selects between two, so a ternary is a wrong answer for four of Arabic's six cases.
+  `lib/i18n/plurals.ts` holds `PLURALS` — an object of CLDR-category forms per key —
+  with its own `PluralKey` union and its own resolver, deliberately **separate from
+  the flat `TranslationKey` dictionary**: a dictionary value is a `string`, a plural
+  value is an object, and keeping the unions apart means `t()` cannot resolve a plural
+  key to `[object Object]` and `tPlural()` cannot take a key with no forms — both are
+  compile errors. `other` is the only mandatory form (CLDR guarantees it for every
+  locale and count) and a missing category falls back **straight to `other`, never to
+  a neighbour**: borrowing `few` for a missing `many` would hide the gap behind a form
+  that is grammatically wrong for that count anyway. The category always comes from
+  `Intl`, never from hand-rolled arithmetic. `plurals.test.ts` pins the Arabic
+  boundaries (0, 1, 2, **3–10**, **11–99**, 100+) and that six counts produce six
+  genuinely distinct strings.
+* **Money renders through `formatMoney`, everywhere.** Four dashboards were printing
+  `{rawValue} JOD` — an ungrouped, unformatted number with a hand-written suffix,
+  bypassing the shared formatter entirely. They now read `JOD 37,500.000` like every
+  other figure in the app.
 * **An unreferenced dictionary key is a question, not a verdict.** `policy.ts`'s 98
   orphans were audited one by one rather than deleted as debt: **15 were missing
   wiring** — the string they were written for was still hard-coded in the component
@@ -6908,9 +6924,15 @@ else.
   `/ar/leads`) does not give for free, and migrating ~80 existing routes under a
   `[locale]` segment would be a large, invasive restructure disproportionate to a bare
   switch. `LanguageProvider` (wraps `AuthProvider`'s children in `app/layout.tsx`)
-  initializes from `localStorage` (a fast, per-device pre-auth GUESS) then syncs from
-  the ACCOUNT's own preference exactly ONCE per session load, after which local state
-  is authoritative — a manual mid-session switch is never silently overwritten by a
+  renders the SSR default (`'AR'`, the schema default) on first paint, adopts
+  `localStorage` (a fast, per-device pre-auth GUESS) in a **mount effect**, then syncs
+  from the ACCOUNT's own preference exactly ONCE per session load, after which local
+  state is authoritative. **The localStorage read must not happen in the `useState`
+  initializer**: that runs during the first client render, where it can return `'EN'`
+  while the server — which has no localStorage and no locale cookie — rendered `'AR'`,
+  and React then discards the server HTML with "Hydration failed because the server
+  rendered text didn't match the client". It stays invisible while a pre-auth screen is
+  hard-coded English and surfaces the moment that screen calls `t()` — a manual mid-session switch is never silently overwritten by a
   stale re-render of the same already-fetched `user` object. Every switch updates React
   state + `document.documentElement.lang`/`dir` synchronously (genuinely instant — no
   navigation, no URL change, no lost session context) and persists via a best-effort

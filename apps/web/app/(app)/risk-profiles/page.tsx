@@ -45,11 +45,13 @@ function Figure({ label, value }: { label: string; value: string }) {
 }
 
 function ConsolidatedPanel({ survey }: { survey: ConsolidatedSurvey }) {
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const c = survey.consolidated;
   return (
     <div style={summaryPanelStyle}>
-      <strong>Consolidated Sum Insured ({c.siteCount} site{c.siteCount === 1 ? '' : 's'})</strong>
+      <strong>
+        {t('rpConsolidatedSumInsured')} ({tPlural('rpSiteCount', c.siteCount)})
+      </strong>
       <p style={{ opacity: 0.7, margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
         The figure a multi-site client&apos;s single Insurance Program is built
         from. Program assembly itself is Process 7.

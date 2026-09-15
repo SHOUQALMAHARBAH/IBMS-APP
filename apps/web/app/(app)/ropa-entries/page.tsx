@@ -38,7 +38,7 @@ function splitList(value: string): string[] {
 export default function RopaEntriesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const canManage = hasAnyPermission(user, ROLES);
 
   const [rows, setRows] = useState<RopaEntry[] | null>(null);
@@ -150,7 +150,7 @@ export default function RopaEntriesPage() {
       ) : null}
       {exportedCount !== null ? (
         <p role="status" style={{ opacity: 0.75 }}>
-          Exported {exportedCount} entr{exportedCount === 1 ? 'y' : 'ies'}.
+          {tPlural('ropaExportedEntries', exportedCount)}
         </p>
       ) : null}
 

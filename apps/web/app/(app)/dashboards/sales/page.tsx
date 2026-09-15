@@ -11,12 +11,13 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 export default function SalesDashboardPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -184,7 +185,7 @@ export default function SalesDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{t('dsalCommissionIncome')}</h2>
-            <div style={statStyle}>{summary.commissionIncomeJod} JOD</div>
+            <div style={statStyle}>{formatMoney(summary.commissionIncomeJod, language)}</div>
           </section>
 
           <section style={sectionStyle}>

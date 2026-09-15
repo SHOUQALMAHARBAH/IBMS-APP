@@ -29,7 +29,7 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function DocumentsPage() {
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -271,8 +271,11 @@ export default function DocumentsPage() {
         ) : null}
         {summary ? (
           <p>
-            {summary.documentCount} document(s) — highest classification:{' '}
-            <strong>{summary.highestClassification ?? 'none'}</strong>
+            {tPlural('docsDocumentCount', summary.documentCount)}{' '}
+            {t('docsHighestClassification')}{' '}
+            <strong>
+              {summary.highestClassification ?? t('docsClassificationNone')}
+            </strong>
           </p>
         ) : loadError ? null : (
         <p>{t('docLoading')}</p>

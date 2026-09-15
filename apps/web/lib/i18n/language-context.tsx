@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../auth/auth-context';
 import { updateLanguagePreference as patchLanguagePreference } from '../auth/auth-api';
 import { translate, type Language, type TranslationKey } from './translations';
+import { translatePlural, type PluralKey } from './plurals';
 
 // Part F — Bilingual UI, item #1. "Instant" means the UI flips the moment a
 // user picks a language — never waiting on the network — so `setLanguage`
@@ -34,20 +35,54 @@ interface LanguageContextValue {
   language: Language;
   setLanguage: (language: Language) => void;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
+  /** Plural-aware sibling of `t`. Separate key union, and `count` is
+   *  mandatory — the category is selected from it, so it is not optional the
+   *  way `params` is. See `./plurals.ts`. */
+  tPlural: (
+    key: PluralKey,
+    count: number,
+    params?: Record<string, string | number>,
+  ) => string;
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
+/** `User.languagePreference`'s own schema default, and the ONLY value the
+ *  server can render: it has no localStorage and no locale cookie to read. */
+const SSR_LANGUAGE: Language = 'AR';
+
 function readStoredLanguage(): Language {
-  if (typeof window === 'undefined') return 'AR'; // User.languagePreference's own schema default
+  if (typeof window === 'undefined') return SSR_LANGUAGE;
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === 'EN' || stored === 'AR' ? stored : 'AR';
+  return stored === 'EN' || stored === 'AR' ? stored : SSR_LANGUAGE;
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [language, setLanguageState] = useState<Language>(readStoredLanguage);
+  // Deliberately NOT `useState(readStoredLanguage)`. That initialiser runs
+  // during the first client render, where it can return 'EN' from
+  // localStorage while the server — which cannot see localStorage — rendered
+  // 'AR'. React then finds the two trees disagree and throws away the
+  // server HTML: "Hydration failed because the server rendered text didn't
+  // match the client", on every string a pre-auth page translates.
+  //
+  // It stayed invisible while the four `(auth)` screens were hard-coded
+  // English, because then both sides rendered the same literal regardless of
+  // the language state. The moment they started calling `t()` the divergence
+  // became visible on the very first screen anyone sees.
+  //
+  // So the first render always matches the server, and the stored preference
+  // is adopted immediately afterwards, in an effect.
+  const [language, setLanguageState] = useState<Language>(SSR_LANGUAGE);
   const syncedFromAccountRef = useRef(false);
+
+  useEffect(() => {
+    // Mount only. The account's own preference, when it arrives below, wins
+    // over this — so if `/auth/me` somehow resolved first, don't undo it.
+    if (syncedFromAccountRef.current) return;
+    const stored = readStoredLanguage();
+    setLanguageState((current) => (stored === current ? current : stored));
+  }, []);
 
   useEffect(() => {
     if (user && !syncedFromAccountRef.current) {
@@ -84,7 +119,19 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     [language],
   );
 
-  const value = useMemo(() => ({ language, setLanguage, t }), [language, setLanguage, t]);
+  const tPlural = useCallback(
+    (
+      key: PluralKey,
+      count: number,
+      params?: Record<string, string | number>,
+    ) => translatePlural(language, key, count, params),
+    [language],
+  );
+
+  const value = useMemo(
+    () => ({ language, setLanguage, t, tPlural }),
+    [language, setLanguage, t, tPlural],
+  );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

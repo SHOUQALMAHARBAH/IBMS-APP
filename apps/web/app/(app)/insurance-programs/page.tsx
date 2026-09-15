@@ -16,7 +16,7 @@ import { formatDate } from '../../../lib/i18n/format';
 
 function ProgramsForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
   const [programs, setPrograms] = useState<InsuranceProgram[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -73,7 +73,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
         >
           <strong>Status: {program.status}</strong>
           <div style={cardMetaStyle}>
-            {program.lines.length} line{program.lines.length === 1 ? '' : 's'}
+            {tPlural('iprogLineCount', program.lines.length)}
           </div>
           <div style={cardMetaStyle}>
             Assembled {formatDate(program.createdAt, language)}

@@ -35,7 +35,7 @@ function BreakdownTable({ title, rows }: { title: string; rows: Record<string, n
 }
 
 export default function ComplianceDashboardPage() {
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -158,7 +158,9 @@ export default function ComplianceDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{t('dcmpBreachRegister')}</h2>
-            <div style={statStyle}>{summary.breachRegister.openCount} open</div>
+            <div style={statStyle}>
+              {tPlural('dcmpBreachesOpen', summary.breachRegister.openCount)}
+            </div>
             <BreakdownTable title={t('dcmpByStatus')} rows={summary.breachRegister.byStatus} />
           </section>
 

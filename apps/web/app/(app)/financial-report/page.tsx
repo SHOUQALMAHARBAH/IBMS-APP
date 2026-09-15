@@ -49,7 +49,7 @@ function Figure({ label, value }: { label: string; value: string }) {
 export default function FinancialReportPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
   const [data, setData] = useState<FinancialReportSummary | null>(null);
@@ -127,8 +127,10 @@ export default function FinancialReportPage() {
             <Figure label={t('frAgeing61To90')} value={data.receivables.d61_90} />
             <Figure label={t('frAgeing90Plus')} value={data.receivables.d90_plus} />
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem' }}>
-              {data.receivables.invoiceCount} invoice(s) across{' '}
-              {data.receivables.customerCount} customer(s).
+              {t('frInvoicesAcrossCustomers', {
+                invoices: tPlural('frInvoiceCount', data.receivables.invoiceCount),
+                customers: tPlural('frCustomerCount', data.receivables.customerCount),
+              })}
             </p>
           </section>
 
@@ -143,7 +145,9 @@ export default function FinancialReportPage() {
               value={data.payables.remittedAmount}
             />
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem' }}>
-              Across {data.payables.insurerCount} insurer(s).
+              {t('frAcrossInsurers', {
+                insurers: tPlural('frInsurerCount', data.payables.insurerCount),
+              })}
             </p>
           </section>
 

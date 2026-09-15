@@ -57,7 +57,7 @@ test("renders every metric section with real figures", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Claims Dashboard" })).toBeVisible();
   await expect(page.getByText("14", { exact: true })).toBeVisible();
   await expect(page.getByText("52", { exact: true })).toBeVisible();
-  await expect(page.getByText("37500.000 JOD")).toBeVisible();
+  await expect(page.getByText("JOD 37,500.000")).toBeVisible();
   await expect(page.getByText("National Insurance")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });

@@ -207,9 +207,11 @@ export default function SalesPerformancePage() {
           </div>
           {performance.target ? (
             <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-              Period {performance.target.periodLabel} (
-              {performance.target.periodStart.slice(0, 10)} to{' '}
-              {performance.target.periodEnd.slice(0, 10)}).
+              {t('spPeriodRange', {
+                label: performance.target.periodLabel,
+                from: performance.target.periodStart.slice(0, 10),
+                to: performance.target.periodEnd.slice(0, 10),
+              })}
             </p>
           ) : (
             <p style={{ opacity: 0.7 }}>{t('spNoTarget')}</p>

@@ -207,6 +207,7 @@ export const POLICY = {
     claimRunSweepButton: 'تشغيل مسح المتابعة',
     claimNotifySubmitButton: 'الإبلاغ عن مطالبة',
     claimThirdPartyInvolvedRow: 'يوجد طرف ثالث',
+    claimFollowUpRaised: 'أُثير في {date}.',
 
     financeBillingStatusPaid: 'مدفوعة',
     financeMethodBank: 'تحويل بنكي',
@@ -483,6 +484,7 @@ export const POLICY = {
     claimRunSweepButton: 'Run follow-up sweep',
     claimNotifySubmitButton: 'Notify claim',
     claimThirdPartyInvolvedRow: 'Third party involved',
+    claimFollowUpRaised: 'raised {date}.',
 
     financeBillingStatusPaid: 'Paid',
     financeMethodBank: 'Bank transfer',

@@ -47,7 +47,7 @@ function parseLines(
 export default function BankReconciliationPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const canReconcile =
     !!user &&
     hasPermission(user, 'reconciliation-exception.investigate');
@@ -164,9 +164,12 @@ export default function BankReconciliationPage() {
 
       {detectResult ? (
         <p>
-          {detectResult.lineCount} line(s): {detectResult.reconciled}{' '}
-          reconciled, <strong>{detectResult.exceptionsRaised}</strong>{' '}
-          exception(s) raised.
+          {tPlural('brDetectLines', detectResult.lineCount)}:{' '}
+          {t('brDetectReconciled', { count: detectResult.reconciled })},{' '}
+          <strong>
+            {tPlural('brDetectExceptions', detectResult.exceptionsRaised)}
+          </strong>
+          .
         </p>
       ) : null}
 

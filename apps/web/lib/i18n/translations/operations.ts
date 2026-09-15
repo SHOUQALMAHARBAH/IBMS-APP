@@ -105,6 +105,8 @@ export const OPERATIONS = {
     docPolicyNotFound: 'الوثيقة غير موجودة.',
     docComputeError: 'تعذّر احتساب ملخّص التصنيف.',
     docNoPermission: 'لا تملك صلاحية document.manage اللازمة لعرض المستندات.',
+    docsHighestClassification: '— أعلى تصنيف:',
+    docsClassificationNone: 'لا يوجد',
 
     // ---- Knowledge base (#74) --------------------------------------------------
     kbHeading: 'قاعدة المعرفة',
@@ -240,6 +242,7 @@ export const OPERATIONS = {
     rpAddSiteButton: 'إضافة موقع',
     rpNoPermission: 'لا تملك صلاحية risk-profile.read اللازمة لعرض ملفات المخاطر.',
     rpOpenSurveyAria: 'فتح مسح المخاطر لـ {name}',
+    rpConsolidatedSumInsured: 'إجمالي مبلغ التأمين الموحَّد',
 
     // ---- Insurance programs (#7) ------------------------------------------------------------------
     iprogHeading: 'برامج التأمين',
@@ -433,6 +436,8 @@ export const OPERATIONS = {
     docPolicyNotFound: 'Policy not found.',
     docComputeError: 'Could not compute the classification summary.',
     docNoPermission: "You don't hold the document.manage permission.",
+    docsHighestClassification: '— highest classification:',
+    docsClassificationNone: 'none',
 
     kbHeading: 'Knowledge Base',
     kbIntro:
@@ -564,6 +569,7 @@ export const OPERATIONS = {
     rpAddSiteButton: 'Add site',
     rpNoPermission: "You don't hold the risk-profile.read permission.",
     rpOpenSurveyAria: 'Open risk survey for {name}',
+    rpConsolidatedSumInsured: 'Consolidated Sum Insured',
 
     iprogHeading: 'Insurance programs',
     iprogLoading: 'Loading…',

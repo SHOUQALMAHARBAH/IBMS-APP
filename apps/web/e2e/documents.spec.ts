@@ -113,7 +113,9 @@ test("computes a policy's highest-classification-present summary", async ({ page
   await page.goto("/documents");
   await page.getByLabel("Policy ID").nth(1).fill("policy-1");
   await page.getByRole("button", { name: "Compute" }).click();
-  await expect(page.getByText("2 document(s)", { exact: false })).toBeVisible();
+  // "2 document(s)" before the plural pass; the count now selects a real
+  // form, so English reads "2 documents" and Arabic would read "مستندان".
+  await expect(page.getByText("2 documents", { exact: false })).toBeVisible();
   await expect(page.getByText("HIGHLY_CONFIDENTIAL")).toBeVisible();
 });
 

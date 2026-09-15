@@ -12,6 +12,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -54,7 +55,7 @@ function ProfitabilityTable({ title, rows }: { title: string; rows: Profitabilit
 }
 
 export default function FinancialDashboardPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -156,7 +157,7 @@ export default function FinancialDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{t('dfinReceivables')}</h2>
-            <div style={statStyle}>{summary.receivables.totals.outstandingTotal} JOD</div>
+            <div style={statStyle}>{formatMoney(summary.receivables.totals.outstandingTotal, language)}</div>
             <div style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem' }}>
               <div>Current: {summary.receivables.totals.current}</div>
               <div>1-30d: {summary.receivables.totals.d1_30}</div>
@@ -170,11 +171,11 @@ export default function FinancialDashboardPage() {
             <h2>{t('dfinPayables')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
-                <div style={statStyle}>{summary.payables.totals.outstandingAmount} JOD</div>
+                <div style={statStyle}>{formatMoney(summary.payables.totals.outstandingAmount, language)}</div>
                 <div>Outstanding ({summary.payables.totals.outstandingCount})</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.payables.totals.remittedAmount} JOD</div>
+                <div style={statStyle}>{formatMoney(summary.payables.totals.remittedAmount, language)}</div>
                 <div>Remitted ({summary.payables.totals.remittedCount})</div>
               </div>
             </div>
@@ -184,15 +185,15 @@ export default function FinancialDashboardPage() {
             <h2>{t('dfinCommissionIncome')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
-                <div style={statStyle}>{summary.commission.earned} JOD</div>
+                <div style={statStyle}>{formatMoney(summary.commission.earned, language)}</div>
                 <div>{t('dfinEarned')}</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.commission.outstanding} JOD</div>
+                <div style={statStyle}>{formatMoney(summary.commission.outstanding, language)}</div>
                 <div>{t('dfinOutstanding')}</div>
               </div>
               <div>
-                <div style={statStyle}>{summary.commission.paid} JOD</div>
+                <div style={statStyle}>{formatMoney(summary.commission.paid, language)}</div>
                 <div>{t('dfinPaid')}</div>
               </div>
             </div>

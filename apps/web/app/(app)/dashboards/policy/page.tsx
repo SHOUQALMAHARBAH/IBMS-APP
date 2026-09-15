@@ -16,7 +16,7 @@ const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 export default function PolicyDashboardPage() {
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -153,8 +153,12 @@ export default function PolicyDashboardPage() {
       {summary ? (
         <>
           <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-            Period {summary.periodLabel} ({summary.periodStart.slice(0, 10)} –{' '}
-            {summary.periodEnd.slice(0, 10)}). Renewal window: {summary.renewalWindowDays} days.
+            {t('dpolPeriodRange', {
+              label: summary.periodLabel,
+              from: summary.periodStart.slice(0, 10),
+              to: summary.periodEnd.slice(0, 10),
+            })}{' '}
+            {tPlural('dpolRenewalWindowDays', summary.renewalWindowDays)}
           </p>
 
           <section style={sectionStyle}>

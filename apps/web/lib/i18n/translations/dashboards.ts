@@ -92,6 +92,7 @@ export const DASHBOARDS = {
     spReviseButton: 'تعديل الحصة',
     spSetButton: 'تحديد الحصة',
     spNoPermission: 'لا تملك صلاحية dashboard.sales.view اللازمة لعرض أداء المبيعات.',
+    spPeriodRange: 'الفترة {label} ({from} إلى {to}).',
 
     // ---- Sales dashboard ----------------------------------------------------
     dsalHeading: 'لوحة المبيعات',
@@ -130,6 +131,7 @@ export const DASHBOARDS = {
     dpolColCancelledAt: 'تاريخ الإلغاء',
     dpolLoadError: 'تعذّر تحميل لوحة الوثائق — حاول مرة أخرى.',
     dpolNoPermission: 'لا تملك صلاحية dashboard.policy.view اللازمة لعرض لوحة الوثائق.',
+    dpolPeriodRange: 'الفترة {label} ({from} – {to}).',
 
     // ---- Claims dashboard ---------------------------------------------------
     dclmHeading: 'لوحة المطالبات',
@@ -149,6 +151,10 @@ export const DASHBOARDS = {
     dclmByInsurer: 'حسب شركة التأمين',
     dclmLoadError: 'تعذّر تحميل لوحة المطالبات — حاول مرة أخرى.',
     dclmNoPermission: 'لا تملك صلاحية dashboard.claims.view اللازمة لعرض لوحة المطالبات.',
+    dclmAgeing0To30: 'من ٠ إلى ٣٠ يوماً',
+    dclmAgeing31To60: 'من ٣١ إلى ٦٠ يوماً',
+    dclmAgeing61To90: 'من ٦١ إلى ٩٠ يوماً',
+    dclmAgeing90Plus: 'أكثر من ٩٠ يوماً',
 
     // ---- Financial dashboard -------------------------------------------------
     dfinHeading: 'اللوحة المالية',
@@ -233,6 +239,7 @@ export const DASHBOARDS = {
     ipLoadError: 'تعذّر تحميل أداء شركة التأمين — حاول مرة أخرى.',
     ipNoPermission: 'لا تملك صلاحية insurer-performance.view اللازمة لعرض هذه الشاشة.',
     ipComputeNote: 'يستخدم معرّف شركة التأمين أعلاه. اترك حقول الفترة فارغة لاحتساب الشهر الميلادي المنتهي بتوقيت UTC (وهو ما تفعله المهمة الشهرية نفسها).',
+    ipMostRecentPeriod: 'أحدث فترة: {label} (احتُسبت {computed}).',
 
     // ---- Employee performance (#61) -----------------------------------------------
     epHeading: 'أداء الموظفين',
@@ -402,6 +409,7 @@ export const DASHBOARDS = {
     spReviseButton: 'Revise target',
     spSetButton: 'Set target',
     spNoPermission: "You don't hold the dashboard.sales.view permission.",
+    spPeriodRange: 'Period {label} ({from} to {to}).',
 
     dsalHeading: 'Sales Dashboard',
     dsalIntro:
@@ -438,6 +446,7 @@ export const DASHBOARDS = {
     dpolColCancelledAt: 'Cancelled at',
     dpolLoadError: 'Could not load the Policy Dashboard — try again.',
     dpolNoPermission: "You don't hold the dashboard.policy.view permission.",
+    dpolPeriodRange: 'Period {label} ({from} – {to}).',
 
     dclmHeading: 'Claims Dashboard',
     dclmIntro:
@@ -456,6 +465,10 @@ export const DASHBOARDS = {
     dclmByInsurer: 'By insurer',
     dclmLoadError: 'Could not load the Claims Dashboard — try again.',
     dclmNoPermission: "You don't hold the dashboard.claims.view permission.",
+    dclmAgeing0To30: '0-30 days',
+    dclmAgeing31To60: '31-60 days',
+    dclmAgeing61To90: '61-90 days',
+    dclmAgeing90Plus: '90+ days',
 
     dfinHeading: 'Financial Dashboard',
     dfinIntro:
@@ -536,6 +549,7 @@ export const DASHBOARDS = {
     ipLoadError: 'Could not load insurer performance — try again.',
     ipNoPermission: "You don't hold the insurer-performance.view permission.",
     ipComputeNote: 'Uses the Insurer ID above. Leave the period fields blank to score the UTC calendar month that just ended (what the monthly job itself does).',
+    ipMostRecentPeriod: 'Most recent period: {label} (computed {computed}).',
 
     epHeading: 'Employee Performance',
     epIntro:

@@ -12,6 +12,7 @@ import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
@@ -55,7 +56,7 @@ function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdo
 }
 
 export default function ClaimsDashboardPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -171,7 +172,9 @@ export default function ClaimsDashboardPage() {
 
           <section style={sectionStyle}>
             <h2>{t('dclmOutstandingValue')}</h2>
-            <div style={statStyle}>{summary.outstandingClaimsValueJod} JOD</div>
+            <div style={statStyle}>
+              {formatMoney(summary.outstandingClaimsValueJod, language)}
+            </div>
           </section>
 
           <section style={sectionStyle}>
@@ -179,19 +182,27 @@ export default function ClaimsDashboardPage() {
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.ageing.d0_30.count}</div>
-                <div>0-30 days ({summary.ageing.d0_30.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing0To30')} ({formatMoney(summary.ageing.d0_30.valueJod, language)})
+                </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d31_60.count}</div>
-                <div>31-60 days ({summary.ageing.d31_60.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing31To60')} ({formatMoney(summary.ageing.d31_60.valueJod, language)})
+                </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d61_90.count}</div>
-                <div>61-90 days ({summary.ageing.d61_90.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing61To90')} ({formatMoney(summary.ageing.d61_90.valueJod, language)})
+                </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d90_plus.count}</div>
-                <div>90+ days ({summary.ageing.d90_plus.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing90Plus')} ({formatMoney(summary.ageing.d90_plus.valueJod, language)})
+                </div>
               </div>
             </div>
           </section>

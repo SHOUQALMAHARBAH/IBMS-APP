@@ -144,8 +144,10 @@ export default function InsurerPerformancePage() {
             <Stat label={t('diepServiceQuality')} value={latest.serviceQualityScore} />
           </div>
           <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-            Most recent period: {latest.periodLabel} (computed{' '}
-            {latest.computedAt.replace('T', ' ').slice(0, 16)}).
+            {t('ipMostRecentPeriod', {
+              label: latest.periodLabel,
+              computed: latest.computedAt.replace('T', ' ').slice(0, 16),
+            })}
           </p>
 
           <h2>{t('dashHistory')}</h2>

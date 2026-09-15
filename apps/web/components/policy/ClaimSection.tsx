@@ -188,7 +188,7 @@ function ClaimDocumentation({
   canDocument: boolean;
   onDone: () => Promise<void>;
 }) {
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const [docType, setDocType] = useState<ClaimDocType>('claim_form');
   const [classification, setClassification] =
     useState<ClaimDocClassification>('CONFIDENTIAL');
@@ -242,8 +242,7 @@ function ClaimDocumentation({
       </ul>
       {claim.documents.length > 0 ? (
         <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: '0.25rem 0' }}>
-          {claim.documents.length} file
-          {claim.documents.length === 1 ? '' : 's'} on record.
+          {tPlural('claimFilesOnRecord', claim.documents.length)}
         </p>
       ) : null}
 
@@ -506,7 +505,7 @@ function ClaimFollowUp({
   onDone: () => Promise<void>;
 }) {
   const { t } = useLanguage();
-  const { language } = useLanguage();
+  const { language, tPlural } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -540,9 +539,14 @@ function ClaimFollowUp({
         </p>
       ) : null}
       <p style={{ fontSize: '0.85rem', margin: '0.25rem 0', opacity: 0.8 }}>
-        No insurer response {claim.followUp.followUpAlertThresholdDays} business
-        days after registration — raised{' '}
-        {formatDate(alert.triggeredAt, language)}.
+        {tPlural(
+          'claimFollowUpBusinessDays',
+          claim.followUp.followUpAlertThresholdDays,
+        )}
+        {' — '}
+        {t('claimFollowUpRaised', {
+          date: formatDate(alert.triggeredAt, language),
+        })}
       </p>
       {canFollowUp ? (
         <button

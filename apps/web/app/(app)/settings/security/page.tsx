@@ -13,7 +13,7 @@ import { formatDateTime } from '../../../../lib/i18n/format';
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const { user, isLoading, refreshUser, clearUser } = useAuth();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
   const [enrollment, setEnrollment] = useState<MfaEnrollResponse | null>(null);
   const [code, setCode] = useState('');
@@ -118,8 +118,10 @@ export default function SecuritySettingsPage() {
 
       <section style={{ marginTop: '2rem' }}>
         <h2>{t('secSession')}</h2>
-        <p>Idle timeout: {user.idleTimeoutMinutes} minutes</p>
-        <p>Automatic sign-out after: {user.hardLogoutAfterIdleMinutes} minutes idle</p>
+        <p>{tPlural('secIdleTimeoutMinutes', user.idleTimeoutMinutes)}</p>
+        <p>
+          {tPlural('secHardLogoutMinutes', user.hardLogoutAfterIdleMinutes)}
+        </p>
         {user.accessValidUntil ? <p>Your access to IBMS ends: {formatDateTime(user.accessValidUntil, language)}</p> : null}
       </section>
 

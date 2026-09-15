@@ -64,9 +64,9 @@ test("renders every metric section with real figures", async ({ page }) => {
 
   await page.goto("/dashboards/financial");
   await expect(page.getByRole("heading", { name: "Financial Dashboard" })).toBeVisible();
-  await expect(page.getByText("1500.000 JOD")).toBeVisible();
-  await expect(page.getByText("1800.000 JOD")).toBeVisible();
-  await expect(page.getByText("300.000 JOD")).toBeVisible();
+  await expect(page.getByText("JOD 1,500.000")).toBeVisible();
+  await expect(page.getByText("JOD 1,800.000")).toBeVisible();
+  await expect(page.getByText("JOD 300.000")).toBeVisible();
   await expect(page.getByText("3200.000", { exact: false }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });
@@ -95,7 +95,7 @@ test("financial dashboard screen has no serious/critical accessibility violation
   );
 
   await page.goto("/dashboards/financial");
-  await expect(page.getByText("1800.000 JOD")).toBeVisible();
+  await expect(page.getByText("JOD 1,800.000")).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),

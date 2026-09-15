@@ -17,7 +17,7 @@ import { formatDate } from '../../../lib/i18n/format';
 export default function NeedsAssessmentsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language, t } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
   const [assessments, setAssessments] = useState<NeedsAssessment[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,8 +79,10 @@ export default function NeedsAssessmentsPage() {
               >
                 <strong>Status: {assessment.status}</strong>
                 <div style={cardMetaStyle}>
-                  {assessment.recommendedCoverageLines.length} coverage line
-                  {assessment.recommendedCoverageLines.length === 1 ? '' : 's'} recommended
+                  {tPlural(
+                    'naCoverageLinesRecommended',
+                    assessment.recommendedCoverageLines.length,
+                  )}
                 </div>
                 <div style={cardMetaStyle}>
                   Updated {formatDate(assessment.updatedAt, language)}

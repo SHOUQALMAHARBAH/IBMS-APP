@@ -279,9 +279,11 @@ export default function EmployeeDetailPage() {
             <section style={sectionStyle}>
               <h2>{t('empdDeprovisioningHeading')}</h2>
               <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-                Triggered {employee.deprovisioningChecklist.triggeredAt.replace('T', ' ').slice(0, 16)}
-                {' — '}due the same business day (24h escalation to IT
-                management if still open).
+                {t('empdDeprovisioningTriggered', {
+                  at: employee.deprovisioningChecklist.triggeredAt
+                    .replace('T', ' ')
+                    .slice(0, 16),
+                })}
               </p>
               <ul>
                 <li>

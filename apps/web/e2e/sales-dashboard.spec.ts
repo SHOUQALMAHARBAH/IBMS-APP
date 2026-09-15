@@ -46,7 +46,7 @@ test("renders every metric section with real figures", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sales Dashboard" })).toBeVisible();
   await expect(page.getByText("20", { exact: true })).toBeVisible();
   await expect(page.getByText("5000.000")).toBeVisible();
-  await expect(page.getByText("800.000 JOD")).toBeVisible();
+  await expect(page.getByText("JOD 800.000")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });
 
@@ -74,7 +74,7 @@ test("sales dashboard screen has no serious/critical accessibility violations @a
   );
 
   await page.goto("/dashboards/sales");
-  await expect(page.getByText("800.000 JOD")).toBeVisible();
+  await expect(page.getByText("JOD 800.000")).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),

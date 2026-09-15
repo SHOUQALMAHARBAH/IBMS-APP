@@ -139,6 +139,7 @@ export const FINANCE = {
     brResumeInvoiceAs: 'استئناف الفاتورة كـ…',
     brResolutionNoteRowAria: 'ملاحظة الإغلاق لـ {id}',
     brResumeInvoiceRowAria: 'استئناف الفاتورة كـ لـ {id}',
+    brDetectReconciled: '{count} مُسوّاة',
 
     // ---- Financial report (#40) ------------------------------------------
     frHeading: 'التقرير المالي',
@@ -181,6 +182,8 @@ export const FINANCE = {
     frAgeing31To60: 'من ٣١ إلى ٦٠ يوماً',
     frAgeing61To90: 'من ٦١ إلى ٩٠ يوماً',
     frAgeing90Plus: 'أكثر من ٩٠ يوماً',
+    frInvoicesAcrossCustomers: '{invoices} موزّعة على {customers}.',
+    frAcrossInsurers: 'موزّعة على {insurers}.',
   },
   EN: {
     caHeading: 'Client accounting',
@@ -300,6 +303,7 @@ export const FINANCE = {
     brResumeInvoiceAs: 'Resume invoice as…',
     brResolutionNoteRowAria: 'Resolution note for {id}',
     brResumeInvoiceRowAria: 'Resume invoice as for {id}',
+    brDetectReconciled: '{count} reconciled',
 
     frHeading: 'Financial report',
     frIntro:
@@ -341,5 +345,7 @@ export const FINANCE = {
     frAgeing31To60: '31–60 days',
     frAgeing61To90: '61–90 days',
     frAgeing90Plus: '90+ days',
+    frInvoicesAcrossCustomers: '{invoices} across {customers}.',
+    frAcrossInsurers: 'Across {insurers}.',
   },
 } as const;
