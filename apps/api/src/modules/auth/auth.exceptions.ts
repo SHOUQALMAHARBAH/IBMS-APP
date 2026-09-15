@@ -63,3 +63,20 @@ export class MfaRequiredException extends CodedForbiddenException {
     );
   }
 }
+
+/**
+ * Part II §4.3 — the onboarding wizard is uninterruptible: "no other API call
+ * succeeds (403 ONBOARDING_INCOMPLETE) until it finishes".
+ *
+ * Distinct from MFA_ENROLLMENT_REQUIRED so the client knows WHICH step is
+ * outstanding and can route straight to it, rather than guessing and showing
+ * the wrong screen.
+ */
+export class OnboardingIncompleteException extends CodedForbiddenException {
+  constructor() {
+    super(
+      'ONBOARDING_INCOMPLETE',
+      'The mandatory password change must be completed before continuing.',
+    );
+  }
+}

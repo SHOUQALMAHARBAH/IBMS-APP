@@ -29,6 +29,7 @@ const PERIOD: PeriodWindow = {
 
 const SCORE_ROW: InsurerPerformanceScore = {
   id: 'score-1',
+  organizationId: 'org-1',
   insurerId: 'insurer-1',
   periodLabel: '2026-08',
   quoteResponseScore: new Prisma.Decimal('50'),

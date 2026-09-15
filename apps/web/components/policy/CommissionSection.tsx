@@ -118,7 +118,7 @@ export function CommissionSection({
             <span>{formatMoney(entry.vatAmount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
-            <span>Gross (incl. VAT)</span>
+            <span>{t('polCommGrossInclVat')}</span>
             <span>{formatMoney(entry.grossAmount, language)}</span>
           </div>
           <div style={quoteFieldStyle}>
@@ -131,7 +131,7 @@ export function CommissionSection({
           </div>
           {entry.status === 'paid' ? (
             <div style={quoteFieldStyle}>
-              <span>Reconciled</span>
+              <span>{t('commissionReconciledLabel')}</span>
               <span>
                 {formatMoney(entry.paidAmount, language)}
                 {entry.paymentReference ? ` · ${entry.paymentReference}` : ''}
@@ -140,7 +140,7 @@ export function CommissionSection({
           ) : null}
           {entry.reversedAmount && Number(entry.reversedAmount) > 0 ? (
             <div style={quoteFieldStyle}>
-              <span>Reversed</span>
+              <span>{t('commissionReversedLabel')}</span>
               <span>
                 {formatMoney(entry.reversedAmount, language)}
                 {entry.reversalReason ? ` · ${entry.reversalReason}` : ''}
@@ -150,7 +150,7 @@ export function CommissionSection({
           {entry.isManualOverride ? (
             <>
               <div style={quoteFieldStyle}>
-                <span>Manual override</span>
+                <span>{t('polCommManualOverride')}</span>
                 <span>
                   {formatMoney(entry.overrideAmount, language)}{' '}
                   {entry.overridePending
@@ -160,7 +160,7 @@ export function CommissionSection({
               </div>
               {entry.overrideReason ? (
                 <div style={quoteFieldStyle}>
-                  <span>Reason</span>
+                  <span>{t('endorsementCancellationReasonLabel')}</span>
                   <span>{entry.overrideReason}</span>
                 </div>
               ) : null}
@@ -198,20 +198,16 @@ export function CommissionSection({
                 );
               }}
             >
-              <label>
-                Override amount
-                <input
-                  aria-label="Override amount"
+              <label>{t('polCommOverrideAmount')}<input
+                  aria-label={t('polCommOverrideAmount')}
                   value={overrideAmount}
                   onChange={(e) => setOverrideAmount(e.target.value)}
                   inputMode="decimal"
                   required
                 />
               </label>
-              <label>
-                Reason (required, logged)
-                <textarea
-                  aria-label="Override reason"
+              <label>{t('polCommOverrideReason')}<textarea
+                  aria-label={t('polCommOverrideReasonAria')}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   minLength={10}
@@ -219,7 +215,7 @@ export function CommissionSection({
                 />
               </label>
               <button type="submit" style={buttonStyle} disabled={busy}>
-                {busy ? t('commissionApprovingButton') : 'Raise manual override'}
+                {busy ? t('commissionApprovingButton') : t('commissionRaiseOverrideButton')}
               </button>
             </form>
           ) : null}
@@ -247,17 +243,15 @@ export function CommissionSection({
               <label>
                 Insurer statement amount (must equal {formatMoney(entry.amount, language)})
                 <input
-                  aria-label="Statement amount"
+                  aria-label={t('polCommStatementAmount')}
                   value={statementAmount}
                   onChange={(e) => setStatementAmount(e.target.value)}
                   inputMode="decimal"
                   required
                 />
               </label>
-              <label>
-                Statement / payment reference
-                <input
-                  aria-label="Payment reference"
+              <label>{t('polCommStatementRef')}<input
+                  aria-label={t('polCommPaymentRef')}
                   value={paymentReference}
                   onChange={(e) => setPaymentReference(e.target.value)}
                   required
@@ -279,7 +273,7 @@ export function CommissionSection({
           {t('commissionCalculateButton')}
         </button>
       ) : (
-        <p style={{ opacity: 0.6 }}>{t('commissionNoneYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('commissionNoneYet')}</p>
       )}
     </section>
   );

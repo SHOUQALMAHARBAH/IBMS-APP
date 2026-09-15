@@ -67,6 +67,22 @@ export class CreateEmployeeDto {
   @Transform(emptyStringToUndefined)
   @IsUUID()
   userId?: string;
+
+  /**
+   * Spec §4.1.2 — the employee's functional grouping on the org chart.
+   *
+   * Optional, and distinct from the `departmentId` an admin sets on the
+   * ACCOUNT at provisioning (§4.2.2): this is the HR record of a person, that
+   * is a field on a login. When this is left unset and `userId` names an
+   * account that has one, the employee adopts the account's — see
+   * `EmployeeRepository.linkUser`. When both are set and they disagree, the
+   * request is refused rather than silently resolved.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 100)
+  departmentId?: string;
 }
 
 /** `field` is fixed to `'nationalId'` — Employee has exactly one

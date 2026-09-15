@@ -7,6 +7,7 @@ import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
 import { SAMPLE_INSURERS } from "./seed-data/insurers";
 import { DOCUMENT_TEMPLATES } from "./seed-data/document-templates";
+import { SLA_POLICY_SEEDS } from "./seed-data/sla-policies";
 
 const prisma = new PrismaClient();
 
@@ -32,11 +33,68 @@ const SEED_SAMPLE_DATA = process.env.NODE_ENV !== "production";
  */
 export const SYSTEM_ACCOUNT_EMAIL = "system@ibms.internal";
 
+/**
+ * Multi-tenancy Phase 1 — the single Organization every existing row was
+ * backfilled onto.
+ *
+ * This id is a fixed constant in three places that must agree and cannot read
+ * each other: the `@default` on every tenant-scoped `organizationId` column in
+ * schema.prisma, the INSERT in migration
+ * `20260925100000_add_organization_multitenancy`, and this file. A generated
+ * uuid would have made the seed unable to name the row the migration created.
+ *
+ * Phase 4 replaces "default" with a real per-office subdomain (spec §4.10);
+ * for now nothing resolves a tenant, so this row is simply where everything
+ * lives.
+ */
+export const DEFAULT_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001";
+
+/**
+ * Idempotent, and deliberately NOT authoritative over an existing row: an
+ * operator who has renamed this Organization to their real brokerage name
+ * keeps that name across every subsequent `npm run db:seed`. Only the id is
+ * guaranteed.
+ *
+ * Runs FIRST — every seeded row below is tenant-scoped and its
+ * `organizationId` foreign key needs this row to already exist.
+ */
+async function ensureDefaultOrganization(): Promise<void> {
+  const existing = await prisma.organization.findUnique({
+    where: { id: DEFAULT_ORGANIZATION_ID },
+  });
+  if (existing) {
+    console.log(
+      `Default organization already present (${existing.legalName}) — left unchanged.`,
+    );
+    return;
+  }
+  await prisma.organization.create({
+    data: {
+      id: DEFAULT_ORGANIZATION_ID,
+      legalName: "Default Brokerage Office",
+      // Arabic is this system's primary language — an office name that exists
+      // only in Latin script shows up untranslated in the middle of an Arabic
+      // page the moment the UI switches.
+      legalNameAr: "مكتب الوساطة الافتراضي",
+      subdomain: "default",
+    },
+  });
+  console.log("Seeded the default organization.");
+}
+
 async function ensureSystemAccount(): Promise<void> {
+  // `User.email` is unique per organization now, not globally (spec §3.2), so
+  // the upsert keys on the compound constraint rather than on email alone.
   await prisma.user.upsert({
-    where: { email: SYSTEM_ACCOUNT_EMAIL },
+    where: {
+      organizationId_email: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        email: SYSTEM_ACCOUNT_EMAIL,
+      },
+    },
     update: {},
     create: {
+      organizationId: DEFAULT_ORGANIZATION_ID,
       fullName: "IBMS System (scheduled jobs)",
       email: SYSTEM_ACCOUNT_EMAIL,
       passwordHash: "disabled-service-account-no-password-login",
@@ -100,11 +158,20 @@ async function ensureBootstrapAdmin(
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // Per-organization uniqueness (spec §3.2) — see ensureSystemAccount().
+  const existing = await prisma.user.findUnique({
+    where: {
+      organizationId_email: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        email,
+      },
+    },
+  });
   const user = existing
     ? existing
     : await prisma.user.create({
         data: {
+          organizationId: DEFAULT_ORGANIZATION_ID,
           fullName: "IBMS Bootstrap Administrator",
           email,
           passwordHash,
@@ -137,7 +204,11 @@ async function ensureBootstrapAdmin(
 
   if (!grant) {
     await prisma.userRoleAssignment.create({
-      data: { userId: user.id, roleId },
+      data: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        userId: user.id,
+        roleId,
+      },
     });
   }
 
@@ -157,12 +228,18 @@ async function ensureBootstrapAdmin(
 async function ensureRetentionSchedule(): Promise<void> {
   for (const item of RETENTION_SCHEDULE) {
     await prisma.retentionScheduleItem.upsert({
-      where: { recordCategory: item.recordCategory },
+      where: {
+        organizationId_recordCategory: {
+          organizationId: DEFAULT_ORGANIZATION_ID,
+          recordCategory: item.recordCategory,
+        },
+      },
       update: {
         retentionPeriodMonths: item.retentionPeriodMonths,
         legalBasis: item.legalBasis,
       },
       create: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
         recordCategory: item.recordCategory,
         retentionPeriodMonths: item.retentionPeriodMonths,
         legalBasis: item.legalBasis,
@@ -197,7 +274,9 @@ async function ensureDocumentTemplates(): Promise<void> {
         },
       });
     } else {
-      await prisma.documentTemplate.create({ data: template });
+      await prisma.documentTemplate.create({
+        data: { organizationId: DEFAULT_ORGANIZATION_ID, ...template },
+      });
     }
   }
   console.log(`Seeded ${DOCUMENT_TEMPLATES.length} document template(s).`);
@@ -209,26 +288,62 @@ async function ensureDocumentTemplates(): Promise<void> {
  * has no unique key to upsert nested `products`/`slaAgreements` against
  * without either duplicating them or hand-rolling per-child reconciliation,
  * neither of which is worth it for sample data.
+ *
+ * Part I §5 (Phase 3 step 10): the company's IDENTITY is now global
+ * (`InsurerMaster`, shared by every office) and only this office's
+ * relationship with it is tenant-scoped. The master is upserted on its unique
+ * legal name — a second office seeded later must attach to the SAME master,
+ * not mint a rival copy of the same company, which is the whole point of the
+ * split.
  */
 async function ensureSampleInsurers(): Promise<void> {
   let created = 0;
   for (const insurer of SAMPLE_INSURERS) {
+    const master = await prisma.insurerMaster.upsert({
+      where: { legalName: insurer.name },
+      update: {},
+      create: {
+        legalName: insurer.name,
+        legalNameAr: insurer.nameAr,
+        linesOffered: [
+          ...new Set(insurer.products.map((p) => p.insuranceLine)),
+        ].sort(),
+      },
+    });
     const existing = await prisma.insurer.findFirst({
-      where: { name: insurer.name },
+      where: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        insurerMasterId: master.id,
+      },
     });
     if (existing) continue;
     await prisma.insurer.create({
       data: {
-        name: insurer.name,
-        nameAr: insurer.nameAr,
-        contactEmail: insurer.contactEmail,
-        contactPhone: insurer.contactPhone,
-        claimsContact: insurer.claimsContact,
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        insurerMasterId: master.id,
+        // Part I §10.2 — three distinct contacts, not one generic one. The
+        // sample data carries an address for each.
+        rfqContactEmail: insurer.contactEmail,
+        rfqContactPhone: insurer.contactPhone,
+        claimsContactEmail: insurer.claimsContact,
         underwriterContact: insurer.underwriterContact,
         creditTermsDays: insurer.creditTermsDays,
         financialStrengthRating: insurer.financialStrengthRating,
-        products: { create: insurer.products },
-        slaAgreements: { create: insurer.slaAgreements },
+        // InsurerProduct and InsurerSlaAgreement are tenant-scoped in their
+        // own right (spec §3.2 — so RLS can enforce them independently in
+        // Phase 2, not only transitively through the parent Insurer).
+        products: {
+          create: insurer.products.map((product) => ({
+            organizationId: DEFAULT_ORGANIZATION_ID,
+            ...product,
+          })),
+        },
+        slaAgreements: {
+          create: insurer.slaAgreements.map((sla) => ({
+            organizationId: DEFAULT_ORGANIZATION_ID,
+            ...sla,
+          })),
+        },
       },
     });
     created += 1;
@@ -250,9 +365,15 @@ async function ensureSampleUsers(
 
   for (const sampleUser of SAMPLE_USERS) {
     const user = await prisma.user.upsert({
-      where: { email: sampleUser.email },
+      where: {
+        organizationId_email: {
+          organizationId: DEFAULT_ORGANIZATION_ID,
+          email: sampleUser.email,
+        },
+      },
       update: { fullName: sampleUser.fullName },
       create: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
         fullName: sampleUser.fullName,
         email: sampleUser.email,
         passwordHash,
@@ -270,7 +391,11 @@ async function ensureSampleUsers(
     });
     if (!activeGrant) {
       await prisma.userRoleAssignment.create({
-        data: { userId: user.id, roleId },
+        data: {
+          organizationId: DEFAULT_ORGANIZATION_ID,
+          userId: user.id,
+          roleId,
+        },
       });
     }
   }
@@ -282,10 +407,107 @@ async function ensureSampleUsers(
  * (upsert-based) so it's safe to re-run in CI/dev without duplicating rows
  * or clobbering roles/permissions added by hand since the last run.
  */
+/**
+ * Seeds the configurable SLA policies that replace the hard-coded
+ * `SLA_REGISTRY` as the runtime source of every deadline.
+ *
+ * Seeded ACTIVE, because the values are the ones the system has been using all
+ * along — this is a migration of where they LIVE, not a change to what they
+ * are. A deployment that seeds and changes nothing behaves exactly as before.
+ *
+ * IDEMPOTENT AND NON-DESTRUCTIVE. An existing policy is left completely
+ * untouched: once Compliance has edited a duration or re-cited a source, a
+ * later `npm run db:seed` (a routine step alongside migrations) must not
+ * silently revert it. That is the same failure the bootstrap-administrator
+ * grant had — a change that undoes itself on the next deploy is not a change.
+ * Only genuinely NEW policy codes are inserted.
+ *
+ * The five entries whose registry citation reads "DRAFT, UNSOURCED" seed as
+ * INTERNAL_POLICY, and three business-process targets as OPERATIONAL. Only
+ * figures traceable to a governing document section seed as REGULATORY — and
+ * the DB CHECK refuses that classification without a named instrument, so this
+ * cannot drift into over-claiming.
+ */
+async function ensureSlaPolicies(): Promise<void> {
+  // The scheduled-jobs service account owns the seeded baseline — these
+  // policies were not authored by any human operator, and attributing them to
+  // one would be a small lie in an audit-relevant field.
+  const systemUser = await prisma.user.findUnique({
+    where: {
+      organizationId_email: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        email: SYSTEM_ACCOUNT_EMAIL,
+      },
+    },
+    select: { id: true },
+  });
+  if (!systemUser) {
+    throw new Error(
+      "System service account missing — ensureSystemAccount() must run before ensureSlaPolicies().",
+    );
+  }
+
+  const existing = new Set(
+    (await prisma.slaPolicy.findMany({ select: { policyCode: true } })).map(
+      (p) => p.policyCode,
+    ),
+  );
+
+  let created = 0;
+  for (const seed of SLA_POLICY_SEEDS) {
+    if (existing.has(seed.policyCode)) continue;
+    await prisma.slaPolicy.create({
+      data: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        policyCode: seed.policyCode,
+        policyName: seed.policyName,
+        processType: seed.processType,
+        description: seed.description,
+        durationValue: seed.durationValue,
+        durationUnit: seed.durationUnit,
+        calendarType: seed.calendarType,
+        sourceType: seed.sourceType,
+        sourceReference: seed.sourceReference,
+        sourceDocument: seed.sourceDocument,
+        sourceSection: seed.sourceSection,
+        status: "ACTIVE",
+        createdByUserId: systemUser.id,
+        escalations: {
+          create: seed.escalations.map((e) => ({
+            // Tenant-scoped in its own right, so RLS can enforce it
+            // independently in Phase 2 — not only through the parent policy.
+            organizationId: DEFAULT_ORGANIZATION_ID,
+            stageOrder: e.stageOrder,
+            offsetValue: e.offsetValue,
+            offsetUnit: e.offsetUnit,
+            escalateTo: e.escalateTo,
+          })),
+        },
+      },
+    });
+    created += 1;
+  }
+
+  const byType = SLA_POLICY_SEEDS.reduce<Record<string, number>>((acc, s) => {
+    acc[s.sourceType] = (acc[s.sourceType] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(
+    `Seeded ${created} new SLA policy/policies (${SLA_POLICY_SEEDS.length} defined, ${existing.size} already present and left untouched). ` +
+      `Provenance: ${Object.entries(byType)
+        .map(([k, v]) => `${v} ${k}`)
+        .join(", ")}.`,
+  );
+}
+
 async function main() {
+  // MUST be first: every seeded row below carries an organizationId foreign
+  // key pointing at this row.
+  await ensureDefaultOrganization();
   await ensureSystemAccount();
   await ensureRetentionSchedule();
   await ensureDocumentTemplates();
+  await ensureSlaPolicies();
 
   for (const role of ROLES) {
     await prisma.role.upsert({

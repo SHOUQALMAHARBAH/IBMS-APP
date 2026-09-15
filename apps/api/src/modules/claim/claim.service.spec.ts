@@ -26,6 +26,7 @@ const EXPIRY = new Date('2027-01-01T00:00:00.000Z');
 function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'clm-1',
+    organizationId: 'org-1',
     email: 'claims@ibms.test',
     roles: ['CLAIMS_OFFICER'],
     sessionId: 's-1',
@@ -37,6 +38,7 @@ function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
 function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'sales-9',
+    organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
     sessionId: 's-9',

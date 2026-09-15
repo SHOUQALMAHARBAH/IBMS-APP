@@ -19,9 +19,9 @@ export interface RetentionScheduleSeed {
 
 export const RETENTION_SCHEDULE: RetentionScheduleSeed[] = [
   {
-    recordCategory: 'AuditLogEntry',
+    recordCategory: "AuditLogEntry",
     retentionPeriodMonths: 120,
     legalBasis:
-      'DRAFT, UNCONFIRMED — no specific figure is cited anywhere in ibms-brain/meta for AuditLogEntry. Seeded as the longer-side candidate between commonly-cited AML minimums (~5 years; cf. FATF Recommendation 11 / Jordan AML/CFT Law No. 46/2007 as amended) and typical CBJ/insurance-broker record-keeping practice (~10 years) in comparable regimes; PDPL No. 24/2023 sets no fixed figure for this record type. Needs a cited figure from Legal/Compliance/DPO before confirmedByLegalCounselAt can be set.',
+      "DRAFT, UNCONFIRMED — no specific figure is cited anywhere in ibms-brain/meta for AuditLogEntry. Seeded as the longer-side candidate between commonly-cited AML minimums (~5 years; cf. FATF Recommendation 11 / Jordan AML/CFT Law No. 46/2007 as amended) and typical CBJ/insurance-broker record-keeping practice (~10 years) in comparable regimes; PDPL No. 24/2023 sets no fixed figure for this record type. Needs a cited figure from Legal/Compliance/DPO before confirmedByLegalCounselAt can be set.",
   },
 ];

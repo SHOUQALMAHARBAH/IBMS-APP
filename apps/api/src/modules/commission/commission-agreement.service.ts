@@ -21,6 +21,7 @@ import {
 } from './commission.config';
 import type { CreateCommissionAgreementDto } from './dto/create-commission-agreement.dto';
 import type { ListCommissionAgreementsQueryDto } from './dto/list-commission-agreements-query.dto';
+import { insurerName } from '../../repositories/insurer-identity';
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -105,7 +106,7 @@ export class CommissionAgreementService {
       if (existing)
         return deriveAgreementView({
           ...existing,
-          insurerName: existing.insurer.name,
+          insurerName: insurerName(existing.insurer),
         });
     }
 
@@ -162,7 +163,7 @@ export class CommissionAgreementService {
 
     return deriveAgreementView({
       ...created,
-      insurerName: created.insurer.name,
+      insurerName: insurerName(created.insurer),
     });
   }
 
@@ -174,7 +175,7 @@ export class CommissionAgreementService {
       insuranceLine: query.insuranceLine,
     });
     return rows.map((r) =>
-      deriveAgreementView({ ...r, insurerName: r.insurer.name }),
+      deriveAgreementView({ ...r, insurerName: insurerName(r.insurer) }),
     );
   }
 

@@ -3,8 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -146,9 +148,7 @@ describe('AML/CFT Transaction Monitoring (e2e) — backlog Part C #48', () => {
         ownerUserId: sales.userId,
       },
     });
-    const insurer = await prisma.insurer.create({
-      data: { name: `AML E2E ins ${suffix}` },
-    });
+    const insurer = await makeInsurer(`AML E2E ins ${suffix}`);
 
     async function makePolicy(customerId: string) {
       const opp = await prisma.opportunity.create({ data: { customerId } });

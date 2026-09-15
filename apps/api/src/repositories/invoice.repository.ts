@@ -21,6 +21,7 @@ import {
   type InsurerRemittanceRow,
   type OutstandingInvoiceRow,
 } from '../modules/finance/finance.config';
+import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
 
 export interface CreateInvoiceRow {
   policyId: string;
@@ -302,7 +303,7 @@ export class InvoiceRepository {
       SELECT
         i.id AS "invoiceId",
         p."insurerId",
-        ins.name AS "insurerName",
+        im."legalName" AS "insurerName",
         i."premiumAmount",
         i."commissionDeducted",
         -- The instalment that COMPLETED collection starts the clock: the
@@ -313,11 +314,16 @@ export class InvoiceRepository {
       -- mandatory on one.
       JOIN "Policy" p ON p.id = i."policyId"
       JOIN "Insurer" ins ON ins.id = p."insurerId"
+      -- Part I §5: the company's name lives on the GLOBAL InsurerMaster now;
+      -- an Insurer row is only this office's relationship with it. Every one
+      -- of them has a master (NOT NULL + FK), so this stays an INNER join.
+      -- (No backticks in this comment: it sits inside a template literal.)
+      JOIN "InsurerMaster" im ON im.id = ins."insurerMasterId"
       JOIN "Receipt" r
         ON r."invoiceId" = i.id
        AND r."receivedAt" < ${scope.asOfExclusiveUpper}
       WHERE ${Prisma.join(conditions, ' AND ')}
-      GROUP BY i.id, p.id, ins.id
+      GROUP BY i.id, p.id, ins.id, im.id
       -- The obligation to the insurer arises only once the client's premium
       -- has been collected IN FULL.
       HAVING SUM(r.amount) >= i."totalAmount"
@@ -362,7 +368,7 @@ export class InvoiceRepository {
         insurerId: true,
         amount: true,
         remittedAt: true,
-        insurer: { select: { name: true } },
+        insurer: { select: INSURER_IDENTITY_SELECT },
       },
       orderBy: { remittedAt: 'asc' },
       take: INSURER_PAYABLES_ROW_LIMIT,
@@ -370,7 +376,7 @@ export class InvoiceRepository {
     return rows.map((r) => ({
       remittanceId: r.id,
       insurerId: r.insurerId,
-      insurerName: r.insurer.name,
+      insurerName: insurerName(r.insurer),
       amount: r.amount,
       // the `remittedAt: { lt: ... }` filter guarantees non-null
       remittedAt: r.remittedAt as Date,

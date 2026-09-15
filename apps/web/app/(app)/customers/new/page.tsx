@@ -7,8 +7,8 @@ import { CustomerOnboardingWizard } from '../../../../components/customer/Custom
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const CAN_CREATE_CUSTOMER_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 export default function NewCustomerPage() {
   const router = useRouter();
@@ -17,11 +17,11 @@ export default function NewCustomerPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
-  const canCreateCustomer = user.roles.some((role) => CAN_CREATE_CUSTOMER_ROLES.includes(role));
+  const canCreateCustomer = hasPermission(user, 'customer.create');
 
   return (
     <main style={pageStyle}>

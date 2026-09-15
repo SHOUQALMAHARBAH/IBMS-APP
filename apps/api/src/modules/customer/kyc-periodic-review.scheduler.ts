@@ -2,10 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import type { KYCRecord } from '@ibms/db';
 import { KycRecordRepository } from '../../repositories/kyc-record.repository';
-import { UserRepository } from '../../repositories/user.repository';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /** Process 3-4 — "Schedule periodic re-KYC by risk classification
  * (KYCRecord.nextReviewDueAt)". Daily sweep transitions every APPROVED
@@ -20,21 +18,27 @@ export class KycPeriodicReviewScheduler {
 
   constructor(
     private readonly kycRecords: KycRecordRepository,
-    private readonly users: UserRepository,
     private readonly workflow: WorkflowTransitionService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 03:00 UTC daily.
   @Cron('0 3 * * *', { name: 'kyc-periodic-review-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `KYC periodic-review sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'KYC periodic-review sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     let due: KYCRecord[];
     try {
       due = await this.kycRecords.findApprovedDueForReview(new Date());
@@ -56,7 +60,7 @@ export class KycPeriodicReviewScheduler {
           entityType: 'KYCRecord',
           entityId: kyc.id,
           toStatus: 'PERIODIC_REVIEW_DUE',
-          actorUserId: systemUser.id,
+          actorUserId: systemUserId,
         });
         moved += 1;
       } catch (err) {

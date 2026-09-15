@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -81,9 +82,17 @@ test("a user without the permission sees a friendly message", async ({ page }) =
   );
 
   await page.goto("/dpo-workspace");
+  // The screen's own translated 403 copy, not the API's English message.
+  // This page used to pass `err.message` straight through, so the raw
+  // server string reached the user in both languages — and this test
+  // asserted exactly that. The absence check is what makes it a proof:
+  // without it the old behaviour satisfies the new assertion too.
+  await expect(
+    page.getByText("dpo-workspace.view permission", { exact: false }),
+  ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("dpo-workspace screen has no serious/critical accessibility violations @a11y", async ({ page }) => {

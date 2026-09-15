@@ -20,6 +20,7 @@ import type {
   UpSellStatus,
 } from '@ibms/db';
 import type { PrismaService } from '../../prisma/prisma.service';
+import type { TenantTransactionClient } from '../../prisma/tenant-scope.extension';
 
 /**
  * The eleven workflow-state entities named in
@@ -504,7 +505,7 @@ export interface WorkflowDelegate {
  *  Accepts either the top-level client or an interactive `$transaction`'s
  *  `tx` callback client — both expose the same per-model delegates. */
 export function getWorkflowDelegate(
-  client: PrismaService['client'] | Prisma.TransactionClient,
+  client: PrismaService['client'] | TenantTransactionClient,
   entityType: WorkflowEntityType,
 ): WorkflowDelegate {
   const delegates: Record<WorkflowEntityType, unknown> = {

@@ -39,13 +39,13 @@ function RfqList({
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   if (loadError) {
     return (
@@ -56,7 +56,7 @@ function RfqList({
   }
   if (!rfqs) return <p>{t('commonLoading')}</p>;
   if (rfqs.length === 0) {
-    return <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('rfqListNone')}</p>;
+    return <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('rfqListNone')}</p>;
   }
 
   return (
@@ -127,7 +127,7 @@ export default function RfqsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 

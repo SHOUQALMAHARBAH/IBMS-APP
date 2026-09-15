@@ -13,12 +13,15 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 import { formatMoney } from '../../../lib/i18n/format';
 
-const GROUP_LABEL: Record<LossRatioGroupBy, string> = {
-  customer: 'Client',
-  policy: 'Policy',
-  line: 'Insurance line',
+// Module scope has no translator, so this maps to label KEYS and the
+// component resolves them — same shape as the DPIA screening questions.
+const GROUP_LABEL_KEY: Record<LossRatioGroupBy, TranslationKey> = {
+  customer: 'claGroupClient',
+  policy: 'claGroupPolicy',
+  line: 'claInsuranceLine',
 };
 
 function ratioPct(v: string): string {
@@ -41,7 +44,7 @@ const headCellStyle: CSSProperties = {
 export default function ClaimsAnalyticsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [groupBy, setGroupBy] = useState<LossRatioGroupBy>('line');
   const [data, setData] = useState<LossRatioBreakdown | null>(null);
@@ -55,30 +58,30 @@ export default function ClaimsAnalyticsPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the claims-analytics.view permission, so there's nothing to show here."
+          ? t('claNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the loss-ratio breakdown — try again.',
+            : t('claLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load(groupBy);
     })();
-  }, [user, groupBy, load]);
+  }, [user, groupBy, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Claims analytics</h1>
+      <h1>{t('claHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
         Loss Ratio (paid claims &divide; written premium, all-time) aggregated by
         client, policy, or insurance line. A declined claim contributes nothing;
@@ -87,15 +90,15 @@ export default function ClaimsAnalyticsPage() {
       </p>
 
       <label style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}>
-        Group by
+        {t('claGroupBy')}
         <select
-          aria-label="Group by"
+          aria-label={t('claGroupBy')}
           value={groupBy}
           onChange={(ev) => setGroupBy(ev.target.value as LossRatioGroupBy)}
         >
           {LOSS_RATIO_GROUP_BY.map((g) => (
             <option key={g} value={g}>
-              {GROUP_LABEL[g]}
+              {GROUP_LABEL_KEY[g]}
             </option>
           ))}
         </select>
@@ -109,20 +112,20 @@ export default function ClaimsAnalyticsPage() {
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No written policies to report on yet.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('claNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
               <thead>
                 <tr>
                   <th style={{ ...headCellStyle, textAlign: 'start' }}>
-                    {GROUP_LABEL[data.groupBy]}
+                    {GROUP_LABEL_KEY[data.groupBy]}
                   </th>
-                  <th style={headCellStyle}>Loss ratio</th>
-                  <th style={headCellStyle}>Claims paid</th>
-                  <th style={headCellStyle}>Written premium</th>
-                  <th style={headCellStyle}>Claims</th>
-                  <th style={headCellStyle}>Policies</th>
+                  <th style={headCellStyle}>{t('claLossRatio')}</th>
+                  <th style={headCellStyle}>{t('claClaimsPaid')}</th>
+                  <th style={headCellStyle}>{t('claWrittenPremium')}</th>
+                  <th style={headCellStyle}>{t('claColClaims')}</th>
+                  <th style={headCellStyle}>{t('claColPolicies')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,7 +170,7 @@ export default function ClaimsAnalyticsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('claLoading')}</p>
       )}
     </main>
   );

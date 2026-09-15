@@ -3,8 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -155,9 +157,7 @@ describe('Profitability Analysis (e2e) — backlog Part C #63', () => {
     // db-test's cumulative book — bySegment (CORPORATE/INDIVIDUAL, a closed
     // 2-value set shared by the whole book) needs a before/after delta
     // instead, the #62 precedent.
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Profitability E2E Insurer') },
-    });
+    const insurer = await makeInsurer(uniqueLabel('Profitability E2E Insurer'));
     const line = uniqueLabel('profitability-e2e-line');
     const customer = await prisma.customer.create({
       data: {

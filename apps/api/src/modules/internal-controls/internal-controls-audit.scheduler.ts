@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import { InternalControlsService } from './internal-controls.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as the other schedulers.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 56 (backlog Part C #56) — "a periodic audit report scanning for
@@ -18,23 +14,29 @@ export class InternalControlsAuditScheduler {
   private readonly logger = new Logger(InternalControlsAuditScheduler.name);
 
   constructor(
-    private readonly users: UserRepository,
     private readonly internalControls: InternalControlsService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // Daily at 10:00 UTC.
   @Cron('0 10 * * *', { name: 'internal-controls-self-approval-audit' })
   async runAudit(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Internal controls audit skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Internal-controls audit sweep',
+      this.logger,
+      (systemUserId) => this.runAuditForOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async runAuditForOrganization(systemUserId: string): Promise<void> {
     try {
-      await this.internalControls.runScheduledAudit(systemUser.id);
+      await this.internalControls.runScheduledAudit(systemUserId);
     } catch (err) {
       this.logger.error(
         `Internal controls audit failed: ${(err as Error).message}`,

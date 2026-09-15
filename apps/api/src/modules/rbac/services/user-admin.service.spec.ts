@@ -12,6 +12,8 @@ import type { PasswordService } from '../../auth/services/password.service';
 import type { PermissionsService } from './permissions.service';
 import type { AuditService } from '../../audit/audit.service';
 import type { AuthenticatedUser } from '../../auth/auth.types';
+import { DepartmentRepository } from '../../../repositories/department.repository';
+import { BranchRepository } from '../../../repositories/branch.repository';
 
 const actor = { id: 'admin-1' } as AuthenticatedUser;
 
@@ -66,13 +68,34 @@ function makeDeps(over: Record<string, unknown> = {}) {
   };
   const permissions = { invalidateCache: vi.fn() };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // Part II §4.2.2 — provisioning now resolves a Department, scoped to the
+  // caller's own office.
+  const departments = {
+    findById: vi.fn().mockResolvedValue({ id: 'dept-1', name: 'Claims' }),
+    ...(over.departments as object),
+  };
+  // §4.2.2 — and a Branch, resolved the same tenant-scoped way.
+  const branches = {
+    findById: vi.fn().mockResolvedValue({ id: 'branch-1', name: 'Amman' }),
+    ...(over.branches as object),
+  };
   const service = new UserAdminService(
+    departments as unknown as DepartmentRepository,
+    branches as unknown as BranchRepository,
     users as unknown as UserRepository,
     passwords as unknown as PasswordService,
     permissions as unknown as PermissionsService,
     audit as unknown as AuditService,
   );
-  return { service, users, passwords, permissions, audit };
+  return {
+    service,
+    users,
+    passwords,
+    permissions,
+    audit,
+    departments,
+    branches,
+  };
 }
 
 describe('UserAdminService.provision (backlog A.2)', () => {
@@ -83,6 +106,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         fullName: 'New User',
         email: 'new@ibms.internal',
         password: 'Sup3rSecret!Pass',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
         roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
       },
       actor.id,
@@ -101,6 +126,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         fullName: 'New User',
         email: 'new@ibms.internal',
         password: 'Sup3rSecret!Pass',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
         roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
       },
       actor.id,
@@ -108,6 +135,83 @@ describe('UserAdminService.provision (backlog A.2)', () => {
     const serialised = JSON.stringify(deps.audit.record.mock.calls);
     expect(serialised).not.toContain('Sup3rSecret');
     expect(serialised).not.toContain('hashed');
+  });
+
+  it('records the department AND the branch in the audit entry (spec §4.2.4)', async () => {
+    const deps = makeDeps();
+    await deps.service.provision(
+      {
+        fullName: 'New User',
+        email: 'new@ibms.internal',
+        password: 'Sup3rSecret!Pass',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
+        roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+      },
+      actor.id,
+    );
+    const created = deps.audit.record.mock.calls.find(
+      (call: [{ action: string; entityType: string }]) =>
+        call[0].action === 'CREATE' && call[0].entityType === 'User',
+    ) as
+      | [
+          {
+            afterValue: {
+              departmentId: string;
+              departmentName: string;
+              branchId: string;
+              branchName: string;
+            };
+          },
+        ]
+      | undefined;
+    expect(created).toBeDefined();
+    // §4.2.4 asks for "which department/branch" by name as well as id — an id
+    // alone is unreadable in an audit export years later.
+    expect(created![0].afterValue).toMatchObject({
+      departmentId: 'dept-1',
+      departmentName: 'Claims',
+      branchId: 'branch-1',
+      branchName: 'Amman',
+    });
+  });
+
+  it('refuses an unknown branch, the same way it refuses an unknown department', async () => {
+    const deps = makeDeps({
+      branches: { findById: vi.fn().mockResolvedValue(null) },
+    });
+    await expect(
+      deps.service.provision(
+        {
+          fullName: 'New User',
+          email: 'new@ibms.internal',
+          password: 'Sup3rSecret!Pass',
+          departmentId: 'dept-1',
+          branchId: 'another-office-branch',
+          roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+        },
+        actor.id,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.users.provision).not.toHaveBeenCalled();
+  });
+
+  it('seats the branch on the created account', async () => {
+    const deps = makeDeps();
+    await deps.service.provision(
+      {
+        fullName: 'New User',
+        email: 'new@ibms.internal',
+        password: 'Sup3rSecret!Pass',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
+        roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+      },
+      actor.id,
+    );
+    expect(deps.users.provision).toHaveBeenCalledWith(
+      expect.objectContaining({ departmentId: 'dept-1', branchId: 'branch-1' }),
+    );
   });
 
   it('rejects a password that fails the Part 10.1 policy', async () => {
@@ -120,6 +224,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           fullName: 'x',
           email: 'x@ibms.internal',
           password: 'weak',
+          departmentId: 'dept-1',
+          branchId: 'branch-1',
           roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
         },
         actor.id,
@@ -135,6 +241,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         fullName: 'x',
         email: 'x@ibms.internal',
         password: 'Sup3rSecret!Pass',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
         roles: [
           RoleName.SALES_RELATIONSHIP_OFFICER,
           RoleName.SALES_RELATIONSHIP_OFFICER,
@@ -157,6 +265,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           fullName: 'x',
           email: 'x@ibms.internal',
           password: 'Sup3rSecret!Pass',
+          departmentId: 'dept-1',
+          branchId: 'branch-1',
           roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
         },
         actor.id,
@@ -172,6 +282,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           fullName: 'x',
           email: 'x@ibms.internal',
           password: 'Sup3rSecret!Pass',
+          departmentId: 'dept-1',
+          branchId: 'branch-1',
           roles: [RoleName.EXTERNAL_AUDITOR],
           accessValidFrom: '2026-10-01T00:00:00.000Z',
           accessValidUntil: '2026-09-01T00:00:00.000Z',
@@ -198,6 +310,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           fullName: 'x',
           email: 'taken@ibms.internal',
           password: 'Sup3rSecret!Pass',
+          departmentId: 'dept-1',
+          branchId: 'branch-1',
           roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
         },
         actor.id,
@@ -467,6 +581,8 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
         fullName: 'Second Identity',
         email: 'second@ibms.internal',
         password: 'Str0ng!Passphrase-2026',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
         roles: [RoleName.DATA_PROTECTION_OFFICER],
       },
       actor.id,

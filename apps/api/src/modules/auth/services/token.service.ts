@@ -9,6 +9,16 @@ import {
 export interface AccessTokenPayload {
   sub: string;
   sid: string;
+  /**
+   * Part II §4.10.2 — "every issued JWT/session carries an organizationId
+   * claim".
+   *
+   * It is a claim, not the source of truth: `validateAndTouch` still resolves
+   * the Organization from the SESSION ROW, and the two are compared. A token
+   * whose claim disagrees with its own session is rejected — which is what the
+   * claim is for, since a token is the one part of this a client holds.
+   */
+  org: string;
 }
 
 @Injectable()

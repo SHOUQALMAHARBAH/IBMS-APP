@@ -20,16 +20,18 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const LOG_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'CLAIMS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'DATA_PROTECTION_OFFICER',
+  'dsr.log',
 ];
-const HANDLE_ROLES = ['DATA_PROTECTION_OFFICER'];
-const CLOSE_ROLES = ['DATA_PROTECTION_OFFICER'];
+const HANDLE_ROLES = [
+  'dsr.handle',
+];
+const CLOSE_ROLES = [
+  'dsr.close',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -43,16 +45,14 @@ const head: CSSProperties = {
   borderBottom: '2px solid #d1d5db',
 };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function DsrPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canLog = hasAny(user?.roles, LOG_ROLES);
-  const canHandle = hasAny(user?.roles, HANDLE_ROLES);
-  const canClose = hasAny(user?.roles, CLOSE_ROLES);
+  const { t } = useLanguage();
+  const canLog = hasAnyPermission(user, LOG_ROLES);
+  const canHandle = hasAnyPermission(user, HANDLE_ROLES);
+  const canClose = hasAnyPermission(user, CLOSE_ROLES);
 
   const [rows, setRows] = useState<DataSubjectRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -73,23 +73,23 @@ export default function DsrPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dsr.log permission."
+          ? t('dsrNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load Data Subject Requests — try again.',
+            : t('dsrLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -99,7 +99,7 @@ export default function DsrPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('dsrActionError'),
       );
     } finally {
       setBusy(false);
@@ -124,15 +124,9 @@ export default function DsrPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Data Subject Requests</h1>
+      <h1>{t('dsrHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Access / Correction / Deletion / Objection requests, logged the
-        moment they are received. Tracked against a 15-business-day
-        (Access/Deletion) or 10-business-day (Correction/Objection) SLA with
-        DPO-then-General-Manager escalation. A Deletion request cannot be
-        marked fully fulfilled while a retention hold is open — use partial
-        fulfilment instead. Closure needs sign-off from a different DPO
-        officer than whoever processed it.
+        {t('dsrIntro')}
       </p>
 
       {canLog ? (
@@ -141,18 +135,18 @@ export default function DsrPage() {
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Customer ID
+            {t('dsrCustomerIdLabel')}
             <input
-              aria-label="Customer ID"
+              aria-label={t('dsrCustomerIdLabel')}
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               required
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Type
+            {t('dsrTypeLabel')}
             <select
-              aria-label="Type"
+              aria-label={t('dsrTypeLabel')}
               value={type}
               onChange={(e) => setType(e.target.value)}
             >
@@ -164,7 +158,7 @@ export default function DsrPage() {
             </select>
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : 'Log request'}
+            {busy ? t('dsrSavingButton') : t('dsrLogButton')}
           </button>
         </form>
       ) : null}
@@ -182,17 +176,17 @@ export default function DsrPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No Data Subject Requests.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('dsrNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Customer</th>
-                  <th style={head}>Type</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>SLA due</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('dsrColCustomer')}</th>
+                  <th style={head}>{t('dsrTypeLabel')}</th>
+                  <th style={head}>{t('dsrColStatus')}</th>
+                  <th style={head}>{t('dsrColSlaDue')}</th>
+                  <th style={head}>{t('dsrColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,16 +206,16 @@ export default function DsrPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '18rem' }}>
                           {canHandle ? (
                             <input
-                              aria-label={`Text for ${d.id}`}
-                              placeholder="dpo handler id / reason / justification"
+                              aria-label={t('dsrTextAria', { id: d.id })}
+                              placeholder={t('dsrTextPlaceholder')}
                               value={text[d.id] ?? ''}
                               onChange={(e) => setVal(d.id, e.target.value)}
                             />
                           ) : null}
                           {canHandle && d.status === 'IN_PROGRESS' ? (
                             <input
-                              aria-label={`Retention schedule reference for ${d.id}`}
-                              placeholder="retention schedule reference"
+                              aria-label={t('dsrRetentionRefAria', { id: d.id })}
+                              placeholder={t('dsrRetentionRefPlaceholder')}
                               value={reference[d.id] ?? ''}
                               onChange={(e) => setRef(d.id, e.target.value)}
                             />
@@ -230,7 +224,7 @@ export default function DsrPage() {
                             <label style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                               <input
                                 type="checkbox"
-                                aria-label={`No open retention hold for ${d.id}`}
+                                aria-label={t('dsrNoRetentionHoldAria', { id: d.id })}
                                 checked={confirmNoHold[d.id] ?? false}
                                 onChange={(e) =>
                                   setConfirmNoHold((c) => ({
@@ -239,7 +233,7 @@ export default function DsrPage() {
                                   }))
                                 }
                               />
-                              No open retention hold
+                              {t('dsrNoRetentionHold')}
                             </label>
                           ) : null}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
@@ -249,7 +243,7 @@ export default function DsrPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => verifyDsrIdentity(d.id))}
                               >
-                                Verify identity
+                                {t('dsrVerifyIdentity')}
                               </button>
                             ) : null}
                             {canHandle && d.status === 'IDENTITY_VERIFIED' ? (
@@ -258,7 +252,7 @@ export default function DsrPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => startDsr(d.id))}
                               >
-                                Start
+                                {t('dsrStartButton')}
                               </button>
                             ) : null}
                             {canHandle &&
@@ -270,7 +264,7 @@ export default function DsrPage() {
                                 disabled={busy || !val(d.id)}
                                 onClick={() => void run(() => assignDsr(d.id, val(d.id)))}
                               >
-                                Assign
+                                {t('dsrAssignButton')}
                               </button>
                             ) : null}
                             {canHandle && d.type === 'ACCESS' && d.status === 'IN_PROGRESS' && !d.accessExtensionAppliedAt ? (
@@ -281,7 +275,7 @@ export default function DsrPage() {
                                   void run(() => applyDsrExtension(d.id, val(d.id)))
                                 }
                               >
-                                Apply +15 day extension
+                                {t('dsrExtendButton')}
                               </button>
                             ) : null}
                             {canHandle && d.status === 'IN_PROGRESS' ? (
@@ -292,7 +286,7 @@ export default function DsrPage() {
                                   void run(() => fulfilDsr(d.id, confirmNoHold[d.id]))
                                 }
                               >
-                                Fulfil
+                                {t('dsrFulfilButton')}
                               </button>
                             ) : null}
                             {canHandle && d.status === 'IN_PROGRESS' ? (
@@ -308,7 +302,7 @@ export default function DsrPage() {
                                   )
                                 }
                               >
-                                Partially fulfil
+                                {t('dsrPartiallyFulfilButton')}
                               </button>
                             ) : null}
                             {canHandle &&
@@ -320,7 +314,7 @@ export default function DsrPage() {
                                 disabled={busy || !val(d.id)}
                                 onClick={() => void run(() => rejectDsr(d.id, val(d.id)))}
                               >
-                                Reject
+                                {t('dsrRejectButton')}
                               </button>
                             ) : null}
                             {canClose &&
@@ -332,7 +326,7 @@ export default function DsrPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => closeDsr(d.id))}
                               >
-                                Close
+                                {t('dsrCloseButton')}
                               </button>
                             ) : null}
                           </div>
@@ -346,7 +340,7 @@ export default function DsrPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dsrLoading')}</p>
       )}
     </main>
   );

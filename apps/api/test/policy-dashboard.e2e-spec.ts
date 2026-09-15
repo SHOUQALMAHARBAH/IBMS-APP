@@ -3,8 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -153,9 +155,9 @@ describe('Policy Dashboard (e2e) — backlog Part E / Process #64', () => {
         ownerUserId: placement.userId,
       },
     });
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Policy Dashboard E2E Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Policy Dashboard E2E Insurer'),
+    );
 
     // Active policy.
     const activeOpportunity = await prisma.opportunity.create({
@@ -281,9 +283,9 @@ describe('Policy Dashboard (e2e) — backlog Part E / Process #64', () => {
         ownerUserId: manager.userId,
       },
     });
-    const insurer = await prisma.insurer.create({
-      data: { name: uniqueLabel('Policy Dashboard E2E Window Insurer') },
-    });
+    const insurer = await makeInsurer(
+      uniqueLabel('Policy Dashboard E2E Window Insurer'),
+    );
     const opportunity = await prisma.opportunity.create({
       data: { customerId: customer.id },
     });

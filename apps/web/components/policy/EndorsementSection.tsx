@@ -24,6 +24,7 @@ import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 
@@ -40,6 +41,7 @@ function nextAction(
   e: Endorsement,
   canManage: boolean,
   canApproveRefund: boolean,
+  t: (key: TranslationKey) => string,
 ):
   | { label: string; run: () => Promise<unknown> }
   | null {
@@ -47,31 +49,31 @@ function nextAction(
     case 'REQUESTED':
     case 'SUBMITTED_TO_INSURER':
       return canManage
-        ? { label: 'Advance to insurer', run: () => advanceEndorsement(e.id) }
+        ? { label: t('endorsementAdvanceButton'), run: () => advanceEndorsement(e.id) }
         : null;
     case 'INSURER_CONFIRMED':
       return canManage
         ? {
-            label: 'Calculate adjustment',
+            label: t('endorsementCalculateButton'),
             run: () => calculateEndorsementAdjustment(e.id),
           }
         : null;
     case 'FINANCIAL_ADJUSTMENT_CALCULATED':
       return canManage
-        ? { label: 'Apply', run: () => applyEndorsement(e.id) }
+        ? { label: t('endorsementApplyButton'), run: () => applyEndorsement(e.id) }
         : null;
     case 'REFUND_APPROVAL_PENDING': {
       const refundId = e.refund?.id;
       return canApproveRefund && refundId
         ? {
-            label: 'Approve refund',
+            label: t('endorsementApproveRefundButton'),
             run: () => approveEndorsementRefund(refundId),
           }
         : null;
     }
     case 'APPLIED':
       return canManage
-        ? { label: 'Notify client', run: () => notifyEndorsementClient(e.id) }
+        ? { label: t('endorsementNotifyButton'), run: () => notifyEndorsementClient(e.id) }
         : null;
     default:
       return null;
@@ -167,10 +169,10 @@ export function EndorsementSection({
       ) : null}
 
       {rows.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('endorsementNoneYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('endorsementNoneYet')}</p>
       ) : (
         rows.map((e) => {
-          const action = nextAction(e, canManage, canApproveRefund);
+          const action = nextAction(e, canManage, canApproveRefund, t);
           return (
             <div key={e.id} style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
               <div
@@ -200,18 +202,18 @@ export function EndorsementSection({
               ) : null}
               {e.refund ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                  Refund {formatMoney(e.refund.amount, language)} ·{' '}
+                  {t('endorsementRefundLabel')} {formatMoney(e.refund.amount, language)} ·{' '}
                   {e.refund.approvedByUserId
-                    ? `approved by ${e.refund.approvedByUserId}`
+                    ? t('endorsementRefundApprovedBy', { user: e.refund.approvedByUserId })
                     : e.refund.needsApproval
-                      ? 'awaiting manager approval'
-                      : 'auto-cleared (below threshold)'}
+                      ? t('endorsementRefundAwaiting')
+                      : t('endorsementRefundAutoCleared')}
                 </p>
               ) : null}
-              <p style={{ opacity: 0.6, fontSize: '0.8rem', margin: '0.4rem 0' }}>
+              <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
                 {e.scheduleVersioned
-                  ? 'A new coverage-schedule version was opened.'
-                  : 'No schedule version yet.'}
+                  ? t('endorsementNewVersionOpened')
+                  : t('endorsementNoVersionYet')}
               </p>
               {action ? (
                 <button
@@ -220,7 +222,7 @@ export function EndorsementSection({
                   style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
                   onClick={() => void run(action.run)}
                 >
-                  {busy ? 'Working…' : action.label}
+                  {busy ? t('endorsementWorkingButton') : action.label}
                 </button>
               ) : null}
             </div>
@@ -232,7 +234,7 @@ export function EndorsementSection({
         <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
           <strong>{t('endorsementRequestHeading')}</strong>
           <div style={quoteFieldStyle}>
-            <label htmlFor="end-type">Type</label>
+            <label htmlFor="end-type">{t('policyTypeLabel')}</label>
             <select
               id="end-type"
               value={type}
@@ -240,12 +242,12 @@ export function EndorsementSection({
                 setType(ev.target.value as 'POSITIVE' | 'NEGATIVE')
               }
             >
-              <option value="POSITIVE">Positive (adds premium)</option>
-              <option value="NEGATIVE">Negative (returns premium)</option>
+              <option value="POSITIVE">{t('endorsementTypePositive')}</option>
+              <option value="NEGATIVE">{t('endorsementTypeNegative')}</option>
             </select>
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="end-change-type">Change</label>
+            <label htmlFor="end-change-type">{t('endorsementChangeTypeLabel')}</label>
             <select
               id="end-change-type"
               value={changeType}
@@ -261,7 +263,7 @@ export function EndorsementSection({
             </select>
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="end-premium">Premium amount (unsigned)</label>
+            <label htmlFor="end-premium">{t('endorsementPremiumUnsigned')}</label>
             <input
               id="end-premium"
               inputMode="decimal"
@@ -271,7 +273,7 @@ export function EndorsementSection({
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="end-effective">Effective from</label>
+            <label htmlFor="end-effective">{t('endorsementEffectiveFromInputLabel')}</label>
             <input
               id="end-effective"
               type="date"
@@ -298,13 +300,13 @@ export function EndorsementSection({
               )
             }
           >
-            {busy ? 'Requesting…' : 'Request endorsement'}
+            {busy ? t('endorsementRequesting') : t('endorsementCreateButton')}
           </button>
 
           <div style={{ marginTop: '1.5rem' }}>
-            <strong>Request a cancellation</strong>
+            <strong>{t('endorsementRequestCancellation')}</strong>
             <div style={quoteFieldStyle}>
-              <label htmlFor="cancel-reason">Reason</label>
+              <label htmlFor="cancel-reason">{t('endorsementCancellationReasonLabel')}</label>
               <input
                 id="cancel-reason"
                 maxLength={2000}
@@ -313,7 +315,7 @@ export function EndorsementSection({
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="cancel-basis">Basis</label>
+              <label htmlFor="cancel-basis">{t('endorsementCancellationBasisLabel')}</label>
               <select
                 id="cancel-basis"
                 value={cancelBasis}
@@ -329,7 +331,7 @@ export function EndorsementSection({
               </select>
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="cancel-date">Cover ceases</label>
+              <label htmlFor="cancel-date">{t('endorsementCoverCeases')}</label>
               <input
                 id="cancel-date"
                 type="date"
@@ -355,7 +357,7 @@ export function EndorsementSection({
                 )
               }
             >
-              {busy ? 'Requesting…' : 'Request cancellation'}
+              {busy ? t('endorsementRequesting') : t('endorsementCancelButton')}
             </button>
           </div>
         </div>

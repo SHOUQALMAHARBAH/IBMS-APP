@@ -20,6 +20,7 @@ import {
   tdStyle,
   thStyle,
 } from './access-recertification.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
 
 const ADMIN_ROLE = 'SYSTEM_SECURITY_ADMINISTRATOR';
 
@@ -35,11 +36,12 @@ interface RecertificationItemsTableProps {
 }
 
 export function RecertificationItemsTable({ items, onItemDecided }: RecertificationItemsTableProps) {
+  const { t } = useLanguage();
   const [decidingItemId, setDecidingItemId] = useState<string | null>(null);
   const [decideErrors, setDecideErrors] = useState<Record<string, string>>({});
 
   if (items.length === 0) {
-    return <p style={emptyStateStyle}>No access-recertification items are currently assigned to you for review.</p>;
+    return <p style={emptyStateStyle}>{t('acrNone')}</p>;
   }
 
   async function handleDecide(item: RecertificationItem, decision: RecertificationDecision) {
@@ -49,7 +51,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
       const updated = await decideRecertificationItem(item.id, decision);
       onItemDecided(updated);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not record your decision — try again.';
+      const message = err instanceof ApiError ? err.message : t('acrDecisionError');
       setDecideErrors((prev) => ({ ...prev, [item.id]: message }));
     } finally {
       setDecidingItemId(null);
@@ -59,22 +61,18 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
   return (
     <table style={tableStyle}>
       <caption style={{ textAlign: 'start', marginBottom: '0.5rem', opacity: 0.75, fontSize: '0.9rem' }}>
-        Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it.
+        {t('acrQueueCaption')}
       </caption>
       <thead>
         <tr>
           <th style={thStyle} scope="col">
             Subject
           </th>
-          <th style={thStyle} scope="col">
-            Current roles
-          </th>
+          <th style={thStyle} scope="col">{t('acrCurrentRoles')}</th>
           <th style={thStyle} scope="col">
             Cycle
           </th>
-          <th style={thStyle} scope="col">
-            Status / decision
-          </th>
+          <th style={thStyle} scope="col">{t('acrStatusDecision')}</th>
         </tr>
       </thead>
       <tbody>
@@ -90,7 +88,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
               </td>
               <td style={tdStyle}>
                 {isAdminSubject ? (
-                  <span style={adminBadgeStyle}>Admin access — not exempt from review</span>
+                  <span style={adminBadgeStyle}>{t('acrAdminNotExempt')}</span>
                 ) : null}
                 {item.subjectRoles
                   .filter((role) => role !== ADMIN_ROLE)
@@ -110,7 +108,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding}
-                      aria-label={`Confirm access for ${item.subjectFullName}`}
+                      aria-label={t('acrConfirmAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'confirmed')}
                     >
                       Confirm
@@ -119,20 +117,18 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding}
-                      aria-label={`Revoke access for ${item.subjectFullName}`}
+                      aria-label={t('acrRevokeAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'revoked')}
                     >
-                      Revoke
+                      {t('usrRevoke')}
                     </button>
                     <button
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding}
-                      aria-label={`Flag access for change for ${item.subjectFullName}`}
+                      aria-label={t('acrFlagAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'changed')}
-                    >
-                      Flag for change
-                    </button>
+                    >{t('acrFlagForChange')}</button>
                   </div>
                 )}
                 {decideErrors[item.id] ? (

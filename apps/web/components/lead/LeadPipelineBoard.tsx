@@ -111,7 +111,7 @@ export function LeadPipelineBoard({ leads, currentUserId, onLeadTransitioned }: 
               const nextStatuses = LEAD_NEXT_STATUSES[lead.status];
               const isTransitioning = transitioningId === lead.id;
               return (
-                <article key={lead.id} style={cardStyle} aria-label={`Lead: ${lead.fullName}`}>
+                <article key={lead.id} style={cardStyle} aria-label={t('leadsCardAria', { name: lead.fullName })}>
                   <strong>{lead.fullName}</strong>
                   <div style={cardMetaStyle}>{t(SOURCE_LABEL_KEY[lead.source])}</div>
                   {lead.contactPhone ? <div style={cardMetaStyle}>{lead.contactPhone}</div> : null}

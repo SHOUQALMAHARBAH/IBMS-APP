@@ -81,7 +81,7 @@ export class DataSharingApprovalService {
     }
 
     const now = new Date();
-    const slaDueAt = this.slaTimer.computeDueAt(
+    const slaDueAt = await this.slaTimer.computeDueAt(
       DATA_SHARING_SLA_WORKFLOW,
       now,
       { regulatoryChannel: isRegulatoryChannel },

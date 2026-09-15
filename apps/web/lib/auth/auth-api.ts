@@ -27,6 +27,11 @@ export interface MeResponse {
   fullName: string;
   languagePreference: 'AR' | 'EN';
   roles: string[];
+  /** Part IV §10.4 — the caller's RESOLVED permission codes, sorted, straight
+   * from the same grid the API enforces with. Every conditional render in the
+   * app reads this (via `hasPermission`); nothing branches on `roles`, which
+   * would be a second, drifting copy of the role-to-permission mapping. */
+  permissions: string[];
   mfaEnabled: boolean;
   mfaPolicySatisfied: boolean;
   accessValidUntil: string | null;

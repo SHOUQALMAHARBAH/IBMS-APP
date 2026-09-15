@@ -26,25 +26,18 @@ import {
 } from '../../../components/crm/crm.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
 // of the `customer.360-view.read` roles: Placement/Claims/Finance can log a
 // touchpoint but cannot read the 360° timeline back).
-const CAN_LOG_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-];
 
 function TimelineList({ view }: { view: Customer360View }) {
   const { language } = useLanguage();
   if (view.timeline.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
         Nothing on this customer&apos;s timeline yet. Log the first interaction
         above — policies, claims and complaints will appear here too once those
         modules exist.
@@ -80,8 +73,9 @@ interface ViewError {
 }
 
 function CrmForCustomer({ customerId }: { customerId: string }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
-  const canLog = user?.roles.some((role) => CAN_LOG_ROLES.includes(role)) ?? false;
+  const canLog = hasPermission(user, 'interaction.log');
 
   const [view, setView] = useState<Customer360View | null>(null);
   const [viewError, setViewError] = useState<ViewError | null>(null);
@@ -104,21 +98,21 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         status,
         message:
           status === 403
-            ? "You don't hold the customer.360-view.read permission, so the 360° timeline isn't shown here."
+            ? t('crmNoPermission')
             : status === 404
-              ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+              ? t('crmCustomerNotFound')
               : err instanceof ApiError
                 ? err.message
-                : 'Could not load this customer view — try again.',
+                : t('crmLoadError'),
       });
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function submit() {
     setLogError(null);
@@ -128,7 +122,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     if (occurredAt) {
       const parsed = new Date(occurredAt);
       if (Number.isNaN(parsed.getTime())) {
-        setLogError('Enter a valid date and time, or leave the date blank.');
+        setLogError(t('crmInvalidDate'));
         return;
       }
       occurredAtIso = parsed.toISOString();
@@ -148,10 +142,10 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLogError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the interaction.log permission."
+          ? t('crmNoPermissionLog')
           : err instanceof ApiError
             ? err.message
-            : 'Could not log the interaction — try again.',
+            : t('crmLogError'),
       );
     } finally {
       setSubmitting(false);
@@ -168,7 +162,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!view && !viewError) return <p>Loading…</p>;
+  if (!view && !viewError) return <p>{t('crmLoading')}</p>;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -191,7 +185,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
 
       {canLog ? (
         <div style={crmPanelStyle}>
-          <strong>Log an interaction</strong>
+          <strong>{t('crmLogHeading')}</strong>
           <div style={crmFormRowStyle}>
             <div>
               <label htmlFor="crm-channel" style={cardMetaStyle}>
@@ -214,20 +208,20 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             </div>
             <div style={{ flex: '1 1 20rem' }}>
               <label htmlFor="crm-summary" style={cardMetaStyle}>
-                What happened?
+                {t('crmWhatHappened')}
               </label>
               <br />
               <input
                 id="crm-summary"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="e.g. Called to confirm the renewal terms"
+                placeholder={t('crmDetailPlaceholder')}
                 style={{ width: '100%' }}
               />
             </div>
             <div>
               <label htmlFor="crm-occurred" style={cardMetaStyle}>
-                When (optional — defaults to now)
+                {t('crmWhenOptional')}
               </label>
               <br />
               <input
@@ -243,11 +237,11 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
               style={{ ...buttonStyle, width: 'auto' }}
               onClick={() => void submit()}
             >
-              {submitting ? 'Logging…' : 'Log interaction'}
+              {submitting ? t('crmLogging') : t('crmLogButton')}
             </button>
           </div>
           {logOk ? (
-            <p style={{ ...cardMetaStyle, opacity: 1 }}>Interaction logged.</p>
+            <p style={{ ...cardMetaStyle, opacity: 1 }}>{t('crmLogged')}</p>
           ) : null}
           {logError ? (
             <p role="alert" style={errorStyle}>
@@ -261,13 +255,12 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         </p>
       ) : null}
 
-      <h3 style={{ marginTop: '1.5rem' }}>Timeline</h3>
+      <h3 style={{ marginTop: '1.5rem' }}>{t('crmTimeline')}</h3>
       {view ? (
         <TimelineList view={view} />
       ) : (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          The 360° timeline needs the <code>customer.360-view.read</code>{' '}
-          permission. You can still log interactions above.
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+          {t('crmTimelineNeedsPermission')}
         </p>
       )}
     </div>
@@ -299,18 +292,19 @@ function CrmFlow() {
 }
 
 export default function CrmPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Relationship (CRM)</h1>
+      <h1>{t('crmHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 10 — log every customer touchpoint (meeting, call, email,
         WhatsApp, visit, proposal, renewal, claim, complaint) and see the

@@ -32,8 +32,7 @@ function Stat({ value, label }: { value: string | number; label: string }) {
 export default function ExecutiveDashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
-  const isArabic = language === 'AR';
+  const { t } = useLanguage();
 
   const [summary, setSummary] = useState<ExecutiveDashboardSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -43,7 +42,7 @@ export default function ExecutiveDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -59,17 +58,13 @@ export default function ExecutiveDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? isArabic
-            ? 'لا تملك صلاحية dashboard.executive.view.'
-            : "You don't hold the dashboard.executive.view permission."
+          ? t('execNoPermission')
           : err instanceof ApiError
             ? err.message
-            : isArabic
-              ? 'تعذّر تحميل لوحة الإدارة التنفيذية — حاول مرة أخرى.'
-              : 'Could not load the Executive Dashboard — try again.',
+            : t('execCouldNotLoadTheExecutive'),
       );
     }
-  }, [branchId, insuranceLine, asOf, isArabic]);
+  }, [branchId, insuranceLine, asOf, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -78,7 +73,7 @@ export default function ExecutiveDashboardPage() {
     })();
     // Filters apply on explicit submit only — same as the sibling dashboards.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, t]);
 
   function applyFilters(ev: React.FormEvent) {
     ev.preventDefault();
@@ -92,12 +87,10 @@ export default function ExecutiveDashboardPage() {
   return (
     <main style={pageStyle}>
       <h1>
-        {isArabic ? 'لوحة الإدارة التنفيذية' : 'Executive Dashboard'}
+        {t('execExecutiveDashboard')}
       </h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {isArabic
-          ? 'ملخّص تنفيذي يجمع لوحات المبيعات والوثائق والمطالبات والمالية والامتثال. كل رقم مأخوذ كما هو من لوحته الأصلية — لا يُعاد احتسابه هنا، حتى لا يختلف الملخّص عمّا يلخّصه.'
-          : 'The Sales, Policy, Claims, Financial and Compliance dashboards rolled up. Every figure is lifted verbatim from the dashboard that produced it — nothing is recalculated here, so the summary can never disagree with what it summarises.'}
+        {t('execTheSalesPolicyClaimsFinancial')}
       </p>
 
       <form
@@ -111,32 +104,32 @@ export default function ExecutiveDashboardPage() {
         }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          {isArabic ? 'رقم الفرع' : 'Branch ID'}
+          {t('execBranchId')}
           <input
-            aria-label="Branch ID filter"
+            aria-label={t('dashBranchIdFilterAria')}
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          {isArabic ? 'فرع التأمين' : 'Insurance line'}
+          {t('execInsuranceLine')}
           <input
-            aria-label="Insurance line filter"
+            aria-label={t('dashInsuranceLineFilterAria')}
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          {isArabic ? 'كما في تاريخ' : 'As of'}
+          {t('execAsOf')}
           <input
-            aria-label="As of date"
+            aria-label={t('dashAsOfDateAria')}
             type="date"
             value={asOf}
             onChange={(e) => setAsOf(e.target.value)}
           />
         </label>
         <button type="submit">
-          {isArabic ? 'تطبيق المرشّحات' : 'Apply filters'}
+          {t('execApplyFilters')}
         </button>
       </form>
 
@@ -148,110 +141,103 @@ export default function ExecutiveDashboardPage() {
 
       {summary && h ? (
         <>
-          <p style={{ opacity: 0.6 }}>
-            {isArabic
-              ? `الفترة ${summary.periodLabel} · كما في ${summary.asOf.slice(0, 10)}`
-              : `Period ${summary.periodLabel} · as of ${summary.asOf.slice(0, 10)}`}
+          <p style={{ color: 'var(--ink-secondary)' }}>
+            {t('execPeriodAsOf', {
+              period: summary.periodLabel,
+              asOf: summary.asOf.slice(0, 10),
+            })}
           </p>
 
           <section style={sectionStyle}>
-            <h2>{isArabic ? 'المبيعات' : 'Sales'}</h2>
+            <h2>{t('execSales')}</h2>
             <div style={gridStyle}>
               <Stat
                 value={h.newLeadsCount}
-                label={isArabic ? 'عملاء محتملون جدد' : 'New leads'}
+                label={t('execNewLeads')}
               />
               <Stat
                 value={`${h.leadConversionRatePercent}%`}
-                label={isArabic ? 'معدّل التحويل' : 'Conversion rate'}
+                label={t('execConversionRate')}
               />
               <Stat
                 value={h.commissionIncomeJod}
-                label={isArabic ? 'دخل العمولات (د.أ)' : 'Commission income (JOD)'}
+                label={t('execCommissionIncomeJod')}
               />
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>{isArabic ? 'الوثائق' : 'Policy'}</h2>
+            <h2>{t('execPolicy')}</h2>
             <div style={gridStyle}>
               <Stat
                 value={h.activePoliciesCount}
-                label={isArabic ? 'وثائق سارية' : 'Active policies'}
+                label={t('execActivePolicies')}
               />
               <Stat
                 value={h.expiringPoliciesCount}
-                label={isArabic ? 'وثائق تقترب من الانتهاء' : 'Expiring soon'}
+                label={t('execExpiringSoon')}
               />
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>{isArabic ? 'المطالبات' : 'Claims'}</h2>
+            <h2>{t('execClaims')}</h2>
             <div style={gridStyle}>
               <Stat
                 value={h.openClaimsCount}
-                label={isArabic ? 'مطالبات مفتوحة' : 'Open claims'}
+                label={t('execOpenClaims')}
               />
               <Stat
                 value={h.outstandingClaimsValueJod}
                 label={
-                  isArabic
-                    ? 'قيمة المطالبات القائمة (د.أ)'
-                    : 'Outstanding claims value (JOD)'
+                  t('execOutstandingClaimsValueJod')
                 }
               />
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>{isArabic ? 'المالية' : 'Financial'}</h2>
+            <h2>{t('execFinancial')}</h2>
             <div style={gridStyle}>
               <Stat
                 value={h.receivablesOutstandingJod}
                 label={
-                  isArabic ? 'ذمم مدينة قائمة (د.أ)' : 'Receivables outstanding (JOD)'
+                  t('execReceivablesOutstandingJod')
                 }
               />
               <Stat
                 value={h.payablesOutstandingJod}
                 label={
-                  isArabic
-                    ? 'مستحقات للمؤمِّنين (د.أ)'
-                    : 'Payables to insurers (JOD)'
+                  t('execPayablesToInsurersJod')
                 }
               />
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>{isArabic ? 'الامتثال' : 'Compliance'}</h2>
+            <h2>{t('execCompliance')}</h2>
             <div style={gridStyle}>
               <Stat
                 value={h.openDsrCount}
                 label={
-                  isArabic
-                    ? 'طلبات أصحاب البيانات المفتوحة'
-                    : 'Open data-subject requests'
+                  t('execOpenDataSubjectRequests')
                 }
               />
               <Stat
                 value={h.openComplianceExceptionsCount}
                 label={
-                  isArabic
-                    ? 'استثناءات امتثال مفتوحة'
-                    : 'Open compliance exceptions'
+                  t('execOpenComplianceExceptions')
                 }
               />
             </div>
-            <p style={{ opacity: 0.6, marginTop: '0.5rem' }}>
-              {isArabic
-                ? 'الاستثناءات = تنبيهات غسل الأموال المفتوحة + سجل الاختراقات المفتوح.'
-                : 'Exceptions = open AML/CFT alerts + open breach-register entries.'}
+            <p style={{ color: 'var(--ink-secondary)', marginTop: '0.5rem' }}>
+              {t('execExceptionsOpenAmlCftAlerts')}
             </p>
           </section>
         </>
-      ) : null}
+      ) : loadError ? null : (
+        <p>{t('dashLoading')}</p>
+      )}
     </main>
   );
 }

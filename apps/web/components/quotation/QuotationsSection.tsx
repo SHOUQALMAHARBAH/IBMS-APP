@@ -211,7 +211,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
       {chains === null ? (
         <p>{t('commonLoading')}</p>
       ) : chains.length === 0 ? (
-        <p style={{ opacity: 0.6 }}>{t('quoteNoneYet')}</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('quoteNoneYet')}</p>
       ) : (
         chains.map((chain) => {
           const c = chain.current;
@@ -345,7 +345,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                             {round && round.round > 0
                               ? t('quoteRoundLabel', { round: round.round })
                               : t('quoteOpeningQuote')}{' '}
-                            <span style={{ opacity: 0.6 }}>v{v.versionNumber}</span>
+                            <span style={{ color: 'var(--ink-secondary)' }}>v{v.versionNumber}</span>
                             {v.isCurrentVersion ? (
                               <span
                                 style={{ ...rfqBadgeStyle, marginInlineStart: '0.4rem' }}
@@ -422,7 +422,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 ))}
               </select>
               {capturable.length === 0 ? (
-                <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
                   {t('quoteAllShortlistedHaveQuote')}
                 </span>
               ) : null}
@@ -535,7 +535,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 value={form.negotiationNotes}
                 rows={2}
                 maxLength={4000}
-                placeholder="e.g. asked for 5% off and the flood exclusion struck"
+                placeholder={t('rfqNegotiationNotesPlaceholder')}
                 onChange={(e) => set('negotiationNotes', e.target.value)}
               />
             </div>

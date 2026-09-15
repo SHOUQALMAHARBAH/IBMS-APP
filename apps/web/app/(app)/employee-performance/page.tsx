@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -45,6 +46,7 @@ function displayOrDash(value: string | number | null): string {
 }
 
 export default function EmployeePerformancePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -61,7 +63,7 @@ export default function EmployeePerformancePage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   async function onLookup(e: FormEvent) {
     e.preventDefault();
@@ -72,10 +74,10 @@ export default function EmployeePerformancePage() {
       setHistory(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the employee-performance.view permission."
+          ? t('epNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load employee performance — try again.',
+            : t('epLoadError'),
       );
     } finally {
       setHasLookedUp(true);
@@ -98,11 +100,11 @@ export default function EmployeePerformancePage() {
               periodEnd: computePeriodEnd,
             },
       );
-      setComputeMessage('Record computed.');
+      setComputeMessage(t('epComputed'));
       setHistory(await listEmployeePerformance({ employeeId }));
     } catch (err) {
       setComputeError(
-        err instanceof ApiError ? err.message : 'Could not compute the record.',
+        err instanceof ApiError ? err.message : t('epComputeError'),
       );
     }
   }
@@ -113,23 +115,22 @@ export default function EmployeePerformancePage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Employee Performance</h1>
+      <h1>{t('epHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        New clients, premium written, commission earned, renewal rate, and
-        cross-sell rate, scored monthly per employee.
+        {t('epIntro')}
       </p>
 
       <form onSubmit={onLookup} style={formStyle}>
-        <h2>Look up an employee</h2>
+        <h2>{t('epLookUp')}</h2>
         <label style={labelStyle}>
-          Employee ID
+          {t('epEmployeeIdLabel')}
           <input
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
             required
           />
         </label>
-        <button type="submit">View performance</button>
+        <button type="submit">{t('epViewButton')}</button>
       </form>
 
       {loadError ? (
@@ -141,17 +142,17 @@ export default function EmployeePerformancePage() {
       {latest ? (
         <>
           <div style={statRow}>
-            <Stat label="New clients" value={displayOrDash(latest.newClients)} />
+            <Stat label={t('diepNewClients')} value={displayOrDash(latest.newClients)} />
             <Stat
-              label="Premium written (JOD)"
+              label={t('epPremiumWrittenJod')}
               value={displayOrDash(latest.premiumWrittenJod)}
             />
             <Stat
-              label="Commission earned (JOD)"
+              label={t('epCommissionEarnedJod')}
               value={displayOrDash(latest.commissionEarnedJod)}
             />
             <Stat
-              label="Renewal rate"
+              label={t('diepRenewalRate')}
               value={
                 latest.renewalRatePercent === null
                   ? '—'
@@ -159,7 +160,7 @@ export default function EmployeePerformancePage() {
               }
             />
             <Stat
-              label="Cross-sell rate"
+              label={t('diepCrossSellRate')}
               value={
                 latest.crossSellRatePercent === null
                   ? '—'
@@ -172,16 +173,16 @@ export default function EmployeePerformancePage() {
             existed to rate that period, not a computed 0%.
           </p>
 
-          <h2>History</h2>
+          <h2>{t('dashHistory')}</h2>
           <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
             <thead>
               <tr>
-                <th style={head}>Period</th>
-                <th style={head}>New clients</th>
-                <th style={head}>Premium written</th>
-                <th style={head}>Commission earned</th>
-                <th style={head}>Renewal rate</th>
-                <th style={head}>Cross-sell rate</th>
+                <th style={head}>{t('dashColPeriod')}</th>
+                <th style={head}>{t('diepNewClients')}</th>
+                <th style={head}>{t('diepPremiumWritten')}</th>
+                <th style={head}>{t('diepCommissionEarned')}</th>
+                <th style={head}>{t('diepRenewalRate')}</th>
+                <th style={head}>{t('diepCrossSellRate')}</th>
               </tr>
             </thead>
             <tbody>
@@ -207,25 +208,23 @@ export default function EmployeePerformancePage() {
           </table>
         </>
       ) : hasLookedUp && !loadError ? (
-        <p style={{ opacity: 0.6 }}>No record has been computed yet for this employee.</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('epNoRecord')}</p>
       ) : null}
 
       <form onSubmit={onCompute} style={formStyle}>
-        <h2>Compute now</h2>
+        <h2>{t('epComputeNow')}</h2>
         <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: 0 }}>
-          Uses the Employee ID above. Leave the period fields blank to score
-          the UTC calendar month that just ended (what the monthly job
-          itself does).
+          {t('epComputeNote')}
         </p>
         <label style={labelStyle}>
-          Period label (optional)
+          {t('ipPeriodOptionalLabel')}
           <input
             value={computePeriodLabel}
             onChange={(e) => setComputePeriodLabel(e.target.value)}
           />
         </label>
         <label style={labelStyle}>
-          Period start (optional)
+          {t('ipPeriodStartOptionalLabel')}
           <input
             type="date"
             value={computePeriodStart}
@@ -233,7 +232,7 @@ export default function EmployeePerformancePage() {
           />
         </label>
         <label style={labelStyle}>
-          Period end (optional)
+          {t('ipPeriodEndOptionalLabel')}
           <input
             type="date"
             value={computePeriodEnd}
@@ -241,7 +240,7 @@ export default function EmployeePerformancePage() {
           />
         </label>
         <button type="submit" disabled={!employeeId}>
-          Compute
+          {t('epComputeButton')}
         </button>
         {computeError ? (
           <p role="alert" style={errorStyle}>

@@ -10,6 +10,8 @@ import {
   reconcileInvoice,
   RECEIPT_METHOD_OPTIONS,
   type Invoice,
+  type InvoiceStatus,
+  type ReceiptMethod,
 } from "../../lib/finance/invoice-api";
 import {
   listPoliciesForOpportunity,
@@ -23,6 +25,29 @@ import {
 } from "../quotation/quotation.styles";
 import { useLanguage } from "../../lib/i18n/language-context";
 import { formatDate, formatMoney } from "../../lib/i18n/format";
+import type { TranslationKey } from "../../lib/i18n/translations";
+
+/** The select rendered the raw snake_case token (`bank_transfer`) as its own
+ *  option text. These four keys were written for exactly this and never
+ *  referenced — the same defect `POLICY_STATUS_LABEL_KEY` exists to prevent. */
+/** The invoice status rendered as the raw enum token (`INVOICED`), the same
+ *  defect `POLICY_STATUS_LABEL_KEY` exists to prevent: a new member of
+ *  `InvoiceStatus` is now a compile error rather than a token on screen. */
+const INVOICE_STATUS_LABEL_KEY: Record<InvoiceStatus, TranslationKey> = {
+  INVOICED: "financeInvoiceStatusInvoiced",
+  COLLECTED: "financeInvoiceStatusCollected",
+  RECONCILED: "financeInvoiceStatusReconciled",
+  REMITTED: "financeInvoiceStatusRemitted",
+  EXCEPTION_RAISED: "financeInvoiceStatusExceptionRaised",
+  EXCEPTION_RESOLVED: "financeInvoiceStatusExceptionResolved",
+};
+
+const RECEIPT_METHOD_LABEL_KEY: Record<ReceiptMethod, TranslationKey> = {
+  bank_transfer: "financeMethodBank",
+  cheque: "financeMethodCheque",
+  card: "financeMethodCard",
+  cash: "financeMethodCash",
+};
 
 interface Props {
   opportunityId: string;
@@ -104,7 +129,7 @@ export function FinanceSection({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Could not generate the invoice — try again.",
+          : t('polFinInvoiceError'),
       );
     }
   }
@@ -173,7 +198,14 @@ export function FinanceSection({
           </div>
           <div style={quoteFieldStyle}>
             <span>{t("financeStatusLabel")}</span>
-            <strong>{invoice.status}</strong>
+            {/* The status label and the "Collected" AMOUNT field both read
+                "Collected" in English, so the status carries a testid: a bare
+                getByText would match two elements. The raw enum token used to
+                be unique by accident, which is what made the old assertions
+                look unambiguous. */}
+            <strong data-testid="invoice-status">
+              {t(INVOICE_STATUS_LABEL_KEY[invoice.status])}
+            </strong>
           </div>
           {(invoice.receipts?.length ?? 0) > 0 ? (
             <>
@@ -234,7 +266,7 @@ export function FinanceSection({
             onClick={() => void downloadDocument(invoice.id)}
             style={{ ...buttonStyle, width: "auto", marginTop: "0.4rem" }}
           >
-            Download invoice (PDF)
+            {t('policyDownloadInvoiceButton')}
           </button>
         </div>
       ) : (
@@ -325,7 +357,7 @@ export function FinanceSection({
             >
               {RECEIPT_METHOD_OPTIONS.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {t(RECEIPT_METHOD_LABEL_KEY[m])}
                 </option>
               ))}
             </select>

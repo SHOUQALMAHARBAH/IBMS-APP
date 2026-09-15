@@ -3,7 +3,6 @@ import type { IncidentReportView } from '../compliance-risk/incident.config';
 import type { DpiaScreeningView } from './dpia-screening.config';
 import type { LegalHoldView } from './legal-hold.config';
 import type { CrossBorderTransferRecordView } from './cross-border-transfer.config';
-import type { ConsentRecordView } from './consent.config';
 
 /**
  * Backlog Part D §5.1, Process #52 item #9 — "A DPO Workspace screen
@@ -62,18 +61,4 @@ export interface DpoWorkspaceSummary {
 export function computeDaysUntilDue(slaDueAtIso: string, now: Date): number {
   const ms = new Date(slaDueAtIso).getTime() - now.getTime();
   return Math.ceil(ms / (24 * 60 * 60 * 1000));
-}
-
-export function summarizeConsentStatus(
-  rows: ConsentRecordView[],
-): ConsentStatusSummary {
-  let activeCount = 0;
-  let withdrawnCount = 0;
-  let declinedCount = 0;
-  for (const r of rows) {
-    if (r.isActive) activeCount++;
-    else if (r.withdrawnAt) withdrawnCount++;
-    else declinedCount++;
-  }
-  return { activeCount, withdrawnCount, declinedCount };
 }

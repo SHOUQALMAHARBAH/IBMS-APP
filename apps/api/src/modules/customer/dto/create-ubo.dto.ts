@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { emptyStringToUndefined } from '../../../common/dto.util';
+import { IsDateOfBirth, IsNationality } from './screening-identity.dto-parts';
 
 /** Process 3 — corporate KYC UBO capture. `isPep` has no default, same
  * rationale as CreateLeadDto.marketingConsentGranted: a PEP flag is a
@@ -24,6 +25,19 @@ export class CreateUboDto {
   @IsString()
   @Length(1, 150)
   givenName!: string;
+
+  /** Part B §11 — screening discriminators. Optional for the same reason as
+   * on `CreateCustomerDto`: absent means "not known", which is different from
+   * "does not match" and is reported as such. */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsDateOfBirth()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsNationality()
+  nationality?: string;
 
   @IsOptional()
   @Transform(emptyStringToUndefined)

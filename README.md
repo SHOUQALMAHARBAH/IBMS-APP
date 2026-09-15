@@ -30,10 +30,12 @@ asset value has grown materially past the property Sum Insured designed into the
 touchpoint as an `Interaction` and serve the aggregated 360° customer view: interactions
 plus policies, claims and complaints merged into one timeline; the latter three are empty
 until Domains B/C/E land).
-Everything else — Domains B–H
-(policy, claims, finance, service, compliance/risk, management, supporting ops), and
-Parts D–G (PDPL/DSR/retention, dashboards, bilingual/RTL UI, final verification) — is
-**not started**. See § Scope status for the full picture and § Known gaps for the
+This paragraph predates Domains B–H (policy,
+claims, finance, service, compliance/risk, management, supporting ops) and Parts D–F
+(PDPL/DSR/retention, dashboards, bilingual/RTL UI), all of which have since been built —
+**§ Scope status below is the authority, not this summary.** Part G's final verification
+checklist has still not been run as a formal, evidence-attached gate. See § Scope status
+for the full picture and § Known gaps for the
 deferred edges of each built item; `meta/context/data-model.md` in ibms-brain is the
 logical data model this is built against. A minimal signed-in navigation shell (a sidebar
 plus a `Welcome` landing at `/`) ties the built screens together; the original `/`
@@ -88,6 +90,159 @@ ibms-app/
   turbo.json         Task graph (build/lint/typecheck/test/e2e)
   .github/workflows/ CI
 ```
+
+### Frontend design system (web)
+
+`apps/web` styles with **CSS custom properties + inline `style` objects** — there is no
+Tailwind, no CSS modules and no third-party component library, and adding one was
+considered and deliberately rejected (retrofitting across 1,116 inline style objects and
+92 pages is a mechanical rewrite with real regression risk for no gain tokens do not
+already give).
+
+* **`app/globals.css`** holds every token: colour, spacing, type scale, radii, elevation,
+  focus ring, light + dark themes, RTL conventions, reduced-motion. The palette is
+  **sampled from the approved login design**, not invented — brand `#3b6790`, hero
+  gradient `#273a4e -> #33516d`, page surface `#f4f6fa`, ink ramp `#26303e / #525e6f`.
+  Re-sample rather than approximate if it is revisited. **One deliberate departure:**
+  `--ink-muted` was sampled at `#828c9a`, which fails WCAG AA on every surface in the
+  file (3.41:1 on a white card, and a card is as light as a background gets, so there
+  was nothing to darken but the ink). It is `#656d7b` — 5.22 / 4.82 / 4.61 on
+  card / page / sunken; dark is `#8b95a4`, worst case 4.98. Primary and secondary are
+  untouched.
+* **Never mute text with `opacity`.** It composites toward whatever is behind the
+  element, so the rendered colour is one no token declares and axe measures the blend:
+  `opacity: 0.6` on `--ink-primary` reads as `#787f89` over the page surface, 3.73:1.
+  That pattern was 20 of the 51 contrast violations the first full `test:a11y` run
+  found. Use `--ink-secondary` (6.09:1) or `--ink-muted`. `opacity` on a *disabled
+  control* is fine — axe exempts those, and `components/ui/Button.tsx` still uses it.
+* **The `(auth)` screens carry the comp's hero gradient**, via `authPageStyle` /
+  `authCardStyle` in `components/auth/auth-form.styles.ts`. Both are **additive**:
+  `pageStyle` and `cardStyle` in that same file are imported by **86 authenticated
+  screens**, so editing them would repaint the whole app. The gradient is vertical
+  (`180deg`, matching the sidebar) because a diagonal would need mirroring for RTL.
+  **Three dark-mode contrast gaps are tracked, none of them visible to axe** — its
+  contrast rule covers text only, so WCAG 1.4.11 non-text contrast is unchecked:
+  (1) input borders sit at **1.35:1 light / 1.37:1 dark** against the card
+  (`--border-default` on `--surface-card`) — pre-existing, app-wide, and the strongest
+  candidate of the three because those are real controls; (2) `--ink-muted` on
+  `--surface-hover` (4.34) — that token has zero consumers; (3) `--nav-ink-muted` on
+  `--nav-item-active` (2.91) — muted nav ink only ever sits on the nav ground. None is
+  addressed; do not self-select them.
+* **`components/ui/`** is the primitive set — `Button`, `Card`/`PageHeader`, `Table`,
+  `Field` (+ `TextInput`/`Select`/`TextArea`), `Badge`, `EmptyState`, `ErrorState`,
+  `Skeleton`/`SkeletonList`. New screens compose these; they cover the four states
+  (loading / empty / error / populated) every data screen owes.
+* **Two `.styles.ts` modules are the app's chokepoints** — `components/lead/lead.styles.ts`
+  (imported by 83 pages) and `components/auth/auth-form.styles.ts` (87). They became the
+  de-facto design system by accident, so a customers page importing `cardStyle` from a
+  *lead* folder is normal here. Both now read tokens only, and their **export names and
+  shapes must stay stable** — changing one restyles (or breaks) dozens of pages at once.
+* **The sidebar renders from permissions, not roles.** `components/app/AppNav.tsx` gates
+  each of its 69 links on `user.permissions` from `/auth/me`, grouped under 9 bilingual
+  headings, with codes taken from each destination route's own `@RequirePermissions`.
+  **`/settings/security` is deliberately ungated**: it is self-service MFA enrolment, and
+  `MfaRequiredGuard` 403s every other screen until a user enrols, so gating it on the
+  admin-only `security-config.read` would lock out ten of the eleven roles.
+* **A status enum becomes readable text in exactly one place.**
+  `lib/policy/policy-status.ts` exports a `Record<PolicyStatus, TranslationKey>`,
+  so adding a status is a compile error rather than a raw token on a screen.
+  The policy list and policy detail pages both read it. They previously did
+  not: the detail page carried its own `Record<string, string>` pair listing
+  two statuses that do not exist (`PLACEMENT_REQUESTED`, `CHECKED`) and missing
+  four that do — including `ACTIVE`, the state every completed policy ends in,
+  which therefore rendered as the literal token in both languages.
+  `lib/lead/lead-status.ts` is the same fix for `LeadStatus`, whose detail page
+  listed four of five statuses and rendered `DISQUALIFIED` raw. Sixteen
+  `Record<Enum, TranslationKey>` maps now cover the enums a user reads. Follow
+  the same shape for any other one.
+* **Every screen is bilingual — 93 of 93**, the 89 under `app/(app)/` plus the four
+  `(auth)` screens that render before anyone is signed in. Copy lives in
+  `lib/i18n/translations/`, one namespaced dictionary per domain (`auth`, `nav`,
+  `leads`, `customers`, `rfq`, `policy`, `complaints`, `customer-service`, `pdpl`,
+  `finance`, `compliance-screening`, `compliance-risk`, `dashboards`, `operations`,
+  `detail-pages`, plus `common`), merged into one flat `TranslationKey` union by
+  `lib/i18n/translations.ts`. **2,705 keys per language, AR and EN in exact parity.**
+  Key names are semantic and per-domain prefixed (`leadsAddButton`, never the English
+  phrase); Arabic is written as Arabic, not translated from the English, and an
+  unsourced term is marked `TODO(arabic-terminology)` in place rather than guessed.
+  Add a new screen's copy to the dictionary its domain already owns — a page-local
+  `Record<string, string>` of labels is the exact defect the status modules above
+  exist to prevent, and `tsc` cannot see it.
+  **The 403 permission-denied branch is wired**, at 86 `t('*NoPermission*')` call
+  sites across 74 files; no `*NoPermission` key is left unreferenced. The shape is
+  always `err.status === 403 ? t('<screen>NoPermission') : err.message`, so the
+  translated string is reached only for a permission denial and a real API error
+  still surfaces its own message.
+  **The merged namespace is now tested, not assumed.** `translations.test.ts` asserts
+  three things the prefix convention only promised: every dictionary file on disk is
+  covered, every key is declared in exactly one file, and every file is at exact AR/EN
+  parity. It was written because four `commChannel*` keys were declared in **both**
+  `rfq.ts` and `customer-service.ts` — the later spread won, so `rfqs/[id]` rendered
+  the communications screen's "Phone call"/"Customer portal" instead of its own
+  "Call"/"Portal". `tsc` cannot see a collision: both sides are `string`, and the
+  merged object is simply the last writer's value. The RFQ set is renamed `rfqComm*`.
+  **Hint text and accessible names are covered too.** The app holds **27**
+  `placeholder` literals: **13 carried English prose and now read from the dictionary**;
+  the other **14 are format examples** (`"17500.000"`, `"+962-7-..."`, a UUID sample)
+  and are deliberately left alone — `lib/i18n/format.ts` pins Arabic to `'ar'`, not
+  `'ar-JO'`, precisely so numerals stay Western, so an AR key would be byte-identical
+  to its EN twin. Separately, **30 template-literal `aria-label`s were English**
+  (`` `Confirm access for ${name}` ``) and now interpolate through `t()`'s `params`
+  argument; these are screen-reader-only, so axe never caught them — it checks that an
+  accessible name *exists*, not what language it is in. Keep an `aria-label` and the
+  visible label of the same control in the same language: a screen reader and the
+  screen disagreeing is the defect this closed. Four `label=` props on
+  `/financial-report` (`"1–30 days"` and its siblings) were the last on-screen
+  literals, sitting between two `Figure`s that already read from the dictionary.
+  English interleaved with interpolations was the last category — **32 sites across
+  17 files**, invisible to a bare-JSX-text scan because the text node itself contains
+  `{`. All are wired; the app now has **no English left outside the dictionaries**.
+* **Count-dependent copy goes through `tPlural()`, never a ternary.**
+  `count === 1 ? '' : 's'` cannot express Arabic: `Intl.PluralRules('ar')` selects
+  between **six** categories (zero / one / two / few / many / other) where English
+  selects between two, so a ternary is a wrong answer for four of Arabic's six cases.
+  `lib/i18n/plurals.ts` holds `PLURALS` — an object of CLDR-category forms per key —
+  with its own `PluralKey` union and its own resolver, deliberately **separate from
+  the flat `TranslationKey` dictionary**: a dictionary value is a `string`, a plural
+  value is an object, and keeping the unions apart means `t()` cannot resolve a plural
+  key to `[object Object]` and `tPlural()` cannot take a key with no forms — both are
+  compile errors. `other` is the only mandatory form (CLDR guarantees it for every
+  locale and count) and a missing category falls back **straight to `other`, never to
+  a neighbour**: borrowing `few` for a missing `many` would hide the gap behind a form
+  that is grammatically wrong for that count anyway. The category always comes from
+  `Intl`, never from hand-rolled arithmetic. `plurals.test.ts` pins the Arabic
+  boundaries (0, 1, 2, **3–10**, **11–99**, 100+) and that six counts produce six
+  genuinely distinct strings.
+* **Money renders through `formatMoney`, everywhere.** Four dashboards were printing
+  `{rawValue} JOD` — an ungrouped, unformatted number with a hand-written suffix,
+  bypassing the shared formatter entirely. They now read `JOD 37,500.000` like every
+  other figure in the app.
+* **An unreferenced dictionary key is a question, not a verdict.** `policy.ts`'s 98
+  orphans were audited one by one rather than deleted as debt: **15 were missing
+  wiring** — the string they were written for was still hard-coded in the component
+  that owns them — and **83 were genuinely dead**, superseded (`policyStatus*` by
+  `policyState*`) or written for a UI that was never built. `policy.ts` is now at
+  **zero** unreferenced; app-wide the count is **61, down from 159**. Audit before you
+  delete: the cheapest way to lose a translation is to bin the key because nothing
+  references it yet.
+* **Enum values render through a `Record<Enum, TranslationKey>` map, never raw.**
+  `POLICY_STATUS_LABEL_KEY` was the first; `INVOICE_STATUS_LABEL_KEY` and
+  `RECEIPT_METHOD_LABEL_KEY` (`components/policy/FinanceSection.tsx`) and
+  `DELIVERY_METHOD_LABEL_KEY` (`PolicySection.tsx`) now cover the three that were
+  still printing their own tokens — `INVOICED`, `bank_transfer` — on screen, in Arabic
+  too. A new enum member is then a compile error, not a token a user reads.
+* **`GET /policies` answers three questions.** With `opportunityId`, the one
+  policy placed from it; with `customerId`, that customer's policies; with
+  neither, the book-wide list behind `/policies` — filtered **in the query** to
+  what the caller may see (whole book for Placement / Manager / Executive /
+  Policy Checking, own-customers-only for everyone else) and capped at
+  `POLICY_LIST_TAKE`. The cap is only safe because the filtering happens in
+  SQL; filtering a capped read afterwards lets the cap decide what the caller
+  cannot see. Supplying both scopes is still refused.
+* **`e2e/fixtures/role-permissions.ts` is generated** from
+  `packages/db/prisma/seed-data/permissions.ts`. 71 of 74 Playwright specs mock
+  `/auth/me`, and the UI renders off `permissions`, so each spec returns a realistic set
+  via `permissionsForRoles(roles)`. Regenerate it when the seed grid changes.
 
 `features/` (web) and `controllers/`, `services/` (api) are still empty scaffolding — no
 feature has needed them over its own `modules/` subfolder yet. `modules/`/`repositories/`
@@ -149,6 +304,31 @@ npm run test:e2e
 # Once you're satisfied, promote the same migration files to the dev DB:
 npm run db:migrate:deploy
 ```
+
+### Scheduled jobs are switched OFF in the test environment
+
+`.env.test.example` sets `SCHEDULED_JOBS=disabled`, and `ScheduledJobsGuard`
+removes every `@Cron` job at boot when it sees exactly that value. **Keep it
+set.**
+
+The e2e suite boots the real `AppModule`, so without it all 19 cron jobs fire
+during a run, on wall-clock time, against shared `db-test` state — and the
+watchlist sync downloads the real OFAC and UN sanctions lists while it is at
+it. A full run starting at 11:59:40 was broken by exactly that: the twice-daily
+watchlist cron fired at 12:00:00, published a real ~1011-record generation, and
+`watchlist-sync.e2e-spec.ts`'s 10-record fixture was then correctly refused by
+the plausibility floor several minutes later. The SLA escalation sweep runs
+every fifteen minutes, so it lands inside any run longer than that.
+
+A suite whose result depends on what time of day it started is not telling you
+about your code. `watchlist-sync.e2e-spec.ts` asserts the scheduler registry is
+empty, so if the variable ever stops reaching the test process you get one
+legible failure instead of confusing ones in unrelated specs.
+
+Any value other than the exact word `disabled` — unset, misspelt, `false`,
+`0` — leaves the jobs **running**. That direction is deliberate: a deployment
+that silently stopped re-screening customers against sanctions lists would be a
+compliance failure, not an inconvenience.
 
 `db:test:migrate:dev` and `db:migrate:deploy` apply the same migration files under
 `packages/db/prisma/migrations/` to different databases — nothing is copied or
@@ -218,8 +398,8 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run test:contract` | API contract tests — validates real responses against the OpenAPI schema generated from `@nestjs/swagger` decorators (`apps/api/test/contract.contract-spec.ts`) — needs a reachable `DATABASE_URL` |
 | `npm run test:security` | Dependency audit (`npm audit --audit-level=high`), repo-wide |
 | `npm run test:smoke` | `bash scripts/smoke.sh api` — dispatches to the api service's smoke test (see below) |
-| `npm run e2e` | Playwright functional e2e (web) — excludes `@a11y`-tagged specs |
-| `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — only `@a11y`-tagged specs |
+| `npm run e2e` | Playwright functional e2e (web) — **excludes** `@a11y`-tagged specs (`--grep-invert @a11y`) |
+| `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — **only** `@a11y`-tagged specs. A separate gate: a green `npm run e2e` says nothing about accessibility, so run both and report both counts |
 | `npm run db:validate` | `prisma validate` — schema is internally valid (not a drift check; that's `db:migrate:status`) |
 | `npm run db:migrate:dev` | Create/apply a migration against the dev DB (`packages/db`) |
 | `npm run db:migrate:deploy` | Apply existing migrations to the dev DB, no schema drift (also used for CI/prod) |
@@ -230,6 +410,7 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run db:studio` | Prisma Studio (dev DB) |
 | `npm run db:seed` | Seed the dev DB — the 11 roles + full permission grid (`packages/db/prisma/seed.ts`), idempotent |
 | `npm run db:test:seed` | Same seed, against `db-test` |
+| `npm run seed:demo -w api` | Demo data for two Organizations — employees, leads, ~500 customers and full sales-to-policy pipelines — created through the real HTTP API, **dev DB only** (never `.env.test`). Scale is env-configurable; accounts come back with MFA off, so sign in with the password and pair an authenticator at Settings → Security — the run now **fails, naming accounts**, if any is left enrolled with a secret nobody holds. See `apps/api/scripts/README-SEED-DEMO.md` |
 
 ## `scripts/`
 
@@ -246,6 +427,21 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
   been migrated at least once (`npm run db:test:migrate:dev`). Run it before opening a PR
   to get the evidence block for the PR description in one shot — claims aren't evidence,
   this is.
+- **`scripts/provision-app-role.mjs`** (multi-tenancy Phase 2 step 8) — creates
+  `ibms_app`, the NON-OWNER database role the running API connects as. Postgres
+  exempts a table's owner from that table's own row-level security policies, so
+  connecting the API as the migration role would leave all 118 policies silently
+  inert; this role owns nothing and is therefore subject to every one of them.
+  Deliberately a script rather than a migration: a Postgres role is
+  cluster-level, creating one needs `CREATEROLE`, and its password is a
+  credential that must come from the environment.
+  `APP_DB_PASSWORD=... npm run db:provision-app-role`. Idempotent — re-running
+  updates the password. Must run BEFORE the migrations, which GRANT to the role
+  and refuse to run without it. See `docs/multi-tenancy-rls.md`.
+- **`scripts/generate-sla-policy-seed.ts`** — regenerates
+  `packages/db/prisma/seed-data/sla-policies.ts` from `sla-policy-source.config.ts`, so
+  the seeded SLA baseline and the governing-source table it is derived from cannot drift
+  apart by hand-editing one of them. Arrived with the configurable SLA engine.
 - **`scripts/backup-restore-drill.sh`** (A.10, Part 10.4/10.5) — dumps a database
   (`db-test` by default — never dev/prod automatically), encrypts the dump
   (AES-256-CBC), decrypts and restores it into a throwaway database, verifies the
@@ -402,6 +598,45 @@ The engineering backlog spans **Part A** (security & cross-cutting infra), **Par
 (PDPL / M-series, dashboards, bilingual UI, a final verification checklist). Where the
 build actually is today:
 
+- **Multi-tenancy — Phases 1-6 complete.** `MULTI-TENANCY-SPEC.md` is a scope
+  addition on top of everything below: the whole backlog was built for ONE brokerage
+  office, and multi-tenancy is being retrofitted one phase at a time, deliberately,
+  because it changes an assumption nearly every file depends on.
+
+  What exists: the `Organization` model; `organizationId` on every tenant-scoped table
+  with every row attributed; a unique-constraint set that is per-office rather than
+  per-platform; and — as of Phase 2 step 7 — **application-layer enforcement**. Every
+  Prisma query against a tenant-scoped model is filtered by the current Organization,
+  injected by `apps/api/src/prisma/tenant-scope.extension.ts` rather than written by hand
+  at any call site, and a tenant-scoped query with no Organization in context is REFUSED
+  rather than run unfiltered. Background jobs run once per ACTIVE Organization.
+
+  **Both isolation layers now exist.** Phase 2 step 8 added the PostgreSQL
+  Row-Level Security policies — 119 of them, one per tenant-scoped table — and
+  the API connects as a NON-OWNER role (`ibms_app`) so Postgres actually applies
+  them. `APP_DATABASE_URL` must be set in every environment or layer 2 is inert;
+  the API logs an error but still boots. Raw SQL (`$queryRaw`) is protected by
+  RLS alone, since the application layer structurally cannot see inside a raw
+  query — any raw path added later must run inside the same session-variable
+  transaction. See `docs/multi-tenancy-rls.md`.
+
+  Everything that paragraph used to list as missing has since shipped: the Part V
+  checklist runs as automated tests across two real Organizations (Phase 2 step 9,
+  extended in Phase 6), the insurer master/relationship split and per-tenant email
+  landed in Phase 3, and the corrected sign-up/MFA/session flow — including
+  subdomain-scoped tenant resolution — landed in Phase 4.
+
+  What does NOT exist, and is not a defect to chase: whether Microsoft Graph and
+  Gmail accept the live payloads (needs a real OAuth consent, which cannot be
+  faked — everything around it is proven), and the `dpoAlternateApproverUserId`
+  fallback, which has no consumer, so in the one edge case it exists for a
+  destruction batch cannot be approved by anyone. That second one is an
+  AVAILABILITY gap, never a safety one: the failure is a stuck batch, never a
+  wrongly-approved one, and it is logged as a known gap rather than patched
+  because letting a non-DPO approve changes a dual-control path. Fuzzy sanctions
+  matching beyond the curated transliteration table (§10.1) is deferred by
+  decision. See CLAUDE.md § What's New for the per-phase record.
+
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,
   encryption-at-rest, a real KMS/HSM, load-test-driven performance indexes, independent
@@ -533,7 +768,7 @@ build actually is today:
 
 | # | Process | Built | Not done (detail in § Known gaps) |
 |---|---|---|---|
-| 41 | Customer Requests | **new module** `apps/api/src/modules/customer-service/` (+ `repositories/service-request.repository.ts`) — **opens Domain E** · **migration `20260903160000` (41st)** only **widens** the pre-existing `ServiceRequest` model: `policyId` (nullable FK, `ON DELETE SET NULL`), `detail`, `raisedByUserId` / `assignedToUserId` / `fulfilledByUserId`, `outcomeNote`, `@@index([customerId])` / `@@index([status, createdAt])` (open-queue read) / `@@index([assignedToUserId])` (my-queue read). The `ServiceRequest` model, its `slaTimerId @unique` link to the generic `SlaTimer`, and the `service-request.manage` (`[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER]`) perm all already existed · **no seed change** · **`ServiceRequest.status` is a PLAIN STRING, NOT a `WorkflowTransitionService` entity** (the `CommissionLedgerEntry` / `ReconciliationException` pattern) — `SERVICE_REQUEST_TRANSITIONS` (`open: [in_progress, fulfilled, cancelled]`, `in_progress: [fulfilled, cancelled]`, both terminal `[]`) / `isServiceRequestTransition` + a service `assertTransition`, every move a **status-conditional `updateMany`** (0 rows → reload → idempotent-or-**409**) · **endpoints** (all `service-request.manage` / Sales, Manager): `POST /service-requests` (`{ customerId, requestType, detail?, policyId?, assignedToUserId? }` — creates at `open`, starts the SLA timer), `POST /service-requests/:id/assign` (`{ assignedToUserId }` — while `open` / `in_progress`), `POST /service-requests/:id/start` (`open → in_progress`, idempotent), `POST /service-requests/:id/fulfil` + `.../cancel` (`{ outcomeNote }` **mandatory** `@MinLength(3)` / `@MaxLength(2000)`, logged **verbatim** — `{open|in_progress} → terminal`, stamps `closedAt` + (fulfil) `fulfilledByUserId`, resolves the SLA timer; a same-note re-close → 200, a different note → **409**, the other terminal state → **422**), `GET /service-requests?customerId=&status=&assignedToUserId=` + `GET /service-requests/:id` (book-wide, capped `SERVICE_REQUEST_READ_LIMIT = 5000`) · **`policyId` (optional) must belong to `customerId`** — a **422** on a cross-customer policy, **404** on an unknown one; `assignedToUserId` validated to exist (**404**) · **the SLA timer is the generic `SlaTimerService` engine** — a new `SLA_REGISTRY` entry `service_request_fulfilment` (`entityType: 'ServiceRequest'`, **5 business days**, one escalation stage → `BRANCH_DEPARTMENT_MANAGER`). **The 5-day figure is DRAFTED / UNSOURCED** — a customer-service turnaround is a published service-standard / courtesy target, **not a PDPL statutory SLA** (`pdpl-sla-timers.md` § "What does NOT trigger this rule" — internal targets are ordinary KPIs); the backlog line names `SlaTimer` so #41 tracks it as a real timer + the existing nightly escalation sweep, and the registry `citation` marks it DRAFT/UNSOURCED like the two KYC rows · **the timer is started BEST-EFFORT at create** (the A.8 / `AccessRecertificationService.startCycle` precedent — the request is already committed; a timer-bookkeeping failure must not roll it back or hide that it was logged), then a best-effort `attachSlaTimer` (`updateMany({ where: { id, slaTimerId: null }, data: { slaTimerId } })`) populates the direct 1:1 `ServiceRequest.slaTimerId @unique` (the schema intends the link — `SlaTimer.serviceRequest` back-relation — unlike `AccessRecertificationCycle`, which has no `slaTimerId`) · `SlaTimerService.resolve` (best-effort) flips the timer's `resolvedAt` on fulfil / cancel · `deriveServiceRequestView`'s `sla` block carries a computed **`breached`** (`resolvedAt === null && dueAt <= now`) so the UI shows "overdue" before the nightly sweep has stamped `escalatedAt` · **no maker/checker** (a service-desk request is single-actor Sales / Manager work — `maker-checker-segregation.md`; the mandatory supervisor sign-off is #42 Complaints' `complaint.close`, not #41) · audit: a best-effort `CREATE ServiceRequest` (ids + type + `detail` + status + `assignedToUserId`), an `UPDATE` on every move (new status + who + `outcomeNote` verbatim + `closedAt`) + the `SlaTimer` engine's own `CREATE` / `SLA_ESCALATED` rows · **`detail` / `outcomeNote` carry a `NO_FULL_ACCOUNT_NUMBER` `@Matches` guard** (rejects a run of 9+ digits, message points at `PaymentChannel` #38) — a Confidential free-text field next to a masked-data path must not be its capture point (`sensitive-data-handling.md`, new clause) · **`@code-reviewer` → APPROVE WITH MINORS** (2 MINORs + 5 NITs addressed — `start`-on-terminal now 422, the free-text guard + lex clause, the composite indexes, the drafted-citation spec, 0-row race tests) · **`/brain-gap` filed + pushed** (ibms-brain — **new `meta/context/customer-service-lifecycle.md`** (Domain E seed) with a "Customer Requests (Process 41)" section; `sensitive-data-handling.md` gains the free-text-guard clause) · web: a new **"Customer requests"** screen (`app/(app)/service-requests/page.tsx` + `lib/customer-service/service-request-api.ts` + an `AppNav` entry) — a log form (customer id / type / detail) and a table of requests with their SLA state (`due …` / `BREACHED …` / `resolved`) and per-row Start / Fulfil / Cancel | the 5-business-day SLA is **drafted / unsourced** (no broker service charter / SOP figure) — same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23), the #27 follow-up thresholds, the #40 `netPosition` metric · **no `ServiceRequest` → `Document` link** — a fulfilled certificate request does not attach the generated PDF (a #25-style `Document` pointer, deferred) · one 5-day SLA for **all four** `requestType`s (no per-type target) · **no re-open path** — a `fulfilled` / `cancelled` request is terminal · a `change` request records intent but **executes nothing** — no path from a service request to a `PaymentChannel` (#38) or an `Endorsement` (#22) · no customer-facing portal / self-service; no bulk actions · `detail` / `outcomeNote` are Confidential business notes (the `NO_FULL_ACCOUNT_NUMBER` guard is the only masking) · `service-request.manage` is role-level (no per-officer queue beyond the `assignedToUserId` filter) |
+| 41 | Customer Requests | **new module** `apps/api/src/modules/customer-service/` (+ `repositories/service-request.repository.ts`) — **opens Domain E** · **migration `20260903160000` (41st)** only **widens** the pre-existing `ServiceRequest` model: `policyId` (nullable FK, `ON DELETE SET NULL`), `detail`, `raisedByUserId` / `assignedToUserId` / `fulfilledByUserId`, `outcomeNote`, `@@index([customerId])` / `@@index([status, createdAt])` (open-queue read) / `@@index([assignedToUserId])` (my-queue read). The `ServiceRequest` model, its `slaTimerId @unique` link to the generic `SlaTimer`, and the `service-request.manage` (`[SALES_RELATIONSHIP_OFFICER, BRANCH_DEPARTMENT_MANAGER]`) perm all already existed · **no seed change** · **`ServiceRequest.status` is a PLAIN STRING, NOT a `WorkflowTransitionService` entity** (the `CommissionLedgerEntry` / `ReconciliationException` pattern) — `SERVICE_REQUEST_TRANSITIONS` (`open: [in_progress, fulfilled, cancelled]`, `in_progress: [fulfilled, cancelled]`, both terminal `[]`) / `isServiceRequestTransition` + a service `assertTransition`, every move a **status-conditional `updateMany`** (0 rows → reload → idempotent-or-**409**) · **endpoints** (all `service-request.manage` / Sales, Manager): `POST /service-requests` (`{ customerId, requestType, detail?, policyId?, assignedToUserId? }` — creates at `open`, starts the SLA timer), `POST /service-requests/:id/assign` (`{ assignedToUserId }` — while `open` / `in_progress`), `POST /service-requests/:id/start` (`open → in_progress`, idempotent), `POST /service-requests/:id/fulfil` + `.../cancel` (`{ outcomeNote }` **mandatory** `@MinLength(3)` / `@MaxLength(2000)`, logged **verbatim** — `{open|in_progress} → terminal`, stamps `closedAt` + (fulfil) `fulfilledByUserId`, resolves the SLA timer; a same-note re-close → 200, a different note → **409**, the other terminal state → **422**), `GET /service-requests?customerId=&status=&assignedToUserId=` + `GET /service-requests/:id` (book-wide, capped `SERVICE_REQUEST_READ_LIMIT = 5000`) · **`policyId` (optional) must belong to `customerId`** — a **422** on a cross-customer policy, **404** on an unknown one; `assignedToUserId` validated to exist (**404**) · **the SLA timer is the generic `SlaTimerService` engine** — a new `SLA_REGISTRY` entry `service_request_fulfilment` (`entityType: 'ServiceRequest'`, **5 business days**, one escalation stage → `BRANCH_DEPARTMENT_MANAGER`). **The 5-day figure is DRAFTED / UNSOURCED** — a customer-service turnaround is a published service-standard / courtesy target, **not a PDPL statutory SLA** (`pdpl-sla-timers.md` § "What does NOT trigger this rule" — internal targets are ordinary KPIs); the backlog line names `SlaTimer` so #41 tracks it as a real timer + the existing nightly escalation sweep, and the registry `citation` marks it DRAFT/UNSOURCED like the two KYC rows · **the timer is started BEST-EFFORT at create** (the A.8 / `AccessRecertificationService.startCycle` precedent — the request is already committed; a timer-bookkeeping failure must not roll it back or hide that it was logged), then a best-effort `attachSlaTimer` (`updateMany({ where: { id, slaTimerId: null }, data: { slaTimerId } })`) populates the direct 1:1 `ServiceRequest.slaTimerId @unique` (the schema intends the link — `SlaTimer.serviceRequest` back-relation — unlike `AccessRecertificationCycle`, which has no `slaTimerId`) · `SlaTimerService.resolve` (best-effort) flips the timer's `resolvedAt` on fulfil / cancel · `deriveServiceRequestView`'s `sla` block carries a computed **`breached`** (`resolvedAt === null && dueAt <= now`) so the UI shows "overdue" before the nightly sweep has stamped `escalatedAt` · **no maker/checker** (a service-desk request is single-actor Sales / Manager work — `maker-checker-segregation.md`; the mandatory supervisor sign-off is #42 Complaints' `complaint.close`, not #41) · audit: a best-effort `CREATE ServiceRequest` (ids + type + `detail` + status + `assignedToUserId`), an `UPDATE` on every move (new status + who + `outcomeNote` verbatim + `closedAt`) + the `SlaTimer` engine's own `CREATE` / `SLA_ESCALATED` rows · **`detail` / `outcomeNote` carry a `NO_FULL_ACCOUNT_NUMBER` `@Matches` guard** (rejects a run of 12+ digits outside a UUID, message points at `PaymentChannel` #38) — a Confidential free-text field next to a masked-data path must not be its capture point (`sensitive-data-handling.md`, new clause) · **`@code-reviewer` → APPROVE WITH MINORS** (2 MINORs + 5 NITs addressed — `start`-on-terminal now 422, the free-text guard + lex clause, the composite indexes, the drafted-citation spec, 0-row race tests) · **`/brain-gap` filed + pushed** (ibms-brain — **new `meta/context/customer-service-lifecycle.md`** (Domain E seed) with a "Customer Requests (Process 41)" section; `sensitive-data-handling.md` gains the free-text-guard clause) · web: a new **"Customer requests"** screen (`app/(app)/service-requests/page.tsx` + `lib/customer-service/service-request-api.ts` + an `AppNav` entry) — a log form (customer id / type / detail) and a table of requests with their SLA state (`due …` / `BREACHED …` / `resolved`) and per-row Start / Fulfil / Cancel | the 5-business-day SLA is **drafted / unsourced** (no broker service charter / SOP figure) — same status as `CLAIM_LARGE_THRESHOLD_JOD` (#23), the #27 follow-up thresholds, the #40 `netPosition` metric · **no `ServiceRequest` → `Document` link** — a fulfilled certificate request does not attach the generated PDF (a #25-style `Document` pointer, deferred) · one 5-day SLA for **all four** `requestType`s (no per-type target) · **no re-open path** — a `fulfilled` / `cancelled` request is terminal · a `change` request records intent but **executes nothing** — no path from a service request to a `PaymentChannel` (#38) or an `Endorsement` (#22) · no customer-facing portal / self-service; no bulk actions · `detail` / `outcomeNote` are Confidential business notes (the `NO_FULL_ACCOUNT_NUMBER` guard is the only masking) · `service-request.manage` is role-level (no per-officer queue beyond the `assignedToUserId` filter) |
 | 42 | Complaints Management | **extends the `customer-service` module** · **migration `20260903170000` (42nd)** only **widens** the pre-existing `Complaint` / `ComplaintAction` / `EscalationRecord`: `Complaint.resolvedByUserId` / `resolvedAt`, `EscalationRecord.escalatedByUserId`, a `Complaint_closure_maker_checker_distinct` CHECK, and 4 indexes (`@@index([status, createdAt])` replacing the bare `@@index([status])`, `@@index([claimId])`, `@@index([responsibleEmployeeUserId])`, `@@index([complaintId])` on both child tables). The models, the `ComplaintStatus` enum, `Complaint.slaTimerId @unique`, the `WORKFLOW_TRANSITIONS.Complaint` map, and the `complaint.log` `[SALES, CLAIMS, FINANCE, COMPLIANCE, MANAGER]` / `complaint.close` `[MANAGER]` / `complaint.escalate` `[MANAGER, COMPLIANCE]` perms all already existed · **no seed change** · **`Complaint.status` IS a `WorkflowTransitionService` entity** (unlike #41) — `LOGGED → [ASSIGNED]`, `ASSIGNED → [IN_PROGRESS]`, `IN_PROGRESS → [RESOLVED, ESCALATED]`, `ESCALATED → [IN_PROGRESS, RESOLVED]`, `RESOLVED → [CLOSED]`; every move through `WorkflowTransitionService.transition`, the one non-transition write is `recordAssignee` (sets `responsibleEmployeeUserId`, no status change, status-conditional); **only `CLOSED` is terminal** · **endpoints**: `POST /complaints` (`complaint.log` — `{ customerId, issue, category?, claimId?, policyId?, responsibleEmployeeUserId? }`, creates at `LOGGED`, best-effort SLA start), `.../:id/assign` (`{ responsibleEmployeeUserId }` — from `LOGGED` also drives `→ ASSIGNED`; else a plain re-assign; **404** unknown user; **422** CLOSED/RESOLVED; 0-row → **409**), `.../:id/start` (`{ASSIGNED|ESCALATED} → IN_PROGRESS`, idempotent, **422** CLOSED/RESOLVED), `.../:id/actions` (`{ actionText }` `@MinLength(3)` — appends a `ComplaintAction` while not CLOSED), `.../:id/resolve` (`{ resolution }` `@MinLength(10)` mandatory **verbatim** — `{IN_PROGRESS|ESCALATED} → RESOLVED`, stamps `resolvedByUserId` + `resolvedAt`; same-note re-resolve → 200, different → **409**; **422** CLOSED), `.../:id/escalate` (`complaint.escalate` — `IN_PROGRESS → ESCALATED` + an `EscalationRecord` in the engine `sideEffect`; `{ escalatedTo?, reason? }`, `escalatedTo` default `dispute_resolution_committee`; resolves the SLA; a re-escalate while ESCALATED is a plain idempotent **no-op** — no count-then-create self-heal (`race-safe-invariants.md`), a missed best-effort `EscalationRecord` leaves the engine `TRANSITION` row as the authoritative fact; **422** CLOSED/RESOLVED), `.../:id/close` (`complaint.close` / **MANAGER** — `RESOLVED → CLOSED`, stamps `closureApprovedByUserId` + `closedAt`; idempotent if CLOSED; **422** if not RESOLVED), `GET /complaints?customerId=&status=&claimId=&responsibleEmployeeUserId=` + `/:id` (book-wide, capped `COMPLAINT_READ_LIMIT = 5000`) · **`claimId` (optional) must belong to `customerId`** — **422** cross-customer, **404** unknown (this is "link it to a claim on dispute"; same for `policyId`); `responsibleEmployeeUserId` validated to exist (**404**) · **mandatory supervisor sign-off before closure** (`maker-checker-segregation.md` / Part 5.2): the **maker** is `resolvedByUserId` (write-once once RESOLVED), the **checker** is `closureApprovedByUserId`; `assertDifferentActors` → **403** on a self-close, backed by the `Complaint_closure_maker_checker_distinct` CHECK; `Complaint` added to `maker-checker.util.ts`'s covered-pairs table · **the SLA timer is the generic `SlaTimerService` engine** — a new `SLA_REGISTRY` entry `complaint_resolution` (`entityType: 'Complaint'`, **10 business days — DRAFTED / UNSOURCED**, one escalation stage → `BRANCH_DEPARTMENT_MANAGER`). A complaint-resolution turnaround is a CBJ insurance conduct-of-business matter (the CBJ Insurance Dispute Resolution Committee `EscalationRecord` routes to is real), **not a PDPL statutory SLA**; `citation` marks it DRAFT/UNSOURCED like #41 / the two KYC rows; `EXPECTED_NON_PDPL_WORKFLOW_NAMES` gains it · started **BEST-EFFORT at create** + a follow-up `attachSlaTimer` for the 1:1 `slaTimerId`; `SlaTimerService.resolve` (best-effort) flips `resolvedAt` when the complaint reaches **`RESOLVED` OR `ESCALATED`** — escalation stops the internal clock · `deriveComplaintView`'s `sla` block carries a computed `breached` (same as #41) · **`issue` / `resolution` / `ComplaintAction.actionText` / `EscalationRecord.reason` carry the shared `NO_FULL_ACCOUNT_NUMBER` `@Matches` guard** — moved from `service-request.config.ts` to `common/dto.util.ts` this pass · audit: best-effort `CREATE Complaint` (ids + issue + category + status), `UPDATE` on resolve / close (`resolution` verbatim + `closureApprovedByUserId` + `closedAt`), best-effort `CREATE ComplaintAction` / `CREATE EscalationRecord` (text verbatim), plus the engine `TRANSITION` rows + the `SlaTimer` engine's own · **`@code-reviewer` (mandatory — migration + workflow state-machine + maker/checker closure + Confidential free-text) → CHANGES REQUESTED → resolved** (1 MAJOR + 1 MINOR + 4 NITs addressed — see the Known-gaps entry below) · **`/brain-gap` filed + pushed** (ibms-brain — `customer-service-lifecycle.md` gains a "Complaints Management (Process 42)" section) · web: a new **"Complaints"** screen (`app/(app)/complaints/page.tsx` + `lib/customer-service/complaint-api.ts` + an `AppNav` entry) — a log form + a table with per-row Assign / Start / Add action / Resolve / Escalate / Close gated by status + role | one 10-day SLA for **all categories** (no per-category target) — the figure is **drafted / unsourced** · **no re-open** of a `CLOSED` complaint · escalation does **not restart** the SLA on a return-to-handling · **no automatic escalation sweep to the committee** — the nightly `SlaTimerScheduler` sweep escalates the SLA timer to the internal `BRANCH_DEPARTMENT_MANAGER` only; the committee route is a **manual `complaint.escalate`** · no link from a complaint to a generated acknowledgement / final-response `Document` · no customer-facing portal |
 | 43 | SLA Management | **new module** `apps/api/src/modules/sla-dashboard/` (+ `repositories/sla-dashboard.repository.ts`) — a read-only cross-module monitoring dashboard over the generic `SlaTimer` engine (backlog A.8) · **no migration, no seed change** — `sla-dashboard.view` (`[COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER, EXECUTIVE_MANAGEMENT, EXTERNAL_AUDITOR]`) was seeded in `a440c1b` · the backlog line has **no checkboxes** ("a monitoring dashboard over `SlaTimer` across every module") — like #40, it is the **backend** for a Part E-style dashboard · kept a **separate module from `SlaModule`** (which owns the engine + the 15-min escalation sweep) — this one only reads · **no maker/checker** (read-only) · today only 3 workflows create timers (`quarterly_access_review`, `service_request_fulfilment`, `complaint_resolution`); the dashboard shows **all** `SLA_REGISTRY` workflows as they come online · **endpoints** (both `sla-dashboard.view`, book-wide, computed at `now`, capped `SLA_DASHBOARD_TIMER_LIMIT = 5000` + `logger.warn` on truncation): **`GET /sla-dashboard/summary`** → `{ generatedAt, dueSoonWindow, totals, byWorkflow[], byEntityType[], byEscalationTarget[] }` — every `SlaTimer` classified into one of **6 mutually-exclusive leaf states** (`on_track` / `due_soon` / `breached` / `escalated` / `resolved_on_time` / `resolved_late`; `escalated` ⇒ past due) then tallied per group + `openBreached` (= breached + escalated) + `entityCount` (distinct `entityId` — a multi-stage workflow contributes >1 timer row per entity) + `oldestOverdueDays`; `totals.breachRate` = `(resolvedLate + breached + escalated) / (that + resolvedOnTime)` 4dp (`"0.0000"` when nothing has reached a deadline) · **`GET /sla-dashboard/timers?state=&entityType=&workflowName=`** → the filterable per-timer drill-down, worst-first (state severity, then oldest deadline); `state` accepts a **leaf** state or a **group** (`open` = unresolved · `open_breached` = breached+escalated · `at_risk` = due_soon+breached+escalated · `resolved`), default when omitted = `open`; `workflowName` is a **prefix** match so a base name catches its `::stage` rows; `baseWorkflowName()` strips the `SlaTimerService` stage suffix so the summary rolls all DSR stages into one `dsr_access_deletion` row · registry labels / `configuredDuration` / a `drafted` flag come from a **new non-throwing `findSlaRegistryEntry()`** (a `SlaTimer.workflowName` could name a since-renamed workflow — a monitoring view degrades to the raw name, never crashes) · **`SLA_DASHBOARD_DUE_SOON_WINDOW = { value: 3, unit: 'calendarDays' }`** is a **dashboard lookahead heuristic, NOT an SLA registry value** — it changes only which bucket a still-open timer shows in, never a deadline, so it is outside `pdpl-sla-timers.md`'s "any registry value must be sourced" rule; drafted, tune freely · all aggregation is pure / unit-tested in `sla-dashboard.config.ts` (mirrors `finance.config.ts`); the service only loads rows + writes the audit · **best-effort `READ` audit row** per read (`entityType: 'SlaDashboard'`, `entityId: 'summary'|'timers'`, counts + `generatedAt` + filters only — **never an `entityId` or a name**), `isSensitiveDataAccess` when the loaded set contains a timer of a personal-data-bearing entity type (`SLA_DASHBOARD_SENSITIVE_ENTITY_TYPES` = DSR / incident / complaint / KYC / claim / legal-hold) — the #30 / #40 precedent (contrast #33 / #34, not audited) · **`@code-reviewer` (Confidential-tier operational data + a new `READ` audit row) → APPROVE WITH MINORS** — no blocker / MAJOR / lex violation, all six mandatory checks pass · **2 MINORs + 4 NITs addressed**: locale-unpinned sort tiebreak → a byte-stable `compareRaw`; `SLA_DASHBOARD_SENSITIVE_ENTITY_TYPES` widened with `ConsentRecord` (M03) / `DataSharingApproval` (M08) + a `/brain-gap` (`sensitive-data-handling.md` § "What triggers" gains a clause — an aggregate `READ` flips `isSensitiveDataAccess` on **existence-context** from an **explicit** list, canonical list belongs in `PRIV-SRS-02`); dead `isSlaTimerStateFilter` export removed, `byEscalationTarget` `Map` keyed on `escalatedTo` directly (a `null` key, no sentinel), the redundant `sensitive` key dropped from the audit `afterValue`, friendly group-filter `<select>` labels · web: a new **"SLA dashboard"** screen (`app/(app)/sla-dashboard/page.tsx` + `lib/sla/sla-dashboard-api.ts` + an `AppNav` entry after "Complaints") — summary stat cards + breach-rate %, a by-workflow table (label · entity · configured SLA · per-state counts · oldest-overdue · a "drafted" marker), a by-entity-type table, and a `state`-`<select>` + timers table from `/timers` | the **`SLA_DASHBOARD_DUE_SOON_WINDOW`** (3 calendar days) is a drafted lookahead heuristic — same status as #41's 5-day SLA / the #40 `netPosition` metric · **no historical SLA-performance trend** — the dashboard is a live "right now" view, no `asOf`, no over-time series · **counts are per timer-*row*** — a multi-stage workflow (only the two DSR types) contributes one row per escalation stage; `entityCount` surfaces the distinct-entity number · **in-memory aggregation** capped at 5000 rows (the #30 / #33 / #40 pattern — push into the query if the timer table outgrows it) · JOD-irrelevant (no money) · no per-workflow drill-through page, no CSV / export, no notifications — the dashboard reads the same `SlaTimer` rows the nightly `SlaTimerScheduler` sweep already escalates |
 | 44 | Customer Communication | **extends the `customer-service` module** · **migration `20260904120000` (43rd)** only **widens** — no new table, **no seed change** (`communication.send` `[SALES_RELATIONSHIP_OFFICER, PLACEMENT_TECHNICAL_OFFICER, CLAIMS_OFFICER, FINANCE_COLLECTIONS_OFFICER]` was seeded in `a440c1b`; 149 perms). Adds **`Customer.preferredContactChannel InteractionChannel?`** (nullable — the recorded outbound-channel preference, the parallel to the pre-existing `Customer.languagePreference` where "recorded language" already lives; also threaded through `CreateCustomerDto` / `CustomerService.toMasked` + `list` / `CustomerRepository`), **`CommunicationLog.isMarketing Boolean @default(false)`** + **`CommunicationLog.consentRecordId String?`** (nullable FK → `ConsentRecord`, `ON DELETE SET NULL`) + a `ConsentRecord.communicationLogs` back-relation, `@@index([customerId])` → `@@index([customerId, sentAt])`, new `@@index([consentRecordId])` · **`CommunicationLog` is shared with Process 12** (RFQ correspondence) — **DISCRIMINATOR: `rfqId IS NULL` == a Process-44 customer-communication row**; every Process-44 read filters `rfqId: null` (a #12 id 404s on `GET /communications/:id`) · **not a `WorkflowTransitionService` entity, no maker/checker, no `SlaTimer`** — a factual send log (the `Interaction` #10 / #12 shape; Process 44 has no SLA — the `consent_withdrawal` M03 timer is a separate concern #44 only *reads*) · new `apps/api/src/modules/customer-service/communication.{config,service,controller}.ts` + `dto/create-communication.dto.ts` + `dto/list-communications-query.dto.ts` + `repositories/communication.repository.ts`, wired as the **3rd `CustomerServiceModule` controller**; `common/dto.util.ts` gains `queryBoolean` (a `?isMarketing=true` query-flag coercer) · **endpoints** (all `communication.send`): `POST /communications` (`{ customerId, body (mandatory), channel?, languageUsed?, isMarketing?, templateId?, subject?, sentAt? }` — creates at `direction: OUTBOUND`, `respectedConsent: true`; **404** unknown customer), `GET /communications?customerId=&channel=&isMarketing=&direction=` (book-wide Process-44 list, newest-first by `sentAt` then `createdAt`, capped `COMMUNICATION_READ_LIMIT = 5000` + `logger.warn`), `GET /communications/consent-status?customerId=` (`{ customerId, marketing: { allowed, reason, consentRecordId } }` — a pre-compose check, declared **before** `:id`; **400** if `customerId` omitted), `GET /communications/:id` (a #12 / unknown id → **404**) · **"Respect the customer's recorded channel and language"** — both **derived, not an input** (`resolveChannel` / `resolveLanguage`, pure — the #28 / #31 / #38 "computed when derivable" rule): omit → taken from the `Customer` record; an explicit value that **disagrees** → **422**; `languageUsed` always resolves (`Customer.languagePreference` has a value), `channel` becomes a **required input** (**422** if also omitted) only when the customer has no `preferredContactChannel` on record; no per-message language override · **the marketing-consent gate** (`evaluateMarketingConsent`, pure) runs **only for `isMarketing: true`** — the repo loads the customer's `ConsentRecord` rows where `purpose = 'MARKETING' OR isMarketing = true` (`PRIV-SOP-04` keeps the two as separate controls; either identifies a marketing-consent row), the pure fn picks the **most recent** by `grantedAt ?? createdAt` then `createdAt` (consent is point-in-time — a fresh grant after a withdrawal is a valid re-opt-in), and `granted && withdrawnAt == null` ⇒ **allowed** (the row's id is stamped onto `CommunicationLog.consentRecordId`); otherwise the send is **BLOCKED with a 422** (`reason` ∈ `no_record` / `not_granted` / `withdrawn`), **no `CommunicationLog` row is written** (PDPL: no marketing without consent — a blocked send did not happen), and a **best-effort `REJECT` audit row** records the attempt (`entityType: 'CommunicationLog'`, `entityId: 'blocked'`, `afterValue` = `customerId` + `channel` + `blocked: 'marketing_consent_<reason>'` + `consentRecordId` — **no subject / body**); a non-marketing (service / transactional) send never touches the consent table — `respectedConsent` stays `true` (contractual necessity), `consentRecordId` null · **`subject` / `body` carry the shared `NO_FULL_ACCOUNT_NUMBER` `@Matches` guard** (`common/dto.util.ts`, same as #41 / #42) and are **Confidential-tier free text** — returned unmasked but **never in an audit row** (the best-effort `CREATE` `afterValue` is channel / language / consent metadata only — the #12 `RfqCommunication` / CRM `Interaction` precedent); **reads are NOT audited** (Confidential tier — the #33 / #34 / #41 precedent; contrast the #30 / #40 / #43 aggregate reads) · `sentAt` is backdatable via `parseHistoricalInstant` (an offset-less datetime or a future instant → **422**) · **no maker/checker** (logging a send is single-actor cross-functional work — `communication.send` is granted to four roles for exactly that reason, the #10 `interaction.log` shape) · **`@code-reviewer` (mandatory — migration + Confidential free-text + a consent gate + a new `REJECT` audit row) → APPROVE WITH MINORS** — no blocker / MAJOR / lex violation, all six mandatory checks pass or N/A with a stated reason. **3 MINORs + 1 NIT addressed**: `resolveChannel` now treats a recorded `preferredContactChannel` outside `COMMUNICATION_CHANNELS` (a `MEETING` / `VISIT` value) as **no usable preference** (was: logged verbatim as a nonsensical send channel, or a permanent 422); `evaluateMarketingConsent` rewritten to the **fail-safe rule** ("allowed only if there is an active grant AND no withdrawal event is `>=` the newest active grant's effective time") so a withdrawal on a *different / older* record still blocks — the multi-record precedence marked drafted pending a pinned `PRIV-SOP-04` section; `GET /communications/consent-status` gained a `ConsentStatusQueryDto` (`@IsUUID` → a malformed id is a 400, not a 404). **For the record (no change):** the consent gate is a read-then-write with no DB constraint (a comment + a brain Deferred note flag that a real email/SMS dispatch must re-check at send time); whether a consent-status lookup is itself a loggable read is an open `PRIV-SOP-04` check (reads stay unaudited, matching #33 / #34 / #41) · **`/brain-gap` filed + pushed** (ibms-brain — `customer-service-lifecycle.md` gains a "Customer Communication (Process 44)" section; intro → "#41–44 are built") · web: a new **"Communications"** screen (`app/(app)/communications/page.tsx` + `lib/customer-service/communication-api.ts` + an `AppNav` entry after "Complaints") — a send form (customer id · channel `<select>` defaulting to "(recorded preference)" · a "Marketing" checkbox · subject · message), a "Check marketing consent" button hitting `/consent-status`, and a table (customer · channel · lang · marketing · subject · sent) | **no real delivery integration** — this is a *log*, not a sender (no email / SMS gateway, no bounce / read tracking) · **`isMarketing` is a caller-asserted boolean** — not derived from `templateId` · one consent check covers all marketing (no per-campaign / per-purpose granularity beyond `MARKETING`) · the `POST` endpoint only writes `OUTBOUND` (`INBOUND` Process-44 rows can be created directly in the DB but not via the API) · **no `CommunicationLog` → CRM 360° timeline wiring** — `buildCustomerTimeline` (#10) still merges only interactions / policies / claims / complaints · no template library / render step (`templateId` is a free string) · no bulk / campaign send · **no `Customer` update endpoint**, so `preferredContactChannel` is set only at customer creation · the "recorded channel" is a plain enum preference — the system does not verify the customer actually has that channel's contact detail on file |
@@ -914,9 +1149,11 @@ build actually is today:
   ("every dashboard filterable by branch/line of business/insurer/time period, and
   renderable in either language") resolves as: the filter half is honestly satisfied
   per-dashboard (each of Part E's six sections above documents exactly which
-  dimensions apply, not a blanket checkbox); the bilingual half is NOT satisfied
-  anywhere in the app and is explicitly Part F's own unbuilt scope, not something Part
-  E's dashboards could close. **PART E IS NOW COMPLETE.** The
+  dimensions apply, not a blanket checkbox); the bilingual half was NOT satisfied
+  anywhere in the app when Part E landed and was explicitly Part F's own scope, not
+  something Part E's dashboards could close — **it is satisfied now**: all fourteen
+  dashboard pages render from `lib/i18n/translations/dashboards.ts`, closing that
+  bullet from the Part F side rather than the Part E one. **PART E IS NOW COMPLETE.** The
   `dashboard.executive.view` cross-department rollup screen (#64's own top-level
   permission, never one of the six NAMED dashboards, no backlog bullet describing its
   content) remains unbuilt.
@@ -5212,7 +5449,7 @@ else.
   `detail` + status) + `UPDATE` per move (`outcomeNote` verbatim + who +
   `closedAt`) + the `SlaTimer` engine rows; `detail` / `outcomeNote` are
   Confidential business notes, not personal data — a **`NO_FULL_ACCOUNT_NUMBER`
-  `@Matches` guard** (rejects a run of 9+ digits, message points at
+  `@Matches` guard** (rejects a run of 12+ digits outside a UUID, message points at
   `PaymentChannel` #38) keeps a full bank/card number out of the free text +
   the audit row (`sensitive-data-handling.md` — a free-text field next to a
   masked-data path must not be its capture point). **`/brain-gap` filed +
@@ -6700,9 +6937,15 @@ else.
   `/ar/leads`) does not give for free, and migrating ~80 existing routes under a
   `[locale]` segment would be a large, invasive restructure disproportionate to a bare
   switch. `LanguageProvider` (wraps `AuthProvider`'s children in `app/layout.tsx`)
-  initializes from `localStorage` (a fast, per-device pre-auth GUESS) then syncs from
-  the ACCOUNT's own preference exactly ONCE per session load, after which local state
-  is authoritative — a manual mid-session switch is never silently overwritten by a
+  renders the SSR default (`'AR'`, the schema default) on first paint, adopts
+  `localStorage` (a fast, per-device pre-auth GUESS) in a **mount effect**, then syncs
+  from the ACCOUNT's own preference exactly ONCE per session load, after which local
+  state is authoritative. **The localStorage read must not happen in the `useState`
+  initializer**: that runs during the first client render, where it can return `'EN'`
+  while the server — which has no localStorage and no locale cookie — rendered `'AR'`,
+  and React then discards the server HTML with "Hydration failed because the server
+  rendered text didn't match the client". It stays invisible while a pre-auth screen is
+  hard-coded English and surfaces the moment that screen calls `t()` — a manual mid-session switch is never silently overwritten by a
   stale re-render of the same already-fetched `user` object. Every switch updates React
   state + `document.documentElement.lang`/`dir` synchronously (genuinely instant — no
   navigation, no URL change, no lost session context) and persists via a best-effort

@@ -121,15 +121,27 @@ jobs:
           POSTGRES_PASSWORD=ibms
           POSTGRES_DB=ibms_test
           DATABASE_URL=postgresql://ibms:ibms@localhost:5432/ibms_test?schema=public
+          APP_DATABASE_URL=postgresql://ibms_app:ci-only-app-role@localhost:5432/ibms_test?schema=public
           JWT_ACCESS_SECRET=ci-only-change-me-32-characters-minimum
           MFA_ENCRYPTION_KEY=jWvaaenpb1O7k9jMlLZhRTeQFNJ1jQOFTUHtzgTHNtg=
           PII_ENCRYPTION_KEYS=v1:DzVvLT8z/wNB6UZW2cglf0EEajI/+hjMXk8WlVfHphI=
           PII_ENCRYPTION_ACTIVE_KEY_ID=v1
           ENABLE_DEV_RESET_TOKEN=true
+          SCHEDULED_JOBS=disabled
           EOF
 
       - name: Database schema (prisma validate)
         run: npm run db:validate
+
+      # Must precede the migrations: 20260928100000_row_level_security GRANTs to
+      # this role and raises if it is missing. The role is what makes RLS apply
+      # at all — Postgres exempts the table owner from its own policies, so CI
+      # has to exercise the same non-owner connection production uses, or the
+      # isolation tests would pass against policies that are silently inert.
+      - name: Provision the non-owner application database role
+        run: npm run db:provision-app-role
+        env:
+          APP_DB_PASSWORD: ci-only-app-role
 
       - name: Run Prisma migrations
         run: npm run db:migrate:deploy
@@ -163,10 +175,30 @@ jobs:
       # Boots the real built service (not a mock) against the same ephemeral
       # postgres this job already migrated/seeded, same "boot the real
       # thing" approach as the Smoke tests step above.
+      #
+      # Through dotenv and .env.test, for the same reason scripts/smoke.sh
+      # sources that file: multi-tenancy Phase 2 runs the API on a NON-OWNER
+      # role so row-level security applies to it, and PrismaService reads that
+      # connection from APP_DATABASE_URL. This job never sets it, and the
+      # `cp .env.example .env` step above leaves a root .env carrying the
+      # placeholder `ibms_app:CHANGE_ME@localhost:5433` — docker-compose's
+      # local dev port, which does not exist on a runner. @nestjs/config fills
+      # gaps only, so DATABASE_URL kept this job's value while APP_DATABASE_URL
+      # silently took the placeholder and the boot died on connect.
+      #
+      # .env.test already holds the correct CI value, and the Smoke step above
+      # proves a real boot works from it. Reading the same file here means the
+      # two boots cannot drift apart again — which is exactly what setting the
+      # variable inline on this step would have invited.
       - name: Start API for DAST scan
         working-directory: apps/api
         run: |
-          node dist/src/main.js >/tmp/ibms-api-dast.log 2>&1 &
+          # Job control on, so the background job leads its own process group:
+          # `npx dotenv -- node` makes the API a GRANDCHILD, and $! is npx. The
+          # teardown below kills the group, not just that wrapper — the same
+          # reason apps/api/scripts/smoke.sh sets this.
+          set -m
+          npx dotenv -e ../../.env.test -- node dist/src/main.js >/tmp/ibms-api-dast.log 2>&1 &
           echo $! > /tmp/ibms-api-dast.pid
           for _ in $(seq 1 30); do
             if curl -sf http://localhost:4000/health >/dev/null 2>&1; then
@@ -199,7 +231,12 @@ jobs:
 
       - name: Stop API (DAST)
         if: always()
-        run: kill "$(cat /tmp/ibms-api-dast.pid)" 2>/dev/null || true
+        # The whole process group (see `set -m` above), falling back to the bare
+        # pid so this still works if the group is gone.
+        run: |
+          pid="$(cat /tmp/ibms-api-dast.pid 2>/dev/null || true)"
+          [ -n "$pid" ] || exit 0
+          kill -- "-${pid}" 2>/dev/null || kill "$pid" 2>/dev/null || true
 
   docker:
     runs-on: ubuntu-latest

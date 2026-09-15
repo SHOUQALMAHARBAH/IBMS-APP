@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import { currentPrivacyNotice, type PrivacyNotice } from '../../lib/pdpl/privacy-notice-api';
 import { ApiError } from '../../lib/auth/api-client';
 
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function PrivacyNoticeDisplay({ touchpoint, canRead }: Props) {
+  const { t } = useLanguage();
   const [notice, setNotice] = useState<PrivacyNotice | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,10 +37,10 @@ export function PrivacyNoticeDisplay({ touchpoint, canRead }: Props) {
     } catch (err) {
       setNotice(null);
       setError(
-        err instanceof ApiError ? err.message : 'Could not load the privacy notice.',
+        err instanceof ApiError ? err.message : t('pnLoadError'),
       );
     }
-  }, [touchpoint]);
+  }, [touchpoint, t]);
 
   useEffect(() => {
     if (!canRead) return;
@@ -59,15 +61,15 @@ export function PrivacyNoticeDisplay({ touchpoint, canRead }: Props) {
         fontSize: '0.85rem',
       }}
     >
-      <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>Privacy notice</h3>
+      <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>{t('pnHeading')}</h3>
       {error ? (
         <p role="alert" style={{ color: '#b91c1c' }}>
           {error}
         </p>
       ) : notice === undefined ? (
-        <p style={{ opacity: 0.6 }}>Loading…</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('consLoading')}</p>
       ) : notice === null ? (
-        <p style={{ opacity: 0.6 }}>No privacy notice published for this touchpoint yet.</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('pnNoneForTouchpoint')}</p>
       ) : (
         <details>
           <summary>

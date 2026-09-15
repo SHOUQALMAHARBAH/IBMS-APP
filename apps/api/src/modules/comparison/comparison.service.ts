@@ -17,6 +17,7 @@ import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.ut
 import { planComparison } from './comparison.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { BuildComparisonDto } from './dto/build-comparison.dto';
+import { insurerName } from '../../repositories/insurer-identity';
 
 type MatrixRow = ComparisonWithRows['rows'][number];
 
@@ -215,7 +216,7 @@ export class ComparisonService {
       if (inMatrix.has(submission.insurerId)) continue;
       const flagged: FlaggedInsurer = {
         id: submission.insurerId,
-        name: submission.insurer.name,
+        name: insurerName(submission.insurer),
         status: submission.status,
       };
       if (submission.status === 'DECLINED') declinedInsurers.push(flagged);

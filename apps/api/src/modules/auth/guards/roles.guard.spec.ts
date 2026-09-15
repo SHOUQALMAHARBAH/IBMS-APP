@@ -21,6 +21,7 @@ function makeReflector(required: RoleName[] | undefined): Reflector {
 
 const user = (roles: RoleName[]): AuthenticatedUser => ({
   id: 'u1',
+  organizationId: 'org-1',
   email: 'u1@ibms.test',
   roles,
   sessionId: 's1',

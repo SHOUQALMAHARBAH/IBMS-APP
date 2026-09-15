@@ -21,6 +21,7 @@ const PERIOD: PeriodWindow = {
 
 const RECORD_ROW: EmployeePerformanceRecord = {
   id: 'record-1',
+  organizationId: 'org-1',
   employeeId: 'employee-1',
   periodLabel: '2026-08',
   newClients: 0,

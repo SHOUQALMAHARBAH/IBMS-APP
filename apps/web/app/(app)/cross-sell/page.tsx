@@ -22,9 +22,8 @@ import {
 } from '../../../components/cross-sell/cross-sell.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
-const CAN_SCAN_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
 
 function OpportunityRow({
   opportunity,
@@ -35,7 +34,7 @@ function OpportunityRow({
   canConvert: boolean;
   onChanged: (updated: CrossSellOpportunity) => void;
 }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [reason, setReason] = useState('');
@@ -82,22 +81,22 @@ function OpportunityRow({
             onClick={() =>
               void run(
                 () => convertCrossSellOpportunity(opportunity.id),
-                'Could not convert — try again.',
+                t('xsConvertError'),
               )
             }
           >
-            {busy ? 'Working…' : 'Convert'}
+            {busy ? t('xsWorking') : t('xsConvertButton')}
           </button>
           {dismissing ? (
             <>
               <label htmlFor={`reason-${opportunity.id}`} style={cardMetaStyle}>
-                Why is this gap not being pursued?
+                {t('xsWhyNotPursued')}
               </label>
               <input
                 id={`reason-${opportunity.id}`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. covered under a group policy elsewhere"
+                placeholder={t('xsDismissPlaceholder')}
                 style={{ minWidth: '18rem' }}
               />
               <button
@@ -108,11 +107,11 @@ function OpportunityRow({
                   void run(
                     () =>
                       dismissCrossSellOpportunity(opportunity.id, reason.trim()),
-                    'Could not dismiss — try again.',
+                    t('xsDismissError'),
                   )
                 }
               >
-                Confirm dismiss
+                {t('xsConfirmDismiss')}
               </button>
               <button
                 type="button"
@@ -144,10 +143,11 @@ function OpportunityRow({
 }
 
 function CrossSellForCustomer({ customerId }: { customerId: string }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
-  const canConvert = user?.roles.includes(CAN_CONVERT_ROLE) ?? false;
+  const canConvert = hasPermission(user, 'cross-sell.convert');
   const canScan =
-    user?.roles.some((role) => CAN_SCAN_ROLES.includes(role)) ?? false;
+    hasPermission(user, 'cross-sell.detect');
 
   const [opportunities, setOpportunities] = useState<
     CrossSellOpportunity[] | null
@@ -164,21 +164,21 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the cross-sell.read permission, so there's nothing to show here."
+          ? t('xsNoPermission')
           : err instanceof ApiError && err.status === 404
-            ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+            ? t('xsCustomerNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load cross-sell opportunities — try again.',
+              : t('xsLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function runScan() {
     setScanError(null);
@@ -190,10 +190,10 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the cross-sell.detect permission."
+          ? t('xsNoPermissionDetect')
           : err instanceof ApiError
             ? err.message
-            : 'Could not run the scan — try again.',
+            : t('xsScanError'),
       );
     } finally {
       setScanning(false);
@@ -213,7 +213,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!opportunities) return <p>Loading…</p>;
+  if (!opportunities) return <p>{t('xsLoading')}</p>;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -224,7 +224,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
           style={{ ...buttonStyle, width: 'auto' }}
           onClick={() => void runScan()}
         >
-          {scanning ? 'Scanning…' : 'Scan for gaps now'}
+          {scanning ? t('xsScanning') : t('xsScanButton')}
         </button>
       ) : null}
       {scanError ? (
@@ -235,7 +235,7 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
 
       {scan ? (
         <div style={crossSellPanelStyle}>
-          <strong>Last scan</strong>
+          <strong>{t('xsLastScan')}</strong>
           <div style={cardMetaStyle}>
             In-force lines held:{' '}
             {scan.heldLines.length ? scan.heldLines.join(', ') : 'none'}
@@ -245,17 +245,15 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
           </div>
           <div style={cardMetaStyle}>
             {scan.heldLines.length === 0
-              ? 'No in-force cover — not a cross-sell target yet.'
+              ? t('xsNoInForceCover')
               : `Gaps: ${scan.gapLines.length ? scan.gapLines.join(', ') : 'none'} · ${scan.newlyFlagged.length} newly flagged`}
           </div>
         </div>
       ) : null}
 
       {opportunities.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          No cross-sell opportunities for this customer. The nightly scan flags
-          a gap when the customer holds an in-force policy but is missing a
-          benchmark line.
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+          {t('xsNoOpportunities')}
         </p>
       ) : (
         <div style={{ marginTop: '1rem' }}>
@@ -298,18 +296,19 @@ function CrossSellFlow() {
 }
 
 export default function CrossSellPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Cross-sell</h1>
+      <h1>{t('xsHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 8 — a nightly job compares each customer&apos;s in-force policy
         lines against a benchmark line list and flags the gaps. Convert an

@@ -1,14 +1,116 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { Role, RoleName, User, UserRoleAssignment } from '@ibms/db';
+import type {
+  MfaMethod,
+  Role,
+  RoleName,
+  User,
+  UserRoleAssignment,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrgContextService } from '../common/org-context/org-context.service';
 
 @Injectable()
 export class UserRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orgContext: OrgContextService,
+  ) {}
 
-  findByEmail(email: string): Promise<User | null> {
-    return this.prisma.client.user.findUnique({ where: { email } });
+  /**
+   * Multi-tenancy Phase 2 — the real unique read Phase 1 owed.
+   *
+   * `User.email` is unique per Organization, not globally
+   * (`@@unique([organizationId, email])`, spec §3.2/§4.1.3), so this addresses
+   * the compound key directly instead of Phase 1's stopgap `findFirst`.
+   * Everything that already knows its Organization uses this — authenticated
+   * requests, and the schedulers, which resolve their own service account once
+   * per Organization they sweep.
+   */
+  findByEmailInOrganization(
+    organizationId: string,
+    email: string,
+  ): Promise<User | null> {
+    return this.prisma.client.user.findUnique({
+      where: { organizationId_email: { organizationId, email } },
+    });
+  }
+
+  /**
+   * The login/signup/password-reset path ONLY — deliberately searches across
+   * every Organization, and is named so that its unscoped-ness is visible at
+   * the call site rather than hidden behind an innocuous `findByEmail`.
+   *
+   * It has to work this way in Phase 2: the caller is anonymous, so their
+   * Organization is precisely what this lookup is trying to establish. Callers
+   * must therefore run it inside `runUnscoped('auth-bootstrap')` and `adopt()`
+   * the resulting user's org immediately, so only the lookup is unscoped and
+   * everything after it is not.
+   *
+   * PHASE 4 removes the need for it: once `GET /orgs/resolve` resolves the
+   * Organization from the subdomain BEFORE the login form is shown (§4.10),
+   * login will know its org up front and can use
+   * `findByEmailInOrganization()` like everything else.
+   */
+  findByEmailAcrossOrganizations(email: string): Promise<User | null> {
+    return this.prisma.client.user.findFirst({ where: { email } });
+  }
+
+  /**
+   * Part II §4.3.2 — enrolment is complete only once one live code verified.
+   *
+   * The four facts move together for the same reason `setPassword` clears
+   * `mustChangePassword` in one write: a half-applied enrolment is either a
+   * user who cannot get in, or a user whose second factor is not really on.
+   */
+  completeMfaEnrollment(id: string, method: MfaMethod): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id },
+      data: {
+        mfaEnabled: true,
+        mfaMethod: method,
+        mfaEnrolledAt: new Date(),
+        mfaEnrollmentPending: false,
+      },
+    });
+  }
+
+  /** Part II §4.2 — an admin-provisioned account starts owing BOTH onboarding
+   * steps: rotate the temporary password, then enrol a second factor. */
+  markOnboardingRequired(id: string): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id },
+      data: { mustChangePassword: true, mfaEnrollmentPending: true },
+    });
+  }
+
+  /** Part II §4.4.3 — the password was proven, so the counter starts over even
+   * when the login resolves to an onboarding step rather than a session. */
+  async resetFailedLoginAttempts(id: string): Promise<void> {
+    await this.prisma.client.user.updateMany({
+      where: { id },
+      data: { failedLoginAttempts: 0 },
+    });
+  }
+
+  /**
+   * Part II §4.3.1/§4.7 — stores a new password hash and closes out whatever
+   * onboarding state prompted it.
+   *
+   * `mustChangePassword` is cleared here rather than by the caller: the flag and
+   * the hash have to move together, or a crash between the two leaves the user
+   * either permanently stuck on the change screen or holding a new password the
+   * system still refuses to let them past.
+   */
+  setPassword(id: string, passwordHash: string): Promise<User> {
+    return this.prisma.client.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        mustChangePassword: false,
+      },
+    });
   }
 
   findById(id: string): Promise<User | null> {
@@ -54,6 +156,12 @@ export class UserRepository {
     });
   }
 
+  /**
+   * Self-service signup. Unlike `provision`, this account owes no password
+   * rotation: the person who will use it is the person who chose the password,
+   * so there is no admin-known secret to close out. MFA enrolment is still
+   * required — `MfaRequiredGuard` enforces that for everyone.
+   */
   create(data: {
     fullName: string;
     email: string;
@@ -61,7 +169,13 @@ export class UserRepository {
     languagePreference?: 'AR' | 'EN';
   }): Promise<User> {
     return this.prisma.client.user.create({
-      data: { ...data, passwordUpdatedAt: new Date() },
+      data: {
+        ...data,
+        passwordUpdatedAt: new Date(),
+        // Explicit, because the column DEFAULTS to true for the provisioning
+        // case. A self-service signup has no admin-known password to rotate.
+        mustChangePassword: false,
+      },
     });
   }
 
@@ -78,6 +192,11 @@ export class UserRepository {
     email: string;
     passwordHash: string;
     languagePreference?: 'AR' | 'EN';
+    /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
+    departmentId?: string;
+    /** Part II §4.2.2 — the organizational location, likewise required by the
+     * DTO and likewise distinct from both Department and Role. */
+    branchId?: string;
     roleIds: string[];
     accessValidFrom?: Date;
     accessValidUntil?: Date;
@@ -87,6 +206,11 @@ export class UserRepository {
       data: {
         ...user,
         passwordUpdatedAt: new Date(),
+        // Part II §4.2.3 — an admin-provisioned account owes BOTH onboarding
+        // steps. The admin knows the temporary password, which is exactly the
+        // residual risk §4.3.1 exists to close, and no second factor exists yet.
+        mustChangePassword: true,
+        mfaEnrollmentPending: true,
         roles: { create: roleIds.map((roleId) => ({ roleId })) },
       },
     });
@@ -282,7 +406,17 @@ export class UserRepository {
   withRoleLocked<T>(roleId: string, work: () => Promise<T>): Promise<T> {
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Role" WHERE id = ${roleId} FOR UPDATE`;
-      return work();
+      // `work()` deliberately issues its queries on the OUTER client, not on
+      // `tx` — this transaction exists only to hold the row lock, and has
+      // always been separate from the work it serialises.
+      //
+      // Multi-tenancy Phase 2 step 8 makes that explicit. Left alone, the work
+      // would inherit "a transaction is already open", skip opening its own RLS
+      // session, and run on a pooled connection with no `app.current_org_id`.
+      // That was not theoretical: `setActive`'s `updateMany` matched zero rows,
+      // which the service reads as "already in that state" and reports as
+      // success — so deactivating an account silently did nothing.
+      return this.orgContext.outsideScopedTransaction(work);
     });
   }
 

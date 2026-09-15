@@ -18,6 +18,7 @@ const d = (s: string) => new Prisma.Decimal(s);
 
 const actor: AuthenticatedUser = {
   id: 'fin-1',
+  organizationId: 'org-1',
   email: 'finance@ibms.test',
   roles: ['FINANCE_COLLECTIONS_OFFICER'],
   sessionId: 's-1',

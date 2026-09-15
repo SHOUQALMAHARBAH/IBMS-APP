@@ -36,6 +36,7 @@ const headCellStyle: CSSProperties = {
 export default function ClientAccountingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const { language } = useLanguage();
 
   const [asOf, setAsOf] = useState('');
@@ -50,43 +51,41 @@ export default function ClientAccountingPage() {
       setData(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the client-accounting.read permission, so there's nothing to show here."
+          ? t('caNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the ageing report — try again.',
+            : t('caLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load(asOf);
     })();
-  }, [user, asOf, load]);
+  }, [user, asOf, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Client accounting</h1>
+      <h1>{t('caHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        Accounts receivable aged by customer — every premium invoice that has not
-        yet been collected in full, split into 30 / 60 / 90-day buckets against
-        the reference date. Rows are ordered worst-first (oldest debt first).
+        {t('caIntro')}
       </p>
 
       <label
         style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}
       >
-        As of
+        {t('caAsOf')}
         <input
           type="date"
-          aria-label="As of date"
+          aria-label={t('caAsOfDateAria')}
           value={asOf}
           max={new Date().toISOString().slice(0, 10)}
           onChange={(ev) => setAsOf(ev.target.value)}
@@ -101,21 +100,21 @@ export default function ClientAccountingPage() {
 
       {data ? (
         data.rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No outstanding receivables to report.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('caNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
               <thead>
                 <tr>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Client</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('caColClient')}</th>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <th key={k} style={headCellStyle}>
                       {AR_AGEING_BUCKET_LABEL[k]}
                     </th>
                   ))}
-                  <th style={headCellStyle}>Outstanding</th>
-                  <th style={headCellStyle}>Invoices</th>
-                  <th style={{ ...headCellStyle, textAlign: 'start' }}>Oldest</th>
+                  <th style={headCellStyle}>{t('caColOutstanding')}</th>
+                  <th style={headCellStyle}>{t('caColInvoices')}</th>
+                  <th style={{ ...headCellStyle, textAlign: 'start' }}>{t('caColOldest')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,7 +139,7 @@ export default function ClientAccountingPage() {
                   <td
                     style={{ ...cellStyle, textAlign: 'start', fontWeight: 600 }}
                   >
-                    Total
+                    {t('caColTotal')}
                   </td>
                   {AR_AGEING_BUCKET_KEYS.map((k) => (
                     <td key={k} style={{ ...cellStyle, fontWeight: 600 }}>
@@ -160,7 +159,7 @@ export default function ClientAccountingPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('caLoading')}</p>
       )}
     </main>
   );

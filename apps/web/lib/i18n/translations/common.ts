@@ -8,6 +8,8 @@
 export const COMMON = {
   AR: {
     commonLoading: 'جارٍ التحميل…',
+    commonWorking: 'جارٍ التنفيذ…',
+    commonSaving: 'جارٍ الحفظ…',
     commonSave: 'حفظ',
     commonCancel: 'إلغاء',
     commonSearch: 'بحث',
@@ -24,11 +26,12 @@ export const COMMON = {
     commonRequired: 'إلزامي',
     commonActions: 'الإجراءات',
     commonStatus: 'الحالة',
-    commonNoPermissionGeneric: 'لا تملك الصلاحية اللازمة لعرض هذا المحتوى.',
     commonTryAgain: 'تعذر تحميل البيانات — حاول مرة أخرى.',
   },
   EN: {
     commonLoading: 'Loading…',
+    commonWorking: 'Working…',
+    commonSaving: 'Saving…',
     commonSave: 'Save',
     commonCancel: 'Cancel',
     commonSearch: 'Search',
@@ -45,7 +48,6 @@ export const COMMON = {
     commonRequired: 'Required',
     commonActions: 'Actions',
     commonStatus: 'Status',
-    commonNoPermissionGeneric: "You don't hold the permission required to view this.",
     commonTryAgain: 'Could not load this — try again.',
   },
 } as const;

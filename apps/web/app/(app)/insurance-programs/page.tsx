@@ -16,7 +16,7 @@ import { formatDate } from '../../../lib/i18n/format';
 
 function ProgramsForCustomer({ customerId }: { customerId: string }) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, t, tPlural } = useLanguage();
 
   const [programs, setPrograms] = useState<InsuranceProgram[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -28,21 +28,21 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the program.read permission, so there's nothing to show here."
+          ? t('iprogNoPermission')
           : err instanceof ApiError && err.status === 404
-            ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+            ? t('iprogCustomerNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load insurance programs — try again.',
+              : t('iprogLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   if (loadError) {
     return (
@@ -51,13 +51,12 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!programs) return <p>Loading…</p>;
+  if (!programs) return <p>{t('iprogLoading')}</p>;
 
   if (programs.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-        No insurance program yet for this customer — assemble one from an
-        approved needs assessment.
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+        {t('iprogNoneForCustomer')}
       </p>
     );
   }
@@ -69,12 +68,12 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
           key={program.id}
           type="button"
           style={programListCardStyle}
-          aria-label={`Open insurance program ${program.id}`}
+          aria-label={t('iprogOpenProgramAria', { id: program.id })}
           onClick={() => router.push(`/insurance-programs/${program.id}`)}
         >
           <strong>Status: {program.status}</strong>
           <div style={cardMetaStyle}>
-            {program.lines.length} line{program.lines.length === 1 ? '' : 's'}
+            {tPlural('iprogLineCount', program.lines.length)}
           </div>
           <div style={cardMetaStyle}>
             Assembled {formatDate(program.createdAt, language)}
@@ -110,18 +109,19 @@ function InsuranceProgramsFlow() {
 }
 
 export default function InsuranceProgramsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Insurance programs</h1>
+      <h1>{t('iprogHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
         Process 7 — a multi-line Insurance Program assembled from an approved
         needs assessment&apos;s coverage list and the risk survey&apos;s

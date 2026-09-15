@@ -32,6 +32,19 @@ export class SlaDashboardRepository {
           ? { workflowName: { startsWith: filter.workflowNamePrefix } }
           : {}),
       },
+      // The policy is what lets a row say whether the deadline it is about to
+      // report as BREACHED is a legal one or an internal target. Derived per
+      // TIMER, not per workflow name, so a historical timer keeps the answer
+      // that was true when it started even if the policy was edited since.
+      include: {
+        slaPolicy: {
+          select: {
+            policyCode: true,
+            sourceType: true,
+            warningThreshold: true,
+          },
+        },
+      },
       orderBy: { dueAt: 'asc' },
       take: filter.limit ?? SLA_DASHBOARD_TIMER_LIMIT,
     });

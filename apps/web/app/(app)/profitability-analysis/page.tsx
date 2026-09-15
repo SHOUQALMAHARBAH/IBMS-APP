@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -21,19 +22,20 @@ const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 function BreakdownTable({ rows }: { rows: ProfitabilityBreakdownRow[] }) {
+  const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ opacity: 0.6 }}>No written policies yet.</p>;
+    return <p style={{ color: 'var(--ink-secondary)' }}>{t('praNone')}</p>;
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
       <thead>
         <tr>
-          <th style={head}>Key</th>
-          <th style={head}>Commission income (JOD)</th>
-          <th style={head}>Cost to serve (JOD)</th>
-          <th style={head}>Net profitability (JOD)</th>
-          <th style={head}>Policies</th>
-          <th style={head}>Claims</th>
+          <th style={head}>{t('dashColKey')}</th>
+          <th style={head}>{t('praColCommissionIncome')}</th>
+          <th style={head}>{t('praColCostToServe')}</th>
+          <th style={head}>{t('praColNetProfitability')}</th>
+          <th style={head}>{t('dashColPolicies')}</th>
+          <th style={head}>{t('praColClaims')}</th>
         </tr>
       </thead>
       <tbody>
@@ -55,6 +57,7 @@ function BreakdownTable({ rows }: { rows: ProfitabilityBreakdownRow[] }) {
 }
 
 export default function ProfitabilityAnalysisPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -65,7 +68,7 @@ export default function ProfitabilityAnalysisPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -75,30 +78,28 @@ export default function ProfitabilityAnalysisPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the profitability-analysis.view permission."
+          ? t('praNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load profitability analysis — try again.',
+            : t('praLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Profitability Analysis</h1>
+      <h1>{t('praHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Commission income vs. cost-to-serve (claims settlement payouts,
-        the closest existing signal for servicing cost) by line and by
-        client segment.
+        {t('praIntro')}
       </p>
 
       {loadError ? (
@@ -109,22 +110,22 @@ export default function ProfitabilityAnalysisPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
             Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
           </p>
 
           <section style={sectionStyle}>
-            <h2>By line</h2>
+            <h2>{t('praByLine')}</h2>
             <BreakdownTable rows={summary.byLine} />
           </section>
 
           <section style={sectionStyle}>
-            <h2>By client segment</h2>
+            <h2>{t('praByClientSegment')}</h2>
             <BreakdownTable rows={summary.bySegment} />
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

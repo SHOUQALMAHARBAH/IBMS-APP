@@ -27,11 +27,21 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
-const SCHEDULE_ROLES = ['COMPLIANCE_OFFICER', 'DATA_PROTECTION_OFFICER'];
-const LEGAL_HOLD_ROLES = ['DATA_PROTECTION_OFFICER'];
-const DISPOSE_NOMINATE_ROLES = ['BRANCH_DEPARTMENT_MANAGER'];
-const DISPOSE_APPROVE_ROLES = ['DATA_PROTECTION_OFFICER'];
+const SCHEDULE_ROLES = [
+  'retention-schedule.manage',
+];
+const LEGAL_HOLD_ROLES = [
+  'legal-hold.manage',
+];
+const DISPOSE_NOMINATE_ROLES = [
+  'retention.dispose.nominate',
+];
+const DISPOSE_APPROVE_ROLES = [
+  'retention.dispose.approve',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -42,17 +52,15 @@ const cell: CSSProperties = {
 const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function RetentionDisposalPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManageSchedule = hasAny(user?.roles, SCHEDULE_ROLES);
-  const canManageHolds = hasAny(user?.roles, LEGAL_HOLD_ROLES);
-  const canNominate = hasAny(user?.roles, DISPOSE_NOMINATE_ROLES);
-  const canApprove = hasAny(user?.roles, DISPOSE_APPROVE_ROLES);
+  const { t } = useLanguage();
+  const canManageSchedule = hasAnyPermission(user, SCHEDULE_ROLES);
+  const canManageHolds = hasAnyPermission(user, LEGAL_HOLD_ROLES);
+  const canNominate = hasAnyPermission(user, DISPOSE_NOMINATE_ROLES);
+  const canApprove = hasAnyPermission(user, DISPOSE_APPROVE_ROLES);
 
   const [schedule, setSchedule] = useState<RetentionScheduleItem[] | null>(null);
   const [holds, setHolds] = useState<LegalHold[] | null>(null);
@@ -91,22 +99,24 @@ export default function RetentionDisposalPage() {
       setHolds(null);
       setBatches(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not load the retention/disposal register — try again.',
+        err instanceof ApiError && err.status === 403
+          ? t('rdNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('rdLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -116,7 +126,7 @@ export default function RetentionDisposalPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('rdActionError'),
       );
     } finally {
       setBusy(false);
@@ -167,13 +177,9 @@ export default function RetentionDisposalPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Retention &amp; Disposal</h1>
+      <h1>{t('rdHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The retention-period table per record category (pending Legal
-        Counsel confirmation), Legal Holds that exclude a category from
-        routine disposal, and the dual-control disposal workflow (Department
-        Manager nominates, DPO approves, execution attested, a Certificate
-        of Destruction required before closure — 30-day execution SLA).
+        {t('rdIntro')}
       </p>
 
       {actionError ? (
@@ -189,25 +195,25 @@ export default function RetentionDisposalPage() {
 
       {/* --- Retention schedule --- */}
       <section style={sectionStyle}>
-        <h2>Retention schedule</h2>
+        <h2>{t('rdScheduleHeading')}</h2>
         {canManageSchedule ? (
           <form
             onSubmit={submitSchedule}
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Record category
+              {t('rdRecordCategoryLabel')}
               <input
-                aria-label="Record category"
+                aria-label={t('rdRecordCategoryLabel')}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Retention period (months)
+              {t('rdRetentionMonthsLabel')}
               <input
-                aria-label="Retention period (months)"
+                aria-label={t('rdRetentionMonthsLabel')}
                 type="number"
                 min={1}
                 value={months}
@@ -216,31 +222,31 @@ export default function RetentionDisposalPage() {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Legal basis (optional)
+              {t('rdLegalBasisLabel')}
               <input
-                aria-label="Legal basis"
+                aria-label={t('rdColLegalBasis')}
                 value={legalBasis}
                 onChange={(e) => setLegalBasis(e.target.value)}
               />
             </label>
             <button type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Add category'}
+              {busy ? t('rdSavingButton') : t('rdAddCategoryButton')}
             </button>
           </form>
         ) : null}
         {schedule ? (
           schedule.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>No retention-schedule items yet.</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoScheduleItems')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Category</th>
-                    <th style={head}>Months</th>
-                    <th style={head}>Legal basis</th>
-                    <th style={head}>Confirmed</th>
-                    <th style={head}>Action</th>
+                    <th style={head}>{t('rdColCategory')}</th>
+                    <th style={head}>{t('rdColMonths')}</th>
+                    <th style={head}>{t('rdColLegalBasis')}</th>
+                    <th style={head}>{t('rdColConfirmed')}</th>
+                    <th style={head}>{t('rdColAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,7 +256,7 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>
                         {canManageSchedule && !s.isConfirmed ? (
                           <input
-                            aria-label={`Months for ${s.recordCategory}`}
+                            aria-label={t('rdMonthsAria', { name: s.recordCategory })}
                             style={{ width: '5rem' }}
                             value={editMonths[s.id] ?? String(s.retentionPeriodMonths)}
                             onChange={(e) =>
@@ -262,7 +268,7 @@ export default function RetentionDisposalPage() {
                         )}
                       </td>
                       <td style={cell}>{s.legalBasis ?? '—'}</td>
-                      <td style={cell}>{s.isConfirmed ? 'Yes' : 'DRAFT — pending'}</td>
+                      <td style={cell}>{s.isConfirmed ? 'Yes' : t('rdDraftPending')}</td>
                       <td style={cell}>
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
                           {canManageSchedule && !s.isConfirmed && editMonths[s.id] ? (
@@ -277,7 +283,7 @@ export default function RetentionDisposalPage() {
                                 )
                               }
                             >
-                              Save
+                              {t('rdSaveButton')}
                             </button>
                           ) : null}
                           {canManageSchedule && !s.isConfirmed ? (
@@ -288,7 +294,7 @@ export default function RetentionDisposalPage() {
                                 void run(() => confirmRetentionScheduleItem(s.id))
                               }
                             >
-                              Confirm
+                              {t('rdConfirmButton')}
                             </button>
                           ) : null}
                         </div>
@@ -300,79 +306,79 @@ export default function RetentionDisposalPage() {
             </div>
           )
         ) : loadError ? null : (
-          <p>Loading&hellip;</p>
+          <p>{t('rdLoading')}</p>
         )}
       </section>
 
       {/* --- Legal holds --- */}
       <section style={sectionStyle}>
-        <h2>Legal holds</h2>
+        <h2>{t('rdHoldsHeading')}</h2>
         {canManageHolds ? (
           <form
             onSubmit={submitHold}
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Scope
+              {t('rdScopeFieldLabel')}
               <input
-                aria-label="Legal hold scope"
+                aria-label={t('rdScopeAria')}
                 value={holdScope}
                 onChange={(e) => setHoldScope(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Reason
+              {t('rdReasonLabel')}
               <input
-                aria-label="Legal hold reason"
+                aria-label={t('rdReasonAria')}
                 value={holdReason}
                 onChange={(e) => setHoldReason(e.target.value)}
                 required
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Record category ID (optional)
+              {t('rdHoldCategoryIdLabel')}
               <input
-                aria-label="Legal hold record category ID"
+                aria-label={t('rdHoldCategoryIdAria')}
                 value={holdCategoryId}
                 onChange={(e) => setHoldCategoryId(e.target.value)}
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Customer ID (optional)
+              {t('rdHoldCustomerIdLabel')}
               <input
-                aria-label="Legal hold customer ID"
+                aria-label={t('rdHoldCustomerIdAria')}
                 value={holdCustomerId}
                 onChange={(e) => setHoldCustomerId(e.target.value)}
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Insured person ID (optional)
+              {t('rdHoldInsuredPersonIdLabel')}
               <input
-                aria-label="Legal hold insured person ID"
+                aria-label={t('rdHoldInsuredPersonIdAria')}
                 value={holdInsuredPersonId}
                 onChange={(e) => setHoldInsuredPersonId(e.target.value)}
               />
             </label>
             <button type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Place hold'}
+              {busy ? t('commonSaving') : t('rdPlaceHoldButton')}
             </button>
           </form>
         ) : null}
         {holds ? (
           holds.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>No Legal Holds.</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoHolds')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Scope</th>
-                    <th style={head}>Category</th>
-                    <th style={head}>Subject</th>
-                    <th style={head}>Next review due</th>
-                    <th style={head}>Status</th>
-                    <th style={head}>Action</th>
+                    <th style={head}>{t('rdScopeLabel')}</th>
+                    <th style={head}>{t('rdColCategory')}</th>
+                    <th style={head}>{t('rdColSubject')}</th>
+                    <th style={head}>{t('rdColNextReviewDue')}</th>
+                    <th style={head}>{t('rdColStatus')}</th>
+                    <th style={head}>{t('rdColAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -390,7 +396,7 @@ export default function RetentionDisposalPage() {
                             : '—'}
                       </td>
                       <td style={cell}>{h.nextReviewDueAt.slice(0, 10)}</td>
-                      <td style={cell}>{h.isActive ? 'Active' : 'Released'}</td>
+                      <td style={cell}>{h.isActive ? 'Active' : t('rdReleased')}</td>
                       <td style={cell}>
                         {canManageHolds && h.isActive ? (
                           <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -399,14 +405,14 @@ export default function RetentionDisposalPage() {
                               disabled={busy}
                               onClick={() => void run(() => reviewLegalHold(h.id))}
                             >
-                              Record review
+                              {t('rdRecordReviewButton')}
                             </button>
                             <button
                               type="button"
                               disabled={busy}
                               onClick={() => void run(() => releaseLegalHold(h.id))}
                             >
-                              Release
+                              {t('rdReleaseButton')}
                             </button>
                           </div>
                         ) : (
@@ -420,44 +426,44 @@ export default function RetentionDisposalPage() {
             </div>
           )
         ) : loadError ? null : (
-          <p>Loading&hellip;</p>
+          <p>{t('rdLoading')}</p>
         )}
       </section>
 
       {/* --- Disposal batches --- */}
       <section style={sectionStyle}>
-        <h2>Disposal batches</h2>
+        <h2>{t('rdBatchesHeading')}</h2>
         {canNominate ? (
           <form
             onSubmit={submitNominate}
             style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
           >
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              Record category ID (optional)
+              {t('rdBatchCategoryIdFieldLabel')}
               <input
-                aria-label="Disposal batch record category ID"
+                aria-label={t('rdBatchCategoryIdLabel')}
                 value={nominateCategoryId}
                 onChange={(e) => setNominateCategoryId(e.target.value)}
               />
             </label>
             <button type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Nominate batch'}
+              {busy ? t('commonSaving') : t('rdNominateBatchButton')}
             </button>
           </form>
         ) : null}
         {batches ? (
           batches.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>No disposal batches.</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rdNoBatches')}</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Category</th>
-                    <th style={head}>Status</th>
-                    <th style={head}>SLA due</th>
-                    <th style={head}>Certificate</th>
-                    <th style={head}>Action</th>
+                    <th style={head}>{t('rdColCategory')}</th>
+                    <th style={head}>{t('rdColStatus')}</th>
+                    <th style={head}>{t('rdColSlaDue')}</th>
+                    <th style={head}>{t('rdColCertificate')}</th>
+                    <th style={head}>{t('rdColAction')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -468,7 +474,7 @@ export default function RetentionDisposalPage() {
                       </td>
                       <td style={cell}>{b.status}</td>
                       <td style={cell}>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</td>
-                      <td style={cell}>{b.hasCertificateOfDestruction ? 'Attached' : '—'}</td>
+                      <td style={cell}>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</td>
                       <td style={cell}>
                         {b.status === 'CLOSED' ? (
                           '—'
@@ -480,7 +486,7 @@ export default function RetentionDisposalPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => managerApproveDisposalBatch(b.id))}
                               >
-                                Manager-approve
+                                {t('rdManagerApproveButton')}
                               </button>
                             ) : null}
                             {canApprove && b.status === 'MANAGER_APPROVED' ? (
@@ -489,13 +495,13 @@ export default function RetentionDisposalPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => dpoApproveDisposalBatch(b.id))}
                               >
-                                DPO-approve
+                                {t('rdDpoApproveButton')}
                               </button>
                             ) : null}
                             {canApprove && b.status === 'DPO_APPROVED' ? (
                               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                                 <select
-                                  aria-label={`Destruction method for ${b.id}`}
+                                  aria-label={t('rdDestructionMethodAria', { id: b.id })}
                                   value={method}
                                   onChange={(e) => setMethod(e.target.value)}
                                 >
@@ -510,7 +516,7 @@ export default function RetentionDisposalPage() {
                                   disabled={busy}
                                   onClick={() => void run(() => executeDisposalBatch(b.id, method))}
                                 >
-                                  Record execution
+                                  {t('rdRecordExecutionButton')}
                                 </button>
                               </div>
                             ) : null}
@@ -520,7 +526,7 @@ export default function RetentionDisposalPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => issueCertificateOfDestruction(b.id))}
                               >
-                                Issue certificate
+                                {t('rdIssueCertificateButton')}
                               </button>
                             ) : null}
                             {canApprove && b.status === 'EXECUTED' && b.hasCertificateOfDestruction ? (
@@ -529,7 +535,7 @@ export default function RetentionDisposalPage() {
                                 disabled={busy}
                                 onClick={() => void run(() => closeDisposalBatch(b.id))}
                               >
-                                Close
+                                {t('rdCloseButton')}
                               </button>
                             ) : null}
                           </div>
@@ -542,7 +548,7 @@ export default function RetentionDisposalPage() {
             </div>
           )
         ) : loadError ? null : (
-          <p>Loading&hellip;</p>
+          <p>{t('rdLoading')}</p>
         )}
       </section>
     </main>

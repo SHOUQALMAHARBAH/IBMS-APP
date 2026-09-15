@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  ScreeningAttemptOutcome,
+  ScreeningProviderKind,
   CustomerType,
   KYCRecord,
   KycStatus,
@@ -40,6 +42,14 @@ export interface CreateScreeningResultInput {
   result: ScreeningOutcome;
   listSource?: string;
   escalatedToComplianceAt?: Date;
+  /** The attempt that produced this result — which provider, which dataset,
+   * and the five-value outcome behind the three-value `result`. Optional so
+   * callers predating the provider seam still compile; a NULL here means the
+   * result was written before attempts were recorded. */
+  screeningRequestId?: string;
+  provider?: ScreeningProviderKind;
+  attemptOutcome?: ScreeningAttemptOutcome;
+  datasetVersion?: string;
 }
 
 export interface UpsertRiskRatingInput {

@@ -17,7 +17,7 @@ export const quoteTermGridStyle: CSSProperties = {
 export const quoteTermLabelStyle: CSSProperties = {
   display: 'block',
   fontSize: '0.75rem',
-  opacity: 0.6,
+  color: 'var(--ink-secondary)',
   textTransform: 'uppercase',
   letterSpacing: '0.02em',
 };

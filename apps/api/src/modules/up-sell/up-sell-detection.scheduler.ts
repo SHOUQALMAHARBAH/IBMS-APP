@@ -1,12 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InsuranceProgramRepository } from '../../repositories/insurance-program.repository';
-import { UserRepository } from '../../repositories/user.repository';
 import { UpSellService } from './up-sell.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as the other schedulers.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 9 — "Automated job comparing current Sum Insured against updated
@@ -29,21 +25,27 @@ export class UpSellDetectionScheduler {
 
   constructor(
     private readonly insurancePrograms: InsuranceProgramRepository,
-    private readonly users: UserRepository,
     private readonly upSell: UpSellService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 05:00 UTC daily.
   @Cron('0 5 * * *', { name: 'up-sell-underinsurance-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Up-sell under-insurance sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Up-sell detection sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     let customerIds: string[];
     try {
       customerIds =
@@ -65,7 +67,7 @@ export class UpSellDetectionScheduler {
       try {
         const outcome = await this.upSell.runDetection(
           customerId,
-          systemUser.id,
+          systemUserId,
         );
         if (outcome.flagged) flagged += 1;
         else if (outcome.suppressedByPriorResolution) suppressed += 1;

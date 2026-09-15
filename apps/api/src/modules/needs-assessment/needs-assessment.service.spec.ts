@@ -25,6 +25,7 @@ function answers(overrides: Record<string, boolean | number> = {}) {
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'sales-1',
+    organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
     sessionId: 'session-1',

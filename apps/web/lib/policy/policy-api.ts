@@ -99,6 +99,8 @@ export interface Policy {
   id: string;
   opportunityId: string;
   customerId: string;
+  /** Identity only — enough for a list row to name its client. */
+  customer: { id: string; legalName: string } | null;
   insurerId: string;
   insurer: { id: string; name: string; nameAr: string | null } | null;
   policyNumber: string | null;
@@ -155,6 +157,23 @@ export function listPoliciesForOpportunity(
   opportunityId: string,
 ): Promise<Policy[]> {
   return apiGet(`/policies?opportunityId=${encodeURIComponent(opportunityId)}`);
+}
+
+/**
+ * The book-wide policy list. With no opportunity/customer scope the API
+ * returns what THIS caller may see — the whole book for Placement /
+ * Manager / Executive / Policy Checking, and only policies on customers they
+ * own for anyone else. The filtering happens in the query, so the server's
+ * cap bounds matching rows rather than rows scanned.
+ */
+export function listPolicies(
+  params: { status?: PolicyStatus; search?: string } = {},
+): Promise<Policy[]> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.search) qs.set('search', params.search);
+  const suffix = qs.toString();
+  return apiGet(`/policies${suffix ? `?${suffix}` : ''}`);
 }
 
 export function placePolicy(input: PlacePolicyInput): Promise<Policy> {

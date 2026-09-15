@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -112,7 +113,9 @@ test("computes a policy's highest-classification-present summary", async ({ page
   await page.goto("/documents");
   await page.getByLabel("Policy ID").nth(1).fill("policy-1");
   await page.getByRole("button", { name: "Compute" }).click();
-  await expect(page.getByText("2 document(s)", { exact: false })).toBeVisible();
+  // "2 document(s)" before the plural pass; the count now selects a real
+  // form, so English reads "2 documents" and Arabic would read "مستندان".
+  await expect(page.getByText("2 documents", { exact: false })).toBeVisible();
   await expect(page.getByText("HIGHLY_CONFIDENTIAL")).toBeVisible();
 });
 

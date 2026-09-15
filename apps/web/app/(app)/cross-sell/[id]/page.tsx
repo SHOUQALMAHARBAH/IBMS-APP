@@ -26,15 +26,15 @@ import {
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../../lib/i18n/format';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
 export default function CrossSellOpportunityDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [opportunity, setOpportunity] = useState<CrossSellOpportunity | null>(
     null,
@@ -52,24 +52,24 @@ export default function CrossSellOpportunityDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This cross-sell opportunity could not be found — it may not exist, or you may not have access to it.'
+          ? t('xsdNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this cross-sell opportunity — try again.',
+            : t('xsdLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(
     fn: () => Promise<CrossSellOpportunity>,
@@ -89,7 +89,7 @@ export default function CrossSellOpportunityDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const canConvert = user.roles.includes(CAN_CONVERT_ROLE);
+  const canConvert = hasPermission(user, 'cross-sell.convert');
 
   return (
     <main style={pageStyle}>
@@ -123,12 +123,12 @@ export default function CrossSellOpportunityDetailPage() {
           <ConsentCaptureWidget
             customerId={opportunity.customerId}
             purpose="MARKETING"
-            label="Cross-sell consent"
+            label={t('xsdConsent')}
             defaultConsentTextVersion="privacy-notice-v1.2"
           />
           <PrivacyNoticeDisplay
             touchpoint="renewal_cross_sell"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div
@@ -140,14 +140,14 @@ export default function CrossSellOpportunityDetailPage() {
             }}
           >
             <div>
-              <div style={profileFieldLabelStyle}>Flagged</div>
+              <div style={profileFieldLabelStyle}>{t('xsdFlagged')}</div>
               <div style={profileFieldValueStyle}>
                 {formatDateTime(opportunity.detectedAt, language)}
               </div>
             </div>
             {opportunity.resolvedAt ? (
               <div>
-                <div style={profileFieldLabelStyle}>Resolved</div>
+                <div style={profileFieldLabelStyle}>{t('xsdResolved')}</div>
                 <div style={profileFieldValueStyle}>
                   {formatDateTime(opportunity.resolvedAt, language)}
                 </div>
@@ -155,7 +155,7 @@ export default function CrossSellOpportunityDetailPage() {
             ) : null}
             {opportunity.dismissReason ? (
               <div>
-                <div style={profileFieldLabelStyle}>Dismiss reason</div>
+                <div style={profileFieldLabelStyle}>{t('xsdDismissReason')}</div>
                 <div style={profileFieldValueStyle}>
                   {opportunity.dismissReason}
                 </div>
@@ -172,19 +172,19 @@ export default function CrossSellOpportunityDetailPage() {
                 onClick={() =>
                   void run(
                     () => convertCrossSellOpportunity(opportunity.id),
-                    'Could not convert — try again.',
+                    t('xsConvertError'),
                   )
                 }
               >
-                {busy ? 'Working…' : 'Convert'}
+                {busy ? t('xsWorking') : t('xsConvertButton')}
               </button>
               {dismissing ? (
                 <>
                   <input
-                    aria-label="Why is this gap not being pursued?"
+                    aria-label={t('xsdWhyNotPursued')}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. covered under a group policy elsewhere"
+                    placeholder={t('xsDismissPlaceholder')}
                     style={{ minWidth: '18rem' }}
                   />
                   <button
@@ -198,11 +198,11 @@ export default function CrossSellOpportunityDetailPage() {
                             opportunity.id,
                             reason.trim(),
                           ),
-                        'Could not dismiss — try again.',
+                        t('xsDismissError'),
                       )
                     }
                   >
-                    Confirm dismiss
+                    {t('xsConfirmDismiss')}
                   </button>
                   <button
                     type="button"

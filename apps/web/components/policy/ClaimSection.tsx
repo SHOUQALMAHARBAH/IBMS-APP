@@ -35,7 +35,7 @@ import {
 } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
-import type { Language } from '../../lib/i18n/translations';
+import type { Language, TranslationKey } from '../../lib/i18n/translations';
 
 interface Props {
   opportunityId: string;
@@ -58,15 +58,21 @@ interface Props {
   canClose: boolean;
 }
 
-function coverageLabel(c: Claim, language: Language): string {
+// `t` is passed in rather than read from a hook: this is a plain helper, not a
+// component, so it has no hook context of its own.
+function coverageLabel(
+  c: Claim,
+  language: Language,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
   if (!c.coverageResolvedAtLossDate || !c.coverage) {
-    return 'coverage at loss date could not be resolved';
+    return t('claimCoverageUnresolved');
   }
   const from = formatDate(c.coverage.effectiveFrom, language);
   const to = c.coverage.effectiveTo
     ? formatDate(c.coverage.effectiveTo, language)
-    : 'open';
-  return `coverage version in force: ${from} → ${to}`;
+    : t('claimCoverageOpenEnd');
+  return t('claimCoverageInForce', { from, to });
 }
 
 /** Process 24 — a Claims Officer registers a NOTIFIED claim with the insurer
@@ -78,6 +84,7 @@ function ClaimRegistrationForm({
   claimId: string;
   onDone: () => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const [insurerRef, setInsurerRef] = useState('');
   const [claimNumber, setClaimNumber] = useState('');
   const [adjusterName, setAdjusterName] = useState('');
@@ -102,7 +109,7 @@ function ClaimRegistrationForm({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'Registration could not be completed — try again.',
+          : t('claimRegistrationError'),
       );
     } finally {
       setBusy(false);
@@ -111,14 +118,14 @@ function ClaimRegistrationForm({
 
   return (
     <div style={{ marginTop: '0.75rem', maxWidth: '30rem' }}>
-      <strong style={{ fontSize: '0.9rem' }}>Register with the insurer</strong>
+      <strong style={{ fontSize: '0.9rem' }}>{t('claimRegistrationHeading')}</strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
         </p>
       ) : null}
       <div style={quoteFieldStyle}>
-        <label htmlFor={`reg-ref-${claimId}`}>Insurer claim reference</label>
+        <label htmlFor={`reg-ref-${claimId}`}>{t('claimInsurerRefLabel')}</label>
         <input
           id={`reg-ref-${claimId}`}
           maxLength={200}
@@ -127,7 +134,7 @@ function ClaimRegistrationForm({
         />
       </div>
       <div style={quoteFieldStyle}>
-        <label htmlFor={`reg-num-${claimId}`}>Broker claim number (optional)</label>
+        <label htmlFor={`reg-num-${claimId}`}>{t('claimBrokerNumberLabel')}</label>
         <input
           id={`reg-num-${claimId}`}
           maxLength={100}
@@ -136,7 +143,7 @@ function ClaimRegistrationForm({
         />
       </div>
       <div style={quoteFieldStyle}>
-        <label htmlFor={`reg-adj-${claimId}`}>Loss adjuster</label>
+        <label htmlFor={`reg-adj-${claimId}`}>{t('claimAdjusterLabel')}</label>
         <input
           id={`reg-adj-${claimId}`}
           maxLength={200}
@@ -146,7 +153,7 @@ function ClaimRegistrationForm({
         />
       </div>
       <div style={quoteFieldStyle}>
-        <label htmlFor={`reg-firm-${claimId}`}>Adjuster firm (optional)</label>
+        <label htmlFor={`reg-firm-${claimId}`}>{t('claimAdjusterFirmLabel')}</label>
         <input
           id={`reg-firm-${claimId}`}
           maxLength={200}
@@ -165,7 +172,7 @@ function ClaimRegistrationForm({
         style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
         onClick={() => void submit()}
       >
-        {busy ? 'Registering…' : 'Register & assign adjuster'}
+        {busy ? t('claimRegisteringButton') : t('claimRegisterButton')}
       </button>
     </div>
   );
@@ -181,6 +188,7 @@ function ClaimDocumentation({
   canDocument: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { t, tPlural } = useLanguage();
   const [docType, setDocType] = useState<ClaimDocType>('claim_form');
   const [classification, setClassification] =
     useState<ClaimDocClassification>('CONFIDENTIAL');
@@ -208,7 +216,7 @@ function ClaimDocumentation({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'That document could not be filed — try again.',
+          : t('claimDocError'),
       );
     } finally {
       setBusy(false);
@@ -218,10 +226,10 @@ function ClaimDocumentation({
   return (
     <div style={{ marginTop: '0.75rem' }}>
       <strong style={{ fontSize: '0.9rem' }}>
-        Documentation{' '}
+        {t('claimDocumentationHeading')}{' '}
         {claim.documentationComplete
-          ? '· complete'
-          : `· missing ${claim.missingMandatoryDocuments.join(', ')}`}
+          ? `· ${t('claimDocumentationComplete')}`
+          : `· ${t('claimDocumentationMissing', { docs: claim.missingMandatoryDocuments.join(', ') })}`}
       </strong>
       <ul style={{ margin: '0.35rem 0', paddingInlineStart: '1.1rem', fontSize: '0.85rem' }}>
         {claim.documentChecklist
@@ -234,8 +242,7 @@ function ClaimDocumentation({
       </ul>
       {claim.documents.length > 0 ? (
         <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: '0.25rem 0' }}>
-          {claim.documents.length} file
-          {claim.documents.length === 1 ? '' : 's'} on record.
+          {tPlural('claimFilesOnRecord', claim.documents.length)}
         </p>
       ) : null}
 
@@ -247,7 +254,7 @@ function ClaimDocumentation({
             </p>
           ) : null}
           <div style={quoteFieldStyle}>
-            <label htmlFor={`doc-type-${claim.id}`}>Document type</label>
+            <label htmlFor={`doc-type-${claim.id}`}>{t('claimDocTypeLabel')}</label>
             <select
               id={`doc-type-${claim.id}`}
               value={docType}
@@ -261,7 +268,7 @@ function ClaimDocumentation({
             </select>
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor={`doc-class-${claim.id}`}>Classification</label>
+            <label htmlFor={`doc-class-${claim.id}`}>{t('claimClassificationLabel')}</label>
             <select
               id={`doc-class-${claim.id}`}
               value={classification}
@@ -277,7 +284,7 @@ function ClaimDocumentation({
             </select>
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor={`doc-name-${claim.id}`}>File name</label>
+            <label htmlFor={`doc-name-${claim.id}`}>{t('claimFileNameLabel')}</label>
             <input
               id={`doc-name-${claim.id}`}
               maxLength={300}
@@ -286,7 +293,7 @@ function ClaimDocumentation({
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor={`doc-ref-${claim.id}`}>Storage reference</label>
+            <label htmlFor={`doc-ref-${claim.id}`}>{t('claimStorageRefLabel')}</label>
             <input
               id={`doc-ref-${claim.id}`}
               maxLength={500}
@@ -304,7 +311,7 @@ function ClaimDocumentation({
             style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
             onClick={() => void submit()}
           >
-            {busy ? 'Filing…' : 'File document'}
+            {busy ? t('claimFilingButton') : t('claimFileButton')}
           </button>
         </div>
       ) : null}
@@ -329,6 +336,7 @@ function ClaimAssessment({
   canAssess: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const { language } = useLanguage();
   const [when, setWhen] = useState('');
   const [outcome, setOutcome] =
@@ -356,7 +364,7 @@ function ClaimAssessment({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'That assessment step could not be completed — try again.',
+          : t('claimAssessmentError'),
       );
     } finally {
       setBusy(false);
@@ -370,7 +378,7 @@ function ClaimAssessment({
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      <strong style={{ fontSize: '0.9rem' }}>Assessment</strong>
+      <strong style={{ fontSize: '0.9rem' }}>{t('claimAssessmentHeading')}</strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
@@ -388,7 +396,7 @@ function ClaimAssessment({
             <>
               <div style={quoteFieldStyle}>
                 <label htmlFor={`asmt-when-${claim.id}`}>
-                  Completion date (adjuster survey / investigation)
+                  {t('claimCompletionDateLabel')}
                 </label>
                 <input
                   id={`asmt-when-${claim.id}`}
@@ -410,7 +418,7 @@ function ClaimAssessment({
                     )
                   }
                 >
-                  Mark survey complete
+                  {t('claimSurveyButton')}
                 </button>
                 <button
                   type="button"
@@ -428,7 +436,7 @@ function ClaimAssessment({
                     )
                   }
                 >
-                  Mark investigation complete
+                  {t('claimInvestigationButton')}
                 </button>
                 <button
                   type="button"
@@ -436,21 +444,21 @@ function ClaimAssessment({
                   title={
                     a.readyForAssessment
                       ? undefined
-                      : 'Complete the mandatory documentation first.'
+                      : t('claimCompleteDocsFirst')
                   }
                   style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
                   onClick={() =>
                     void run(() => submitClaimForAssessment(claim.id))
                   }
                 >
-                  Submit for assessment
+                  {t('claimSubmitButton')}
                 </button>
               </div>
             </>
           ) : (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <select
-                aria-label="Assessment verdict"
+                aria-label={t('claimVerdictLabel')}
                 value={outcome}
                 onChange={(ev) =>
                   setOutcome(ev.target.value as ClaimAssessmentOutcome)
@@ -475,7 +483,7 @@ function ClaimAssessment({
                   void run(() => decideClaimAssessment(claim.id, outcome))
                 }
               >
-                Record verdict
+                {t('claimRecordVerdictButton')}
               </button>
             </div>
           )}
@@ -496,7 +504,8 @@ function ClaimFollowUp({
   canFollowUp: boolean;
   onDone: () => Promise<void>;
 }) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
+  const { language, tPlural } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -514,7 +523,7 @@ function ClaimFollowUp({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'That alert could not be resolved — try again.',
+          : t('claimAlertResolveError'),
       );
     } finally {
       setBusy(false);
@@ -523,18 +532,21 @@ function ClaimFollowUp({
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>
-        Insurer follow-up alert
-      </strong>
+      <strong style={{ fontSize: '0.9rem', color: '#b45309' }}>{t('claimFollowUpAlertHeading')}</strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
         </p>
       ) : null}
       <p style={{ fontSize: '0.85rem', margin: '0.25rem 0', opacity: 0.8 }}>
-        No insurer response {claim.followUp.followUpAlertThresholdDays} business
-        days after registration — raised{' '}
-        {formatDate(alert.triggeredAt, language)}.
+        {tPlural(
+          'claimFollowUpBusinessDays',
+          claim.followUp.followUpAlertThresholdDays,
+        )}
+        {' — '}
+        {t('claimFollowUpRaised', {
+          date: formatDate(alert.triggeredAt, language),
+        })}
       </p>
       {canFollowUp ? (
         <button
@@ -543,7 +555,7 @@ function ClaimFollowUp({
           style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
           onClick={() => void resolve(alert.id)}
         >
-          Resolve
+          {t('claimResolveAlertButton')}
         </button>
       ) : null}
     </div>
@@ -569,6 +581,7 @@ function ClaimSettlement({
   canSecondApproveSettlement: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const { language } = useLanguage();
   const [approvedAmount, setApprovedAmount] = useState('');
   const [deductible, setDeductible] = useState('');
@@ -590,7 +603,7 @@ function ClaimSettlement({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'That settlement step could not be completed — try again.',
+          : t('claimSettlementError'),
       );
     } finally {
       setBusy(false);
@@ -599,7 +612,7 @@ function ClaimSettlement({
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      <strong style={{ fontSize: '0.9rem' }}>Settlement</strong>
+      <strong style={{ fontSize: '0.9rem' }}>{t('claimSettlementHeading')}</strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
@@ -628,7 +641,7 @@ function ClaimSettlement({
         claim.status === 'PARTIALLY_APPROVED') ? (
         <div style={{ maxWidth: '30rem' }}>
           <div style={quoteFieldStyle}>
-            <label htmlFor={`stl-appr-${claim.id}`}>Approved amount</label>
+            <label htmlFor={`stl-appr-${claim.id}`}>{t('claimApprovedAmountLabel')}</label>
             <input
               id={`stl-appr-${claim.id}`}
               inputMode="decimal"
@@ -638,7 +651,7 @@ function ClaimSettlement({
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor={`stl-ded-${claim.id}`}>Deductible</label>
+            <label htmlFor={`stl-ded-${claim.id}`}>{t('poldDeductible')}</label>
             <input
               id={`stl-ded-${claim.id}`}
               inputMode="decimal"
@@ -652,9 +665,7 @@ function ClaimSettlement({
               type="checkbox"
               checked={brokerProcessedPayment}
               onChange={(ev) => setBrokerProcessedPayment(ev.target.checked)}
-            />
-            The broker processes this payment (forces a second approver)
-          </label>
+            />{t('claimBrokerProcessesPayment')}</label>
           <button
             type="button"
             disabled={
@@ -672,9 +683,7 @@ function ClaimSettlement({
                 }),
               )
             }
-          >
-            Record settlement
-          </button>
+          >{t('claimRecordSettlementButton')}</button>
         </div>
       ) : null}
 
@@ -689,9 +698,7 @@ function ClaimSettlement({
           onClick={() =>
             void run(() => secondApproveClaimSettlement(claim.id))
           }
-        >
-          Second-approve settlement
-        </button>
+        >{t('claimSecondApproveButton')}</button>
       ) : null}
     </div>
   );
@@ -710,6 +717,7 @@ function ClaimClosure({
   canClose: boolean;
   onDone: () => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const { language } = useLanguage();
   const [confirmedOn, setConfirmedOn] = useState('');
   const [busy, setBusy] = useState(false);
@@ -729,7 +737,7 @@ function ClaimClosure({
       setError(
         err instanceof ApiError
           ? err.message
-          : 'The claim could not be closed — try again.',
+          : t('claimCloseError'),
       );
     } finally {
       setBusy(false);
@@ -738,7 +746,7 @@ function ClaimClosure({
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      <strong style={{ fontSize: '0.9rem' }}>Closure</strong>
+      <strong style={{ fontSize: '0.9rem' }}>{t('claimClosureHeading')}</strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
@@ -747,7 +755,7 @@ function ClaimClosure({
 
       {claim.status === 'CLOSED' ? (
         <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
-          Closed{' '}
+          {t('claimStatusClosed')}{' '}
           {claim.closedAt ? formatDate(claim.closedAt, language) : ''}
           {paymentConfirmed
             ? ` · client payment confirmed ${formatDate(
@@ -758,10 +766,7 @@ function ClaimClosure({
         </p>
       ) : claim.status === 'DECLINED' ? (
         <>
-          <p style={{ fontSize: '0.85rem', margin: '0.35rem 0', opacity: 0.8 }}>
-            Declined by the insurer — no payment. Close the claim to trigger the
-            Loss Ratio recompute.
-          </p>
+          <p style={{ fontSize: '0.85rem', margin: '0.35rem 0', opacity: 0.8 }}>{t('claimDeclinedNote')}</p>
           {canClose ? (
             <button
               type="button"
@@ -769,7 +774,7 @@ function ClaimClosure({
               style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
               onClick={() => void close({})}
             >
-              Close claim
+              {t('claimCloseButton')}
             </button>
           ) : null}
         </>
@@ -786,16 +791,14 @@ function ClaimClosure({
               style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
               onClick={() => void close({})}
             >
-              Close claim
+              {t('claimCloseButton')}
             </button>
           ) : null}
         </>
       ) : canClose ? (
         <div style={{ maxWidth: '30rem' }}>
           <div style={quoteFieldStyle}>
-            <label htmlFor={`close-paid-${claim.id}`}>
-              Client received the settlement payment on
-            </label>
+            <label htmlFor={`close-paid-${claim.id}`}>{t('claimClientReceivedOn')}</label>
             <input
               id={`close-paid-${claim.id}`}
               type="date"
@@ -935,13 +938,13 @@ export function ClaimSection({
                 setFormError(
                   err instanceof ApiError
                     ? err.message
-                    : 'The follow-up sweep could not run — try again.',
+                    : t('claimSweepError'),
                 ),
               )
               .finally(() => setBusy(false));
           }}
         >
-          {busy ? 'Running…' : 'Run follow-up sweep'}
+          {busy ? t('claimRunning') : t('claimRunSweepButton')}
         </button>
       ) : null}
 
@@ -957,7 +960,7 @@ export function ClaimSection({
       ) : null}
 
       {rows.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>No claims yet.</p>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('policyNoClaimsYet')}</p>
       ) : (
         rows.map((c) => (
           <div key={c.id} style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
@@ -1001,7 +1004,7 @@ export function ClaimSection({
             ) : null}
             {c.isThirdPartyInvolved ? (
               <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                Third party involved
+                {t('claimThirdPartyInvolvedRow')}
                 {c.thirdParty?.fullName ? (
                   <>
                     {': '}
@@ -1018,8 +1021,7 @@ export function ClaimSection({
             {c.insurerClaimReference || c.adjuster ? (
               <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
                 {c.insurerClaimReference ? (
-                  <>
-                    Insurer ref <bdi>{c.insurerClaimReference}</bdi>
+                  <>{t('claimInsurerRefShort')}<bdi>{c.insurerClaimReference}</bdi>
                   </>
                 ) : (
                   ''
@@ -1043,8 +1045,8 @@ export function ClaimSection({
                 )}
               </p>
             ) : null}
-            <p style={{ opacity: 0.6, fontSize: '0.8rem', margin: '0.4rem 0' }}>
-              {coverageLabel(c, language)}
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
+              {coverageLabel(c, language, t)}
             </p>
             {canRegister && c.status === 'NOTIFIED' ? (
               <ClaimRegistrationForm claimId={c.id} onDone={load} />
@@ -1081,9 +1083,9 @@ export function ClaimSection({
 
       {canRecord ? (
         <div style={{ marginTop: '1.5rem', maxWidth: '32rem' }}>
-          <strong>Notify a claim</strong>
+          <strong>{t('claimNotifyButton')}</strong>
           <div style={quoteFieldStyle}>
-            <label htmlFor="claim-loss-date">Loss date</label>
+            <label htmlFor="claim-loss-date">{t('claimLossDueDateLabel')}</label>
             <input
               id="claim-loss-date"
               type="date"
@@ -1092,7 +1094,7 @@ export function ClaimSection({
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="claim-cause">Cause of loss</label>
+            <label htmlFor="claim-cause">{t('claimCauseOfLossLabel')}</label>
             <input
               id="claim-cause"
               maxLength={2000}
@@ -1102,7 +1104,7 @@ export function ClaimSection({
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="claim-location">Location (optional)</label>
+            <label htmlFor="claim-location">{t('claimLocationLabel')}</label>
             <input
               id="claim-location"
               maxLength={500}
@@ -1112,7 +1114,7 @@ export function ClaimSection({
             />
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="claim-estimate">Estimated loss</label>
+            <label htmlFor="claim-estimate">{t('claimEstimatedLossLabel')}</label>
             <input
               id="claim-estimate"
               inputMode="decimal"
@@ -1128,13 +1130,11 @@ export function ClaimSection({
               type="checkbox"
               checked={thirdParty}
               onChange={(ev) => setThirdParty(ev.target.checked)}
-            />
-            A third party is involved
-          </label>
+            />{t('claimThirdPartyInvolved')}</label>
           {thirdParty ? (
             <>
               <div style={quoteFieldStyle}>
-                <label htmlFor="claim-tp-name">Third party name (optional)</label>
+                <label htmlFor="claim-tp-name">{t('claimThirdPartyName')}</label>
                 <input
                   id="claim-tp-name"
                   maxLength={200}
@@ -1144,9 +1144,7 @@ export function ClaimSection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="claim-tp-contact">
-                  Third party contact (optional, stored encrypted)
-                </label>
+                <label htmlFor="claim-tp-contact">{t('claimThirdPartyContact')}</label>
                 <input
                   id="claim-tp-contact"
                   maxLength={500}
@@ -1161,9 +1159,7 @@ export function ClaimSection({
                   type="checkbox"
                   checked={tpSubrogation}
                   onChange={(ev) => setTpSubrogation(ev.target.checked)}
-                />
-                Flag for subrogation / recovery
-              </label>
+                />{t('claimSubrogationFlag')}</label>
             </>
           ) : null}
           <button
@@ -1177,7 +1173,7 @@ export function ClaimSection({
             style={{ ...buttonStyle, width: 'auto' }}
             onClick={() => void submit()}
           >
-            {busy ? 'Recording…' : 'Notify claim'}
+            {busy ? t('claimNotifyingButton') : t('claimNotifySubmitButton')}
           </button>
         </div>
       ) : null}

@@ -154,13 +154,13 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
       {!loaded ? (
         <p>{t('commonLoading')}</p>
       ) : matrix === null ? (
-        <p style={{ opacity: 0.6 }}>
+        <p style={{ color: 'var(--ink-secondary)' }}>
           {t('comparisonNoneYet')}
           {isPlacement ? t('comparisonNoneYetPlacementHint') : ''}
         </p>
       ) : (
         <>
-          <div style={{ ...comparisonPreStyle, opacity: 0.6, marginTop: '0.5rem' }}>
+          <div style={{ ...comparisonPreStyle, color: 'var(--ink-secondary)', marginTop: '0.5rem' }}>
             {t('comparisonBuiltAt', { date: formatDateTime(matrix.builtAt, language) })}
           </div>
 
@@ -196,7 +196,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                         {q.insurer.name}
                         {q.isCurrentVersion ? null : (
                           <span
-                            style={{ opacity: 0.6, fontSize: '0.78rem' }}
+                            style={{ color: 'var(--ink-secondary)', fontSize: '0.78rem' }}
                             title={t('comparisonSupersededTitle')}
                           >
                             {' '}
@@ -270,9 +270,9 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
             <>
               <strong>{t('comparisonScoresHeading')}</strong>
               <div style={comparisonScoreGridStyle}>
-                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t('comparisonScoreColumnInsurer')}</span>
-                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t('comparisonScoreColumnQuality')}</span>
-                <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t('comparisonScoreColumnService')}</span>
+                <span style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem' }}>{t('comparisonScoreColumnInsurer')}</span>
+                <span style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem' }}>{t('comparisonScoreColumnQuality')}</span>
+                <span style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem' }}>{t('comparisonScoreColumnService')}</span>
                 {matrix.rows.map((row) => {
                   const insurerId = row.quotation.insurerId;
                   const draft = scores[insurerId] ?? {

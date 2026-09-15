@@ -3,8 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -158,9 +160,9 @@ describe('Relationship Management / CRM (e2e) — backlog Part C #10', () => {
   /** Directly seeds a Policy + Claim + Complaint for a customer (no Policy /
    * Claim / Complaint module exists — Domains B / C / E). */
   async function seedBookOfBusiness(customerId: string): Promise<void> {
-    const insurer = await prisma.insurer.create({
-      data: { name: `CRM Test Insurer ${Math.random().toString(36).slice(2)}` },
-    });
+    const insurer = await makeInsurer(
+      `CRM Test Insurer ${Math.random().toString(36).slice(2)}`,
+    );
     const opportunity = await prisma.opportunity.create({
       data: { customerId },
     });

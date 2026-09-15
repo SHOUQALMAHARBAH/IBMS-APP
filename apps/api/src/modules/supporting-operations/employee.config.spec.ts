@@ -9,6 +9,7 @@ import {
 function employee(over: Partial<Employee> = {}): Employee {
   return {
     id: 'emp-1',
+    organizationId: 'org-1',
     fullName: 'Jane Doe',
     givenName: 'Jane',
     fatherName: null,
@@ -23,6 +24,7 @@ function employee(over: Partial<Employee> = {}): Employee {
     backgroundCheckCompletedAt: new Date('2024-01-10T00:00:00.000Z'),
     createdAt: new Date('2024-01-15T09:00:00.000Z'),
     updatedAt: new Date('2024-01-15T09:00:00.000Z'),
+    departmentId: null,
     ...over,
   };
 }
@@ -32,6 +34,7 @@ function checklist(
 ): AccessDeprovisioningChecklist {
   return {
     id: 'chk-1',
+    organizationId: 'org-1',
     employeeId: 'emp-1',
     triggeredAt: new Date('2026-09-16T09:00:00.000Z'),
     systemAccessRevokedAt: null,

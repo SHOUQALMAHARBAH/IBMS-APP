@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClaimFollowUpScheduler } from './claim-followup.scheduler';
-import type { UserRepository } from '../../repositories/user.repository';
+import type { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 import type { ClaimService } from './claim.service';
 
 const EMPTY_RESULT = {
@@ -12,31 +12,43 @@ const EMPTY_RESULT = {
   failed: 0,
 };
 
+/**
+ * Multi-tenancy Phase 2 (step 7) — the scheduler no longer resolves the system
+ * service account itself; `PerOrganizationRunner` does, once per ACTIVE
+ * Organization. This stand-in plays the single-Organization case: it invokes
+ * the callback once with that org's service-account id.
+ *
+ * The behaviours that moved out of the scheduler — looping every ACTIVE
+ * Organization, skipping one with no service account, isolating one org's
+ * failure from the rest — are covered by per-organization.runner.spec.ts,
+ * where they now live.
+ */
+function makeRunner() {
+  const forEach = vi.fn(
+    async (
+      _job: string,
+      _logger: unknown,
+      work: (systemUserId: string, organizationId: string) => Promise<void>,
+    ) => {
+      await work('system-1', 'org-1');
+    },
+  );
+  return { forEach } as unknown as PerOrganizationRunner;
+}
+
 function makeDeps() {
-  const findByEmail = vi
-    .fn()
-    .mockResolvedValue({ id: 'system-1', email: 'system@ibms.internal' });
-  const users = { findByEmail } as unknown as UserRepository;
+  const perOrganization = makeRunner();
 
   const runFollowUpScan = vi.fn().mockResolvedValue({ ...EMPTY_RESULT });
   const claims = { runFollowUpScan } as unknown as ClaimService;
 
   return {
-    scheduler: new ClaimFollowUpScheduler(users, claims),
-    mocks: { findByEmail, runFollowUpScan },
+    scheduler: new ClaimFollowUpScheduler(claims, perOrganization),
+    mocks: { runFollowUpScan },
   };
 }
 
 describe('ClaimFollowUpScheduler.runSweep', () => {
-  it('does nothing when the system service account is missing', async () => {
-    const { scheduler, mocks } = makeDeps();
-    mocks.findByEmail.mockResolvedValue(null);
-
-    await scheduler.runSweep();
-
-    expect(mocks.runFollowUpScan).not.toHaveBeenCalled();
-  });
-
   it('delegates to ClaimService.runFollowUpScan with the system account id', async () => {
     const { scheduler, mocks } = makeDeps();
 

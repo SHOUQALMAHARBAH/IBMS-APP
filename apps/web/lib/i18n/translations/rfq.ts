@@ -120,6 +120,8 @@ export const RFQ = {
     rfqLogExchangeError: 'تعذر تسجيل المراسلة — حاول مرة أخرى.',
     rfqDirectionLabel: 'الاتجاه',
     rfqChannelLabel: 'القناة',
+    rfqLinePlaceholder: 'التأمين على الممتلكات ضد جميع الأخطار',
+    rfqNegotiationNotesPlaceholder: 'مثال: طُلب خصم ٥٪ وشطب استثناء الفيضان',
     rfqCommInsurerLabel: 'المؤمِّن (اختياري)',
     rfqCommInsurerWholePanel: 'كل القائمة',
     rfqCommSubjectLabel: 'الموضوع (اختياري)',
@@ -149,13 +151,13 @@ export const RFQ = {
     rfqInsurerStatusNoResponse: 'لا استجابة',
 
     // Enum labels — communication direction/channel
-    commDirectionInboundBadge: 'وارد',
-    commDirectionOutboundBadge: 'صادر',
-    commChannelEmail: 'بريد إلكتروني',
-    commChannelCall: 'مكالمة',
-    commChannelPortal: 'بوابة إلكترونية',
-    commChannelMeeting: 'اجتماع',
-    commChannelOther: 'أخرى',
+    rfqCommDirectionInboundBadge: 'وارد',
+    rfqCommDirectionOutboundBadge: 'صادر',
+    rfqCommChannelEmail: 'بريد إلكتروني',
+    rfqCommChannelCall: 'مكالمة',
+    rfqCommChannelPortal: 'بوابة إلكترونية',
+    rfqCommChannelMeeting: 'اجتماع',
+    rfqCommChannelOther: 'أخرى',
 
     // Enum labels — ClientDecisionRoute
     cdRoutePlacement: 'إحلال',
@@ -443,6 +445,8 @@ export const RFQ = {
     rfqLogExchangeError: 'Could not log the exchange — try again.',
     rfqDirectionLabel: 'Direction',
     rfqChannelLabel: 'Channel',
+    rfqLinePlaceholder: 'Property All Risks',
+    rfqNegotiationNotesPlaceholder: 'e.g. asked for 5% off and the flood exclusion struck',
     rfqCommInsurerLabel: 'Insurer (optional)',
     rfqCommInsurerWholePanel: 'Whole panel',
     rfqCommSubjectLabel: 'Subject (optional)',
@@ -472,13 +476,13 @@ export const RFQ = {
     rfqInsurerStatusNoResponse: 'No response',
 
     // Enum labels — communication direction/channel
-    commDirectionInboundBadge: 'Inbound',
-    commDirectionOutboundBadge: 'Outbound',
-    commChannelEmail: 'Email',
-    commChannelCall: 'Call',
-    commChannelPortal: 'Portal',
-    commChannelMeeting: 'Meeting',
-    commChannelOther: 'Other',
+    rfqCommDirectionInboundBadge: 'Inbound',
+    rfqCommDirectionOutboundBadge: 'Outbound',
+    rfqCommChannelEmail: 'Email',
+    rfqCommChannelCall: 'Call',
+    rfqCommChannelPortal: 'Portal',
+    rfqCommChannelMeeting: 'Meeting',
+    rfqCommChannelOther: 'Other',
 
     // Enum labels — ClientDecisionRoute
     cdRoutePlacement: 'Placement',

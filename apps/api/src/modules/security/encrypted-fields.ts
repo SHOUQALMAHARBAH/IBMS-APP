@@ -13,6 +13,11 @@ export const ENCRYPTED_FIELDS = {
   InsuredPerson: ['nationalIdEnc'],
   Employee: ['nationalIdEnc'],
   ThirdPartyClaimant: ['contactDetailsEnc'],
+  // Part I §6. Not personal data, but the same `-- ENCRYPT` treatment: this is
+  // the credential that sends mail as a real company. Written and read by
+  // `EmailProviderRegistry`/`OrganizationEmailIntegrationService` under the
+  // `oauth` purpose, not by the generic helpers below.
+  OrganizationEmailIntegration: ['oauthRefreshTokenEnc'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type EncryptedEntityName = keyof typeof ENCRYPTED_FIELDS;

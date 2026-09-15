@@ -11,7 +11,9 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -78,6 +80,12 @@ const RUN_ID = `${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
 const OFAC_ENT_NUM = `9${RUN_ID}`.slice(0, 9);
 const SANCTIONED_NAME = `Zzq Watchlist Test ${RUN_ID}`;
 
+/** Part V cross-cutting item 1 — a list entry whose given name has a KNOWN
+ * romanisation variant. The customer below is spelled "Muhammad"; this entry
+ * says "Mohammed". The rest of the name is run-unique so the assertion cannot
+ * collide with the cumulative global watchlist cache. */
+const TRANSLITERATION_ENTRY_NAME = `Mohammed Zzqx${RUN_ID} Alhashimi`;
+
 // WatchlistSyncService refuses to trust a parse of fewer than
 // WATCHLIST_MIN_ABSOLUTE_RECORDS (10) records when there is no PRIOR
 // successful sync for that source to compare against — a real, deliberate
@@ -91,7 +99,7 @@ const OFAC_FILLER_ROWS = Array.from(
   (_, i) =>
     `F${i}-${RUN_ID},"Filler OFAC Entry ${i} ${RUN_ID}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"filler row to clear the no-prior-sync plausibility floor"`,
 ).join('\n');
-const OFAC_CSV_FIXTURE = `${OFAC_FILLER_ROWS}\n${OFAC_ENT_NUM},"${SANCTIONED_NAME}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"DOB 01 Jan 1980."\n`;
+const OFAC_CSV_FIXTURE = `${OFAC_FILLER_ROWS}\n${OFAC_ENT_NUM},"${SANCTIONED_NAME}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"DOB 01 Jan 1980."\n${OFAC_ENT_NUM}T,"${TRANSLITERATION_ENTRY_NAME}","individual","SDGT",-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,-0- ,"DOB 02 Feb 1975."\n`;
 
 const UN_DATA_ID = `8${RUN_ID}`.slice(0, 9);
 const UN_FILLER_INDIVIDUALS = Array.from(
@@ -205,6 +213,23 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
     sharedApp = undefined;
   });
 
+  it('runs with every scheduled job removed — nothing fires mid-suite', async () => {
+    // This spec was broken once by exactly that: a full run starting at
+    // 11:59:40 had the twice-daily watchlist cron fire at 12:00:00, perform a
+    // REAL sanctions download and publish a ~1011-record generation, after
+    // which this file's 10-record fixture was correctly refused by the
+    // plausibility floor. The assertion that failed was a safety control doing
+    // its job on state a background job had changed underneath it.
+    //
+    // Asserted here rather than trusted, because the failure mode is silent:
+    // if `SCHEDULED_JOBS=disabled` ever stops reaching the test process, every
+    // symptom is a confusing failure in some unrelated spec hours later.
+    const app = await boot();
+    const jobs = app.get(SchedulerRegistry).getCronJobs();
+
+    expect([...jobs.keys()]).toEqual([]);
+  });
+
   it('syncs both free sanctions lists, and a customer whose name matches one gets flagged HIT on screening', async () => {
     const app = await boot();
     const compliance = await makeUser(
@@ -266,10 +291,30 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
       .post('/watchlist-sync/run')
       .set(bearer(compliance.accessToken))
       .expect(201);
-    const countAfter = await prisma.watchlistEntry.count({
-      where: { source: 'OFAC_SDN', sourceRecordId: OFAC_ENT_NUM },
+    // Part B §6 — the property is "a re-sync does not duplicate a record",
+    // and it is now scoped to the generation a screening can actually see. A
+    // bare count across every generation is legitimately >1: the previous
+    // generation is RETAINED so it can be rolled back to, which is the point
+    // of the retention window.
+    const countInPublished = await prisma.watchlistEntry.count({
+      where: {
+        source: 'OFAC_SDN',
+        sourceRecordId: OFAC_ENT_NUM,
+        datasetVersion: { status: 'PUBLISHED' },
+      },
     });
-    expect(countAfter).toBe(1);
+    expect(countInPublished).toBe(1);
+
+    // And the re-sync really did publish a NEW generation, superseding rather
+    // than mutating the old one — the behaviour that makes the swap atomic.
+    const generations = await prisma.watchlistDatasetVersion.findMany({
+      where: { source: 'OFAC_SDN' },
+      orderBy: { downloadedAt: 'desc' },
+      select: { status: true },
+    });
+    expect(generations[0].status).toBe('PUBLISHED');
+    expect(generations.filter((g) => g.status === 'PUBLISHED')).toHaveLength(1);
+    expect(generations.some((g) => g.status === 'SUPERSEDED')).toBe(true);
 
     // now onboard a customer whose legal name is a token-reordering of the
     // synced sanctioned name — normalizeWatchlistName is order-independent.
@@ -391,6 +436,20 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
       .set(bearer(compliance.accessToken))
       .expect(400);
 
+    // Part B §16 — a decision may only be recorded on a case somebody actually
+    // picked up. Deciding straight from OPEN is the rubber-stamp the queue
+    // exists to prevent, so the match is assigned and started first; that is
+    // now part of adjudicating one end to end.
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/assign`)
+      .set(bearer(compliance.accessToken))
+      .send({ assigneeUserId: compliance.userId })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/screening/matches/${matchId}/start-review`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
     // A written reason is mandatory on BOTH outcomes and has a real floor:
     // "cleared" with no stated basis is indistinguishable from "ignored".
     await request(app.getHttpServer())
@@ -440,5 +499,153 @@ describe('Sanctions & PEP Screening / Watchlist Sync (e2e) — backlog Part C #4
       .set(bearer(compliance.accessToken))
       .expect(200);
     expect((counted.body as PendingCountBody).watchlistReady).toBe(true);
+  });
+
+  /**
+   * Part V cross-cutting item 1 (Phase 6) — "a sanctioned name entered with a
+   * slightly different spelling than the watchlist entry (e.g. Muhammad vs
+   * Mohammed) is still flagged as a match".
+   *
+   * Distinct from the containment test above, which covers a subject carrying
+   * an EXTRA name the entry does not have. This one is the romanisation case:
+   * every token corresponds, one of them is simply spelled differently, and
+   * an exact matcher returns CLEAR for it — the silent failure that matters
+   * most in a sanctions control.
+   *
+   * Asserted end to end through the real screening path against a real synced
+   * list entry, not against `matchesSampleWatchlist` (a substring fixture that
+   * could not demonstrate this) and not at the unit level, where
+   * `watchlist-match.config.spec.ts` already covers the canonicalisation.
+   */
+  it('flags a customer whose name is a romanisation variant of a list entry (item 1)', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'wl-translit-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    const sales = await makeUser(
+      app,
+      'wl-translit-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    await request(app.getHttpServer())
+      .post('/watchlist-sync/run')
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    // "Muhammad" where the list says "Mohammed" — the same name, a different
+    // romanisation of it.
+    const variantName = TRANSLITERATION_ENTRY_NAME.replace(
+      'Mohammed',
+      'Muhammad',
+    );
+    expect(variantName).not.toBe(TRANSLITERATION_ENTRY_NAME);
+
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: variantName,
+        ownerUserId: sales.userId,
+      },
+    });
+    const started = await request(app.getHttpServer())
+      .post(`/customers/${customer.id}/kyc`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    const kycId = (started.body as KycRecordBody).id;
+    await request(app.getHttpServer())
+      .post(`/kyc-records/${kycId}/submit`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/kyc-records/${kycId}/run-screening`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    const queued = await request(app.getHttpServer())
+      .get(`/screening/matches?kycRecordId=${kycId}`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const rows = queued.body as ScreeningMatchBody[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].subjectName).toBe(variantName);
+    expect(rows[0].listEntryName).toBe(TRANSLITERATION_ENTRY_NAME);
+    expect(rows[0].status).toBe('pending');
+  });
+
+  /**
+   * Part V cross-cutting item 2 (Phase 6) — "a recurring scheduled job
+   * re-screens every EXISTING active customer, not only new customers at
+   * intake".
+   *
+   * The pre-existing batch test asserts the endpoint runs and is
+   * permission-gated, but its customer's KYC is deliberately not approved, so
+   * it is skipped and the counter stays 0 — it proves the endpoint works, not
+   * that an existing customer gets re-screened. This closes that half.
+   */
+  it('re-screens an already-onboarded ACTIVE customer, not just new intake (item 2)', async () => {
+    const app = await boot();
+    const compliance = await makeUser(
+      app,
+      'wl-rescreen-compliance',
+      'COMPLIANCE_OFFICER',
+    );
+    const sales = await makeUser(
+      app,
+      'wl-rescreen-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    await request(app.getHttpServer())
+      .post('/watchlist-sync/run')
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `${SANCTIONED_NAME} Rescreen`,
+        ownerUserId: sales.userId,
+      },
+    });
+    const started = await request(app.getHttpServer())
+      .post(`/customers/${customer.id}/kyc`)
+      .set(bearer(sales.accessToken))
+      .expect(201);
+    const kycId = (started.body as KycRecordBody).id;
+
+    // The preconditions the batch selects on, set directly: an ACTIVE customer
+    // with an APPROVED KYC file. Walking the full maker/checker approval flow
+    // here would be testing KYC approval, which has its own coverage — what is
+    // under test is the batch's SELECTION and that it actually screens.
+    await prisma.customer.update({
+      where: { id: customer.id },
+      data: { status: 'ACTIVE' },
+    });
+    await prisma.kYCRecord.update({
+      where: { id: kycId },
+      data: { status: 'APPROVED' },
+    });
+
+    const before = await prisma.screeningResult.count({
+      where: { kycRecordId: kycId },
+    });
+
+    const batch = await request(app.getHttpServer())
+      .post('/screening/recurring-batch')
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+    expect((batch.body as ScreeningBatchBody).screened).toBeGreaterThanOrEqual(
+      1,
+    );
+
+    // The assertion that carries the meaning: this customer, who was already
+    // onboarded and never re-submitted anything, has NEW screening results.
+    const after = await prisma.screeningResult.count({
+      where: { kycRecordId: kycId },
+    });
+    expect(after).toBeGreaterThan(before);
   });
 });

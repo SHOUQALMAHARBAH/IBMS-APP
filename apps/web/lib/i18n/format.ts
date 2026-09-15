@@ -27,7 +27,11 @@ const AR_LOCALE = 'ar';
  *  business context expects, rather than US-style MM/DD/YYYY. */
 const EN_LOCALE = 'en-GB';
 
-const LOCALE_BY_LANGUAGE: Record<Language, string> = {
+/** Exported so `./plurals.ts` selects its CLDR category against the SAME
+ *  locale tags this file formats numbers and dates with. Two copies of
+ *  'ar' vs 'ar-JO' would eventually disagree, and the disagreement would
+ *  show up as a plural form that does not match the numeral beside it. */
+export const LOCALE_BY_LANGUAGE: Record<Language, string> = {
   AR: AR_LOCALE,
   EN: EN_LOCALE,
 };

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { OrgContextService } from '../../../common/org-context/org-context.service';
 import type { SecurityConfig, User, UserSession } from '@ibms/db';
 import { SessionService } from './session.service';
 import {
@@ -10,6 +11,7 @@ import {
 function makeConfig(overrides: Partial<SecurityConfig> = {}): SecurityConfig {
   return {
     id: 'default',
+    organizationId: 'org-1',
     idleTimeoutMinutes: 15,
     hardLogoutAfterIdleMinutes: 30,
     accessTokenTtlMinutes: 15,
@@ -26,12 +28,17 @@ function makeConfig(overrides: Partial<SecurityConfig> = {}): SecurityConfig {
 function makeSession(overrides: Partial<UserSession> = {}): UserSession {
   return {
     id: 'session-1',
+    organizationId: 'org-1',
     userId: 'user-1',
     refreshTokenId: null,
     createdAt: new Date(),
     lastActivityAt: new Date(),
     lastStepUpAt: null,
     expiresAt: new Date(Date.now() + 999_999),
+    // Part II §4.1.5 — the two ceilings the service now reads. Far enough out
+    // that a fixture which does not care about expiry is simply live.
+    idleExpiresAt: new Date(Date.now() + 999_999),
+    absoluteExpiresAt: new Date(Date.now() + 9_999_999),
     revokedAt: null,
     revokedReason: null,
     ipAddress: null,
@@ -43,7 +50,13 @@ function makeSession(overrides: Partial<UserSession> = {}): UserSession {
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 'user-1',
+    organizationId: 'org-1',
     fullName: 'Test User',
+    mustChangePassword: false,
+    mfaMethod: null,
+    mfaEnrolledAt: null,
+    mfaEnrollmentPending: false,
+    departmentId: null,
     email: 'test@ibms.test',
     passwordHash: 'x',
     passwordUpdatedAt: new Date(),
@@ -97,13 +110,19 @@ function buildService(
 
   // SessionService's constructor types expect the full repository/service
   // classes — the mocks above cover every method it actually calls.
+  // A real OrgContextService, not a mock: `validateAndTouch` now establishes
+  // the Organization itself (unscoped session lookup -> adopt), and a stub
+  // would hide whether it actually does.
+  const orgContext = new OrgContextService();
+
   const service = new SessionService(
     sessions as never,
     users as never,
     securityConfig as never,
     audit as never,
+    orgContext,
   );
-  return { service, sessions, users, securityConfig, audit };
+  return { service, sessions, users, securityConfig, audit, orgContext };
 }
 
 describe('SessionService.validateAndTouch', () => {
@@ -112,11 +131,20 @@ describe('SessionService.validateAndTouch', () => {
     const result = await service.validateAndTouch('user-1', 'session-1');
     expect(result).toEqual({
       id: 'user-1',
+      // Multi-tenancy Phase 2 — the Organization every query made on this
+      // caller's behalf is scoped to. Read off the User row this method
+      // already loads, so it costs no extra query.
+      organizationId: 'org-1',
       email: 'test@ibms.test',
       roles: [],
       sessionId: 'session-1',
     });
-    expect(sessions.touchActivity).toHaveBeenCalledWith('session-1');
+    // Part II §4.1.5 — the idle ceiling moves forward with the activity, so the
+    // stored value is written here rather than recomputed on every later read.
+    expect(sessions.touchActivity).toHaveBeenCalledWith(
+      'session-1',
+      expect.any(Date),
+    );
   });
 
   it('rejects when the session does not exist', async () => {

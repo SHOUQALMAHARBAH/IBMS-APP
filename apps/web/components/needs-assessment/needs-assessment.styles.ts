@@ -19,7 +19,7 @@ export const coveragePreviewStyle: CSSProperties = {
   padding: '1rem',
   border: '1px solid rgba(128,128,128,0.3)',
   borderRadius: '0.5rem',
-  background: 'rgba(128,128,128,0.05)',
+  background: 'var(--surface-sunken)',
 };
 
 export const coverageTagListStyle: CSSProperties = {

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F — Bilingual UI (backlog Part 11), item #2: "full RTL layout for
 // Arabic ... navigation, forms, tables ... genuinely mirrored, not just
@@ -28,7 +29,7 @@ async function mockAuth(page: Page, languagePreference: "AR" | "EN") {
   await page.route("**/auth/me", (route) =>
     route.fulfill({
       status: 200,
-      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], languagePreference },
+      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], permissions: permissionsForRoles(["COMPLIANCE_OFFICER"]), languagePreference },
     }),
   );
 }
@@ -57,7 +58,7 @@ test("the sidebar renders on the opposite screen edge in Arabic vs. English — 
   await mockAuth(page, "EN");
   await mockStatus(page);
   await page.goto("/watchlist-sync");
-  const nav = page.getByRole("navigation", { name: "Primary" });
+  const nav = page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ });
   await expect(nav).toBeVisible();
   const ltrBox = await nav.boundingBox();
   if (!ltrBox) throw new Error("nav has no bounding box");
@@ -95,8 +96,15 @@ test("a table's column order visually reverses in Arabic — same DOM order, mir
 
   await mockAuth(page, "AR");
   await page.reload();
-  const firstHeaderRtl = await page.getByRole("columnheader", { name: "Source" }).boundingBox();
-  const lastHeaderRtl = await page.getByRole("columnheader", { name: "Completed" }).boundingBox();
+  // The page is genuinely translated now, so in Arabic the headers ARE
+  // Arabic — asserting the English names here would only have worked while
+  // the screen was English-only, which is the thing this test denies.
+  const firstHeaderRtl = await page
+    .getByRole("columnheader", { name: "المصدر" })
+    .boundingBox();
+  const lastHeaderRtl = await page
+    .getByRole("columnheader", { name: "وقت الانتهاء" })
+    .boundingBox();
   if (!firstHeaderRtl || !lastHeaderRtl) throw new Error("header cells not found");
   // RTL: same DOM order, but native <table> column mirroring (a standard
   // browser behavior once `direction` inherits as rtl) now renders "Source"

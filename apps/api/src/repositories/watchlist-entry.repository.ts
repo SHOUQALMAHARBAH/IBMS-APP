@@ -55,7 +55,8 @@ export class WatchlistEntryRepository {
   ): Promise<WatchlistMatch | null> {
     if (!normalizedName) return null;
     const row = await this.prisma.client.watchlistEntry.findFirst({
-      where: { normalizedName },
+      // Part B §6 — only the PUBLISHED generation is visible to a screening.
+      where: { normalizedName, datasetVersion: { status: 'PUBLISHED' } },
       select: {
         source: true,
         sourceRecordId: true,
@@ -75,7 +76,7 @@ export class WatchlistEntryRepository {
    * record count against before pruning (a `@code-reviewer` BLOCKER: a 200
    * response carrying the wrong content — a WAF page, a captcha, a changed
    * redirect target — parses to near-zero records and, with no check,
-   * would `pruneStale` the entire prior cache for that source). */
+   * would have replaced the entire prior cache for that source). */
   findLastSuccessfulRun(
     source: WatchlistSource,
   ): Promise<WatchlistSyncRun | null> {
@@ -87,7 +88,8 @@ export class WatchlistEntryRepository {
 
   completeSyncRun(
     id: string,
-    result: { recordCount: number } | { errorMessage: string },
+    result:
+      { recordCount: number; addedCount?: number } | { errorMessage: string },
   ): Promise<WatchlistSyncRun> {
     return this.prisma.client.watchlistSyncRun.update({
       where: { id },
@@ -102,6 +104,7 @@ export class WatchlistEntryRepository {
               status: 'succeeded',
               completedAt: new Date(),
               recordCount: result.recordCount,
+              addedCount: result.addedCount,
             },
     });
   }
@@ -121,7 +124,7 @@ export class WatchlistEntryRepository {
   }
 
   /** Upserts every parsed record for `source` under this `syncRunId` (the
-   * "still on the list" stamp `pruneStale` below reads), then deletes every
+   * "still on the list" stamp), against the generation supplied — every
    * row of this `source` NOT stamped with `syncRunId` — i.e. every entry
    * that existed before this sync but was not seen in it, because the
    * source list dropped it. Two passes over the DB, not a single
@@ -147,6 +150,10 @@ export class WatchlistEntryRepository {
       normalizedName: string;
       canonicalTokens: string[];
     })[],
+    /** Part B §6 — the generation these rows belong to. Rows written against a
+     * generation that is not yet PUBLISHED are invisible to every screening,
+     * which is what makes the write phase safe to do incrementally. */
+    datasetVersionId: string,
   ): Promise<void> {
     for (let i = 0; i < records.length; i += WATCHLIST_UPSERT_CHUNK_SIZE) {
       const chunk = records.slice(i, i + WATCHLIST_UPSERT_CHUNK_SIZE);
@@ -154,9 +161,10 @@ export class WatchlistEntryRepository {
         chunk.map((record) =>
           this.prisma.client.watchlistEntry.upsert({
             where: {
-              source_sourceRecordId: {
+              source_sourceRecordId_datasetVersionId: {
                 source,
                 sourceRecordId: record.sourceRecordId,
+                datasetVersionId,
               },
             },
             create: {
@@ -168,6 +176,7 @@ export class WatchlistEntryRepository {
               listProgram: record.listProgram,
               remarks: record.remarks,
               syncRunId,
+              datasetVersionId,
             },
             update: {
               fullName: record.fullName,
@@ -201,7 +210,12 @@ export class WatchlistEntryRepository {
    * Cheap: a bounded existence check, not a count of 19,000 rows.
    */
   async hasUsableEntries(): Promise<boolean> {
+    // Part B §6 — rows belonging to a generation that is still DOWNLOADED do
+    // NOT make the cache usable. Counting them would report a screening as
+    // possible while the only readable generation is empty, which is the
+    // false-assurance this check exists to prevent.
     const first = await this.prisma.client.watchlistEntry.findFirst({
+      where: { datasetVersion: { status: 'PUBLISHED' } },
       select: { id: true },
     });
     return first !== null;
@@ -322,13 +336,19 @@ export class WatchlistEntryRepository {
     const rows = await this.prisma.client.$queryRaw<
       WatchlistEntry[]
     >(Prisma.sql`
-      SELECT *
-      FROM "WatchlistEntry"
-      WHERE ("normalizedName" = ${exactName})
-         OR ("canonicalTokens" <@ ${subjectTokens}
-             AND ("canonicalTokens" @> ${subjectTokens}
-                  OR array_length("canonicalTokens", 1) >= ${MIN_ENTRY_TOKENS_FOR_FUZZY}))
-      ORDER BY array_length("canonicalTokens", 1) DESC, "id" ASC
+      SELECT e.*
+      FROM "WatchlistEntry" e
+      -- Part B §6: an INNER JOIN onto the published generation, so a screening
+      -- can only ever see one complete list. A generation still being written
+      -- is not PUBLISHED and is therefore invisible here — which is what makes
+      -- a sync atomic from the reader's side without locking anything.
+      JOIN "WatchlistDatasetVersion" v
+        ON v."id" = e."datasetVersionId" AND v."status" = 'PUBLISHED'
+      WHERE (e."normalizedName" = ${exactName})
+         OR (e."canonicalTokens" <@ ${subjectTokens}
+             AND (e."canonicalTokens" @> ${subjectTokens}
+                  OR array_length(e."canonicalTokens", 1) >= ${MIN_ENTRY_TOKENS_FOR_FUZZY}))
+      ORDER BY array_length(e."canonicalTokens", 1) DESC, e."id" ASC
       LIMIT ${WATCHLIST_CANDIDATE_LIMIT + 1}
     `);
 
@@ -339,16 +359,60 @@ export class WatchlistEntryRepository {
     };
   }
 
-  pruneStale(
-    source: WatchlistSource,
-    syncRunId: string,
-  ): Promise<Prisma.BatchPayload> {
-    return this.prisma.client.watchlistEntry.deleteMany({
-      where: { source, syncRunId: { not: syncRunId } },
+  /** Rows still held by one generation. Zero means retention has reclaimed it
+   * and it can no longer be rolled back to, however healthy its metadata is. */
+  countByDatasetVersion(datasetVersionId: string): Promise<number> {
+    return this.prisma.client.watchlistEntry.count({
+      where: { datasetVersionId },
     });
   }
 
+  /** Rows in the PUBLISHED generation for a source — what a screening can
+   * actually see, not what the table happens to hold. */
   countBySource(source: WatchlistSource): Promise<number> {
-    return this.prisma.client.watchlistEntry.count({ where: { source } });
+    return this.prisma.client.watchlistEntry.count({
+      where: { source, datasetVersion: { status: 'PUBLISHED' } },
+    });
+  }
+
+  /**
+   * Part B §21 — how many entries this run saw for the FIRST time.
+   *
+   * `upsertMany` stamps every still-listed row with the current `syncRunId`
+   * but only sets `syncedAt` on CREATE (the update branch deliberately leaves
+   * it alone), so `syncedAt` is genuinely "first seen" rather than "last
+   * confirmed". A row carrying this run's id AND a `syncedAt` at or after the
+   * run started is therefore new, and one carrying this run's id with an
+   * older `syncedAt` is a row that was already there.
+   *
+   * Counted rather than tracked during the upsert loop: `upsert` does not
+   * report whether it created or updated, and pre-checking every one of
+   * ~19,000 records would double the round trips to learn something one
+   * COUNT can answer.
+   */
+  countAddedInRun(
+    source: WatchlistSource,
+    syncRunId: string,
+    runStartedAt: Date,
+  ): Promise<number> {
+    return this.prisma.client.watchlistEntry.count({
+      where: { source, syncRunId, syncedAt: { gte: runStartedAt } },
+    });
+  }
+
+  /**
+   * Part B §21 — the most recent successful sync that actually ADDED
+   * something, across all sources.
+   *
+   * Only additions matter: an entry leaving a list cannot create a match that
+   * did not exist before, but one arriving can. A run that added nothing is
+   * not a reason to re-screen anybody, and treating it as one would hold every
+   * pending file twice a day for no finding.
+   */
+  findLatestAddingSyncRun(): Promise<WatchlistSyncRun | null> {
+    return this.prisma.client.watchlistSyncRun.findFirst({
+      where: { status: 'succeeded', addedCount: { gt: 0 } },
+      orderBy: { completedAt: 'desc' },
+    });
   }
 }

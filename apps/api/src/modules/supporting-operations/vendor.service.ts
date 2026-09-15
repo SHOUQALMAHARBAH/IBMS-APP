@@ -113,7 +113,7 @@ export class VendorService {
     let updated = await this.vendors.setRiskTier(id, dto.riskTier);
 
     if (dpaRequiredForTier(dto.riskTier) && !existing.annualReviewDueAt) {
-      const dueAt = this.slaTimers.computeDueAt(
+      const dueAt = await this.slaTimers.computeDueAt(
         VENDOR_ANNUAL_REVIEW_SLA_WORKFLOW,
         new Date(),
       );
@@ -163,7 +163,7 @@ export class VendorService {
       createdBefore: now,
       actorUserId,
     });
-    const dueAt = this.slaTimers.computeDueAt(
+    const dueAt = await this.slaTimers.computeDueAt(
       VENDOR_ANNUAL_REVIEW_SLA_WORKFLOW,
       now,
     );
@@ -218,7 +218,7 @@ export class VendorService {
       throw new ConflictException(`Vendor ${id} has already been terminated.`);
     }
 
-    const dueAt = this.slaTimers.computeDueAt(
+    const dueAt = await this.slaTimers.computeDueAt(
       VENDOR_TERMINATION_ACCESS_REVOCATION_SLA_WORKFLOW,
       now,
     );

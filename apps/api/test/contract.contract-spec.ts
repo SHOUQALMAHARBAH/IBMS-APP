@@ -9,7 +9,13 @@ import Ajv from 'ajv';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from '@ibms/db';
+// The tenant-scoped client, same as the 74 e2e specs. Phase 2 dropped the
+// temporary `organizationId` default, so a fixture write through the RAW
+// `@ibms/db` client inserts a row with no Organization and fails NOT NULL —
+// which is what `userRoleAssignment.create` below was doing. `Role` itself
+// is platform-level and unscoped, so it is unaffected either way; see the
+// header of ./tenant-prisma for why specs no longer reach for the raw client.
+import { prisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 interface MfaEnrollBody {

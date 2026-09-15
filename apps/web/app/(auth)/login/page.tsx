@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useLanguage } from '../../../lib/i18n/language-context';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { login, verifyMfaChallenge } from '../../../lib/auth/auth-api';
@@ -8,15 +9,16 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   buttonStyle,
-  cardStyle,
+  authCardStyle,
   errorStyle,
   helperLinkStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
+  authPageStyle,
 } from '../../../components/auth/auth-form.styles';
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { refreshUser } = useAuth();
 
@@ -40,7 +42,7 @@ export default function LoginPage() {
         router.push('/');
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong — try again.');
+      setError(err instanceof ApiError ? err.message : t('authGenericError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -56,22 +58,22 @@ export default function LoginPage() {
       await refreshUser();
       router.push('/');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Invalid code — try again.');
+      setError(err instanceof ApiError ? err.message : t('authInvalidCode'));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={cardStyle}>
-        <h1 style={{ marginTop: 0 }}>Sign in</h1>
+    <main style={authPageStyle}>
+      <div style={authCardStyle}>
+        <h1 style={{ marginTop: 0 }}>{t('authSignInHeading')}</h1>
 
         {mfaChallengeToken ? (
           <form onSubmit={(e) => void handleMfaSubmit(e)}>
-            <p style={{ opacity: 0.8 }}>Enter the 6-digit code from your authenticator app.</p>
+            <p style={{ opacity: 0.8 }}>{t('authMfaPrompt')}</p>
             <label htmlFor="code" style={labelStyle}>
-              Authentication code
+              {t('authMfaCodeLabel')}
             </label>
             <input
               id="code"
@@ -90,13 +92,13 @@ export default function LoginPage() {
               </p>
             ) : null}
             <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-              {isSubmitting ? 'Verifying…' : 'Verify'}
+              {isSubmitting ? t('authVerifying') : t('authVerifyButton')}
             </button>
           </form>
         ) : (
           <form onSubmit={(e) => void handleCredentialsSubmit(e)}>
             <label htmlFor="email" style={labelStyle}>
-              Email
+              {t('authEmailLabel')}
             </label>
             <input
               id="email"
@@ -108,7 +110,7 @@ export default function LoginPage() {
               style={inputStyle}
             />
             <label htmlFor="password" style={labelStyle}>
-              Password
+              {t('authPasswordLabel')}
             </label>
             <input
               id="password"
@@ -125,13 +127,13 @@ export default function LoginPage() {
               </p>
             ) : null}
             <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? t('authSigningIn') : t('authSignInButton')}
             </button>
             <p style={helperLinkStyle}>
-              <Link href="/forgot-password">Forgot your password?</Link>
+              <Link href="/forgot-password">{t('authForgotLink')}</Link>
             </p>
             <p style={helperLinkStyle}>
-              No account? <Link href="/signup">Sign up</Link>
+              {t('authNoAccount')} <Link href="/signup">{t('authSignUpLink')}</Link>
             </p>
           </form>
         )}

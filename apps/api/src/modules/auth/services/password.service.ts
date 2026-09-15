@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { validatePasswordPolicy } from '@ibms/db';
 
@@ -25,5 +25,19 @@ export class PasswordService {
 
   validatePolicy(password: string): string[] {
     return validatePasswordPolicy(password);
+  }
+
+  /**
+   * Throws unless the password satisfies the Part 10.1 policy.
+   *
+   * The throwing form exists so callers cannot accept a password by forgetting
+   * to look at the returned array — `validatePolicy` returns violations, and an
+   * ignored non-empty array is silently a policy bypass.
+   */
+  assertMeetsPolicy(password: string): void {
+    const violations = validatePasswordPolicy(password);
+    if (violations.length > 0) {
+      throw new UnprocessableEntityException(violations.join(' '));
+    }
   }
 }

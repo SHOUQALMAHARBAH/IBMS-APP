@@ -198,7 +198,7 @@ export function ClientDecisionSection({
               {decision.notes}
             </p>
           ) : null}
-          <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
             {t('cdRecordedMeta', {
               date: formatDateTime(decision.decidedAt, language),
               status: opportunityStatusLabel,
@@ -272,7 +272,7 @@ export function ClientDecisionSection({
           </button>
         </div>
       ) : (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
           {t('cdNoneYet')}
         </p>
       )}

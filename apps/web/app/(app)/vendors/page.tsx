@@ -15,6 +15,7 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -26,6 +27,7 @@ const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4r
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function VendorsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -46,7 +48,7 @@ export default function VendorsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async (term: string) => {
     try {
@@ -56,13 +58,13 @@ export default function VendorsPage() {
       setVendors(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the vendor.manage permission."
+          ? t('venNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load vendors — try again.',
+            : t('venLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   function onSearchSubmit(e: FormEvent) {
     e.preventDefault();
@@ -74,7 +76,7 @@ export default function VendorsPage() {
     void (async () => {
       await load(searchTerm);
     })();
-  }, [user, searchTerm, load]);
+  }, [user, searchTerm, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function VendorsPage() {
       setVendorType('other');
       await load(searchTerm);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not create the vendor.');
+      setFormError(err instanceof ApiError ? err.message : t('venCreateError'));
     }
   }
 
@@ -101,7 +103,7 @@ export default function VendorsPage() {
       setEditingId(null);
       await load(searchTerm);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not update the vendor.');
+      setFormError(err instanceof ApiError ? err.message : t('venUpdateError'));
     }
   }
 
@@ -109,13 +111,9 @@ export default function VendorsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Vendors</h1>
+      <h1>{t('venHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The shared vendor register — Procurement&apos;s general
-        (&ldquo;other&rdquo;) vendors alongside Vendor Management&apos;s
-        risk-tiered ones (insurer, reinsurer, loss adjuster, IT/cloud,
-        printing/archiving, marketing/call-centre). Open a vendor for risk
-        tiering, Data Processing Agreements, and termination.
+        {t('venIntro')}
       </p>
 
       <form onSubmit={onSearchSubmit} style={{ margin: '0.75rem 0' }}>
@@ -127,7 +125,7 @@ export default function VendorsPage() {
           dir="auto"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Name, in Arabic or English"
+          placeholder={t('venSearchPlaceholder')}
         />
         <button type="submit" style={{ marginInlineStart: '0.5rem', cursor: 'pointer' }}>
           Search
@@ -142,16 +140,16 @@ export default function VendorsPage() {
 
       {vendors ? (
         vendors.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
-            {searchTerm ? 'No vendors match your search.' : 'No vendors recorded yet.'}
+          <p style={{ color: 'var(--ink-secondary)' }}>
+            {searchTerm ? t('venNoneMatch') : t('venNone')}
           </p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '30rem' }}>
             <thead>
               <tr>
-                <th style={head}>Name</th>
-                <th style={head}>Type</th>
-                <th style={head}>Risk tier</th>
+                <th style={head}>{t('venColName')}</th>
+                <th style={head}>{t('venColType')}</th>
+                <th style={head}>{t('venColRiskTier')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -181,7 +179,7 @@ export default function VendorsPage() {
                         <button type="button" onClick={() => startEdit(vendor)}>
                           Rename
                         </button>{' '}
-                        <Link href={`/vendors/${vendor.id}`}>Manage</Link>
+                        <Link href={`/vendors/${vendor.id}`}>{t('venManageButton')}</Link>
                       </>
                     )}
                   </td>
@@ -191,17 +189,17 @@ export default function VendorsPage() {
           </table>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('venLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new vendor</h2>
+        <h2>{t('venCreateHeading')}</h2>
         <label style={labelStyle}>
-          Name
+          {t('venColName')}
           <input dir="auto" value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label style={labelStyle}>
-          Type
+          {t('venColType')}
           <select
             value={vendorType}
             onChange={(e) => setVendorType(e.target.value as VendorType)}
@@ -218,7 +216,7 @@ export default function VendorsPage() {
             {formError}
           </p>
         ) : null}
-        <button type="submit">Record vendor</button>
+        <button type="submit">{t('venSubmitButton')}</button>
       </form>
     </main>
   );

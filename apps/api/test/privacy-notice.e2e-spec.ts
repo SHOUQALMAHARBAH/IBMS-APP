@@ -3,7 +3,8 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -99,21 +100,42 @@ describe('Notices (e2e) — backlog Part D §5.1, Process #52', () => {
     sharedApp = undefined;
   });
 
-  it('gates create/list/legal-review behind privacy-notice.publish', async () => {
+  it('gates writes behind privacy-notice.publish and reads behind privacy-notice.read', async () => {
     const app = await boot();
-    const outsider = await makeUser(
+    // A touchpoint role: holds read (it has to show the notice at intake),
+    // never publish. This assertion changed deliberately when the read was
+    // split out of `consent.manage` — listing used to 403 for this role, and
+    // now must not.
+    const touchpointRole = await makeUser(
       app,
       'notice-outsider',
       'SALES_RELATIONSHIP_OFFICER',
     );
     await request(app.getHttpServer())
       .post('/privacy-notices')
-      .set(bearer(outsider.accessToken))
+      .set(bearer(touchpointRole.accessToken))
       .send({ touchpoint: 'claims', textAr: 'x', textEn: 'x' })
       .expect(403);
     await request(app.getHttpServer())
       .get('/privacy-notices')
-      .set(bearer(outsider.accessToken))
+      .set(bearer(touchpointRole.accessToken))
+      .expect(200);
+
+    // A role that stands in front of no data subject holds NEITHER, so the
+    // read is genuinely gated rather than open to any authenticated user —
+    // without this half, granting read to everyone would still pass.
+    const unrelated = await makeUser(
+      app,
+      'notice-unrelated',
+      'FINANCE_COLLECTIONS_OFFICER',
+    );
+    await request(app.getHttpServer())
+      .get('/privacy-notices')
+      .set(bearer(unrelated.accessToken))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/privacy-notices/current?touchpoint=claims')
+      .set(bearer(unrelated.accessToken))
       .expect(403);
   });
 
@@ -200,7 +222,7 @@ describe('Notices (e2e) — backlog Part D §5.1, Process #52', () => {
     expect((res.body as { notice: unknown }).notice).toBeNull();
   });
 
-  it('current() also accepts consent.manage — the touchpoint-facing roles that need to display it', async () => {
+  it('current() is reachable by a touchpoint role via privacy-notice.read', async () => {
     const app = await boot();
     const sales = await makeUser(
       app,
@@ -259,5 +281,64 @@ describe('Notices (e2e) — backlog Part D §5.1, Process #52', () => {
       .get('/privacy-notices/00000000-0000-0000-0000-000000000000')
       .set(bearer(dpo.accessToken))
       .expect(404);
+  });
+
+  /**
+   * Part IV §10.4 — reading a notice and publishing one are two different acts
+   * by two different sets of people, so they are two permissions.
+   *
+   * A Sales Officer stands in front of the data subject at intake and must be
+   * able to show them the applicable notice; they must never be able to change
+   * what it says. Before `privacy-notice.read` existed the read was authorised
+   * by `consent.manage` — the right people, reached through a WRITE permission
+   * on a different resource, which is the coupling this separates.
+   */
+  it('lets a touchpoint role READ the applicable notice but never publish one', async () => {
+    const app = await boot();
+    const dpo = await makeUser(app, 'pn-dpo-split', 'DATA_PROTECTION_OFFICER');
+    const sales = await makeUser(
+      app,
+      'pn-sales-split',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    const touchpoint = `lead_capture`;
+    await request(app.getHttpServer())
+      .post('/privacy-notices')
+      .set(bearer(dpo.accessToken))
+      .send({
+        touchpoint,
+        textEn: 'We process your data to quote and place insurance.',
+        textAr: 'نعالج بياناتك لتسعير وإصدار التأمين.',
+      })
+      .expect(201);
+
+    // READ — the whole point: this is the call the intake widget makes.
+    await request(app.getHttpServer())
+      .get(`/privacy-notices/current?touchpoint=${touchpoint}`)
+      .set(bearer(sales.accessToken))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/privacy-notices')
+      .set(bearer(sales.accessToken))
+      .expect(200);
+
+    // PUBLISH — still refused. Splitting read out must not widen who writes.
+    await request(app.getHttpServer())
+      .post('/privacy-notices')
+      .set(bearer(sales.accessToken))
+      .send({ touchpoint, textEn: 'Not allowed.', textAr: 'غير مسموح.' })
+      .expect(403);
+
+    // And the permission set the UI renders from says the same thing, so the
+    // screen hides the publish control instead of offering a guaranteed 403.
+    const me = (
+      await request(app.getHttpServer())
+        .get('/auth/me')
+        .set(bearer(sales.accessToken))
+        .expect(200)
+    ).body as { permissions: string[] };
+    expect(me.permissions).toContain('privacy-notice.read');
+    expect(me.permissions).not.toContain('privacy-notice.publish');
   });
 });

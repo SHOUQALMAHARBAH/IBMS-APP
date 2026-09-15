@@ -11,6 +11,7 @@ import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../lib/customer/customer-api';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -27,7 +28,6 @@ const STATUS_LABEL_KEY: Record<CustomerStatus, TranslationKey> = {
 // Roles the seeded permission grid grants `customer.create` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
 // same convention as leads/page.tsx's CAN_CREATE_LEAD_ROLES.
-const CAN_CREATE_CUSTOMER_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -66,18 +66,18 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadCustomers(searchTerm);
     })();
-  }, [user, searchTerm, loadCustomers]);
+  }, [user, searchTerm, loadCustomers, t]);
 
   if (isLoading || !user) return null;
 
-  const canCreateCustomer = user.roles.some((role) => CAN_CREATE_CUSTOMER_ROLES.includes(role));
+  const canCreateCustomer = hasPermission(user, 'customer.create');
 
   return (
     <main style={pageStyle}>
@@ -114,7 +114,7 @@ export default function CustomersPage() {
       ) : null}
       {customers !== null && !loadError ? (
         customers.length === 0 ? (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
             {searchTerm ? t('customersNoneMatch') : t('customersNoneYet')}
           </p>
         ) : (

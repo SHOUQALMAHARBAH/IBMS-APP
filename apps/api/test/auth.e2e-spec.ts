@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from '@ibms/db';
+import { prisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -20,6 +20,7 @@ interface MeBody {
   email: string;
   mfaEnabled: boolean;
   languagePreference: 'AR' | 'EN';
+  permissions: string[];
 }
 interface ForgotPasswordBody {
   devResetToken?: string;
@@ -115,6 +116,13 @@ describe('Auth (e2e)', () => {
       const meBody = me.body as MeBody;
       expect(meBody.email).toBe(email);
       expect(meBody.mfaEnabled).toBe(false);
+      // Part IV §10.4 — the resolved permission set ships with the identity,
+      // so the frontend has one source to render from. A fresh signup holds no
+      // roles at all, so the correct answer here is an empty array, NOT a
+      // missing field: the UI must be able to tell "no permissions" from "the
+      // server did not say", and only one of those is safe to render from.
+      expect(Array.isArray(meBody.permissions)).toBe(true);
+      expect(meBody.permissions).toEqual([]);
 
       const refreshed = await agent.post('/auth/refresh').expect(200);
       const refreshedBody = refreshed.body as { accessToken: string };
@@ -238,10 +246,17 @@ describe('Auth (e2e)', () => {
       const app = await boot();
       const email = uniqueEmail('lockout');
       await signup(app, email);
+      // Keyed by organizationId, not by a hard-coded 'default' id. Phase 2
+      // step 8 replaced the singleton row with `id @default(uuid())` plus
+      // `@@unique([organizationId])`; matching on `id: 'default'` therefore
+      // finds nothing on a clean database, falls through to create, and
+      // collides on organizationId against the row that already exists. This
+      // mirrors `SecurityConfigRepository.get()` — `organizationId` and `id`
+      // are both supplied by the schema, never by hand.
       const config = await prisma.securityConfig.upsert({
-        where: { id: 'default' },
+        where: { organizationId: TEST_ORGANIZATION_ID },
         update: {},
-        create: { id: 'default' },
+        create: {},
       });
 
       for (let i = 0; i < config.maxFailedLoginAttempts; i += 1) {

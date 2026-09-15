@@ -5,6 +5,7 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildRecommendationReportHtml } from './recommendation-report.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { insurerName } from '../../repositories/insurer-identity';
 
 const RECOMMENDATION_REPORT_TEMPLATE_TYPE = 'recommendation_report';
 
@@ -68,7 +69,7 @@ export class RecommendationReportDocumentService {
         customerLegalName: customer.legalName,
         insuranceLine: q.rfq.insuranceLine,
         createdAt: view.createdAt,
-        insurerName: q.insurer.name,
+        insurerName: insurerName(q.insurer),
         premium: q.premium,
         currency: q.currency,
         deductible: q.deductible,

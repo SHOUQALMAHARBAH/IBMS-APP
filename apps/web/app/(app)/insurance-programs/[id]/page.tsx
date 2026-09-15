@@ -14,6 +14,8 @@ import { createOpportunity } from '../../../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 import {
   profileFieldLabelStyle,
   profileFieldValueStyle,
@@ -26,9 +28,9 @@ import {
   programTableStyle,
 } from '../../../../components/insurance-program/insurance-program.styles';
 
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 export default function InsuranceProgramDetailPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
@@ -47,24 +49,24 @@ export default function InsuranceProgramDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This insurance program could not be found — it may not exist, or you may not have access to it.'
+          ? t('iprogdNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this insurance program — try again.',
+            : t('iprogdLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function runAction(
     action: (id: string) => Promise<InsuranceProgramWithContext>,
@@ -100,7 +102,7 @@ export default function InsuranceProgramDetailPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : 'Could not take this program to market — try again.',
+          : t('iprogdToMarketError'),
       );
       setBusy(false);
     }
@@ -108,7 +110,7 @@ export default function InsuranceProgramDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isPlacement = hasPermission(user, 'program.assemble');
   const ctx = program?.context;
 
   return (
@@ -147,7 +149,7 @@ export default function InsuranceProgramDetailPage() {
             }}
           >
             <div>
-              <div style={profileFieldLabelStyle}>Source needs assessment</div>
+              <div style={profileFieldLabelStyle}>{t('iprogdSourceNeedsAssessment')}</div>
               <div style={profileFieldValueStyle}>
                 {ctx.needsAssessmentId ? (
                   <button
@@ -175,20 +177,19 @@ export default function InsuranceProgramDetailPage() {
               </div>
             </div>
             <div>
-              <div style={profileFieldLabelStyle}>Asset survey</div>
+              <div style={profileFieldLabelStyle}>{t('iprogdAssetSurvey')}</div>
               <div style={profileFieldValueStyle}>
                 {ctx.surveyComplete
                   ? `${ctx.sumInsured.assetCount} asset${ctx.sumInsured.assetCount === 1 ? '' : 's'} surveyed`
-                  : 'Not started — Property / BI lines have no Sum Insured basis yet'}
+                  : t('iprogdNotStarted')}
               </div>
             </div>
           </div>
 
           <div style={programPanelStyle}>
-            <strong>Derived Sum Insured (from the risk survey)</strong>
+            <strong>{t('iprogdDerivedSi')}</strong>
             <p style={{ opacity: 0.7, margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
-              A re-assembly would seed the Property All Risks and Business
-              Interruption lines from these figures.
+              {t('iprogdReassemblyNote')}
             </p>
             <div
               style={{
@@ -212,15 +213,15 @@ export default function InsuranceProgramDetailPage() {
             </div>
           </div>
 
-          <h2 style={{ marginTop: '2rem' }}>Program lines</h2>
+          <h2 style={{ marginTop: '2rem' }}>{t('iprogdLines')}</h2>
           {program.lines.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>No lines.</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('iprogdNoLines')}</p>
           ) : (
             <table style={programTableStyle}>
               <thead>
                 <tr>
-                  <th style={programCellStyle}>Insurance line</th>
-                  <th style={programCellNumStyle}>Sum Insured basis (JOD)</th>
+                  <th style={programCellStyle}>{t('iprogdColLine')}</th>
+                  <th style={programCellNumStyle}>{t('iprogdColSiBasis')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,11 +250,11 @@ export default function InsuranceProgramDetailPage() {
                     onClick={() =>
                       void runAction(
                         finalizeInsuranceProgram,
-                        'Could not finalize — try again.',
+                        t('iprogdFinalizeError'),
                       )
                     }
                   >
-                    {busy ? 'Working…' : 'Finalize'}
+                    {busy ? t('iprogdWorking') : t('iprogdFinalizeButton')}
                   </button>
                   <button
                     type="button"
@@ -262,11 +263,11 @@ export default function InsuranceProgramDetailPage() {
                     onClick={() =>
                       void runAction(
                         reassembleInsuranceProgram,
-                        'Could not re-assemble — try again.',
+                        t('iprogdReassembleError'),
                       )
                     }
                   >
-                    Re-assemble from current results
+                    {t('iprogdReassembleButton')}
                   </button>
                 </>
               ) : null}
@@ -278,7 +279,7 @@ export default function InsuranceProgramDetailPage() {
                     style={buttonStyle}
                     onClick={() => void takeToMarket()}
                   >
-                    {busy ? 'Working…' : 'Take to market'}
+                    {busy ? t('commonWorking') : t('iprogdToMarketButton')}
                   </button>
                   <button
                     type="button"
@@ -287,11 +288,11 @@ export default function InsuranceProgramDetailPage() {
                     onClick={() =>
                       void runAction(
                         reopenInsuranceProgram,
-                        'Could not reopen — try again.',
+                        t('iprogdReopenError'),
                       )
                     }
                   >
-                    Reopen for revision
+                    {t('iprogdReopenButton')}
                   </button>
                 </>
               ) : null}

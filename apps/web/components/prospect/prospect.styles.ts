@@ -16,7 +16,7 @@ export const profileGridStyle: CSSProperties = {
 
 export const profileFieldLabelStyle: CSSProperties = {
   fontSize: '0.75rem',
-  opacity: 0.6,
+  color: 'var(--ink-secondary)',
   textTransform: 'uppercase',
   letterSpacing: '0.02em',
 };

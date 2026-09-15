@@ -30,10 +30,16 @@ export class RefreshTokenRepository {
     });
   }
 
-  async revokeAllForUser(userId: string): Promise<void> {
-    await this.prisma.client.refreshToken.updateMany({
+  /** Returns the number of rows actually revoked (Part V multi-tenancy item
+   * 6). A legitimate zero exists — a user may hold nothing live — so the count is
+   * reported rather than asserted; what it buys is that a caller or test can
+   * check the post-condition instead of trusting a `void` return, which is
+   * how an RLS-zero-filtered revoke passed for success in Phase 2 step 8. */
+  async revokeAllForUser(userId: string): Promise<number> {
+    const { count } = await this.prisma.client.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    return count;
   }
 }

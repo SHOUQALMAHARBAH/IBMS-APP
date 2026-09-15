@@ -5,11 +5,12 @@ import type {
   Prisma,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
 
 /** An agreement row joined to its insurer name — the shape the commission
  * reads return. */
 const AGREEMENT_WITH_INSURER = {
-  include: { insurer: { select: { name: true } } },
+  include: { insurer: { select: INSURER_IDENTITY_SELECT } },
 } as const;
 
 export type AgreementWithInsurer = Prisma.CommissionAgreementGetPayload<
@@ -50,11 +51,13 @@ export class CommissionRepository {
   }
 
   async listInsurers(): Promise<{ id: string; name: string }[]> {
-    const insurers = await this.prisma.client.insurer.findMany({
-      select: { id: true, name: true },
+    const rows = await this.prisma.client.insurer.findMany({
+      select: INSURER_IDENTITY_SELECT,
     });
+    const insurers = rows.map((r) => ({ id: r.id, name: insurerName(r) }));
     // Sorted in JS, not via Prisma `orderBy` (plain Postgres default
-    // collation) — Insurer.name is genuinely bilingual (Part F item #4), and
+    // collation) — the insurer's legal name is genuinely bilingual (Part F
+    // item #4), and
     // a fixed 'ar' locale is the only way to get Arabic-aware ordering
     // without a DB-level ICU collation migration. A small, unpaginated
     // lookup list, so an in-memory sort is negligible cost.

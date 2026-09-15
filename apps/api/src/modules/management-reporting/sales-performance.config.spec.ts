@@ -9,6 +9,7 @@ import {
 
 const ROW: SalesTarget = {
   id: 'target-1',
+  organizationId: 'org-1',
   ownerUserId: 'user-1',
   branchId: null,
   periodLabel: '2026-Q4',

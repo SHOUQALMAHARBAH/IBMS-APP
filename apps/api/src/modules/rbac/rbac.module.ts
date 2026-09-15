@@ -3,17 +3,20 @@ import { APP_GUARD } from '@nestjs/core';
 import { RbacController } from './controllers/rbac.controller';
 import { AccessRecertificationController } from './controllers/access-recertification.controller';
 import { UserAdminController } from './controllers/user-admin.controller';
-import { PermissionsService } from './services/permissions.service';
+import { OrgStructureController } from './controllers/org-structure.controller';
+import { PermissionsModule } from './permissions.module';
 import { UserAdminService } from './services/user-admin.service';
+import { OrgStructureService } from './services/org-structure.service';
 import { AccessRecertificationService } from './services/access-recertification.service';
 import { AccessRecertificationScheduler } from './services/access-recertification.scheduler';
 import { PermissionsGuard } from './guards/permissions.guard';
 import { RoleRepository } from '../../repositories/role.repository';
-import { PermissionRepository } from '../../repositories/permission.repository';
 import { AccessRecertificationRepository } from '../../repositories/access-recertification.repository';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { SlaModule } from '../sla/sla.module';
+import { DepartmentRepository } from '../../repositories/department.repository';
+import { BranchRepository } from '../../repositories/branch.repository';
 
 @Module({
   // AuthModule exports UserRepository — reused here (the scheduler needs it
@@ -21,25 +24,27 @@ import { SlaModule } from '../sla/sla.module';
   // needs it to enrich item views with subject name/email/roles) rather
   // than re-provided. SlaModule exports SlaTimerService — AccessRecertification
   // Service.startCycle() starts a quarterly_access_review timer (backlog A.8).
-  imports: [AuditModule, AuthModule, SlaModule],
+  imports: [AuditModule, AuthModule, SlaModule, PermissionsModule],
   controllers: [
     RbacController,
     AccessRecertificationController,
     UserAdminController,
+    OrgStructureController,
   ],
   providers: [
-    PermissionsService,
+    DepartmentRepository,
+    BranchRepository,
     UserAdminService,
+    OrgStructureService,
     AccessRecertificationService,
     AccessRecertificationScheduler,
     RoleRepository,
-    PermissionRepository,
     AccessRecertificationRepository,
     // Global guard — see permissions.guard.ts. Runs after AuthModule's
     // JwtAuthGuard/MfaRequiredGuard/RolesGuard/StepUpGuard (module import
     // order in AppModule determines global-guard execution order).
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [PermissionsService],
+  exports: [PermissionsModule],
 })
 export class RbacModule {}

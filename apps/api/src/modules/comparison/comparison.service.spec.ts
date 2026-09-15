@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'plc-1',
+    organizationId: 'org-1',
     email: 'placement@ibms.test',
     roles: ['PLACEMENT_TECHNICAL_OFFICER'],
     sessionId: 'session-1',
@@ -24,11 +25,12 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   };
 }
 
-const insurer = (id: string, name: string) => ({
+// Post Part I §5 split: the company's name is on the global InsurerMaster,
+// and the office's own row carries only what differs per office.
+const insurer = (id: string, legalName: string) => ({
   id,
-  name,
-  nameAr: null,
   financialStrengthRating: null,
+  insurerMaster: { legalName, legalNameAr: null },
 });
 
 function submission(id: string, insurerId: string, status = 'SENT') {

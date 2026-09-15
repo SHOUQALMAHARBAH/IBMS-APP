@@ -102,10 +102,16 @@ export class AccessRecertificationRepository {
   /** Revokes every currently-active role assignment for a user (the
    * recertification item covers the user's whole access, not one grant —
    * AccessRecertificationItem has no per-assignment foreign key). */
-  async revokeAllActiveRoleAssignmentsForUser(userId: string): Promise<void> {
-    await this.prisma.client.userRoleAssignment.updateMany({
+  /** Returns the number of rows actually revoked (Part V multi-tenancy item
+   * 6). A legitimate zero exists — a user may hold no active grants — so the count is
+   * reported rather than asserted; what it buys is that a caller or test can
+   * check the post-condition instead of trusting a `void` return, which is
+   * how an RLS-zero-filtered revoke passed for success in Phase 2 step 8. */
+  async revokeAllActiveRoleAssignmentsForUser(userId: string): Promise<number> {
+    const { count } = await this.prisma.client.userRoleAssignment.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    return count;
   }
 }

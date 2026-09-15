@@ -101,7 +101,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         dir="auto"
         value={insuranceLine}
         onChange={(e) => setInsuranceLine(e.target.value)}
-        placeholder="Property All Risks"
+        placeholder={t('rfqLinePlaceholder')}
         style={{ minWidth: '20rem', marginTop: '0.35rem' }}
       />
 
@@ -110,7 +110,7 @@ function NewRfqForm({ opportunityId }: { opportunityId: string }) {
         <div style={cardMetaStyle}>{t('rfqNewShortlistHint')}</div>
         <div style={insurerPickerStyle}>
           {insurers.length === 0 ? (
-            <span style={{ opacity: 0.6 }}>{t('rfqNewNoInsurersOnFile')}</span>
+            <span style={{ color: 'var(--ink-secondary)' }}>{t('rfqNewNoInsurersOnFile')}</span>
           ) : (
             insurers.map((insurer) => (
               <label
@@ -198,7 +198,7 @@ export default function NewRfqPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 

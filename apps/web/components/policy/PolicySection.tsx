@@ -27,6 +27,17 @@ import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
+import type { TranslationKey } from '../../lib/i18n/translations';
+
+/** `DELIVERY_METHOD_OPTIONS` carries an English `label` alongside each value;
+ *  the select rendered it directly. The value is the contract with the API, the
+ *  label is copy — so the copy moves here and the option list keeps its shape. */
+const DELIVERY_METHOD_LABEL_KEY: Record<DeliveryMethod, TranslationKey> = {
+  email: 'policyDeliveryMethodEmail',
+  portal: 'policyDeliveryMethodPortal',
+  courier: 'policyDeliveryMethodCourier',
+  in_person: 'policyDeliveryMethodInPerson',
+};
 
 interface Props {
   opportunity: OpportunityWithContext;
@@ -77,6 +88,7 @@ function DocumentRowsEditor({
   rows: PolicyDocumentInput[];
   setRows: (rows: PolicyDocumentInput[]) => void;
 }) {
+  const { t } = useLanguage();
   function update(i: number, patch: Partial<PolicyDocumentInput>) {
     setRows(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
@@ -94,7 +106,7 @@ function DocumentRowsEditor({
           }}
         >
           <select
-            aria-label={`Document ${i + 1} category`}
+            aria-label={t('policyDocCategoryAria', { n: i + 1 })}
             value={row.category}
             onChange={(e) => update(i, { category: e.target.value as DocumentCategory })}
           >
@@ -105,7 +117,7 @@ function DocumentRowsEditor({
             ))}
           </select>
           <select
-            aria-label={`Document ${i + 1} classification`}
+            aria-label={t('policyDocClassificationAria', { n: i + 1 })}
             value={row.classification}
             onChange={(e) =>
               update(i, { classification: e.target.value as DataClassification })
@@ -118,14 +130,14 @@ function DocumentRowsEditor({
             ))}
           </select>
           <input
-            aria-label={`Document ${i + 1} file name`}
-            placeholder="file name"
+            aria-label={t('policyDocFileNameAria', { n: i + 1 })}
+            placeholder={t('policyDocFileNamePlaceholder')}
             value={row.fileName}
             onChange={(e) => update(i, { fileName: e.target.value })}
           />
           <input
-            aria-label={`Document ${i + 1} storage reference`}
-            placeholder="storage reference"
+            aria-label={t('policyDocStorageRefAria', { n: i + 1 })}
+            placeholder={t('policyDocStorageRefPlaceholder')}
             value={row.storageRef}
             onChange={(e) => update(i, { storageRef: e.target.value })}
           />
@@ -134,7 +146,7 @@ function DocumentRowsEditor({
             style={{ ...buttonStyle, width: 'auto' }}
             onClick={() => setRows(rows.filter((_, idx) => idx !== i))}
           >
-            Remove
+            {t('policyRemoveDocRowButton')}
           </button>
         </div>
       ))}
@@ -142,9 +154,7 @@ function DocumentRowsEditor({
         type="button"
         style={{ ...buttonStyle, width: 'auto' }}
         onClick={() => setRows([...rows, emptyDocRow()])}
-      >
-        Add document
-      </button>
+      >{t('policyAddDocumentButton')}</button>
     </div>
   );
 }
@@ -318,7 +328,7 @@ export function PolicySection({
         isPlacement ? (
           <div style={{ marginTop: '1rem', maxWidth: '30rem' }}>
             <div style={quoteFieldStyle}>
-              <label htmlFor="pol-inception">Inception date</label>
+              <label htmlFor="pol-inception">{t('policyInceptionDateLabel')}</label>
               <input
                 id="pol-inception"
                 type="date"
@@ -327,7 +337,7 @@ export function PolicySection({
               />
             </div>
             <div style={quoteFieldStyle}>
-              <label htmlFor="pol-expiry">Expiry date (optional)</label>
+              <label htmlFor="pol-expiry">{t('policyExpiryDateLabel')}</label>
               <input
                 id="pol-expiry"
                 type="date"
@@ -350,11 +360,11 @@ export function PolicySection({
                 })
               }
             >
-              {busy ? 'Placing…' : 'Place policy'}
+              {busy ? t('policyPlacingButton') : t('policyPlaceButton')}
             </button>
           </div>
         ) : (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>No policy placed yet.</p>
+          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('policyNoneYet')}</p>
         )
       ) : (
         <div style={{ ...quoteChainCardStyle, marginTop: '1rem' }}>
@@ -400,9 +410,9 @@ export function PolicySection({
 
           {policy.status === 'PLACEMENT_CONFIRMED' && isPlacement ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
-              <strong>Record insurer issuance</strong>
+              <strong>{t('policyRecordIssuanceHeading')}</strong>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-number">Policy number</label>
+                <label htmlFor="pol-number">{t('policyPolicyNumberLabel')}</label>
                 <input
                   id="pol-number"
                   value={policyNumber}
@@ -410,7 +420,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-issued-premium">Issued premium</label>
+                <label htmlFor="pol-issued-premium">{t('policyIssuedPremiumLabel')}</label>
                 <input
                   id="pol-issued-premium"
                   inputMode="decimal"
@@ -420,7 +430,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-limits">Limits (JSON)</label>
+                <label htmlFor="pol-limits">{t('policyLimitsLabel')}</label>
                 <textarea
                   id="pol-limits"
                   rows={3}
@@ -428,13 +438,11 @@ export function PolicySection({
                   onChange={(e) => setLimitsText(e.target.value)}
                 />
                 {limits === null ? (
-                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>
-                    Must be a non-empty JSON object.
-                  </span>
+                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>{t('policyMustBeJsonObject')}</span>
                 ) : null}
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-sums-insured">Sums insured (JSON)</label>
+                <label htmlFor="pol-sums-insured">{t('policySumsInsuredLabel')}</label>
                 <textarea
                   id="pol-sums-insured"
                   rows={3}
@@ -442,13 +450,11 @@ export function PolicySection({
                   onChange={(e) => setSumsInsuredText(e.target.value)}
                 />
                 {sumsInsured === null ? (
-                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>
-                    Must be a non-empty JSON object.
-                  </span>
+                  <span style={{ ...errorStyle, fontSize: '0.8rem' }}>{t('policyMustBeJsonObject')}</span>
                 ) : null}
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-perils">Named perils (comma-separated)</label>
+                <label htmlFor="pol-perils">{t('policyNamedPerilsLabel')}</label>
                 <input
                   id="pol-perils"
                   value={namedPerilsText}
@@ -456,16 +462,14 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="pol-extensions">Extensions (comma-separated)</label>
+                <label htmlFor="pol-extensions">{t('policyExtensionsLabel')}</label>
                 <input
                   id="pol-extensions"
                   value={extensionsText}
                   onChange={(e) => setExtensionsText(e.target.value)}
                 />
               </div>
-              <p style={{ fontWeight: 600, marginTop: '0.6rem' }}>
-                Issued documents
-              </p>
+              <p style={{ fontWeight: 600, marginTop: '0.6rem' }}>{t('policyIssuedDocumentsHeading')}</p>
               <DocumentRowsEditor rows={issuanceDocs} setRows={setIssuanceDocs} />
               <button
                 type="button"
@@ -489,14 +493,14 @@ export function PolicySection({
                   )
                 }
               >
-                {busy ? 'Recording…' : 'Record issuance'}
+                {busy ? t('policyIssuingButton') : t('policyIssueButton')}
               </button>
             </div>
           ) : null}
 
           {policy.schedules.length > 0 ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Coverage schedule</p>
+              <p style={{ fontWeight: 600 }}>{t('policyCoverageScheduleHeading')}</p>
               {policy.schedules.map((s) => (
                 <div key={s.id} style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
                   Effective {formatDate(s.effectiveFrom, language)}
@@ -514,7 +518,7 @@ export function PolicySection({
                 onClick={() => void downloadDocument(policy.id)}
                 style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
               >
-                Download schedule summary (PDF)
+                {t('policyDownloadScheduleButton')}
               </button>
               <button
                 type="button"
@@ -525,15 +529,13 @@ export function PolicySection({
                   marginTop: '0.4rem',
                   marginInlineStart: '0.5rem',
                 }}
-              >
-                Download certificate (PDF)
-              </button>
+              >{t('policyDownloadCertificate')}</button>
             </div>
           ) : null}
 
           {policy.documents.length > 0 ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Electronic file documents</p>
+              <p style={{ fontWeight: 600 }}>{t('policyElectronicFileHeading')}</p>
               <ul style={{ margin: '0.3rem 0' }}>
                 {policy.documents.map((d) => (
                   <li key={d.id} style={{ fontSize: '0.9rem' }}>
@@ -546,7 +548,7 @@ export function PolicySection({
 
           {isPlacement && policy.status !== 'PLACEMENT_CONFIRMED' ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Attach a document</p>
+              <p style={{ fontWeight: 600 }}>{t('policyAttachDocumentHeading')}</p>
               <DocumentRowsEditor rows={attachDocs} setRows={setAttachDocs} />
               <button
                 type="button"
@@ -570,7 +572,7 @@ export function PolicySection({
                   })
                 }
               >
-                Attach
+                {t('policyAttachDocsButton')}
               </button>
             </div>
           ) : null}
@@ -584,10 +586,10 @@ export function PolicySection({
               }}
             >
               <p style={{ fontWeight: 600, margin: 0 }}>
-                Quality-control check:{' '}
+                {t('policyQcResultLabel')}{' '}
                 {policy.checking.discrepancyFound
-                  ? 'DISCREPANCY — Delivery blocked'
-                  : 'verified'}
+                  ? t('policyQcDiscrepancyBlocked')
+                  : t('policyQcVerified')}
               </p>
               {policy.checking.discrepancyDetail ? (
                 <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
@@ -595,11 +597,9 @@ export function PolicySection({
                 </p>
               ) : null}
               {policy.checking.discrepancyLoggedAsPiRiskEvent ? (
-                <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>
-                  A Professional Indemnity risk event has been logged.
-                </p>
+                <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>{t('policyPiRiskEventLogged')}</p>
               ) : null}
-              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', opacity: 0.6 }}>
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>
                 Checked by {policy.checking.checkedByUserId ?? '—'}
                 {policy.checking.checkedAt
                   ? ` on ${formatDateTime(policy.checking.checkedAt, language)}`
@@ -611,15 +611,13 @@ export function PolicySection({
           {canCheck && CHECKABLE_STATES.has(policy.status) ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
               <strong>
-                {policy.checking ? 'Re-run the quality-control check' : 'Quality-control check'}
+                {policy.checking ? t('policyQcRerunHeading') : t('policyQcHeading')}
               </strong>
               <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.2rem 0' }}>
-                Enter the Requested Coverage — the system compares it line-by-line
-                against the issued schedule. A discrepancy blocks Delivery and
-                logs a PI risk event. You cannot check a policy you placed.
+                {t('policyRequestedCoverageNote')}
               </p>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-limits">Requested limits (JSON)</label>
+                <label htmlFor="chk-limits">{t('policyRequestedLimitsLabel')}</label>
                 <textarea
                   id="chk-limits"
                   rows={3}
@@ -628,7 +626,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-sums">Requested sums insured (JSON)</label>
+                <label htmlFor="chk-sums">{t('policyRequestedSumsLabel')}</label>
                 <textarea
                   id="chk-sums"
                   rows={3}
@@ -637,7 +635,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-perils">Requested named perils (comma-separated)</label>
+                <label htmlFor="chk-perils">{t('policyRequestedPerilsLabel')}</label>
                 <input
                   id="chk-perils"
                   value={chkPerilsText}
@@ -645,7 +643,7 @@ export function PolicySection({
                 />
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="chk-extensions">Requested extensions (comma-separated)</label>
+                <label htmlFor="chk-extensions">{t('policyRequestedExtensionsLabel')}</label>
                 <input
                   id="chk-extensions"
                   value={chkExtensionsText}
@@ -672,21 +670,21 @@ export function PolicySection({
                   })
                 }
               >
-                {busy ? 'Checking…' : 'Run check'}
+                {busy ? t('policyCheckingButton') : t('policyCheckButton')}
               </button>
             </div>
           ) : null}
 
           {policy.delivery ? (
             <div style={{ marginTop: '0.8rem' }}>
-              <p style={{ fontWeight: 600 }}>Delivery</p>
+              <p style={{ fontWeight: 600 }}>{t('policyDeliveryHeading')}</p>
               <p style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
                 {policy.delivery.method} · to {policy.delivery.recipient} ·{' '}
                 {formatDate(policy.delivery.deliveredAt, language)}
                 {' · '}
                 {policy.delivery.receiptAcknowledgedAt
                   ? `receipt acknowledged ${formatDate(policy.delivery.receiptAcknowledgedAt, language)}`
-                  : 'awaiting client acknowledgement'}
+                  : t('policyAwaitingAcknowledgement')}
               </p>
               {canDeliver && !policy.delivery.receiptAcknowledgedAt ? (
                 <button
@@ -699,18 +697,16 @@ export function PolicySection({
                       onOpportunityChanged();
                     })
                   }
-                >
-                  Acknowledge receipt
-                </button>
+                >{t('policyAcknowledgeReceiptButton')}</button>
               ) : null}
             </div>
           ) : null}
 
           {canDeliver && !policy.delivery && policy.status === 'VERIFIED' ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '30rem' }}>
-              <strong>Record delivery</strong>
+              <strong>{t('policyRecordDeliveryButtonText')}</strong>
               <div style={quoteFieldStyle}>
-                <label htmlFor="del-method">Method</label>
+                <label htmlFor="del-method">{t('financeMethodLabel')}</label>
                 <select
                   id="del-method"
                   value={deliveryMethod}
@@ -720,18 +716,18 @@ export function PolicySection({
                 >
                   {DELIVERY_METHOD_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
-                      {o.label}
+                      {t(DELIVERY_METHOD_LABEL_KEY[o.value])}
                     </option>
                   ))}
                 </select>
               </div>
               <div style={quoteFieldStyle}>
-                <label htmlFor="del-recipient">Recipient</label>
+                <label htmlFor="del-recipient">{t('policyDeliveryRecipientLabel')}</label>
                 <input
                   id="del-recipient"
                   value={deliveryRecipient}
                   maxLength={200}
-                  placeholder="name / email / courier reference"
+                  placeholder={t('policyDeliveryRecipientPlaceholder')}
                   onChange={(e) => setDeliveryRecipient(e.target.value)}
                 />
               </div>
@@ -749,7 +745,7 @@ export function PolicySection({
                   })
                 }
               >
-                {busy ? 'Recording…' : 'Record delivery'}
+                {busy ? t('policyIssuingButton') : t('policyRecordDeliveryButton')}
               </button>
             </div>
           ) : null}
