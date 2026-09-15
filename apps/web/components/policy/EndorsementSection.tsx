@@ -202,12 +202,12 @@ export function EndorsementSection({
               ) : null}
               {e.refund ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                  Refund {formatMoney(e.refund.amount, language)} ·{' '}
+                  {t('endorsementRefundLabel')} {formatMoney(e.refund.amount, language)} ·{' '}
                   {e.refund.approvedByUserId
-                    ? `approved by ${e.refund.approvedByUserId}`
+                    ? t('endorsementRefundApprovedBy', { user: e.refund.approvedByUserId })
                     : e.refund.needsApproval
-                      ? 'awaiting manager approval'
-                      : 'auto-cleared (below threshold)'}
+                      ? t('endorsementRefundAwaiting')
+                      : t('endorsementRefundAutoCleared')}
                 </p>
               ) : null}
               <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
@@ -247,7 +247,7 @@ export function EndorsementSection({
             </select>
           </div>
           <div style={quoteFieldStyle}>
-            <label htmlFor="end-change-type">Change</label>
+            <label htmlFor="end-change-type">{t('endorsementChangeTypeLabel')}</label>
             <select
               id="end-change-type"
               value={changeType}
@@ -300,7 +300,7 @@ export function EndorsementSection({
               )
             }
           >
-            {busy ? t('endorsementRequesting') : 'Request endorsement'}
+            {busy ? t('endorsementRequesting') : t('endorsementCreateButton')}
           </button>
 
           <div style={{ marginTop: '1.5rem' }}>
@@ -357,7 +357,7 @@ export function EndorsementSection({
                 )
               }
             >
-              {busy ? t('endorsementRequesting') : 'Request cancellation'}
+              {busy ? t('endorsementRequesting') : t('endorsementCancelButton')}
             </button>
           </div>
         </div>

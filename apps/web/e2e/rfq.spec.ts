@@ -2047,7 +2047,7 @@ test("raises a premium invoice from the Billing block — commission netted, tot
   await expect(
     page.getByText("JOD 115,350.000", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
 
   // Part F item #7 — an invoice now exists, so the download button
   // appears and produces a real bilingual PDF download.
@@ -2100,10 +2100,10 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await page.getByLabel("Fees amount").fill("150.000");
   await page.getByLabel("Due date").fill("2026-12-01");
   await page.getByRole("button", { name: "Issue invoice" }).click();
-  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
 
   // 1a. Process 32 — a PART payment. The money is booked, but the invoice
-  //     stays INVOICED: only the instalment that completes it moves it on,
+  //     stays Invoiced: only the instalment that completes it moves it on,
   //     which is what keeps it on the #33 ageing report for the remainder.
   await page.getByLabel("Instalment amount").fill("15,350.000".replace(",", ""));
   // The payment reference is MANDATORY — it is the idempotency key, and the
@@ -2112,7 +2112,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   // client's money twice (two Receipts, two `in` ledger rows).
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-1");
   await page.getByRole("button", { name: "Record collection" }).click();
-  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
   await expect(page.getByText("JOD 15,350.000")).toBeVisible();
   // The remaining balance is shown while the invoice is part-paid.
   await expect(page.getByText("Outstanding balance")).toBeVisible();
@@ -2124,7 +2124,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   //     idempotently rather than booking a second.
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-2");
   await page.getByRole("button", { name: "Record collection" }).click();
-  await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Collected");
   // Collected is now the pooled total of BOTH instalments — which equals the
   // invoiced total, so the figure legitimately appears TWICE ("Total due" and
   // "Collected"). Asserting the count says exactly that, where a bare
@@ -2136,13 +2136,13 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await page
     .getByRole("button", { name: "Reconcile collected funds" })
     .click();
-  await expect(page.getByText("RECONCILED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Reconciled");
 
   // 3. remit the net premium (120000 - 14400)
   await page
     .getByRole("button", { name: /Remit JOD 105,600.000 to insurer/ })
     .click();
-  await expect(page.getByText("REMITTED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Remitted");
   await expect(page.getByText("Remitted to insurer")).toBeVisible();
   await expect(page.getByText(/JOD 105,600.000 on/)).toBeVisible();
 

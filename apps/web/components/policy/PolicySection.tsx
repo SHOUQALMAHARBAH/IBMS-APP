@@ -27,6 +27,17 @@ import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
+import type { TranslationKey } from '../../lib/i18n/translations';
+
+/** `DELIVERY_METHOD_OPTIONS` carries an English `label` alongside each value;
+ *  the select rendered it directly. The value is the contract with the API, the
+ *  label is copy — so the copy moves here and the option list keeps its shape. */
+const DELIVERY_METHOD_LABEL_KEY: Record<DeliveryMethod, TranslationKey> = {
+  email: 'policyDeliveryMethodEmail',
+  portal: 'policyDeliveryMethodPortal',
+  courier: 'policyDeliveryMethodCourier',
+  in_person: 'policyDeliveryMethodInPerson',
+};
 
 interface Props {
   opportunity: OpportunityWithContext;
@@ -135,7 +146,7 @@ function DocumentRowsEditor({
             style={{ ...buttonStyle, width: 'auto' }}
             onClick={() => setRows(rows.filter((_, idx) => idx !== i))}
           >
-            Remove
+            {t('policyRemoveDocRowButton')}
           </button>
         </div>
       ))}
@@ -349,7 +360,7 @@ export function PolicySection({
                 })
               }
             >
-              {busy ? t('policyPlacingButton') : 'Place policy'}
+              {busy ? t('policyPlacingButton') : t('policyPlaceButton')}
             </button>
           </div>
         ) : (
@@ -561,7 +572,7 @@ export function PolicySection({
                   })
                 }
               >
-                Attach
+                {t('policyAttachDocsButton')}
               </button>
             </div>
           ) : null}
@@ -575,10 +586,10 @@ export function PolicySection({
               }}
             >
               <p style={{ fontWeight: 600, margin: 0 }}>
-                Quality-control check:{' '}
+                {t('policyQcResultLabel')}{' '}
                 {policy.checking.discrepancyFound
-                  ? 'DISCREPANCY — Delivery blocked'
-                  : 'verified'}
+                  ? t('policyQcDiscrepancyBlocked')
+                  : t('policyQcVerified')}
               </p>
               {policy.checking.discrepancyDetail ? (
                 <p style={{ margin: '0.3rem 0', fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>
@@ -600,7 +611,7 @@ export function PolicySection({
           {canCheck && CHECKABLE_STATES.has(policy.status) ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
               <strong>
-                {policy.checking ? 'Re-run the quality-control check' : 'Quality-control check'}
+                {policy.checking ? t('policyQcRerunHeading') : t('policyQcHeading')}
               </strong>
               <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.2rem 0' }}>
                 {t('policyRequestedCoverageNote')}
@@ -659,7 +670,7 @@ export function PolicySection({
                   })
                 }
               >
-                {busy ? t('policyCheckingButton') : 'Run check'}
+                {busy ? t('policyCheckingButton') : t('policyCheckButton')}
               </button>
             </div>
           ) : null}
@@ -673,7 +684,7 @@ export function PolicySection({
                 {' · '}
                 {policy.delivery.receiptAcknowledgedAt
                   ? `receipt acknowledged ${formatDate(policy.delivery.receiptAcknowledgedAt, language)}`
-                  : 'awaiting client acknowledgement'}
+                  : t('policyAwaitingAcknowledgement')}
               </p>
               {canDeliver && !policy.delivery.receiptAcknowledgedAt ? (
                 <button
@@ -705,7 +716,7 @@ export function PolicySection({
                 >
                   {DELIVERY_METHOD_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
-                      {o.label}
+                      {t(DELIVERY_METHOD_LABEL_KEY[o.value])}
                     </option>
                   ))}
                 </select>

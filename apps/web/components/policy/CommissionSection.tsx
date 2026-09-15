@@ -131,7 +131,7 @@ export function CommissionSection({
           </div>
           {entry.status === 'paid' ? (
             <div style={quoteFieldStyle}>
-              <span>Reconciled</span>
+              <span>{t('commissionReconciledLabel')}</span>
               <span>
                 {formatMoney(entry.paidAmount, language)}
                 {entry.paymentReference ? ` · ${entry.paymentReference}` : ''}
@@ -140,7 +140,7 @@ export function CommissionSection({
           ) : null}
           {entry.reversedAmount && Number(entry.reversedAmount) > 0 ? (
             <div style={quoteFieldStyle}>
-              <span>Reversed</span>
+              <span>{t('commissionReversedLabel')}</span>
               <span>
                 {formatMoney(entry.reversedAmount, language)}
                 {entry.reversalReason ? ` · ${entry.reversalReason}` : ''}
@@ -215,7 +215,7 @@ export function CommissionSection({
                 />
               </label>
               <button type="submit" style={buttonStyle} disabled={busy}>
-                {busy ? t('commissionApprovingButton') : 'Raise manual override'}
+                {busy ? t('commissionApprovingButton') : t('commissionRaiseOverrideButton')}
               </button>
             </form>
           ) : null}

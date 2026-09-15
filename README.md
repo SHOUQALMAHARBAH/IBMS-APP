@@ -187,10 +187,21 @@ already give).
   scan cannot see these, because the text node itself contains `{`. The pluralisation
   half is not a key-wiring job: these sites use `count === 1 ? '' : 's'`, and Arabic
   has more plural forms than that expresses, so it needs a plural rule in
-  `translate()`. Also still open: `policy.ts` carries 98 unreferenced keys (down from
-  161), orphaned before this work when the policy screens moved to `pold*` in
-  `detail-pages.ts` — pre-existing debt, not a regression; 159 keys are unreferenced
-  across all sixteen dictionaries, 98 of them there.
+  `translate()`.
+* **An unreferenced dictionary key is a question, not a verdict.** `policy.ts`'s 98
+  orphans were audited one by one rather than deleted as debt: **15 were missing
+  wiring** — the string they were written for was still hard-coded in the component
+  that owns them — and **83 were genuinely dead**, superseded (`policyStatus*` by
+  `policyState*`) or written for a UI that was never built. `policy.ts` is now at
+  **zero** unreferenced; app-wide the count is **61, down from 159**. Audit before you
+  delete: the cheapest way to lose a translation is to bin the key because nothing
+  references it yet.
+* **Enum values render through a `Record<Enum, TranslationKey>` map, never raw.**
+  `POLICY_STATUS_LABEL_KEY` was the first; `INVOICE_STATUS_LABEL_KEY` and
+  `RECEIPT_METHOD_LABEL_KEY` (`components/policy/FinanceSection.tsx`) and
+  `DELIVERY_METHOD_LABEL_KEY` (`PolicySection.tsx`) now cover the three that were
+  still printing their own tokens — `INVOICED`, `bank_transfer` — on screen, in Arabic
+  too. A new enum member is then a compile error, not a token a user reads.
 * **`GET /policies` answers three questions.** With `opportunityId`, the one
   policy placed from it; with `customerId`, that customer's policies; with
   neither, the book-wide list behind `/policies` — filtered **in the query** to

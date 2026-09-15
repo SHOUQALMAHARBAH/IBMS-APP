@@ -35,7 +35,7 @@ import {
 } from '../quotation/quotation.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
-import type { Language } from '../../lib/i18n/translations';
+import type { Language, TranslationKey } from '../../lib/i18n/translations';
 
 interface Props {
   opportunityId: string;
@@ -58,15 +58,21 @@ interface Props {
   canClose: boolean;
 }
 
-function coverageLabel(c: Claim, language: Language): string {
+// `t` is passed in rather than read from a hook: this is a plain helper, not a
+// component, so it has no hook context of its own.
+function coverageLabel(
+  c: Claim,
+  language: Language,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
   if (!c.coverageResolvedAtLossDate || !c.coverage) {
-    return 'coverage at loss date could not be resolved';
+    return t('claimCoverageUnresolved');
   }
   const from = formatDate(c.coverage.effectiveFrom, language);
   const to = c.coverage.effectiveTo
     ? formatDate(c.coverage.effectiveTo, language)
-    : 'open';
-  return `coverage version in force: ${from} → ${to}`;
+    : t('claimCoverageOpenEnd');
+  return t('claimCoverageInForce', { from, to });
 }
 
 /** Process 24 — a Claims Officer registers a NOTIFIED claim with the insurer
@@ -220,10 +226,10 @@ function ClaimDocumentation({
   return (
     <div style={{ marginTop: '0.75rem' }}>
       <strong style={{ fontSize: '0.9rem' }}>
-        Documentation{' '}
+        {t('claimDocumentationHeading')}{' '}
         {claim.documentationComplete
-          ? '· complete'
-          : `· missing ${claim.missingMandatoryDocuments.join(', ')}`}
+          ? `· ${t('claimDocumentationComplete')}`
+          : `· ${t('claimDocumentationMissing', { docs: claim.missingMandatoryDocuments.join(', ') })}`}
       </strong>
       <ul style={{ margin: '0.35rem 0', paddingInlineStart: '1.1rem', fontSize: '0.85rem' }}>
         {claim.documentChecklist
@@ -545,7 +551,7 @@ function ClaimFollowUp({
           style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
           onClick={() => void resolve(alert.id)}
         >
-          Resolve
+          {t('claimResolveAlertButton')}
         </button>
       ) : null}
     </div>
@@ -736,7 +742,7 @@ function ClaimClosure({
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
-      <strong style={{ fontSize: '0.9rem' }}>Closure</strong>
+      <strong style={{ fontSize: '0.9rem' }}>{t('claimClosureHeading')}</strong>
       {error ? (
         <p role="alert" style={errorStyle}>
           {error}
@@ -745,7 +751,7 @@ function ClaimClosure({
 
       {claim.status === 'CLOSED' ? (
         <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
-          Closed{' '}
+          {t('claimStatusClosed')}{' '}
           {claim.closedAt ? formatDate(claim.closedAt, language) : ''}
           {paymentConfirmed
             ? ` · client payment confirmed ${formatDate(
@@ -934,7 +940,7 @@ export function ClaimSection({
               .finally(() => setBusy(false));
           }}
         >
-          {busy ? t('claimRunning') : 'Run follow-up sweep'}
+          {busy ? t('claimRunning') : t('claimRunSweepButton')}
         </button>
       ) : null}
 
@@ -994,7 +1000,7 @@ export function ClaimSection({
             ) : null}
             {c.isThirdPartyInvolved ? (
               <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
-                Third party involved
+                {t('claimThirdPartyInvolvedRow')}
                 {c.thirdParty?.fullName ? (
                   <>
                     {': '}
@@ -1036,7 +1042,7 @@ export function ClaimSection({
               </p>
             ) : null}
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
-              {coverageLabel(c, language)}
+              {coverageLabel(c, language, t)}
             </p>
             {canRegister && c.status === 'NOTIFIED' ? (
               <ClaimRegistrationForm claimId={c.id} onDone={load} />
@@ -1163,7 +1169,7 @@ export function ClaimSection({
             style={{ ...buttonStyle, width: 'auto' }}
             onClick={() => void submit()}
           >
-            {busy ? t('policyIssuingButton') : 'Notify claim'}
+            {busy ? t('claimNotifyingButton') : t('claimNotifySubmitButton')}
           </button>
         </div>
       ) : null}
