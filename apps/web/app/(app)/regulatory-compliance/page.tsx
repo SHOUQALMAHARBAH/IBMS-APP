@@ -350,7 +350,7 @@ export default function RegulatoryCompliancePage() {
                       {canManage && !it.isSubmitted ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
-                            aria-label={`Evidence reference for ${it.obligationName}`}
+                            aria-label={t('rcEvidenceRefAria', { name: it.obligationName })}
                             value={evidenceDrafts[it.id] ?? ''}
                             onChange={(e) =>
                               setEvidenceDrafts((prev) => ({

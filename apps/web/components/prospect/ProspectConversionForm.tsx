@@ -95,7 +95,7 @@ export function ProspectConversionForm({
               value={sector}
               onChange={(e) => setSector(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. Manufacturing"
+              placeholder={t('prosnIndustryPlaceholder')}
             />
           </div>
         </div>
@@ -129,7 +129,7 @@ export function ProspectConversionForm({
               value={businessSize}
               onChange={(e) => setBusinessSize(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. SME, Corporate"
+              placeholder={t('prosnSegmentPlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
@@ -162,7 +162,7 @@ export function ProspectConversionForm({
               value={expectedPremium}
               onChange={(e) => setExpectedPremium(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. 1250.500"
+              placeholder={t('prosnPremiumPlaceholder')}
             />
           </div>
         </div>
@@ -174,7 +174,7 @@ export function ProspectConversionForm({
               value={productsOfInterest}
               onChange={(e) => setProductsOfInterest(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. Medical, Motor, Property"
+              placeholder={t('prosnLinesPlaceholder')}
             />
           </div>
         </div>

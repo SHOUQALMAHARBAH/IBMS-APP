@@ -217,7 +217,7 @@ export default function SlaPoliciesPage() {
                       {canManage ? (
                         <div style={{ display: "flex", gap: "0.3rem" }}>
                           <input
-                            aria-label={`Duration for ${p.policyName}`}
+                            aria-label={t('slapDurationAria', { name: p.policyName })}
                             type="number"
                             min={0}
                             value={drafts[p.id] ?? String(p.durationValue)}

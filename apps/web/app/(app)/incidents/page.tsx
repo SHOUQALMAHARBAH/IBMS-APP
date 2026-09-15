@@ -275,7 +275,7 @@ export default function IncidentsPage() {
                             <label key={r} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                               <input
                                 type="checkbox"
-                                aria-label={`Notify ${r} for ${inc.id}`}
+                                aria-label={t('incNotifyRoleAria', { role: r, id: inc.id })}
                                 checked={(regulatorDrafts[inc.id] ?? []).includes(r)}
                                 onChange={() => toggleRegulator(inc.id, r)}
                               />
@@ -314,7 +314,7 @@ export default function IncidentsPage() {
                       {canContain && inc.status === 'RECOVERED' ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <input
-                            aria-label={`Root cause analysis for ${inc.id}`}
+                            aria-label={t('incRootCauseAria', { id: inc.id })}
                             placeholder={t('incRootCauseLabel')}
                             value={rootCauseDrafts[inc.id] ?? ''}
                             onChange={(e) =>

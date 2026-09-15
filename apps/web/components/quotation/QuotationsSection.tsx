@@ -535,7 +535,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 value={form.negotiationNotes}
                 rows={2}
                 maxLength={4000}
-                placeholder="e.g. asked for 5% off and the flood exclusion struck"
+                placeholder={t('rfqNegotiationNotesPlaceholder')}
                 onChange={(e) => set('negotiationNotes', e.target.value)}
               />
             </div>

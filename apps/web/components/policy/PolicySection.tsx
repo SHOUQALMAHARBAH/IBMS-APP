@@ -95,7 +95,7 @@ function DocumentRowsEditor({
           }}
         >
           <select
-            aria-label={`Document ${i + 1} category`}
+            aria-label={t('policyDocCategoryAria', { n: i + 1 })}
             value={row.category}
             onChange={(e) => update(i, { category: e.target.value as DocumentCategory })}
           >
@@ -106,7 +106,7 @@ function DocumentRowsEditor({
             ))}
           </select>
           <select
-            aria-label={`Document ${i + 1} classification`}
+            aria-label={t('policyDocClassificationAria', { n: i + 1 })}
             value={row.classification}
             onChange={(e) =>
               update(i, { classification: e.target.value as DataClassification })
@@ -119,14 +119,14 @@ function DocumentRowsEditor({
             ))}
           </select>
           <input
-            aria-label={`Document ${i + 1} file name`}
-            placeholder="file name"
+            aria-label={t('policyDocFileNameAria', { n: i + 1 })}
+            placeholder={t('policyDocFileNamePlaceholder')}
             value={row.fileName}
             onChange={(e) => update(i, { fileName: e.target.value })}
           />
           <input
-            aria-label={`Document ${i + 1} storage reference`}
-            placeholder="storage reference"
+            aria-label={t('policyDocStorageRefAria', { n: i + 1 })}
+            placeholder={t('policyDocStorageRefPlaceholder')}
             value={row.storageRef}
             onChange={(e) => update(i, { storageRef: e.target.value })}
           />
@@ -716,7 +716,7 @@ export function PolicySection({
                   id="del-recipient"
                   value={deliveryRecipient}
                   maxLength={200}
-                  placeholder="name / email / courier reference"
+                  placeholder={t('policyDeliveryRecipientPlaceholder')}
                   onChange={(e) => setDeliveryRecipient(e.target.value)}
                 />
               </div>

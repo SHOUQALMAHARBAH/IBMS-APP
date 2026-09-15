@@ -176,6 +176,7 @@ export const OPERATIONS = {
     acrCycleDueDate: 'تاريخ الاستحقاق (اختياري — الافتراضي 15 يوماً)',
     acrCycleLabel: 'وسم الدورة',
     acrStartCycleHeading: 'بدء دورة إعادة اعتماد جديدة',
+    acrCycleNamePlaceholder: 'مثال: الربع الأول 2026 — مراجعة استثنائية',
     acrDecisionError: 'تعذّر تسجيل قرارك — حاول مرة أخرى.',
     acrFlagForChange: 'وسم للتغيير',
     acrAdminNotExempt: 'وصول إداري — غير مستثنى من المراجعة',
@@ -184,6 +185,9 @@ export const OPERATIONS = {
     acrQueueIntro: 'قائمة إعادة اعتماد الوصول — أكّد أن كل شخص ما زال يحتاج الوصول المُدرج، أو ألغِه أو ضَع عليه وسماً للتغيير.',
     acrQuarterlyNote: 'تعمل الدورة تلقائياً كل ربع سنة أيضاً. استخدم هذا لبدء دورة عند الطلب — يحصل كل مستخدم يحمل دوراً نشطاً حالياً على عنصر مُسنَد إلى مراجع مؤهَّل.',
     acrQueueCaption: 'قائمة إعادة اعتماد الوصول — أكّد أن كل شخص ما زال يحتاج الوصول المُدرج، أو ألغِه أو ضَع عليه وسماً.',
+    acrConfirmAccessAria: 'تأكيد صلاحية الوصول لـ {name}',
+    acrRevokeAccessAria: 'سحب صلاحية الوصول من {name}',
+    acrFlagAccessAria: 'الإشارة إلى تغيير صلاحية الوصول لـ {name}',
 
     // ---- Claims analytics (#30) -----------------------------------------------------------
     claHeading: 'تحليلات المطالبات',
@@ -235,6 +239,7 @@ export const OPERATIONS = {
     rpAddingButton: 'جارٍ الإضافة…',
     rpAddSiteButton: 'إضافة موقع',
     rpNoPermission: 'لا تملك صلاحية risk-profile.read اللازمة لعرض ملفات المخاطر.',
+    rpOpenSurveyAria: 'فتح مسح المخاطر لـ {name}',
 
     // ---- Insurance programs (#7) ------------------------------------------------------------------
     iprogHeading: 'برامج التأمين',
@@ -243,6 +248,7 @@ export const OPERATIONS = {
     iprogLoadError: 'تعذّر تحميل برامج التأمين — حاول مرة أخرى.',
     iprogNoPermission: 'لا تملك صلاحية program.read اللازمة لعرض برامج التأمين.',
     iprogNoneForCustomer: 'لا يوجد برنامج تأمين لهذا العميل بعد — جمِّع واحداً من تقييم احتياجات معتمد.',
+    iprogOpenProgramAria: 'فتح برنامج التأمين {id}',
 
     // ---- Needs assessments (#5) --------------------------------------------------------------------
     naHeading: 'تقييمات الاحتياجات',
@@ -250,6 +256,7 @@ export const OPERATIONS = {
     naNone: 'لا توجد تقييمات احتياجات بعد.',
     naLoadError: 'تعذّر تحميل تقييمات الاحتياجات — حاول مرة أخرى.',
     naNoPermission: 'لا تملك صلاحية needs-assessment.read اللازمة لعرض تقييمات الاحتياجات.',
+    naViewAssessmentAria: 'عرض تقييم الاحتياجات {id}',
 
     // ---- Prospects (#2) -----------------------------------------------------------------------------
     prosHeading: 'العملاء المرتقبون',
@@ -260,6 +267,7 @@ export const OPERATIONS = {
     prosNone: 'لا يوجد عملاء مرتقبون بعد.',
     prosNoPermission: 'لا تملك صلاحية prospect.read اللازمة لعرض العملاء المرتقبين.',
     prosIntro: 'العملية 2 — العملاء المحتملون المؤهَّلون الذين حُوِّلوا إلى عملاء مرتقبين. حوِّل عميلاً محتملاً من لوحة المسار لإضافته هنا.',
+    prosViewProfileAria: 'عرض الملف الشخصي — {name}',
 
     // ---- Home launcher --------------------------------------------------------------------------------
     homeLeadsBlurb: 'التقط عميلاً محتملاً من أي مصدر استقطاب وانقله عبر مراحل المسار.',
@@ -313,6 +321,7 @@ export const OPERATIONS = {
     usrGrant: 'منح',
     usrDeactivate: 'تعطيل',
     usrActivate: 'تفعيل',
+    usrRoleToGrantAria: 'الدور المراد منحه لـ {email}',
     renCouldNotLoadRenewalCases: 'تعذّر تحميل حالات التجديد — حاول مرة أخرى.',
     renThatActionFailedTryAgain: 'فشل الإجراء — حاول مرة أخرى.',
     renRenewalCases: 'حالات التجديد',
@@ -492,6 +501,7 @@ export const OPERATIONS = {
     acrCycleDueDate: 'Due date (optional — defaults to 15 days)',
     acrCycleLabel: 'Cycle label',
     acrStartCycleHeading: 'Start a new recertification cycle',
+    acrCycleNamePlaceholder: 'e.g. Q1-2026 ad hoc',
     acrDecisionError: 'Could not record your decision — try again.',
     acrFlagForChange: 'Flag for change',
     acrAdminNotExempt: 'Admin access — not exempt from review',
@@ -500,6 +510,9 @@ export const OPERATIONS = {
     acrQueueIntro: 'Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it for change.',
     acrQuarterlyNote: 'A cycle also runs automatically every quarter. Use this to start one on demand — every user currently holding an active role gets an item, assigned to an eligible reviewer.',
     acrQueueCaption: 'Access-recertification queue — confirm each person still needs the access listed, or revoke/flag it.',
+    acrConfirmAccessAria: 'Confirm access for {name}',
+    acrRevokeAccessAria: 'Revoke access for {name}',
+    acrFlagAccessAria: 'Flag access for change for {name}',
 
     claHeading: 'Claims analytics',
     claIntro:
@@ -550,6 +563,7 @@ export const OPERATIONS = {
     rpAddingButton: 'Adding…',
     rpAddSiteButton: 'Add site',
     rpNoPermission: "You don't hold the risk-profile.read permission.",
+    rpOpenSurveyAria: 'Open risk survey for {name}',
 
     iprogHeading: 'Insurance programs',
     iprogLoading: 'Loading…',
@@ -558,12 +572,14 @@ export const OPERATIONS = {
     iprogLoadError: 'Could not load insurance programs — try again.',
     iprogNoPermission: "You don't hold the program.read permission.",
     iprogNoneForCustomer: 'No insurance program yet for this customer — assemble one from an approved needs assessment.',
+    iprogOpenProgramAria: 'Open insurance program {id}',
 
     naHeading: 'Needs assessments',
     naLoading: 'Loading…',
     naNone: 'No needs assessments yet.',
     naLoadError: 'Could not load needs assessments — try again.',
     naNoPermission: "You don't hold the needs-assessment.read permission.",
+    naViewAssessmentAria: 'View needs assessment {id}',
 
     prosHeading: 'Prospects',
     prosLoading: 'Loading…',
@@ -573,6 +589,7 @@ export const OPERATIONS = {
     prosNone: 'No prospects yet.',
     prosNoPermission: "You don't hold the prospect.read permission.",
     prosIntro: 'Process 2 — qualified leads that have been converted into prospects. Convert a lead from the pipeline board to add one here.',
+    prosViewProfileAria: 'View profile — {name}',
 
     homeLeadsBlurb: 'Capture a lead from any acquisition source and move it through the pipeline.',
     homeProspectsBlurb: 'Qualify a converted lead and record its business profile.',
@@ -624,6 +641,7 @@ export const OPERATIONS = {
     usrGrant: 'Grant',
     usrDeactivate: 'Deactivate',
     usrActivate: 'Activate',
+    usrRoleToGrantAria: 'Role to grant to {email}',
     renCouldNotLoadRenewalCases: 'Could not load renewal cases — try again.',
     renThatActionFailedTryAgain: 'That action failed — try again.',
     renRenewalCases: 'Renewal cases',

@@ -25,6 +25,12 @@ export const POLICY = {
     policyMustBeJsonObject: 'يجب أن يكون كائن JSON غير فارغ.',
     policyRecordIssuanceHeading: 'تسجيل إصدار شركة التأمين',
     policyAddDocumentButton: 'إضافة مستند',
+    policyDocFileNamePlaceholder: 'اسم الملف',
+    policyDocStorageRefPlaceholder: 'مرجع التخزين',
+    policyDocCategoryAria: 'فئة المستند {n}',
+    policyDocClassificationAria: 'تصنيف المستند {n}',
+    policyDocFileNameAria: 'اسم ملف المستند {n}',
+    policyDocStorageRefAria: 'مرجع تخزين المستند {n}',
     policyDownloadScheduleButton: 'تنزيل ملخص الجدول (PDF)',
     policyDeliveryHeading: 'التسليم',
     policyRecordDeliveryButton: 'تسجيل التسليم',
@@ -61,6 +67,7 @@ export const POLICY = {
     policyActionError: 'تعذر إتمام هذا الإجراء — حاول مرة أخرى.',
     policyDeliveryMethodLabel: 'طريقة التسليم',
     policyDeliveryRecipientLabel: 'المستقبِل',
+    policyDeliveryRecipientPlaceholder: 'الاسم / البريد الإلكتروني / مرجع شركة الشحن',
     policyRecordDeliveryButtonText: 'تسجيل التسليم',
 
     // EndorsementSection.tsx
@@ -345,6 +352,12 @@ export const POLICY = {
     policyMustBeJsonObject: 'Must be a non-empty JSON object.',
     policyRecordIssuanceHeading: 'Record insurer issuance',
     policyAddDocumentButton: 'Add document',
+    policyDocFileNamePlaceholder: 'file name',
+    policyDocStorageRefPlaceholder: 'storage reference',
+    policyDocCategoryAria: 'Document {n} category',
+    policyDocClassificationAria: 'Document {n} classification',
+    policyDocFileNameAria: 'Document {n} file name',
+    policyDocStorageRefAria: 'Document {n} storage reference',
     policyDownloadScheduleButton: 'Download schedule summary (PDF)',
     policyDeliveryHeading: 'Delivery',
     policyRecordDeliveryButton: 'Record delivery',
@@ -381,6 +394,7 @@ export const POLICY = {
     policyActionError: 'That action could not be completed — try again.',
     policyDeliveryMethodLabel: 'Delivery method',
     policyDeliveryRecipientLabel: 'Recipient',
+    policyDeliveryRecipientPlaceholder: 'name / email / courier reference',
     policyRecordDeliveryButtonText: 'Record delivery',
 
     // EndorsementSection.tsx

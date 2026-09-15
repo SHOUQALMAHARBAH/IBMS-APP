@@ -167,7 +167,7 @@ export function LeadIntakeForm({ onLeadCreated }: LeadIntakeFormProps) {
             value={consentTextVersion}
             onChange={(e) => setConsentTextVersion(e.target.value)}
             style={inputStyle}
-            placeholder="e.g. privacy-notice-v1.2"
+            placeholder={t('consTextVersionPlaceholder')}
           />
         </div>
         <button type="submit" disabled={isSubmitting} style={buttonStyle}>

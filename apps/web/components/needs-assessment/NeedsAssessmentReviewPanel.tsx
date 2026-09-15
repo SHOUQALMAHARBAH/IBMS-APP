@@ -94,7 +94,7 @@ export function NeedsAssessmentReviewPanel({
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         style={inputStyle}
-        placeholder="e.g. Cyber cover is missing — client stores card data"
+        placeholder={t('nadGapNotePlaceholder')}
       />
       <div style={reviewActionsStyle}>
         <button

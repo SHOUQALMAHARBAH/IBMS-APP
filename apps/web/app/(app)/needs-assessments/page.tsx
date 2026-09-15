@@ -74,7 +74,7 @@ export default function NeedsAssessmentsPage() {
                 key={assessment.id}
                 type="button"
                 style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
-                aria-label={`View needs assessment ${assessment.id}`}
+                aria-label={t('naViewAssessmentAria', { id: assessment.id })}
                 onClick={() => router.push(`/needs-assessments/${assessment.id}`)}
               >
                 <strong>Status: {assessment.status}</strong>

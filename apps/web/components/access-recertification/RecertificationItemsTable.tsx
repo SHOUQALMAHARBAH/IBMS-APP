@@ -108,7 +108,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding}
-                      aria-label={`Confirm access for ${item.subjectFullName}`}
+                      aria-label={t('acrConfirmAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'confirmed')}
                     >
                       Confirm
@@ -117,7 +117,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding}
-                      aria-label={`Revoke access for ${item.subjectFullName}`}
+                      aria-label={t('acrRevokeAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'revoked')}
                     >
                       {t('usrRevoke')}
@@ -126,7 +126,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                       type="button"
                       style={inlineButtonStyle}
                       disabled={isDeciding}
-                      aria-label={`Flag access for change for ${item.subjectFullName}`}
+                      aria-label={t('acrFlagAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'changed')}
                     >{t('acrFlagForChange')}</button>
                   </div>

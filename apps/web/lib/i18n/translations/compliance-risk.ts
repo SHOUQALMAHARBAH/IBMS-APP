@@ -99,6 +99,7 @@ export const COMPLIANCE_RISK = {
     rcIssuedAt: 'تاريخ الإصدار',
     rcScopeOfAuth: 'نطاق التفويض',
     rcLicenseNumber: 'رقم الترخيص',
+    rcEvidenceRefAria: 'مرجع الإثبات لـ {name}',
 
     // ---- Operational & PI risk (#53-54) ------------------------------------
     opHeading: 'المخاطر التشغيلية ومخاطر المسؤولية المهنية',
@@ -147,6 +148,9 @@ export const COMPLIANCE_RISK = {
     opActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     opNoPermission: 'لا تملك صلاحية risk-register.manage اللازمة لعرض سجل المخاطر.',
     opNoPermissionPi: 'لا تملك صلاحية pi-policy.manage اللازمة لعرض وثيقة المسؤولية المهنية.',
+    opMitigationRowAria: 'إجراء التخفيف لـ {id}',
+    opClaimsHistoryRowAria: 'سجل المطالبات لـ {id}',
+    opEventMitigationAria: 'إجراء التخفيف للحدث {id}',
 
     // ---- Incident management (#55) -----------------------------------------
     incHeading: 'إدارة الحوادث',
@@ -190,6 +194,8 @@ export const COMPLIANCE_RISK = {
     incClassNotYetClassified: 'لم يُصنَّف بعد',
     incRoleDpo: 'مسؤول حماية البيانات',
     incRoleExec: 'الإدارة التنفيذية',
+    incNotifyRoleAria: 'إشعار {role} بخصوص {id}',
+    incRootCauseAria: 'تحليل السبب الجذري لـ {id}',
 
     // ---- Internal controls (#56) --------------------------------------------
     icHeading: 'الضوابط الداخلية — تدقيق الموافقة الذاتية',
@@ -237,6 +243,7 @@ export const COMPLIANCE_RISK = {
     iafLoadError: 'تعذّر تحميل ملاحظات التدقيق الداخلي — حاول مرة أخرى.',
     iafActionError: 'تعذّر تنفيذ الإجراء — حاول مرة أخرى.',
     iafNoPermission: 'لا تملك صلاحية internal-audit.record/internal-audit.close اللازمة لعرض ملاحظات التدقيق الداخلي.',
+    iafRemediationActionAria: 'إجراء المعالجة لـ {id}',
 
     // ---- Audit trail (Part 5.1) ----------------------------------------------
     atHeading: 'سجل التدقيق',
@@ -351,6 +358,7 @@ export const COMPLIANCE_RISK = {
     rcIssuedAt: 'Issued at',
     rcScopeOfAuth: 'Scope of authorization',
     rcLicenseNumber: 'License number',
+    rcEvidenceRefAria: 'Evidence reference for {name}',
 
     opHeading: 'Operational & Professional Indemnity Risk',
     opIntro:
@@ -398,6 +406,9 @@ export const COMPLIANCE_RISK = {
     opActionError: 'That action failed — try again.',
     opNoPermission: "You don't hold the risk-register.manage permission.",
     opNoPermissionPi: "You don't hold the pi-policy.manage permission.",
+    opMitigationRowAria: 'Mitigation for {id}',
+    opClaimsHistoryRowAria: 'Claims history for {id}',
+    opEventMitigationAria: 'Mitigation for event {id}',
 
     incHeading: 'Incident Management',
     incIntro:
@@ -440,6 +451,8 @@ export const COMPLIANCE_RISK = {
     incClassNotYetClassified: 'Not yet classified',
     incRoleDpo: 'Data Protection Officer',
     incRoleExec: 'Executive Management',
+    incNotifyRoleAria: 'Notify {role} for {id}',
+    incRootCauseAria: 'Root cause analysis for {id}',
 
     icHeading: 'Internal controls — self-approval audit',
     icIntro:
@@ -483,6 +496,7 @@ export const COMPLIANCE_RISK = {
     iafLoadError: 'Could not load internal audit findings — try again.',
     iafActionError: 'That action failed — try again.',
     iafNoPermission: "You don't hold the internal-audit.record/internal-audit.close permission.",
+    iafRemediationActionAria: 'Remediation action for {id}',
 
     atHeading: 'Audit Trail',
     atIntro:

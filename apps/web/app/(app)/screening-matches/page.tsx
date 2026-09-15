@@ -225,7 +225,7 @@ export default function ScreeningMatchesPage() {
                       ) : canReview ? (
                         <div style={{ display: "grid", gap: "0.3rem" }}>
                           <textarea
-                            aria-label={`Review reason for ${r.subjectName}`}
+                            aria-label={t('smReviewReasonAria', { name: r.subjectName })}
                             value={reasons[r.id] ?? ""}
                             onChange={(e) =>
                               setReasons((prev) => ({

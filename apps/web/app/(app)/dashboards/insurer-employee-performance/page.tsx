@@ -106,7 +106,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
           {t('dashPeriodLabel')}
           <input
             aria-label={t('dashPeriodLabel')}
-            placeholder="e.g. 2026-08"
+            placeholder={t('dashPeriodLabelPlaceholder')}
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
           />

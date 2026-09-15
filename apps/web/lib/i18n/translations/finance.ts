@@ -137,6 +137,8 @@ export const FINANCE = {
     brNoPermission: 'لا تملك صلاحية reconciliation-exception.investigate اللازمة لعرض هذه الشاشة.',
     brStatusReconciled: 'مُسوّاة',
     brResumeInvoiceAs: 'استئناف الفاتورة كـ…',
+    brResolutionNoteRowAria: 'ملاحظة الإغلاق لـ {id}',
+    brResumeInvoiceRowAria: 'استئناف الفاتورة كـ لـ {id}',
 
     // ---- Financial report (#40) ------------------------------------------
     frHeading: 'التقرير المالي',
@@ -175,6 +177,10 @@ export const FINANCE = {
     frLoading: 'جارٍ التحميل…',
     frLoadError: 'تعذّر تحميل التقرير المالي — حاول مرة أخرى.',
     frNoPermission: 'لا تملك صلاحية financial-report.view اللازمة لعرض التقرير المالي.',
+    frAgeing1To30: 'من ١ إلى ٣٠ يوماً',
+    frAgeing31To60: 'من ٣١ إلى ٦٠ يوماً',
+    frAgeing61To90: 'من ٦١ إلى ٩٠ يوماً',
+    frAgeing90Plus: 'أكثر من ٩٠ يوماً',
   },
   EN: {
     caHeading: 'Client accounting',
@@ -292,6 +298,8 @@ export const FINANCE = {
     brNoPermission: "You don't hold the reconciliation-exception.investigate permission.",
     brStatusReconciled: 'Reconciled',
     brResumeInvoiceAs: 'Resume invoice as…',
+    brResolutionNoteRowAria: 'Resolution note for {id}',
+    brResumeInvoiceRowAria: 'Resume invoice as for {id}',
 
     frHeading: 'Financial report',
     frIntro:
@@ -329,5 +337,9 @@ export const FINANCE = {
     frLoading: 'Loading…',
     frLoadError: 'Could not load the financial report — try again.',
     frNoPermission: "You don't hold the financial-report.view permission.",
+    frAgeing1To30: '1–30 days',
+    frAgeing31To60: '31–60 days',
+    frAgeing61To90: '61–90 days',
+    frAgeing90Plus: '90+ days',
   },
 } as const;

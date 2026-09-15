@@ -261,7 +261,7 @@ export default function OperationalPiRiskPage() {
                   {canManageRiskRegister && r.status === 'open' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '14rem' }}>
                       <input
-                        aria-label={`Mitigation for ${r.id}`}
+                        aria-label={t('opMitigationRowAria', { id: r.id })}
                         placeholder={t('opMitigationActionLabel')}
                         value={mitigationDrafts[r.id] ?? ''}
                         onChange={(e) =>
@@ -378,7 +378,7 @@ export default function OperationalPiRiskPage() {
                   <td style={cell}>
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
                       <input
-                        aria-label={`Claims history for ${p.id}`}
+                        aria-label={t('opClaimsHistoryRowAria', { id: p.id })}
                         placeholder={t('opClaimsHistoryLabel')}
                         value={claimsHistoryDrafts[p.id] ?? ''}
                         onChange={(e) =>
@@ -464,8 +464,8 @@ export default function OperationalPiRiskPage() {
                   <td style={cell}>
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
                       <input
-                        aria-label={`Mitigation for event ${ev.id}`}
-                        placeholder="mitigation action"
+                        aria-label={t('opEventMitigationAria', { id: ev.id })}
+                        placeholder={t('opMitigationActionLabel')}
                         value={eventMitigationDrafts[ev.id] ?? ''}
                         onChange={(e) =>
                           setEventMitigationDrafts((d) => ({ ...d, [ev.id]: e.target.value }))

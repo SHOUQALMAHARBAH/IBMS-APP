@@ -168,12 +168,27 @@ already give).
   the communications screen's "Phone call"/"Customer portal" instead of its own
   "Call"/"Portal". `tsc` cannot see a collision: both sides are `string`, and the
   merged object is simply the last writer's value. The RFQ set is renamed `rfqComm*`.
-  **Two things are known-open and deliberately not in that pass.** Thirteen
-  `placeholder="…"` example hints are still literal English (`"file name"` and
-  `"storage reference"` on `PolicySection`, `"e.g. Manufacturing"` and two more on
-  `ProspectConversionForm`, plus six others) — form hint text, a category no pass has
-  claimed yet. And `policy.ts` still carries 98 unreferenced keys (down from 161),
-  orphaned before this work when the policy screens moved to `pold*` in
+  **Hint text and accessible names are covered too.** The app holds **27**
+  `placeholder` literals: **13 carried English prose and now read from the dictionary**;
+  the other **14 are format examples** (`"17500.000"`, `"+962-7-..."`, a UUID sample)
+  and are deliberately left alone — `lib/i18n/format.ts` pins Arabic to `'ar'`, not
+  `'ar-JO'`, precisely so numerals stay Western, so an AR key would be byte-identical
+  to its EN twin. Separately, **30 template-literal `aria-label`s were English**
+  (`` `Confirm access for ${name}` ``) and now interpolate through `t()`'s `params`
+  argument; these are screen-reader-only, so axe never caught them — it checks that an
+  accessible name *exists*, not what language it is in. Keep an `aria-label` and the
+  visible label of the same control in the same language: a screen reader and the
+  screen disagreeing is the defect this closed. Four `label=` props on
+  `/financial-report` (`"1–30 days"` and its siblings) were the last on-screen
+  literals, sitting between two `Figure`s that already read from the dictionary.
+  **Still open, and a different shape of work:** English interleaved with
+  interpolations — **29 sites across 14 files** (`JOD` on four dashboards, `minutes`
+  on `/settings/security`, `{n} invoice(s) across {m} customer(s).`). A bare-JSX-text
+  scan cannot see these, because the text node itself contains `{`. The pluralisation
+  half is not a key-wiring job: these sites use `count === 1 ? '' : 's'`, and Arabic
+  has more plural forms than that expresses, so it needs a plural rule in
+  `translate()`. Also still open: `policy.ts` carries 98 unreferenced keys (down from
+  161), orphaned before this work when the policy screens moved to `pold*` in
   `detail-pages.ts` — pre-existing debt, not a regression; 159 keys are unreferenced
   across all sixteen dictionaries, 98 of them there.
 * **`GET /policies` answers three questions.** With `opportunityId`, the one

@@ -256,7 +256,7 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>
                         {canManageSchedule && !s.isConfirmed ? (
                           <input
-                            aria-label={`Months for ${s.recordCategory}`}
+                            aria-label={t('rdMonthsAria', { name: s.recordCategory })}
                             style={{ width: '5rem' }}
                             value={editMonths[s.id] ?? String(s.retentionPeriodMonths)}
                             onChange={(e) =>
@@ -501,7 +501,7 @@ export default function RetentionDisposalPage() {
                             {canApprove && b.status === 'DPO_APPROVED' ? (
                               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                                 <select
-                                  aria-label={`Destruction method for ${b.id}`}
+                                  aria-label={t('rdDestructionMethodAria', { id: b.id })}
                                   value={method}
                                   onChange={(e) => setMethod(e.target.value)}
                                 >

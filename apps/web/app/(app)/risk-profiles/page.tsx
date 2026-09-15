@@ -173,7 +173,7 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
               key={profile.id}
               type="button"
               style={siteCardStyle}
-              aria-label={`Open risk survey for ${profile.siteLabel ?? profile.id}`}
+              aria-label={t('rpOpenSurveyAria', { name: profile.siteLabel ?? profile.id })}
               onClick={() => router.push(`/risk-profiles/${profile.id}`)}
             >
               <strong>

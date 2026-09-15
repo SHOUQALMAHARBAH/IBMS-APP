@@ -65,6 +65,7 @@ export const PDPL = {
     consStatusGranted: 'ممنوحة',
     consStatusDeclined: 'مرفوضة',
     consStatusNeverGranted: 'لم تُمنح قط',
+    consTextVersionRowAria: '{label} — إصدار نص الموافقة',
 
     // ---- Data Subject Requests (M04) ------------------------------------
     dsrHeading: 'طلبات أصحاب البيانات',
@@ -105,6 +106,9 @@ export const PDPL = {
     dsrTypeCorrection: 'تصحيح',
     dsrTypeDeletion: 'حذف',
     dsrTypeObjection: 'اعتراض',
+    dsrTextAria: 'النص لـ {id}',
+    dsrRetentionRefAria: 'مرجع جدول الاحتفاظ لـ {id}',
+    dsrNoRetentionHoldAria: 'لا يوجد تعليق احتفاظ مفتوح لـ {id}',
 
     // ---- Retention & Disposal (M06) -------------------------------------
     rdHeading: 'الاحتفاظ والإتلاف',
@@ -169,6 +173,8 @@ export const PDPL = {
     rdHoldCategoryIdAria: 'معرّف فئة السجلات للحجز القانوني',
     rdHoldCustomerIdAria: 'معرّف العميل للحجز القانوني',
     rdHoldInsuredPersonIdAria: 'معرّف الشخص المؤمَّن عليه للحجز القانوني',
+    rdMonthsAria: 'عدد الأشهر لـ {name}',
+    rdDestructionMethodAria: 'طريقة الإتلاف لـ {id}',
 
     // ---- Cross-border transfer (M07) ------------------------------------
     cbtHeading: 'النقل عبر الحدود',
@@ -368,6 +374,7 @@ export const PDPL = {
     consStatusGranted: 'Granted',
     consStatusDeclined: 'Declined',
     consStatusNeverGranted: 'Never granted',
+    consTextVersionRowAria: '{label} — consent text version',
 
     dsrHeading: 'Data Subject Requests',
     dsrIntro:
@@ -407,6 +414,9 @@ export const PDPL = {
     dsrTypeCorrection: 'Correction',
     dsrTypeDeletion: 'Deletion',
     dsrTypeObjection: 'Objection',
+    dsrTextAria: 'Text for {id}',
+    dsrRetentionRefAria: 'Retention schedule reference for {id}',
+    dsrNoRetentionHoldAria: 'No open retention hold for {id}',
 
     rdHeading: 'Retention & Disposal',
     rdIntro:
@@ -467,6 +477,8 @@ export const PDPL = {
     rdHoldCategoryIdAria: 'Legal hold record category ID',
     rdHoldCustomerIdAria: 'Legal hold customer ID',
     rdHoldInsuredPersonIdAria: 'Legal hold insured person ID',
+    rdMonthsAria: 'Months for {name}',
+    rdDestructionMethodAria: 'Destruction method for {id}',
 
     cbtHeading: 'Cross-Border Transfer',
     cbtIntro:

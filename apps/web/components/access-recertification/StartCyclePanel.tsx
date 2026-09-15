@@ -56,7 +56,7 @@ export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
               value={cycleLabel}
               onChange={(e) => setCycleLabel(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. Q1-2026 ad hoc"
+              placeholder={t('acrCycleNamePlaceholder')}
             />
           </div>
           <div style={fieldStyle}>

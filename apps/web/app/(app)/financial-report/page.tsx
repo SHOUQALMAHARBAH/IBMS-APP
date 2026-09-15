@@ -122,10 +122,10 @@ export default function FinancialReportPage() {
               value={data.receivables.outstandingTotal}
             />
             <Figure label={t('frCurrent')} value={data.receivables.current} />
-            <Figure label="1–30 days" value={data.receivables.d1_30} />
-            <Figure label="31–60 days" value={data.receivables.d31_60} />
-            <Figure label="61–90 days" value={data.receivables.d61_90} />
-            <Figure label="90+ days" value={data.receivables.d90_plus} />
+            <Figure label={t('frAgeing1To30')} value={data.receivables.d1_30} />
+            <Figure label={t('frAgeing31To60')} value={data.receivables.d31_60} />
+            <Figure label={t('frAgeing61To90')} value={data.receivables.d61_90} />
+            <Figure label={t('frAgeing90Plus')} value={data.receivables.d90_plus} />
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem' }}>
               {data.receivables.invoiceCount} invoice(s) across{' '}
               {data.receivables.customerCount} customer(s).

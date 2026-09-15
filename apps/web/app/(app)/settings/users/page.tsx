@@ -354,7 +354,7 @@ export default function UserAdminPage() {
                             }}
                           >
                             <select
-                              aria-label={`Role to grant to ${u.email}`}
+                              aria-label={t('usrRoleToGrantAria', { email: u.email })}
                               value={grantChoice}
                               onChange={(e) =>
                                 setGrantChoice(e.target.value as RoleName)

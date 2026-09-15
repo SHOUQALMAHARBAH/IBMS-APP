@@ -186,7 +186,7 @@ export function ConsentCaptureWidget({
               fontSize: '0.85rem',
             }}
           >{t('consTextVersionLabel')}<input
-              aria-label={`${label} — consent text version`}
+              aria-label={t('consTextVersionRowAria', { label })}
               value={consentTextVersion}
               onChange={(e) => setConsentTextVersion(e.target.value)}
             />

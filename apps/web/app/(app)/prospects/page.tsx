@@ -97,7 +97,7 @@ export default function ProspectsPage() {
                 key={prospect.id}
                 type="button"
                 style={{ ...cardStyle, textAlign: 'start', width: '100%', cursor: 'pointer' }}
-                aria-label={`View profile — ${prospect.companyName}`}
+                aria-label={t('prosViewProfileAria', { name: prospect.companyName })}
                 onClick={() => router.push(`/prospects/${prospect.id}`)}
               >
                 <strong>
