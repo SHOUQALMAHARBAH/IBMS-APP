@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from './tenant-prisma';
+import { prisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -246,10 +246,17 @@ describe('Auth (e2e)', () => {
       const app = await boot();
       const email = uniqueEmail('lockout');
       await signup(app, email);
+      // Keyed by organizationId, not by a hard-coded 'default' id. Phase 2
+      // step 8 replaced the singleton row with `id @default(uuid())` plus
+      // `@@unique([organizationId])`; matching on `id: 'default'` therefore
+      // finds nothing on a clean database, falls through to create, and
+      // collides on organizationId against the row that already exists. This
+      // mirrors `SecurityConfigRepository.get()` — `organizationId` and `id`
+      // are both supplied by the schema, never by hand.
       const config = await prisma.securityConfig.upsert({
-        where: { id: 'default' },
+        where: { organizationId: TEST_ORGANIZATION_ID },
         update: {},
-        create: { id: 'default' },
+        create: {},
       });
 
       for (let i = 0; i < config.maxFailedLoginAttempts; i += 1) {
