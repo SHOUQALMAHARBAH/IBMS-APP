@@ -9,12 +9,12 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   buttonStyle,
-  cardStyle,
+  authCardStyle,
   errorStyle,
   helperLinkStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
+  authPageStyle,
 } from '../../../components/auth/auth-form.styles';
 
 export default function LoginPage() {
@@ -65,8 +65,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={cardStyle}>
+    <main style={authPageStyle}>
+      <div style={authCardStyle}>
         <h1 style={{ marginTop: 0 }}>{t('authSignInHeading')}</h1>
 
         {mfaChallengeToken ? (

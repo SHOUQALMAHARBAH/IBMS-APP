@@ -115,6 +115,19 @@ already give).
   That pattern was 20 of the 51 contrast violations the first full `test:a11y` run
   found. Use `--ink-secondary` (6.09:1) or `--ink-muted`. `opacity` on a *disabled
   control* is fine — axe exempts those, and `components/ui/Button.tsx` still uses it.
+* **The `(auth)` screens carry the comp's hero gradient**, via `authPageStyle` /
+  `authCardStyle` in `components/auth/auth-form.styles.ts`. Both are **additive**:
+  `pageStyle` and `cardStyle` in that same file are imported by **86 authenticated
+  screens**, so editing them would repaint the whole app. The gradient is vertical
+  (`180deg`, matching the sidebar) because a diagonal would need mirroring for RTL.
+  **Three dark-mode contrast gaps are tracked, none of them visible to axe** — its
+  contrast rule covers text only, so WCAG 1.4.11 non-text contrast is unchecked:
+  (1) input borders sit at **1.35:1 light / 1.37:1 dark** against the card
+  (`--border-default` on `--surface-card`) — pre-existing, app-wide, and the strongest
+  candidate of the three because those are real controls; (2) `--ink-muted` on
+  `--surface-hover` (4.34) — that token has zero consumers; (3) `--nav-ink-muted` on
+  `--nav-item-active` (2.91) — muted nav ink only ever sits on the nav ground. None is
+  addressed; do not self-select them.
 * **`components/ui/`** is the primitive set — `Button`, `Card`/`PageHeader`, `Table`,
   `Field` (+ `TextInput`/`Select`/`TextArea`), `Badge`, `EmptyState`, `ErrorState`,
   `Skeleton`/`SkeletonList`. New screens compose these; they cover the four states

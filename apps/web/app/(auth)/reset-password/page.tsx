@@ -8,12 +8,12 @@ import { resetPassword } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   buttonStyle,
-  cardStyle,
+  authCardStyle,
   errorStyle,
   helperLinkStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
+  authPageStyle,
   successStyle,
 } from '../../../components/auth/auth-form.styles';
 
@@ -90,8 +90,8 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   const { t } = useLanguage();
   return (
-    <main style={pageStyle}>
-      <div style={cardStyle}>
+    <main style={authPageStyle}>
+      <div style={authCardStyle}>
         <h1 style={{ marginTop: 0 }}>{t('authResetHeading')}</h1>
         <Suspense fallback={null}>
           <ResetPasswordForm />

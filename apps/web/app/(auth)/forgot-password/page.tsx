@@ -7,12 +7,12 @@ import { forgotPassword } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import {
   buttonStyle,
-  cardStyle,
+  authCardStyle,
   errorStyle,
   helperLinkStyle,
   inputStyle,
   labelStyle,
-  pageStyle,
+  authPageStyle,
   successStyle,
 } from '../../../components/auth/auth-form.styles';
 
@@ -43,8 +43,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={cardStyle}>
+    <main style={authPageStyle}>
+      <div style={authCardStyle}>
         <h1 style={{ marginTop: 0 }}>{t('authForgotHeading')}</h1>
         {message ? (
           <>

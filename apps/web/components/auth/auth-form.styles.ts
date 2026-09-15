@@ -21,6 +21,28 @@ export const pageStyle: CSSProperties = {
   background: 'var(--surface-page)',
 };
 
+/*
+ * The pre-authentication background.
+ *
+ * ADDITIVE on purpose. `pageStyle` above is imported by 86 authenticated
+ * screens as well as the four `(auth)` ones, so putting the gradient there
+ * would paint the navy behind the entire app — the exact hazard this file's
+ * header warns about. The `(auth)` pages point at this instead; nothing else
+ * changes.
+ *
+ * The gradient is the approved design's hero panel, which is where
+ * `--nav-gradient-*` was measured from in the first place — until now it only
+ * reached the sidebar, so the palette's own source screen was the one place
+ * it never appeared. Same two tokens, same 180deg the sidebar uses: vertical
+ * carries no physical direction, so it needs no RTL mirroring, where a
+ * diagonal would have to be flipped for Arabic.
+ */
+export const authPageStyle: CSSProperties = {
+  ...pageStyle,
+  background:
+    'linear-gradient(180deg, var(--nav-gradient-from) 0%, var(--nav-gradient-to) 100%)',
+};
+
 export const cardStyle: CSSProperties = {
   width: '24rem',
   maxWidth: '100%',
@@ -29,6 +51,33 @@ export const cardStyle: CSSProperties = {
   border: '1px solid var(--border-default)',
   borderRadius: 'var(--radius-xl)',
   boxShadow: 'var(--shadow-md)',
+};
+
+/*
+ * The card as it sits on `authPageStyle`'s gradient.
+ *
+ * ADDITIVE, like `authPageStyle`: the shared `cardStyle` is untouched, so the
+ * 86 authenticated screens that use it are unaffected.
+ *
+ * Only the border colour differs, and only because the DARK theme needs it.
+ * There, `--surface-card` (#1e2733) sits on a #131a21-#1b2735 gradient and
+ * measures 1.00:1 against it — the card has no surface separation at all, and
+ * its edge rests entirely on the border. `--border-default` gives that edge
+ * 1.35:1, under the 3:1 WCAG 1.4.11 asks of a boundary that carries meaning.
+ *
+ * `--ink-muted` is the lightest token that clears it (4.93:1). Two approaches
+ * were measured and rejected first: darkening the gradient cannot work — even
+ * a pure-black ground only reaches 1.31:1, because two dark surfaces cannot
+ * separate by luminance — and no existing surface token works as a lighter
+ * card (`--surface-hover` reaches 1.14:1). `--ink-secondary` and `--brand-300`
+ * also clear 3:1, at 7.11 and 7.31, but read as a bright ring drawn around the
+ * card rather than an edge.
+ *
+ * axe cannot catch any of this: its contrast rule covers text only.
+ */
+export const authCardStyle: CSSProperties = {
+  ...cardStyle,
+  borderColor: 'var(--ink-muted)',
 };
 
 export const labelStyle: CSSProperties = {
