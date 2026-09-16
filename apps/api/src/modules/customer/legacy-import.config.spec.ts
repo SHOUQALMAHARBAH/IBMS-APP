@@ -1,12 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { UnprocessableEntityException } from '@nestjs/common';
 import {
+  LEGACY_IMPORT_MAX_BYTES,
   LEGACY_IMPORT_MAX_ROWS,
   mapRows,
   parseCsv,
 } from './legacy-import.config';
 
 describe('parseCsv', () => {
+  it('refuses input longer than the byte cap instead of walking it', () => {
+    // The loop inside parseCsv has to carry its own bound. The controller's
+    // multer limit and the service's file.size check both sit upstream, and
+    // mapRows' row cap only runs AFTER the whole string has been walked.
+    const tooLong = 'a'.repeat(LEGACY_IMPORT_MAX_BYTES + 1);
+    expect(() => parseCsv(tooLong)).toThrow(UnprocessableEntityException);
+    expect(() => parseCsv(tooLong)).toThrow(/too large to read/);
+  });
+
+  it('accepts input exactly at the cap — the bound is not off by one', () => {
+    // UTF-16 code units are <= UTF-8 bytes, so a file that passed the byte cap
+    // can never be rejected here. This pins that the guard is >, not >=.
+    const atLimit = 'a'.repeat(LEGACY_IMPORT_MAX_BYTES);
+    expect(() => parseCsv(atLimit)).not.toThrow();
+  });
+
   it('reads a plain file', () => {
     expect(parseCsv('a,b\n1,2\n3,4')).toEqual([
       ['a', 'b'],

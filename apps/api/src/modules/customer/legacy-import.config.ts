@@ -80,6 +80,28 @@ export function parseCsv(text: string): string[][] {
   // A BOM survives an Excel "Save as CSV" and would otherwise become part of
   // the first header name, silently breaking the mapping for that one column.
   const input = text.replace(/^\uFEFF/, '');
+
+  // An explicit, LOCAL bound on the loop below.
+  //
+  // The size of this input is already capped twice — multer's
+  // `limits.fileSize` on the controller and a `file.size` check in the service
+  // — and the row count is capped in `mapRows()`. But all three are enforced
+  // somewhere else, and `mapRows()` in particular only runs AFTER this
+  // function has already walked the entire string. Nothing a reader of this
+  // function can see stops it, which is also exactly what CodeQL reports
+  // (`js/loop-bound-injection`: iteration over a user-controlled length).
+  //
+  // `String.length` counts UTF-16 code units, and for UTF-8 input that is
+  // always <= the byte count: a 2- or 3-byte character is one unit, and a
+  // 4-byte one is two. So this can never reject a file that legitimately
+  // passed the byte cap — it is the same bound expressed where the loop lives,
+  // not a second, stricter one.
+  if (input.length > LEGACY_IMPORT_MAX_BYTES) {
+    throw new UnprocessableEntityException(
+      `The uploaded file is too large to read; the limit is ${LEGACY_IMPORT_MAX_BYTES} bytes. Split it and import in parts.`,
+    );
+  }
+
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
