@@ -24,7 +24,7 @@ import {
  */
 
 const card: CSSProperties = {
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--border-default)",
   borderRadius: 6,
   padding: "1rem",
   marginBottom: "1rem",
@@ -35,7 +35,7 @@ const headCell: CSSProperties = {
   padding: "0.35rem 0.7rem",
   textAlign: "start",
   fontWeight: 600,
-  borderBottom: "2px solid #d1d5db",
+  borderBottom: "2px solid var(--border-default)",
 };
 
 const bodyCell: CSSProperties = {

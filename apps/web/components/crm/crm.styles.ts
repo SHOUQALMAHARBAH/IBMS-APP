@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 export const crmPanelStyle: CSSProperties = {
   marginTop: '1rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   background: 'var(--surface-sunken)',
 };
@@ -29,7 +29,7 @@ export const crmTimelineItemStyle: CSSProperties = {
   display: 'flex',
   gap: '0.9rem',
   padding: '0.75rem 0',
-  borderTop: '1px solid rgba(128,128,128,0.2)',
+  borderTop: '1px solid var(--border-subtle)',
 };
 
 export const crmKindBadgeStyle: CSSProperties = {
@@ -38,7 +38,7 @@ export const crmKindBadgeStyle: CSSProperties = {
   borderRadius: '0.75rem',
   fontSize: '0.7rem',
   letterSpacing: '0.03em',
-  border: '1px solid rgba(128,128,128,0.4)',
+  border: '1px solid var(--border-strong)',
   whiteSpace: 'nowrap',
   alignSelf: 'flex-start',
 };

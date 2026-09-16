@@ -21,13 +21,13 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'end',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 const leftCell: CSSProperties = { ...cell, textAlign: 'start' };
 const leftHead: CSSProperties = { ...head, textAlign: 'start' };
@@ -53,7 +53,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div
       style={{
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 8,
         padding: '0.6rem 0.9rem',
         minWidth: '7.5rem',

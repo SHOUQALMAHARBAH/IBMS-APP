@@ -24,13 +24,13 @@ function oldest(daysOverdue: number, dueDate: string | null, language: Language)
 
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'end',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 export default function ClientAccountingPage() {

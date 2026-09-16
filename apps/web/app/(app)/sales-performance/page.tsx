@@ -24,7 +24,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div
       style={{
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 8,
         padding: '0.6rem 0.9rem',
         minWidth: '9rem',

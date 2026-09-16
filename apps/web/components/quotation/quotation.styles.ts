@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 export const quoteChainCardStyle: CSSProperties = {
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   marginBottom: '0.75rem',
 };

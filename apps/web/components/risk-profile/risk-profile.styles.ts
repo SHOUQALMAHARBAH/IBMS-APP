@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 export const summaryPanelStyle: CSSProperties = {
   marginTop: '1rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   background: 'var(--surface-sunken)',
 };
@@ -35,7 +35,7 @@ export const assetTableStyle: CSSProperties = {
 export const assetCellStyle: CSSProperties = {
   textAlign: 'start',
   padding: '0.5rem 0.6rem',
-  borderBottom: '1px solid rgba(128,128,128,0.2)',
+  borderBottom: '1px solid var(--border-subtle)',
   verticalAlign: 'top',
 };
 
@@ -46,7 +46,7 @@ export const assetFormStyle: CSSProperties = {
   alignItems: 'flex-end',
   marginTop: '1rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
 };
 
@@ -57,7 +57,7 @@ export const siteCardStyle: CSSProperties = {
   width: '100%',
   textAlign: 'start',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   cursor: 'pointer',
   marginBottom: '0.75rem',

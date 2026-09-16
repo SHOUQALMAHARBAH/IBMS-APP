@@ -8,7 +8,7 @@ export const comparisonScrollStyle: CSSProperties = {
 export const comparisonCalloutStyle: CSSProperties = {
   marginTop: '0.75rem',
   padding: '0.6rem 0.9rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   fontSize: '0.9rem',
 };

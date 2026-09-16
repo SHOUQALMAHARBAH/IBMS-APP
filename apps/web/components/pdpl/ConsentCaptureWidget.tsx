@@ -121,7 +121,7 @@ export function ConsentCaptureWidget({
     return (
       <section
         style={{
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--border-subtle)',
           borderRadius: 8,
           padding: '0.75rem 1rem',
           margin: '0.75rem 0',
@@ -138,7 +138,7 @@ export function ConsentCaptureWidget({
   return (
     <section
       style={{
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 8,
         padding: '0.75rem 1rem',
         margin: '0.75rem 0',
