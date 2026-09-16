@@ -125,10 +125,19 @@ export class UserRepository {
    * asked for. Only /auth/me needs this — the navbar shows the department
    * under the signed-in user's name.
    */
+  /** The account linked to an HR record, if any. `User.employeeId` is
+   *  @unique, so this is at most one row. */
+  findByEmployeeId(employeeId: string): Promise<User | null> {
+    return this.prisma.client.user.findUnique({ where: { employeeId } });
+  }
+
   findByIdWithDepartment(id: string) {
     return this.prisma.client.user.findUnique({
       where: { id },
-      include: { department: true },
+      // The HR record too: /auth/me resolves the DISPLAY name from it when a
+      // link exists (see common/display-name.util.ts), and the department for
+      // the navbar's second line.
+      include: { department: true, employee: true },
     });
   }
 
@@ -209,6 +218,7 @@ export class UserRepository {
     languagePreference?: 'AR' | 'EN';
     /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
     departmentId?: string;
+    employeeId?: string;
     /** Part II §4.2.2 — the organizational location, likewise required by the
      * DTO and likewise distinct from both Department and Role. */
     branchId?: string;
@@ -249,6 +259,7 @@ export class UserRepository {
       accessValidUntil: Date | null;
       createdAt: Date;
       roles: RoleName[];
+      employee: { fullName: string } | null;
     }[]
   > {
     const rows = await this.prisma.client.user.findMany({
@@ -256,6 +267,10 @@ export class UserRepository {
       skip,
       orderBy: { createdAt: 'desc' },
       select: {
+        // The linked HR record's name, so the admin list shows the same
+        // display name the person sees in their own navbar rather than the
+        // free text typed at provisioning. See common/display-name.util.ts.
+        employee: { select: { fullName: true } },
         id: true,
         fullName: true,
         email: true,

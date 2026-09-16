@@ -431,10 +431,15 @@ async function ensureActor(
   let user = await rawPrisma.user.findFirst({ where: { organizationId: orgId, email } });
   if (!user) {
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
+    const actorName = personName();
     user = await rawPrisma.user.create({
       data: {
         organizationId: orgId,
-        fullName: `Demo ${def.label}`,
+        // A person's name, not their job title. This used to read
+        // `Demo ${def.label}` — so every demo account showed "Demo Sales
+        // Relationship Officer" in the navbar, with initials to match, while
+        // the linked Employee row held the real four-part Arabic name.
+        fullName: `${actorName.given} ${actorName.father} ${actorName.family}`,
         email,
         passwordHash,
         mustChangePassword: false,

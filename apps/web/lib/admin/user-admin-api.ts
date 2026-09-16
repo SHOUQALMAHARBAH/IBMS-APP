@@ -52,6 +52,11 @@ export interface ProvisionUserInput {
    * them do. The form must not present any two of them as one field. */
   departmentId: string;
   branchId: string;
+  /** The HR record this account belongs to, when one exists. Link-only — an
+   *  Employee is never created here, because it needs a national ID. Once
+   *  linked, that record's four-part official name becomes the display name
+   *  everywhere, and this free-text `fullName` stops being shown. */
+  employeeId?: string;
   roles: RoleName[];
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window. */
   accessValidFrom?: string;

@@ -17,6 +17,7 @@ import { AuthModule } from '../auth/auth.module';
 import { SlaModule } from '../sla/sla.module';
 import { DepartmentRepository } from '../../repositories/department.repository';
 import { BranchRepository } from '../../repositories/branch.repository';
+import { EmployeeRepository } from '../../repositories/employee.repository';
 
 @Module({
   // AuthModule exports UserRepository — reused here (the scheduler needs it
@@ -34,6 +35,7 @@ import { BranchRepository } from '../../repositories/branch.repository';
   providers: [
     DepartmentRepository,
     BranchRepository,
+    EmployeeRepository,
     UserAdminService,
     OrgStructureService,
     AccessRecertificationService,

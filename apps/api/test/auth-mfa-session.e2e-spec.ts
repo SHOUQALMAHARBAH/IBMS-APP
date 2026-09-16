@@ -328,6 +328,141 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
     expect(body.department!.nameAr).toBe(`المطالبات ${tag}`);
   });
 
+  it('the display name comes from the linked HR record, and falls back when there is none', async () => {
+    // An employee record first — HR data, created through its own endpoint
+    // because it needs a national ID this flow never collects.
+    const employee = await request(app!.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'طارق',
+        fatherName: 'ناصر',
+        grandfatherName: 'كريم',
+        familyName: 'الزعبي',
+        nationalId: `99${Date.now()}`.slice(0, 10),
+        hireDate: '2026-01-01',
+        departmentId,
+      })
+      .expect(201);
+    const employeeId = (employee.body as { id: string }).id;
+
+    // An account naming it. The free-text fullName is deliberately something
+    // nobody should ever see once the link exists.
+    const email = uniqueEmail(`linked-${tag}`);
+    await request(app!.getHttpServer())
+      .post('/admin/users')
+      .set(bearer(admin.accessToken))
+      .send({
+        fullName: 'Demo Sales Relationship Officer',
+        email,
+        password: PASSWORD,
+        departmentId,
+        branchId,
+        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        employeeId,
+      })
+      .expect(201);
+
+    const login = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password: PASSWORD })
+      .expect(200);
+    const changed = await request(app!.getHttpServer())
+      .post('/auth/password/force-change')
+      .send({
+        onboardingToken: (login.body as LoginBody).onboardingToken,
+        newPassword: NEW_PASSWORD,
+      })
+      .expect(200);
+
+    const me = await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer((changed.body as LoginBody).accessToken!))
+      .expect(200);
+    // The HR record wins: the four-part official name, not the role label.
+    expect((me.body as { fullName: string }).fullName).toBe(
+      'طارق ناصر كريم الزعبي',
+    );
+
+    // And an account with no link still shows its own name — the state every
+    // account was in before the link had a writer on this path.
+    const unlinked = await provision(`unlinked-${tag}`, [
+      'SALES_RELATIONSHIP_OFFICER',
+    ]);
+    const login2 = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({ email: unlinked.email, password: PASSWORD })
+      .expect(200);
+    const changed2 = await request(app!.getHttpServer())
+      .post('/auth/password/force-change')
+      .send({
+        onboardingToken: (login2.body as LoginBody).onboardingToken,
+        newPassword: NEW_PASSWORD,
+      })
+      .expect(200);
+    const me2 = await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer((changed2.body as LoginBody).accessToken!))
+      .expect(200);
+    expect((me2.body as { fullName: string }).fullName).toContain(
+      'Provisioned',
+    );
+  });
+
+  it('refuses a link to an unknown employee, and to one already taken', async () => {
+    await request(app!.getHttpServer())
+      .post('/admin/users')
+      .set(bearer(admin.accessToken))
+      .send({
+        fullName: 'Someone',
+        email: uniqueEmail(`badlink-${tag}`),
+        password: PASSWORD,
+        departmentId,
+        branchId,
+        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        employeeId: '00000000-0000-0000-0000-000000000000',
+      })
+      .expect(422);
+
+    const employee = await request(app!.getHttpServer())
+      .post('/employees')
+      .set(bearer(admin.accessToken))
+      .send({
+        givenName: 'لينا',
+        familyName: 'البدور',
+        nationalId: `88${Date.now()}`.slice(0, 10),
+        hireDate: '2026-01-01',
+        departmentId,
+      })
+      .expect(201);
+    const employeeId = (employee.body as { id: string }).id;
+
+    const body = {
+      password: PASSWORD,
+      departmentId,
+      branchId,
+      roles: ['SALES_RELATIONSHIP_OFFICER'],
+      employeeId,
+    };
+    await request(app!.getHttpServer())
+      .post('/admin/users')
+      .set(bearer(admin.accessToken))
+      .send({ ...body, fullName: 'First', email: uniqueEmail(`taken1-${tag}`) })
+      .expect(201);
+
+    // User.employeeId is @unique, so without this check the second attempt
+    // would surface as a P2002 that reads like an email collision.
+    await request(app!.getHttpServer())
+      .post('/admin/users')
+      .set(bearer(admin.accessToken))
+      .send({
+        ...body,
+        fullName: 'Second',
+        email: uniqueEmail(`taken2-${tag}`),
+      })
+      .expect(409);
+  });
+
   it('the mandatory change is one-shot — the token cannot be replayed', async () => {
     const user = await provision(`onboard-replay-${tag}`, [
       'SALES_RELATIONSHIP_OFFICER',

@@ -21,6 +21,7 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
+import { listEmployees, type EmployeeListRow } from '../../../../lib/supporting-operations/employee-api';
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -45,6 +46,7 @@ export default function UserAdminPage() {
   const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
+  const canLinkEmployee = hasPermission(user, 'employee.manage');
 
   const [rows, setRows] = useState<AdminUser[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -63,6 +65,8 @@ export default function UserAdminPage() {
   const [branches, setBranches] = useState<OrgUnit[]>([]);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [employees, setEmployees] = useState<EmployeeListRow[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -96,18 +100,22 @@ export default function UserAdminPage() {
     if (!user || !isAdmin) return;
     void (async () => {
       try {
-        const [depts, brs] = await Promise.all([
+        const [depts, brs, emps] = await Promise.all([
           listDepartments(),
           listBranches(),
+          // Only when the caller can read it — GET /employees needs
+          // employee.manage, and a 403 here would blank the other two.
+          canLinkEmployee ? listEmployees() : Promise.resolve([]),
         ]);
         setDepartments(depts);
         setBranches(brs);
+        setEmployees(emps);
       } catch {
         // The form's own error line covers a failed submit; an empty dropdown
         // is self-explanatory and must not blank the user list beside it.
       }
     })();
-  }, [user, isAdmin, t]);
+  }, [user, isAdmin, canLinkEmployee, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -136,6 +144,9 @@ export default function UserAdminPage() {
         departmentId,
         branchId,
         roles,
+        // Omitted rather than sent empty: the DTO treats absence as "no link",
+        // and an empty string would fail validation as a malformed id.
+        employeeId: employeeId || undefined,
       });
       setFullName('');
       setEmail('');
@@ -143,6 +154,7 @@ export default function UserAdminPage() {
       setRoles([]);
       setDepartmentId('');
       setBranchId('');
+      setEmployeeId('');
     });
   }
 
@@ -219,6 +231,32 @@ export default function UserAdminPage() {
               ))}
             </select>
           </label>
+          {/*
+            Optional, and rendered only for someone who can actually read the
+            employee list — `GET /employees` needs `employee.manage`, and a
+            select that 403s on load is worse than no select.
+
+            Link-only by design: an Employee cannot be created from here
+            because it requires a national ID, which is Highly Confidential
+            and has no business being typed into an account-creation form.
+          */}
+          {canLinkEmployee ? (
+            <label>
+              {t('usrEmployeeRecord')}
+              <select
+                aria-label={t('usrEmployeeRecord')}
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+              >
+                <option value="">{t('usrNoEmployeeLink')}</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             {t('usrBranch')}
             <select

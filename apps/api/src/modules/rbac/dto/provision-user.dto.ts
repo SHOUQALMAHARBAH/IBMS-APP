@@ -80,6 +80,23 @@ export class ProvisionUserDto {
 
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window.
    * `AuthService.assertAccessWindowActive` enforces both bounds at login. */
+  /**
+   * The HR record this account belongs to, when one exists.
+   *
+   * Optional and LINK-ONLY: an Employee cannot be created here, because
+   * creating one requires a national ID — Highly Confidential under Part 10.2
+   * — and a user-provisioning form is not where that should first be typed.
+   * HR creates the Employee; this names it.
+   *
+   * Linking is what makes `Employee.fullName` reachable as the display name.
+   * Until an account is linked it falls back to the free-text `fullName`
+   * above, which is what every account did before this field existed.
+   */
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  employeeId?: string;
+
   @IsOptional()
   @IsDateString()
   accessValidFrom?: string;

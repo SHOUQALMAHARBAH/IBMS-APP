@@ -8,6 +8,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import type { RoleName, User } from '@ibms/db';
+import { resolveDisplayName } from '../../../common/display-name.util';
 import { PermissionsService } from '../../rbac/services/permissions.service';
 import { UserRepository } from '../../../repositories/user.repository';
 import { OrganizationRepository } from '../../../repositories/organization.repository';
@@ -758,7 +759,9 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
-      fullName: user.fullName,
+      // The HR record when one is linked, the account's own free text when
+      // not. Same field name, so nothing downstream changes shape.
+      fullName: resolveDisplayName(user),
       languagePreference: user.languagePreference,
       roles,
       permissions,

@@ -14,6 +14,7 @@ import type { AuditService } from '../../audit/audit.service';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { DepartmentRepository } from '../../../repositories/department.repository';
 import { BranchRepository } from '../../../repositories/branch.repository';
+import { EmployeeRepository } from '../../../repositories/employee.repository';
 
 const actor = { id: 'admin-1' } as AuthenticatedUser;
 
@@ -79,10 +80,17 @@ function makeDeps(over: Record<string, unknown> = {}) {
     findById: vi.fn().mockResolvedValue({ id: 'branch-1', name: 'Amman' }),
     ...(over.branches as object),
   };
+  // Link-only employee lookup: absent by default, so every existing case
+  // behaves as it did before the field existed.
+  const employees = {
+    findById: vi.fn().mockResolvedValue(null),
+    ...(over.employees as object),
+  };
   const service = new UserAdminService(
     departments as unknown as DepartmentRepository,
     branches as unknown as BranchRepository,
     users as unknown as UserRepository,
+    employees as unknown as EmployeeRepository,
     passwords as unknown as PasswordService,
     permissions as unknown as PermissionsService,
     audit as unknown as AuditService,

@@ -343,6 +343,8 @@ export const OPERATIONS = {
     renRequired: 'مطلوبة',
     renInsurerTermsWorsened: 'شروط المؤمِّن ساءت',
     renRiskChanged: 'تغيّر الخطر',
+    usrEmployeeRecord: 'سجل الموظف',
+    usrNoEmployeeLink: 'بدون ربط',
     secPasswordHeading: 'كلمة المرور',
     secPasswordIntro:
       'تغيير كلمة المرور يُنهي كل جلساتك الأخرى ويلغي ثقة الأجهزة التي وثقت بها سابقاً.',
@@ -674,6 +676,8 @@ export const OPERATIONS = {
     renRequired: 'Required',
     renInsurerTermsWorsened: 'Insurer terms worsened',
     renRiskChanged: 'Risk changed',
+    usrEmployeeRecord: 'Employee record',
+    usrNoEmployeeLink: 'Not linked',
     secPasswordHeading: 'Password',
     secPasswordIntro:
       'Changing your password signs out every other session and stops trusting devices you had trusted before.',
