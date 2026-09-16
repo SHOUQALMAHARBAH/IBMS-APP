@@ -33,8 +33,6 @@ describe('translate', () => {
       language: translate('AR', 'language'),
       switchToArabic: translate('AR', 'switchToArabic'),
       switchToEnglish: translate('AR', 'switchToEnglish'),
-      signedInAs: translate('AR', 'signedInAs'),
-      noRoleAssigned: translate('AR', 'noRoleAssigned'),
       signOut: translate('AR', 'signOut'),
     });
     for (const key of arKeys) {

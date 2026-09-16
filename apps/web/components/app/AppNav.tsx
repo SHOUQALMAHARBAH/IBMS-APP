@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState, useSyncExternalStore } from 'react';
 import { useAuth } from '../../lib/auth/auth-context';
-import { logout } from '../../lib/auth/auth-api';
 import { hasAnyPermission } from '../../lib/auth/permissions';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { foldedIncludes, foldForSearch } from '../../lib/i18n/fold';
@@ -17,7 +16,6 @@ import {
   subscribeNavGroups,
 } from './nav-open-groups';
 import {
-  brandStyle,
   navGroupItemsStyle,
   navGroupSummaryStyle,
   navLinkActiveStyle,
@@ -27,7 +25,6 @@ import {
   navSearchWrapStyle,
   sidebarFooterStyle,
   sidebarStyle,
-  signOutButtonStyle,
 } from './app.styles';
 
 /*
@@ -386,9 +383,8 @@ function rankIn(order: readonly string[], value: string): number {
 
 export function AppNav() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, clearUser } = useAuth();
-  const { language, setLanguage, t, tPlural } = useLanguage();
+  const { user } = useAuth();
+  const { t, tPlural } = useLanguage();
 
   const canSee = (item: NavItem) => !item.permissions || hasAnyPermission(user, item.permissions);
 
@@ -452,12 +448,6 @@ export function AppNav() {
 
   const matchCount = shownGroups.reduce((n, g) => n + g.items.length, 0);
 
-  async function handleSignOut() {
-    await logout();
-    clearUser();
-    router.push('/login');
-  }
-
   function renderLink(item: NavItem) {
     const isActive = item.href === activeHref;
     return (
@@ -474,10 +464,6 @@ export function AppNav() {
 
   return (
     <nav aria-label={t('navPrimaryAria')} style={sidebarStyle}>
-      <Link href="/" style={brandStyle}>
-        IBMS
-      </Link>
-
       <div style={navSearchWrapStyle}>
         <TextInput
           type="search"
@@ -519,39 +505,18 @@ export function AppNav() {
         </details>
       ))}
 
-      <div
-        role="group"
-        aria-label={t('language')}
-        style={{ display: 'flex', gap: 'var(--space-2)', padding: '0 var(--space-2)', marginTop: 'var(--space-4)' }}
-      >
-        <button
-          type="button"
-          aria-pressed={language === 'AR'}
-          onClick={() => setLanguage('AR')}
-          style={language === 'AR' ? navLinkActiveStyle : navLinkStyle}
-        >
-          {t('switchToArabic')}
-        </button>
-        <button
-          type="button"
-          aria-pressed={language === 'EN'}
-          onClick={() => setLanguage('EN')}
-          style={language === 'EN' ? navLinkActiveStyle : navLinkStyle}
-        >
-          {t('switchToEnglish')}
-        </button>
-      </div>
+      {/*
+        Identity and sign-out moved to the navbar's profile menu, which now
+        shows the same name plus the department and owns the sign-out. Leaving
+        a second copy here would be the duplicate-brand-mark problem again,
+        one row down.
 
-      <div style={sidebarFooterStyle}>
-        {renderLink(SECURITY)}
-        <div style={{ marginTop: 'var(--space-3)' }}>
-          {t('signedInAs')} {user?.fullName}
-        </div>
-        <div>{user && user.roles.length > 0 ? user.roles.join(', ') : t('noRoleAssigned')}</div>
-        <button type="button" onClick={() => void handleSignOut()} style={signOutButtonStyle}>
-          {t('signOut')}
-        </button>
-      </div>
+        The Security link stays. It is the SELF-SERVICE MFA enrolment route,
+        deliberately ungated because MfaRequiredGuard 403s every other screen
+        until a user enrols — and it is now reachable two ways, which for the
+        one route that can strand a user is a feature rather than a duplicate.
+      */}
+      <div style={sidebarFooterStyle}>{renderLink(SECURITY)}</div>
     </nav>
   );
 }

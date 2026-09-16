@@ -10,11 +10,173 @@ import type { CSSProperties } from 'react';
 // rather than a default admin template. All values are tokens from
 // globals.css; nothing here hard-codes a colour.
 
+/** The whole authenticated frame: navbar across the top, then everything
+ *  else. The inner row is `shellRowStyle`. */
 export const shellStyle: CSSProperties = {
   display: 'flex',
+  flexDirection: 'column',
   minHeight: '100vh',
-  alignItems: 'stretch',
 };
+
+/** Sidebar + content. Was `shellStyle` itself until the navbar landed above
+ *  it; a plain `flex-direction: row` is still what mirrors the sidebar to the
+ *  opposite screen edge under `dir="rtl"` for free. */
+export const shellRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'stretch',
+  flex: '1 1 auto',
+  minHeight: 0,
+};
+
+/**
+ * The navbar's own height, as a token rather than a literal, because THREE
+ * things have to agree on it: the bar itself, the sidebar's sticky offset, and
+ * the sidebar's max-height. Get them out of step and the sidebar either slides
+ * under the bar or grows a phantom scrollbar exactly one bar tall.
+ */
+export const NAVBAR_HEIGHT = '3.5rem';
+
+export const navbarStyle: CSSProperties = {
+  flex: `0 0 ${NAVBAR_HEIGHT}`,
+  height: NAVBAR_HEIGHT,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-3)',
+  padding: '0 var(--space-4)',
+  background: 'var(--nav-bg)',
+  color: 'var(--nav-ink)',
+  // Logical: the divider belongs on the edge touching the content below,
+  // which is the same reasoning as `sidebarStyle`'s borderInlineEnd.
+  borderBlockEnd: '1px solid var(--nav-divider)',
+  position: 'sticky',
+  top: 0,
+  zIndex: 20,
+};
+
+export const navbarBrandStyle: CSSProperties = {
+  fontWeight: 'var(--weight-bold)' as CSSProperties['fontWeight'],
+  fontSize: 'var(--text-lg)',
+  letterSpacing: '0.02em',
+  color: 'var(--nav-ink)',
+  // Wordmark today. An SVG drops in here without touching the layout.
+};
+
+/** Pushed to the trailing edge by `margin-inline-start: auto` — logical, so
+ *  it lands on the correct side in both directions. */
+export const trailingGroupStyle: CSSProperties = {
+  marginInlineStart: 'auto',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-3)',
+};
+
+/**
+ * The notifications slot — reserved, not working. No hover, no focus, no
+ * pointer cursor: every one of those would promise behaviour that does not
+ * exist yet. `--nav-ink-muted` on the nav ground is the same pairing the
+ * sidebar's group headings use.
+ */
+export const notificationsSlotStyle: CSSProperties = {
+  color: 'var(--nav-ink-muted)',
+  fontSize: 'var(--text-md)',
+  lineHeight: 1,
+  userSelect: 'none',
+};
+
+export const navbarToggleStyle: CSSProperties = {
+  fontFamily: 'inherit',
+  fontSize: 'var(--text-sm)',
+  padding: 'var(--space-1) var(--space-2)',
+  borderRadius: 'var(--radius-md)',
+  // The fix for the grey chrome: these were `navLinkStyle` buttons, which set
+  // no background at all, so the browser painted its own default button face
+  // on the navy rail.
+  background: 'transparent',
+  border: '1px solid var(--nav-divider)',
+  color: 'var(--nav-ink)',
+  cursor: 'pointer',
+  transition: 'background var(--transition-fast)',
+};
+
+export const navbarToggleActiveStyle: CSSProperties = {
+  ...navbarToggleStyle,
+  background: 'var(--nav-item-active)',
+  borderColor: 'var(--nav-item-active)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+};
+
+export const profileSummaryStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
+  cursor: 'pointer',
+  padding: 'var(--space-1) var(--space-2)',
+  borderRadius: 'var(--radius-md)',
+  listStyle: 'none',
+  maxWidth: '14rem',
+};
+
+export const avatarStyle: CSSProperties = {
+  flex: '0 0 auto',
+  width: '2rem',
+  height: '2rem',
+  borderRadius: 'var(--radius-full)',
+  background: 'var(--nav-item-active)',
+  color: 'var(--nav-ink)',
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 'var(--text-sm)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+};
+
+export const profileNameStyle: CSSProperties = {
+  fontSize: 'var(--text-sm)',
+  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
+  color: 'var(--nav-ink)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+export const profileDeptStyle: CSSProperties = {
+  fontSize: 'var(--text-xs)',
+  color: 'var(--nav-ink-muted)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+/** Anchored to the trailing edge with a logical offset so it opens inward in
+ *  both directions rather than off the side of the screen in Arabic. */
+export const profileMenuStyle: CSSProperties = {
+  position: 'absolute',
+  insetInlineEnd: 0,
+  top: 'calc(100% + var(--space-2))',
+  minWidth: '12rem',
+  background: 'var(--surface-card)',
+  color: 'var(--ink-primary)',
+  border: '1px solid var(--border-default)',
+  borderRadius: 'var(--radius-md)',
+  boxShadow: 'var(--shadow-md)',
+  padding: 'var(--space-1)',
+  display: 'grid',
+  gap: '2px',
+  zIndex: 30,
+};
+
+export const profileMenuItemStyle: CSSProperties = {
+  display: 'block',
+  padding: 'var(--space-2) var(--space-3)',
+  borderRadius: 'var(--radius-sm)',
+  fontFamily: 'inherit',
+  fontSize: 'var(--text-sm)',
+  color: 'var(--ink-primary)',
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+};
+
+
 
 export const sidebarStyle: CSSProperties = {
   flex: `0 0 var(--sidebar-width)`,
@@ -34,8 +196,11 @@ export const sidebarStyle: CSSProperties = {
   // The nav is taller than the viewport for a broadly-permissioned role, so
   // it scrolls itself rather than the page.
   position: 'sticky',
-  top: 0,
-  maxHeight: '100vh',
+  // Not 0: the navbar is sticky at the top of the same scroll container, so a
+  // zero offset parks the rail underneath it. Both values are derived from
+  // NAVBAR_HEIGHT rather than restating it — the height exists in one place.
+  top: NAVBAR_HEIGHT,
+  maxHeight: `calc(100vh - ${NAVBAR_HEIGHT})`,
   overflowY: 'auto',
 };
 
@@ -153,19 +318,6 @@ export const sidebarFooterStyle: CSSProperties = {
   color: 'var(--nav-ink-muted)',
 };
 
-export const signOutButtonStyle: CSSProperties = {
-  marginTop: 'var(--space-3)',
-  width: '100%',
-  padding: 'var(--space-2)',
-  fontFamily: 'inherit',
-  fontSize: 'var(--text-sm)',
-  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
-  color: 'var(--nav-ink)',
-  background: 'rgba(255, 255, 255, 0.1)',
-  border: '1px solid var(--nav-divider)',
-  borderRadius: 'var(--radius-md)',
-  cursor: 'pointer',
-};
 
 // Home page — a responsive grid of module entry-point cards.
 export const homeGridStyle: CSSProperties = {

@@ -45,6 +45,23 @@ async function mockManager(page: Page, languagePreference: "AR" | "EN" = "EN") {
 // whole screen — the same convention every other spec here follows.
 const CUSTOMERS_URL = "http://localhost:4000/customers**";
 
+/**
+ * Waits until the group's open/closed DECISION has actually reached storage.
+ *
+ * Clicking a <summary> opens the <details> NATIVELY and synchronously; the
+ * React `onToggle` that records the decision runs afterwards. So asserting the
+ * group's links are visible proves only that the element opened — not that
+ * anything was persisted — and a `page.reload()` straight after can beat the
+ * write. That was a real intermittent failure (twice in five full runs), and
+ * the cause was this assertion standing in for a precondition it does not
+ * actually establish.
+ */
+async function expectDecisionStored(page: Page, groupKey: string, open: boolean) {
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('ibms.nav.openGroups')))
+    .toContain(`"${groupKey}":${open}`);
+}
+
 function nav(page: Page) {
   return page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ });
 }
@@ -77,6 +94,7 @@ test("expanding a group is remembered on the next page load", async ({ page }) =
   const sidebar = nav(page);
   await sidebar.locator("summary", { hasText: "Finance" }).click();
   await expect(sidebar.getByRole("link", { name: "Client accounting" })).toBeVisible();
+  await expectDecisionStored(page, "navGroupFinance", true);
 
   // A full reload, not a client-side navigation — the decision has to survive
   // in localStorage, and be adopted without tripping hydration.
@@ -98,6 +116,7 @@ test("collapsing a group is remembered too — the default does not win it back"
   // the section they are working in.
   await sidebar.locator("summary", { hasText: "Clients" }).click();
   await expect(customers).toBeHidden();
+  await expectDecisionStored(page, "navGroupClients", false);
 
   await page.reload();
   await expect(nav(page).getByRole("link", { name: "Customers", exact: true })).toBeHidden();

@@ -296,6 +296,38 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       .expect(201);
   });
 
+  it('/auth/me carries the Department, in both spellings, for the navbar to render', async () => {
+    const user = await provision(`onboard-dept-${tag}`, [
+      'SALES_RELATIONSHIP_OFFICER',
+    ]);
+    const login = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({ email: user.email, password: PASSWORD })
+      .expect(200);
+    const changed = await request(app!.getHttpServer())
+      .post('/auth/password/force-change')
+      .send({
+        onboardingToken: (login.body as LoginBody).onboardingToken,
+        newPassword: NEW_PASSWORD,
+      })
+      .expect(200);
+
+    const me = await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer((changed.body as LoginBody).accessToken!))
+      .expect(200);
+
+    // BOTH spellings, not one resolved string: nameAr is nullable and the
+    // caller is what knows which language it is rendering in. The navbar shows
+    // this under the signed-in user's name.
+    const body = me.body as {
+      department: { name: string; nameAr: string | null } | null;
+    };
+    expect(body.department).not.toBeNull();
+    expect(body.department!.name).toBe(`Claims ${tag}`);
+    expect(body.department!.nameAr).toBe(`المطالبات ${tag}`);
+  });
+
   it('the mandatory change is one-shot — the token cannot be replayed', async () => {
     const user = await provision(`onboard-replay-${tag}`, [
       'SALES_RELATIONSHIP_OFFICER',

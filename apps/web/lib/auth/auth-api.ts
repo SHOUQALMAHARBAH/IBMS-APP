@@ -59,6 +59,10 @@ export interface MeResponse {
   mfaEnabled: boolean;
   mfaPolicySatisfied: boolean;
   accessValidUntil: string | null;
+  /** The Department this user sits in, or null — signup grants none, only
+   *  admin provisioning does. Both spellings, because `nameAr` is nullable
+   *  and the caller is the one that knows which language it is rendering. */
+  department: { name: string; nameAr: string | null } | null;
   idleTimeoutMinutes: number;
   hardLogoutAfterIdleMinutes: number;
   stepUpFresh: boolean;

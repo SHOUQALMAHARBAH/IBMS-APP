@@ -741,7 +741,7 @@ export class AuthService {
   }
 
   async me(userId: string, sessionId: string) {
-    const user = await this.users.findById(userId);
+    const user = await this.users.findByIdWithDepartment(userId);
     if (!user) throw new NotFoundException('User not found');
     const roles = await this.users.getRoleNames(userId);
     const config = await this.securityConfig.get();
@@ -765,6 +765,15 @@ export class AuthService {
       mfaEnabled: user.mfaEnabled,
       mfaPolicySatisfied: this.mfaPolicySatisfied(user, roles),
       accessValidUntil: user.accessValidUntil,
+      // Both spellings, not one resolved string: the caller knows which
+      // language it is rendering in and `nameAr` is nullable, so picking here
+      // would either need the language passed in or would strand Arabic
+      // users on the English name. Same optional-Arabic shape
+      // KnowledgeBaseArticle uses. Null when the user has no Department —
+      // signup grants none, only provisioning does.
+      department: user.department
+        ? { name: user.department.name, nameAr: user.department.nameAr }
+        : null,
       idleTimeoutMinutes: config.idleTimeoutMinutes,
       hardLogoutAfterIdleMinutes: config.hardLogoutAfterIdleMinutes,
       stepUpFresh,

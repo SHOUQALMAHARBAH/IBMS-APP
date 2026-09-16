@@ -117,6 +117,21 @@ export class UserRepository {
     return this.prisma.client.user.findUnique({ where: { id } });
   }
 
+  /**
+   * `findById` plus the Department the user sits in.
+   *
+   * A sibling rather than a widening of `findById`, which has many callers
+   * that want a plain `User` and would all inherit a relation none of them
+   * asked for. Only /auth/me needs this — the navbar shows the department
+   * under the signed-in user's name.
+   */
+  findByIdWithDepartment(id: string) {
+    return this.prisma.client.user.findUnique({
+      where: { id },
+      include: { department: true },
+    });
+  }
+
   async getRoleNames(userId: string): Promise<RoleName[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { userId, revokedAt: null },

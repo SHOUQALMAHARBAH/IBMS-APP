@@ -1,16 +1,16 @@
 // The primary sidebar nav (AppNav.tsx) — on every authenticated screen, so
 // the highest-visibility translation target in the whole app. Also carries
 // the original item #1 keys (language/switchToArabic/switchToEnglish/
-// signedInAs/noRoleAssigned/signOut), unchanged from the first dictionary.
+// signOut), unchanged from the first dictionary. signedInAs/noRoleAssigned
+// went with the sidebar footer block the navbar profile menu replaced.
 export const NAV = {
   AR: {
     language: 'اللغة',
     switchToArabic: 'العربية',
     switchToEnglish: 'English',
-    signedInAs: 'تسجيل الدخول باسم',
-    noRoleAssigned: 'لم يتم تعيين دور',
     signOut: 'تسجيل الخروج',
     navPrimaryAria: 'التنقّل الرئيسي',
+    navbarAria: 'الحساب والإعدادات',
 
     navHome: 'الرئيسية',
     navLeads: 'العملاء المحتملون',
@@ -101,10 +101,9 @@ export const NAV = {
     language: 'Language',
     switchToArabic: 'العربية',
     switchToEnglish: 'English',
-    signedInAs: 'Signed in as',
-    noRoleAssigned: 'No role assigned',
     signOut: 'Sign out',
     navPrimaryAria: 'Primary',
+    navbarAria: 'Account and settings',
 
     navHome: 'Home',
     navLeads: 'Leads',

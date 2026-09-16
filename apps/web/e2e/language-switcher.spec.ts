@@ -73,7 +73,18 @@ test("switching language is instant (no reload) and persists via PATCH /auth/me/
   await expect.poll(() => page.evaluate(() => document.documentElement.dir)).toBe("ltr");
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe("en");
   await expect(page.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("Sign out")).toBeVisible();
+  // Both landmarks re-render, so assert one string from each: the sidebar no
+  // longer has a sign-out to check (identity and sign-out moved to the navbar
+  // profile menu), and checking only the navbar would leave the sidebar —
+  // which is most of the translated surface — unasserted.
+  await expect(
+    page.getByRole("navigation", { name: /^(Primary|التنقّل الرئيسي)$/ }).getByRole("link", { name: "Home" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: /^(Account and settings|الحساب والإعدادات)$/ })
+      .getByText("Sales Officer"),
+  ).toBeVisible();
   expect(patchCalled).toBe(true);
 
   // a fresh load now reflects the persisted (mocked-server) preference

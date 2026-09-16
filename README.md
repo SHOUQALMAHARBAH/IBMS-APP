@@ -1232,15 +1232,18 @@ narrows a gap.
 Neither blocks anything; both are recorded so they are not rediscovered as
 surprises.
 
-- **`apps/web/e2e/sidebar-manager.spec.ts:72` is intermittently flaky.**
-  "expanding a group is remembered on the next page load" failed once in three
-  full `npm run e2e` runs, and passed 4/4 when run in isolation immediately
-  afterwards. The mechanism was NOT identified: the localStorage write in
-  `nav-open-groups.ts#setNavGroupOpen` is synchronous and happens before the
-  assertion that precedes the reload, so the obvious race does not explain it.
-  It is deliberately NOT "hardened" — a speculative fix to a test whose failure
-  mode is not understood buys nothing and hides the next occurrence. If it
-  recurs, capture the trace rather than adding a wait.
+- **RESOLVED — the `sidebar-manager.spec.ts` flake had a real cause.** It
+  recurred (twice in five full runs) and the mechanism turned out to be the
+  test, not the store. Clicking a `<summary>` opens the `<details>`
+  **natively and synchronously**; the React `onToggle` that records the
+  decision runs afterwards. So asserting the group's links are visible proved
+  only that the element had opened — not that anything had been persisted —
+  and the `page.reload()` on the next line could beat the write. Both
+  persistence tests now wait for the decision to actually reach
+  `localStorage` before reloading, which is the precondition they always
+  depended on. Five consecutive full-spec runs green afterwards. Worth
+  remembering generally: with `<details>`, visibility is the browser's doing
+  and tells you nothing about your own state having been recorded.
 
 - **`authPasswordRule` uses Arabic-Indic numerals.** Its Arabic value opens
   with `١٢`, where the rest of the app renders Western digits — `lib/i18n/
