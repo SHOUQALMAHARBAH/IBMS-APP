@@ -1263,7 +1263,9 @@ Two smaller findings from the same analysis, also open:
 - **The insurer/employee-performance overlap above** is recorded here rather
   than fixed, on the same reasoning.
 - **Per-user, usage-based ordering does not exist and cannot yet.** Section
-  order is a fixed, role-informed list in `AppNav.tsx`. There is no page-view
+  order is a fixed, role-informed list in `AppNav.tsx` (`NAV_ORDER_BY_ROLE`,
+  which carries the Branch/Department Manager and Executive; every other role
+  falls back to declaration order). There is no page-view
   telemetry in `apps/web`, and `AuditLogEntry`'s `READ` action is written at
   only 27 deliberate sites weighted towards reporting screens, so ordering by
   it would rank dashboards top purely because dashboards are what log reads. A

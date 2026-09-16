@@ -152,7 +152,7 @@ test("the Manager's group order puts the book of business above administration",
 
   // Not a full-sequence assertion — that would break on any future group — but
   // the ordering decision this pass actually made: client-facing work first,
-  // oversight last. GROUP_ORDER_BY_ROLE is what drives it.
+  // oversight last. NAV_ORDER_BY_ROLE is what drives it.
   expect(order.indexOf("clients")).toBe(0);
   expect(order.indexOf("new business")).toBeLessThan(order.indexOf("finance"));
   expect(order.indexOf("dashboards")).toBeLessThan(order.indexOf("administration"));

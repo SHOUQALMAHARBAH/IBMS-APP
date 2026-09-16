@@ -78,7 +78,7 @@ import {
  * ONE taxonomy, filtered per role — never a per-role tree. A user holding two
  * roles still gets one coherent sidebar, and there is no second structure to
  * drift from the grid. What varies per role is ORDER; see
- * GROUP_ORDER_BY_ROLE.
+ * NAV_ORDER_BY_ROLE.
  *
  * Item order inside the six groups this pass did not restructure is left
  * exactly as it was, deliberately: re-sequencing groups nobody asked about
@@ -103,7 +103,7 @@ type NavGroup = { labelKey: TranslationKey; items: readonly NavItem[] };
 const HOME: NavItem = { href: '/', labelKey: 'navHome' };
 
 /** Declaration order is the DEFAULT group order, used by any role without an
- *  entry in GROUP_ORDER_BY_ROLE. */
+ *  entry in NAV_ORDER_BY_ROLE. */
 const NAV_GROUPS: readonly NavGroup[] = [
   {
     labelKey: 'navGroupNewBusiness',
@@ -288,7 +288,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 ];
 
 /*
- * Group order per role — the whole of what "ordered by how often it is used"
+ * Navigation order per role — the whole of what "ordered by how often it is used"
  * means in this pass, and it is a FIXED, role-informed order rather than a
  * measured one. That is not a shortcut; it is what the data supports. There is
  * no page-view telemetry anywhere in apps/web, and AuditLogEntry's READ action
@@ -300,21 +300,63 @@ const NAV_GROUPS: readonly NavGroup[] = [
  *
  * A role absent from this map falls back to NAV_GROUPS' declaration order.
  */
-const GROUP_ORDER_BY_ROLE: Readonly<Record<string, readonly TranslationKey[]>> = {
+type RoleNavOrder = {
+  /** Every group key, so the order stays defined if a permission changes and
+   *  a group this role cannot currently see starts rendering. */
+  groups: readonly TranslationKey[];
+  /**
+   * Hrefs lifted to the top of THEIR OWN group for this role.
+   *
+   * Item order is otherwise global, deliberately — a second per-role item
+   * taxonomy is exactly the duplicated structure this file's header argues
+   * against. But one item genuinely changes meaning with the reader:
+   * /dashboards/executive is the screen an Executive opens first and the one a
+   * Manager opens last, and it cannot be both eighth and first in a single
+   * global list. A short list of exceptions carried on the SAME per-role
+   * entry as the group order is the smallest thing that expresses it — one
+   * place to look for "what is different for this role", rather than two
+   * parallel maps to keep in step.
+   */
+  hoist?: readonly string[];
+};
+
+const NAV_ORDER_BY_ROLE: Readonly<Record<string, RoleNavOrder>> = {
   // A Manager works the book first and administers last.
-  BRANCH_DEPARTMENT_MANAGER: [
-    'navGroupClients',
-    'navGroupNewBusiness',
-    'navGroupPolicies',
-    'navGroupService',
-    'navGroupFinance',
-    'navGroupDashboards',
-    'navGroupPerformance',
-    'navGroupCompliance',
-    'navGroupOperations',
-    'navGroupPrivacy',
-    'navGroupAdmin',
-  ],
+  BRANCH_DEPARTMENT_MANAGER: {
+    groups: [
+      'navGroupClients',
+      'navGroupNewBusiness',
+      'navGroupPolicies',
+      'navGroupService',
+      'navGroupFinance',
+      'navGroupDashboards',
+      'navGroupPerformance',
+      'navGroupCompliance',
+      'navGroupOperations',
+      'navGroupPrivacy',
+      'navGroupAdmin',
+    ],
+  },
+  // An Executive reads the numbers first and the pipeline afterwards — the
+  // mirror image of the Manager, who lives in the book and checks the numbers.
+  // Operations and Privacy render for neither role today; they are listed so a
+  // future permission grant does not land them in an arbitrary position.
+  EXECUTIVE_MANAGEMENT: {
+    groups: [
+      'navGroupDashboards',
+      'navGroupPerformance',
+      'navGroupFinance',
+      'navGroupPolicies',
+      'navGroupClients',
+      'navGroupNewBusiness',
+      'navGroupService',
+      'navGroupCompliance',
+      'navGroupOperations',
+      'navGroupPrivacy',
+      'navGroupAdmin',
+    ],
+    hoist: ['/dashboards/executive'],
+  },
 };
 
 /** Self-service account security. Never gated — see the note above. */
@@ -327,12 +369,19 @@ function matches(pathname: string, href: string): boolean {
 
 /** The first role THIS MAP declares that the user actually holds — so the
  *  result does not depend on the order /auth/me happens to return roles in. */
-function groupOrderFor(roles: readonly string[] | undefined): readonly TranslationKey[] | null {
+function navOrderFor(roles: readonly string[] | undefined): RoleNavOrder | null {
   if (!roles?.length) return null;
-  for (const [role, order] of Object.entries(GROUP_ORDER_BY_ROLE)) {
+  for (const [role, order] of Object.entries(NAV_ORDER_BY_ROLE)) {
     if (roles.includes(role)) return order;
   }
   return null;
+}
+
+/** Position in `order`, or the end for anything the list does not name.
+ *  Paired with a stable sort, so unnamed entries keep their relative order. */
+function rankIn(order: readonly string[], value: string): number {
+  const i = order.indexOf(value);
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i;
 }
 
 export function AppNav() {
@@ -348,18 +397,25 @@ export function AppNav() {
     items: group.items.filter(canSee),
   })).filter((group) => group.items.length > 0);
 
-  const order = groupOrderFor(user?.roles);
+  const roleOrder = navOrderFor(user?.roles);
   // Array.prototype.sort is stable, so a group the order omits keeps its
-  // declaration position relative to the other omitted ones.
-  const visibleGroups = order
-    ? [...permitted].sort((a, b) => {
-        const rank = (key: TranslationKey) => {
-          const i = order.indexOf(key);
-          return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-        };
-        return rank(a.labelKey) - rank(b.labelKey);
-      })
-    : permitted;
+  // declaration position relative to the other omitted ones, and an item no
+  // `hoist` names keeps its global position relative to the other unhoisted
+  // ones.
+  const hoist = roleOrder?.hoist;
+  const withHoistedItems =
+    hoist && hoist.length > 0
+      ? permitted.map((group) => ({
+          labelKey: group.labelKey,
+          items: [...group.items].sort((a, b) => rankIn(hoist, a.href) - rankIn(hoist, b.href)),
+        }))
+      : permitted;
+
+  const visibleGroups = roleOrder
+    ? [...withHoistedItems].sort(
+        (a, b) => rankIn(roleOrder.groups, a.labelKey) - rankIn(roleOrder.groups, b.labelKey),
+      )
+    : withHoistedItems;
 
   // Longest matching href wins, so /customers/kyc-queue highlights "KYC
   // queue" only — not "Customers" as well. Computed over the VISIBLE set so a
