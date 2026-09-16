@@ -5,6 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
+import { DEFAULT_PAGE_SIZE } from '../../common/pagination';
 import { PolicyService } from './policy.service';
 import type { PolicyRepository } from '../../repositories/policy.repository';
 import type { OpportunityRepository } from '../../repositories/opportunity.repository';
@@ -134,6 +135,7 @@ function makeDeps(opts: Opts = {}) {
     .mockResolvedValue(opts.existingPolicy ?? null);
   const findManyByCustomerId = vi.fn().mockResolvedValue([policyRow()]);
   const findManyForActor = vi.fn().mockResolvedValue([policyRow()]);
+  const countForActor = vi.fn().mockResolvedValue(1);
   const createIssuanceArtifacts = vi
     .fn()
     .mockImplementation(
@@ -189,6 +191,7 @@ function makeDeps(opts: Opts = {}) {
     findByOpportunityId,
     findManyByCustomerId,
     findManyForActor,
+    countForActor,
     createIssuanceArtifacts,
     attachDocuments,
   } as unknown as PolicyRepository;
@@ -299,6 +302,7 @@ function makeDeps(opts: Opts = {}) {
       findByOpportunityId,
       findManyByCustomerId,
       findManyForActor,
+      countForActor,
       createIssuanceArtifacts,
       attachDocuments,
       findOpportunityById,
@@ -696,10 +700,27 @@ describe('PolicyService', () => {
       // and still covered by the test below.
       const { service, mocks } = makeDeps();
 
-      await expect(service.list({}, placement())).resolves.toHaveLength(1);
+      const result = await service.list({}, placement());
+      expect(result.items).toHaveLength(1);
+      // The count is the whole matching set, not this page — it is what the
+      // page control renders "of N" from.
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(0);
+      expect(result.pageSize).toBe(DEFAULT_PAGE_SIZE);
 
       // Placement works the whole book, so no owner filter is applied.
-      expect(mocks.findManyForActor).toHaveBeenCalledWith({
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        { ownerUserId: null, status: undefined, search: undefined },
+        {
+          take: DEFAULT_PAGE_SIZE,
+          skip: 0,
+          page: 0,
+          pageSize: DEFAULT_PAGE_SIZE,
+        },
+      );
+      // The count runs on the SAME filter, so "of N" can never contradict the
+      // rows on screen.
+      expect(mocks.countForActor).toHaveBeenCalledWith({
         ownerUserId: null,
         status: undefined,
         search: undefined,
@@ -719,13 +740,17 @@ describe('PolicyService', () => {
       );
 
       // The visibility rule reaches the repository as a QUERY filter — if it
-      // were applied to the rows afterwards, the cap would silently decide
-      // what this caller cannot see.
-      expect(mocks.findManyForActor).toHaveBeenCalledWith({
-        ownerUserId: 'sales-1',
-        status: 'ISSUED',
-        search: 'Rawabi',
-      });
+      // were applied to the rows afterwards, the page window would silently
+      // decide what this caller cannot see.
+      expect(mocks.findManyForActor).toHaveBeenCalledWith(
+        { ownerUserId: 'sales-1', status: 'ISSUED', search: 'Rawabi' },
+        {
+          take: DEFAULT_PAGE_SIZE,
+          skip: 0,
+          page: 0,
+          pageSize: DEFAULT_PAGE_SIZE,
+        },
+      );
     });
 
     it('422 when both scopes are provided', async () => {
@@ -741,8 +766,12 @@ describe('PolicyService', () => {
     it('returns [] for an opportunity scope with no policy yet', async () => {
       const { service, mocks } = makeDeps();
       mocks.findByOpportunityId.mockResolvedValue(null);
-      const rows = await service.list({ opportunityId: 'opp-1' }, placement());
-      expect(rows).toEqual([]);
+      const result = await service.list(
+        { opportunityId: 'opp-1' },
+        placement(),
+      );
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
     });
 
     it('returns the policy for an opportunity scope', async () => {
@@ -772,10 +801,9 @@ describe('PolicyService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      const [view] = await service.list(
-        { opportunityId: 'opp-1' },
-        placement(),
-      );
+      const [view] = (
+        await service.list({ opportunityId: 'opp-1' }, placement())
+      ).items;
       expect(view.id).toBe('pol-1');
       expect(view.issuanceComplete).toBe(false);
     });

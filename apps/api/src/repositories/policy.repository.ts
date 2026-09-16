@@ -33,18 +33,16 @@ export type PolicyWithContext = Prisma.PolicyGetPayload<{
 }>;
 
 /**
- * The book-wide policy list is capped rather than paginated: this codebase
- * has no offset-pagination convention (0 of 50 list DTOs carry a page
- * param), and inventing one here would make this the only list screen that
- * behaves differently — the thing the frontend directive's consistency rule
- * exists to prevent.
+ * The book-wide policy list is paginated, not capped. It was capped until
+ * `common/pagination.ts` existed — the comment here used to say so, and said
+ * the reason was that no list endpoint in this codebase took a page param.
+ * Five now do, this is one of them, and the old cap silently dropped the
+ * oldest tail of a book that outgrew it.
  *
- * The cap is only safe because every filter is applied in the query (see
- * `findManyForActor`). Ordered newest-first, so what falls outside the cap is
- * the oldest tail; a caller looking for something older narrows by status or
- * search rather than scrolling.
+ * Paging is only safe because every filter is applied in the query (see
+ * `findManyForActor`), so the window narrows a set the caller is already
+ * entitled to see. Ordered newest-first, same as before.
  */
-export const POLICY_LIST_TAKE = 200;
 
 export interface ListPoliciesFilter {
   /** `null` = this caller reaches the whole book. Otherwise, only policies
@@ -178,18 +176,30 @@ export class PolicyRepository {
    * `POLICY_CROSS_OWNER_ROLES`) passes `null`; anyone else passes their own
    * id and sees only policies on Customers they own.
    *
-   * Filtering before the cap rather than after it is the standing rule from
-   * the `DpoWorkspaceService` defect: a capped read that is filtered in
-   * memory lets the cap silently decide what the caller cannot see. Every
-   * filter below is part of the query, so `POLICY_LIST_TAKE` bounds the
-   * MATCHING rows, not the rows scanned.
+   * Filtering before the window rather than after it is the standing rule
+   * from the `DpoWorkspaceService` defect: a bounded read that is filtered in
+   * memory lets the bound silently decide what the caller cannot see. Every
+   * filter below is part of the query, so the window bounds the MATCHING
+   * rows, not the rows scanned.
    */
-  findManyForActor(filter: ListPoliciesFilter): Promise<PolicyWithContext[]> {
+  findManyForActor(
+    filter: ListPoliciesFilter,
+    window: { take: number; skip: number },
+  ): Promise<PolicyWithContext[]> {
     return this.prisma.client.policy.findMany({
       where: buildPolicyListWhere(filter),
       include: POLICY_INCLUDE,
       orderBy: { createdAt: 'desc' },
-      take: POLICY_LIST_TAKE,
+      take: window.take,
+      skip: window.skip,
+    });
+  }
+
+  /** Counts on the SAME `where` the page query runs, so the two can never
+   *  disagree about what is being counted. */
+  countForActor(filter: ListPoliciesFilter): Promise<number> {
+    return this.prisma.client.policy.count({
+      where: buildPolicyListWhere(filter),
     });
   }
 

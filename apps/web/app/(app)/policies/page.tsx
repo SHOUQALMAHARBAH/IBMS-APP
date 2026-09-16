@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { ApiError } from '../../../lib/auth/api-client';
+import { Pagination } from '../../../components/ui/Pagination';
 import {
   listPolicies,
   type Policy,
@@ -47,15 +48,24 @@ export default function PoliciesPage() {
   const [search, setSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [status, setStatus] = useState<PolicyStatus | ''>('');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(0);
 
   const loadPolicies = useCallback(
-    async (term: string, statusFilter: PolicyStatus | '') => {
+    async (term: string, statusFilter: PolicyStatus | '', nextPage = 0) => {
       try {
         const result = await listPolicies({
           ...(term ? { search: term } : {}),
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(nextPage ? { page: nextPage } : {}),
         });
-        setPolicies(result);
+        setPolicies(result.items);
+        setTotal(result.total);
+        // The server's size, not a constant repeated here: it clamps what was
+        // asked for, so this is the only honest source for the range label.
+        setPageSize(result.pageSize);
+        setPage(result.page);
         setLoadError(null);
       } catch (err) {
         setPolicies(null);
@@ -195,6 +205,14 @@ export default function PoliciesPage() {
           </>
         )
       ) : null}
+      {/* Both filters travel with the page, so paging never silently widens
+          the result set the reader is looking at. */}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={(next) => void loadPolicies(searchTerm, status, next)}
+      />
     </main>
   );
 }

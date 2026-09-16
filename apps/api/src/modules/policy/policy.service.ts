@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
+import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 import type { Customer, Policy, PolicyStatus } from '@ibms/db';
 import {
   PolicyRepository,
@@ -713,7 +714,7 @@ export class PolicyService {
   async list(
     query: ListPoliciesQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<PolicyView[]> {
+  ): Promise<Paginated<PolicyView>> {
     const scopes = [query.opportunityId, query.customerId].filter(
       (v) => v != null,
     );
@@ -731,28 +732,43 @@ export class PolicyService {
       // `assertCustomerVisible`, expressed as a query filter instead of a
       // per-row check: a caller who works the whole book passes `null`,
       // everyone else is pinned to Customers they own. It has to be part of
-      // the query — filtering a capped read afterwards would let the cap
-      // decide what the caller cannot see, which is exactly the
-      // `DpoWorkspaceService` defect.
-      const rows = await this.policies.findManyForActor({
+      // the query — paginating a read that was filtered afterwards would
+      // let the page size decide what the caller cannot see, which is exactly
+      // the `DpoWorkspaceService` defect.
+      const filter = {
         ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,
         status: query.status,
         search: query.search,
-      });
-      return rows.map((r) => this.toView(r));
+      };
+      const window = pageWindow(query.page, query.pageSize);
+      const [rows, total] = await Promise.all([
+        this.policies.findManyForActor(filter, window),
+        this.policies.countForActor(filter),
+      ]);
+      return {
+        items: rows.map((r) => this.toView(r)),
+        total,
+        page: window.page,
+        pageSize: window.pageSize,
+      };
     }
 
     if (query.opportunityId) {
       await this.loadVisibleOpportunity(query.opportunityId, actor);
       const row = await this.policies.findByOpportunityId(query.opportunityId);
-      return row ? [this.toView(row)] : [];
+      // Same envelope as the book-wide branch, deliberately: one response
+      // shape per endpoint means one client. These two scoped branches are
+      // bounded by construction — at most one policy per opportunity, and one
+      // customer's own policies — so they report everything they have and the
+      // page control hides itself.
+      return wholeSet(row ? [this.toView(row)] : []);
     }
 
     await this.assertCustomerVisible(query.customerId as string, actor);
     const rows = await this.policies.findManyByCustomerId(
       query.customerId as string,
     );
-    return rows.map((r) => this.toView(r));
+    return wholeSet(rows.map((r) => this.toView(r)));
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<PolicyView> {

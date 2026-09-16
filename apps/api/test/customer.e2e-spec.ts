@@ -437,7 +437,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get('/customers?search=trade')
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -469,7 +471,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get(`/customers?search=${encodeURIComponent('سيارة')}`)
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -508,7 +512,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get('/customers?search=Ahmad')
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -540,7 +546,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get(`/customers?search=${encodeURIComponent('خالد')}`)
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -561,8 +569,97 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get('/customers?search=')
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customer.id);
+    });
+
+    it('pages the list: two pages, disjoint rows, a stable total', async () => {
+      const app = await boot();
+      // A fresh owner, so this caller's whole book is exactly the three rows
+      // created below and the assertions are about a known set rather than
+      // whatever db-test has accumulated.
+      const sales = await makeUser(
+        app,
+        'cust-paging',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      await createIndividualCustomer(app, sales.accessToken, `Awwal ${unique}`);
+      await createIndividualCustomer(app, sales.accessToken, `Thani ${unique}`);
+      await createIndividualCustomer(
+        app,
+        sales.accessToken,
+        `Thalith ${unique}`,
+      );
+
+      const pageOf = async (qs: string) => {
+        const res = await request(app.getHttpServer())
+          .get(`/customers?${qs}`)
+          .set(bearer(sales.accessToken))
+          .expect(200);
+        return res.body as {
+          items: CustomerBody[];
+          total: number;
+          page: number;
+          pageSize: number;
+        };
+      };
+
+      const first = await pageOf('pageSize=2');
+      expect(first.items).toHaveLength(2);
+      expect(first.page).toBe(0);
+      expect(first.pageSize).toBe(2);
+      // `total` is the whole matching set, not this page — it is what the page
+      // control renders "of N" from and how it knows when to stop.
+      expect(first.total).toBe(3);
+
+      const second = await pageOf('page=1&pageSize=2');
+      expect(second.items).toHaveLength(1);
+      expect(second.page).toBe(1);
+      expect(second.total).toBe(3);
+
+      // The two pages must not overlap, or paging through the list would show
+      // the same customer twice and skip another.
+      const firstIds = first.items.map((c) => c.id);
+      const secondIds = second.items.map((c) => c.id);
+      expect(firstIds).toHaveLength(new Set(firstIds).size);
+      expect(firstIds.some((id) => secondIds.includes(id))).toBe(false);
+      expect(new Set([...firstIds, ...secondIds]).size).toBe(3);
+
+      // Past the end is an empty page, not an error: the client may hold a
+      // stale page number after rows are deleted.
+      const past = await pageOf('page=9&pageSize=2');
+      expect(past.items).toHaveLength(0);
+      expect(past.total).toBe(3);
+    });
+
+    it('clamps a hostile page size instead of running the unbounded query', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-paging-clamp',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+
+      // The whole point of MAX_PAGE_SIZE: `?pageSize=100000` is the unbounded
+      // read this work exists to remove, so it is clamped rather than obeyed.
+      const res = await request(app.getHttpServer())
+        .get('/customers?pageSize=100000')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const body = res.body as { pageSize: number; items: CustomerBody[] };
+      expect(body.pageSize).toBe(200);
+      expect(body.items.length).toBeLessThanOrEqual(200);
+
+      // A negative page is clamped to the first one rather than producing a
+      // negative OFFSET, which Postgres would reject outright.
+      const negative = await request(app.getHttpServer())
+        .get('/customers?page=-5')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((negative.body as { page: number }).page).toBe(0);
     });
 
     it('a nonsense search term matches nothing', async () => {
@@ -578,7 +675,11 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get(`/customers?search=${nonsense}`)
         .set(bearer(sales.accessToken))
         .expect(200);
-      expect(res.body as CustomerBody[]).toHaveLength(0);
+      const page = res.body as { items: CustomerBody[]; total: number };
+      expect(page.items).toHaveLength(0);
+      // `total` counts the whole matching set, so an empty page here is a
+      // genuinely empty result rather than a page past the end of one.
+      expect(page.total).toBe(0);
     });
   });
 

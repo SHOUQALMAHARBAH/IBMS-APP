@@ -3,6 +3,7 @@
 // apps/api's /audit-trail endpoints. audit-log.read /
 // document-history.read / workflow-history.read.
 
+import type { Paginated } from '../api/paginated';
 import { apiGet } from '../auth/api-client';
 
 export interface AuditLogEntry {
@@ -43,7 +44,10 @@ export function browseAuditTrail(filters: {
   action?: string;
   from?: string;
   to?: string;
-}): Promise<AuditLogEntry[]> {
+  /** 0-based. Omitted on the first page, so the common request keeps the URL
+   *  it has always had. */
+  page?: number;
+}): Promise<Paginated<AuditLogEntry>> {
   const params = new URLSearchParams();
   if (filters.entityType) params.set('entityType', filters.entityType);
   if (filters.entityId) params.set('entityId', filters.entityId);
@@ -51,6 +55,7 @@ export function browseAuditTrail(filters: {
   if (filters.action) params.set('action', filters.action);
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
+  if (filters.page) params.set('page', String(filters.page));
   const qs = params.toString();
   return apiGet(`/audit-trail${qs ? `?${qs}` : ''}`);
 }

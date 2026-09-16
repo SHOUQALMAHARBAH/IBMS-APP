@@ -1263,6 +1263,33 @@ surprises.
   Western-digit convention. Pre-existing, out of scope, and a one-line fix
   whenever those two screens are next touched.
 
+### OPEN — two of the five paginated lists had nothing to paginate
+
+Offset pagination was scoped to the five lists a real office grows without bound:
+customers, policies, claims, invoices and the audit trail. Three of them had a
+book-wide list endpoint and a screen, and all three now page
+(`apps/api/src/common/pagination.ts`, `apps/web/components/ui/Pagination.tsx`).
+The other two did not:
+
+- **`GET /claims` has no book-wide branch at all** — it 422s unless given
+  exactly one of `policyId` or `customerId`, and there is no `/claims` list
+  screen in `apps/web` (only `claims-analytics` and the claims dashboard). Its
+  two scoped reads are bounded by the policy or customer they belong to.
+
+- **`GET /invoices` likewise 400s without `policyId` or `customerId`**, and its
+  own error text names the book-wide view: the Process 33 receivables ageing
+  report (`GET /client-accounting/ageing`). That report is one row per customer
+  with an outstanding balance, so it grows with the customer book — but it is a
+  report with on-screen totals, not a list, and paging it raises a real question
+  (does "total outstanding" mean the page or the whole book?) that has no
+  precedent in this codebase.
+
+Neither was given a page control, because the honest options were to paginate a
+read that is already bounded — a control that can never render — or to build two
+new book-wide endpoints, which is new feature work and a new access-control
+surface rather than the capping fix this pass was. Recorded so the scope is
+explicit rather than looking like an oversight.
+
 ### OPEN, client-facing — the sidebar is organised, but not yet "major modules only"
 
 The Frontend & UX Engineering Directive §5 asks for a sidebar holding "only the

@@ -27,6 +27,10 @@ export const COMMON = {
     commonActions: 'الإجراءات',
     commonStatus: 'الحالة',
     commonTryAgain: 'تعذر تحميل البيانات — حاول مرة أخرى.',
+    pagingAria: 'تصفّح الصفحات',
+    pagingRange: 'عرض {from}–{to} من {total}',
+    pagingPrevious: 'السابق',
+    pagingNext: 'التالي',
   },
   EN: {
     commonLoading: 'Loading…',
@@ -49,5 +53,9 @@ export const COMMON = {
     commonActions: 'Actions',
     commonStatus: 'Status',
     commonTryAgain: 'Could not load this — try again.',
+    pagingAria: 'Pagination',
+    pagingRange: 'Showing {from}–{to} of {total}',
+    pagingPrevious: 'Previous',
+    pagingNext: 'Next',
   },
 } as const;

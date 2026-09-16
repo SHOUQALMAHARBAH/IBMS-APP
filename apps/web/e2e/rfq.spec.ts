@@ -786,7 +786,7 @@ async function mockRfqApi(
       };
       return route.fulfill({ status: 201, json: policy });
     }
-    return route.fulfill({ status: 200, json: policy ? [policy] : [] });
+    return route.fulfill({ status: 200, json: paged(policy ? [policy] : []) });
   });
 
   // Process 31-32 — the premium invoice + its collection cycle. Starts empty;
@@ -1448,6 +1448,13 @@ async function driveClaimToVerdict(
   await page.getByLabel("Assessment verdict").selectOption(opts.verdict);
   await page.getByRole("button", { name: "Record verdict" }).click();
   await expect(page.getByText(`verdict ${opts.verdict}`)).toBeVisible();
+}
+
+// `/policies` is one of the five paged lists: it returns
+// `{ items, total, page, pageSize }`, on its scoped branches too, so the
+// client has one response shape rather than one per branch.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
 }
 
 test("opens an opportunity and lists its RFQs", async ({ page }) => {

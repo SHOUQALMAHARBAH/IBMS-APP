@@ -104,15 +104,35 @@ export class CustomerRepository {
     return this.prisma.client.customer.findUnique({ where: { id } });
   }
 
-  findMany(filter: CustomerFilter): Promise<Customer[]> {
+  /** The `where` both the page query and its count run on, so they can never
+   *  disagree about what is being counted. */
+  private listWhere(filter: CustomerFilter) {
+    return {
+      ownerUserId: filter.ownerUserId,
+      status: filter.status,
+      id: filter.id ? { in: filter.id } : undefined,
+    };
+  }
+
+  /** The window is REQUIRED, not optional. This has exactly one caller today
+   *  (`CustomerService.list`), and an optional window would let the next one
+   *  read the whole customer book by leaving an argument off — which is the
+   *  unbounded query `common/pagination.ts` exists to remove. A caller that
+   *  genuinely wants every match should say so with an explicit window. */
+  findMany(
+    filter: CustomerFilter,
+    window: { take: number; skip: number },
+  ): Promise<Customer[]> {
     return this.prisma.client.customer.findMany({
-      where: {
-        ownerUserId: filter.ownerUserId,
-        status: filter.status,
-        id: filter.id ? { in: filter.id } : undefined,
-      },
+      where: this.listWhere(filter),
       orderBy: { createdAt: 'desc' },
+      take: window.take,
+      skip: window.skip,
     });
+  }
+
+  countMany(filter: CustomerFilter): Promise<number> {
+    return this.prisma.client.customer.count({ where: this.listWhere(filter) });
   }
 
   /** Part F item #6 — bilingual full-text search (Arabic + English) over

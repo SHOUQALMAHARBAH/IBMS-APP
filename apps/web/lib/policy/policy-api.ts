@@ -3,6 +3,7 @@
 // Policy from an accepted Opportunity (inception date set at placement),
 // then records the insurer-issued policy/schedule/documents/premium invoice.
 
+import type { Paginated } from '../api/paginated';
 import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
 
 export type PolicyStatus =
@@ -153,25 +154,34 @@ export interface RecordPolicyIssuanceInput {
   documents: PolicyDocumentInput[];
 }
 
-export function listPoliciesForOpportunity(
+/** Scoped to one opportunity, so at most one policy comes back — but the
+ *  endpoint returns the same envelope on every branch, and unwrapping it here
+ *  keeps that detail out of the two callers that only ever wanted the rows. */
+export async function listPoliciesForOpportunity(
   opportunityId: string,
 ): Promise<Policy[]> {
-  return apiGet(`/policies?opportunityId=${encodeURIComponent(opportunityId)}`);
+  const page: Paginated<Policy> = await apiGet(
+    `/policies?opportunityId=${encodeURIComponent(opportunityId)}`,
+  );
+  return page.items;
 }
 
 /**
  * The book-wide policy list. With no opportunity/customer scope the API
  * returns what THIS caller may see — the whole book for Placement /
  * Manager / Executive / Policy Checking, and only policies on customers they
- * own for anyone else. The filtering happens in the query, so the server's
- * cap bounds matching rows rather than rows scanned.
+ * own for anyone else. The filtering happens in the query, so the page window
+ * narrows matching rows rather than rows scanned.
  */
 export function listPolicies(
-  params: { status?: PolicyStatus; search?: string } = {},
-): Promise<Policy[]> {
+  params: { status?: PolicyStatus; search?: string; page?: number } = {},
+): Promise<Paginated<Policy>> {
   const qs = new URLSearchParams();
   if (params.status) qs.set('status', params.status);
   if (params.search) qs.set('search', params.search);
+  // Sent only past the first page, so the common request keeps the URL it has
+  // always had and the server's own default decides the size.
+  if (params.page) qs.set('page', String(params.page));
   const suffix = qs.toString();
   return apiGet(`/policies${suffix ? `?${suffix}` : ''}`);
 }

@@ -1,4 +1,11 @@
-import { IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PolicyStatus } from '@ibms/db';
 import { emptyStringToUndefined } from '../../../common/dto.util';
@@ -43,4 +50,17 @@ export class ListPoliciesQueryDto {
   @IsString()
   @Length(1, 200)
   search?: string;
+
+  /** Applies to the book-wide list only. The two scoped branches are bounded by
+   *  construction and return everything they have. 0-based; out-of-range values
+   *  are clamped rather than rejected — see `common/pagination.ts`. */
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt()
+  page?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt()
+  pageSize?: number;
 }

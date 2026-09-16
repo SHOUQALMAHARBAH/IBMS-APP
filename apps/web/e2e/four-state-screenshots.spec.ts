@@ -90,13 +90,20 @@ const CUSTOMER_AR = {
   contactEmail: "***@example.test",
 };
 
+// `/customers` and `/policies` are among the five paged lists: they return
+// `{ items, total, page, pageSize }`, on its scoped branches too, so the
+// client has one response shape rather than one per branch.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async ({
   page,
 }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"], "AR");
 
   // loading
-  const g = gate([CUSTOMER_AR]);
+  const g = gate(paged([CUSTOMER_AR]));
   await page.route("http://localhost:4000/customers", g.route);
   await page.goto("/customers");
   await expect(page.getByText("جارٍ التحميل…")).toBeVisible();
@@ -108,7 +115,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
 
   // empty
   await page.route("http://localhost:4000/customers", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
   await page.goto(page.url());
   await expect(page.getByText("لا يوجد عملاء بعد.")).toBeVisible();
@@ -661,7 +668,7 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
     (route) => route.fulfill({ status: 200, json: [] }),
   );
   await page.route("http://localhost:4000/policies?opportunityId=opp-1", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
   await page.goto("/opportunities/opp-1");
   await expect(page.getByText("No RFQs yet.", { exact: false })).toBeVisible();
@@ -678,7 +685,7 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
     (route) => route.fulfill({ status: 200, json: [RECOMMENDATION] }),
   );
   await page.route("http://localhost:4000/policies?opportunityId=opp-1", (route) =>
-    route.fulfill({ status: 200, json: [POLICY] }),
+    route.fulfill({ status: 200, json: paged([POLICY]) }),
   );
   await page.route("http://localhost:4000/invoices?policyId=pol-1", (route) =>
     route.fulfill({ status: 200, json: [INVOICE] }),

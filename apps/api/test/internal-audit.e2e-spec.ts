@@ -270,9 +270,14 @@ describe('Internal Audit (e2e) — backlog Part C #57', () => {
       .get(`/audit-trail?entityType=Lead&entityId=${leadId}&action=TRANSITION`)
       .set(bearer(auditor.accessToken))
       .expect(200);
-    expect((browsed.body as AuditLogEntryBody[]).length).toBeGreaterThanOrEqual(
-      1,
-    );
+    const browsedPage = browsed.body as {
+      items: AuditLogEntryBody[];
+      total: number;
+    };
+    expect(browsedPage.items.length).toBeGreaterThanOrEqual(1);
+    // The browse is paged now; `total` is the whole matching set, so it can
+    // never be smaller than what came back on this page.
+    expect(browsedPage.total).toBeGreaterThanOrEqual(browsedPage.items.length);
 
     // Admin DOES hold audit-log.read
     await request(app.getHttpServer())
@@ -331,5 +336,48 @@ describe('Internal Audit (e2e) — backlog Part C #57', () => {
       .get(`/audit-trail/documents/does-not-exist/history`)
       .set(bearer(auditor.accessToken))
       .expect(404);
+  });
+
+  it('pages the audit-log browse rather than capping it', async () => {
+    const app = await boot();
+    const auditor = await makeUser(app, 'ia-page-aud', 'EXTERNAL_AUDITOR');
+
+    const pageOf = async (qs: string) => {
+      const res = await request(app.getHttpServer())
+        .get(`/audit-trail?${qs}`)
+        .set(bearer(auditor.accessToken))
+        .expect(200);
+      return res.body as {
+        items: AuditLogEntryBody[];
+        total: number;
+        page: number;
+        pageSize: number;
+      };
+    };
+
+    // Unfiltered, against the accumulated test database: this is exactly the
+    // browse the old 5,000-row cap silently truncated, and the point of the
+    // change is that the reader can now reach past the newest page.
+    const first = await pageOf('pageSize=2');
+    expect(first.items).toHaveLength(2);
+    expect(first.page).toBe(0);
+    expect(first.total).toBeGreaterThan(2);
+
+    const second = await pageOf('page=1&pageSize=2');
+    expect(second.page).toBe(1);
+    // Disjoint from the first page — overlapping pages would show the same
+    // entry twice and skip another, which on an audit log is a real defect.
+    const firstIds = first.items.map((r) => r.id);
+    const secondIds = second.items.map((r) => r.id);
+    expect(firstIds.some((id) => secondIds.includes(id))).toBe(false);
+
+    // The count is of the whole matching set, so it does not shrink as the
+    // reader pages through it.
+    expect(second.total).toBeGreaterThanOrEqual(first.items.length + 1);
+
+    // The browse itself is a recorded read (PDPL: who looked at the log).
+    // That row is written per request, so `total` grows between the two calls
+    // above — which is why this asserts a floor, never equality.
+    expect(first.pageSize).toBe(2);
   });
 });

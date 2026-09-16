@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE } from '../../common/pagination';
 import { AuditTrailService } from './audit-trail.service';
 import type { AuditTrailRepository } from '../../repositories/audit-trail.repository';
 import type { AuditService } from '../audit/audit.service';
@@ -44,6 +45,7 @@ function docVersion(
 function makeService(over: { repo?: Record<string, unknown> } = {}) {
   const repo = {
     findAuditLog: vi.fn().mockResolvedValue([logRow()]),
+    countAuditLog: vi.fn().mockResolvedValue(1),
     findWorkflowHistory: vi
       .fn()
       .mockResolvedValue([logRow({ action: 'TRANSITION' })]),
@@ -70,11 +72,22 @@ describe('AuditTrailService.browseAuditLog (Process 57)', () => {
       { entityType: 'Policy', entityId: 'policy-1' },
       'u-auditor',
     );
+    // The page query and the count run on the SAME filter, so "of N" can
+    // never contradict the rows on screen.
+    const expectedFilter = expect.objectContaining({
+      entityType: 'Policy',
+      entityId: 'policy-1',
+    }) as unknown;
     expect(repo.findAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: 'Policy', entityId: 'policy-1' }),
-      expect.any(Number),
+      expectedFilter,
+      DEFAULT_PAGE_SIZE,
+      0,
     );
-    expect(rows).toHaveLength(1);
+    expect(repo.countAuditLog).toHaveBeenCalledWith(expectedFilter);
+    expect(rows.items).toHaveLength(1);
+    expect(rows.total).toBe(1);
+    expect(rows.page).toBe(0);
+    expect(rows.pageSize).toBe(DEFAULT_PAGE_SIZE);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'u-auditor',
@@ -102,9 +115,8 @@ describe('AuditTrailService.browseAuditLog (Process 57)', () => {
   it('does not fail the read if the audit write itself fails', async () => {
     const { service, audit } = makeService();
     audit.record.mockRejectedValueOnce(new Error('audit down'));
-    await expect(service.browseAuditLog({}, 'u-auditor')).resolves.toHaveLength(
-      1,
-    );
+    const page = await service.browseAuditLog({}, 'u-auditor');
+    expect(page.items).toHaveLength(1);
   });
 });
 

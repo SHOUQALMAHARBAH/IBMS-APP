@@ -52,7 +52,7 @@ function nav(page: Page) {
 
 async function openCustomers(page: Page, language: "AR" | "EN" = "EN") {
   await mockExecutive(page, language);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 }
 
@@ -108,7 +108,7 @@ test("the same item is NOT hoisted for a Manager — the exception is per role",
       json: { ...ME_BASE, languagePreference: "EN", roles, permissions: permissionsForRoles(roles) },
     }),
   );
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);

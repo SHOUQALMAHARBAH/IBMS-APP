@@ -15,12 +15,19 @@ const ME_BASE = {
   stepUpFresh: true,
 };
 
-async function mockAuth(page: Page, roles: string[]) {
+async function mockAuth(
+  page: Page,
+  roles: string[],
+  languagePreference: "AR" | "EN" = "EN",
+) {
   await page.route("**/auth/refresh", (route) =>
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, languagePreference, roles, permissions: permissionsForRoles(roles) },
+    }),
   );
 }
 
@@ -62,10 +69,18 @@ const KYC_RECORD = {
   updatedAt: "2026-08-26T00:00:00.000Z",
 };
 
+// The five growing lists return `{ items, total, page, pageSize }`, not a bare
+// array. Wrapping fixtures here rather than hand-writing the envelope at every
+// mock keeps the shape in one place — the same reason the app has one
+// `Pagination` component.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 test("renders the customer list and navigates to a profile on click", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("http://localhost:4000/customers", (route) =>
-    route.fulfill({ status: 200, json: [CUSTOMER] }),
+    route.fulfill({ status: 200, json: paged([CUSTOMER]) }),
   );
   await page.route("http://localhost:4000/customers/cust-1", (route) =>
     route.fulfill({ status: 200, json: CUSTOMER }),
@@ -100,9 +115,9 @@ test("the search box re-fetches with a search querystring and renders the filter
     lastUrl = route.request().url();
     const url = new URL(lastUrl);
     if (url.searchParams.get("search") === "Sara") {
-      return route.fulfill({ status: 200, json: [OTHER_CUSTOMER] });
+      return route.fulfill({ status: 200, json: paged([OTHER_CUSTOMER]) });
     }
-    return route.fulfill({ status: 200, json: [CUSTOMER, OTHER_CUSTOMER] });
+    return route.fulfill({ status: 200, json: paged([CUSTOMER, OTHER_CUSTOMER]) });
   });
 
   await page.goto("/customers");
@@ -117,10 +132,71 @@ test("the search box re-fetches with a search querystring and renders the filter
   expect(new URL(lastUrl).searchParams.get("search")).toBe("Sara");
 });
 
+test("pages the customer list, and hides the control when there is only one page", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  const SECOND = { ...CUSTOMER, id: "cust-2", legalName: "Sara Odeh", givenName: "Sara", familyName: "Odeh" };
+  const THIRD = { ...CUSTOMER, id: "cust-3", legalName: "Rami Haddad", givenName: "Rami", familyName: "Haddad" };
+
+  const seen: string[] = [];
+  await page.route("http://localhost:4000/customers**", (route) => {
+    const url = new URL(route.request().url());
+    seen.push(url.search);
+    const requested = Number(url.searchParams.get("page") ?? 0);
+    // The server clamps and reports back; the control renders what it is told
+    // rather than recomputing the window itself.
+    return route.fulfill({
+      status: 200,
+      json: requested === 0
+        ? { items: [CUSTOMER, SECOND], total: 3, page: 0, pageSize: 2 }
+        : { items: [THIRD], total: 3, page: 1, pageSize: 2 },
+    });
+  });
+
+  await page.goto("/customers");
+  await expect(page.getByText("Showing 1–2 of 3")).toBeVisible();
+  await expect(page.getByText("Rami Haddad")).toHaveCount(0);
+  // Nothing before the first page, so Previous is inert rather than absent -
+  // a control that appears and disappears moves the rows under the pointer.
+  await expect(page.getByRole("button", { name: "Previous" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Rami Haddad")).toBeVisible();
+  await expect(page.getByText("Showing 3–3 of 3")).toBeVisible();
+  await expect(page.getByText("Ahmad Al-Fulani")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Next" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
+  expect(seen.at(-1)).toContain("page=1");
+
+  await page.getByRole("button", { name: "Previous" }).click();
+  await expect(page.getByText("Ahmad Al-Fulani")).toBeVisible();
+  // Back to the first page means back to the plain URL, not `page=0`.
+  expect(seen.at(-1)).not.toContain("page=");
+});
+
+test("the page control renders in Arabic, and stays hidden on a single page", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"], "AR");
+  await page.route("http://localhost:4000/customers**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: { items: [CUSTOMER], total: 3, page: 0, pageSize: 1 },
+    }),
+  );
+
+  await page.goto("/customers");
+  // Western digits in Arabic too: lib/i18n/format.ts pins 'ar', not 'ar-JO',
+  // so numerals match every other figure in the app.
+  await expect(page.getByText("عرض 1–1 من 3")).toBeVisible();
+  await expect(page.getByRole("button", { name: "التالي" })).toBeEnabled();
+});
+
 test("shows an empty state when there are no customers yet", async ({ page }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("http://localhost:4000/customers", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
 
   await page.goto("/customers");
@@ -255,7 +331,7 @@ test("customer list and profile screens have no serious/critical accessibility v
 }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
   await page.route("http://localhost:4000/customers", (route) =>
-    route.fulfill({ status: 200, json: [CUSTOMER] }),
+    route.fulfill({ status: 200, json: paged([CUSTOMER]) }),
   );
   await page.route("http://localhost:4000/customers/cust-1", (route) =>
     route.fulfill({ status: 200, json: CUSTOMER }),

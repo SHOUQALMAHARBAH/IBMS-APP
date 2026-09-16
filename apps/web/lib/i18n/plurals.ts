@@ -1,5 +1,5 @@
 import type { Language } from './translations';
-import { LOCALE_BY_LANGUAGE } from './format';
+import { formatNumber, LOCALE_BY_LANGUAGE } from './format';
 
 // Plural-aware copy.
 //
@@ -294,10 +294,7 @@ export function translatePlural(
   const category = rulesFor(language).select(count);
   const raw = forms[category] ?? forms.other;
 
-  const withCount = raw.replaceAll(
-    '{count}',
-    count.toLocaleString(LOCALE_BY_LANGUAGE[language]),
-  );
+  const withCount = raw.replaceAll('{count}', formatNumber(count, language));
   if (!params) return withCount;
   return Object.entries(params).reduce(
     (acc, [name, value]) => acc.replaceAll(`{${name}}`, String(value)),

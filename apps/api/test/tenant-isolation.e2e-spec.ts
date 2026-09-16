@@ -351,8 +351,25 @@ describe('Part V — two Organizations cannot reach each other (item 1)', () => 
       .get('/customers')
       .set(bearer(officeA.accessToken))
       .expect(200);
-    const ids = (list.body as { id: string }[]).map((c) => c.id);
+    const body = list.body as { items: { id: string }[]; total: number };
+    const ids = body.items.map((c) => c.id);
 
+    // The list is paged, so scanning the returned rows only proves the other
+    // office's customer is absent from THIS page. `total` is the count of
+    // every row matching the filter, across every page - so comparing it to
+    // office A's own row count proves office B contributes nothing to the set
+    // at all, which is the isolation claim this test exists to make.
+    const officeARows = await rawPrisma.customer.count({
+      where: { organizationId: TEST_ORGANIZATION_ID },
+    });
+    expect(body.total).toBe(officeARows);
+    expect(
+      await rawPrisma.customer.count({ where: { organizationId: ORG_B_ID } }),
+    ).toBeGreaterThan(0);
+
+    // The newest row is office A's own, created by this test - so the first
+    // page is where it has to be, and its presence proves the list is not
+    // simply empty.
     expect(ids).toContain(customerAId);
     expect(ids).not.toContain(customerBId);
   });
@@ -360,13 +377,33 @@ describe('Part V — two Organizations cannot reach each other (item 1)', () => 
   it("full-text search for the shared name returns only this office's row", async () => {
     // Search runs through $queryRaw, which the application layer cannot filter
     // — so this is RLS doing the work, not the middleware.
-    const list = await request(app!.getHttpServer())
-      .get(`/customers?search=${encodeURIComponent('الأمانة')}`)
-      .set(bearer(officeA.accessToken))
-      .expect(200);
-    const ids = (list.body as { id: string }[]).map((c) => c.id);
+    // The list is paged, so this sweeps EVERY page rather than scanning the
+    // first one: db-test is cumulative and both offices add a row with this
+    // name on every run, so a first-page-only assertion would quietly stop
+    // proving anything once the matches outgrew one page.
+    const seen: string[] = [];
+    let page = 0;
+    let total = 0;
+    // Bounded by a constant, never by the response - a loop whose only limit
+    // comes from the thing under test is not a test.
+    const MAX_PAGES = 20;
+    do {
+      const res = await request(app!.getHttpServer())
+        .get(
+          `/customers?search=${encodeURIComponent('الأمانة')}&pageSize=200&page=${page}`,
+        )
+        .set(bearer(officeA.accessToken))
+        .expect(200);
+      const body = res.body as { items: { id: string }[]; total: number };
+      total = body.total;
+      seen.push(...body.items.map((c) => c.id));
+      page += 1;
+    } while (seen.length < total && page < MAX_PAGES);
 
-    expect(ids).not.toContain(customerBId);
+    // Every match was actually read, so the absence below is an absence from
+    // the whole matching set.
+    expect(seen).toHaveLength(total);
+    expect(seen).not.toContain(customerBId);
   });
 
   it("writing to the other office's customer is 404, not a silent success", async () => {

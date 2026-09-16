@@ -52,28 +52,42 @@ const DOCUMENT_VERSION_SELECT = {
 export class AuditTrailRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** The `where` shared by the page query and its count, so the two can never
+   *  disagree about what is being counted. */
+  private auditLogWhere(filter: AuditLogFilter) {
+    return {
+      ...(filter.entityType ? { entityType: filter.entityType } : {}),
+      ...(filter.entityId ? { entityId: filter.entityId } : {}),
+      ...(filter.userId ? { userId: filter.userId } : {}),
+      ...(filter.action ? { action: filter.action as AuditAction } : {}),
+      ...(filter.from || filter.to
+        ? {
+            occurredAt: {
+              ...(filter.from ? { gte: filter.from } : {}),
+              ...(filter.to ? { lte: filter.to } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
   findAuditLog(
     filter: AuditLogFilter,
     take: number,
+    skip = 0,
   ): Promise<AuditLogEntryRow[]> {
     return this.prisma.client.auditLogEntry.findMany({
-      where: {
-        ...(filter.entityType ? { entityType: filter.entityType } : {}),
-        ...(filter.entityId ? { entityId: filter.entityId } : {}),
-        ...(filter.userId ? { userId: filter.userId } : {}),
-        ...(filter.action ? { action: filter.action as AuditAction } : {}),
-        ...(filter.from || filter.to
-          ? {
-              occurredAt: {
-                ...(filter.from ? { gte: filter.from } : {}),
-                ...(filter.to ? { lte: filter.to } : {}),
-              },
-            }
-          : {}),
-      },
+      where: this.auditLogWhere(filter),
       select: AUDIT_LOG_ENTRY_SELECT,
       orderBy: { occurredAt: 'desc' },
       take,
+      skip,
+    });
+  }
+
+  countAuditLog(filter: AuditLogFilter): Promise<number> {
+    return this.prisma.client.auditLogEntry.count({
+      where: this.auditLogWhere(filter),
     });
   }
 

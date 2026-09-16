@@ -57,6 +57,18 @@ export function formatMoney(
     : `${currency} ${value}`;
 }
 
+/**
+ * A plain number, grouped for the locale.
+ *
+ * Arabic resolves to `'ar'` rather than `'ar-JO'` (see the note on
+ * LOCALE_BY_LANGUAGE), so the digits stay Western and only the grouping
+ * separators follow the locale — which is what every other figure in this app
+ * does and what the placeholders deliberately do not fight.
+ */
+export function formatNumber(value: number, language: Language): string {
+  return value.toLocaleString(LOCALE_BY_LANGUAGE[language]);
+}
+
 /** Locale-aware `Date.prototype.toLocaleDateString()` replacement. */
 export function formatDate(value: string | Date, language: Language): string {
   const d = typeof value === 'string' ? new Date(value) : value;

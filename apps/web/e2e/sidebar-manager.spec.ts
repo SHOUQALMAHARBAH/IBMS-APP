@@ -68,7 +68,7 @@ function nav(page: Page) {
 
 test("only the group holding the current route is expanded on arrival", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);
@@ -88,7 +88,7 @@ test("only the group holding the current route is expanded on arrival", async ({
 
 test("expanding a group is remembered on the next page load", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);
@@ -104,7 +104,7 @@ test("expanding a group is remembered on the next page load", async ({ page }) =
 
 test("collapsing a group is remembered too — the default does not win it back", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);
@@ -124,7 +124,7 @@ test("collapsing a group is remembered too — the default does not win it back"
 
 test("search reaches items inside collapsed groups and reports a count", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);
@@ -143,7 +143,7 @@ test("search reaches items inside collapsed groups and reports a count", async (
 
 test("search says so when nothing matches, rather than emptying the rail silently", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);
@@ -154,7 +154,7 @@ test("search says so when nothing matches, rather than emptying the rail silentl
 
 test("the Manager's group order puts the book of business above administration", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   // Wait for the nav to have groups at all first: they render only once
@@ -180,7 +180,7 @@ test("the Manager's group order puts the book of business above administration",
 
 test("the two Retention entries are no longer both called Retention", async ({ page }) => {
   await mockManager(page);
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);
@@ -194,7 +194,7 @@ test("the two Retention entries are no longer both called Retention", async ({ p
 
 test("search works in Arabic, including a query typed with a different alef", async ({ page }) => {
   await mockManager(page, "AR");
-  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(CUSTOMERS_URL, (route) => route.fulfill({ status: 200, json: { items: [], total: 0, page: 0, pageSize: 50 } }));
   await page.goto("/customers");
 
   const sidebar = nav(page);

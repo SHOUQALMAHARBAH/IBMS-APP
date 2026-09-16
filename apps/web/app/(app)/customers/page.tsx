@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listCustomers, type Customer } from '../../../lib/customer/customer-api';
+import { Pagination } from '../../../components/ui/Pagination';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
@@ -42,11 +43,22 @@ export default function CustomersPage() {
   // not search-as-you-type (this app has no debounce utility anywhere).
   const [search, setSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(0);
 
-  const loadCustomers = useCallback(async (term: string) => {
+  const loadCustomers = useCallback(async (term: string, nextPage = 0) => {
     try {
-      const result = await listCustomers(term ? { search: term } : {});
-      setCustomers(result);
+      const result = await listCustomers({
+        ...(term ? { search: term } : {}),
+        ...(nextPage ? { page: nextPage } : {}),
+      });
+      setCustomers(result.items);
+      setTotal(result.total);
+      // The server's size, not a constant repeated here: it clamps what was
+      // asked for, so this is the only honest source for the range label.
+      setPageSize(result.pageSize);
+      setPage(result.page);
       setLoadError(null);
     } catch (err) {
       setLoadError(
@@ -139,6 +151,15 @@ export default function CustomersPage() {
           </div>
         )
       ) : null}
+      {/* Below the list, and it hides itself when everything fits on one
+          page — see the component. The search term travels with the page so
+          paging a filtered list stays filtered. */}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={(next) => void loadCustomers(searchTerm, next)}
+      />
     </main>
   );
 }

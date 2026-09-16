@@ -69,10 +69,18 @@ function policy(over: Partial<Record<string, unknown>> = {}) {
 
 const LIST_URL = "http://localhost:4000/policies**";
 
+// The five growing lists return `{ items, total, page, pageSize }`, not a bare
+// array. Wrapping fixtures here rather than hand-writing the envelope at every
+// mock keeps the shape in one place — the same reason the app has one
+// `Pagination` component.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 test("renders the populated list and opens a policy on click", async ({ page }) => {
   await mockAuth(page, ["POLICY_CHECKING_OFFICER"]);
   await page.route(LIST_URL, (route) =>
-    route.fulfill({ status: 200, json: [policy()] }),
+    route.fulfill({ status: 200, json: paged([policy()]) }),
   );
 
   await page.goto("/policies");
@@ -99,7 +107,7 @@ test("shows an empty state that is true whether nothing exists or nothing is you
   page,
 }) => {
   await mockAuth(page, ["POLICY_CHECKING_OFFICER"]);
-  await page.route(LIST_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(LIST_URL, (route) => route.fulfill({ status: 200, json: paged([]) }));
 
   await page.goto("/policies");
   await expect(page.getByText("No policies to show.", { exact: false })).toBeVisible();
@@ -125,7 +133,7 @@ test("shows a loading state before the list resolves", async ({ page }) => {
   });
   await page.route(LIST_URL, async (route) => {
     await gate;
-    await route.fulfill({ status: 200, json: [policy()] });
+    await route.fulfill({ status: 200, json: paged([policy()]) });
   });
 
   await page.goto("/policies");
@@ -141,7 +149,7 @@ test("the status filter and the search box each reach the API as a query param",
   const seen: string[] = [];
   await page.route(LIST_URL, (route) => {
     seen.push(new URL(route.request().url()).search);
-    return route.fulfill({ status: 200, json: [policy()] });
+    return route.fulfill({ status: 200, json: paged([policy()]) });
   });
 
   await page.goto("/policies");
@@ -164,7 +172,7 @@ test("a policy with no number yet still renders a usable row", async ({ page }) 
   await page.route(LIST_URL, (route) =>
     route.fulfill({
       status: 200,
-      json: [policy({ policyNumber: null, status: "PLACEMENT_CONFIRMED" })],
+      json: paged([policy({ policyNumber: null, status: "PLACEMENT_CONFIRMED" })]),
     }),
   );
 
@@ -181,7 +189,7 @@ test("the sidebar shows Policies to a Policy Checking Officer and hides it from 
   page,
 }) => {
   await mockAuth(page, ["POLICY_CHECKING_OFFICER"]);
-  await page.route(LIST_URL, (route) => route.fulfill({ status: 200, json: [] }));
+  await page.route(LIST_URL, (route) => route.fulfill({ status: 200, json: paged([]) }));
   await page.goto("/policies");
   const nav = page.getByRole("navigation", { name: "Primary" });
   await expect(nav.getByRole("link", { name: "Policies" })).toBeVisible();

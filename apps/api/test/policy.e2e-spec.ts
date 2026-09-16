@@ -445,7 +445,7 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
       .get(`/policies?opportunityId=${opportunityId}`)
       .set(bearer(plc.accessToken))
       .expect(200);
-    expect(list.body as PolicyBody[]).toHaveLength(1);
+    expect((list.body as { items: PolicyBody[] }).items).toHaveLength(1);
     await request(app.getHttpServer())
       .get(`/policies/${policy.id}`)
       .set(bearer(plc.accessToken))
@@ -1197,31 +1197,50 @@ describe('Policy list (e2e) — book-wide GET /policies', () => {
       'own-b',
     );
 
-    const idsFor = async (token: string, qs = ''): Promise<string[]> => {
+    const pageFor = async (token: string, qs = '') => {
       const res = await request(app.getHttpServer())
         .get(`/policies${qs}`)
         .set(bearer(token))
         .expect(200);
-      return (res.body as PolicyBody[]).map((p) => p.id);
+      return res.body as {
+        items: PolicyBody[];
+        total: number;
+        pageSize: number;
+      };
+    };
+
+    // An owner-limited caller's whole book has to fit on one page for a
+    // `not.toContain` below to mean anything: otherwise the absence is only an
+    // absence from the first 50 rows. These two users own one policy each, so
+    // it does — and this asserts that rather than assuming it.
+    const ownIdsFor = async (token: string): Promise<string[]> => {
+      const page = await pageFor(token);
+      expect(page.total).toBeLessThanOrEqual(page.pageSize);
+      expect(page.total).toBe(page.items.length);
+      return page.items.map((p) => p.id);
     };
 
     // Sales A sees its own and NOT Sales B's. Asserting BOTH halves matters:
     // "does not contain B" alone would also pass if the list came back empty.
-    const seenByA = await idsFor(salesA.accessToken);
+    const seenByA = await ownIdsFor(salesA.accessToken);
     expect(seenByA).toContain(policyA);
     expect(seenByA).not.toContain(policyB);
 
-    const seenByB = await idsFor(salesB.accessToken);
+    const seenByB = await ownIdsFor(salesB.accessToken);
     expect(seenByB).toContain(policyB);
     expect(seenByB).not.toContain(policyA);
 
-    // The Policy Checking Officer works the whole book (Process 20 QC).
-    const seenByChecker = await idsFor(checker.accessToken);
+    // The Policy Checking Officer works the whole book (Process 20 QC). No
+    // single-page assertion here: this reads the accumulated test database, so
+    // there genuinely are later pages — both policies were just created, and
+    // the list is newest-first.
+    const checkerPage = await pageFor(checker.accessToken);
+    const seenByChecker = checkerPage.items.map((p) => p.id);
     expect(seenByChecker).toContain(policyA);
     expect(seenByChecker).toContain(policyB);
   });
 
-  it('filters by status and by search, in the query rather than after the cap', async () => {
+  it('filters by status and by search, in the query rather than after the page', async () => {
     const app = await boot();
     const plc = await makeUser(app, 'pl-f-plc', 'PLACEMENT_TECHNICAL_OFFICER');
     const checker = await makeUser(app, 'pl-f-chk', 'POLICY_CHECKING_OFFICER');
@@ -1243,7 +1262,7 @@ describe('Policy list (e2e) — book-wide GET /policies', () => {
         .get(`/policies?${qs}`)
         .set(bearer(checker.accessToken))
         .expect(200);
-      return (res.body as PolicyBody[]).map((p) => p.id);
+      return (res.body as { items: PolicyBody[] }).items.map((p) => p.id);
     };
 
     // Matching status includes it; a different status excludes it.

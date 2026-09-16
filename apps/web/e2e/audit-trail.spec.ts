@@ -57,12 +57,19 @@ const DOCUMENT_HISTORY = {
   auditTrail: AUDIT_ROWS,
 };
 
+// The audit-log browse returns `{ items, total, page, pageSize }` — it is one
+// of the five paged lists. Workflow/document history are NOT paged: they are
+// bounded by the entity they belong to, and still return bare arrays.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 test("browses the audit log, looks up workflow history, and looks up document history", async ({
   page,
 }) => {
   await mockAuth(page, ["EXTERNAL_AUDITOR"]);
   await page.route("http://localhost:4000/audit-trail?**", (route) =>
-    route.fulfill({ status: 200, json: AUDIT_ROWS }),
+    route.fulfill({ status: 200, json: paged(AUDIT_ROWS) }),
   );
   await page.route("http://localhost:4000/audit-trail/workflow-history**", (route) =>
     route.fulfill({ status: 200, json: AUDIT_ROWS }),

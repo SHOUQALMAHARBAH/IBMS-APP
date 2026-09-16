@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Pagination } from '../../../components/ui/Pagination';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   browseAuditTrail,
@@ -81,6 +82,17 @@ export default function AuditTrailPage() {
   const [browseEntityType, setBrowseEntityType] = useState('');
   const [browseEntityId, setBrowseEntityId] = useState('');
   const [browseRows, setBrowseRows] = useState<AuditLogEntry[] | null>(null);
+  // The filters that produced the rows currently on screen — NOT the live
+  // input values. Paging has to re-send the query that produced the set being
+  // paged, or typing a new filter and then clicking Next would ask for page 2
+  // of a search that was never run.
+  const [browseApplied, setBrowseApplied] = useState<{
+    entityType?: string;
+    entityId?: string;
+  }>({});
+  const [browsePage, setBrowsePage] = useState(0);
+  const [browseTotal, setBrowseTotal] = useState(0);
+  const [browsePageSize, setBrowsePageSize] = useState(0);
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [browseBusy, setBrowseBusy] = useState(false);
 
@@ -101,15 +113,32 @@ export default function AuditTrailPage() {
 
   async function runBrowse(ev: React.FormEvent) {
     ev.preventDefault();
+    const filters = {
+      entityType: browseEntityType || undefined,
+      entityId: browseEntityId || undefined,
+    };
+    setBrowseApplied(filters);
+    await browseTo(0, filters);
+  }
+
+  // The audit log is the fastest-growing table here, so it is read a page at a
+  // time. A new search restarts at page 0 through the submit above; paging
+  // re-sends the filters that produced the set, never the live inputs.
+  async function browseTo(
+    nextPage: number,
+    filters: { entityType?: string; entityId?: string } = browseApplied,
+  ) {
     setBrowseBusy(true);
     setBrowseError(null);
     try {
-      setBrowseRows(
-        await browseAuditTrail({
-          entityType: browseEntityType || undefined,
-          entityId: browseEntityId || undefined,
-        }),
-      );
+      const result = await browseAuditTrail({
+        ...filters,
+        ...(nextPage ? { page: nextPage } : {}),
+      });
+      setBrowseRows(result.items);
+      setBrowseTotal(result.total);
+      setBrowsePageSize(result.pageSize);
+      setBrowsePage(result.page);
     } catch (err) {
       setBrowseRows(null);
       setBrowseError(messageFor(err, t('atNoPermissionFor', { permission: 'audit-log.read' }), t('atLogLoadError')));
@@ -183,7 +212,18 @@ export default function AuditTrailPage() {
             {browseError}
           </p>
         ) : null}
-        {browseRows ? <AuditLogTable rows={browseRows} /> : null}
+        {browseRows ? (
+          <>
+            <AuditLogTable rows={browseRows} />
+            <Pagination
+              page={browsePage}
+              pageSize={browsePageSize}
+              total={browseTotal}
+              busy={browseBusy}
+              onPageChange={(next) => void browseTo(next)}
+            />
+          </>
+        ) : null}
       </section>
 
       <section style={sectionStyle}>

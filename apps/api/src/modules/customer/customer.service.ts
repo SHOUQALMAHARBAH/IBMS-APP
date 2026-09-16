@@ -28,6 +28,7 @@ import {
   isCustomerVisibleTo,
 } from '../../common/rbac-visibility.util';
 import { composeFullName } from '../../common/person-name.util';
+import { pageWindow, type Paginated } from '../../common/pagination';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
 import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
@@ -267,13 +268,18 @@ export class CustomerService {
     query: ListCustomersQueryDto,
     actor: AuthenticatedUser,
   ): Promise<
-    Omit<
-      Customer,
-      // `organizationId` omitted for the same reason as on MaskedCustomer —
-      // tenancy plumbing, not customer data, and keeping it out preserves the
-      // pre-multi-tenancy response shape exactly.
-      'organizationId' | 'nationalIdEnc' | 'contactPhoneEnc' | 'contactEmailEnc'
-    >[]
+    Paginated<
+      Omit<
+        Customer,
+        // `organizationId` omitted for the same reason as on MaskedCustomer —
+        // tenancy plumbing, not customer data, and keeping it out preserves
+        // the pre-multi-tenancy row shape exactly.
+        | 'organizationId'
+        | 'nationalIdEnc'
+        | 'contactPhoneEnc'
+        | 'contactEmailEnc'
+      >
+    >
   > {
     const canViewAllOwners = actor.roles.some((role) =>
       (CUSTOMER_CROSS_OWNER_ROLES as readonly string[]).includes(role),
@@ -288,11 +294,17 @@ export class CustomerService {
         ? await this.customers.searchIds(query.search)
         : undefined,
     };
-    const customers = await this.customers.findMany(filter);
+    // One window, used by both queries below: a page read and a count that
+    // disagreed about the filter would render "51 of 12".
+    const window = pageWindow(query.page, query.pageSize);
+    const [customers, total] = await Promise.all([
+      this.customers.findMany(filter, window),
+      this.customers.countMany(filter),
+    ]);
     // Explicit allow-list, not destructure-and-strip — same reasoning as
     // toMasked() above: what's returned is spelled out, not inferred from
     // what was removed.
-    return customers.map((customer) => ({
+    const items = customers.map((customer) => ({
       id: customer.id,
       prospectId: customer.prospectId,
       customerType: customer.customerType,
@@ -322,6 +334,7 @@ export class CustomerService {
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
     }));
+    return { items, total, page: window.page, pageSize: window.pageSize };
   }
 
   private async findOwnedOrVisible(
