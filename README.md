@@ -1232,6 +1232,16 @@ narrows a gap.
 Neither blocks anything; both are recorded so they are not rediscovered as
 surprises.
 
+- **19 buttons render as grey browser chrome in dark mode.** They carry an
+  inline style of `{ cursor: 'pointer' }` and nothing else — no
+  `background`, no `color` — so the browser paints its own default button
+  face. The "← All customers" chip on `/customers/[id]` is the clearest
+  example. Same class as the language toggle the navbar pass fixed, and it was
+  invisible until the theme toggle made dark mode reachable on purpose. Not a
+  contrast failure — the text stays readable — just visually wrong against a
+  dark surface. Cosmetic, not blocking; fix them the way `navbarToggleStyle`
+  was fixed, whenever those screens are next touched.
+
 - **RESOLVED — the `sidebar-manager.spec.ts` flake had a real cause.** It
   recurred (twice in five full runs) and the mechanism turned out to be the
   test, not the store. Clicking a `<summary>` opens the `<details>`

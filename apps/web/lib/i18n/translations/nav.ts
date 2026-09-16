@@ -11,6 +11,9 @@ export const NAV = {
     signOut: 'تسجيل الخروج',
     navPrimaryAria: 'التنقّل الرئيسي',
     navbarAria: 'الحساب والإعدادات',
+    themeLabel: 'المظهر',
+    themeLight: 'فاتح',
+    themeDark: 'داكن',
 
     navHome: 'الرئيسية',
     navLeads: 'العملاء المحتملون',
@@ -104,6 +107,9 @@ export const NAV = {
     signOut: 'Sign out',
     navPrimaryAria: 'Primary',
     navbarAria: 'Account and settings',
+    themeLabel: 'Theme',
+    themeLight: 'Light',
+    themeDark: 'Dark',
 
     navHome: 'Home',
     navLeads: 'Leads',

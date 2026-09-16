@@ -147,11 +147,25 @@
 }
 
 /*
- * Dark mode. Only the colour tokens are redefined — spacing, type, radii and
- * elevation are theme-independent, so they stay defined once above.
+ * Dark mode, in two places that must stay identical.
+ *
+ * The media query is the DEFAULT: a user who has never touched the toggle
+ * follows their operating system, which is how every user behaved before the
+ * toggle existed. It is guarded by `:root:not([data-theme="light"])` so that
+ * an explicit LIGHT choice still wins on a machine set to dark — without the
+ * guard, choosing light on a dark OS would do nothing.
+ *
+ * The attribute block is the explicit override, set by the theme toggle.
+ *
+ * The two blocks are duplicated deliberately rather than collapsed with
+ * `light-dark()`, which would express this once: that function is Baseline
+ * 2024, and this is a product whose browser floor is not ours to bet. The
+ * duplication is guarded instead — `globals-theme.test.ts` parses this file
+ * and fails the build if the two blocks stop defining the same token set.
+ * Edit one, edit the other.
  */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
 
     --surface-page: #161d26;
@@ -190,6 +204,47 @@
     --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5);
   }
+}
+
+/* The explicit override. Same tokens as above — see the note there. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --surface-page: #161d26;
+    --surface-card: #1e2733;
+    --surface-sunken: #131920;
+    --surface-hover: #263141;
+
+    --ink-primary: #e8ecf2;
+    --ink-secondary: #a9b4c2;
+    --ink-muted: #8b95a4;
+    --ink-inverse: #1a222c;
+    --ink-brand: #9bb9d3;
+
+    --border-subtle: #26303d;
+    --border-default: #313d4c;
+    --border-strong: #43515f;
+
+    --nav-bg: #131920;
+    --nav-gradient-from: #131920;
+    --nav-gradient-to: #1c2836;
+
+    --info-bg: #1c2a38;
+    --info-ink: #a8c6e0;
+    --info-border: #2c445b;
+    --success-bg: #16291e;
+    --success-ink: #86c9a1;
+    --success-border: #244c33;
+    --warning-bg: #2b2115;
+    --warning-ink: #e0b571;
+    --warning-border: #4d3a1c;
+    --danger-bg: #2c1a1a;
+    --danger-ink: #e59a9a;
+    --danger-border: #522c2c;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.5);
 }
 
 /* --- base ------------------------------------------------------------- */

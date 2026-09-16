@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth/auth-context';
 import { logout } from '../../lib/auth/auth-api';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { initialsFrom } from '../../lib/i18n/initials';
+import { ThemeToggle } from './ThemeToggle';
 import {
   avatarStyle,
   navbarBrandStyle,
@@ -115,6 +116,8 @@ export function AppNavbar() {
             {t('switchToEnglish')}
           </button>
         </div>
+
+        <ThemeToggle />
 
         <details
           ref={menuRef}
