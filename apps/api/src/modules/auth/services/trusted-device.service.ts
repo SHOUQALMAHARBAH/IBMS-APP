@@ -30,6 +30,15 @@ export interface DeviceContext {
  * also why the raw value never lands in the database: hashed, it answers "have
  * I seen this device for this user before" and nothing else.
  */
+export interface TrustedDeviceView {
+  id: string;
+  /** What the user called this device when they trusted it, if anything. */
+  label: string | null;
+  trustedAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+}
+
 @Injectable()
 export class TrustedDeviceService {
   constructor(
@@ -110,8 +119,29 @@ export class TrustedDeviceService {
     return { id: granted.id, expiresAt };
   }
 
-  list(userId: string) {
-    return this.devices.listLiveForUser(userId);
+  /**
+   * The devices a user currently trusts, as a VIEW rather than the row.
+   *
+   * `deviceFingerprintHash` and `firstSeenIp` never leave the server. This
+   * file already refuses to put a stable device identifier in the audit trail,
+   * on the grounds that one "becomes a movement log for the employee" — and a
+   * JSON response the browser can read is no better a place for it than an
+   * audit row. The endpoint used to return the whole record; nothing consumed
+   * it, so narrowing costs nothing.
+   *
+   * What is left is what a person needs in order to recognise a device and
+   * decide whether to drop it: what they called it, when they trusted it, when
+   * that trust lapses, and when it was last used.
+   */
+  async list(userId: string): Promise<TrustedDeviceView[]> {
+    const devices = await this.devices.listLiveForUser(userId);
+    return devices.map((d) => ({
+      id: d.id,
+      label: d.label,
+      trustedAt: d.trustedAt.toISOString(),
+      expiresAt: d.expiresAt.toISOString(),
+      lastUsedAt: d.lastUsedAt?.toISOString() ?? null,
+    }));
   }
 
   /**

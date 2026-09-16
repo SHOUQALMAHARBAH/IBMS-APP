@@ -345,6 +345,16 @@ export const OPERATIONS = {
     renRiskChanged: 'تغيّر الخطر',
     usrEmployeeRecord: 'سجل الموظف',
     usrNoEmployeeLink: 'بدون ربط',
+    secDevicesHeading: 'الأجهزة الموثوقة',
+    secDevicesIntro:
+      'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
+    secNoTrustedDevices: 'لا توجد أجهزة موثوقة.',
+    secUnnamedDevice: 'جهاز بلا اسم',
+    secDeviceTrustedOn: 'مُوثَّق في',
+    secDeviceExpires: 'تنتهي الثقة في',
+    secRevokeDevice: 'إلغاء الثقة',
+    secRevokingDevice: 'جارٍ الإلغاء…',
+    secRevokeDeviceAria: 'إلغاء الثقة بجهاز {device}',
     secPasswordHeading: 'كلمة المرور',
     secPasswordIntro:
       'تغيير كلمة المرور يُنهي كل جلساتك الأخرى ويلغي ثقة الأجهزة التي وثقت بها سابقاً.',
@@ -678,6 +688,16 @@ export const OPERATIONS = {
     renRiskChanged: 'Risk changed',
     usrEmployeeRecord: 'Employee record',
     usrNoEmployeeLink: 'Not linked',
+    secDevicesHeading: 'Trusted devices',
+    secDevicesIntro:
+      'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
+    secNoTrustedDevices: 'No trusted devices.',
+    secUnnamedDevice: 'Unnamed device',
+    secDeviceTrustedOn: 'Trusted on',
+    secDeviceExpires: 'Trust ends',
+    secRevokeDevice: 'Revoke',
+    secRevokingDevice: 'Revoking…',
+    secRevokeDeviceAria: 'Revoke trust for {device}',
     secPasswordHeading: 'Password',
     secPasswordIntro:
       'Changing your password signs out every other session and stops trusting devices you had trusted before.',

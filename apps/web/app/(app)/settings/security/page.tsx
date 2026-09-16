@@ -7,9 +7,12 @@ import { useAuth } from '../../../../lib/auth/auth-context';
 import {
   changePassword,
   enrollTotp,
+  listTrustedDevices,
   logout,
+  revokeTrustedDevice,
   verifyTotpEnrollment,
   type MfaEnrollResponse,
+  type TrustedDevice,
 } from '../../../../lib/auth/auth-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonDisabledStyle, buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../../../../components/auth/auth-form.styles';
@@ -40,6 +43,44 @@ export default function SecuritySettingsPage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwMessage, setPwMessage] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Part II §4.4 — the devices skipping the second factor. Own error state,
+  // like the password block: a failed revoke must not blank the MFA section.
+  const [devices, setDevices] = useState<TrustedDevice[] | null>(null);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  /*
+   * The initial device read.
+   *
+   * Hooks sit above the early return below, because React requires the same
+   * hook order on every render and this page returns null while the session
+   * resolves.
+   *
+   * The state is set inside the promise callback rather than in the effect
+   * body — the shape `react-hooks/set-state-in-effect` allows, and the one it
+   * rejects when an awaited helper is called directly. `cancelled` closes the
+   * other half of the same problem: navigating away mid-request would
+   * otherwise set state on an unmounted page.
+   */
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    listTrustedDevices()
+      .then((list) => {
+        if (!cancelled) setDevices(list);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setDeviceError(err instanceof ApiError ? err.message : t('authGenericError'));
+        // null would render the loading state forever; an empty list beside
+        // the error line says "we tried, and could not".
+        setDevices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -112,6 +153,22 @@ export default function SecuritySettingsPage() {
       setPwError(err instanceof ApiError ? err.message : t('authGenericError'));
     } finally {
       setIsChangingPassword(false);
+    }
+  }
+
+  async function handleRevokeDevice(id: string) {
+    setDeviceError(null);
+    setRevoking(id);
+    try {
+      await revokeTrustedDevice(id);
+      // Re-read rather than splice the row out: the server decides what is
+      // still live, and a device whose trust lapsed while this page was open
+      // should disappear on the same refresh.
+      setDevices(await listTrustedDevices());
+    } catch (err) {
+      setDeviceError(err instanceof ApiError ? err.message : t('authGenericError'));
+    } finally {
+      setRevoking(null);
     }
   }
 
@@ -239,6 +296,61 @@ export default function SecuritySettingsPage() {
               : t('secChangePasswordButton')}
           </button>
         </form>
+      </section>
+
+      <section style={{ marginTop: '2rem' }}>
+        <h2>{t('secDevicesHeading')}</h2>
+        <p>{t('secDevicesIntro')}</p>
+        {deviceError ? (
+          <p role="alert" style={errorStyle}>
+            {deviceError}
+          </p>
+        ) : null}
+        {devices === null ? (
+          <p>{t('commonLoading')}</p>
+        ) : devices.length === 0 ? (
+          <p>{t('secNoTrustedDevices')}</p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 'var(--space-2)' }}>
+            {devices.map((d) => (
+              <li
+                key={d.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 'var(--space-3)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-2) var(--space-3)',
+                }}
+              >
+                <span style={{ display: 'grid', minWidth: 0 }}>
+                  <strong>{d.label ?? t('secUnnamedDevice')}</strong>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--ink-secondary)' }}>
+                    {t('secDeviceTrustedOn')} {formatDateTime(d.trustedAt, language)}
+                    {' · '}
+                    {t('secDeviceExpires')} {formatDateTime(d.expiresAt, language)}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleRevokeDevice(d.id)}
+                  disabled={revoking === d.id}
+                  /* Named per device, so a screen-reader user hears WHICH
+                     device a button drops rather than five identical
+                     "Revoke"s. */
+                  aria-label={t('secRevokeDeviceAria', {
+                    device: d.label ?? t('secUnnamedDevice'),
+                  })}
+                  style={revoking === d.id ? buttonDisabledStyle : buttonStyle}
+                >
+                  {revoking === d.id ? t('secRevokingDevice') : t('secRevokeDevice')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section style={{ marginTop: '2rem' }}>

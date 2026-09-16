@@ -228,6 +228,63 @@ test("a successful change reports how many other sessions were signed out", asyn
   await expect(page.getByText("2 other sessions were signed out.")).toBeVisible();
 });
 
+/* ------------------------------------------------------------------ */
+/* Part II §4.4 — trusted devices, on the same screen                   */
+/* ------------------------------------------------------------------ */
+
+const DEVICES = [
+  {
+    id: "dev-1",
+    label: "Office laptop",
+    trustedAt: "2026-09-01T09:00:00.000Z",
+    expiresAt: "2026-10-01T09:00:00.000Z",
+    lastUsedAt: "2026-09-15T08:00:00.000Z",
+  },
+  { id: "dev-2", label: null, trustedAt: "2026-09-10T09:00:00.000Z", expiresAt: "2026-10-10T09:00:00.000Z", lastUsedAt: null },
+];
+
+test("lists the devices skipping the second factor, naming each revoke button", async ({ page }) => {
+  await openSecurity(page);
+  await page.route("**/auth/trusted-devices", (route) =>
+    route.fulfill({ status: 200, json: DEVICES }),
+  );
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "Trusted devices" })).toBeVisible();
+  await expect(page.getByText("Office laptop")).toBeVisible();
+  // A device trusted without a label still needs something to point at.
+  await expect(page.getByText("Unnamed device")).toBeVisible();
+  // Named per device: five identical "Revoke"s tell a screen-reader user
+  // nothing about which one they are about to drop.
+  await expect(page.getByRole("button", { name: "Revoke trust for Office laptop" })).toBeVisible();
+});
+
+test("revoking a device re-reads the list from the server", async ({ page }) => {
+  await openSecurity(page);
+  let listed = 0;
+  await page.route("**/auth/trusted-devices", (route) => {
+    listed += 1;
+    route.fulfill({ status: 200, json: listed === 1 ? DEVICES : [DEVICES[1]] });
+  });
+  await page.route("**/auth/trusted-devices/dev-1/revoke", (route) =>
+    route.fulfill({ status: 200, json: {} }),
+  );
+  await page.reload();
+
+  await page.getByRole("button", { name: "Revoke trust for Office laptop" }).click();
+  // Re-read, not spliced: the server decides what is still live.
+  await expect(page.getByText("Office laptop")).toHaveCount(0);
+  await expect(page.getByText("Unnamed device")).toBeVisible();
+  expect(listed).toBeGreaterThan(1);
+});
+
+test("an empty device list says so rather than showing an empty panel", async ({ page }) => {
+  await openSecurity(page);
+  await page.route("**/auth/trusted-devices", (route) => route.fulfill({ status: 200, json: [] }));
+  await page.reload();
+  await expect(page.getByText("No trusted devices.")).toBeVisible();
+});
+
 test("a wrong current password shows the server's message and keeps the form", async ({ page }) => {
   await openSecurity(page);
   await page.route("**/auth/password/change", (route) =>

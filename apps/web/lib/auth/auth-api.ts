@@ -142,6 +142,29 @@ export function changePassword(input: {
   return apiPost('/auth/password/change', input);
 }
 
+/** Part II §4.4 — a device this account has chosen to trust, so it skips the
+ *  second factor until the trust lapses. The fingerprint and first-seen IP
+ *  never leave the server: a stable device identifier in a response the
+ *  browser can read is a movement log, which is the same reason the audit
+ *  trail refuses to store one. */
+export interface TrustedDevice {
+  id: string;
+  label: string | null;
+  trustedAt: string;
+  expiresAt: string;
+  lastUsedAt: string | null;
+}
+
+export function listTrustedDevices(): Promise<TrustedDevice[]> {
+  return apiGet('/auth/trusted-devices');
+}
+
+/** Revoking forces the MFA prompt again on that device. A user can only
+ *  revoke their own — the API answers 404, not 403, for anyone else's. */
+export function revokeTrustedDevice(id: string): Promise<void> {
+  return apiPost(`/auth/trusted-devices/${encodeURIComponent(id)}/revoke`, {});
+}
+
 export function forgotPassword(email: string): Promise<{ message: string; devResetToken?: string }> {
   return apiPost('/auth/forgot-password', { email }, { skipAuthRetry: true });
 }

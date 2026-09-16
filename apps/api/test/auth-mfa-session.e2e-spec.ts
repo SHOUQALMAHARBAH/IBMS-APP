@@ -658,6 +658,28 @@ describe('Part V auth — trusted devices (items 6, 7)', () => {
       .expect(200);
     expect((noFingerprint.body as LoginBody).mfaRequired).toBe(true);
 
+    // The list a user reads before deciding what to drop. It must carry
+    // enough to recognise a device and NOTHING that identifies it: a stable
+    // fingerprint in a response the browser can read is a movement log, which
+    // is the same reason TrustedDeviceService refuses to audit one.
+    const listed = await request(app!.getHttpServer())
+      .get('/auth/trusted-devices')
+      .set(bearer(user.accessToken))
+      .expect(200);
+    const rows = listed.body as Record<string, unknown>[];
+    expect(rows.length).toBeGreaterThan(0);
+    const row = rows.find((r) => r.id === trust.id)!;
+    expect(row).toBeDefined();
+    expect(Object.keys(row).sort()).toEqual([
+      'expiresAt',
+      'id',
+      'label',
+      'lastUsedAt',
+      'trustedAt',
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('deviceFingerprintHash');
+    expect(JSON.stringify(rows)).not.toContain('firstSeenIp');
+
     // Revoking it brings the prompt back.
     await request(app!.getHttpServer())
       .post(`/auth/trusted-devices/${trust.id}/revoke`)
