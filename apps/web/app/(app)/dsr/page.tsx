@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -193,8 +194,8 @@ export default function DsrPage() {
                 {rows.map((d) => (
                   <tr key={d.id}>
                     <td style={cell}>{(d.customerId ?? d.insuredPersonId ?? '—').slice(0, 8)}…</td>
-                    <td style={cell}>{d.type}</td>
-                    <td style={cell}>{d.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
+                    <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
                     <td style={cell}>
                       {d.slaDueAt.slice(0, 10)}
                       {d.isOverdue ? ' (overdue)' : ''}

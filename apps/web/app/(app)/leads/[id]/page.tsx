@@ -8,13 +8,17 @@ import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
 import { profileFieldLabelStyle, profileFieldValueStyle, profileGridStyle } from '../../../../components/prospect/prospect.styles';
+import type { LeadSource, LeadStatus } from '../../../../lib/lead/lead-api';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { leadStatusLabelKey } from '../../../../lib/lead/lead-status';
 
+// Typed, not `string`: these two are printed to a person, so they go through
+// ENUM_LABEL, and that lookup only compiles against the real vocabulary.
 interface LeadDetail {
   id: string;
   fullName: string;
-  source: string;
-  status: string;
+  source: LeadSource;
+  status: LeadStatus;
   contactPhone?: string | null;
   contactEmail?: string | null;
   marketingConsentGranted: boolean;
@@ -133,7 +137,7 @@ export default function LeadDetailPage() {
           <div>
             <div style={profileFieldLabelStyle}>{t('leaddSource')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.source}</bdi>
+              <bdi>{t(ENUM_LABEL.LeadSource[lead.source])}</bdi>
             </div>
           </div>
 

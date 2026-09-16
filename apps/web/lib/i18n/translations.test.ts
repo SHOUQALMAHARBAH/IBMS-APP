@@ -18,6 +18,7 @@ import { COMPLIANCE_RISK } from './translations/compliance-risk';
 import { DASHBOARDS } from './translations/dashboards';
 import { OPERATIONS } from './translations/operations';
 import { DETAIL_PAGES } from './translations/detail-pages';
+import { ENUMS } from './translations/enums';
 
 describe('translate', () => {
   it('returns the AR string for AR', () => {
@@ -69,6 +70,7 @@ describe('the merged dictionary', () => {
     'dashboards.ts': DASHBOARDS,
     'operations.ts': OPERATIONS,
     'detail-pages.ts': DETAIL_PAGES,
+    'enums.ts': ENUMS,
   };
 
   // Without this, the map above silently under-covers the moment someone adds

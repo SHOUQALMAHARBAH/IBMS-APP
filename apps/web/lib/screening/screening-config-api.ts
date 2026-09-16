@@ -6,7 +6,25 @@ import { apiGet } from "../auth/api-client";
 // configured and nothing more — there is no field here that could leak it,
 // which is the point.
 
+export type WatchlistSource = 'OFAC_SDN' | 'UN_CONSOLIDATED';
+
 export type ScreeningProviderKind = "built_in" | "on_premise" | "commercial";
+export type ScreeningAttemptOutcome =
+  | 'NO_MATCH'
+  | 'POTENTIAL_MATCH'
+  | 'NOT_CONFIGURED'
+  | 'SCREENING_FAILED'
+  | 'UNABLE_TO_SCREEN';
+
+export type DatasetVersionStatus =
+  | 'DOWNLOADED'
+  | 'VALIDATED'
+  | 'PUBLISHED'
+  | 'SUPERSEDED'
+  | 'REJECTED';
+
+export type WatchlistSyncRunStatus = 'running' | 'succeeded' | 'failed';
+
 export type ProviderHealthStatus =
   "HEALTHY" | "DEGRADED" | "UNAVAILABLE" | "NOT_CONFIGURED";
 
@@ -97,7 +115,7 @@ export interface ScreeningOverview {
     unresolvedRate: number;
     recentUnresolved: {
       correlationId: string;
-      outcome: string;
+      outcome: ScreeningAttemptOutcome;
       failureReason: string | null;
       providerName: string;
       startedAt: string;
@@ -112,8 +130,8 @@ export interface ScreeningOverview {
   caseWorkload: Record<string, number>;
   datasets: {
     id: string;
-    source: string;
-    status: string;
+    source: WatchlistSource;
+    status: DatasetVersionStatus;
     version: string;
     recordCount: number | null;
     addedCount: number | null;
@@ -139,8 +157,8 @@ export interface ScreeningOverview {
     configurationProblems: string[];
   };
   listSync: {
-    source: string;
-    status: string;
+    source: WatchlistSource;
+    status: WatchlistSyncRunStatus;
     recordCount: number | null;
     addedCount: number | null;
     startedAt: string;

@@ -22,12 +22,24 @@ export const DATA_SHARING_CHANNELS = [
   'OTHER_UNSECURED',
 ] as const;
 
+export type DataSharingChannel =
+  | 'SECURE_SFTP'
+  | 'ENCRYPTED_EMAIL'
+  | 'VENDOR_SECURE_PORTAL'
+  | 'CBJ_REGULATORY_PORTAL'
+  | 'IN_PERSON_ENCRYPTED_MEDIA'
+  | 'UNENCRYPTED_EMAIL'
+  | 'POSTAL_MAIL'
+  | 'OTHER_UNSECURED';
+
+export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
+
 export interface DataSharingApproval {
   id: string;
   vendorId: string | null;
   description: string;
-  classification: string;
-  channel: string;
+  classification: DataClassification;
+  channel: DataSharingChannel;
   isRegulatoryChannel: boolean;
   requestedByUserId: string;
   approvedByUserId: string | null;
@@ -54,7 +66,7 @@ export function createDataSharingApproval(body: {
   vendorId?: string;
   description: string;
   classification: string;
-  channel: string;
+  channel: DataSharingChannel;
   isRegulatoryChannel?: boolean;
 }): Promise<DataSharingApproval> {
   return apiPost('/data-sharing-approvals', body);

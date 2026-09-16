@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -256,7 +257,7 @@ export default function OperationalPiRiskPage() {
                 <td style={cell}>{r.riskType}</td>
                 <td style={cell}>{r.description}</td>
                 <td style={cell}>{r.mitigationAction ?? '—'}</td>
-                <td style={cell}>{r.status}</td>
+                <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
                 <td style={cell}>
                   {canManageRiskRegister && r.status === 'open' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '14rem' }}>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listProspects, type Prospect } from '../../../lib/prospect/prospect-api';
@@ -109,7 +110,7 @@ export default function ProspectsPage() {
                     <bdi>{prospect.location}</bdi>
                   </div>
                 ) : null}
-                <div style={cardMetaStyle}>Status: {prospect.status}</div>
+                <div style={cardMetaStyle}>Status: {t(ENUM_LABEL.ProspectStatus[prospect.status])}</div>
               </button>
             ))}
           </div>

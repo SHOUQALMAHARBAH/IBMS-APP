@@ -15,6 +15,8 @@ export const TRANSACTION_MONITORING_PATTERN_TYPES = [
   'other',
 ] as const;
 
+export type TransactionMonitoringStatus = 'open' | 'closed';
+
 export interface TransactionMonitoringAlert {
   id: string;
   customerId: string | null;
@@ -26,7 +28,7 @@ export interface TransactionMonitoringAlert {
   escalatedToSuspiciousActivity: boolean;
   escalatedAt: string | null;
   reportedToAuthorityAt: string | null;
-  status: string;
+  status: TransactionMonitoringStatus;
   isClosed: boolean;
   classification: string;
 }

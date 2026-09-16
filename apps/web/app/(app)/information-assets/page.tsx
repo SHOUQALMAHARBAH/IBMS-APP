@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -145,7 +146,7 @@ export default function InformationAssetsPage() {
                     )}
                   </td>
                   <td style={cell}>{asset.assetType}</td>
-                  <td style={cell}>{asset.classification}</td>
+                  <td style={cell}>{t(ENUM_LABEL.DataClassification[asset.classification])}</td>
                   <td style={cell}>{asset.ownerUserId}</td>
                   <td style={cell}>
                     {editingId === asset.id ? (

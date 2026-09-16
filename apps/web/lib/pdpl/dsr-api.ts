@@ -8,12 +8,23 @@ import { apiGet, apiPost } from '../auth/api-client';
 
 export const DSR_TYPES = ['ACCESS', 'CORRECTION', 'DELETION', 'OBJECTION'];
 
+export type DsrType = 'ACCESS' | 'CORRECTION' | 'DELETION' | 'OBJECTION';
+
+export type DsrStatus =
+  | 'RECEIVED'
+  | 'IDENTITY_VERIFIED'
+  | 'IN_PROGRESS'
+  | 'PARTIALLY_FULFILLED'
+  | 'FULFILLED'
+  | 'REJECTED'
+  | 'CLOSED';
+
 export interface DataSubjectRequest {
   id: string;
   customerId: string | null;
   insuredPersonId: string | null;
-  type: string;
-  status: string;
+  type: DsrType;
+  status: DsrStatus;
   receivedAt: string;
   identityVerifiedAt: string | null;
   slaDueAt: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -207,7 +208,7 @@ export default function BankReconciliationPage() {
                     <td style={{ ...cellStyle, textAlign: 'end' }}>
                       <strong>{r.varianceAmount}</strong>
                     </td>
-                    <td style={cellStyle}>{r.status}</td>
+                    <td style={cellStyle}>{t(ENUM_LABEL.ReconciliationExceptionStatus[r.status])}</td>
                     <td style={cellStyle}>
                       {canReconcile ? (
                         <div

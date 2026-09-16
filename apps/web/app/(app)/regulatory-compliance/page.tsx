@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -204,7 +205,7 @@ export default function RegulatoryCompliancePage() {
               <tr>
                 <td style={cell}>{t('rcColStatus')}</td>
                 <td style={cell}>
-                  {license.status}
+                  {t(ENUM_LABEL.BrokerLicenseStatus[license.status])}
                   {license.isCurrentlyLapsed ? ' (currently lapsed)' : ''}
                 </td>
               </tr>

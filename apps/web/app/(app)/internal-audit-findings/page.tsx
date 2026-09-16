@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -166,7 +167,7 @@ export default function InternalAuditFindingsPage() {
                   <td style={cell}>{f.auditPeriodLabel}</td>
                   <td style={cell}>{f.finding}</td>
                   <td style={cell}>{f.remediationAction ?? '—'}</td>
-                  <td style={cell}>{f.status}</td>
+                  <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[f.status])}</td>
                   <td style={cell}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '16rem' }}>
                       {canRecord && f.status === 'open' ? (

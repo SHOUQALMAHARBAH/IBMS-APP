@@ -1412,14 +1412,14 @@ async function driveClaimToVerdict(
   await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill(opts.estimatedLoss);
   await page.getByRole("button", { name: "Notify claim" }).click();
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
 
   await page.getByLabel("Insurer claim reference").fill(opts.insurerRef);
   await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   for (const [docType, fileName] of [
     ["claim_form", "cf.pdf"],
@@ -1443,7 +1443,7 @@ async function driveClaimToVerdict(
 
   await page.getByRole("button", { name: "Submit for assessment" }).click();
   await expect(
-    page.getByText("UNDER_ASSESSMENT", { exact: true }),
+    page.getByText("Under assessment", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("Assessment verdict").selectOption(opts.verdict);
   await page.getByRole("button", { name: "Record verdict" }).click();
@@ -1843,7 +1843,7 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await page.getByRole("button", { name: "Place policy" }).click();
 
   await expect.poll(() => placed?.inceptionDate).toBe("2026-10-01");
-  await expect(page.getByText("PLACEMENT_CONFIRMED")).toBeVisible();
+  await expect(page.getByText("Placement confirmed")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Download schedule summary (PDF)" }),
   ).toHaveCount(0);
@@ -1857,7 +1857,7 @@ test("places a policy from an accepted opportunity and records its issuance", as
 
   await expect.poll(() => issued?.policyNumber).toBe("POL-WEB-1");
   await expect.poll(() => issued?.issuedPremium).toBe("118500.000");
-  await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Issued", { exact: true })).toBeVisible();
   await expect(page.getByText("POL-WEB-1")).toBeVisible();
 
   // Part F item #7 — a schedule now exists, so both buttons appear and
@@ -1961,7 +1961,7 @@ test("records policy delivery and the client receipt acknowledgement", async ({
   await expect(page.getByText("awaiting client acknowledgement")).toBeVisible();
 
   await page.getByRole("button", { name: "Acknowledge receipt" }).click();
-  await expect(page.getByText("ACTIVE", { exact: true })).toBeVisible();
+  await expect(page.getByText("Active", { exact: true })).toBeVisible();
 });
 
 test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
@@ -1993,7 +1993,7 @@ test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
     .click();
 
   await expect.poll(() => requested?.premiumAmount).toBe("2500.000");
-  await expect(page.getByText("REQUESTED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Requested", { exact: true })).toBeVisible();
   await expect(
     page.getByText("Premium adjustment JOD 2,500.000"),
   ).toBeVisible();
@@ -2191,7 +2191,7 @@ test("notifies a claim against an issued policy", async ({ page }) => {
 
   await expect.poll(() => notified?.estimatedLoss).toBe("30000.000");
   await expect.poll(() => notified?.causeOfLoss).toContain("warehouse roof");
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
   await expect(page.getByText("large claim", { exact: false })).toBeVisible();
   await expect(
     page.getByText("coverage version in force", { exact: false }),
@@ -2270,7 +2270,7 @@ test("registers a NOTIFIED claim with the insurer and assigns the adjuster", asy
   await page.getByLabel("Cause of loss").fill("Burst riser main flooded unit 4.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
 
   // the registration form appears on the NOTIFIED claim
   await page.getByLabel("Insurer claim reference").fill("INS-CLM-2026-9001");
@@ -2284,7 +2284,7 @@ test("registers a NOTIFIED claim with the insurer and assigns the adjuster", asy
     .poll(() => registered?.insurerClaimReference)
     .toBe("INS-CLM-2026-9001");
   await expect.poll(() => registered?.adjuster.name).toBe("Cunningham Lindsey");
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
   await expect(
     page.getByText("adjuster Cunningham Lindsey", { exact: false }),
   ).toBeVisible();
@@ -2315,14 +2315,14 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
 
   await page.getByLabel("Insurer claim reference").fill("INS-DOC-1");
   await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // the documentation checklist shows the missing mandatory docs
   await expect(page.getByText("missing claim_form, photo, repair_estimate")).toBeVisible();
@@ -2333,7 +2333,7 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await page.getByRole("button", { name: "File document" }).click();
 
   await expect.poll(() => attached?.documents[0].docType).toBe("claim_form");
-  await expect(page.getByText("DOCUMENTATION_IN_PROGRESS", { exact: true })).toBeVisible();
+  await expect(page.getByText("Documentation in progress", { exact: true })).toBeVisible();
   await expect(page.getByText("missing photo, repair_estimate")).toBeVisible();
 });
 
@@ -2365,7 +2365,7 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // file every mandatory document
   for (const [docType, fileName] of [
@@ -2392,7 +2392,7 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
 
   // submit for assessment, then record the verdict
   await page.getByRole("button", { name: "Submit for assessment" }).click();
-  await expect(page.getByText("UNDER_ASSESSMENT", { exact: true })).toBeVisible();
+  await expect(page.getByText("Under assessment", { exact: true })).toBeVisible();
   await page
     .getByLabel("Assessment verdict")
     .selectOption("PARTIALLY_APPROVED");
@@ -2439,7 +2439,7 @@ test("raises an insurer non-response follow-up alert via the sweep and resolves 
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // no alert yet
   await expect(page.getByText("Insurer follow-up alert")).toHaveCount(0);

@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -472,7 +473,7 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>
                         {b.retentionScheduleItemId ? b.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
                       </td>
-                      <td style={cell}>{b.status}</td>
+                      <td style={cell}>{t(ENUM_LABEL.DisposalBatchStatus[b.status])}</td>
                       <td style={cell}>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</td>
                       <td style={cell}>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</td>
                       <td style={cell}>

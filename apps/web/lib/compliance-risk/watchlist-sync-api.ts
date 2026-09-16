@@ -7,8 +7,12 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
+export type WatchlistSource = 'OFAC_SDN' | 'UN_CONSOLIDATED';
+
+export type WatchlistSyncRunStatus = 'running' | 'succeeded' | 'failed';
+
 export interface WatchlistSyncOutcome {
-  source: string;
+  source: WatchlistSource;
   status: 'succeeded' | 'failed';
   recordCount?: number;
   errorMessage?: string;
@@ -16,10 +20,10 @@ export interface WatchlistSyncOutcome {
 
 export interface WatchlistSyncRun {
   id: string;
-  source: string;
+  source: WatchlistSource;
   startedAt: string;
   completedAt: string | null;
-  status: string;
+  status: WatchlistSyncRunStatus;
   recordCount: number | null;
   errorMessage: string | null;
 }

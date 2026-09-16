@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -117,7 +118,7 @@ export default function UpSellRecommendationDetailPage() {
         <>
           <h1>{t('upsdHeading')}</h1>
           <p style={{ opacity: 0.8 }}>
-            <span style={upSellBadgeStyle}>{recommendation.status}</span>
+            <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
           </p>
 
           <ConsentCaptureWidget

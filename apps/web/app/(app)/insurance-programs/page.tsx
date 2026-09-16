@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -72,7 +73,7 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
           aria-label={t('iprogOpenProgramAria', { id: program.id })}
           onClick={() => router.push(`/insurance-programs/${program.id}`)}
         >
-          <strong>Status: {program.status}</strong>
+          <strong>Status: {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}</strong>
           <div style={cardMetaStyle}>
             {tPlural('iprogLineCount', program.lines.length)}
           </div>

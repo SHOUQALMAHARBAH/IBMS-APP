@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -88,7 +89,7 @@ function AssembleFlow() {
   return (
     <>
       <p style={{ opacity: 0.8 }}>
-        Needs assessment {assessment.id.slice(0, 8)} — status {assessment.status}.
+        Needs assessment {assessment.id.slice(0, 8)} — status {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}.
       </p>
 
       {!isApproved ? (

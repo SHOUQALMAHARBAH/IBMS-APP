@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -160,7 +161,7 @@ export default function RenewalCasesPage() {
                     <td style={cell}>{r.policyNumber ?? '—'}</td>
                     <td style={cell}>{r.insuranceLine}</td>
                     <td style={cell}>{r.expiryDate?.slice(0, 10) ?? '—'}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.RenewalStatus[r.status])}</td>
                     <td style={cell}>{r.lossRatio?.ratio ?? '—'}</td>
                     <td style={cell}>
                       {r.requiresRemarketing

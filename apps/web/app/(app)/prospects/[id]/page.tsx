@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { getProspect, type Prospect } from '../../../../lib/prospect/prospect-api';
@@ -80,7 +81,7 @@ export default function ProspectProfilePage() {
           <h1>
             <bdi>{prospect.companyName}</bdi>
           </h1>
-          <p style={{ opacity: 0.8 }}>Status: {prospect.status}</p>
+          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.ProspectStatus[prospect.status])}</p>
           <div style={profileGridStyle}>
             <ProfileField label={t('prosdColSector')} value={prospect.sector} />
             <ProfileField label={t('prosdColActivity')} value={prospect.activity} />

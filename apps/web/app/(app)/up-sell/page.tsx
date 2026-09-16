@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -68,7 +69,7 @@ function RecommendationRow({
         }}
       >
         <strong>{t('upsUnderInsuranceFlagged')}</strong>
-        <span style={upSellBadgeStyle}>{recommendation.status}</span>
+        <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
       </div>
       <div style={upSellFigureRowStyle}>
         <span>Designed Sum Insured (JOD): {recommendation.currentSumInsured}</span>

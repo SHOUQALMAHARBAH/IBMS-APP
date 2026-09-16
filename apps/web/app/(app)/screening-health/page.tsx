@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
@@ -178,7 +179,9 @@ export default function ScreeningHealthPage() {
             </div>
             <div style={row}>
               <span>{t('shState')}</span>
-              <span data-state={health.state}>{health.state}</span>
+              <span data-state={health.state}>
+                {t(ENUM_LABEL.ProviderHealthState[health.state])}
+              </span>
             </div>
             <div style={row}>
               <span>{t('shType')}</span>
@@ -408,7 +411,7 @@ export default function ScreeningHealthPage() {
                 <tbody>
                   {overview.attempts.recentUnresolved.map((row_) => (
                     <tr key={row_.correlationId}>
-                      <td style={bodyCell}>{row_.outcome}</td>
+                      <td style={bodyCell}>{t(ENUM_LABEL.ScreeningAttemptOutcome[row_.outcome])}</td>
                       <td style={bodyCell}>{row_.providerName}</td>
                       {/* The reason names the remedy, never the customer. */}
                       <td style={bodyCell}>{row_.failureReason ?? "—"}</td>
@@ -523,9 +526,9 @@ export default function ScreeningHealthPage() {
                       data-dataset-status={d.status}
                       data-dataset-source={d.source}
                     >
-                      <td style={bodyCell}>{d.source}</td>
+                      <td style={bodyCell}>{t(ENUM_LABEL.WatchlistSource[d.source])}</td>
                       <td style={bodyCell}>
-                        <span style={statusStyle(d.status)}>{d.status}</span>
+                        <span style={statusStyle(d.status)}>{t(ENUM_LABEL.DatasetVersionStatus[d.status])}</span>
                         {d.rejectionReason ? (
                           <div style={{ fontSize: "0.75rem", opacity: 0.8 }}>
                             {d.rejectionReason}
@@ -600,9 +603,9 @@ export default function ScreeningHealthPage() {
                 <tbody>
                   {overview.listSync.map((r, i) => (
                     <tr key={`${r.source}-${r.startedAt}-${i}`}>
-                      <td style={bodyCell}>{r.source}</td>
+                      <td style={bodyCell}>{t(ENUM_LABEL.WatchlistSource[r.source])}</td>
                       <td style={bodyCell}>
-                        {r.status}
+                        {t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}
                         {r.errorMessage ? (
                           <div
                             style={{ fontSize: "0.75rem", color: "#b91c1c" }}

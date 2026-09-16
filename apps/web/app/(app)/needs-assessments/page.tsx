@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -76,7 +77,7 @@ export default function NeedsAssessmentsPage() {
                 aria-label={t('naViewAssessmentAria', { id: assessment.id })}
                 onClick={() => router.push(`/needs-assessments/${assessment.id}`)}
               >
-                <strong>Status: {assessment.status}</strong>
+                <strong>Status: {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}</strong>
                 <div style={cardMetaStyle}>
                   {tPlural(
                     'naCoverageLinesRecommended',

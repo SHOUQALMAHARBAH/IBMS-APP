@@ -83,7 +83,7 @@ test("browses the audit log, looks up workflow history, and looks up document hi
 
   await page.getByLabel("Entity type").first().fill("Lead");
   await page.getByRole("button", { name: "Browse" }).click();
-  await expect(page.getByRole("cell", { name: "TRANSITION" }).first()).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Status change" }).first()).toBeVisible();
 
   await page.getByLabel("Workflow entity type").fill("Lead");
   await page.getByLabel("Workflow entity id").fill("lead-1");

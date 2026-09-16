@@ -91,7 +91,7 @@ export type DeliveryMethod = (typeof DELIVERY_METHOD_OPTIONS)[number]['value'];
 
 export interface PolicyDelivery {
   deliveredAt: string;
-  method: string;
+  method: DeliveryMethod;
   recipient: string;
   receiptAcknowledgedAt: string | null;
 }

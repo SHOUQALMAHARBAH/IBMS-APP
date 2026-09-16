@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import { ApiError } from "../../../lib/auth/api-client";
@@ -257,7 +258,7 @@ export default function SlaPoliciesPage() {
                           ? t('slapCustom')
                           : t('slapJordanWorkingDays')}
                     </td>
-                    <td style={cell}>{p.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.SlaPolicyStatus[p.status])}</td>
                     <td style={cell}>
                       {canManage ? (
                         <div style={{ display: "flex", gap: "0.3rem" }}>

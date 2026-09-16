@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { Pagination } from '../../../components/ui/Pagination';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -59,7 +60,7 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
             rows.map((r) => (
               <tr key={r.id}>
                 <td style={cell}>{r.occurredAt.replace('T', ' ').slice(0, 19)}</td>
-                <td style={cell}>{r.action}</td>
+                <td style={cell}>{t(ENUM_LABEL.AuditAction[r.action])}</td>
                 <td style={cell}>
                   {r.entityType} <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
                 </td>
@@ -318,8 +319,8 @@ export default function AuditTrailPage() {
                         {v.isRequestedVersion ? ' (requested)' : ''}
                       </td>
                       <td style={cell}>{v.fileName}</td>
-                      <td style={cell}>{v.category}</td>
-                      <td style={cell}>{v.classification}</td>
+                      <td style={cell}>{t(ENUM_LABEL.DocumentCategory[v.category])}</td>
+                      <td style={cell}>{t(ENUM_LABEL.DataClassification[v.classification])}</td>
                       <td style={cell}>{v.uploadedByUserId}</td>
                       <td style={cell}>{v.createdAt.slice(0, 10)}</td>
                     </tr>

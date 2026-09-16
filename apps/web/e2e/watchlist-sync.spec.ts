@@ -62,8 +62,8 @@ test("lists sync runs with the sync/batch buttons", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Sanctions & PEP watchlist sync" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "OFAC_SDN" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "UN_CONSOLIDATED" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "OFAC SDN" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "UN consolidated list" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Sync watchlists now" }),
   ).toBeVisible();
@@ -91,7 +91,7 @@ test("watchlist-sync screen has no serious/critical accessibility violations @a1
   await mockStatus(page);
 
   await page.goto("/watchlist-sync");
-  await expect(page.getByRole("cell", { name: "OFAC_SDN" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "OFAC SDN" })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter(

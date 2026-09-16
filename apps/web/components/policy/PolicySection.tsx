@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   acknowledgePolicyReceipt,
   attachPolicyDocuments,
@@ -379,7 +380,7 @@ export function PolicySection({
             <strong>
               <bdi>{policy.insurer?.name ?? policy.insurerId}</bdi>
             </strong>
-            <span style={rfqBadgeStyle}>{policy.status}</span>
+            <span style={rfqBadgeStyle}>{t(ENUM_LABEL.PolicyStatus[policy.status])}</span>
           </div>
           <p style={{ margin: '0.4rem 0' }}>
             <bdi>{policy.insuranceLine}</bdi>
@@ -539,7 +540,7 @@ export function PolicySection({
               <ul style={{ margin: '0.3rem 0' }}>
                 {policy.documents.map((d) => (
                   <li key={d.id} style={{ fontSize: '0.9rem' }}>
-                    {d.category} · {d.classification} · {d.fileName} (v{d.versionNumber})
+                    {t(ENUM_LABEL.DocumentCategory[d.category])} · {t(ENUM_LABEL.DataClassification[d.classification])} · {d.fileName} (v{d.versionNumber})
                   </li>
                 ))}
               </ul>
@@ -679,7 +680,7 @@ export function PolicySection({
             <div style={{ marginTop: '0.8rem' }}>
               <p style={{ fontWeight: 600 }}>{t('policyDeliveryHeading')}</p>
               <p style={{ fontSize: '0.9rem', margin: '0.3rem 0' }}>
-                {policy.delivery.method} · to {policy.delivery.recipient} ·{' '}
+                {t(ENUM_LABEL.DeliveryMethod[policy.delivery.method])} · to {policy.delivery.recipient} ·{' '}
                 {formatDate(policy.delivery.deliveredAt, language)}
                 {' · '}
                 {policy.delivery.receiptAcknowledgedAt

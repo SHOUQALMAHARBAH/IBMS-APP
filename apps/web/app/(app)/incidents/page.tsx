@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -215,11 +216,11 @@ export default function IncidentsPage() {
                 <tr key={inc.id}>
                   <td style={cell}>{inc.title}</td>
                   <td style={cell}>
-                    {inc.severity}
+                    {t(ENUM_LABEL.IncidentSeverity[inc.severity])}
                     {inc.isContainmentOverdue ? ' (containment overdue)' : ''}
                   </td>
-                  <td style={cell}>{inc.status}</td>
-                  <td style={cell}>{inc.classification}</td>
+                  <td style={cell}>{t(ENUM_LABEL.IncidentStatus[inc.status])}</td>
+                  <td style={cell}>{t(ENUM_LABEL.IncidentClassification[inc.classification])}</td>
                   <td style={cell}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '20rem' }}>
                       {canContain && inc.status === 'REPORTED' ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -11,6 +12,7 @@ import {
   declineDataSharingApproval,
   listDataSharingApprovals,
   type DataSharingApproval,
+  type DataSharingChannel,
 } from '../../../lib/pdpl/data-sharing-approval-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
@@ -49,7 +51,9 @@ export default function DataSharingApprovalsPage() {
   const [description, setDescription] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [classification, setClassification] = useState<string>(DATA_CLASSIFICATIONS[0]);
-  const [channel, setChannel] = useState<string>(DATA_SHARING_CHANNELS[0]);
+  const [channel, setChannel] = useState<DataSharingChannel>(
+    DATA_SHARING_CHANNELS[0],
+  );
   const [isRegulatoryChannel, setIsRegulatoryChannel] = useState(false);
 
   const load = useCallback(async () => {
@@ -161,7 +165,7 @@ export default function DataSharingApprovalsPage() {
             >
               {DATA_CLASSIFICATIONS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.DataClassification[c])}
                 </option>
               ))}
             </select>
@@ -171,11 +175,13 @@ export default function DataSharingApprovalsPage() {
             <select
               aria-label={t('dsaChannelLabel')}
               value={channel}
-              onChange={(e) => setChannel(e.target.value)}
+              onChange={(e) =>
+                setChannel(e.target.value as DataSharingChannel)
+              }
             >
               {DATA_SHARING_CHANNELS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.DataSharingChannel[c])}
                 </option>
               ))}
             </select>
@@ -214,8 +220,8 @@ export default function DataSharingApprovalsPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>{r.description}</td>
-                    <td style={cell}>{r.classification}</td>
-                    <td style={cell}>{r.channel}</td>
+                    <td style={cell}>{t(ENUM_LABEL.DataClassification[r.classification])}</td>
+                    <td style={cell}>{t(ENUM_LABEL.DataSharingChannel[r.channel])}</td>
                     <td style={cell}>{r.slaDueAt.slice(0, 10)}</td>
                     <td style={cell}>
                       {r.isApproved ? 'Approved' : r.isDeclined ? 'Declined' : 'Pending'}

@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import {
@@ -219,7 +220,7 @@ export default function ScreeningMatchesPage() {
                     <td style={cell}>
                       {r.status !== "pending" ? (
                         <div style={{ fontSize: "0.85rem" }}>
-                          <strong>{r.status}</strong>
+                          <strong>{t(ENUM_LABEL.ScreeningMatchStatus[r.status])}</strong>
                           <div style={{ opacity: 0.75 }}>{r.reviewReason}</div>
                         </div>
                       ) : canReview ? (

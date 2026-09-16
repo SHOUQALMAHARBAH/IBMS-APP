@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -64,7 +65,7 @@ function OpportunityRow({
         }}
       >
         <strong>{opportunity.gapLine}</strong>
-        <span style={crossSellBadgeStyle}>{opportunity.status}</span>
+        <span style={crossSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[opportunity.status])}</span>
       </div>
       <div style={cardMetaStyle}>
         Flagged {formatDate(opportunity.detectedAt, language)}

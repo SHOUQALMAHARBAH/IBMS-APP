@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -299,7 +300,7 @@ export default function CustomerProfilePage() {
             {documents.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerDocumentsNone')}</p> : null}
             {documents.map((d) => (
               <div key={d.id} style={repeatableRowStyle}>
-                <strong>{d.fileName}</strong> — {d.classification}
+                <strong>{d.fileName}</strong> — {t(ENUM_LABEL.DocumentClassification[d.classification])}
               </div>
             ))}
           </section>

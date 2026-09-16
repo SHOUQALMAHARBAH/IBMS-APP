@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   attachClaimDocuments,
   closeClaim,
@@ -976,7 +977,7 @@ export function ClaimSection({
                 Loss {formatDate(c.lossDate, language)}
                 {c.isLargeClaim ? ' · large claim' : ''}
               </strong>
-              <span style={rfqBadgeStyle}>{c.status}</span>
+              <span style={rfqBadgeStyle}>{t(ENUM_LABEL.ClaimStatus[c.status])}</span>
             </div>
             <p style={{ margin: '0.4rem 0' }}>
               Estimated loss {formatMoney(c.estimatedLoss, language)}

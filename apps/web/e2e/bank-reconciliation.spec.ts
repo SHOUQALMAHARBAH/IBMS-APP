@@ -66,7 +66,7 @@ test("lists open exceptions with the exact variance amount", async ({
   ).toBeVisible();
 
   await expect(page.getByRole("cell", { name: "5000.000" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "open", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Open", exact: true })).toBeVisible();
 
   // Finance sees the detect form + the per-row actions
   await expect(page.getByLabel("Statement lines")).toBeVisible();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   advanceEndorsement,
   applyEndorsement,
@@ -186,7 +187,7 @@ export function EndorsementSection({
                 <strong>
                   {e.type === 'NEGATIVE' ? '−' : '+'} {e.changeType}
                 </strong>
-                <span style={rfqBadgeStyle}>{e.status}</span>
+                <span style={rfqBadgeStyle}>{t(ENUM_LABEL.EndorsementStatus[e.status])}</span>
               </div>
               <p style={{ margin: '0.4rem 0' }}>
                 Premium adjustment {formatMoney(e.premiumAdjustment, language)}

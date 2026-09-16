@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -185,7 +186,7 @@ export default function DpiaScreeningsPage() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>{r.subjectDescription}</td>
-                    <td style={cell}>{r.outcome}</td>
+                    <td style={cell}>{t(ENUM_LABEL.DpiaOutcome[r.outcome])}</td>
                     <td style={cell}>{r.dpoReviewDueAt ? r.dpoReviewDueAt.slice(0, 10) : '—'}</td>
                     <td style={cell}>
                       {!canManage ? (

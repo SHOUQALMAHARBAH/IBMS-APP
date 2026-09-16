@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -215,7 +216,7 @@ export default function TransactionMonitoringPage() {
                   <tr key={r.id}>
                     <td style={cell}>{r.customerId ? `${r.customerId.slice(0, 8)}…` : '—'}</td>
                     <td style={cell}>{r.patternType}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
                     <td style={cell}>{r.escalatedToSuspiciousActivity ? 'yes' : 'no'}</td>
                     <td style={cell}>{r.reportedToAuthorityAt ? 'yes' : 'no'}</td>
                     <td style={cell}>{r.detectedAt.slice(0, 10)}</td>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -117,7 +118,7 @@ export default function CrossSellOpportunityDetailPage() {
         <>
           <h1>{opportunity.gapLine}</h1>
           <p style={{ opacity: 0.8 }}>
-            <span style={crossSellBadgeStyle}>{opportunity.status}</span>
+            <span style={crossSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[opportunity.status])}</span>
           </p>
 
           <ConsentCaptureWidget

@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -165,7 +166,7 @@ export default function KnowledgeBasePage() {
                       article.titleAr ?? '—'
                     )}
                   </td>
-                  <td style={cell}>{article.category}</td>
+                  <td style={cell}>{t(ENUM_LABEL.KbCategory[article.category])}</td>
                   <td style={cell}>{article.publishedAt.slice(0, 10)}</td>
                   <td style={cell}>
                     {editingId === article.id ? (

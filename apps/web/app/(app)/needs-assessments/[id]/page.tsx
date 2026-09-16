@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -117,7 +118,7 @@ export default function NeedsAssessmentDetailPage() {
       {assessment ? (
         <>
           <h1>{t('nadHeading')}</h1>
-          <p style={{ opacity: 0.8 }}>Status: {assessment.status}</p>
+          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}</p>
 
           <ConsentCaptureWidget
             customerId={assessment.customerId}

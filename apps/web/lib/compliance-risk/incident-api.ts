@@ -14,16 +14,29 @@ export const INCIDENT_REGULATORS = [
   'Personal_Data_Protection_Council',
 ];
 
+export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export type IncidentStatus =
+  | 'REPORTED'
+  | 'CONTAINED'
+  | 'IMPACT_ASSESSED'
+  | 'CLASSIFIED'
+  | 'NOTIFIED'
+  | 'RECOVERED'
+  | 'CLOSED';
+
+export type IncidentClassification = 'NOT_YET_CLASSIFIED' | 'MATERIAL' | 'NON_MATERIAL';
+
 export interface IncidentReport {
   id: string;
   title: string;
   description: string;
-  severity: string;
-  status: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
   reportedAt: string;
   containedAt: string | null;
   impactAssessedAt: string | null;
-  classification: string;
+  classification: IncidentClassification;
   classifiedByDpoUserId: string | null;
   seniorManagementCoSignUserId: string | null;
   seniorManagementNotifiedAt: string | null;

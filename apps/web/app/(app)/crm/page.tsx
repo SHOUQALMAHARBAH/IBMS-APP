@@ -1,6 +1,9 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import type { TranslationKey } from '../../../lib/i18n/translations';
+import type { TimelineEvent } from '../../../lib/crm/crm-api';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -34,6 +37,29 @@ import { hasPermission } from '../../../lib/auth/permissions';
 // of the `customer.360-view.read` roles: Placement/Claims/Finance can log a
 // touchpoint but cannot read the 360° timeline back).
 
+/**
+ * A timeline row's status comes from whichever module raised it, so one
+ * lookup table cannot serve it: a POLICY row carries a PolicyStatus, a CLAIM
+ * row a ClaimStatus, a COMPLAINT row a ComplaintStatus, and an INTERACTION
+ * row has no status at all. `kind` is what says which — this picks the map
+ * from it rather than guessing from the value, which would collide the moment
+ * two vocabularies share a word (CLOSED is in two of these three).
+ */
+function timelineStatusLabel(event: TimelineEvent): TranslationKey | null {
+  if (!event.status) return null;
+  const map =
+    event.kind === 'POLICY'
+      ? ENUM_LABEL.PolicyStatus
+      : event.kind === 'CLAIM'
+        ? ENUM_LABEL.ClaimStatus
+        : event.kind === 'COMPLAINT'
+          ? ENUM_LABEL.ComplaintStatus
+          : null;
+  // An unknown value is rendered as-is rather than crashing or blanking: the
+  // server owns these vocabularies and may add one before the UI knows it.
+  return (map as Record<string, TranslationKey> | null)?.[event.status] ?? null;
+}
+
 function TimelineList({ view }: { view: Customer360View }) {
   const { language, t } = useLanguage();
   if (view.timeline.length === 0) {
@@ -47,12 +73,17 @@ function TimelineList({ view }: { view: Customer360View }) {
     <div style={{ marginTop: '1rem' }}>
       {view.timeline.map((event) => (
         <div key={`${event.kind}-${event.refId}`} style={crmTimelineItemStyle}>
-          <span style={crmKindBadgeStyle}>{event.kind}</span>
+          <span style={crmKindBadgeStyle}>
+            {t(ENUM_LABEL.TimelineEventKind[event.kind])}
+          </span>
           <div>
             <div>
               <strong>{event.title}</strong>
-              {event.status ? (
-                <span style={{ opacity: 0.7 }}> — {event.status}</span>
+              {timelineStatusLabel(event) ? (
+                <span style={{ opacity: 0.7 }}>
+                  {' '}
+                  — {t(timelineStatusLabel(event)!)}
+                </span>
               ) : null}
             </div>
             {event.detail ? <div>{event.detail}</div> : null}
@@ -171,7 +202,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <bdi>{view.customer.legalName}</bdi>
           </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
-            {view.customer.customerType} — Status: {view.customer.status}
+            {view.customer.customerType} — Status: {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
           </p>
           <div style={crmCountRowStyle}>
             <span>Interactions: {view.counts.interactions}</span>

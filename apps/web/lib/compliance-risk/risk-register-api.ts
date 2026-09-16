@@ -13,12 +13,14 @@ export const RISK_REGISTER_TYPES = [
   'reputational',
 ];
 
+export type RiskRegisterStatus = 'open' | 'closed';
+
 export interface RiskRegisterItem {
   id: string;
   riskType: string;
   description: string;
   mitigationAction: string | null;
-  status: string;
+  status: RiskRegisterStatus;
   loggedAt: string;
   closedAt: string | null;
 }

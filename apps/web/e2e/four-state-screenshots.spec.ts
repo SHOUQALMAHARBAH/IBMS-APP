@@ -249,7 +249,12 @@ test("four-state screenshots: /watchlist-sync (item #2 RTL layout mirroring)", a
     route.fulfill({ status: 200, json: SYNC_RUNS }),
   );
   await page.goto(page.url());
-  await expect(page.getByRole("cell", { name: "OFAC_SDN" })).toBeVisible();
+  // The label, not the stored code — and this screen renders in Arabic, so
+  // asserting the Arabic label is what proves the enum is actually translated
+  // rather than merely relabelled in English.
+  await expect(
+    page.getByRole("cell", { name: "قائمة OFAC للمصنّفين" }),
+  ).toBeVisible();
   await capture(page, "watchlist-sync", "populated");
 });
 

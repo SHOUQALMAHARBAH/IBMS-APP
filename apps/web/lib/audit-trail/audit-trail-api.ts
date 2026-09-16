@@ -6,10 +6,48 @@
 import type { Paginated } from '../api/paginated';
 import { apiGet } from '../auth/api-client';
 
+export type AuditAction =
+  | 'CREATE'
+  | 'READ'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'TRANSITION'
+  | 'EXPORT'
+  | 'PRINT'
+  | 'LOGIN'
+  | 'LOGIN_FAILED'
+  | 'LOGOUT'
+  | 'PASSWORD_RESET_REQUESTED'
+  | 'PASSWORD_RESET_COMPLETED'
+  | 'MFA_ENROLLED'
+  | 'MFA_VERIFIED'
+  | 'MFA_FAILED'
+  | 'STEP_UP_VERIFIED'
+  | 'ACCESS_WINDOW_EXPIRED';
+
+export type DocumentCategory =
+  | 'APPLICATION_PROPOSAL'
+  | 'RISK_SURVEY'
+  | 'QUOTATION'
+  | 'COMPARISON'
+  | 'RECOMMENDATION'
+  | 'CLIENT_APPROVAL'
+  | 'POLICY'
+  | 'ENDORSEMENT'
+  | 'INVOICE'
+  | 'RECEIPT'
+  | 'CLAIM'
+  | 'CORRESPONDENCE'
+  | 'OTHER';
+
+export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
+
 export interface AuditLogEntry {
   id: string;
   userId: string;
-  action: string;
+  action: AuditAction;
   entityType: string;
   entityId: string;
   beforeValue: unknown;
@@ -22,8 +60,8 @@ export interface DocumentVersion {
   id: string;
   versionNumber: number;
   fileName: string;
-  category: string;
-  classification: string;
+  category: DocumentCategory;
+  classification: DataClassification;
   uploadedByUserId: string;
   deletionLocked: boolean;
   deletionOverrideByUserId: string | null;

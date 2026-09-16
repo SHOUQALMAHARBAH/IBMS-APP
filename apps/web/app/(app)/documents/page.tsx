@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -184,8 +185,8 @@ export default function DocumentsPage() {
               {documents.map((doc) => (
                 <tr key={doc.id}>
                   <td style={cell}>{doc.fileName}</td>
-                  <td style={cell}>{doc.category}</td>
-                  <td style={cell}>{doc.classification}</td>
+                  <td style={cell}>{t(ENUM_LABEL.DocumentCategory[doc.category])}</td>
+                  <td style={cell}>{t(ENUM_LABEL.DataClassification[doc.classification])}</td>
                   <td style={cell}>{doc.versionNumber}</td>
                   <td style={cell}>{doc.deletionLocked ? t('docLocked') : t('docUnlocked')}</td>
                   <td style={cell}>

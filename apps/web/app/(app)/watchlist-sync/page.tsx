@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -156,8 +157,8 @@ export default function WatchlistSyncPage() {
               <tbody>
                 {runs.map((r) => (
                   <tr key={r.id}>
-                    <td style={cell}>{r.source}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.WatchlistSource[r.source])}</td>
+                    <td style={cell}>{t(ENUM_LABEL.WatchlistSyncRunStatus[r.status])}</td>
                     <td style={cell}>{r.recordCount ?? '—'}</td>
                     <td style={cell}>{r.startedAt.slice(0, 16).replace('T', ' ')}</td>
                     <td style={cell}>

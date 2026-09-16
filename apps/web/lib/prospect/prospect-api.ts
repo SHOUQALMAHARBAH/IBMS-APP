@@ -3,6 +3,8 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
+export type ProspectStatus = 'qualifying';
+
 export interface Prospect {
   id: string;
   leadId: string | null;
@@ -16,7 +18,7 @@ export interface Prospect {
   productsOfInterest: string[];
   expectedPremium: string | null;
   salesOwnerUserId: string;
-  status: string;
+  status: ProspectStatus;
   createdAt: string;
   updatedAt: string;
 }

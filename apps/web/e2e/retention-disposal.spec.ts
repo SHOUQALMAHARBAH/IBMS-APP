@@ -126,7 +126,7 @@ test("lists the retention schedule, Legal Holds, and disposal batches with their
     page.getByRole("button", { name: "Record review" }).first(),
   ).toBeVisible();
 
-  await expect(page.getByRole("cell", { name: "DPO_APPROVED" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "DPO approved" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record execution" }),
   ).toBeVisible();

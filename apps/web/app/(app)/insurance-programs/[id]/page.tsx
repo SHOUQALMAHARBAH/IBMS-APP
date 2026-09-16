@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -138,7 +139,7 @@ export default function InsuranceProgramDetailPage() {
       {program && ctx ? (
         <>
           <h1>Insurance program{ctx.siteLabel ? ` — ${ctx.siteLabel}` : ''}</h1>
-          <p style={{ opacity: 0.8 }}>Status: {program.status}</p>
+          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.InsuranceProgramStatus[program.status])}</p>
 
           <div
             style={{

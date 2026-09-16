@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -110,8 +111,8 @@ export default function DpoWorkspacePage() {
                   <tbody>
                     {summary.dsrQueue.map((d) => (
                       <tr key={d.id}>
-                        <td style={cell}>{d.type}</td>
-                        <td style={cell}>{d.status}</td>
+                        <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
+                        <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
                         <td style={cell}>{d.slaDueAt.slice(0, 10)}</td>
                         <td style={cell}>
                           {d.daysUntilDue < 0
@@ -144,8 +145,8 @@ export default function DpoWorkspacePage() {
                     {summary.incidentRegister.map((i) => (
                       <tr key={i.id}>
                         <td style={cell}>{i.title}</td>
-                        <td style={cell}>{i.severity}</td>
-                        <td style={cell}>{i.status}</td>
+                        <td style={cell}>{t(ENUM_LABEL.IncidentSeverity[i.severity])}</td>
+                        <td style={cell}>{t(ENUM_LABEL.IncidentStatus[i.status])}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -172,7 +173,7 @@ export default function DpoWorkspacePage() {
                     {summary.dpiaRegister.map((d) => (
                       <tr key={d.id}>
                         <td style={cell}>{d.subjectDescription}</td>
-                        <td style={cell}>{d.outcome}</td>
+                        <td style={cell}>{t(ENUM_LABEL.DpiaOutcome[d.outcome])}</td>
                         <td style={cell}>{d.dpoReviewDueAt ? d.dpoReviewDueAt.slice(0, 10) : '—'}</td>
                       </tr>
                     ))}
