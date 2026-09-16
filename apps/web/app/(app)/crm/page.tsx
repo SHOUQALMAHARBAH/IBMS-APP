@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -34,13 +35,11 @@ import { hasPermission } from '../../../lib/auth/permissions';
 // touchpoint but cannot read the 360° timeline back).
 
 function TimelineList({ view }: { view: Customer360View }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   if (view.timeline.length === 0) {
     return (
       <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
-        Nothing on this customer&apos;s timeline yet. Log the first interaction
-        above — policies, claims and complaints will appear here too once those
-        modules exist.
+        {t('crmTimelineEmpty')}
       </p>
     );
   }
@@ -269,21 +268,18 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
 
 function CrmFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and open its relationship timeline from there.
+        <SentenceWithLink
+          sentence={t('crmNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -306,10 +302,7 @@ export default function CrmPage() {
     <main style={pageStyle}>
       <h1>{t('crmHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 10 — log every customer touchpoint (meeting, call, email,
-        WhatsApp, visit, proposal, renewal, claim, complaint) and see the
-        360° timeline: interactions today, plus policies, claims and complaints
-        once those modules land.
+        {t('crmIntro')}
       </p>
       <Suspense fallback={null}>
         <CrmFlow />

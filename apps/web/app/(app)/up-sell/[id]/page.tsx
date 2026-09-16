@@ -104,7 +104,7 @@ export default function UpSellRecommendationDetailPage() {
         }
         style={{ cursor: 'pointer' }}
       >
-        ← All up-sell recommendations
+        {t('upsdBackToList')}
       </button>
 
       {loadError ? (

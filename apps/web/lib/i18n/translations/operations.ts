@@ -362,6 +362,26 @@ export const OPERATIONS = {
     secChangePasswordButton: 'تغيير كلمة المرور',
     secChangingPasswordButton: 'جارٍ التغيير…',
     secPasswordChanged: 'تم تغيير كلمة المرور.',
+    acrIntro:
+      'البند 5.1 — مراجعة دورية (ربع سنوية) لمن يملك الصلاحيات. أكّد كل بند ' +
+      'أدناه أو ألغِه أو ضع عليه علامة؛ وتشمل المراجعة صلاحيات مدير ' +
+      'النظام/الأمن نفسه، وتُراجَع كما تُراجَع صلاحيات أي شخص آخر.',
+    iprogIntro:
+      'العملية 7 — برنامج تأمين متعدد الخطوط يُبنى من قائمة تغطية معتمدة من ' +
+      'تقييم الاحتياجات ومبلغ التأمين المشتق من مسح المخاطر، ثم يُعتمد ' +
+      'نهائياً ليغذي طلب عروض الأسعار.',
+    naIntro:
+      'العملية 5 — استبيان مخاطر منظّم يقترح قائمة تغطية، ثم بوابة مراجعة ' +
+      'واعتماد. ابدأ تقييماً من ملف العميل.',
+    secHardwareKeyPending:
+      'يتطلب دورك مفتاح أمان مادياً. مسار التسجيل هذا غير متاح بعد — ويفي رمز ' +
+      'تطبيق المصادقة بمتطلب المصادقة الثنائية الإلزامية في الوقت الحالي.',
+    iprogNoCustomerSelected:
+      'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح برنامج التأمين ' +
+      'الخاص به من هناك.',
+    rpNoCustomerSelected:
+      'لم يتم اختيار عميل — افتح عميلاً من {link} ثم ابدأ مسح المخاطر من ' +
+      'هناك.',
   },
   EN: {
     secHeading: 'Security',
@@ -705,5 +725,27 @@ export const OPERATIONS = {
     secChangePasswordButton: 'Change password',
     secChangingPasswordButton: 'Changing…',
     secPasswordChanged: 'Your password has been changed.',
+    acrIntro:
+      'Part 5.1 — periodic (quarterly) review of who holds access. Confirm, ' +
+      "revoke, or flag each item below; a System/Security Administrator's own " +
+      "access is included and reviewed the same as anyone else's.",
+    iprogIntro:
+      'Process 7 — a multi-line Insurance Program assembled from an approved ' +
+      "needs assessment's coverage list and the risk survey's derived Sum " +
+      'Insured, then finalized to feed an RFQ.',
+    naIntro:
+      'Process 5 — a structured risk questionnaire that recommends a coverage ' +
+      "list, then a review and approval gate. Start one from a customer's " +
+      'profile.',
+    secHardwareKeyPending:
+      "Your role requires a hardware security key. That enrollment path isn't " +
+      'available yet — an authenticator-app code satisfies the mandatory-MFA ' +
+      'requirement for now.',
+    iprogNoCustomerSelected:
+      'No customer selected — open a customer from {link} and open its ' +
+      'insurance program from there.',
+    rpNoCustomerSelected:
+      'No customer selected — open a customer from {link} and start the risk ' +
+      'survey from there.',
   },
 } as const;

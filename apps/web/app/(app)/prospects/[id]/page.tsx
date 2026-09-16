@@ -66,7 +66,7 @@ export default function ProspectProfilePage() {
   return (
     <main style={pageStyle}>
       <button type="button" onClick={() => router.push('/prospects')} style={{ cursor: 'pointer' }}>
-        ← All prospects
+        {t('prospdBackToList')}
       </button>
 
       {loadError ? (

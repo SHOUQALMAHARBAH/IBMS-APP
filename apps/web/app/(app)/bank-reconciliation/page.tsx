@@ -249,7 +249,7 @@ export default function BankReconciliationPage() {
                             }
                           >
                             <option value="">{t('brResumeInvoiceAs')}</option>
-                            <option value="RECONCILED">RECONCILED</option>
+                            <option value="RECONCILED">{t('brResumeReconciled')}</option>
                           </select>
                           <button
                             type="button"

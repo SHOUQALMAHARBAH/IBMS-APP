@@ -189,8 +189,7 @@ export default function SecuritySettingsPage() {
         </p>
         {!user.mfaPolicySatisfied && user.mfaEnabled ? (
           <p style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-            Your role requires a hardware security key. That enrollment path isn&apos;t available yet — an
-            authenticator-app code satisfies the mandatory-MFA requirement for now.
+            {t('secHardwareKeyPending')}
           </p>
         ) : null}
 

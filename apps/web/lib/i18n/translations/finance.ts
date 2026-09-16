@@ -184,6 +184,11 @@ export const FINANCE = {
     frAgeing90Plus: 'أكثر من ٩٠ يوماً',
     frInvoicesAcrossCustomers: '{invoices} موزّعة على {customers}.',
     frAcrossInsurers: 'موزّعة على {insurers}.',
+    frNetPositionNote:
+      '«صافي المركز» هو نتيجة الاكتتاب للمحفظة — الأقساط المكتتبة ناقص ' +
+      'المطالبات المدفوعة ناقص العمولة — وليس هامش الوساطة نفسه (ذلك هو ' +
+      '«العمولة»). القيمة السالبة تعني أن الخط دفع أكثر مما حصّله من أقساط.',
+    brResumeReconciled: 'مسوّاة',
   },
   EN: {
     caHeading: 'Client accounting',
@@ -347,5 +352,11 @@ export const FINANCE = {
     frAgeing90Plus: '90+ days',
     frInvoicesAcrossCustomers: '{invoices} across {customers}.',
     frAcrossInsurers: 'Across {insurers}.',
+    frNetPositionNote:
+      "“Net position” is the book's underwriting result — premium written " +
+      "less claims paid less commission — not the brokerage's own margin " +
+      '(that is “Commission”). A negative figure means the line paid out more ' +
+      'than it took in premium.',
+    brResumeReconciled: 'Reconciled',
   },
 } as const;

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -270,9 +271,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
 
       {recommendations.length === 0 ? (
         <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
-          No up-sell recommendations for this customer. The nightly scan raises
-          one when a customer&apos;s surveyed asset value grows materially past
-          their designed property Sum Insured.
+          {t('upsEmptyForCustomer')}
         </p>
       ) : (
         <div style={{ marginTop: '1rem' }}>
@@ -292,21 +291,18 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
 
 function UpSellFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and open its up-sell recommendations from there.
+        <SentenceWithLink
+          sentence={t('upsNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -329,11 +325,7 @@ export default function UpSellPage() {
     <main style={pageStyle}>
       <h1>{t('upsHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 9 — a nightly job compares each customer&apos;s designed
-        property Sum Insured against the current value of their surveyed assets
-        and proposes an increase where the gap is material. Convert a
-        recommendation to take the increase forward, or dismiss it with a
-        reason.
+        {t('upsIntro')}
       </p>
       <Suspense fallback={null}>
         <UpSellFlow />

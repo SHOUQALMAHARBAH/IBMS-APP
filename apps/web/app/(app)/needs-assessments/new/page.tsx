@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState, type FormEvent } from 'react';
+import { SentenceWithLink } from '../../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -104,15 +105,11 @@ function NewNeedsAssessmentFlow() {
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline' }}
-        >
-          Customers
-        </button>{' '}
-        and start the assessment from there.
+        <SentenceWithLink
+          sentence={t('nanNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -128,16 +125,13 @@ function NewNeedsAssessmentFlow() {
       <section style={sectionStyle}>
         <h2 style={{ marginTop: 0 }}>{t('nanRiskProfileLabel')}</h2>
         <p style={{ opacity: 0.8 }}>
-          Pick the location this assessment covers, or add one. The detailed asset survey
-          and Sum Insured derivation live under{' '}
-          <button
-            type="button"
-            onClick={() => router.push(`/risk-profiles?customerId=${customerId}`)}
-            style={{ textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            {t('nanRiskSurveysLink')}
-          </button>
-          .
+          <SentenceWithLink
+            sentence={t('nanRiskProfilePickLocation')}
+            linkLabel={t('nanRiskSurveysLink')}
+            onLinkClick={() =>
+              router.push(`/risk-profiles?customerId=${customerId}`)
+            }
+          />
         </p>
 
         {profiles && profiles.length > 0 ? (
@@ -235,7 +229,7 @@ export default function NewNeedsAssessmentPage() {
         onClick={() => router.push('/needs-assessments')}
         style={{ cursor: 'pointer' }}
       >
-        ← All needs assessments
+        {t('nadBackToList')}
       </button>
       <h1>{t('nanHeading')}</h1>
       {canStart ? (

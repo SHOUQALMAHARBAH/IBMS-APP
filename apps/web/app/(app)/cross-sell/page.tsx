@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -273,21 +274,18 @@ function CrossSellForCustomer({ customerId }: { customerId: string }) {
 
 function CrossSellFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and open its cross-sell opportunities from there.
+        <SentenceWithLink
+          sentence={t('xsNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -310,9 +308,7 @@ export default function CrossSellPage() {
     <main style={pageStyle}>
       <h1>{t('xsHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 8 — a nightly job compares each customer&apos;s in-force policy
-        lines against a benchmark line list and flags the gaps. Convert an
-        opportunity to take it forward into an RFQ, or dismiss it with a reason.
+        {t('xsIntro')}
       </p>
       <Suspense fallback={null}>
         <CrossSellFlow />

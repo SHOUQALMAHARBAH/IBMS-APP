@@ -173,6 +173,10 @@ export const CUSTOMER_SERVICE = {
     slaDashStateOpenBreached: 'متجاوزة أو مُصعَّدة',
     slaDashStateAtRisk: 'معرّضة للخطر (تقترب من الاستحقاق / متجاوزة / مُصعَّدة)',
     slaDashStateResolved: 'محلولة (أياً كان)',
+    slaDashIntro:
+      'مؤقتات اتفاقيات مستوى الخدمة لكل الوحدات في عرض واحد — ما هو ضمن ' +
+      'المسار، وما اقترب موعده، وما تجاوز المدة أو جرى تصعيده، وأداء كل سير ' +
+      'عمل مقابل المدة المحددة له. مباشر، يُحتسب عند القراءة.',
   },
   EN: {
     srHeading: 'Customer requests',
@@ -331,5 +335,9 @@ export const CUSTOMER_SERVICE = {
     slaDashStateOpenBreached: 'Breached or escalated',
     slaDashStateAtRisk: 'At risk (due soon / breached / escalated)',
     slaDashStateResolved: 'Resolved (any)',
+    slaDashIntro:
+      "Every module's SLA timers in one view — what is on track, due soon, " +
+      'breached or escalated, and how each workflow is performing against its ' +
+      'configured turnaround. Live, computed on read.',
   },
 } as const;

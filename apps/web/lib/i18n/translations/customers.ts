@@ -22,7 +22,7 @@ export const CUSTOMERS = {
     customerStatusLabel: "الحالة: {status}",
 
     // customers/[id]/page.tsx — profile
-    customerProfileBackButton: "← كل العملاء",
+    customerProfileBackButton: "→ كل العملاء",
     customerProfileNotFound:
       "تعذر العثور على هذا العميل — قد لا يكون موجوداً، أو لا تملك صلاحية الوصول إليه.",
     customerProfileTypeStatusLine: "{type} — الحالة: {status}",

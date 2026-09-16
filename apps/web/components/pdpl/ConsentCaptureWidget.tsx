@@ -129,7 +129,7 @@ export function ConsentCaptureWidget({
       >
         <h3 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem' }}>{label}</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--ink-secondary)' }}>
-          You don&apos;t hold the consent.manage permission.
+          {t('consWidgetNoPermission')}
         </p>
       </section>
     );

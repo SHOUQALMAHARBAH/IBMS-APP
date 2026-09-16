@@ -276,6 +276,8 @@ export const POLICY = {
     policyDeliveryMethodPortal: 'بوابة العملاء',
     policyDeliveryMethodCourier: 'شركة شحن',
     policyDeliveryMethodInPerson: 'تسليم شخصي',
+    polClaimConfirmPaymentClose: 'تأكيد الدفع وإغلاق المطالبة',
+    polCommissionReconcileMarkPaid: 'تسوية ووسم كمدفوعة',
   },
   EN: {
     // PolicySection.tsx
@@ -549,5 +551,7 @@ export const POLICY = {
     policyDeliveryMethodPortal: 'Client portal',
     policyDeliveryMethodCourier: 'Courier',
     policyDeliveryMethodInPerson: 'In person',
+    polClaimConfirmPaymentClose: 'Confirm payment & close claim',
+    polCommissionReconcileMarkPaid: 'Reconcile & mark paid',
   },
 } as const;

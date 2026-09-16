@@ -114,9 +114,7 @@ function AssembleFlow() {
       )}
 
       <p style={{ opacity: 0.7, fontSize: '0.85rem', marginTop: '1rem' }}>
-        Property All Risks and Business Interruption lines are seeded with the
-        Sum Insured derived from the risk survey; every other line&apos;s basis
-        is set later at the quotation stage.
+        {t('iprognIntro')}
       </p>
 
       <button

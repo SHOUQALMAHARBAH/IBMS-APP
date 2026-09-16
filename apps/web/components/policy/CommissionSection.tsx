@@ -258,7 +258,7 @@ export function CommissionSection({
                 />
               </label>
               <button type="submit" style={buttonStyle} disabled={busy}>
-                Reconcile &amp; mark paid
+                {t('polCommissionReconcileMarkPaid')}
               </button>
             </form>
           ) : null}

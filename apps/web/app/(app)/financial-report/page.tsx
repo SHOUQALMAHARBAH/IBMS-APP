@@ -201,11 +201,7 @@ export default function FinancialReportPage() {
           <section style={sectionStyle}>
             <h2>{t('frBookResultByLine')}</h2>
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.9rem', maxWidth: '44rem' }}>
-              &ldquo;Net position&rdquo; is the book&rsquo;s underwriting result
-              &mdash; premium written less claims paid less commission &mdash;
-              not the brokerage&rsquo;s own margin (that is
-              &ldquo;Commission&rdquo;). A negative figure means the line paid
-              out more than it took in premium.
+              {t('frNetPositionNote')}
             </p>
             <ProfitTable rows={data.profitability.byLine} />
             <h2 style={{ marginTop: '1.25rem' }}>{t('frBookResultBySegment')}</h2>

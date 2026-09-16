@@ -814,7 +814,7 @@ function ClaimClosure({
               void close({ clientPaymentConfirmedAt: confirmedOn.trim() })
             }
           >
-            Confirm payment &amp; close claim
+            {t('polClaimConfirmPaymentClose')}
           </button>
         </div>
       ) : null}

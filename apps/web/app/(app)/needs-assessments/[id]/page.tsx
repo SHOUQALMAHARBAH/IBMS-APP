@@ -105,7 +105,7 @@ export default function NeedsAssessmentDetailPage() {
         onClick={() => router.push('/needs-assessments')}
         style={{ cursor: 'pointer' }}
       >
-        ← All needs assessments
+        {t('nadBackToList')}
       </button>
 
       {loadError ? (

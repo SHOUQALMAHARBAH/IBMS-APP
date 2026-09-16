@@ -104,7 +104,7 @@ export default function CrossSellOpportunityDetailPage() {
         }
         style={{ cursor: 'pointer' }}
       >
-        ← All cross-sell opportunities
+        {t('xsdBackToList')}
       </button>
 
       {loadError ? (

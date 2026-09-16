@@ -78,9 +78,7 @@ export default function AccessRecertificationPage() {
     <main style={pageStyle}>
       <h1>{t('acrHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Part 5.1 — periodic (quarterly) review of who holds access. Confirm, revoke, or flag each
-        item below; a System/Security Administrator&apos;s own access is included and reviewed the
-        same as anyone else&apos;s.
+        {t('acrIntro')}
       </p>
 
       {canStartCycle ? <StartCyclePanel onCycleStarted={() => void loadItems()} /> : null}

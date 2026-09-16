@@ -136,9 +136,7 @@ export default function SlaDashboardPage() {
     <main style={pageStyle}>
       <h1>{tr('slaDashHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Every module&rsquo;s SLA timers in one view — what is on track, due soon,
-        breached or escalated, and how each workflow is performing against its
-        configured turnaround. Live, computed on read.
+        {tr('slaDashIntro')}
       </p>
 
       {loadError ? (

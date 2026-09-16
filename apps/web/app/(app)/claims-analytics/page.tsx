@@ -83,10 +83,7 @@ export default function ClaimsAnalyticsPage() {
     <main style={pageStyle}>
       <h1>{t('claHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '44rem' }}>
-        Loss Ratio (paid claims &divide; written premium, all-time) aggregated by
-        client, policy, or insurance line. A declined claim contributes nothing;
-        an open claim is not counted until it settles. Rows are ordered
-        worst-first.
+        {t('claIntro')}
       </p>
 
       <label style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.75rem 0' }}>

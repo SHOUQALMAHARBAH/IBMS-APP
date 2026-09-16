@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
+import { SentenceWithLink } from '../../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { type Prospect } from '../../../../lib/prospect/prospect-api';
@@ -17,6 +18,7 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 
 function ConvertProspectForm() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   // leadFullName is a display-only prefill hint passed by the pipeline
   // board, which already holds the full Lead in memory — never trusted as
@@ -32,11 +34,11 @@ function ConvertProspectForm() {
   if (!leadId) {
     return (
       <p role="alert" style={errorStyle}>
-        No lead selected — go back to the{' '}
-        <button type="button" onClick={() => router.push('/leads')} style={{ textDecoration: 'underline' }}>
-          pipeline
-        </button>{' '}
-        and convert a qualified lead from there.
+        <SentenceWithLink
+          sentence={t('prospnNoLeadSelected')}
+          linkLabel={t('prospnPipelineLink')}
+          onLinkClick={() => router.push('/leads')}
+        />
       </p>
     );
   }

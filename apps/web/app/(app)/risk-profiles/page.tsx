@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   createRiskProfile,
@@ -53,8 +54,7 @@ function ConsolidatedPanel({ survey }: { survey: ConsolidatedSurvey }) {
         {t('rpConsolidatedSumInsured')} ({tPlural('rpSiteCount', c.siteCount)})
       </strong>
       <p style={{ opacity: 0.7, margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
-        The figure a multi-site client&apos;s single Insurance Program is built
-        from. Program assembly itself is Process 7.
+        {t('rpIntro')}
       </p>
       <div style={summaryGridStyle}>
         <Figure label={t('rpColProperty')} value={c.propertySumInsured} />
@@ -233,21 +233,18 @@ function RiskProfilesForCustomer({ customerId }: { customerId: string }) {
 
 function RiskProfilesFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and start the risk survey from there.
+        <SentenceWithLink
+          sentence={t('rpNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }

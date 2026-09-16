@@ -398,6 +398,49 @@ export const DETAIL_PAGES = {
     leaddUpdated: 'آخر تحديث',
     leaddEnUs2: 'ar-JO',
     leaddBack: 'العودة',
+    crmIntro:
+      'العملية 10 — تسجيل كل نقطة تواصل مع العميل (اجتماع، مكالمة، بريد ' +
+      'إلكتروني، واتساب، زيارة، عرض، تجديد، مطالبة، شكوى) ورؤية الجدول الزمني ' +
+      'الشامل: التفاعلات حالياً، إضافة إلى الوثائق والمطالبات والشكاوى عند ' +
+      'توفر تلك الوحدات.',
+    crmTimelineEmpty:
+      'لا يوجد شيء في الجدول الزمني لهذا العميل بعد. سجّل أول تفاعل أعلاه — ' +
+      'وستظهر هنا أيضاً الوثائق والمطالبات والشكاوى عند توفر تلك الوحدات.',
+    xsIntro:
+      'العملية 8 — مهمة ليلية تقارن خطوط الوثائق السارية لكل عميل بقائمة خطوط ' +
+      'مرجعية وتحدد الفجوات. حوّل الفرصة للمضي بها إلى طلب عروض أسعار، أو ' +
+      'ارفضها مع ذكر السبب.',
+    upsIntro:
+      'العملية 9 — مهمة ليلية تقارن مبلغ التأمين المصمم للممتلكات لكل عميل ' +
+      'بالقيمة الحالية لأصوله الممسوحة وتقترح زيادة عند وجود فجوة جوهرية. ' +
+      'حوّل التوصية للمضي بالزيادة، أو ارفضها مع ذكر السبب.',
+    upsEmptyForCustomer:
+      'لا توجد توصيات بيع إضافي لهذا العميل. يرفع الفحص الليلي توصية عندما ' +
+      'تتجاوز قيمة أصول العميل الممسوحة مبلغ التأمين المصمم للممتلكات بفارق ' +
+      'جوهري.',
+    xsdBackToList: '→ كل فرص البيع المتبادل',
+    iprogdBackToList: '→ كل برامج التأمين',
+    nadBackToList: '→ كل تقييمات الاحتياجات',
+    upsdBackToList: '→ كل توصيات البيع الإضافي',
+    prospdBackToList: '→ كل العملاء المحتملين',
+    crmNoCustomerSelected:
+      'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح الجدول الزمني ' +
+      'لعلاقته من هناك.',
+    xsNoCustomerSelected:
+      'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح فرص البيع المتبادل ' +
+      'الخاصة به من هناك.',
+    upsNoCustomerSelected:
+      'لم يتم اختيار عميل — افتح عميلاً من {link} ثم افتح توصيات البيع ' +
+      'الإضافي الخاصة به من هناك.',
+    nanNoCustomerSelected:
+      'لم يتم اختيار عميل — افتح عميلاً من {link} ثم ابدأ التقييم من هناك.',
+    nanRiskProfilePickLocation:
+      'اختر الموقع الذي يغطيه هذا التقييم، أو أضف موقعاً. أما مسح الأصول ' +
+      'التفصيلي واشتقاق مبلغ التأمين فيوجدان ضمن {link}.',
+    prospnNoLeadSelected:
+      'لم يتم اختيار عميل محتمل — عُد إلى {link} وحوّل عميلاً محتملاً مؤهلاً ' +
+      'من هناك.',
+    prospnPipelineLink: 'مسار العملاء المحتملين',
   },
   EN: {
     empdHeading: 'Employee',
@@ -779,5 +822,53 @@ export const DETAIL_PAGES = {
     leaddUpdated: 'Updated',
     leaddEnUs2: 'en-US',
     leaddBack: 'Back',
+    crmIntro:
+      'Process 10 — log every customer touchpoint (meeting, call, email, ' +
+      'WhatsApp, visit, proposal, renewal, claim, complaint) and see the 360° ' +
+      'timeline: interactions today, plus policies, claims and complaints ' +
+      'once those modules land.',
+    crmTimelineEmpty:
+      "Nothing on this customer's timeline yet. Log the first interaction " +
+      'above — policies, claims and complaints will appear here too once ' +
+      'those modules exist.',
+    xsIntro:
+      "Process 8 — a nightly job compares each customer's in-force policy " +
+      'lines against a benchmark line list and flags the gaps. Convert an ' +
+      'opportunity to take it forward into an RFQ, or dismiss it with a ' +
+      'reason.',
+    upsIntro:
+      "Process 9 — a nightly job compares each customer's designed property " +
+      'Sum Insured against the current value of their surveyed assets and ' +
+      'proposes an increase where the gap is material. Convert a ' +
+      'recommendation to take the increase forward, or dismiss it with a ' +
+      'reason.',
+    upsEmptyForCustomer:
+      'No up-sell recommendations for this customer. The nightly scan raises ' +
+      "one when a customer's surveyed asset value grows materially past their " +
+      'designed property Sum Insured.',
+    xsdBackToList: '← All cross-sell opportunities',
+    iprogdBackToList: '← All insurance programs',
+    nadBackToList: '← All needs assessments',
+    upsdBackToList: '← All up-sell recommendations',
+    prospdBackToList: '← All prospects',
+    crmNoCustomerSelected:
+      'No customer selected — open a customer from {link} and open its ' +
+      'relationship timeline from there.',
+    xsNoCustomerSelected:
+      'No customer selected — open a customer from {link} and open its ' +
+      'cross-sell opportunities from there.',
+    upsNoCustomerSelected:
+      'No customer selected — open a customer from {link} and open its ' +
+      'up-sell recommendations from there.',
+    nanNoCustomerSelected:
+      'No customer selected — open a customer from {link} and start the ' +
+      'assessment from there.',
+    nanRiskProfilePickLocation:
+      'Pick the location this assessment covers, or add one. The detailed ' +
+      'asset survey and Sum Insured derivation live under {link}.',
+    prospnNoLeadSelected:
+      'No lead selected — go back to the {link} and convert a qualified lead ' +
+      'from there.',
+    prospnPipelineLink: 'pipeline',
   },
 } as const;

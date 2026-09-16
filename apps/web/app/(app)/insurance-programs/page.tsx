@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -86,21 +87,18 @@ function ProgramsForCustomer({ customerId }: { customerId: string }) {
 
 function InsuranceProgramsFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and open its insurance program from there.
+        <SentenceWithLink
+          sentence={t('iprogNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -123,9 +121,7 @@ export default function InsuranceProgramsPage() {
     <main style={pageStyle}>
       <h1>{t('iprogHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 7 — a multi-line Insurance Program assembled from an approved
-        needs assessment&apos;s coverage list and the risk survey&apos;s
-        derived Sum Insured, then finalized to feed an RFQ.
+        {t('iprogIntro')}
       </p>
       <Suspense fallback={null}>
         <InsuranceProgramsFlow />

@@ -54,8 +54,7 @@ export default function NeedsAssessmentsPage() {
     <main style={pageStyle}>
       <h1>{t('naHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 5 — a structured risk questionnaire that recommends a coverage list, then a
-        review and approval gate. Start one from a customer&apos;s profile.
+        {t('naIntro')}
       </p>
 
       {assessments === null && !loadError ? <p>{t('naLoading')}</p> : null}

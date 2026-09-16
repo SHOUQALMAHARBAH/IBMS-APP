@@ -126,7 +126,7 @@ export default function InsuranceProgramDetailPage() {
         }
         style={{ cursor: 'pointer' }}
       >
-        ← All insurance programs
+        {t('iprogdBackToList')}
       </button>
 
       {loadError ? (
