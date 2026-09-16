@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -156,7 +157,7 @@ export default function RetentionCasesPage() {
               >
                 {RETENTION_CASE_REASONS.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {t(ENUM_LABEL.RetentionCaseReason[r])}
                   </option>
                 ))}
               </select>

@@ -508,7 +508,7 @@ export default function RetentionDisposalPage() {
                                 >
                                   {DISPOSAL_METHODS.map((m) => (
                                     <option key={m} value={m}>
-                                      {m}
+                                      {t(ENUM_LABEL.DisposalMethod[m])}
                                     </option>
                                   ))}
                                 </select>

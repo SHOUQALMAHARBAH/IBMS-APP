@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import type { IncidentSeverity } from '../../../lib/compliance-risk/incident-api';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -76,7 +77,9 @@ export default function IncidentsPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [severity, setSeverity] = useState(INCIDENT_SEVERITIES[2]);
+  const [severity, setSeverity] = useState<IncidentSeverity>(
+    INCIDENT_SEVERITIES[2],
+  );
 
   const [rootCauseDrafts, setRootCauseDrafts] = useState<Record<string, string>>({});
   const [regulatorDrafts, setRegulatorDrafts] = useState<Record<string, string[]>>({});
@@ -184,11 +187,11 @@ export default function IncidentsPage() {
             <select
               aria-label={t('incColSeverity')}
               value={severity}
-              onChange={(e) => setSeverity(e.target.value)}
+              onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
             >
               {INCIDENT_SEVERITIES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {t(ENUM_LABEL.IncidentSeverity[s])}
                 </option>
               ))}
             </select>

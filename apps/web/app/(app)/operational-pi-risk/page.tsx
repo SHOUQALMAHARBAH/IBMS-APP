@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import type { RiskRegisterType } from '../../../lib/compliance-risk/risk-register-api';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -64,7 +65,9 @@ export default function OperationalPiRiskPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [riskType, setRiskType] = useState(RISK_REGISTER_TYPES[0]);
+  const [riskType, setRiskType] = useState<RiskRegisterType>(
+    RISK_REGISTER_TYPES[0],
+  );
   const [riskDescription, setRiskDescription] = useState('');
   const [mitigationDrafts, setMitigationDrafts] = useState<Record<string, string>>({});
 
@@ -210,11 +213,11 @@ export default function OperationalPiRiskPage() {
             <select
               aria-label={t('opRiskTypeLabel')}
               value={riskType}
-              onChange={(e) => setRiskType(e.target.value)}
+              onChange={(e) => setRiskType(e.target.value as RiskRegisterType)}
             >
-              {RISK_REGISTER_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {RISK_REGISTER_TYPES.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.RiskRegisterType[opt])}
                 </option>
               ))}
             </select>

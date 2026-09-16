@@ -11,7 +11,8 @@ export const RISK_REGISTER_TYPES = [
   'financial',
   'compliance',
   'reputational',
-];
+] as const;
+export type RiskRegisterType = (typeof RISK_REGISTER_TYPES)[number];
 
 export type RiskRegisterStatus = 'open' | 'closed';
 

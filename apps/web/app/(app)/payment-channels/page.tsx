@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -15,7 +16,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 
-const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'];
+const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'] as const;
 
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -171,9 +172,9 @@ export default function PaymentChannelsPage() {
               value={channelType}
               onChange={(e) => setChannelType(e.target.value)}
             >
-              {CHANNEL_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {CHANNEL_TYPES.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.PaymentChannelType[opt])}
                 </option>
               ))}
             </select>

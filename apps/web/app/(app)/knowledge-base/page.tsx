@@ -203,7 +203,7 @@ export default function KnowledgeBasePage() {
           <select value={category} onChange={(e) => setCategory(e.target.value as KbCategory)}>
             {KB_CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(ENUM_LABEL.KbCategory[c])}
               </option>
             ))}
           </select>

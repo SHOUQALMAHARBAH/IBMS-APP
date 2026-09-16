@@ -177,9 +177,9 @@ export default function InformationAssetsPage() {
         <label style={labelStyle}>
           {t('iassetColType')}
           <select value={assetType} onChange={(e) => setAssetType(e.target.value as AssetType)}>
-            {ASSET_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {ASSET_TYPES.map((opt) => (
+              <option key={opt} value={opt}>
+                {t(ENUM_LABEL.InformationAssetType[opt])}
               </option>
             ))}
           </select>
@@ -200,7 +200,7 @@ export default function InformationAssetsPage() {
           >
             {DATA_CLASSIFICATIONS.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(ENUM_LABEL.DataClassification[c])}
               </option>
             ))}
           </select>

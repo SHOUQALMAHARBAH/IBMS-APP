@@ -151,9 +151,9 @@ export default function DsrPage() {
               value={type}
               onChange={(e) => setType(e.target.value)}
             >
-              {DSR_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {DSR_TYPES.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.DsrType[opt])}
                 </option>
               ))}
             </select>

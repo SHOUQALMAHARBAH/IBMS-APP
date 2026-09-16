@@ -113,7 +113,7 @@ function DocumentRowsEditor({
           >
             {DOCUMENT_CATEGORY_OPTIONS.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(ENUM_LABEL.DocumentCategory[c])}
               </option>
             ))}
           </select>
@@ -126,7 +126,7 @@ function DocumentRowsEditor({
           >
             {DATA_CLASSIFICATION_OPTIONS.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(ENUM_LABEL.DataClassification[c])}
               </option>
             ))}
           </select>

@@ -7,7 +7,7 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
-export const INCIDENT_SEVERITIES = ['low', 'medium', 'high', 'critical'];
+export const INCIDENT_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
 export const INCIDENT_REGULATORS = [
   'CBJ',
   'NCSC',

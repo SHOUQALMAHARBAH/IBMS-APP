@@ -258,7 +258,7 @@ export function EndorsementSection({
             >
               {ENDORSEMENT_CHANGE_TYPE_OPTIONS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.EndorsementChangeType[c])}
                 </option>
               ))}
             </select>

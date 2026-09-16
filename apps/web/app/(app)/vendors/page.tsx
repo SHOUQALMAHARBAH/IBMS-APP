@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -204,9 +205,9 @@ export default function VendorsPage() {
             value={vendorType}
             onChange={(e) => setVendorType(e.target.value as VendorType)}
           >
-            {VENDOR_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {VENDOR_TYPES.map((opt) => (
+              <option key={opt} value={opt}>
+                {t(ENUM_LABEL.VendorType[opt])}
               </option>
             ))}
           </select>

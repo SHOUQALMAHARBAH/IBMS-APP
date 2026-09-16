@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -200,7 +201,7 @@ export default function BcpDrPlansPage() {
           <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
             {BCP_DR_SCENARIOS.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {t(ENUM_LABEL.BcpDrScenario[s])}
               </option>
             ))}
           </select>

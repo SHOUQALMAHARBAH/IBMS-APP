@@ -156,7 +156,7 @@ export default function TransactionMonitoringPage() {
               >
                 {TRANSACTION_MONITORING_PATTERN_TYPES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {t(ENUM_LABEL.TransactionMonitoringPattern[p])}
                   </option>
                 ))}
               </select>

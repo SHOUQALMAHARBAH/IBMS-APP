@@ -6,7 +6,7 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
-export const DSR_TYPES = ['ACCESS', 'CORRECTION', 'DELETION', 'OBJECTION'];
+export const DSR_TYPES = ['ACCESS', 'CORRECTION', 'DELETION', 'OBJECTION'] as const;
 
 export type DsrType = 'ACCESS' | 'CORRECTION' | 'DELETION' | 'OBJECTION';
 

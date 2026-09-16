@@ -241,7 +241,7 @@ export default function DocumentsPage() {
             >
               {DATA_CLASSIFICATIONS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.DataClassification[c])}
                 </option>
               ))}
             </select>

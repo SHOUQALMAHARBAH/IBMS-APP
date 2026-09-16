@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -168,7 +169,7 @@ export default function CommunicationsPage() {
               <option value="">{t('commChannelDefaultOption')}</option>
               {COMMUNICATION_CHANNELS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.CommunicationChannel[c])}
                 </option>
               ))}
             </select>

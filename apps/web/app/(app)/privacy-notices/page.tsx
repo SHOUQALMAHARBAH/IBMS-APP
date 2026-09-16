@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -126,9 +127,9 @@ export default function PrivacyNoticesPage() {
               value={touchpoint}
               onChange={(e) => setTouchpoint(e.target.value)}
             >
-              {PRIVACY_NOTICE_TOUCHPOINTS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {PRIVACY_NOTICE_TOUCHPOINTS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.PrivacyNoticeTouchpoint[opt])}
                 </option>
               ))}
             </select>

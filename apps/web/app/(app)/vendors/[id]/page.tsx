@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -221,9 +222,9 @@ export default function VendorDetailPage() {
                 value={riskTier}
                 onChange={(e) => setRiskTierValue(e.target.value as RiskTier)}
               >
-                {RISK_TIERS.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {RISK_TIERS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {t(ENUM_LABEL.RiskTier[opt])}
                   </option>
                 ))}
               </select>

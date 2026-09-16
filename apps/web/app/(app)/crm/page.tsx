@@ -231,7 +231,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
               >
                 {INTERACTION_CHANNELS.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {t(ENUM_LABEL.InteractionChannel[c])}
                   </option>
                 ))}
               </select>

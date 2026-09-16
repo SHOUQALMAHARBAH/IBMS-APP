@@ -261,9 +261,9 @@ function ClaimDocumentation({
               value={docType}
               onChange={(ev) => setDocType(ev.target.value as ClaimDocType)}
             >
-              {CLAIM_DOC_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {CLAIM_DOC_TYPE_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.ClaimDocType[opt])}
                 </option>
               ))}
             </select>
@@ -279,7 +279,7 @@ function ClaimDocumentation({
             >
               {CLAIM_DOC_CLASSIFICATION_OPTIONS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.DataClassification[c])}
                 </option>
               ))}
             </select>
@@ -467,7 +467,7 @@ function ClaimAssessment({
               >
                 {CLAIM_ASSESSMENT_OUTCOMES.map((o) => (
                   <option key={o} value={o}>
-                    {o}
+                    {t(ENUM_LABEL.ClaimStatus[o])}
                   </option>
                 ))}
               </select>
