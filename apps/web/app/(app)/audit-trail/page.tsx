@@ -89,6 +89,7 @@ export default function AuditTrailPage() {
   const [browseApplied, setBrowseApplied] = useState<{
     entityType?: string;
     entityId?: string;
+    to?: string;
   }>({});
   const [browsePage, setBrowsePage] = useState(0);
   const [browseTotal, setBrowseTotal] = useState(0);
@@ -116,6 +117,16 @@ export default function AuditTrailPage() {
     const filters = {
       entityType: browseEntityType || undefined,
       entityId: browseEntityId || undefined,
+      // Pinned to the instant this browse was submitted, and reused for every
+      // page of it.
+      //
+      // This is the one list whose own reads APPEND to the table they read:
+      // each browse records a PDPL access row, which sorts to the top and
+      // shifts every later page down by one. Without the pin, clicking Next
+      // shows a row the previous page already showed, and hides one entirely.
+      // An audit browse reading "as at the moment you searched" is also the
+      // more honest thing for it to mean.
+      to: new Date().toISOString(),
     };
     setBrowseApplied(filters);
     await browseTo(0, filters);
@@ -126,7 +137,11 @@ export default function AuditTrailPage() {
   // re-sends the filters that produced the set, never the live inputs.
   async function browseTo(
     nextPage: number,
-    filters: { entityType?: string; entityId?: string } = browseApplied,
+    filters: {
+      entityType?: string;
+      entityId?: string;
+      to?: string;
+    } = browseApplied,
   ) {
     setBrowseBusy(true);
     setBrowseError(null);
