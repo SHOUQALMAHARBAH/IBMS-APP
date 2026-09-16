@@ -117,6 +117,25 @@ export const buttonStyle: CSSProperties = {
   cursor: 'pointer',
 };
 
+/*
+ * Inline styles cannot express `:disabled`, and the auth screens have no
+ * class hook — so a disabled submit button looked exactly like a live one.
+ * That was tolerable while the only disabled window was the half-second of
+ * submitting (the label changes to "Saving…", which says it), and is not
+ * tolerable on the password screens, where the button stays disabled for as
+ * long as the policy is unmet: the user sees a button that appears ready and
+ * does nothing when clicked.
+ *
+ * Matches components/ui/Button.tsx's own inert treatment (opacity 0.55), the
+ * one place `opacity` is still correct for muting — axe exempts disabled
+ * controls from contrast, precisely because they are not actionable.
+ */
+export const buttonDisabledStyle: CSSProperties = {
+  ...buttonStyle,
+  opacity: 0.55,
+  cursor: 'not-allowed',
+};
+
 export const errorStyle: CSSProperties = {
   color: 'var(--danger-ink)',
   fontSize: 'var(--text-sm)',

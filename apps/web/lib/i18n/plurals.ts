@@ -174,6 +174,14 @@ const AR: PluralDictionary = {
     many: '{count} ملفاً مسجّلاً.',
     other: '{count} ملف مسجّل.',
   },
+  secOtherSessionsRevoked: {
+    zero: 'لم تكن هناك جلسات أخرى.',
+    one: 'أُنهيت جلسة واحدة أخرى.',
+    two: 'أُنهيت جلستان أخريان.',
+    few: 'أُنهيت {count} جلسات أخرى.',
+    many: 'أُنهيت {count} جلسة أخرى.',
+    other: 'أُنهيت {count} جلسة أخرى.',
+  },
   navSearchMatches: {
     zero: 'لا توجد نتائج',
     one: 'نتيجة واحدة',
@@ -227,6 +235,10 @@ const EN: PluralDictionary = {
   claimFilesOnRecord: {
     one: '{count} file on record.',
     other: '{count} files on record.',
+  },
+  secOtherSessionsRevoked: {
+    one: '{count} other session was signed out.',
+    other: '{count} other sessions were signed out.',
   },
   navSearchMatches: {
     one: '{count} match',

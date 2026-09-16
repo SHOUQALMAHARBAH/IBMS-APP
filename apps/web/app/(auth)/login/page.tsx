@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { login, verifyMfaChallenge } from '../../../lib/auth/auth-api';
+import { isMustChangePassword, login, verifyMfaChallenge } from '../../../lib/auth/auth-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -37,6 +37,15 @@ export default function LoginPage() {
       const res = await login({ email, password });
       if ('mfaRequired' in res) {
         setMfaChallengeToken(res.mfaChallengeToken);
+      } else if (isMustChangePassword(res)) {
+        // Part II §4.3.1 — a provisioned account owes its first password
+        // change and gets an onboarding token INSTEAD of a session. Without
+        // this branch the else below ran, pushing to / with no token, and the
+        // app bounced straight back here showing nothing: every
+        // admin-created employee was locked out of their own first login.
+        router.push(
+          `/change-password?token=${encodeURIComponent(res.onboardingToken)}`,
+        );
       } else {
         await refreshUser();
         router.push('/');

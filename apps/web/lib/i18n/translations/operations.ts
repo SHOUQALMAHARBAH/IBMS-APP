@@ -343,6 +343,13 @@ export const OPERATIONS = {
     renRequired: 'مطلوبة',
     renInsurerTermsWorsened: 'شروط المؤمِّن ساءت',
     renRiskChanged: 'تغيّر الخطر',
+    secPasswordHeading: 'كلمة المرور',
+    secPasswordIntro:
+      'تغيير كلمة المرور يُنهي كل جلساتك الأخرى ويلغي ثقة الأجهزة التي وثقت بها سابقاً.',
+    secCurrentPasswordLabel: 'كلمة المرور الحالية',
+    secChangePasswordButton: 'تغيير كلمة المرور',
+    secChangingPasswordButton: 'جارٍ التغيير…',
+    secPasswordChanged: 'تم تغيير كلمة المرور.',
   },
   EN: {
     secHeading: 'Security',
@@ -667,5 +674,12 @@ export const OPERATIONS = {
     renRequired: 'Required',
     renInsurerTermsWorsened: 'Insurer terms worsened',
     renRiskChanged: 'Risk changed',
+    secPasswordHeading: 'Password',
+    secPasswordIntro:
+      'Changing your password signs out every other session and stops trusting devices you had trusted before.',
+    secCurrentPasswordLabel: 'Current password',
+    secChangePasswordButton: 'Change password',
+    secChangingPasswordButton: 'Changing…',
+    secPasswordChanged: 'Your password has been changed.',
   },
 } as const;

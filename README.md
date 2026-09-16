@@ -1227,6 +1227,29 @@ tracks what's genuinely incomplete **within an item that has actually been built
 project-wide picture is § Scope status above. Updated in the same change that closes or
 narrows a gap.
 
+### OPEN — two small items parked from the password self-service pass
+
+Neither blocks anything; both are recorded so they are not rediscovered as
+surprises.
+
+- **`apps/web/e2e/sidebar-manager.spec.ts:72` is intermittently flaky.**
+  "expanding a group is remembered on the next page load" failed once in three
+  full `npm run e2e` runs, and passed 4/4 when run in isolation immediately
+  afterwards. The mechanism was NOT identified: the localStorage write in
+  `nav-open-groups.ts#setNavGroupOpen` is synchronous and happens before the
+  assertion that precedes the reload, so the obvious race does not explain it.
+  It is deliberately NOT "hardened" — a speculative fix to a test whose failure
+  mode is not understood buys nothing and hides the next occurrence. If it
+  recurs, capture the trace rather than adding a wait.
+
+- **`authPasswordRule` uses Arabic-Indic numerals.** Its Arabic value opens
+  with `١٢`, where the rest of the app renders Western digits — `lib/i18n/
+  format.ts` pins Arabic to the `'ar'` locale, not `'ar-JO'`, specifically so
+  numerals stay Western. The key predates this pass and is used on
+  `/signup` and `/reset-password` only; the new `pwRule*` keys follow the
+  Western-digit convention. Pre-existing, out of scope, and a one-line fix
+  whenever those two screens are next touched.
+
 ### OPEN, client-facing — the sidebar is organised, but not yet "major modules only"
 
 The Frontend & UX Engineering Directive §5 asks for a sidebar holding "only the

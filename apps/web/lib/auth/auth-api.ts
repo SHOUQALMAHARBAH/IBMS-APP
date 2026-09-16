@@ -19,7 +19,31 @@ export interface MfaChallengeResponse {
   mfaChallengeToken: string;
 }
 
-export type LoginResponse = IssuedSessionResponse | MfaChallengeResponse;
+/**
+ * Part II §4.3.1 — the account still owes its mandatory first password change.
+ *
+ * Deliberately NOT a session: the admin who provisioned the account knows the
+ * temporary password, so nothing may happen on it until that is rotated. The
+ * onboarding token is the only thing this outcome carries, and
+ * `POST /auth/password/force-change` is the only thing it opens.
+ *
+ * This member was missing until now, and the omission was not cosmetic: every
+ * account created through `POST /admin/users` gets `mustChangePassword: true`
+ * (the schema default, and what `UserRepository.provision` writes), so the
+ * login page saw an outcome it had no branch for, pushed to `/` with no token,
+ * and was bounced straight back to `/login` with no message. Provisioned
+ * employees — which is every real employee, since signup grants no roles —
+ * could not complete a first login at all.
+ */
+export interface MustChangePasswordResponse {
+  outcome: 'MUST_CHANGE_PASSWORD';
+  onboardingToken: string;
+}
+
+export type LoginResponse =
+  | IssuedSessionResponse
+  | MfaChallengeResponse
+  | MustChangePasswordResponse;
 
 export interface MeResponse {
   id: string;
@@ -50,6 +74,12 @@ function isIssuedSession(res: LoginResponse): res is IssuedSessionResponse {
   return 'accessToken' in res;
 }
 
+export function isMustChangePassword(
+  res: LoginResponse,
+): res is MustChangePasswordResponse {
+  return 'outcome' in res && res.outcome === 'MUST_CHANGE_PASSWORD';
+}
+
 export async function signup(input: { fullName: string; email: string; password: string }): Promise<void> {
   await apiPost<{ id: string; email: string }>('/auth/signup', input);
 }
@@ -74,6 +104,38 @@ export async function logout(): Promise<void> {
   } finally {
     setAccessToken(null);
   }
+}
+
+/**
+ * Part II §4.3.1 — consumes the onboarding token from a MUST_CHANGE_PASSWORD
+ * login and issues the real session, so the caller lands in the app exactly as
+ * a normal login would leave them.
+ *
+ * `skipAuthRetry` because there is no session to refresh yet: a 401 here means
+ * the token is wrong, not that an access token expired.
+ */
+export async function forceChangePassword(input: {
+  onboardingToken: string;
+  newPassword: string;
+}): Promise<AuthUser> {
+  const res = await apiPost<IssuedSessionResponse>('/auth/password/force-change', input, {
+    skipAuthRetry: true,
+  });
+  setAccessToken(res.accessToken);
+  return res.user;
+}
+
+/**
+ * Part II §4.7 — self-service change on a live session. The API revokes every
+ * OTHER session and every trusted device, and returns how many sessions went,
+ * which is worth telling the user: it is how they would notice someone else
+ * had been signed in as them.
+ */
+export function changePassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<{ otherSessionsRevoked: number }> {
+  return apiPost('/auth/password/change', input);
 }
 
 export function forgotPassword(email: string): Promise<{ message: string; devResetToken?: string }> {
