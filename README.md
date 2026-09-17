@@ -450,6 +450,14 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
   target (`RTO_TARGET_SECONDS`, default 900s). Requires `BACKUP_ENCRYPTION_KEY` in the
   environment. `npm run db:backup:drill` runs it. See
   `ibms-brain/meta/lex/backup-rpo-rto.md` for the RPO/RTO targets this is testing.
+  The row-count check counts **every row per table** (`query_to_xml` + `count(*)`).
+  It used to sum `pg_stat_user_tables.n_live_tup` after an `ANALYZE`, on the stated
+  grounds that this made the comparison exact — it does not. `ANALYZE` samples, so
+  that number stays an estimate, and the drill was comparing two estimates and
+  reporting any drift as data loss. Measured on a single database with no restore
+  involved: the estimate said 4,142,466 rows and the true count was 4,141,630. The
+  exact count runs after the RTO clock stops, so verification time is never charged
+  against the restore target.
 
 ## CI
 
@@ -483,8 +491,31 @@ scanning), not SAST (this repo's own code).
 
 **`.github/workflows/backup-drill.yml`** (A.10, Part 10.4/10.5) — runs
 `scripts/backup-restore-drill.sh` against `db-test` weekly and on manual dispatch.
-Needs a `BACKUP_DRILL_ENCRYPTION_KEY` repository secret to run — see
+
+It generates an **ephemeral per-run passphrase** when no
+`BACKUP_DRILL_ENCRYPTION_KEY` repository secret is set, which is the normal case
+and the right one: the drill proves the round trip (dump → encrypt → decrypt →
+restore → exact row-count parity, inside the RTO target) against a throwaway
+database holding nothing but the seeded role/permission grid. A long-lived repo
+secret would add a credential to a job with no real data to protect and still
+would not exercise the production key-management path. Setting the secret
+overrides the ephemeral passphrase if you want that path exercised too. See
 `ibms-brain/meta/lex/backup-rpo-rto.md`.
+
+**This drill failed every scheduled run from 2026-08-31 to 2026-09-14** — three
+stacked, independent faults, each hidden behind the one before it:
+
+1. **The seed crashed.** Nothing in this job ever ran `prisma generate`: `npm ci`
+   has no postinstall hook, and unlike `ci.yml` this workflow runs no turbo task
+   (turbo's graph builds `@ibms/db`, which is where `ci.yml` quietly gets its
+   client). `RoleName` was `undefined` and the seed died on
+   `Cannot read properties of undefined (reading 'SALES_RELATIONSHIP_OFFICER')`.
+2. **No passphrase existed.** `BACKUP_DRILL_ENCRYPTION_KEY` was never set on this
+   repository, so the drill step would have exited 1 even once the seed was
+   fixed.
+3. **The verification compared estimates**, not counts — see the
+   `backup-restore-drill.sh` entry above. This one only became visible once the
+   first two were fixed and the drill could reach its own summary.
 
 ### First end-to-end verification
 

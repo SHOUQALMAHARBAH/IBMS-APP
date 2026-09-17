@@ -15,6 +15,12 @@ on:
     - cron: "0 4 * * 1"
   workflow_dispatch: {}
 
+# Needed by the "surface the result" steps below, which file / close a tracking
+# issue. `contents: read` is otherwise the default set.
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   drill:
     runs-on: ubuntu-latest
@@ -30,6 +36,21 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # The seed imports `RoleName` from the GENERATED client, and nothing in
+      # this job had ever generated it: `npm ci` runs no postinstall hook, and
+      # unlike ci.yml this workflow runs no turbo task (turbo's graph builds
+      # `@ibms/db` as a dependency, which is where ci.yml quietly gets its
+      # client from). The seed therefore died on
+      # `Cannot read properties of undefined (reading 'SALES_RELATIONSHIP_OFFICER')`
+      # on every scheduled run since 2026-08-31.
+      #
+      # No `dotenv` wrapper and no DATABASE_URL: `prisma generate` only reads
+      # the schema. Going through `npm run db:generate` would NOT work here —
+      # that script is `dotenv -e ../../.env`, and this workflow only ever
+      # writes `.env.test`.
+      - name: Generate the Prisma client
+        run: npx prisma generate --schema packages/db/prisma/schema.prisma
 
       - name: Create .env.test
         run: |
@@ -82,12 +103,93 @@ jobs:
       - name: Seed database (roles + permission grid)
         run: npm run db:test:seed
 
+      # The drill encrypts its dump so it is never a plaintext file on disk
+      # (Part 10.2/10.6), and `backup-restore-drill.sh` refuses to run without
+      # a passphrase. That secret has never been set on this repository, so
+      # even once the seed above is fixed this step would still have failed —
+      # two stacked failures, not one.
+      #
+      # An EPHEMERAL per-run passphrase is the right one for this drill, not a
+      # missing long-lived one. What the drill exists to prove is that the
+      # round trip works — dump, encrypt, decrypt, restore, compare row counts,
+      # inside the RTO target — against a throwaway database holding nothing
+      # but the seeded role/permission grid. A repo secret would put a
+      # long-lived credential into a job with no real data to protect, and it
+      # still would not exercise the production key-management path, which
+      # will not be a GitHub secret.
+      #
+      # Setting BACKUP_DRILL_ENCRYPTION_KEY still overrides this, for anyone
+      # who wants the configured path exercised too.
       - name: Backup + restore drill
         env:
-          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_DRILL_ENCRYPTION_KEY }}
+          CONFIGURED_PASSPHRASE: ${{ secrets.BACKUP_DRILL_ENCRYPTION_KEY }}
         run: |
-          if [ -z "${BACKUP_ENCRYPTION_KEY:-}" ]; then
-            echo "backup-drill workflow: BACKUP_DRILL_ENCRYPTION_KEY repo secret is not set — see ibms-brain/meta/lex/backup-rpo-rto.md" >&2
-            exit 1
+          if [ -n "${CONFIGURED_PASSPHRASE:-}" ]; then
+            echo "backup-drill: using the configured repository passphrase."
+          else
+            echo "backup-drill: no BACKUP_DRILL_ENCRYPTION_KEY set — using an ephemeral per-run passphrase."
+            echo "backup-drill: the round trip is still proven; see ibms-brain/meta/lex/backup-rpo-rto.md."
+            CONFIGURED_PASSPHRASE="$(openssl rand -base64 32)"
           fi
-          bash scripts/backup-restore-drill.sh
+          BACKUP_ENCRYPTION_KEY="${CONFIGURED_PASSPHRASE}" \
+            bash scripts/backup-restore-drill.sh
+
+      # ---------------------------------------------------------------------
+      # Make a failure REACH someone.
+      #
+      # This drill sat red from 2026-08-31 to 2026-09-17 and nothing surfaced
+      # it: it is a scheduled job, so no pull request was ever blocked, and
+      # GitHub's own "scheduled workflow failed" mail goes to the last person
+      # to touch the file rather than to anyone watching the repository.
+      # `backup-rpo-rto.md` is mandatory and says the restore path must be
+      # exercised end to end "not merely assumed to work" — for three weeks it
+      # was assumed to work while failing.
+      #
+      # An ISSUE, not a chat webhook, deliberately: every webhook needs a
+      # secret, this repository has none set, and a notification path that
+      # silently never fires is the exact bug this drill just had. The issue
+      # route uses the built-in token and needs nothing configured.
+      #
+      # De-duplicating on purpose — a drill that stays broken should own ONE
+      # issue that accumulates comments, not 52 issues a year.
+      # ---------------------------------------------------------------------
+      - name: Open or update the tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Backup restore drill is failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="The weekly backup/restore drill failed.
+
+          Run: ${RUN_URL}
+          Commit: ${GITHUB_SHA}
+
+          \`backup-rpo-rto.md\` is mandatory: the restore path must be exercised
+          end to end, not assumed to work. Until this passes again there is no
+          evidence the database can actually be restored."
+          existing="$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "${existing}" ]; then
+            echo "Commenting on existing issue #${existing}."
+            gh issue comment "${existing}" --body "${body}"
+          else
+            echo "Filing a new tracking issue."
+            gh issue create --title "${TITLE}" --body "${body}"
+          fi
+
+      # The other half: an issue nobody closes becomes noise, and a stale open
+      # issue is as misleading as a silent failure.
+      - name: Close the tracking issue once the drill passes again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Backup restore drill is failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing="$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body "The drill passed again: ${RUN_URL}"
+            gh issue close "${existing}"
+          else
+            echo "No open tracking issue to close."
+          fi
