@@ -99,7 +99,20 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const res = await fetchWithRetry(path, init, options);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // An empty body is NOT always a 204. A NestJS handler typed `Promise<void>`
+  // under `@HttpCode(200)` answers 200 with nothing in the body — this API has
+  // 154 such service methods — and `res.json()` on an empty body throws a
+  // SyntaxError. That is not an `ApiError`, so every caller written as
+  // `err instanceof ApiError ? err.message : <fallback>` reported its FALLBACK
+  // for what was actually a success.
+  //
+  // On MFA enrolment that fallback is "Invalid code — try again", shown to a
+  // user whose correct code had already enabled MFA server-side. Reading the
+  // body as text first fixes the whole class at the one chokepoint every
+  // request goes through, rather than endpoint by endpoint.
+  const text = await res.text();
+  if (text.trim().length === 0) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 // Part F item #7 — the first binary (non-JSON) download this app makes.
