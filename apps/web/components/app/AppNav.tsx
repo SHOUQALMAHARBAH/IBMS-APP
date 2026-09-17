@@ -323,23 +323,40 @@ type RoleNavOrder = {
   hoist?: readonly string[];
 };
 
+/**
+ * The house order, for every role.
+ *
+ * This was the Branch/Department Manager's own order and nobody else's. Every
+ * other role except Executive fell through to the DECLARATION order of
+ * `NAV_GROUPS` — which is an artefact of how the file was written, not a
+ * decision about what an officer needs first. That is what made a manager's
+ * sidebar look considered and everyone else's look arbitrary: not one pixel of
+ * styling (there is no role-conditional styling anywhere in this component —
+ * every role renders the same `sidebarStyle`, the same `<details>` groups and
+ * the same link styles), purely the order the groups came out in.
+ *
+ * Work first, administration last. It reads correctly for a Claims Officer or
+ * a Finance Officer for the same reason it reads correctly for a Manager: the
+ * groups a role cannot see are filtered out before this order is applied, so a
+ * role simply gets its own subset of the same sequence.
+ */
+const DEFAULT_NAV_ORDER: RoleNavOrder = {
+  groups: [
+    'navGroupClients',
+    'navGroupNewBusiness',
+    'navGroupPolicies',
+    'navGroupService',
+    'navGroupFinance',
+    'navGroupDashboards',
+    'navGroupPerformance',
+    'navGroupCompliance',
+    'navGroupOperations',
+    'navGroupPrivacy',
+    'navGroupAdmin',
+  ],
+};
+
 const NAV_ORDER_BY_ROLE: Readonly<Record<string, RoleNavOrder>> = {
-  // A Manager works the book first and administers last.
-  BRANCH_DEPARTMENT_MANAGER: {
-    groups: [
-      'navGroupClients',
-      'navGroupNewBusiness',
-      'navGroupPolicies',
-      'navGroupService',
-      'navGroupFinance',
-      'navGroupDashboards',
-      'navGroupPerformance',
-      'navGroupCompliance',
-      'navGroupOperations',
-      'navGroupPrivacy',
-      'navGroupAdmin',
-    ],
-  },
   // An Executive reads the numbers first and the pipeline afterwards — the
   // mirror image of the Manager, who lives in the book and checks the numbers.
   // Operations and Privacy render for neither role today; they are listed so a
@@ -371,13 +388,16 @@ function matches(pathname: string, href: string): boolean {
 }
 
 /** The first role THIS MAP declares that the user actually holds — so the
- *  result does not depend on the order /auth/me happens to return roles in. */
-function navOrderFor(roles: readonly string[] | undefined): RoleNavOrder | null {
-  if (!roles?.length) return null;
-  for (const [role, order] of Object.entries(NAV_ORDER_BY_ROLE)) {
-    if (roles.includes(role)) return order;
+ *  result does not depend on the order /auth/me happens to return roles in.
+ *  Anyone the map does not name gets `DEFAULT_NAV_ORDER`, which is the same
+ *  sequence a Manager sees; nobody falls through to the declaration order. */
+function navOrderFor(roles: readonly string[] | undefined): RoleNavOrder {
+  if (roles?.length) {
+    for (const [role, order] of Object.entries(NAV_ORDER_BY_ROLE)) {
+      if (roles.includes(role)) return order;
+    }
   }
-  return null;
+  return DEFAULT_NAV_ORDER;
 }
 
 /** Position in `order`, or the end for anything the list does not name.
