@@ -27,6 +27,7 @@
     "migrate:test:deploy": "dotenv -e ../../.env.test -- prisma migrate deploy",
     "migrate:test:status": "dotenv -e ../../.env.test -- prisma migrate status",
     "validate": "dotenv -e ../../.env -- prisma validate",
+    "format": "dotenv -e ../../.env -- prisma format",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "seed": "dotenv -e ../../.env -- prisma db seed",
     "seed:test": "dotenv -e ../../.env.test -- prisma db seed",

@@ -844,8 +844,11 @@ build actually is today:
   cross-module SLA dashboard, consent-gated `CommunicationLog` sends,
   `CustomerFeedback` satisfaction logging, and `RetentionCase` opened
   automatically on renewal inactivity / lapse risk (#46 — built ahead of its
-  data source, the Part 3.9 renewal module itself is not built, so the sweep
-  is a logged no-op until it lands, same shape as #29's Loss Ratio). **Domain F —
+  data source; the Part 3.9 renewal module has SINCE landed in the 2026-09-09
+  gap-closing pass, so the sweep now has real `RenewalCase` traffic rather
+  than the logged no-op it shipped as. Per-process rows below that still say
+  "the renewal module is not built" are a record of what was true when that
+  process was built, not a current-state claim). **Domain F —
   Compliance & Risk (#47–57) is complete.** #47 KYC needed no separate build — it is
   fully covered by Part C #3-4's `KycService`/`ScreeningService` (sanctions/PEP/AML
   screening, EDD, maker/checker approval, periodic re-KYC — see the #3-4 row above).
@@ -1211,10 +1214,53 @@ build actually is today:
   gaps below ("Part F — Bilingual UI (Part 11) — known gaps, consolidated")
   for the full audit against the literal backlog text, including how this
   relates to Part G's own narrower core-screens requirement.
-- **Part G — final verification checklist** — not run as a formal, evidence-attached
-  gate (individual gates — `prisma validate`, maker/checker tests, `transition()`-only
-  status writes, `-- ENCRYPT` coverage, no-float money, SLA escalation jobs — do pass
-  where the relevant code exists).
+- **Part G — final verification checklist** — **six of seven items closed and
+  guarded; item 7 remains.** Items 1-6 are now enforced by tests that fail when
+  the property stops holding, each proven by planting a regression and watching
+  it fire:
+  - **1. `prisma validate` + `prisma format`** — `db:format` script plus a CI
+    step that runs it and fails on any resulting diff (Prisma has no
+    `--check`, so "changes nothing" is the proof).
+  - **2. Maker/checker rules tested** — audited all enforcement points; **already
+    fully covered, no new tests needed.** Two earlier "gaps" were
+    keyword-search false negatives: DSR closure is tested (its comment says
+    "close by the SAME DPO officer", not "self-approval"), and access
+    recertification is covered by a UNIT test, correctly — the service's own
+    comment notes that state is structurally unreachable through the API.
+    `internal-audit-finding` and `user-admin` only MENTION
+    `assertDifferentActors` in comments; neither enforces it.
+  - **3. `transition()`-only status writes** — `status-writes.inventory.spec.ts`.
+    The codebase was already clean: all four apparent violations are
+    status-CONDITIONAL updates (`status` in `where`, a different field in
+    `data`), which is the race-safe pattern, not a bypass.
+  - **4. `-- ENCRYPT` coverage** — `encrypted-fields.inventory.spec.ts`, plus two
+    reconciliations: `MfaCredential.secretEnc` is now documented in a new
+    `ENCRYPTED_ELSEWHERE` constant (it is encrypted via `MfaService.encryptSecret`
+    → `crypto.util.ts`, under its own `MFA_ENCRYPTION_KEY`, and must NOT join
+    `ENCRYPTED_FIELDS`, which DRIVES encryption — a field in both is encrypted
+    twice); and `OrganizationEmailIntegration.oauthRefreshTokenEnc` gained the
+    inline schema marker it was missing despite being correctly encrypted.
+  - **5. No float in money** — this one was **NOT met** and is the item this pass
+    actually fixed. `money-fields.inventory.spec.ts` inventories `Decimal`
+    columns, so a `Float` is invisible to it: a planted `plantedFloatAmount
+    Float` on `Invoice` passed all seven of its tests. New
+    `float-money.inventory.spec.ts` allow-lists the three legitimately
+    non-monetary floats (`ScreeningMatch.matchScore`,
+    `ScreeningMatch.reviewThreshold`, `SlaPolicy.warningThreshold`) and fails on
+    any other — plus a check that nothing money-named can be allow-listed.
+  - **6. SLA escalation jobs** — `sla-registry.coverage.spec.ts` pins all fourteen
+    deadlines the source document names and asserts each registered workflow is
+    referenced by real code. One documented variation:
+    **`claim_followup_insurer_response` escalates through its own
+    `ClaimFollowUpAlert` model and nightly `ClaimFollowUpScheduler`**, not the
+    generic `SlaTimer` engine — a real escalation job, which is what the item
+    asks for, but not a uniform implementation.
+  - **7. Core screens (Lead→Policy→Claim→Renewal) in both languages across all
+    four states, with screenshots** — **still open.** Deferred deliberately to
+    its own session rather than rushed: it is up to 32 captures across four
+    screens, two languages and four states. It is now achievable — the Renewal
+    module (`apps/api/src/modules/renewal/`) and its `/renewal-cases` screen
+    both exist, which several older per-process rows below predate.
 
 Nothing here has been deployed anywhere and the production target is undecided (§
 Deployment). Part C #1–10 currently live on the `feat/backlog-c1-lead-management` branch;
@@ -1319,6 +1365,19 @@ stored table later is an informed decision rather than a surprise.
 - **`AccessAnomalyAlert` is not a source.** It has a detection service but no
   read endpoint anywhere, so including it would have meant creating a new
   access-control surface rather than reusing one.
+
+### OPEN, FOR THE CLIENT — is `MfaCredential.webauthnPublicKeyEnc` wanted?
+
+The column is marked `-- ENCRYPT` in the schema and is written by **nothing at
+all**. WebAuthn enrolment is not implemented — `/settings/security` tells a
+user holding a hardware-key-required role that the path is not available yet
+and an authenticator app satisfies the requirement for now.
+
+So the column is either a placeholder for planned WebAuthn support, in which
+case it stays, or dead code that should be dropped. That is a product question,
+not one to guess at: `encrypted-fields.inventory.spec.ts` lists it explicitly
+as knowingly-unwritten so the guard passes honestly, and the moment anything
+writes it that entry has to be revisited.
 
 ### CLOSED BY DECISION — no search by national ID
 

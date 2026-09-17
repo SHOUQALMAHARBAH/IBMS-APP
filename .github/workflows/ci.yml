@@ -133,6 +133,15 @@ jobs:
       - name: Database schema (prisma validate)
         run: npm run db:validate
 
+      # Part G checklist: `prisma format` has to actually RUN, not just be
+      # available. It rewrites in place and has no --check, so the proof that
+      # the committed schema is already formatted is that running it changes
+      # nothing.
+      - name: Database schema (prisma format leaves no diff)
+        run: |
+          npm run db:format
+          git diff --exit-code -- packages/db/prisma/schema.prisma
+
       # Must precede the migrations: 20260928100000_row_level_security GRANTs to
       # this role and raises if it is missing. The role is what makes RLS apply
       # at all — Postgres exempts the table owner from its own policies, so CI

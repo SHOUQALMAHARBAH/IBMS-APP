@@ -4299,7 +4299,7 @@ model OrganizationEmailIntegration {
   /// -- ENCRYPT. The long-lived OAuth refresh token, encrypted with the same
   /// field-level service as national IDs (`EncryptionService`, purpose
   /// `oauth`). Never returned by any API, never logged.
-  oauthRefreshTokenEnc String
+  oauthRefreshTokenEnc String // -- ENCRYPT
   /// Microsoft identifies the directory the mailbox lives in; Google does not
   /// need it. Null for GOOGLE_WORKSPACE.
   providerTenantId     String?

@@ -27,6 +27,7 @@
     "test:a11y": "turbo run test:a11y",
     "db:generate": "npm run generate --workspace=@ibms/db",
     "db:validate": "npm run validate --workspace=@ibms/db",
+    "db:format": "npm run format --workspace=@ibms/db",
     "db:migrate:dev": "npm run migrate:dev --workspace=@ibms/db",
     "db:migrate:deploy": "npm run migrate:deploy --workspace=@ibms/db",
     "db:migrate:status": "npm run migrate:status --workspace=@ibms/db",
