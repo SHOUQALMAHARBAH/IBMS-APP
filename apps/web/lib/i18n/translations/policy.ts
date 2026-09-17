@@ -278,6 +278,9 @@ export const POLICY = {
     policyDeliveryMethodInPerson: 'تسليم شخصي',
     polClaimConfirmPaymentClose: 'تأكيد الدفع وإغلاق المطالبة',
     polCommissionReconcileMarkPaid: 'تسوية ووسم كمدفوعة',
+    polClaimSurveyLabel: 'المعاينة',
+    polClaimInvestigationLabel: 'التحقيق',
+    polClaimVerdictLabel: 'القرار',
   },
   EN: {
     // PolicySection.tsx
@@ -553,5 +556,8 @@ export const POLICY = {
     policyDeliveryMethodInPerson: 'In person',
     polClaimConfirmPaymentClose: 'Confirm payment & close claim',
     polCommissionReconcileMarkPaid: 'Reconcile & mark paid',
+    polClaimSurveyLabel: 'Survey',
+    polClaimInvestigationLabel: 'Investigation',
+    polClaimVerdictLabel: 'Verdict',
   },
 } as const;

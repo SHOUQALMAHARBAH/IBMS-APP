@@ -32,7 +32,7 @@ const head: CSSProperties = {
 export default function WatchlistSyncPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, tPlural } = useLanguage();
   const canManage = hasPermission(user, 'sanctions-pep.screen');
 
   const [runs, setRuns] = useState<WatchlistSyncRun[] | null>(null);
@@ -86,12 +86,24 @@ export default function WatchlistSyncPage() {
     setMessage(null);
     await run(async () => {
       const outcomes = await runWatchlistSync();
+      // A template literal hides raw enum values from any scan that looks at
+      // JSX, which is how `OFAC_SDN: succeeded (19329 records)` survived the
+      // sweep of the tables on this same screen.
       setMessage(
         outcomes
-          .map(
-            (o) =>
-              `${o.source}: ${o.status}${o.recordCount !== undefined ? ` (${o.recordCount} records)` : ''}${o.errorMessage ? ` — ${o.errorMessage}` : ''}`,
-          )
+          .map((o) => {
+            const head = `${t(ENUM_LABEL.WatchlistSource[o.source])}: ${t(
+              ENUM_LABEL.WatchlistSyncRunStatus[o.status],
+            )}`;
+            const count =
+              o.recordCount !== undefined
+                ? ` (${tPlural('wlsRecordsSynced', o.recordCount)})`
+                : '';
+            // The provider's own error text, never translated - it is
+            // evidence, and rewording it would make it disagree with the log.
+            const error = o.errorMessage ? ` — ${o.errorMessage}` : '';
+            return `${head}${count}${error}`;
+          })
           .join(' · '),
       );
     });

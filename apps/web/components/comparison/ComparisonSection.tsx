@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   buildComparison,
   downloadComparisonDocument,
@@ -245,7 +246,14 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
             <div style={comparisonCalloutStyle}>
               <strong>{t('comparisonMissingInsurersLabel')}</strong>{' '}
               {matrix.missingInsurers
-                .map((i) => `${i.name}${i.status ? ` (${i.status})` : ''}`)
+                .map(
+                  (ins) =>
+                    `${ins.name}${
+                      ins.status
+                        ? ` (${t(ENUM_LABEL.RfqInsurerStatus[ins.status])})`
+                        : ''
+                    }`,
+                )
                 .join(', ')}
             </div>
           ) : null}

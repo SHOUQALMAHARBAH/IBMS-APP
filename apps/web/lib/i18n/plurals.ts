@@ -166,6 +166,14 @@ const AR: PluralDictionary = {
     many: 'تسجيل الخروج التلقائي بعد: {count} دقيقة من الخمول',
     other: 'تسجيل الخروج التلقائي بعد: {count} دقيقة من الخمول',
   },
+  wlsRecordsSynced: {
+    zero: 'لم تُزامَن أي سجلات',
+    one: 'سجل واحد',
+    two: 'سجلان',
+    few: '{count} سجلات',
+    many: '{count} سجلاً',
+    other: '{count} سجل',
+  },
   claimFilesOnRecord: {
     zero: 'لا توجد ملفات مسجّلة.',
     one: 'ملف واحد مسجّل.',
@@ -231,6 +239,10 @@ const EN: PluralDictionary = {
   secHardLogoutMinutes: {
     one: 'Automatic sign-out after: {count} minute idle',
     other: 'Automatic sign-out after: {count} minutes idle',
+  },
+  wlsRecordsSynced: {
+    one: '{count} record',
+    other: '{count} records',
   },
   claimFilesOnRecord: {
     one: '{count} file on record.',

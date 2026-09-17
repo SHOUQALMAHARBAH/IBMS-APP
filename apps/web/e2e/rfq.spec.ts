@@ -1447,7 +1447,16 @@ async function driveClaimToVerdict(
   ).toBeVisible();
   await page.getByLabel("Assessment verdict").selectOption(opts.verdict);
   await page.getByRole("button", { name: "Record verdict" }).click();
-  await expect(page.getByText(`verdict ${opts.verdict}`)).toBeVisible();
+  // The <select> is driven by the stored code; the line below it now reads
+  // the label, so the assertion maps one to the other.
+  const VERDICT_LABEL: Record<string, string> = {
+    APPROVED: "Approved",
+    PARTIALLY_APPROVED: "Partially approved",
+    DECLINED: "Declined",
+  };
+  await expect(
+    page.getByText(`Verdict ${VERDICT_LABEL[opts.verdict]}`),
+  ).toBeVisible();
 }
 
 // `/policies` is one of the five paged lists: it returns
@@ -1614,7 +1623,7 @@ test("builds the comparison matrix and shows the missing-insurer flag", async ({
     page.getByRole("button", { name: "Rebuild comparison" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Middle East Assurance (NO_RESPONSE)"),
+    page.getByText("Middle East Assurance (No response)"),
   ).toBeVisible();
 });
 
@@ -2399,7 +2408,7 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
   await page.getByRole("button", { name: "Record verdict" }).click();
 
   // the verdict shows and the decision control is gone
-  await expect(page.getByText("verdict PARTIALLY_APPROVED")).toBeVisible();
+  await expect(page.getByText("Verdict Partially approved")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record verdict" }),
   ).toHaveCount(0);

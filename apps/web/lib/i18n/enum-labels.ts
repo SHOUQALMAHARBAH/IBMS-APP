@@ -448,4 +448,11 @@ export const ENUM_LABEL = {
     renewal_inactivity: 'retReasonRenewalInactivity',
     lapse_risk: 'retReasonLapseRisk',
   } satisfies Labels<string>,
+  RfqInsurerStatus: {
+    SENT: 'rfqInsurerStatusSent',
+    VIEWED: 'rfqInsurerStatusViewed',
+    QUOTED: 'rfqInsurerStatusQuoted',
+    DECLINED: 'rfqInsurerStatusDeclined',
+    NO_RESPONSE: 'rfqInsurerStatusNoResponse',
+  } satisfies Labels<string>,
 } as const;

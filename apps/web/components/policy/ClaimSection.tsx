@@ -386,9 +386,13 @@ function ClaimAssessment({
         </p>
       ) : null}
       <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
-        Survey {stamp(a.surveyCompletedAt)} · investigation{' '}
-        {stamp(a.investigationCompletedAt)}
-        {decided ? ` · verdict ${a.outcome}` : ''}
+        {t('polClaimSurveyLabel')} {stamp(a.surveyCompletedAt)} ·{' '}
+        {t('polClaimInvestigationLabel')} {stamp(a.investigationCompletedAt)}
+        {decided && a.outcome
+          ? ` · ${t('polClaimVerdictLabel')} ${t(
+              ENUM_LABEL.ClaimStatus[a.outcome],
+            )}`
+          : ''}
       </p>
 
       {canAssess && !decided ? (
