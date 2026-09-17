@@ -1323,7 +1323,12 @@ async function mockRfqApi(
       claimRows.push(row);
       return route.fulfill({ status: 201, json: row });
     }
-    return route.fulfill({ status: 200, json: claimRows });
+    // `GET /claims` returns the same paged envelope on every branch now
+    // (scoped or queue), so the mock has to carry it too.
+    return route.fulfill({
+      status: 200,
+      json: { items: claimRows, total: claimRows.length, page: 0, pageSize: 50 },
+    });
   });
 
   // One route for the whole /rfqs prefix — the last-registered route wins in

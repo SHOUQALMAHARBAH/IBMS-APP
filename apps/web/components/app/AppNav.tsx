@@ -127,6 +127,12 @@ const NAV_GROUPS: readonly NavGroup[] = [
     labelKey: 'navGroupPolicies',
     items: [
       { href: '/policies', labelKey: 'navPolicies', permissions: ['policy.read'] },
+      // The Claims desk's own landing screen. The "Claims" GROUP was dissolved
+      // earlier precisely because it held only an analytics screen with no
+      // operational claims screen to sit beside; the operational screen now
+      // exists, and it belongs next to the policy a claim is made against —
+      // Policy -> Claims -> Renewals is the lifecycle order.
+      { href: '/claims', labelKey: 'navClaims', permissions: ['claim.read'] },
       { href: '/renewal-cases', labelKey: 'navRenewalCases', permissions: ['renewal.read'] },
     ],
   },

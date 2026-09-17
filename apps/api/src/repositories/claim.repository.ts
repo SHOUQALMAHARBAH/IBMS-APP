@@ -75,6 +75,54 @@ const CLAIM_INCLUDE = {
  * read. The list is newest-first, so this returns the most recent N. */
 export const CLAIM_LIST_LIMIT = 200;
 
+export interface ListClaimsFilter {
+  /** `null` = this caller reaches the whole claims book (see
+   *  `CLAIM_CROSS_OWNER_ROLES`). Otherwise, only claims whose Customer is
+   *  owned by this user id. */
+  ownerUserId: string | null;
+  status?: ClaimStatus;
+  /** Matched against claim number, insurer claim reference, policy number and
+   *  insurance line — what someone actually has to hand when chasing a claim. */
+  search?: string;
+  /**
+   * Narrow to claims carrying an UNRESOLVED follow-up alert.
+   *
+   * Deliberately the only "needs attention" filter offered, because it is the
+   * only one the database can answer. Documentation-completeness and
+   * awaiting-second-approval are DERIVED in `ClaimService`'s view, so
+   * filtering on them would mean fetching a bounded page and then dropping
+   * rows from it in memory — which lets the page size silently decide what the
+   * caller cannot see (the `DpoWorkspaceService` defect this repository's
+   * policy sibling already records).
+   */
+  alertOpen?: boolean;
+}
+
+function buildClaimListWhere(filter: ListClaimsFilter): Prisma.ClaimWhereInput {
+  const where: Prisma.ClaimWhereInput = {};
+
+  if (filter.ownerUserId !== null) {
+    where.customer = { ownerUserId: filter.ownerUserId };
+  }
+  if (filter.status) {
+    where.status = filter.status;
+  }
+  if (filter.alertOpen) {
+    where.followUpAlerts = { some: { resolvedAt: null } };
+  }
+  if (filter.search) {
+    const contains = { contains: filter.search, mode: 'insensitive' } as const;
+    where.OR = [
+      { claimNumber: contains },
+      { insurerClaimReference: contains },
+      { policy: { policyNumber: contains } },
+      { policy: { insuranceLine: contains } },
+    ];
+  }
+
+  return where;
+}
+
 /** A claim with its third-party child, its status-history trail and the parent
  * policy context (identity + every coverage-schedule window) — the shape every
  * claim read returns. */
@@ -376,6 +424,34 @@ export class ClaimRepository {
       include: CLAIM_INCLUDE,
       orderBy: { createdAt: 'desc' },
       take: CLAIM_LIST_LIMIT,
+    });
+  }
+
+  /**
+   * One page of the claims queue.
+   *
+   * Every filter is part of the QUERY, so the window bounds the matching rows
+   * rather than the rows scanned — the same rule `PolicyRepository.
+   * findManyForActor` states, and for the same reason.
+   */
+  findManyForActor(
+    filter: ListClaimsFilter,
+    window: { take: number; skip: number },
+  ): Promise<ClaimWithContext[]> {
+    return this.prisma.client.claim.findMany({
+      where: buildClaimListWhere(filter),
+      include: CLAIM_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: window.take,
+      skip: window.skip,
+    });
+  }
+
+  /** Counts on the SAME `where` the page query runs, so the two can never
+   *  disagree about what is being counted. */
+  countForActor(filter: ListClaimsFilter): Promise<number> {
+    return this.prisma.client.claim.count({
+      where: buildClaimListWhere(filter),
     });
   }
 

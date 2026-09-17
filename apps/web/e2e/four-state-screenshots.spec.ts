@@ -640,7 +640,10 @@ async function mockOpportunityDetailBase(page: Page) {
     route.fulfill({ status: 200, json: { notice: null } }),
   );
   await page.route("http://localhost:4000/claims**", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({
+      status: 200,
+      json: { items: [], total: 0, page: 0, pageSize: 50 },
+    }),
   );
 }
 

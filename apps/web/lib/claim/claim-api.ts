@@ -13,6 +13,7 @@
 // receipt is confirmed (-> CLOSED, triggering a Loss Ratio recompute).
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { Paginated } from '../api/paginated';
 
 export const CLAIM_DOC_TYPE_OPTIONS = [
   'claim_form',
@@ -182,8 +183,49 @@ export interface RegisterClaimInput {
   adjuster: { name: string; firm?: string };
 }
 
-export function listClaimsForPolicy(policyId: string): Promise<Claim[]> {
-  return apiGet(`/claims?policyId=${encodeURIComponent(policyId)}`);
+/** Scoped to one policy — bounded by construction, so the caller only ever
+ *  wanted the rows. The endpoint returns the same paged envelope on every
+ *  branch; unwrapping it here keeps that detail out of `ClaimSection`, exactly
+ *  as `listPoliciesForOpportunity` does for policies. */
+export async function listClaimsForPolicy(policyId: string): Promise<Claim[]> {
+  const page: Paginated<Claim> = await apiGet(
+    `/claims?policyId=${encodeURIComponent(policyId)}`,
+  );
+  return page.items;
+}
+
+/**
+ * The claims QUEUE — every claim this caller may see, newest first.
+ *
+ * With no policy/customer scope the API returns what THIS caller is entitled
+ * to: the whole claims book for a Claims Officer / Manager / Executive, and
+ * only claims on customers they own for anyone else. The filtering happens in
+ * the query, so the page window narrows matching rows rather than rows
+ * scanned.
+ */
+export function listClaims(
+  params: {
+    status?: ClaimStatus;
+    search?: string;
+    alertOpen?: boolean;
+    page?: number;
+  } = {},
+): Promise<Paginated<Claim>> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.search) qs.set('search', params.search);
+  if (params.alertOpen) qs.set('alertOpen', 'true');
+  // Sent only past the first page, so the common request keeps the URL it has
+  // always had and the server's own default decides the size.
+  if (params.page) qs.set('page', String(params.page));
+  const suffix = qs.toString();
+  return apiGet(`/claims${suffix ? `?${suffix}` : ''}`);
+}
+
+/** One claim, by id. Visibility is the server's call: a claim outside this
+ *  caller's book is a 404, never a filtered-empty success. */
+export function getClaim(claimId: string): Promise<Claim> {
+  return apiGet(`/claims/${encodeURIComponent(claimId)}`);
 }
 
 export function notifyClaim(input: NotifyClaimInput): Promise<Claim> {

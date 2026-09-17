@@ -1374,25 +1374,43 @@ stored table later is an informed decision rather than a surprise.
   read endpoint anywhere, so including it would have meant creating a new
   access-control surface rather than reusing one.
 
-### OPEN — there is no standalone Claims screen
+### CLOSED — the Claims Officer now has a screen (`/claims`)
 
-Part G item 7 names Lead→Policy→Claim→Renewal as the core chain. Three of
-those four are their own screens (`/leads`, `/policies`, `/renewal-cases`).
-The Claim stage is **not**: claims are operated through `ClaimSection` on
-`/opportunities/[id]`, and `AppNav`'s own comment records why — the "Claims"
-nav group "held exactly one item, an analytics screen, with no operational
-claims screen to sit beside", so it was dissolved into Performance & analysis.
+This was logged as an open product gap by Part G item 7 and has since been
+fixed. A `CLAIMS_OFFICER` held `claim.read`, `claim.register`, `claim.document`,
+`claim.assess`, `claim.settle.approve` and `claim.close` — its whole job — but
+every route to a claim went through `/opportunities/[id]`, a screen behind an
+`opportunity.read` the role does **not** hold. The API accepted them; no screen
+offered it. Structurally the Policy Checking Officer gap, and fixed the same
+way: give the role a screen rather than widen the role.
 
-Item 7's captures therefore photograph `/opportunities/[id]` for the Claim
-stage, which is the screen that stage actually has. A dedicated claims
-list/detail screen (a Claims Officer's own work queue) does not exist and is a
-real product gap, not a documentation one: a `CLAIMS_OFFICER` holds
-`claim.read` but has no screen that lists the claims they are responsible for
-— they can only reach a claim by first opening the opportunity it hangs off,
-which needs `opportunity.read`, a permission that role does not hold. **This
-is the same shape as the Policy Checking Officer gap fixed earlier**, and is
-left logged rather than fixed because building a claims queue screen is a
-feature, not a verification fix.
+- **`GET /claims` gained an unscoped branch.** It previously demanded exactly
+  one of `policyId`/`customerId` (422 otherwise), so "what claims am I
+  responsible for" was not an answerable question. The queue branch filters on
+  the SAME visibility rule the scoped branches enforce per row
+  (`CLAIM_CROSS_OWNER_ROLES`), expressed as a query filter so the page window
+  bounds matching rows rather than rows scanned. Supplying BOTH scopes is still
+  a 422 — they are different questions.
+- **The endpoint now returns the same `{items,total,page,pageSize}` envelope on
+  every branch**, scoped or queue, so the client has one shape per endpoint
+  rather than one per branch. `listClaimsForPolicy` unwraps it, exactly as
+  `listPoliciesForOpportunity` does.
+- **`/claims` is a queue, not an index.** Each row carries the state the desk
+  triages on — status, an unresolved insurer follow-up alert, incomplete
+  documentation — so the screen answers "what needs me next" rather than only
+  linking onward.
+- **`/claims/[id]` renders the same `ClaimCard`** the opportunity screen does,
+  extracted so the two cannot drift into two different claim UIs.
+
+**Known limits of the fix.** Only ONE "needs attention" filter is offered
+(`alertOpen`), because it is the only signal that is a stored column;
+documentation-completeness and awaiting-second-approval are derived when the
+view is built, and filtering a bounded page on them in memory would let the
+page size decide what the caller cannot see. `/claims/[id]` deliberately does
+**not** offer `claim.notify`: raising a claim starts from the policy it is
+raised against, so notification stays on the policy screen. The queue shows the
+policy number rather than the customer name — `CLAIM_INCLUDE` carries no
+customer join, and widening it would add PII to every claim read in the app.
 
 ### FIXED BY ITEM 7 — the Claims block swallowed its own load error
 

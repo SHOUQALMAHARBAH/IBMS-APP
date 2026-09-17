@@ -429,7 +429,7 @@ for (const lang of LANGS) {
     await page.route(OPP_POLICIES_URL, gPolicies.route);
     await page.route(OPP_RFQS_URL, gRfqs.route);
     await page.route(CLAIMS_URL, (route) =>
-      route.fulfill({ status: 200, json: [CLAIM] }),
+      route.fulfill({ status: 200, json: paged([CLAIM]) }),
     );
     await page.goto("/opportunities/opp-1");
     await expect(page.getByText(COPY.loading[lang]).first()).toBeVisible();
@@ -484,7 +484,7 @@ for (const lang of LANGS) {
       route.fulfill({ status: 200, json: [] }),
     );
     await page.route(CLAIMS_URL, (route) =>
-      route.fulfill({ status: 200, json: [] }),
+      route.fulfill({ status: 200, json: paged([]) }),
     );
     await page.goto("/opportunities/opp-1");
     await expect(page.getByText(COPY.claimsNoneYet[lang])).toBeVisible();
