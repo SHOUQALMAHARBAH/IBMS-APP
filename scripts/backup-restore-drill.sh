@@ -80,16 +80,37 @@ END_EPOCH=$(date +%s)
 ELAPSED_SECONDS=$((END_EPOCH - START_EPOCH))
 
 echo "backup-restore-drill: verifying restored row counts match the original ..."
+# Counts every row, table by table.
+#
+# This used to sum `pg_stat_user_tables.n_live_tup` after an ANALYZE, on the
+# stated grounds that ANALYZE made the comparison "exact, not approximate".
+# That is false: ANALYZE SAMPLES, so `n_live_tup` stays an estimate, and the
+# drill was comparing two estimates and calling any drift data loss. Measured
+# on one database with no restore involved at all: the estimate said 4,142,466
+# and the true count was 4,141,630 — an 836-row "mismatch" out of thin air.
+#
+# `query_to_xml` runs a real `count(*)` per table and keeps the whole thing one
+# statement. It costs a full scan of every table, which is why it sits AFTER
+# END_EPOCH above — verification time is not restore time, and must not be
+# charged against the RTO target.
 count_rows() {
   local database="$1"
   docker compose exec -T "${SERVICE}" psql -U "${DB_USER}" -d "${database}" -tA -c "
-    SELECT COALESCE(SUM(n_live_tup), 0)::bigint FROM pg_stat_user_tables;
+    SELECT COALESCE(
+             SUM((xpath('/row/c/text()', x))[1]::text::bigint),
+             0
+           )::bigint
+      FROM (
+        SELECT query_to_xml(
+                 format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name),
+                 false, true, ''
+               ) AS x
+          FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND table_type = 'BASE TABLE'
+      ) s;
   "
 }
-# pg_stat_user_tables is estimate-only until ANALYZE runs — force it on both
-# sides so this comparison is exact, not approximate.
-docker compose exec -T "${SERVICE}" psql -U "${DB_USER}" -d "${DB_NAME}" -c "ANALYZE;" >/dev/null
-docker compose exec -T "${SERVICE}" psql -U "${DB_USER}" -d "${RESTORE_DB}" -c "ANALYZE;" >/dev/null
 ORIGINAL_ROWS="$(count_rows "${DB_NAME}" | tr -d '[:space:]')"
 RESTORED_ROWS="$(count_rows "${RESTORE_DB}" | tr -d '[:space:]')"
 
