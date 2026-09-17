@@ -361,7 +361,7 @@ export default function UserAdminPage() {
                               key={role}
                               style={{ display: 'block', fontSize: '0.85rem' }}
                             >
-                              {role}
+                              {t(ENUM_LABEL.RoleName[role])}
                               {isAdmin ? (
                                 <button
                                   type="button"

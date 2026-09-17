@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
+import type { RoleName } from '../../lib/admin/user-admin-api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -45,7 +47,12 @@ export default function HomePage() {
       <h1>{t('homeWelcome', { name: user.fullName })}</h1>
       <p style={{ opacity: 0.8 }}>
         {t('homeSignedInAs', {
-          roles: user.roles.length > 0 ? user.roles.join(', ') : t('homeNoRole'),
+          roles:
+            user.roles.length > 0
+              ? user.roles
+                  .map((r) => t(ENUM_LABEL.RoleName[r as RoleName]))
+                  .join(', ')
+              : t('homeNoRole'),
         })}
       </p>
 
