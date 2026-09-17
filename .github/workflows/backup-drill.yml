@@ -15,6 +15,12 @@ on:
     - cron: "0 4 * * 1"
   workflow_dispatch: {}
 
+# Needed by the "surface the result" steps below, which file / close a tracking
+# issue. `contents: read` is otherwise the default set.
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   drill:
     runs-on: ubuntu-latest
@@ -127,3 +133,63 @@ jobs:
           fi
           BACKUP_ENCRYPTION_KEY="${CONFIGURED_PASSPHRASE}" \
             bash scripts/backup-restore-drill.sh
+
+      # ---------------------------------------------------------------------
+      # Make a failure REACH someone.
+      #
+      # This drill sat red from 2026-08-31 to 2026-09-17 and nothing surfaced
+      # it: it is a scheduled job, so no pull request was ever blocked, and
+      # GitHub's own "scheduled workflow failed" mail goes to the last person
+      # to touch the file rather than to anyone watching the repository.
+      # `backup-rpo-rto.md` is mandatory and says the restore path must be
+      # exercised end to end "not merely assumed to work" — for three weeks it
+      # was assumed to work while failing.
+      #
+      # An ISSUE, not a chat webhook, deliberately: every webhook needs a
+      # secret, this repository has none set, and a notification path that
+      # silently never fires is the exact bug this drill just had. The issue
+      # route uses the built-in token and needs nothing configured.
+      #
+      # De-duplicating on purpose — a drill that stays broken should own ONE
+      # issue that accumulates comments, not 52 issues a year.
+      # ---------------------------------------------------------------------
+      - name: Open or update the tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Backup restore drill is failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="The weekly backup/restore drill failed.
+
+          Run: ${RUN_URL}
+          Commit: ${GITHUB_SHA}
+
+          \`backup-rpo-rto.md\` is mandatory: the restore path must be exercised
+          end to end, not assumed to work. Until this passes again there is no
+          evidence the database can actually be restored."
+          existing="$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "${existing}" ]; then
+            echo "Commenting on existing issue #${existing}."
+            gh issue comment "${existing}" --body "${body}"
+          else
+            echo "Filing a new tracking issue."
+            gh issue create --title "${TITLE}" --body "${body}"
+          fi
+
+      # The other half: an issue nobody closes becomes noise, and a stale open
+      # issue is as misleading as a silent failure.
+      - name: Close the tracking issue once the drill passes again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Backup restore drill is failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing="$(gh issue list --state open --search "in:title \"${TITLE}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body "The drill passed again: ${RUN_URL}"
+            gh issue close "${existing}"
+          else
+            echo "No open tracking issue to close."
+          fi
