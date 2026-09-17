@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NotificationBell } from './NotificationBell';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -19,7 +20,6 @@ import {
   profileSummaryStyle,
   navbarToggleActiveStyle,
   navbarToggleStyle,
-  notificationsSlotStyle,
   trailingGroupStyle,
 } from './app.styles';
 
@@ -85,18 +85,9 @@ export function AppNavbar() {
       </Link>
 
       <div style={trailingGroupStyle}>
-        {/*
-          Reserved for the notifications system (backlog item 1b) and nothing
-          else yet. Deliberately NOT a <button>: an empty button takes focus,
-          shows a focus ring and does nothing when pressed, which is precisely
-          how a control reads as broken. `aria-hidden` keeps it out of the
-          accessibility tree entirely — there is no control here to announce.
-          When 1b lands this becomes a real button and gains focus, hover and a
-          badge in one change.
-        */}
-        <span aria-hidden="true" style={notificationsSlotStyle}>
-          🔔
-        </span>
+        {/* Item 1b landed: the reserved slot is a real button with a badge,
+            exactly as the placeholder comment said it would become. */}
+        <NotificationBell />
 
         <div role="group" aria-label={t('language')} style={{ display: 'flex', gap: 'var(--space-1)' }}>
           <button

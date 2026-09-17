@@ -37,6 +37,7 @@ import { ClaimModule } from './modules/claim/claim.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { CommissionModule } from './modules/commission/commission.module';
 import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
@@ -270,6 +271,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // Manager, Exec, Auditor). No migration, no seed change; a best-effort READ
     // audit row per read. Separate from SlaModule (the engine + sweep).
     SlaDashboardModule,
+    NotificationModule,
     // Part D (PDPL foundations, `IMPROVEMENTS.md` §5.1 / backlog Process #52)
     // — M03 Consent Management: capture a consent decision at a defined
     // touchpoint, withdraw it through a two-step request/confirm flow that

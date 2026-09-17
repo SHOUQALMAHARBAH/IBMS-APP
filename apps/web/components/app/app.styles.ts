@@ -76,13 +76,6 @@ export const trailingGroupStyle: CSSProperties = {
  * exist yet. `--nav-ink-muted` on the nav ground is the same pairing the
  * sidebar's group headings use.
  */
-export const notificationsSlotStyle: CSSProperties = {
-  color: 'var(--nav-ink-muted)',
-  fontSize: 'var(--text-md)',
-  lineHeight: 1,
-  userSelect: 'none',
-};
-
 export const navbarToggleStyle: CSSProperties = {
   fontFamily: 'inherit',
   fontSize: 'var(--text-sm)',

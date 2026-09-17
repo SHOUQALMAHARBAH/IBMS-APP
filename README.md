@@ -1263,6 +1263,44 @@ surprises.
   Western-digit convention. Pre-existing, out of scope, and a one-line fix
   whenever those two screens are next touched.
 
+### OPEN — the notification centre is DERIVED, and what that costs
+
+The bell (`GET /notifications` + `components/app/NotificationBell.tsx`) is
+option A of two that were scoped: it computes live counts at read time from
+rows that already record the work, and there is no `Notification` table.
+Everything below is a consequence of that, recorded so that upgrading to a
+stored table later is an informed decision rather than a surprise.
+
+- **No change history.** It reports states that need attention, not events
+  that happened. An item disappears the moment the work behind it is done,
+  and nothing records that it was ever shown. "Your claim moved to APPROVED
+  at 14:02" is not expressible — status CHANGES are not recorded as
+  notifiable events anywhere in this system, only current state is.
+- **No cross-device read/unread.** There is nothing stored to mark as read,
+  so there is no dismissal at all: an item is present while the work is, and
+  gone when it is not. A second device shows the same list, which is correct
+  here but is not what "unread" means.
+- **Four SLA escalation targets reach nobody.** `SlaTimer.escalatedTo` is
+  free text; only `BRANCH_DEPARTMENT_MANAGER`, `CLAIMS_OFFICER`,
+  `COMPLIANCE_OFFICER` and `DATA_PROTECTION_OFFICER` name a real `RoleName`.
+  `GENERAL_MANAGER`, `IT_MANAGEMENT`, `CUSTOMER_RETENTION` and
+  `DPO_AND_LEGAL_COUNSEL` name functions this system has no RBAC role for, so
+  a timer escalated to one of them is shown to nobody through the bell. Those
+  timers remain visible on the book-wide SLA dashboard. Closing this is an
+  org-chart decision (which real role fills each function), not a code change,
+  and a stored `Notification` row cannot be written until it is made — every
+  row has to name a recipient.
+- **Counts, never rows.** Reading a screening match or a claim is an
+  `isSensitiveDataAccess` audit event. A bell rendered on every page load
+  would otherwise write one per navigation per user and put customer names
+  into a payload whose only job is to say how many things need attention, so
+  the endpoint returns a kind, a number, a severity and a link — nothing else.
+  `screening.controller.ts` already kept a separate `matches/pending-count`
+  endpoint for the same reason.
+- **`AccessAnomalyAlert` is not a source.** It has a detection service but no
+  read endpoint anywhere, so including it would have meant creating a new
+  access-control surface rather than reusing one.
+
 ### CLOSED BY DECISION — no search by national ID
 
 `CustomerPicker` finds a customer by NAME. It does not search by national ID,
