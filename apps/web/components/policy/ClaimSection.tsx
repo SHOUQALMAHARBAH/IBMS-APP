@@ -481,7 +481,7 @@ function ClaimAssessment({
                 title={
                   a.adjusterWorkComplete
                     ? undefined
-                    : 'Record the adjuster survey + investigation first.'
+                    : t('claimAdjusterWorkFirstTitle')
                 }
                 style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
                 onClick={() =>
@@ -626,9 +626,10 @@ function ClaimSettlement({
 
       {s ? (
         <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
-          Estimated {formatMoney(s.estimatedLoss, language)} · approved{' '}
-          {formatMoney(s.approvedAmount, language)} · deductible{' '}
-          {formatMoney(s.deductible, language)} · net{' '}
+          {t('claimEstimatedShort')} {formatMoney(s.estimatedLoss, language)} ·{' '}
+          {t('claimSettlementApprovedSeparator')}{' '}
+          {formatMoney(s.approvedAmount, language)} · {t('claimDeductibleShort')}{' '}
+          {formatMoney(s.deductible, language)} · {t('claimNetSettlementShort')}{' '}
           {formatMoney(s.netSettlement, language)}
           {s.brokerProcessedPayment ? ' · broker-processed' : ''}
           {s.secondApproverRequired
@@ -786,7 +787,7 @@ function ClaimClosure({
       ) : paymentConfirmed ? (
         <>
           <p style={{ fontSize: '0.85rem', margin: '0.35rem 0' }}>
-            Client payment confirmed{' '}
+            {t('claimClientPaymentConfirmedLabel')}{' '}
             {formatDate(paymentConfirmed, language)}.
           </p>
           {canClose ? (
@@ -918,6 +919,21 @@ export function ClaimSection({
   }
 
   if (policy === undefined) return null;
+  // A failed load nulls the policy, which then short-circuits the section
+  // below and takes the section's own error message down with it — so the
+  // block rendered NOTHING when its read failed, and `loadError` was
+  // unreachable. Found by Part G item 7, which needs a real error state to
+  // photograph and could not produce one.
+  if (loadError && !policy) {
+    return (
+      <section>
+        <h2 style={{ marginTop: '2.5rem' }}>{t('claimSectionHeading')}</h2>
+        <p role="alert" style={errorStyle}>
+          {loadError}
+        </p>
+      </section>
+    );
+  }
   // Nothing to show until a policy has been issued (a coverage schedule
   // exists) or claims already sit against it.
   if (!policy || (!policy.issuanceComplete && rows.length === 0)) return null;
@@ -978,13 +994,13 @@ export function ClaimSection({
               }}
             >
               <strong>
-                Loss {formatDate(c.lossDate, language)}
-                {c.isLargeClaim ? ' · large claim' : ''}
+                {t('claimLossOnLabel')} {formatDate(c.lossDate, language)}
+                {c.isLargeClaim ? ` · ${t('claimLargeClaimSuffix')}` : ''}
               </strong>
               <span style={rfqBadgeStyle}>{t(ENUM_LABEL.ClaimStatus[c.status])}</span>
             </div>
             <p style={{ margin: '0.4rem 0' }}>
-              Estimated loss {formatMoney(c.estimatedLoss, language)}
+              {t('claimEstimatedLossLabel')} {formatMoney(c.estimatedLoss, language)}
               {c.claimNumber ? (
                 <>
                   {' · '}
@@ -1034,7 +1050,7 @@ export function ClaimSection({
                 {c.adjuster ? (
                   <>
                     {c.insurerClaimReference ? ' · ' : ''}
-                    adjuster <bdi>{c.adjuster.name}</bdi>
+                    {t('claimAdjusterInlineLabel')} <bdi>{c.adjuster.name}</bdi>
                     {c.adjuster.firm ? (
                       <>
                         {' ('}

@@ -186,7 +186,7 @@ export default function RenewalCasesPage() {
                                 void run(() => transitionRenewalCase(r.id, next))
                               }
                             >
-                              {next}
+                              {t(ENUM_LABEL.RenewalStatus[next])}
                             </button>
                           ))}
                           {!r.insurerTermsWorsened ? (

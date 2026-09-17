@@ -34,7 +34,8 @@ This paragraph predates Domains B–H (policy,
 claims, finance, service, compliance/risk, management, supporting ops) and Parts D–F
 (PDPL/DSR/retention, dashboards, bilingual/RTL UI), all of which have since been built —
 **§ Scope status below is the authority, not this summary.** Part G's final verification
-checklist has still not been run as a formal, evidence-attached gate. See § Scope status
+checklist is **complete** — all seven items closed, each guarded by a test that fails when
+the property stops holding. See § Scope status
 for the full picture and § Known gaps for the
 deferred edges of each built item; `meta/context/data-model.md` in ibms-brain is the
 logical data model this is built against. A minimal signed-in navigation shell (a sidebar
@@ -1214,10 +1215,10 @@ build actually is today:
   gaps below ("Part F — Bilingual UI (Part 11) — known gaps, consolidated")
   for the full audit against the literal backlog text, including how this
   relates to Part G's own narrower core-screens requirement.
-- **Part G — final verification checklist** — **six of seven items closed and
-  guarded; item 7 remains.** Items 1-6 are now enforced by tests that fail when
-  the property stops holding, each proven by planting a regression and watching
-  it fire:
+- **Part G — final verification checklist** — **COMPLETE. All seven items
+  closed and guarded.** Every item is enforced by a test that fails when the
+  property stops holding, and each guard was proven by planting a regression
+  and watching it fire:
   - **1. `prisma validate` + `prisma format`** — `db:format` script plus a CI
     step that runs it and fails on any resulting diff (Prisma has no
     `--check`, so "changes nothing" is the proof).
@@ -1256,11 +1257,18 @@ build actually is today:
     generic `SlaTimer` engine — a real escalation job, which is what the item
     asks for, but not a uniform implementation.
   - **7. Core screens (Lead→Policy→Claim→Renewal) in both languages across all
-    four states, with screenshots** — **still open.** Deferred deliberately to
-    its own session rather than rushed: it is up to 32 captures across four
-    screens, two languages and four states. It is now achievable — the Renewal
-    module (`apps/api/src/modules/renewal/`) and its `/renewal-cases` screen
-    both exist, which several older per-process rows below predate.
+    four states, with screenshots** — `e2e/part-g-core-screens.spec.ts`, 8
+    tests, **32 captures** (4 screens x 2 languages x 4 states), written as a
+    separate file from Part F item #8's sweep because that one captures ONE
+    language per screen and has no `/leads` capture at all. Evidence lands in
+    `test-results/part-g-core-screens/<screen>/<lang>-<state>.png`.
+    **One role, `SALES_RELATIONSHIP_OFFICER`, drives all four screens** — the
+    only seeded role holding `lead.list.read` + `policy.read` + `claim.read` +
+    `renewal.read` + `opportunity.read`. That is deliberate: item 7 says the
+    screens WORK, and a fixture stitched from several roles would prove the
+    pages render without proving any real user can walk the chain. **This item
+    found four real defects, three of them only visible by LOOKING at the
+    captures** — see the four entries below.
 
 Nothing here has been deployed anywhere and the production target is undecided (§
 Deployment). Part C #1–10 currently live on the `feat/backlog-c1-lead-management` branch;
@@ -1365,6 +1373,62 @@ stored table later is an informed decision rather than a surprise.
 - **`AccessAnomalyAlert` is not a source.** It has a detection service but no
   read endpoint anywhere, so including it would have meant creating a new
   access-control surface rather than reusing one.
+
+### OPEN — there is no standalone Claims screen
+
+Part G item 7 names Lead→Policy→Claim→Renewal as the core chain. Three of
+those four are their own screens (`/leads`, `/policies`, `/renewal-cases`).
+The Claim stage is **not**: claims are operated through `ClaimSection` on
+`/opportunities/[id]`, and `AppNav`'s own comment records why — the "Claims"
+nav group "held exactly one item, an analytics screen, with no operational
+claims screen to sit beside", so it was dissolved into Performance & analysis.
+
+Item 7's captures therefore photograph `/opportunities/[id]` for the Claim
+stage, which is the screen that stage actually has. A dedicated claims
+list/detail screen (a Claims Officer's own work queue) does not exist and is a
+real product gap, not a documentation one: a `CLAIMS_OFFICER` holds
+`claim.read` but has no screen that lists the claims they are responsible for
+— they can only reach a claim by first opening the opportunity it hangs off,
+which needs `opportunity.read`, a permission that role does not hold. **This
+is the same shape as the Policy Checking Officer gap fixed earlier**, and is
+left logged rather than fixed because building a claims queue screen is a
+feature, not a verification fix.
+
+### FIXED BY ITEM 7 — the Claims block swallowed its own load error
+
+`ClaimSection`'s catch set `setPolicy(null)`, and the render short-circuited on
+`!policy` BEFORE reaching its own `loadError` alert — so a failed claims read
+rendered **nothing at all**, and the error block was unreachable dead code.
+Found because item 7 needs a real error state to photograph and could not
+produce one. Fixed with an early branch that renders the section heading plus
+the alert when the load failed.
+
+### FIXED BY ITEM 7 — raw enum codes in the renewal action buttons
+
+`/renewal-cases` rendered its transition buttons as `{next}` — the bare
+`RenewalStatus` code — so the Arabic screen showed `LAPSED`,
+`QUOTES_OBTAINED`, `IN_PROGRESS` in the middle of an otherwise Arabic table.
+`ENUM_LABEL.RenewalStatus` already existed and was already used two lines
+above, in the status cell. This is exactly the blind spot the enum sweep
+documented: a `.map()` over an array variable, invisible to a scanner that
+looks for property accesses. **Caught by reading the Arabic screenshot, not by
+a passing test.**
+
+### FIXED BY ITEM 7 — nine hardcoded English fragments in the Claims section
+
+The Arabic claim card rendered `Loss`, `Estimated loss`, `adjuster`,
+`large claim`, `Estimated`/`approved`/`deductible`/`net`, and
+`Client payment confirmed` as English, plus an English `title` on a disabled
+assessment button. `claimEstimatedLossLabel` already existed and was never
+called — the same "a translation nobody called" pattern the prose sweep hit.
+Nine new keys x 2 languages; the i18n parity tests cover them.
+
+A LABEL is translated, a NAME is not: the adjuster FIRM ("Levant Loss
+Adjusters") stays English because it is data. That distinction broke the first
+version of the regression guard, which asserted the English word "adjuster"
+was absent and matched the firm name instead — `getByText` is a
+case-insensitive substring match. The guard now asserts the Arabic labels are
+PRESENT, which cannot collide with data.
 
 ### OPEN, FOR THE CLIENT — is `MfaCredential.webauthnPublicKeyEnc` wanted?
 
@@ -8008,13 +8072,13 @@ oversight is silent" convention:
   built does not satisfy this — it captures one language per screen
   (chosen to demonstrate RTL/bidi), not both languages per screen, and
   does not cover a dedicated `/leads` screenshot at all. This is also
-  where Part G's own list is currently impossible to fully satisfy
-  regardless: **no dedicated "Renewal" screen or backend module exists
-  anywhere in this app** (confirmed via search — no frontend page, no
-  controller; "renewal" appears only incidentally in a few unrelated
-  modules' fields/comments). Building a real Renewal process is its own,
-  larger, unstarted piece of work, not a Part F or Part G documentation
-  gap.
+  where Part G's own list was, when this note was written, impossible to
+  satisfy: no dedicated Renewal screen or backend module existed. **That is
+  no longer true** — the 2026-09-09 gap-closing pass built
+  `apps/api/src/modules/renewal/` and the `/renewal-cases` screen, and Part G
+  item 7 has since captured all four stages in both languages. This paragraph
+  is kept as a record of what was true for Part F item #8, not as a current
+  claim.
 - **Item #7's generated documents are never persisted** — `Document`
   (Process #70) is version/classification metadata tracking, not a real
   object store, and this app has no real file storage anywhere for
