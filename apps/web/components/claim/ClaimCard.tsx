@@ -900,7 +900,7 @@ export function ClaimCard({
             ''
           )}
           {claim.thirdParty?.subrogationRecoveryFlag
-            ? ' · subrogation/recovery flagged'
+            ? ` · ${t('claimSubrogationFlagged')}`
             : ''}
         </p>
       ) : null}
