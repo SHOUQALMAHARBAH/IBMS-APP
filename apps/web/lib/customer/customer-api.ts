@@ -24,6 +24,12 @@ export interface Customer {
   fatherName: string | null;
   grandfatherName: string | null;
   familyName: string | null;
+  // Part B §11 screening discriminators. The api has always returned these in
+  // the clear - deliberately, so a reviewer can tell two people of the same
+  // name apart - but the web type never declared them. CustomerPicker is the
+  // first thing to need exactly that.
+  dateOfBirth: string | null;
+  nationality: string | null;
   registrationNumber: string | null;
   taxRegistrationNumber: string | null;
   registeredAddress: string | null;

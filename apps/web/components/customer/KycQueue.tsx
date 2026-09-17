@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   approveKyc,
   getScreeningHold,

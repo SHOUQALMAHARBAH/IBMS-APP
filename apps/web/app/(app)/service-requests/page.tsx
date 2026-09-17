@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -137,15 +138,12 @@ export default function ServiceRequestsPage() {
 
       {canManage ? (
         <form onSubmit={submit} style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('srCustomerIdLabel')}
-            <input
-              aria-label={t('srCustomerIdLabel')}
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            />
-          </label>
+          <CustomerPicker
+            value={customerId}
+            onChange={setCustomerId}
+            label={t('srCustomerIdLabel')}
+            required
+          />
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             {t('srTypeLabel')}
             <select

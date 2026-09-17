@@ -21,8 +21,8 @@ export const COMPLIANCE_RISK = {
     tmHeading: 'مراقبة المعاملات لمكافحة غسل الأموال وتمويل الإرهاب',
     tmIntro:
       'تُرصد تلقائياً مدفوعات الأقساط الكبيرة غير المعتادة، وعمليات الإلغاء والاسترجاع المتكرّرة، ومصادر الدفع من أطراف ثالثة (مسح ليلي، أو شغّله الآن). ويمكن تصعيد النمط المرصود إلى نشاط مشبوه ثم إبلاغ الجهة المختصة به — ويبقى السجل هنا دليلاً في الحالتين.',
-    tmCustomerIdOptionalLabel: 'معرّف العميل (اختياري)',
-    tmCustomerIdLabel: 'معرّف العميل',
+    tmCustomerIdOptionalLabel: 'العميل (اختياري)',
+    tmCustomerIdLabel: 'العميل',
     tmPatternLabel: 'النمط',
     tmDetailLabel: 'التفاصيل',
     tmRunSweepButton: 'تشغيل مسح الكشف الآن',
@@ -282,8 +282,8 @@ export const COMPLIANCE_RISK = {
     tmHeading: 'AML/CFT transaction monitoring',
     tmIntro:
       'Unusually large premium payments, frequent cancellations/refunds, and third-party payment sources are flagged automatically (nightly sweep, or run it now). Escalate a flagged pattern to suspicious activity, then report it to the competent authority — the record stays here as evidence either way.',
-    tmCustomerIdOptionalLabel: 'Customer ID (optional)',
-    tmCustomerIdLabel: 'Customer ID',
+    tmCustomerIdOptionalLabel: 'Customer (optional)',
+    tmCustomerIdLabel: 'Customer',
     tmPatternLabel: 'Pattern',
     tmDetailLabel: 'Detail',
     tmRunSweepButton: 'Run detection sweep now',

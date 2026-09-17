@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -156,15 +157,27 @@ export default function PaymentChannelsPage() {
               <option value="insurer">{t('pcInsurer')}</option>
             </select>
           </label>
-          <label style={labelStyle}>
-            {ownerType === 'customer' ? t('pcCustomerIdLabel') : t('pcInsurerIdLabel')}
-            <input
-              aria-label={t('pcOwnerIdAria')}
+          {/* The insurer branch keeps the id field: insurers are a different
+              list with a different search, and a customer picker there would
+              be worse than the box it replaced. */}
+          {ownerType === 'customer' ? (
+            <CustomerPicker
               value={ownerId}
-              onChange={(e) => setOwnerId(e.target.value)}
+              onChange={setOwnerId}
+              label={t('pcCustomerIdLabel')}
               required
             />
-          </label>
+          ) : (
+            <label style={labelStyle}>
+              {t('pcInsurerIdLabel')}
+              <input
+                aria-label={t('pcOwnerIdAria')}
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value)}
+                required
+              />
+            </label>
+          )}
           <label style={labelStyle}>
             {t('pcChannelTypeLabel')}
             <select

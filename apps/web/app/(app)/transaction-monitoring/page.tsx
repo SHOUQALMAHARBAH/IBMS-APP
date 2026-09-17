@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -135,16 +136,11 @@ export default function TransactionMonitoringPage() {
               maxWidth: '30rem',
             }}
           >
-            <label
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-            >
-              {t('tmCustomerIdOptionalLabel')}
-              <input
-                aria-label={t('tmCustomerIdLabel')}
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-              />
-            </label>
+            <CustomerPicker
+              value={customerId}
+              onChange={setCustomerId}
+              label={t('tmCustomerIdOptionalLabel')}
+            />
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
             >

@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -345,14 +346,11 @@ export default function RetentionDisposalPage() {
                 onChange={(e) => setHoldCategoryId(e.target.value)}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {t('rdHoldCustomerIdLabel')}
-              <input
-                aria-label={t('rdHoldCustomerIdAria')}
-                value={holdCustomerId}
-                onChange={(e) => setHoldCustomerId(e.target.value)}
-              />
-            </label>
+            <CustomerPicker
+              value={holdCustomerId}
+              onChange={setHoldCustomerId}
+              label={t('rdHoldCustomerIdLabel')}
+            />
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
               {t('rdHoldInsuredPersonIdLabel')}
               <input

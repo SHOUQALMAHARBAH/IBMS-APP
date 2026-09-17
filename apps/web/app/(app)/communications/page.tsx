@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -146,17 +147,12 @@ export default function CommunicationsPage() {
             maxWidth: '34rem',
           }}
         >
-          <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-          >
-            {t('commCustomerIdLabel')}
-            <input
-              aria-label={t('commCustomerIdLabel')}
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            />
-          </label>
+          <CustomerPicker
+            value={customerId}
+            onChange={setCustomerId}
+            label={t('commCustomerIdLabel')}
+            required
+          />
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >

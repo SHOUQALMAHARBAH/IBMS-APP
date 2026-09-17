@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -122,17 +123,12 @@ export default function FeedbackPage() {
             maxWidth: '30rem',
           }}
         >
-          <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-          >
-            {t('fbCustomerIdLabel')}
-            <input
-              aria-label={t('fbCustomerIdLabel')}
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            />
-          </label>
+          <CustomerPicker
+            value={customerId}
+            onChange={setCustomerId}
+            label={t('fbCustomerIdLabel')}
+            required
+          />
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >

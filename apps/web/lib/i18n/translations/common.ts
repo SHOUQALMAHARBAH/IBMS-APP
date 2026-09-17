@@ -31,6 +31,11 @@ export const COMMON = {
     pagingRange: 'عرض {from}–{to} من {total}',
     pagingPrevious: 'السابق',
     pagingNext: 'التالي',
+    customerPickerSearchLabel: 'ابحث عن عميل',
+    customerPickerSearchPlaceholder: 'الاسم، بالعربية أو الإنجليزية',
+    customerPickerNonePlaceholder: '— اختر عميلاً —',
+    customerPickerNoMatches: 'لا يوجد عميل مطابق لهذا الاسم.',
+    customerPickerSearchError: 'تعذّر تنفيذ بحث العملاء. حاول مرة أخرى.',
   },
   EN: {
     commonLoading: 'Loading…',
@@ -57,5 +62,10 @@ export const COMMON = {
     pagingRange: 'Showing {from}–{to} of {total}',
     pagingPrevious: 'Previous',
     pagingNext: 'Next',
+    customerPickerSearchLabel: 'Find a customer',
+    customerPickerSearchPlaceholder: 'Name, in Arabic or English',
+    customerPickerNonePlaceholder: '— select a customer —',
+    customerPickerNoMatches: 'No customer matches that name.',
+    customerPickerSearchError: 'The customer search could not run. Try again.',
   },
 } as const;

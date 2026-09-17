@@ -19,7 +19,7 @@ export const COMPLAINTS = {
       'شكاوى العملاء، ويمكن ربط الشكوى بمطالبة محل نزاع. تُتابَع كل شكوى مقابل مهلة حل مستهدفة قدرها عشرة أيام عمل، وتُصعَّد الشكوى التي يتعذّر حلّها داخلياً إلى لجنة تسوية المنازعات التأمينية. ويتطلب الإغلاق اعتماد مشرف غير الشخص الذي قام بالحل.',
 
     // Log form
-    complaintsCustomerIdLabel: 'معرّف العميل',
+    complaintsCustomerIdLabel: 'العميل',
     complaintsIssueLabel: 'موضوع الشكوى',
     complaintsCategoryLabel: 'التصنيف (اختياري)',
     complaintsCategoryAria: 'التصنيف',
@@ -74,7 +74,7 @@ export const COMPLAINTS = {
     complaintsIntro:
       'Customer complaints, optionally linked to a claim under dispute. Each is tracked against a resolution SLA (a 10-business-day working target). A complaint that cannot be resolved internally is escalated to the Insurance Dispute Resolution Committee. Closure needs a supervisor sign-off by a different person than the one who resolved it.',
 
-    complaintsCustomerIdLabel: 'Customer ID',
+    complaintsCustomerIdLabel: 'Customer',
     complaintsIssueLabel: 'Issue',
     complaintsCategoryLabel: 'Category (optional)',
     complaintsCategoryAria: 'Category',

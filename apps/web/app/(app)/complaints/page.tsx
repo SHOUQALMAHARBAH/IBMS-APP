@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -196,15 +197,12 @@ export default function ComplaintsPage() {
           onSubmit={submit}
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '32rem' }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            {t('complaintsCustomerIdLabel')}
-            <input
-              aria-label={t('complaintsCustomerIdLabel')}
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            />
-          </label>
+          <CustomerPicker
+            value={customerId}
+            onChange={setCustomerId}
+            label={t('complaintsCustomerIdLabel')}
+            required
+          />
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             {t('complaintsIssueLabel')}
             <textarea

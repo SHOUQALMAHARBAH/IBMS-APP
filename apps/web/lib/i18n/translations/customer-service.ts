@@ -16,7 +16,7 @@ export const CUSTOMER_SERVICE = {
     srHeading: 'طلبات العملاء',
     srIntro:
       'شهادات التأمين والنسخ والتعديلات وسائر طلبات خدمة العملاء. تُتابَع كل طلب مقابل مهلة تنفيذ مستهدفة قدرها خمسة أيام عمل، تُصعَّد بعدها إلى مدير الفرع؛ ويتوقّف المؤقّت عند تنفيذ الطلب أو إلغائه.',
-    srCustomerIdLabel: 'معرّف العميل',
+    srCustomerIdLabel: 'العميل',
     srTypeLabel: 'نوع الطلب',
     srDetailLabel: 'التفاصيل (اختياري)',
     srLogButton: 'تسجيل الطلب',
@@ -49,7 +49,7 @@ export const CUSTOMER_SERVICE = {
     fbHeading: 'آراء العملاء',
     fbIntro:
       'ردود استبيان رضا العملاء المسجّلة بعد الإصدار أو بعد المطالبة أو بعد التجديد. وهي سجل واقعي فقط — بلا سير عمل وبلا مهلة.',
-    fbCustomerIdLabel: 'معرّف العميل',
+    fbCustomerIdLabel: 'العميل',
     fbContextLabel: 'السياق',
     fbScoreLabel: 'التقييم (١-٥، اختياري)',
     fbCommentsLabel: 'الملاحظات (اختياري)',
@@ -71,7 +71,7 @@ export const CUSTOMER_SERVICE = {
 
     // ---- Communications (#44) ------------------------------------------
     commHeading: 'المراسلات',
-    commCustomerIdLabel: 'معرّف العميل',
+    commCustomerIdLabel: 'العميل',
     commChannelLabel: 'القناة (اتركها فارغة لاستخدام القناة المفضّلة المسجّلة للعميل)',
     commMarketingLabel: 'مراسلة تسويقية (مشروطة بموافقة العميل)',
     commSubjectLabel: 'الموضوع (اختياري)',
@@ -109,7 +109,7 @@ export const CUSTOMER_SERVICE = {
 
     // ---- Customer retention (#46) --------------------------------------
     retHeading: 'الاحتفاظ بالعملاء',
-    retCustomerIdLabel: 'معرّف العميل',
+    retCustomerIdLabel: 'العميل',
     retReasonLabel: 'السبب',
     retSweepButton: 'تشغيل مسح الكشف الآن',
     retOpenButton: 'فتح حالة احتفاظ',
@@ -182,7 +182,7 @@ export const CUSTOMER_SERVICE = {
     srHeading: 'Customer requests',
     srIntro:
       'Certificates, copies, changes and other customer service requests. Each is tracked against a fulfilment SLA (a 5-business-day working target, escalating to the branch manager); the timer clears when the request is fulfilled or cancelled.',
-    srCustomerIdLabel: 'Customer ID',
+    srCustomerIdLabel: 'Customer',
     srTypeLabel: 'Request type',
     srDetailLabel: 'Detail (optional)',
     srLogButton: 'Log request',
@@ -214,7 +214,7 @@ export const CUSTOMER_SERVICE = {
     fbHeading: 'Customer feedback',
     fbIntro:
       'Satisfaction survey responses logged post-issuance, post-claim, or post-renewal. A factual log — no workflow, no SLA.',
-    fbCustomerIdLabel: 'Customer ID',
+    fbCustomerIdLabel: 'Customer',
     fbContextLabel: 'Context',
     fbScoreLabel: 'Score (1-5, optional)',
     fbCommentsLabel: 'Comments (optional)',
@@ -235,7 +235,7 @@ export const CUSTOMER_SERVICE = {
     fbContextPostRenewal: 'After renewal',
 
     commHeading: 'Communications',
-    commCustomerIdLabel: 'Customer ID',
+    commCustomerIdLabel: 'Customer',
     commChannelLabel: "Channel (blank = the customer's recorded preference)",
     commMarketingLabel: 'Marketing communication (consent-gated)',
     commSubjectLabel: 'Subject (optional)',
@@ -272,7 +272,7 @@ export const CUSTOMER_SERVICE = {
     commNo: 'no',
 
     retHeading: 'Customer retention',
-    retCustomerIdLabel: 'Customer ID',
+    retCustomerIdLabel: 'Customer',
     retReasonLabel: 'Reason',
     retSweepButton: 'Run detection sweep now',
     retOpenButton: 'Open retention case',

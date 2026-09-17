@@ -1263,6 +1263,19 @@ surprises.
   Western-digit convention. Pre-existing, out of scope, and a one-line fix
   whenever those two screens are next touched.
 
+### CLOSED BY DECISION — no search by national ID
+
+`CustomerPicker` finds a customer by NAME. It does not search by national ID,
+and will not: `Customer.nationalIdEnc` is encrypted with a random IV per value
+(`encryption.service.ts`), so identical national IDs produce different
+ciphertext and the column cannot be matched. Making it searchable would mean
+an HMAC blind index over a Highly Confidential identifier, plus a migration, a
+backfill and a PDPL justification — out of scope for this system. Name search,
+with the bilingual and transliteration matching `GET /customers?search=`
+already provides, covers the actual need; `dateOfBirth` and `nationality` are
+returned in the clear (Part B §11) and disambiguate two people of the same
+name. Recorded as a decision, not a deferral.
+
 ### OPEN — two of the five paginated lists had nothing to paginate
 
 Offset pagination was scoped to the five lists a real office grows without bound:

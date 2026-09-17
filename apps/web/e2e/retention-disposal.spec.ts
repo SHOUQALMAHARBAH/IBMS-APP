@@ -138,6 +138,42 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
   await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
   await mockRegister(page);
 
+  // The customer is chosen from a picker now, not typed as a UUID, so the
+  // picker's own search has to have something to offer.
+  await page.route("http://localhost:4000/customers**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        items: [
+          {
+            id: "cust-new",
+            prospectId: null,
+            customerType: "CORPORATE",
+            legalName: "Al-Ufuq Trading Co.",
+            givenName: null,
+            fatherName: null,
+            grandfatherName: null,
+            familyName: null,
+            dateOfBirth: null,
+            nationality: null,
+            registrationNumber: "REG-1001",
+            taxRegistrationNumber: null,
+            registeredAddress: null,
+            natureOfBusiness: null,
+            languagePreference: "EN",
+            status: "ACTIVE",
+            ownerUserId: "user-1",
+            createdAt: "2026-08-26T00:00:00.000Z",
+            updatedAt: "2026-08-26T00:00:00.000Z",
+          },
+        ],
+        total: 1,
+        page: 0,
+        pageSize: 50,
+      },
+    }),
+  );
+
   await page.goto("/retention-disposal");
   await expect(page.getByText("Customer cust-123…")).toBeVisible();
 
@@ -164,9 +200,12 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
     return route.fulfill({ status: 200, json: HOLDS });
   });
 
+
   await page.getByLabel("Legal hold scope").fill("New hold");
   await page.getByLabel("Legal hold reason").fill("New reason");
-  await page.getByLabel("Legal hold customer ID").fill("cust-new");
+  await page
+    .getByLabel("Customer (optional)")
+    .selectOption("cust-new");
   await page.getByRole("button", { name: "Place hold" }).click();
 
   await expect.poll(() => lastCreateBody).not.toBeNull();

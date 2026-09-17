@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -184,27 +185,36 @@ export default function ConsentPage() {
               <option value="lead">{t('consKindLead')}</option>
             </select>
           </label>
-          <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-          >
-            {ownerKind === 'customer'
-              ? t('consCustomerIdLabel')
-              : ownerKind === 'insuredPerson'
-                ? t('consInsuredPersonIdLabel')
-                : t('consLeadIdLabel')}
-            <input
-              aria-label={
-                ownerKind === 'customer'
-                  ? 'Customer ID'
-                  : ownerKind === 'insuredPerson'
-                    ? 'Insured person ID'
-                    : 'Lead ID'
-              }
+          {/* Only the customer branch gets a picker. An InsuredPerson has no
+              list endpoint and a Lead's is a different search entirely, so
+              those two keep the id field rather than get a picker that cannot
+              search anything. */}
+          {ownerKind === 'customer' ? (
+            <CustomerPicker
               value={ownerId}
-              onChange={(e) => setOwnerId(e.target.value)}
+              onChange={setOwnerId}
+              label={t('consCustomerIdLabel')}
               required
             />
-          </label>
+          ) : (
+            <label
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            >
+              {ownerKind === 'insuredPerson'
+                ? t('consInsuredPersonIdLabel')
+                : t('consLeadIdLabel')}
+              <input
+                aria-label={
+                  ownerKind === 'insuredPerson'
+                    ? t('consInsuredPersonIdLabel')
+                    : t('consLeadIdLabel')
+                }
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value)}
+                required
+              />
+            </label>
+          )}
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
