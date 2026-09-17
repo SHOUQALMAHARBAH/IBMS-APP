@@ -62,15 +62,19 @@ export default function LoginPage() {
     if (!mfaChallengeToken) return;
     setError(null);
     setIsSubmitting(true);
+    // Only the VERIFY call can mean "bad code". Everything after it runs on an
+    // already-accepted code, so a failure there must not be reported as one —
+    // that is how a correct code ends up showing "Invalid code — try again".
     try {
       await verifyMfaChallenge({ mfaChallengeToken, code });
-      await refreshUser();
-      router.push('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('authInvalidCode'));
-    } finally {
       setIsSubmitting(false);
+      return;
     }
+    await refreshUser();
+    setIsSubmitting(false);
+    router.push('/');
   }
 
   return (

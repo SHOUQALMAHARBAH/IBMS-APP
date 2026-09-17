@@ -105,17 +105,21 @@ export default function SecuritySettingsPage() {
     if (!enrollment) return;
     setError(null);
     setIsBusy(true);
+    // Only the VERIFY call can mean "bad code". Once it returns, MFA is enabled
+    // server-side, and reporting a later failure as an invalid code tells the
+    // user the opposite of what happened.
     try {
       await verifyTotpEnrollment({ credentialId: enrollment.credentialId, code });
-      setEnrollment(null);
-      setCode('');
-      setMessage(t('secEnabledMessage'));
-      await refreshUser();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('secInvalidCode'));
-    } finally {
       setIsBusy(false);
+      return;
     }
+    setEnrollment(null);
+    setCode('');
+    setMessage(t('secEnabledMessage'));
+    await refreshUser();
+    setIsBusy(false);
   }
 
   const canChangePassword =
