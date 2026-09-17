@@ -1263,6 +1263,25 @@ surprises.
   Western-digit convention. Pre-existing, out of scope, and a one-line fix
   whenever those two screens are next touched.
 
+### OPEN — /policies/[id] renders a recommendation block that cannot fill
+
+`apps/web/app/(app)/policies/[id]/page.tsx` renders
+`policy.recommendation.recommendedQuotation` (insurer, premium, deductible,
+commission). `GET /policies/:id` never returns a `recommendation` field —
+`PolicyService.toView()`'s keys are id / opportunityId / customerId / customer
+/ insurerId / insurer / policyNumber / insuranceLine / status / inceptionDate /
+expiryDate / requestedPremium / issuedPremium / premiumVariance / currency /
+placedByUserId / issuedByUserId / schedules. The block is therefore dead: it
+renders nothing, silently, because every access is optionally chained.
+
+Found while adding the policy-checking block to the same screen. Left alone
+deliberately — deleting it assumes the intent was wrong, and widening the view
+to carry a recommendation is a product decision about what belongs on a policy
+screen. The page's local `PolicyDetail` interface was widened with the two
+fields the checking block needs rather than swapped for the shared `Policy`
+type, precisely so this question stays open rather than being closed by a
+compiler error.
+
 ### OPEN — the notification centre is DERIVED, and what that costs
 
 The bell (`GET /notifications` + `components/app/NotificationBell.tsx`) is

@@ -281,6 +281,7 @@ export const POLICY = {
     polClaimSurveyLabel: 'المعاينة',
     polClaimInvestigationLabel: 'التحقيق',
     polClaimVerdictLabel: 'القرار',
+    policyCheckError: 'تعذّر تسجيل نتيجة التدقيق — حاول مرة أخرى.',
   },
   EN: {
     // PolicySection.tsx
@@ -559,5 +560,6 @@ export const POLICY = {
     polClaimSurveyLabel: 'Survey',
     polClaimInvestigationLabel: 'Investigation',
     polClaimVerdictLabel: 'Verdict',
+    policyCheckError: 'The check could not be recorded. Try again.',
   },
 } as const;

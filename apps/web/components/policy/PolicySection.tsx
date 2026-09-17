@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PolicyCheckingBlock } from './PolicyCheckingBlock';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   acknowledgePolicyReceipt,
   attachPolicyDocuments,
-  checkPolicy,
   downloadPolicyCertificateDocument,
   downloadPolicyScheduleDocument,
   listPoliciesForOpportunity,
@@ -47,12 +47,6 @@ interface Props {
   canDeliver: boolean;
   onOpportunityChanged: () => void;
 }
-
-const CHECKABLE_STATES = new Set([
-  'ISSUED',
-  'DISCREPANCY',
-  'CHECKING_IN_PROGRESS',
-]);
 
 /** The section only makes sense once the client has accepted (the Opportunity
  * reaches PLACEMENT) — or a Policy already exists (a status that lagged the
@@ -189,12 +183,6 @@ export function PolicySection({
   const [attachDocs, setAttachDocs] = useState<PolicyDocumentInput[]>([emptyDocRow()]);
 
   // Process 20 — the checker's transcription of the Requested Coverage.
-  const [chkLimitsText, setChkLimitsText] = useState(
-    '{\n  "buildings": "5000000.000"\n}',
-  );
-  const [chkSumsText, setChkSumsText] = useState('{\n  "total": "5000000.000"\n}');
-  const [chkPerilsText, setChkPerilsText] = useState('fire, flood, theft');
-  const [chkExtensionsText, setChkExtensionsText] = useState('');
 
   // Process 21 — delivery.
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('email');
@@ -609,72 +597,19 @@ export function PolicySection({
             </div>
           ) : null}
 
-          {canCheck && CHECKABLE_STATES.has(policy.status) ? (
-            <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
-              <strong>
-                {policy.checking ? t('policyQcRerunHeading') : t('policyQcHeading')}
-              </strong>
-              <p style={{ opacity: 0.7, fontSize: '0.85rem', margin: '0.2rem 0' }}>
-                {t('policyRequestedCoverageNote')}
-              </p>
-              <div style={quoteFieldStyle}>
-                <label htmlFor="chk-limits">{t('policyRequestedLimitsLabel')}</label>
-                <textarea
-                  id="chk-limits"
-                  rows={3}
-                  value={chkLimitsText}
-                  onChange={(e) => setChkLimitsText(e.target.value)}
-                />
-              </div>
-              <div style={quoteFieldStyle}>
-                <label htmlFor="chk-sums">{t('policyRequestedSumsLabel')}</label>
-                <textarea
-                  id="chk-sums"
-                  rows={3}
-                  value={chkSumsText}
-                  onChange={(e) => setChkSumsText(e.target.value)}
-                />
-              </div>
-              <div style={quoteFieldStyle}>
-                <label htmlFor="chk-perils">{t('policyRequestedPerilsLabel')}</label>
-                <input
-                  id="chk-perils"
-                  value={chkPerilsText}
-                  onChange={(e) => setChkPerilsText(e.target.value)}
-                />
-              </div>
-              <div style={quoteFieldStyle}>
-                <label htmlFor="chk-extensions">{t('policyRequestedExtensionsLabel')}</label>
-                <input
-                  id="chk-extensions"
-                  value={chkExtensionsText}
-                  onChange={(e) => setChkExtensionsText(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                disabled={
-                  busy ||
-                  parseJsonObject(chkLimitsText) === null ||
-                  parseJsonObject(chkSumsText) === null
-                }
-                style={{ ...buttonStyle, width: 'auto', marginTop: '0.4rem' }}
-                onClick={() =>
-                  void run(async () => {
-                    await checkPolicy(policy.id, {
-                      limits: parseJsonObject(chkLimitsText) ?? {},
-                      sumsInsured: parseJsonObject(chkSumsText) ?? {},
-                      namedPerils: splitList(chkPerilsText),
-                      extensions: splitList(chkExtensionsText),
-                    });
-                    onOpportunityChanged();
-                  })
-                }
-              >
-                {busy ? t('policyCheckingButton') : t('policyCheckButton')}
-              </button>
-            </div>
-          ) : null}
+          <PolicyCheckingBlock
+            policy={policy}
+            canCheck={canCheck}
+            // BOTH reloads, not just the opportunity: the check moves the
+            // policy's own status, and this section holds its own copy. The
+            // parent's `run()` helper did the `load()` half implicitly, and
+            // dropping it left the discrepancy block and the delivery form
+            // rendering against a stale policy — which rfq.spec.ts caught.
+            onChecked={async () => {
+              await load();
+              onOpportunityChanged();
+            }}
+          />
 
           {policy.delivery ? (
             <div style={{ marginTop: '0.8rem' }}>

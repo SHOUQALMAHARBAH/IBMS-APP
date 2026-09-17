@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PolicyCheckingBlock } from '../../../../components/policy/PolicyCheckingBlock';
+import { hasAnyPermission } from '../../../../lib/auth/permissions';
+import type { PolicyChecking, PolicyStatus } from '../../../../lib/policy/policy-api';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
@@ -13,7 +16,12 @@ import { profileFieldLabelStyle, profileFieldValueStyle, profileGridStyle } from
 interface PolicyDetail {
   id: string;
   policyNumber: string | null;
-  status: string;
+  // The real vocabulary, not `string`: PolicyCheckingBlock decides whether a
+  // check may be recorded from it.
+  status: PolicyStatus;
+  /** Populated once a check has been recorded. The endpoint has always
+   *  returned it; this page simply never declared it. */
+  checking: PolicyChecking | null;
   inceptionDate: string;
   customer?: {
     id: string;
@@ -221,10 +229,20 @@ export default function PolicyDetailPage() {
         </div>
       )}
 
+      {/* Process 20. This is the screen a Policy Checking Officer can
+          actually reach: their three permissions do not include
+          `opportunity.read`, so the copy of this block on /opportunities/[id]
+          was unreachable for the one role whose job it is. */}
+      <PolicyCheckingBlock
+        policy={policy}
+        canCheck={hasAnyPermission(user, ['policy.check'])}
+        onChecked={load}
+      />
+
       <button
         type="button"
         style={smallButtonStyle}
-        onClick={() => router.push('/opportunities')}
+        onClick={() => router.push('/policies')}
       >
         {t('poldBack')}
       </button>

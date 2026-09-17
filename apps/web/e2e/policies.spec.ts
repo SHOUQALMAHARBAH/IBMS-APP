@@ -202,3 +202,57 @@ test("the sidebar shows Policies to a Policy Checking Officer and hides it from 
     page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Policies" }),
   ).toHaveCount(0);
 });
+
+test("a Policy Checking Officer records the QC check from the policy screen", async ({
+  page,
+}) => {
+  // The whole point of the fix: this role holds policy.read, policy.check and
+  // dashboard.policy.view — and NOT opportunity.read, so the copy of this form
+  // on /opportunities/[id] is unreachable for them. Their own screen has to
+  // carry it.
+  await mockAuth(page, ["POLICY_CHECKING_OFFICER"]);
+
+  let checkBody: Record<string, unknown> | null = null;
+  let checked = false;
+  // Host-qualified, always: a bare `**/policies/pol-1` also matches the PAGE
+  // document request and answers the navigation itself with JSON.
+  await page.route("http://localhost:4000/policies/pol-1", (route) =>
+    route.fulfill({
+      status: 200,
+      json: policy({ status: "ISSUED", checking: checked ? { checkedAt: "2026-09-17T00:00:00.000Z", discrepancyDetail: null, discrepancyLoggedAsPiRiskEvent: false } : null }),
+    }),
+  );
+  await page.route("http://localhost:4000/policies/pol-1/checking", (route) => {
+    checkBody = route.request().postDataJSON() as Record<string, unknown>;
+    checked = true;
+    return route.fulfill({ status: 201, json: {} });
+  });
+
+  await page.goto("/policies/pol-1");
+  await expect(page.getByRole("button", { name: "Run check" })).toBeVisible();
+
+  await page.getByLabel("Requested named perils (comma-separated)").fill("fire, flood");
+  await page.getByRole("button", { name: "Run check" }).click();
+
+  await expect.poll(() => checkBody).not.toBeNull();
+  // The endpoint takes the requested coverage as one nested object, not four
+  // loose fields — assert the shape the api actually receives.
+  expect(checkBody).toMatchObject({
+    requestedCoverage: { namedPerils: ["fire", "flood"] },
+  });
+});
+
+test("the checking form is absent for a role without policy.check", async ({ page }) => {
+  // A Placement Officer may read the policy they placed but must never check
+  // it — the segregation this role pair exists for.
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await page.route("http://localhost:4000/policies/pol-1", (route) =>
+    route.fulfill({ status: 200, json: policy({ status: "ISSUED", checking: null }) }),
+  );
+
+  await page.goto("/policies/pol-1");
+  await expect(
+    page.getByRole("heading", { name: /POL-2026-00341/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run check" })).toHaveCount(0);
+});
