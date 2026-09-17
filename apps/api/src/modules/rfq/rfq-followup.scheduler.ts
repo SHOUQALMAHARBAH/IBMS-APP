@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import { RfqService, type FollowUpScanResult } from './rfq.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as the cross-sell / up-sell schedulers.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 11 — "Follow-up alert job once `followUpThresholdDays` is
@@ -28,24 +24,30 @@ export class RfqFollowUpScheduler {
   private readonly logger = new Logger(RfqFollowUpScheduler.name);
 
   constructor(
-    private readonly users: UserRepository,
     private readonly rfqs: RfqService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 06:00 UTC daily.
   @Cron('0 6 * * *', { name: 'rfq-followup-alert-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `RFQ follow-up sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'RFQ follow-up sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     let result: FollowUpScanResult;
     try {
-      result = await this.rfqs.runFollowUpScan(systemUser.id);
+      result = await this.rfqs.runFollowUpScan(systemUserId);
     } catch (err) {
       this.logger.error(
         `RFQ follow-up sweep could not run: ${(err as Error).message}`,

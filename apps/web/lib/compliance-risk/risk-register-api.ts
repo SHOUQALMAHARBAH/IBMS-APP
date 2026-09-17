@@ -11,14 +11,17 @@ export const RISK_REGISTER_TYPES = [
   'financial',
   'compliance',
   'reputational',
-];
+] as const;
+export type RiskRegisterType = (typeof RISK_REGISTER_TYPES)[number];
+
+export type RiskRegisterStatus = 'open' | 'closed';
 
 export interface RiskRegisterItem {
   id: string;
   riskType: string;
   description: string;
   mitigationAction: string | null;
-  status: string;
+  status: RiskRegisterStatus;
   loggedAt: string;
   closedAt: string | null;
 }

@@ -5,13 +5,15 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
+export type BrokerLicenseStatus = 'active' | 'lapsed';
+
 export interface BrokerLicense {
   id: string;
   licenseNumber: string;
   scopeOfAuthorization: string | null;
   issuedAt: string | null;
   expiresAt: string;
-  status: string;
+  status: BrokerLicenseStatus;
   isCurrentlyLapsed: boolean;
 }
 

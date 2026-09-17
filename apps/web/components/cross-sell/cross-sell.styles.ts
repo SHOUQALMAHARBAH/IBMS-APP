@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 export const crossSellCardStyle: CSSProperties = {
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   marginBottom: '0.75rem',
 };
@@ -10,9 +10,9 @@ export const crossSellCardStyle: CSSProperties = {
 export const crossSellPanelStyle: CSSProperties = {
   marginTop: '1rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
-  background: 'rgba(128,128,128,0.05)',
+  background: 'var(--surface-sunken)',
 };
 
 export const crossSellActionsStyle: CSSProperties = {
@@ -28,5 +28,5 @@ export const crossSellBadgeStyle: CSSProperties = {
   padding: '0.1rem 0.5rem',
   borderRadius: '0.75rem',
   fontSize: '0.8rem',
-  border: '1px solid rgba(128,128,128,0.4)',
+  border: '1px solid var(--border-strong)',
 };

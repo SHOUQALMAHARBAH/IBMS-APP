@@ -6,6 +6,7 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildCertificateOfInsuranceHtml } from './certificate-of-insurance.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { insurerName } from '../../repositories/insurer-identity';
 
 const CERTIFICATE_OF_INSURANCE_TEMPLATE_TYPE = 'certificate_of_insurance';
 
@@ -91,7 +92,9 @@ export class CertificateOfInsuranceDocumentService {
       {
         policyId: policy.id,
         customerLegalName: customer.legalName,
-        insurerName: policy.insurer?.name ?? policy.insurerId,
+        insurerName: policy.insurer
+          ? insurerName(policy.insurer)
+          : policy.insurerId,
         policyNumber: policy.policyNumber,
         insuranceLine: policy.insuranceLine,
         inceptionDate: policy.inceptionDate,

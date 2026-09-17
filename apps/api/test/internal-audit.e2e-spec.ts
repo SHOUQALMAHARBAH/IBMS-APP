@@ -3,7 +3,8 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -269,9 +270,14 @@ describe('Internal Audit (e2e) — backlog Part C #57', () => {
       .get(`/audit-trail?entityType=Lead&entityId=${leadId}&action=TRANSITION`)
       .set(bearer(auditor.accessToken))
       .expect(200);
-    expect((browsed.body as AuditLogEntryBody[]).length).toBeGreaterThanOrEqual(
-      1,
-    );
+    const browsedPage = browsed.body as {
+      items: AuditLogEntryBody[];
+      total: number;
+    };
+    expect(browsedPage.items.length).toBeGreaterThanOrEqual(1);
+    // The browse is paged now; `total` is the whole matching set, so it can
+    // never be smaller than what came back on this page.
+    expect(browsedPage.total).toBeGreaterThanOrEqual(browsedPage.items.length);
 
     // Admin DOES hold audit-log.read
     await request(app.getHttpServer())
@@ -330,5 +336,58 @@ describe('Internal Audit (e2e) — backlog Part C #57', () => {
       .get(`/audit-trail/documents/does-not-exist/history`)
       .set(bearer(auditor.accessToken))
       .expect(404);
+  });
+
+  it('pages the audit-log browse rather than capping it', async () => {
+    const app = await boot();
+    const auditor = await makeUser(app, 'ia-page-aud', 'EXTERNAL_AUDITOR');
+
+    const pageOf = async (qs: string) => {
+      const res = await request(app.getHttpServer())
+        .get(`/audit-trail?${qs}`)
+        .set(bearer(auditor.accessToken))
+        .expect(200);
+      return res.body as {
+        items: AuditLogEntryBody[];
+        total: number;
+        page: number;
+        pageSize: number;
+      };
+    };
+
+    // Pinned to an instant BEFORE the first read, and reused for the second.
+    //
+    // This endpoint is the one list whose own reads append to the table it
+    // reads: every browse records a PDPL access row. Without the pin, the row
+    // written by page 0's request sorts to the top (occurredAt desc) and
+    // shifts everything down one, so page 1 re-shows a row page 0 already
+    // returned — a real defect, and the reason the UI pins the same `to` for
+    // the whole browse rather than only the test doing it.
+    const asOf = new Date().toISOString();
+
+    // Against the accumulated test database: this is exactly the browse the
+    // old 5,000-row cap silently truncated, and the point of the change is
+    // that the reader can now page past the newest rows.
+    const first = await pageOf(`pageSize=2&to=${encodeURIComponent(asOf)}`);
+    expect(first.items).toHaveLength(2);
+    expect(first.page).toBe(0);
+    expect(first.total).toBeGreaterThan(2);
+    expect(first.pageSize).toBe(2);
+
+    const second = await pageOf(
+      `page=1&pageSize=2&to=${encodeURIComponent(asOf)}`,
+    );
+    expect(second.page).toBe(1);
+
+    // Disjoint — overlapping pages would show one entry twice and skip
+    // another, which on an audit log is a real defect rather than a cosmetic
+    // one. This holds only because both reads are pinned to the same instant.
+    const firstIds = first.items.map((r) => r.id);
+    const secondIds = second.items.map((r) => r.id);
+    expect(firstIds.some((id) => secondIds.includes(id))).toBe(false);
+
+    // Same pinned window, so the count is identical rather than merely
+    // non-shrinking: the rows this test's own two reads wrote fall outside it.
+    expect(second.total).toBe(first.total);
   });
 });

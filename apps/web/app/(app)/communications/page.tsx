@@ -1,6 +1,8 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -14,31 +16,38 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 
-const SEND_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-];
+const CHANNEL_LABEL_KEY: Record<string, TranslationKey> = {
+  EMAIL: 'commChannelEmail',
+  SMS: 'commChannelSms',
+  WHATSAPP: 'commChannelWhatsapp',
+  CALL: 'commChannelCall',
+  PORTAL: 'commChannelPortal',
+  OTHER: 'commChannelOther',
+};
+
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 export default function CommunicationsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canSend =
-    !!user && user.roles.some((r) => SEND_ROLES.includes(r));
+    hasPermission(user, 'communication.send');
 
   const [rows, setRows] = useState<Communication[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -61,36 +70,36 @@ export default function CommunicationsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the communication.send permission."
+          ? t('commNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load communications — try again.',
+            : t('commLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function checkConsent() {
     setConsent(null);
     setConsentError(null);
     if (!customerId.trim()) {
-      setConsentError('Enter a customer ID first.');
+      setConsentError(t('commEnterCustomerFirst'));
       return;
     }
     try {
       setConsent(await getMarketingConsentStatus(customerId.trim()));
     } catch (err) {
       setConsentError(
-        err instanceof ApiError ? err.message : 'Consent check failed.',
+        err instanceof ApiError ? err.message : t('commConsentCheckFailed'),
       );
     }
   }
@@ -112,7 +121,7 @@ export default function CommunicationsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'The send failed — try again.',
+        err instanceof ApiError ? err.message : t('commSendError'),
       );
     } finally {
       setBusy(false);
@@ -123,12 +132,9 @@ export default function CommunicationsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Communications</h1>
+      <h1>{t('commHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Outbound customer communications. Channel and language default to the
-        customer&apos;s recorded preferences (an explicit value that disagrees is
-        rejected). A <strong>marketing</strong> send is allowed only while the
-        customer&apos;s marketing consent is granted and not withdrawn.
+        {t('commIntro')}
       </p>
 
       {canSend ? (
@@ -141,30 +147,25 @@ export default function CommunicationsPage() {
             maxWidth: '34rem',
           }}
         >
+          <CustomerPicker
+            value={customerId}
+            onChange={setCustomerId}
+            label={t('commCustomerIdLabel')}
+            required
+          />
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Customer ID
-            <input
-              aria-label="Customer ID"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            />
-          </label>
-          <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-          >
-            Channel (blank = the customer&apos;s recorded preference)
+            {t('commChannelLabel')}
             <select
-              aria-label="Channel"
+              aria-label={t('commColChannel')}
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
             >
-              <option value="">(recorded preference)</option>
+              <option value="">{t('commChannelDefaultOption')}</option>
               {COMMUNICATION_CHANNELS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.CommunicationChannel[c])}
                 </option>
               ))}
             </select>
@@ -172,18 +173,18 @@ export default function CommunicationsPage() {
           <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
             <input
               type="checkbox"
-              aria-label="Marketing"
+              aria-label={t('commColMarketing')}
               checked={isMarketing}
               onChange={(e) => setIsMarketing(e.target.checked)}
             />
-            Marketing communication (consent-gated)
+            {t('commMarketingLabel')}
           </label>
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Subject (optional)
+            {t('commSubjectLabel')}
             <input
-              aria-label="Subject"
+              aria-label={t('commColSubject')}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
@@ -191,9 +192,9 @@ export default function CommunicationsPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Message
+            {t('commMessageLabel')}
             <textarea
-              aria-label="Message"
+              aria-label={t('commMessageLabel')}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               required
@@ -202,10 +203,10 @@ export default function CommunicationsPage() {
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button type="submit" disabled={busy}>
-              {busy ? 'Sending…' : 'Log communication'}
+              {busy ? t('commSendingButton') : t('commLogButton')}
             </button>
             <button type="button" onClick={() => void checkConsent()}>
-              Check marketing consent
+              {t('commCheckConsentButton')}
             </button>
           </div>
           {consent ? (
@@ -215,10 +216,12 @@ export default function CommunicationsPage() {
                 color: consent.marketing.allowed ? '#15803d' : '#b45309',
               }}
             >
-              Marketing consent:{' '}
+              {t('commConsentLabel')}{' '}
               {consent.marketing.allowed
-                ? 'granted — a marketing send is allowed'
-                : `blocked (${consent.marketing.reason.replace('_', ' ')})`}
+                ? t('commConsentAllowed')
+                : t('commConsentBlocked', {
+                    reason: consent.marketing.reason.replace('_', ' '),
+                  })}
             </p>
           ) : null}
           {consentError ? (
@@ -242,18 +245,18 @@ export default function CommunicationsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No communications.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('commNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Customer</th>
-                  <th style={head}>Channel</th>
-                  <th style={head}>Lang</th>
-                  <th style={head}>Marketing</th>
-                  <th style={head}>Subject</th>
-                  <th style={head}>Sent</th>
+                  <th style={head}>{t('commColCustomer')}</th>
+                  <th style={head}>{t('commColChannel')}</th>
+                  <th style={head}>{t('commColLang')}</th>
+                  <th style={head}>{t('commColMarketing')}</th>
+                  <th style={head}>{t('commColSubject')}</th>
+                  <th style={head}>{t('commColSent')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,9 +265,11 @@ export default function CommunicationsPage() {
                     <td style={cell}>
                       {r.customerId ? `${r.customerId.slice(0, 8)}…` : '—'}
                     </td>
-                    <td style={cell}>{r.channel}</td>
+                    <td style={cell}>
+                      {CHANNEL_LABEL_KEY[r.channel] ? t(CHANNEL_LABEL_KEY[r.channel]) : r.channel}
+                    </td>
                     <td style={cell}>{r.languageUsed ?? '—'}</td>
-                    <td style={cell}>{r.isMarketing ? 'yes' : 'no'}</td>
+                    <td style={cell}>{r.isMarketing ? t('commYes') : t('commNo')}</td>
                     <td style={cell}>{r.subject ?? '—'}</td>
                     <td style={cell}>{r.sentAt.slice(0, 10)}</td>
                   </tr>
@@ -273,7 +278,9 @@ export default function CommunicationsPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        <p>{t('commLoading')}</p>
+      )}
     </main>
   );
 }

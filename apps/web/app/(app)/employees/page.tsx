@@ -12,17 +12,19 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function EmployeesPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -44,7 +46,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -54,20 +56,20 @@ export default function EmployeesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the employee.manage permission."
+          ? t('empNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load employees — try again.',
+            : t('empLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -94,7 +96,7 @@ export default function EmployeesPage() {
       await load();
     } catch (err) {
       setCreateError(
-        err instanceof ApiError ? err.message : 'Could not create the employee record.',
+        err instanceof ApiError ? err.message : t('empCreateError'),
       );
     }
   }
@@ -103,10 +105,9 @@ export default function EmployeesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Employees</h1>
+      <h1>{t('empHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Employee records, licensing/certification tracking, and security
-        awareness training (Part 8.2).
+        {t('empIntro')}
       </p>
 
       {loadError ? (
@@ -117,16 +118,16 @@ export default function EmployeesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No employees recorded yet.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('empNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
             <thead>
               <tr>
-                <th style={head}>Name</th>
-                <th style={head}>Position</th>
-                <th style={head}>Licensed role</th>
-                <th style={head}>Hire date</th>
-                <th style={head}>Terminated</th>
+                <th style={head}>{t('empColName')}</th>
+                <th style={head}>{t('empColPosition')}</th>
+                <th style={head}>{t('empColLicensedRole')}</th>
+                <th style={head}>{t('empColHireDate')}</th>
+                <th style={head}>{t('empColTerminated')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -141,7 +142,7 @@ export default function EmployeesPage() {
                   <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
                   <td style={cell}>{row.terminationDate ? 'Yes' : 'No'}</td>
                   <td style={cell}>
-                    <Link href={`/employees/${row.id}`}>View</Link>
+                    <Link href={`/employees/${row.id}`}>{t('empViewButton')}</Link>
                   </td>
                 </tr>
               ))}
@@ -149,13 +150,13 @@ export default function EmployeesPage() {
           </table>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('empLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new employee</h2>
+        <h2>{t('empCreateHeading')}</h2>
         <label style={labelStyle}>
-          Given name
+          {t('empGivenName')}
           <input
             dir="auto"
             value={givenName}
@@ -164,11 +165,11 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Father&apos;s name (optional)
+          {t('empFatherName')}
           <input dir="auto" value={fatherName} onChange={(e) => setFatherName(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          Grandfather&apos;s name (optional)
+          {t('empGrandfatherName')}
           <input
             dir="auto"
             value={grandfatherName}
@@ -176,7 +177,7 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Family name
+          {t('empFamilyName')}
           <input
             dir="auto"
             value={familyName}
@@ -185,7 +186,7 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          National ID
+          {t('empNationalId')}
           <input
             value={nationalId}
             onChange={(e) => setNationalId(e.target.value)}
@@ -193,11 +194,11 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Position (optional)
+          {t('empPosition')}
           <input value={position} onChange={(e) => setPosition(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          Hire date
+          {t('empHireDate')}
           <input
             type="date"
             value={hireDate}
@@ -206,11 +207,11 @@ export default function EmployeesPage() {
           />
         </label>
         <label style={labelStyle}>
-          Licensed role (optional)
+          {t('empLicensedRole')}
           <input
             value={licensedRole}
             onChange={(e) => setLicensedRole(e.target.value)}
-            placeholder="e.g. CBJ-licensed Broker Representative"
+            placeholder={t('empLicensedRolePlaceholder')}
           />
         </label>
         {createError ? (
@@ -218,7 +219,7 @@ export default function EmployeesPage() {
             {createError}
           </p>
         ) : null}
-        <button type="submit">Record employee</button>
+        <button type="submit">{t('empSubmitButton')}</button>
       </form>
     </main>
   );

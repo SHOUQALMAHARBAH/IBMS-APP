@@ -1,6 +1,8 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -14,25 +16,37 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 
-const MANAGE_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
+const REASON_LABEL_KEY: Record<string, TranslationKey> = {
+  renewal_inactivity: 'retReasonRenewalInactivity',
+  lapse_risk: 'retReasonLapseRisk',
+};
+const STATUS_LABEL_KEY: Record<string, TranslationKey> = {
+  open: 'retStatusOpen',
+  closed: 'retStatusClosed',
+};
+
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 export default function RetentionCasesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.some((r) => MANAGE_ROLES.includes(r));
+  const { t } = useLanguage();
+  const canManage = hasPermission(user, 'retention-case.manage');
 
   const [rows, setRows] = useState<RetentionCase[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -51,23 +65,23 @@ export default function RetentionCasesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the retention-case.manage permission."
+          ? t('retNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load retention cases — try again.',
+            : t('retLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -77,7 +91,7 @@ export default function RetentionCasesPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('retActionError'),
       );
     } finally {
       setBusy(false);
@@ -106,11 +120,9 @@ export default function RetentionCasesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Customer retention</h1>
+      <h1>{t('retHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Retention cases open automatically when a renewal case shows lapse
-        risk or has sat inactive too long (nightly sweep), or can be opened
-        manually. A factual log — no workflow, no SLA.
+        {t('retIntro')}
       </p>
 
       {canManage ? (
@@ -124,39 +136,34 @@ export default function RetentionCasesPage() {
               maxWidth: '30rem',
             }}
           >
+            <CustomerPicker
+              value={customerId}
+              onChange={setCustomerId}
+              label={t('retCustomerIdLabel')}
+              required
+            />
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
             >
-              Customer ID
-              <input
-                aria-label="Customer ID"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                required
-              />
-            </label>
-            <label
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-            >
-              Reason
+              {t('retReasonLabel')}
               <select
-                aria-label="Reason"
+                aria-label={t('retReasonLabel')}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               >
                 {RETENTION_CASE_REASONS.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {t(ENUM_LABEL.RetentionCaseReason[r])}
                   </option>
                 ))}
               </select>
             </label>
             <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-              {busy ? 'Saving…' : 'Open retention case'}
+              {busy ? t('retSavingButton') : t('retOpenButton')}
             </button>
           </form>
           <button type="button" disabled={busy} onClick={() => void sweep()}>
-            Run detection sweep now
+            {t('retSweepButton')}
           </button>
           {sweepMessage ? <p style={{ opacity: 0.75 }}>{sweepMessage}</p> : null}
         </>
@@ -175,25 +182,29 @@ export default function RetentionCasesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No retention cases.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('retNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Customer</th>
-                  <th style={head}>Reason</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>Opened</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('retColCustomer')}</th>
+                  <th style={head}>{t('retColReason')}</th>
+                  <th style={head}>{t('retColStatus')}</th>
+                  <th style={head}>{t('retColOpened')}</th>
+                  <th style={head}>{t('retColAction')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>{r.customerId.slice(0, 8)}…</td>
-                    <td style={cell}>{r.reason}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>
+                      {REASON_LABEL_KEY[r.reason] ? t(REASON_LABEL_KEY[r.reason]) : r.reason}
+                    </td>
+                    <td style={cell}>
+                      {STATUS_LABEL_KEY[r.status] ? t(STATUS_LABEL_KEY[r.status]) : r.status}
+                    </td>
                     <td style={cell}>{r.createdAt.slice(0, 10)}</td>
                     <td style={cell}>
                       {canManage && !r.isClosed ? (
@@ -202,7 +213,7 @@ export default function RetentionCasesPage() {
                           disabled={busy}
                           onClick={() => void run(() => closeRetentionCase(r.id))}
                         >
-                          Close
+                          {t('retCloseButton')}
                         </button>
                       ) : null}
                     </td>
@@ -212,7 +223,9 @@ export default function RetentionCasesPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        <p>{t('retLoading')}</p>
+      )}
     </main>
   );
 }

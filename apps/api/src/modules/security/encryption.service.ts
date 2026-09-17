@@ -5,11 +5,14 @@ import { AuditService } from '../audit/audit.service';
 
 const ALGORITHM = 'aes-256-gcm';
 
-/** Only one purpose exists today (PII field-level encryption). Typed as a
- * union rather than a bare string so a future purpose (e.g. document
- * storage keys) is a deliberate addition here, not a typo anywhere it's
- * called from. */
-export type EncryptionPurpose = 'pii';
+/** Typed as a union rather than a bare string so a new purpose is a
+ * deliberate addition here, not a typo anywhere it's called from.
+ *
+ * - `pii`  — the `-- ENCRYPT` field-level encryption of personal data.
+ * - `oauth` — Part I §6: an Organization's mailbox refresh token. Separated
+ *   from `pii` because it is not personal data and its key-use audit trail
+ *   should be distinguishable from a national ID being read. */
+export type EncryptionPurpose = 'pii' | 'oauth';
 
 export interface KeyUseContext {
   /** Acting user — required so key-use logging (below) attributes to

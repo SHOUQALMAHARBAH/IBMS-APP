@@ -14,10 +14,11 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const cell: CSSProperties = { padding: '0.35rem 0.75rem', borderBottom: '1px solid #e5e7eb', textAlign: 'start' };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const cell: CSSProperties = { padding: '0.35rem 0.75rem', borderBottom: '1px solid var(--border-subtle)', textAlign: 'start' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
 function previousUtcMonthLabel(): string {
   const now = new Date();
@@ -30,6 +31,7 @@ function displayOrDash(value: string | number | null): string {
 }
 
 export default function InsurerEmployeePerformanceDashboardPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -43,7 +45,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -65,13 +67,13 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       setEmployeeRecords(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the insurer-performance.view / employee-performance.view permissions."
+          ? t('diepNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the Insurer & Employee Performance Dashboard — try again.',
+            : t('diepLoadError'),
       );
     }
-  }, [periodLabel, branchId, insurerId]);
+  }, [periodLabel, branchId, insurerId, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -80,7 +82,7 @@ export default function InsurerEmployeePerformanceDashboardPage() {
     })();
     // Filters apply on explicit "Apply filters" submit only — see below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, t]);
 
   function applyFilters(ev: React.FormEvent) {
     ev.preventDefault();
@@ -91,14 +93,9 @@ export default function InsurerEmployeePerformanceDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Insurer &amp; Employee Performance Dashboard</h1>
+      <h1>{t('diepHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Insurer performance score across 4 axes (backlog #60) and employee KPI
-        achievement (backlog #61) for one period. Insurer ID scopes the
-        insurer table to a single insurer&apos;s already-computed score;
-        branch scoping applies only to employee performance — an
-        insurer&apos;s score is a book-wide figure with no branch dimension.
-        Neither table has an insurance-line dimension of its own.
+        {t('diepIntro')}
       </p>
 
       <form
@@ -106,23 +103,23 @@ export default function InsurerEmployeePerformanceDashboardPage() {
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Period label
+          {t('dashPeriodLabel')}
           <input
-            aria-label="Period label"
-            placeholder="e.g. 2026-08"
+            aria-label={t('dashPeriodLabel')}
+            placeholder={t('dashPeriodLabelPlaceholder')}
             value={periodLabel}
             onChange={(e) => setPeriodLabel(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurer ID (insurer table only)
-          <input aria-label="Insurer ID filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          {t('diepInsurerIdScopedLabel')}
+          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Branch ID (employees only)
-          <input aria-label="Branch ID filter" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          {t('diepBranchIdScopedLabel')}
+          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
-        <button type="submit">Apply filters</button>
+        <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
       {loadError ? (
@@ -132,18 +129,18 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       ) : null}
 
       <section style={sectionStyle}>
-        <h2>Insurer performance (4 axes)</h2>
+        <h2>{t('diepInsurerSection')}</h2>
         {insurerScores === null ? null : insurerScores.length === 0 ? (
-          <p>No insurer scores computed for this period yet.</p>
+          <p>{t('diepNoInsurerScores')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
             <thead>
               <tr>
-                <th style={head}>Insurer ID</th>
-                <th style={head}>Quote response</th>
-                <th style={head}>Claims service</th>
-                <th style={head}>Price</th>
-                <th style={head}>Service quality</th>
+                <th style={head}>{t('diepColInsurerId')}</th>
+                <th style={head}>{t('diepQuoteResponse')}</th>
+                <th style={head}>{t('diepClaimsService')}</th>
+                <th style={head}>{t('diepPrice')}</th>
+                <th style={head}>{t('diepServiceQuality')}</th>
               </tr>
             </thead>
             <tbody>
@@ -162,19 +159,19 @@ export default function InsurerEmployeePerformanceDashboardPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2>Employee KPI achievement</h2>
+        <h2>{t('diepEmployeeSection')}</h2>
         {employeeRecords === null ? null : employeeRecords.length === 0 ? (
-          <p>No employee performance records computed for this period yet.</p>
+          <p>{t('diepNoEmployeeRecords')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
             <thead>
               <tr>
-                <th style={head}>Employee ID</th>
-                <th style={head}>New clients</th>
-                <th style={head}>Premium written</th>
-                <th style={head}>Commission earned</th>
-                <th style={head}>Renewal rate</th>
-                <th style={head}>Cross-sell rate</th>
+                <th style={head}>{t('diepColEmployeeId')}</th>
+                <th style={head}>{t('diepNewClients')}</th>
+                <th style={head}>{t('diepPremiumWritten')}</th>
+                <th style={head}>{t('diepCommissionEarned')}</th>
+                <th style={head}>{t('diepRenewalRate')}</th>
+                <th style={head}>{t('diepCrossSellRate')}</th>
               </tr>
             </thead>
             <tbody>

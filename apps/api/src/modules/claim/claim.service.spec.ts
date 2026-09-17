@@ -26,6 +26,7 @@ const EXPIRY = new Date('2027-01-01T00:00:00.000Z');
 function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'clm-1',
+    organizationId: 'org-1',
     email: 'claims@ibms.test',
     roles: ['CLAIMS_OFFICER'],
     sessionId: 's-1',
@@ -37,6 +38,7 @@ function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
 function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'sales-9',
+    organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
     sessionId: 's-9',
@@ -269,6 +271,8 @@ function makeDeps(opts: Opts = {}) {
     }),
     findManyByPolicyId: vi.fn().mockResolvedValue([]),
     findManyByCustomerId: vi.fn().mockResolvedValue([]),
+    findManyForActor: vi.fn().mockResolvedValue([]),
+    countForActor: vi.fn().mockResolvedValue(0),
     // Process 28 — settlement.
     createSettlement: vi
       .fn()
@@ -613,11 +617,8 @@ describe('ClaimService reads', () => {
     expect(view.coverageResolvedAtLossDate).toBe(false);
   });
 
-  it('list: 422 unless exactly one scope is given', async () => {
+  it('list: 422 when BOTH scopes are given — they are different questions', async () => {
     const { service } = makeDeps();
-    await expect(service.list({}, claims())).rejects.toBeInstanceOf(
-      UnprocessableEntityException,
-    );
     await expect(
       service.list({ policyId: 'pol-1', customerId: 'cus-1' }, claims()),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
@@ -627,6 +628,82 @@ describe('ClaimService reads', () => {
     const { service, claimRepo } = makeDeps();
     await service.list({ policyId: 'pol-1' }, claims());
     expect(claimRepo.findManyByPolicyId).toHaveBeenCalledWith('pol-1');
+  });
+
+  it('list with NO scope is the queue, not a 422 — the gap this closes', async () => {
+    // It used to throw here, which is precisely why a CLAIMS_OFFICER had no
+    // screen: there was no way to ask "what claims am I responsible for".
+    const { service, claimRepo } = makeDeps();
+    const page = await service.list({}, claims());
+    expect(claimRepo.findManyForActor).toHaveBeenCalled();
+    expect(page).toMatchObject({ items: [], total: 0, page: 0 });
+  });
+
+  it('queue: a cross-owner role reaches the whole book (ownerUserId null)', async () => {
+    const { service, claimRepo } = makeDeps();
+    await service.list({}, claims({ roles: ['CLAIMS_OFFICER'] }));
+    expect(claimRepo.findManyForActor).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerUserId: null }),
+      expect.anything(),
+    );
+  });
+
+  it('queue: any other role is pinned to customers it owns', async () => {
+    // The visibility rule is the SAME one the scoped branches enforce per row;
+    // expressing it as a query filter is what makes it safe to paginate.
+    const { service, claimRepo } = makeDeps();
+    await service.list(
+      {},
+      claims({ id: 'sales-9', roles: ['SALES_RELATIONSHIP_OFFICER'] }),
+    );
+    expect(claimRepo.findManyForActor).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerUserId: 'sales-9' }),
+      expect.anything(),
+    );
+  });
+
+  it('queue: the count runs on the same filter as the page', async () => {
+    const { service, claimRepo } = makeDeps();
+    await service.list({ status: 'SETTLED', alertOpen: 'true' }, claims());
+    const [pageFilter] = claimRepo.findManyForActor.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
+    const [countFilter] = claimRepo.countForActor.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
+    expect(countFilter).toEqual(pageFilter);
+    expect(pageFilter).toMatchObject({ status: 'SETTLED', alertOpen: true });
+  });
+
+  it('queue: alertOpen is only true for the literal string "true"', async () => {
+    const { service, claimRepo } = makeDeps();
+    await service.list({ alertOpen: 'false' }, claims());
+    expect(claimRepo.findManyForActor).toHaveBeenCalledWith(
+      expect.objectContaining({ alertOpen: false }),
+      expect.anything(),
+    );
+  });
+
+  it('queue: the audit row names the SCOPE and carries no claim content', async () => {
+    const { service, audit } = makeDeps();
+    audit.record.mockClear();
+    await service.list({}, claims());
+    const read = audit.record.mock.calls.find(
+      (c) => (c[0] as { action: string }).action === 'READ',
+    )?.[0] as { entityId: string; afterValue: Record<string, unknown> };
+    expect(read.entityId).toBe('queue:book-wide');
+    expect(read.afterValue).toMatchObject({ view: 'claims-queue' });
+    // ids and counts only — never a cause of loss or a claimant name.
+    expect(JSON.stringify(read.afterValue)).not.toMatch(
+      /causeOfLoss|lossLocation/,
+    );
+  });
+
+  it('the scoped branches return the SAME envelope as the queue', async () => {
+    const { service } = makeDeps();
+    const scoped = await service.list({ policyId: 'pol-1' }, claims());
+    expect(scoped).toMatchObject({ items: [], total: 0 });
+    expect(Array.isArray(scoped.items)).toBe(true);
   });
 
   it('get: records a sensitive-data-access READ audit (ids only, no claim content)', async () => {

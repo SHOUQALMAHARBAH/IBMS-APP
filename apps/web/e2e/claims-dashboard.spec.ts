@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -56,7 +57,7 @@ test("renders every metric section with real figures", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Claims Dashboard" })).toBeVisible();
   await expect(page.getByText("14", { exact: true })).toBeVisible();
   await expect(page.getByText("52", { exact: true })).toBeVisible();
-  await expect(page.getByText("37500.000 JOD")).toBeVisible();
+  await expect(page.getByText("JOD 37,500.000")).toBeVisible();
   await expect(page.getByText("National Insurance")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply filters" })).toBeVisible();
 });

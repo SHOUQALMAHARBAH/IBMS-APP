@@ -47,6 +47,7 @@ describe('deriveEmployeePerformanceRecordView', () => {
   it('renders money as fixed 3dp strings, rates as fixed 2dp strings, and nulls through unchanged', () => {
     const row: EmployeePerformanceRecord = {
       id: 'record-1',
+      organizationId: 'org-1',
       employeeId: 'employee-1',
       periodLabel: '2026-08',
       newClients: 3,
@@ -70,6 +71,7 @@ describe('deriveEmployeePerformanceRecordView', () => {
   it('renders a zero renewal rate ("0%", not null) distinctly from no renewal data at all', () => {
     const row: EmployeePerformanceRecord = {
       id: 'record-2',
+      organizationId: 'org-1',
       employeeId: 'employee-1',
       periodLabel: '2026-08',
       newClients: 0,

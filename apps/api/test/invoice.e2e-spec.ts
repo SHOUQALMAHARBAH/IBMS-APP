@@ -3,8 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -255,9 +257,7 @@ async function activePolicy(
       insuranceLine: 'Property All Risks',
     },
   });
-  const insurer = await prisma.insurer.create({
-    data: { name: `Invoice E2E ${tag} ins ${rand}` },
-  });
+  const insurer = await makeInsurer(`Invoice E2E ${tag} ins ${rand}`);
   await prisma.rFQInsurer.create({
     data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
   });
@@ -1131,7 +1131,8 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
         ownerType: 'customer',
         customerId,
         channelType: 'bank_transfer',
-        label: 'Client account 0123456789',
+        // 16 digits — see the guard's 12-digit floor (ISO/IEC 7812).
+        label: 'Client account 0123456789012345',
       })
       .expect(400);
     await request(app.getHttpServer())

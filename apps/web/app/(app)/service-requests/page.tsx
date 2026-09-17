@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -14,21 +15,38 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 
-const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
-const REQUEST_TYPES = ['certificate', 'copy', 'change', 'other'];
+const REQUEST_TYPES = ['certificate', 'copy', 'change', 'other'] as const;
+
+/** Request type / status -> label key. Both are plain lowercase strings in the
+ * schema rather than Prisma enums, so this mapping is the only thing keeping
+ * `in_progress` off a user's screen. */
+const TYPE_LABEL_KEY: Record<(typeof REQUEST_TYPES)[number], TranslationKey> = {
+  certificate: 'srTypeCertificate',
+  copy: 'srTypeCopy',
+  change: 'srTypeChange',
+  other: 'srTypeOther',
+};
+const STATUS_LABEL_KEY: Record<string, TranslationKey> = {
+  open: 'srStatusOpen',
+  in_progress: 'srStatusInProgress',
+  fulfilled: 'srStatusFulfilled',
+  cancelled: 'srStatusCancelled',
+};
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 function slaLabel(r: ServiceRequest): string {
@@ -41,9 +59,10 @@ function slaLabel(r: ServiceRequest): string {
 export default function ServiceRequestsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
   const canManage =
     !!user &&
-    (user.roles.includes(SALES_ROLE) || user.roles.includes(MANAGER_ROLE));
+    hasPermission(user, 'service-request.manage');
 
   const [rows, setRows] = useState<ServiceRequest[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -62,23 +81,23 @@ export default function ServiceRequestsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the service-request.manage permission."
+          ? t('srNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load service requests — try again.',
+            : t('srLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -88,7 +107,7 @@ export default function ServiceRequestsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('srActionError'),
       );
     } finally {
       setBusy(false);
@@ -112,49 +131,43 @@ export default function ServiceRequestsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Customer requests</h1>
+      <h1>{t('srHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Certificates, copies, changes and other customer service requests. Each
-        is tracked against a fulfilment SLA (a 5-business-day working target,
-        escalating to the branch manager); the timer clears when the request is
-        fulfilled or cancelled.
+        {t('srIntro')}
       </p>
 
       {canManage ? (
         <form onSubmit={submit} style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}>
+          <CustomerPicker
+            value={customerId}
+            onChange={setCustomerId}
+            label={t('srCustomerIdLabel')}
+            required
+          />
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Customer ID
-            <input
-              aria-label="Customer ID"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              required
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Request type
+            {t('srTypeLabel')}
             <select
-              aria-label="Request type"
+              aria-label={t('srTypeLabel')}
               value={requestType}
               onChange={(e) => setRequestType(e.target.value)}
             >
-              {REQUEST_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {REQUEST_TYPES.map((rt) => (
+                <option key={rt} value={rt}>
+                  {t(TYPE_LABEL_KEY[rt])}
                 </option>
               ))}
             </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Detail (optional)
+            {t('srDetailLabel')}
             <input
-              aria-label="Detail"
+              aria-label={t('srColDetail')}
               value={detail}
               onChange={(e) => setDetail(e.target.value)}
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : 'Log request'}
+            {busy ? t('srSavingButton') : t('srLogButton')}
           </button>
         </form>
       ) : null}
@@ -172,27 +185,33 @@ export default function ServiceRequestsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No service requests.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('srNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Customer</th>
-                  <th style={head}>Type</th>
-                  <th style={head}>Detail</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>SLA</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('srColCustomer')}</th>
+                  <th style={head}>{t('srColType')}</th>
+                  <th style={head}>{t('srColDetail')}</th>
+                  <th style={head}>{t('srColStatus')}</th>
+                  <th style={head}>{t('srColSla')}</th>
+                  <th style={head}>{t('srColAction')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>{r.customerId.slice(0, 8)}…</td>
-                    <td style={cell}>{r.requestType}</td>
+                    <td style={cell}>
+                      {TYPE_LABEL_KEY[r.requestType as keyof typeof TYPE_LABEL_KEY]
+                        ? t(TYPE_LABEL_KEY[r.requestType as keyof typeof TYPE_LABEL_KEY])
+                        : r.requestType}
+                    </td>
                     <td style={cell}>{r.detail ?? '—'}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>
+                      {STATUS_LABEL_KEY[r.status] ? t(STATUS_LABEL_KEY[r.status]) : r.status}
+                    </td>
                     <td style={cell}>{slaLabel(r)}</td>
                     <td style={cell}>
                       {canManage && !r.isClosed ? (
@@ -203,12 +222,12 @@ export default function ServiceRequestsPage() {
                               disabled={busy}
                               onClick={() => void run(() => startServiceRequest(r.id))}
                             >
-                              Start
+                              {t('srStartButton')}
                             </button>
                           ) : null}
                           <input
-                            aria-label={`Outcome note for ${r.id}`}
-                            placeholder="Outcome note (min 3 chars)"
+                            aria-label={t('srOutcomeNoteLabel')}
+                            placeholder={t('srOutcomeNoteLabel')}
                             value={notes[r.id] ?? ''}
                             onChange={(e) =>
                               setNotes((n) => ({ ...n, [r.id]: e.target.value }))
@@ -224,7 +243,7 @@ export default function ServiceRequestsPage() {
                                 )
                               }
                             >
-                              Fulfil
+                              {t('srFulfilButton')}
                             </button>
                             <button
                               type="button"
@@ -250,7 +269,7 @@ export default function ServiceRequestsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('srLoading')}</p>
       )}
     </main>
   );

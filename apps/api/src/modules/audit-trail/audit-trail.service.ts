@@ -3,6 +3,7 @@ import type { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { AuditTrailRepository } from '../../repositories/audit-trail.repository';
+import { pageWindow, type Paginated } from '../../common/pagination';
 import {
   AUDIT_TRAIL_READ_LIMIT,
   buildDocumentVersionViews,
@@ -43,19 +44,26 @@ export class AuditTrailService {
   async browseAuditLog(
     query: ListAuditTrailQueryDto,
     actorUserId: string,
-  ): Promise<AuditLogEntryView[]> {
-    const rows = await this.repo.findAuditLog(
-      {
-        entityType: query.entityType,
-        entityId: query.entityId,
-        userId: query.userId,
-        action: query.action,
-        from: query.from ? new Date(query.from) : undefined,
-        to: query.to ? new Date(query.to) : undefined,
-      },
-      AUDIT_TRAIL_READ_LIMIT,
-    );
-    this.warnIfTruncated(rows.length, 'audit-log');
+  ): Promise<Paginated<AuditLogEntryView>> {
+    const filter = {
+      entityType: query.entityType,
+      entityId: query.entityId,
+      userId: query.userId,
+      action: query.action,
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+    };
+    // Paged, not capped. This is the fastest-growing table in the system, and
+    // a cap answered a browse of an aged log by silently dropping everything
+    // past the newest 5,000 rows — the reader could not tell a short result
+    // from a truncated one. `warnIfTruncated` is deliberately NOT called here
+    // any more: nothing is truncated, and `total` says how much there is.
+    // The two history reads below still cap, and still warn.
+    const window = pageWindow(query.page, query.pageSize);
+    const [rows, total] = await Promise.all([
+      this.repo.findAuditLog(filter, window.take, window.skip),
+      this.repo.countAuditLog(filter),
+    ]);
 
     await this.recordReadBestEffort(
       'AuditLogEntry',
@@ -70,11 +78,22 @@ export class AuditTrailService {
           to: query.to ?? null,
         },
         returned: rows.length,
+        // Which page was read, not just how many rows came back: "browsed the
+        // audit log" is a reviewable event, and the page is part of what was
+        // actually seen.
+        page: window.page,
+        pageSize: window.pageSize,
+        matching: total,
       },
       actorUserId,
     );
 
-    return rows.map(deriveAuditLogEntryView);
+    return {
+      items: rows.map(deriveAuditLogEntryView),
+      total,
+      page: window.page,
+      pageSize: window.pageSize,
+    };
   }
 
   async documentHistory(

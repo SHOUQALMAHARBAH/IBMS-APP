@@ -12,20 +12,19 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const statRow: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.75rem', margin: '1rem 0' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div
       style={{
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 8,
         padding: '0.6rem 0.9rem',
         minWidth: '9rem',
@@ -40,12 +39,10 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 export default function SalesPerformancePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const isManager = hasAny(user?.roles, [
-    'BRANCH_DEPARTMENT_MANAGER',
-    'EXECUTIVE_MANAGEMENT',
-  ]);
+  const isManager = hasPermission(user, 'sales-target.manage');
 
   const [ownerUserId, setOwnerUserId] = useState('');
   const [branchId, setBranchId] = useState('');
@@ -63,7 +60,7 @@ export default function SalesPerformancePage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(
     async (filters: {
@@ -78,16 +75,16 @@ export default function SalesPerformancePage() {
         setPerformance(null);
         setLoadError(
           err instanceof ApiError && err.status === 403
-            ? "You don't hold the dashboard.sales.view permission."
+            ? t('spNoPermission')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load sales performance — try again.',
+              : t('spLoadError'),
         );
       } finally {
         setHasLookedUp(true);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -96,7 +93,7 @@ export default function SalesPerformancePage() {
     void (async () => {
       await load({});
     })();
-  }, [user, isManager, load]);
+  }, [user, isManager, load, t]);
 
   function onLookup(e: FormEvent) {
     e.preventDefault();
@@ -117,7 +114,7 @@ export default function SalesPerformancePage() {
           performance.target.id,
           Number(targetNewProspects),
         );
-        setTargetMessage('Target revised.');
+        setTargetMessage(t('spTargetRevised'));
       } else {
         await createSalesTarget({
           ownerUserId: ownerUserId || undefined,
@@ -127,7 +124,7 @@ export default function SalesPerformancePage() {
           periodEnd: targetPeriodEnd,
           targetNewProspects: Number(targetNewProspects),
         });
-        setTargetMessage('Target set.');
+        setTargetMessage(t('spTargetSet'));
       }
       await load({
         ownerUserId: ownerUserId || undefined,
@@ -135,7 +132,7 @@ export default function SalesPerformancePage() {
         periodLabel: periodLabel || undefined,
       });
     } catch (err) {
-      setTargetError(err instanceof ApiError ? err.message : 'Could not save the target.');
+      setTargetError(err instanceof ApiError ? err.message : t('spSaveTargetError'));
     }
   }
 
@@ -143,39 +140,38 @@ export default function SalesPerformancePage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Sales Performance</h1>
+      <h1>{t('spHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        New prospects qualified against quota, per Sales/Relationship
-        Officer or per branch/team.
+        {t('spIntro')}
       </p>
 
       {isManager ? (
         <form onSubmit={onLookup} style={formStyle}>
-          <h2>Look up performance</h2>
+          <h2>{t('spLookUp')}</h2>
           <label style={labelStyle}>
-            Owner user ID
+            {t('spOwnerUserIdLabel')}
             <input
               value={ownerUserId}
               onChange={(e) => setOwnerUserId(e.target.value)}
-              placeholder="one employee"
+              placeholder={t('spOneEmployee')}
             />
           </label>
           <label style={labelStyle}>
-            Branch ID
+            {t('dashBranchIdLabel')}
             <input
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              placeholder="one team"
+              placeholder={t('spOneTeam')}
             />
           </label>
           <label style={labelStyle}>
-            Period label (optional — defaults to the current period)
+            {t('spPeriodOptionalLabel')}
             <input
               value={periodLabel}
               onChange={(e) => setPeriodLabel(e.target.value)}
             />
           </label>
-          <button type="submit">View performance</button>
+          <button type="submit">{t('spViewButton')}</button>
         </form>
       ) : null}
 
@@ -189,19 +185,19 @@ export default function SalesPerformancePage() {
         <>
           <div style={statRow}>
             <Stat
-              label="Target — new prospects"
+              label={t('spTargetNewProspects')}
               value={performance.target?.targetNewProspects ?? '—'}
             />
             <Stat
-              label="Actual — new prospects"
+              label={t('spActualNewProspects')}
               value={performance.actual?.newProspects ?? '—'}
             />
             <Stat
-              label="Actual — new leads"
+              label={t('spActualNewLeads')}
               value={performance.actual?.newLeads ?? '—'}
             />
             <Stat
-              label="Achievement"
+              label={t('spAchievement')}
               value={
                 performance.achievementPercent === null
                   ? '—'
@@ -211,21 +207,23 @@ export default function SalesPerformancePage() {
           </div>
           {performance.target ? (
             <p style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-              Period {performance.target.periodLabel} (
-              {performance.target.periodStart.slice(0, 10)} to{' '}
-              {performance.target.periodEnd.slice(0, 10)}).
+              {t('spPeriodRange', {
+                label: performance.target.periodLabel,
+                from: performance.target.periodStart.slice(0, 10),
+                to: performance.target.periodEnd.slice(0, 10),
+              })}
             </p>
           ) : (
-            <p style={{ opacity: 0.7 }}>No target set for the current period yet.</p>
+            <p style={{ opacity: 0.7 }}>{t('spNoTarget')}</p>
           )}
 
           {isManager ? (
             <form onSubmit={onSetTarget} style={formStyle}>
-              <h2>{performance.target ? 'Revise target' : 'Set target'}</h2>
+              <h2>{performance.target ? t('spReviseButton') : t('spSetButton')}</h2>
               {!performance.target ? (
                 <>
                   <label style={labelStyle}>
-                    Period start
+                    {t('dashPeriodStart')}
                     <input
                       type="date"
                       value={targetPeriodStart}
@@ -234,7 +232,7 @@ export default function SalesPerformancePage() {
                     />
                   </label>
                   <label style={labelStyle}>
-                    Period end
+                    {t('dashPeriodEnd')}
                     <input
                       type="date"
                       value={targetPeriodEnd}
@@ -245,7 +243,7 @@ export default function SalesPerformancePage() {
                 </>
               ) : null}
               <label style={labelStyle}>
-                Target new prospects
+                {t('spTargetNewProspects')}
                 <input
                   type="number"
                   min={1}
@@ -267,9 +265,9 @@ export default function SalesPerformancePage() {
           ) : null}
         </>
       ) : loadError ? null : hasLookedUp ? null : isManager ? (
-        <p style={{ opacity: 0.6 }}>Pick an employee or a branch above.</p>
+        <p style={{ color: 'var(--ink-secondary)' }}>{t('spPickFirst')}</p>
       ) : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

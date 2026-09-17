@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -23,10 +24,11 @@ import {
 } from '../../../../components/prospect/prospect.styles';
 import { repeatableRowStyle } from '../../../../components/customer/customer.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../../lib/customer/customer-api';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -109,14 +111,14 @@ export default function CustomerProfilePage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function handleReveal(field: RevealableField) {
     setRevealError(null);
@@ -139,35 +141,12 @@ export default function CustomerProfilePage() {
   // Client-side hint only (same convention as CAN_CREATE_CUSTOMER_ROLES) —
   // the backend enforces needs-assessment.create / risk-profile.* on write
   // regardless.
-  const canStartNeedsAssessment = user.roles.includes('SALES_RELATIONSHIP_OFFICER');
-  const canOpenRiskSurvey = user.roles.some((role) =>
-    ['SALES_RELATIONSHIP_OFFICER', 'PLACEMENT_TECHNICAL_OFFICER'].includes(role),
-  );
-  const canOpenInsuranceProgram = user.roles.some((role) =>
-    [
-      'SALES_RELATIONSHIP_OFFICER',
-      'PLACEMENT_TECHNICAL_OFFICER',
-      'BRANCH_DEPARTMENT_MANAGER',
-      'EXECUTIVE_MANAGEMENT',
-    ].includes(role),
-  );
-  const canOpenCrossSell = user.roles.some((role) =>
-    [
-      'SALES_RELATIONSHIP_OFFICER',
-      'BRANCH_DEPARTMENT_MANAGER',
-      'EXECUTIVE_MANAGEMENT',
-    ].includes(role),
-  );
+  const canStartNeedsAssessment = hasPermission(user, 'needs-assessment.create');
+  const canOpenRiskSurvey = hasPermission(user, 'risk-profile.create');
+  const canOpenInsuranceProgram = hasPermission(user, 'program.read');
+  const canOpenCrossSell = hasPermission(user, 'cross-sell.read');
   const canOpenUpSell = canOpenCrossSell;
-  const canOpenCrm = user.roles.some((role) =>
-    [
-      'SALES_RELATIONSHIP_OFFICER',
-      'BRANCH_DEPARTMENT_MANAGER',
-      'EXECUTIVE_MANAGEMENT',
-      'COMPLIANCE_OFFICER',
-      'EXTERNAL_AUDITOR',
-    ].includes(role),
-  );
+  const canOpenCrm = hasPermission(user, 'customer.360-view.read');
 
   return (
     <main style={pageStyle}>
@@ -201,7 +180,7 @@ export default function CustomerProfilePage() {
           />
           <PrivacyNoticeDisplay
             touchpoint="onboarding_kyc"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={profileGridStyle}>
@@ -303,7 +282,7 @@ export default function CustomerProfilePage() {
           {customer.customerType === 'CORPORATE' ? (
             <section style={{ marginTop: '2rem' }}>
               <h2>{t('customerUbosHeading')}</h2>
-              {ubos.length === 0 ? <p style={{ opacity: 0.6 }}>{t('customerUbosNone')}</p> : null}
+              {ubos.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUbosNone')}</p> : null}
               {ubos.map((u) => (
                 <div key={u.id} style={repeatableRowStyle}>
                   <strong>
@@ -318,10 +297,10 @@ export default function CustomerProfilePage() {
 
           <section style={{ marginTop: '2rem' }}>
             <h2>{t('customerDocumentsHeading')}</h2>
-            {documents.length === 0 ? <p style={{ opacity: 0.6 }}>{t('customerDocumentsNone')}</p> : null}
+            {documents.length === 0 ? <p style={{ color: 'var(--ink-secondary)' }}>{t('customerDocumentsNone')}</p> : null}
             {documents.map((d) => (
               <div key={d.id} style={repeatableRowStyle}>
-                <strong>{d.fileName}</strong> — {d.classification}
+                <strong>{d.fileName}</strong> — {t(ENUM_LABEL.DocumentClassification[d.classification])}
               </div>
             ))}
           </section>
@@ -340,7 +319,7 @@ export default function CustomerProfilePage() {
                 {t('customerNeedsAssessmentStartButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerNeedsAssessmentNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerNeedsAssessmentNoPermission')}</p>
             )}
           </section>
 
@@ -358,7 +337,7 @@ export default function CustomerProfilePage() {
                 {t('customerRiskSurveyOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerRiskSurveyNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerRiskSurveyNoPermission')}</p>
             )}
           </section>
 
@@ -376,7 +355,7 @@ export default function CustomerProfilePage() {
                 {t('customerInsuranceProgramOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerInsuranceProgramNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerInsuranceProgramNoPermission')}</p>
             )}
           </section>
 
@@ -394,7 +373,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrossSellOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerCrossSellNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrossSellNoPermission')}</p>
             )}
           </section>
 
@@ -412,7 +391,7 @@ export default function CustomerProfilePage() {
                 {t('customerUpSellOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerUpSellNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerUpSellNoPermission')}</p>
             )}
           </section>
 
@@ -428,7 +407,7 @@ export default function CustomerProfilePage() {
                 {t('customerCrmOpenButton')}
               </button>
             ) : (
-              <p style={{ opacity: 0.6 }}>{t('customerCrmNoPermission')}</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('customerCrmNoPermission')}</p>
             )}
           </section>
         </>

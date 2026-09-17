@@ -128,9 +128,288 @@ enum AuthProvider {
 /// Part 10.1 — MFA factor type. WEBAUTHN is schema-reserved for the
 /// hardware-token fast-follow (mandatory for privileged roles / Compliance
 /// / DPO) — no enrollment/verification path exists for it yet.
+/// Part II §4.1.3.
+enum MfaMethod {
+  TOTP_APP
+  SMS
+  EMAIL
+}
+
 enum MfaCredentialType {
   TOTP
   WEBAUTHN
+}
+
+// ============================================================================
+// MULTI-TENANCY — PART I of the multi-tenant architecture spec
+//
+// Every brokerage office using this platform is one `Organization`. Office A
+// must never be able to see, query, export, search, or infer the EXISTENCE of
+// Office B's customers, employees, policies, claims, documents or audit logs
+// (spec §1). That is enforced at two independent layers:
+//
+//   1. Application layer — a Prisma middleware/interceptor injects the current
+//      request's `organizationId` into every query. NOT BUILT YET (Phase 2).
+//   2. Database layer — PostgreSQL Row-Level Security keyed to a session
+//      variable `app.current_org_id`. NOT BUILT YET (Phase 2).
+//
+// This phase (Phase 1) is schema + backfill ONLY: the column exists on every
+// tenant-scoped table and every existing row points at one seeded
+// Organization. Nothing enforces isolation yet.
+//
+// ---------------------------------------------------------------------------
+// THE TEMPORARY `@default` IS GONE — PHASE 2 REMOVED IT (migration 20260927100000)
+// ---------------------------------------------------------------------------
+// Through Phase 1 every tenant-scoped `organizationId` carried
+// `@default("00000000-0000-0000-0000-000000000001")`. That was a deliberate,
+// temporary device: it made the column NOT NULL from the very first migration,
+// backfilled every pre-existing row inside the same `ALTER TABLE`, and kept
+// every existing `.create()` call site compiling, which is what let Phase 1 be
+// "schema + backfill, no application change".
+//
+// It is now removed, because from Phase 2 onwards it would be a hazard rather
+// than a convenience: a write path the org-scoping audit missed would SILENTLY
+// succeed with the default office's id instead of failing loudly, masking
+// exactly the gap that phase exists to catch.
+//
+// `organizationId` is now supplied by `tenantScopeExtension`
+// (apps/api/src/prisma/tenant-scope.extension.ts), which injects it into every
+// query — including nested relation writes — and refuses to run a tenant-scoped
+// query at all when there is no Organization in context. Nothing in the API
+// passes it by hand.
+//
+// The one place that still writes it explicitly is `prisma/seed.ts`, which runs
+// outside the API and therefore outside the extension.
+// ============================================================================
+
+/// Spec §2 — one brokerage office on the platform. Deliberately NOT itself
+/// tenant-scoped: it is the tenant.
+///
+/// `legalNameAr` is not decoration. Arabic is this system's primary language
+/// (English is the secondary), so an office's name has to be storable in the
+/// language the UI actually runs in — otherwise switching to Arabic leaves the
+/// org name sitting in Latin script in the middle of an Arabic page. Same
+/// reasoning as `Customer.legalNameAr` / `Insurer.nameAr` elsewhere in this
+/// schema.
+model Organization {
+  id                         String    @id @default(uuid())
+  legalName                  String
+  /// Arabic legal name — see the model comment. Optional only because an
+  /// office may be onboarded before its registered Arabic name is confirmed.
+  legalNameAr                String?
+  /// This office's own CBJ broker license number. Distinct from the
+  /// `BrokerLicense` model, which tracks a license's lifecycle per office.
+  brokerLicenseNumber        String?
+  /// Tenant resolution key (spec §4.10) — e.g. "alsalam" resolves
+  /// alsalam.ibms-app.example to this row BEFORE any login step runs.
+  /// Nothing consumes it yet; `GET /orgs/resolve` arrives in Phase 4.
+  subdomain                  String    @unique
+  status                     OrgStatus @default(ACTIVE)
+  /// Spec §10.5 — OPTIONAL edge-case fallback only. In the normal org chart the
+  /// DPO (Office Manager) and a Branch/Department Manager are structurally
+  /// different people, so maker/checker on a disposal batch already resolves to
+  /// two humans. This exists solely for an office small enough that one person
+  /// holds both titles, and names whoever approves in their place.
+  /// Deliberately a plain id, NOT a User relation — a second
+  /// Organization<->User relation would force every other relation in this
+  /// file to be explicitly named.
+  dpoAlternateApproverUserId String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  accessAnomalyAlerts             AccessAnomalyAlert[]
+  accessDeprovisioningChecklists  AccessDeprovisioningChecklist[]
+  accessRecertificationCycles     AccessRecertificationCycle[]
+  accessRecertificationItems      AccessRecertificationItem[]
+  adjusters                       Adjuster[]
+  assets                          Asset[]
+  auditLogEntries                 AuditLogEntry[]
+  emailIntegration                OrganizationEmailIntegration?
+  bcpDrPlans                      BcpDrPlan[]
+  branches                        Branch[]
+  brokerLicenses                  BrokerLicense[]
+  cancellations                   Cancellation[]
+  certificateOfDestructions       CertificateOfDestruction[]
+  claims                          Claim[]
+  claimDocuments                  ClaimDocument[]
+  claimFollowUpAlerts             ClaimFollowUpAlert[]
+  claimStatusHistories            ClaimStatusHistory[]
+  clientDecisions                 ClientDecision[]
+  clientFundsLedgerEntries        ClientFundsLedgerEntry[]
+  commissionAgreements            CommissionAgreement[]
+  commissionLedgerEntries         CommissionLedgerEntry[]
+  commissionReversals             CommissionReversal[]
+  communicationLogs               CommunicationLog[]
+  comparisonMatrixes              ComparisonMatrix[]
+  comparisonMatrixRows            ComparisonMatrixRow[]
+  complaints                      Complaint[]
+  complaintActions                ComplaintAction[]
+  complianceCalendarItems         ComplianceCalendarItem[]
+  conflictOfInterestDisclosures   ConflictOfInterestDisclosure[]
+  consentRecords                  ConsentRecord[]
+  coverNotes                      CoverNote[]
+  crossBorderTransferRecords      CrossBorderTransferRecord[]
+  crossSellOpportunities          CrossSellOpportunity[]
+  customers                       Customer[]
+  customerFeedbacks               CustomerFeedback[]
+  dataProcessingAgreements        DataProcessingAgreement[]
+  dataSharingApprovals            DataSharingApproval[]
+  dataSubjectRequests             DataSubjectRequest[]
+  deliveryRecords                 DeliveryRecord[]
+  departments                     Department[]
+  disposalBatches                 DisposalBatch[]
+  documents                       Document[]
+  documentTemplates               DocumentTemplate[]
+  dpiaScreenings                  DpiaScreening[]
+  employees                       Employee[]
+  employeePerformanceRecords      EmployeePerformanceRecord[]
+  endorsements                    Endorsement[]
+  escalationRecords               EscalationRecord[]
+  incidentReports                 IncidentReport[]
+  informationAssets               InformationAsset[]
+  insurancePrograms               InsuranceProgram[]
+  insuranceProgramLines           InsuranceProgramLine[]
+  insuredPersons                  InsuredPerson[]
+  insurers                        Insurer[]
+  insurerPerformanceScores        InsurerPerformanceScore[]
+  insurerProducts                 InsurerProduct[]
+  insurerSlaAgreements            InsurerSlaAgreement[]
+  interactions                    Interaction[]
+  internalAuditFindings           InternalAuditFinding[]
+  invoices                        Invoice[]
+  knowledgeBaseArticles           KnowledgeBaseArticle[]
+  kyCRecords                      KYCRecord[]
+  leads                           Lead[]
+  legalHolds                      LegalHold[]
+  lossRatios                      LossRatio[]
+  mfaCredentials                  MfaCredential[]
+  needsAssessments                NeedsAssessment[]
+  opportunities                   Opportunity[]
+  passwordHistoryEntries          PasswordHistoryEntry[]
+  passwordResetTokens             PasswordResetToken[]
+  paymentChannels                 PaymentChannel[]
+  policies                        Policy[]
+  policyCheckings                 PolicyChecking[]
+  policySchedules                 PolicySchedule[]
+  premiumTransactions             PremiumTransaction[]
+  privacyNotices                  PrivacyNotice[]
+  professionalIndemnityPolicies   ProfessionalIndemnityPolicy[]
+  professionalIndemnityRiskEvents ProfessionalIndemnityRiskEvent[]
+  prospects                       Prospect[]
+  quotations                      Quotation[]
+  receipts                        Receipt[]
+  recommendations                 Recommendation[]
+  reconciliationExceptions        ReconciliationException[]
+  refreshTokens                   RefreshToken[]
+  refunds                         Refund[]
+  remittances                     Remittance[]
+  renewalCases                    RenewalCase[]
+  renewalRecommendations          RenewalRecommendation[]
+  retentionCases                  RetentionCase[]
+  retentionScheduleItems          RetentionScheduleItem[]
+  rfqs                            RFQ[]
+  rfQInsurers                     RFQInsurer[]
+  riskProfiles                    RiskProfile[]
+  riskRatings                     RiskRating[]
+  riskRegisterItems               RiskRegisterItem[]
+  ropaEntries                     RopaEntry[]
+  salesTargets                    SalesTarget[]
+  screeningCaseNotes              ScreeningCaseNote[]
+  screeningHoldReleases           ScreeningHoldRelease[]
+  screeningMatches                ScreeningMatch[]
+  screeningRequests               ScreeningRequest[]
+  screeningResults                ScreeningResult[]
+  securityAwarenessTrainings      SecurityAwarenessTraining[]
+  securityConfigs                 SecurityConfig[]
+  serviceRequests                 ServiceRequest[]
+  settlements                     Settlement[]
+  slaTimers                       SlaTimer[]
+  thirdPartyClaimants             ThirdPartyClaimant[]
+  transactionMonitoringAlerts     TransactionMonitoringAlert[]
+  trustedDevices                  TrustedDevice[]
+  ultimateBeneficialOwners        UltimateBeneficialOwner[]
+  upSellRecommendations           UpSellRecommendation[]
+  slaHolidays                     SlaHoliday[]
+  slaPolicies                     SlaPolicy[]
+  slaPolicyEscalations            SlaPolicyEscalation[]
+  users                           User[]
+  userRoleAssignments             UserRoleAssignment[]
+  userSessions                    UserSession[]
+  vendors                         Vendor[]
+}
+
+enum OrgStatus {
+  ACTIVE
+  /// e.g. non-payment — blocks login, data retained.
+  SUSPENDED
+  /// Office has left the platform.
+  DEACTIVATED
+}
+
+/// Spec §4.1.1 — an employee's FUNCTIONAL grouping. Three things it is not:
+///   * not `Branch` (an organizational LOCATION),
+///   * not `Role` (which drives RBAC permissions),
+///   * not shared between offices — Office A's "Claims" department is a
+///     different row from Office B's "Claims" department.
+/// One department contains users holding several different roles (the Claims
+/// department holds both CLAIMS_OFFICER and a BRANCH_DEPARTMENT_MANAGER).
+/// Nothing reads this yet — the provisioning UI that sets it is Phase 4.
+model Department {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  /// Arabic department name — the org chart renders in Arabic by default.
+  nameAr         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  employees Employee[]
+  users     User[]
+
+  @@index([organizationId])
+}
+
+/// Spec §4.1.4 — a device a user has chosen to trust, which lets a STANDARD
+/// role skip the per-login MFA prompt for the trust window (default 30 days).
+/// SYSTEM_SECURITY_ADMINISTRATOR / COMPLIANCE_OFFICER / DPO are never eligible
+/// (spec §4.4) — that rule lives in the auth module and is built in Phase 4.
+/// The raw device fingerprint is NEVER stored, only its hash.
+model TrustedDevice {
+  id                    String       @id @default(uuid())
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id])
+  deviceFingerprintHash String
+  /// e.g. "Chrome on Windows — Amman Branch PC".
+  label                 String?
+  firstSeenIp           String?
+  trustedAt             DateTime     @default(now())
+  /// Default trustedAt + 30 days, configurable.
+  expiresAt             DateTime
+  revokedAt             DateTime?
+  revokedReason         String?
+  lastUsedAt            DateTime?
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+/// Spec §4.1.3 / §4.7 — previous password hashes, so a password change can be
+/// rejected for reusing (e.g.) any of the last 5. Append-only: a row is
+/// history and is never updated or deleted.
+model PasswordHistoryEntry {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  passwordHash   String
+  createdAt      DateTime     @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -140,27 +419,71 @@ enum MfaCredentialType {
 /// Part 5.1, Part 10.1 — a system user. MFA/session details live at the
 /// auth-provider layer; this table is the authorization anchor.
 model User {
-  id                  String             @id @default(uuid())
-  fullName            String
-  email               String             @unique
-  passwordHash        String
-  passwordUpdatedAt   DateTime?
-  isActive            Boolean            @default(true)
-  languagePreference  LanguagePreference @default(AR)
-  branchId            String?
-  branch              Branch?            @relation(fields: [branchId], references: [id])
-  employeeId          String?            @unique
-  employee            Employee?          @relation(fields: [employeeId], references: [id])
-  authProvider        AuthProvider       @default(LOCAL)
-  mfaEnabled          Boolean            @default(false)
-  lastLoginAt         DateTime?
-  failedLoginAttempts Int                @default(0)
-  lockedUntil         DateTime? // Part 10.1 — automatic lockout after repeated failed logins
+  id                   String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String             @default(dbgenerated())
+  organization         Organization       @relation(fields: [organizationId], references: [id])
+  fullName             String
+  /// Spec §3.2 / §4.1.3 — email is unique WITHIN an Organization, not across
+  /// the platform. The global `@unique` was dropped: two brokerage offices may
+  /// legitimately employ people whose addresses follow the same pattern, or in
+  /// an edge case the exact same address (a shared accountant, a contractor
+  /// working for both), and the two must not collide. See `@@unique` below.
+  email                String
+  passwordHash         String
+  passwordUpdatedAt    DateTime?
+  /// Part II §4.3.1 — forces exactly ONE password change, on first login,
+  /// before any other action. The admin who provisioned the account knows the
+  /// temporary password, and that is the residual risk this closes.
+  ///
+  /// Defaults TRUE because an admin-provisioned account is the case that must
+  /// not be forgotten. Self-service signup sets it to false explicitly: that
+  /// user chose their own password and has nothing to rotate. Migration
+  /// 20261001100000 backfills every pre-existing row to false — they have been
+  /// using their own passwords for months, and flipping them all into forced
+  /// rotation on deploy would lock out the entire system at once.
+  mustChangePassword   Boolean            @default(true)
+  isActive             Boolean            @default(true)
+  languagePreference   LanguagePreference @default(AR)
+  branchId             String?
+  branch               Branch?            @relation(fields: [branchId], references: [id])
+  /// Part II §4.2.2 — the functional grouping an admin picks when provisioning,
+  /// as a field SEPARATE from Branch (a location) and from Role (what the
+  /// person may do). §4.1.2 also links Department from `Employee`, which is the
+  /// org-chart view; this is the account-provisioning view, and it mirrors
+  /// `branchId` directly above because §4.2.2 describes the admin filling both
+  /// on the same form. A provisioned account frequently has no `Employee` row
+  /// yet, so without this the required field would have nowhere to land.
+  departmentId         String?
+  department           Department?        @relation(fields: [departmentId], references: [id])
+  employeeId           String?            @unique
+  employee             Employee?          @relation(fields: [employeeId], references: [id])
+  authProvider         AuthProvider       @default(LOCAL)
+  mfaEnabled           Boolean            @default(false)
+  /// Part II §4.3.2. TOTP_APP is the default and preferred method — the code is
+  /// generated on the device, so there is no "send" round trip. SMS/EMAIL exist
+  /// only as a lost-device fallback, never as the primary method.
+  mfaMethod            MfaMethod?
+  mfaEnrolledAt        DateTime?
+  /// Part II §4.3.2 — true between "account provisioned" and "one live code
+  /// verified". While it is true the user reaches the enrollment screen and
+  /// nothing else.
+  ///
+  /// The TOTP secret itself is NOT here, although §4.1.3 sketches a
+  /// `mfaSecretEnc` column on User: it already lives on `MfaCredential.secretEnc`,
+  /// which predates this phase, is already field-level encrypted, and supports
+  /// several credentials per user plus the WebAuthn fast-follow. Moving it up to
+  /// User would be a strictly worse model adopted only to match a sketch.
+  mfaEnrollmentPending Boolean            @default(false)
+  lastLoginAt          DateTime?
+  failedLoginAttempts  Int                @default(0)
+  lockedUntil          DateTime? // Part 10.1 — automatic lockout after repeated failed logins
   // External Auditor (Part 5.1) — time-boxed access
-  accessValidFrom     DateTime?
-  accessValidUntil    DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  accessValidFrom      DateTime?
+  accessValidUntil     DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   roles               UserRoleAssignment[]
   auditLogEntries     AuditLogEntry[]             @relation("AuditLogUser")
@@ -170,8 +493,19 @@ model User {
   refreshTokens       RefreshToken[]
   sessions            UserSession[]
   passwordResetTokens PasswordResetToken[]
+  /// Spec §4.1.4 / §4.1.3 — populated by the Phase 4 auth rebuild. Declared
+  /// here now because Phase 1 creates the tables they point at.
+  trustedDevices      TrustedDevice[]
+  passwordHistory     PasswordHistoryEntry[]
 
+  @@unique([organizationId, email])
   @@index([email])
+  @@index([organizationId])
+  /// Declared, not just created in SQL — Prisma does not index a foreign key
+  /// automatically on Postgres, and an undeclared index shows up forever as
+  /// drift that `migrate diff` wants to DROP (the same trap Phase 1 hit with
+  /// `SlaTimer.slaPolicyId`).
+  @@index([departmentId])
 }
 
 /// Part 10.1 — a single enrolled MFA factor. A user may hold more than one
@@ -179,6 +513,10 @@ model User {
 /// without losing the audit trail of when it was enrolled/used.
 model MfaCredential {
   id                   String            @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String            @default(dbgenerated())
+  organization         Organization      @relation(fields: [organizationId], references: [id])
   userId               String
   user                 User              @relation(fields: [userId], references: [id])
   type                 MfaCredentialType
@@ -193,6 +531,7 @@ model MfaCredential {
   webauthnCounter      Int?
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 /// Part 10.1 — issued refresh tokens. The raw token is never stored, only
@@ -201,20 +540,25 @@ model MfaCredential {
 /// `replacedByTokenId` chains rotation so reuse of a retired token (a stolen
 /// or replayed refresh token) is detectable, not just "expired eventually."
 model RefreshToken {
-  id                String    @id @default(uuid())
+  id                String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
   userId            String
-  user              User      @relation(fields: [userId], references: [id])
-  tokenHash         String    @unique
-  issuedAt          DateTime  @default(now())
+  user              User         @relation(fields: [userId], references: [id])
+  tokenHash         String       @unique
+  issuedAt          DateTime     @default(now())
   expiresAt         DateTime
   revokedAt         DateTime?
-  replacedByTokenId String?   @unique
+  replacedByTokenId String?      @unique
   userAgent         String?
   ipAddress         String?
 
   session UserSession?
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 /// Part 10.1 / Part 8.3 — the live-session anchor idle-timeout enforcement
@@ -223,36 +567,54 @@ model RefreshToken {
 /// `SecurityConfig.idleTimeoutMinutes` or past `User.accessValidUntil` is
 /// rejected AND the session is revoked here (not just refused at login).
 model UserSession {
-  id             String        @id @default(uuid())
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  refreshTokenId String?       @unique
-  refreshToken   RefreshToken? @relation(fields: [refreshTokenId], references: [id])
-  createdAt      DateTime      @default(now())
-  lastActivityAt DateTime      @default(now())
-  lastStepUpAt   DateTime? // Part 10.1 — forced re-auth before sensitive actions
-  expiresAt      DateTime
-  revokedAt      DateTime?
-  revokedReason  String? // idle_timeout | logout | access_window_expired | admin_revoked | refresh_reuse_detected
-  ipAddress      String?
-  userAgent      String?
+  id                String        @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String        @default(dbgenerated())
+  organization      Organization  @relation(fields: [organizationId], references: [id])
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+  refreshTokenId    String?       @unique
+  refreshToken      RefreshToken? @relation(fields: [refreshTokenId], references: [id])
+  createdAt         DateTime      @default(now())
+  lastActivityAt    DateTime      @default(now())
+  lastStepUpAt      DateTime? // Part 10.1 — forced re-auth before sensitive actions
+  /// Part II §4.1.5 — two independent ceilings, because they answer different
+  /// questions. `idleExpiresAt` moves forward on every authenticated request
+  /// and is what "you have been away too long" means; `absoluteExpiresAt` never
+  /// moves and caps how long one sign-in can live no matter how busy the user
+  /// is. Either one elapsing fully revokes the session (§4.5) — it is a session
+  /// termination, not a screen lock.
+  idleExpiresAt     DateTime      @default(now())
+  absoluteExpiresAt DateTime      @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  revokedReason     String? // idle_timeout | logout | access_window_expired | admin_revoked | refresh_reuse_detected
+  ipAddress         String?
+  userAgent         String?
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 /// Part 10.1 — forgot-password flow. Single-use (`usedAt`), short-lived,
 /// hashed the same way as RefreshToken.
 model PasswordResetToken {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  tokenHash   String    @unique
-  expiresAt   DateTime
-  usedAt      DateTime?
-  requestedIp String?
-  createdAt   DateTime  @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  requestedIp    String?
+  createdAt      DateTime     @default(now())
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 /// Part 10.1 / Part 8.3 — single-row, admin-editable security configuration
@@ -261,16 +623,30 @@ model PasswordResetToken {
 /// roles-and-segregation-of-duties.md for that role's mandate. The
 /// application layer enforces the single-row invariant (fixed id "default").
 model SecurityConfig {
-  id                         String   @id @default("default")
-  idleTimeoutMinutes         Int      @default(15)
-  hardLogoutAfterIdleMinutes Int      @default(30)
-  accessTokenTtlMinutes      Int      @default(15)
-  refreshTokenTtlDays        Int      @default(14)
-  stepUpMaxAgeMinutes        Int      @default(10)
-  maxFailedLoginAttempts     Int      @default(5)
-  lockoutMinutes             Int      @default(15)
+  /// Multi-tenancy Phase 2 step 8 — a generated id, keyed by Organization via
+  /// the `@@unique` below rather than by a fixed `"default"` row.
+  ///
+  /// The singleton id was a single-tenant assumption of exactly the kind step 5
+  /// removed from the unique constraints: harmless with one office (the upsert
+  /// matched the Phase 1 backfilled row), but a second Organization's upsert
+  /// would have collided on that same primary key.
+  id                         String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId             String       @default(dbgenerated())
+  organization               Organization @relation(fields: [organizationId], references: [id])
+  idleTimeoutMinutes         Int          @default(15)
+  hardLogoutAfterIdleMinutes Int          @default(30)
+  accessTokenTtlMinutes      Int          @default(15)
+  refreshTokenTtlDays        Int          @default(14)
+  stepUpMaxAgeMinutes        Int          @default(10)
+  maxFailedLoginAttempts     Int          @default(5)
+  lockoutMinutes             Int          @default(15)
   updatedByUserId            String?
-  updatedAt                  DateTime @updatedAt
+  updatedAt                  DateTime     @updatedAt
+
+  @@unique([organizationId])
+  @@index([organizationId])
 }
 
 /// Part 5.1 — role catalogue.
@@ -310,17 +686,21 @@ model RolePermission {
 /// Explicit many-to-many: a user may hold more than one role (Part 5.1 notes
 /// the DPO/Compliance Officer dual-hat as a conditional, recorded case).
 model UserRoleAssignment {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  roleId    String
-  role      Role      @relation(fields: [roleId], references: [id])
-  grantedAt DateTime  @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  roleId         String
+  role           Role         @relation(fields: [roleId], references: [id])
+  grantedAt      DateTime     @default(now())
   // Part 10.1 — set when an access-recertification decision revokes this
   // grant (AccessRecertificationItem.decision = "revoked"). A row with
   // revokedAt set is no longer an active assignment, but is kept (not
   // deleted) as the audit record of when/that access was withdrawn.
-  revokedAt DateTime?
+  revokedAt      DateTime?
 
   /// NOTE — there is deliberately NO `@@unique([userId, roleId])` here. The
   /// real invariant is "at most one ACTIVE grant per (user, role)", which is
@@ -334,20 +714,31 @@ model UserRoleAssignment {
   /// are history and must be unlimited. `prisma migrate dev` will offer to
   /// re-add the full unique as drift; do NOT accept it.
   @@index([userId, roleId])
+  @@index([organizationId])
 }
 
 /// Part 10.1 — periodic (e.g. quarterly) access recertification workflow.
 model AccessRecertificationCycle {
-  id         String                      @id @default(uuid())
-  cycleLabel String
-  startedAt  DateTime                    @default(now())
-  dueAt      DateTime
-  closedAt   DateTime?
-  items      AccessRecertificationItem[]
+  id             String                      @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String                      @default(dbgenerated())
+  organization   Organization                @relation(fields: [organizationId], references: [id])
+  cycleLabel     String
+  startedAt      DateTime                    @default(now())
+  dueAt          DateTime
+  closedAt       DateTime?
+  items          AccessRecertificationItem[]
+
+  @@index([organizationId])
 }
 
 model AccessRecertificationItem {
   id             String                     @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String                     @default(dbgenerated())
+  organization   Organization               @relation(fields: [organizationId], references: [id])
   cycleId        String
   cycle          AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
   subjectUserId  String
@@ -356,21 +747,33 @@ model AccessRecertificationItem {
   decision       String? // confirmed | revoked | changed
   reviewedAt     DateTime?
   createdAt      DateTime                   @default(now())
+
+  @@index([organizationId])
 }
 
 /// Supporting structure referenced by "filterable by branch" dashboards
 /// (Part 13) and Branch/Department Manager role (Part 5.1).
 model Branch {
-  id     String  @id @default(uuid())
-  name   String
-  nameAr String?
-  users  User[]
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  nameAr         String?
+  users          User[]
+
+  @@index([organizationId])
 }
 
 /// Process 66 — Human Resources. Minimal record: licensing/certification
 /// tracking for regulated staff, training records (Part 8.2).
 model Employee {
-  id                               String    @id @default(uuid())
+  id                               String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                   String       @default(dbgenerated())
+  organization                     Organization @relation(fields: [organizationId], references: [id])
   fullName                         String // computed from the 4 parts below when they're set (see composeFullName) — historical rows keep only this field, parts null
   givenName                        String? // Jordanian national-ID convention (Part F item #4) — given/father's/grandfather's/family name
   fatherName                       String?
@@ -383,37 +786,59 @@ model Employee {
   licensedRole                     String? // e.g. regulated staff licensing/certification (Part 8.2)
   confidentialityAgreementSignedAt DateTime? // Part 8.2 NDAs
   backgroundCheckCompletedAt       DateTime? // Part 8.2 screening
-  createdAt                        DateTime  @default(now())
-  updatedAt                        DateTime  @updatedAt
+  createdAt                        DateTime     @default(now())
+  updatedAt                        DateTime     @updatedAt
+
+  /// Spec §4.1.2 — the employee's functional grouping. Nullable: every
+  /// pre-existing Employee row predates Department entirely, and the
+  /// provisioning UI that makes it mandatory at creation is Phase 4.
+  /// NOT a Role, and NOT a Branch — see the Department model.
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
 
   user                    User?
   trainings               SecurityAwarenessTraining[]
   deprovisioningChecklist AccessDeprovisioningChecklist?
   performanceRecords      EmployeePerformanceRecord[]
+
+  @@index([departmentId])
+  @@index([organizationId])
 }
 
 /// Part 8.2 — security awareness training completion tracking.
 model SecurityAwarenessTraining {
-  id           String    @id @default(uuid())
-  employeeId   String
-  employee     Employee  @relation(fields: [employeeId], references: [id])
-  trainingName String
-  completedAt  DateTime?
-  dueAt        DateTime?
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id])
+  trainingName   String
+  completedAt    DateTime?
+  dueAt          DateTime?
+
+  @@index([organizationId])
 }
 
 /// Part 8.2 — termination/change-of-employment de-provisioning checklist,
 /// triggered by HR status change (Part 5, PDPL SLA: same business day).
 model AccessDeprovisioningChecklist {
-  id                      String    @id @default(uuid())
-  employeeId              String    @unique
-  employee                Employee  @relation(fields: [employeeId], references: [id])
-  triggeredAt             DateTime  @default(now())
+  id                      String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String       @default(dbgenerated())
+  organization            Organization @relation(fields: [organizationId], references: [id])
+  employeeId              String       @unique
+  employee                Employee     @relation(fields: [employeeId], references: [id])
+  triggeredAt             DateTime     @default(now())
   systemAccessRevokedAt   DateTime?
   physicalAccessRevokedAt DateTime?
   deviceReturnedAt        DateTime?
   knowledgeTransferDoneAt DateTime?
   completedAt             DateTime?
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -432,18 +857,22 @@ enum LeadStatus {
 /// media, campaigns, tenders, corporate/bank partnerships, strategic
 /// partners, ex-customers, renewal opportunities.
 model Lead {
-  id                      String     @id @default(uuid())
+  id                      String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String       @default(dbgenerated())
+  organization            Organization @relation(fields: [organizationId], references: [id])
   fullName                String
   source                  String // referral | website | social_media | campaign | tender | bank_partner | strategic_partner | ex_customer | renewal
   ownerUserId             String
-  status                  LeadStatus @default(NEW)
+  status                  LeadStatus   @default(NEW)
   contactPhone            String?
   contactEmail            String?
   // marketing consent captured distinctly from KYC consent, unticked by default (Part 6.3)
-  marketingConsentGranted Boolean    @default(false)
-  firstContactAt          DateTime   @default(now())
-  createdAt               DateTime   @default(now())
-  updatedAt               DateTime   @updatedAt
+  marketingConsentGranted Boolean      @default(false)
+  firstContactAt          DateTime     @default(now())
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
 
   prospect       Prospect?
   consentRecords ConsentRecord[] // Part D §5.1 — marketing consent, pre-Customer
@@ -451,11 +880,16 @@ model Lead {
   @@index([ownerUserId])
   @@index([source])
   @@index([status])
+  @@index([organizationId])
 }
 
 /// Process 2 — Prospect Management (qualification of a Lead).
 model Prospect {
   id                 String                   @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String                   @default(dbgenerated())
+  organization       Organization             @relation(fields: [organizationId], references: [id])
   leadId             String?                  @unique
   lead               Lead?                    @relation(fields: [leadId], references: [id])
   companyName        String
@@ -478,6 +912,7 @@ model Prospect {
   customer Customer?
 
   @@index([salesOwnerUserId])
+  @@index([organizationId])
 }
 
 enum CustomerType {
@@ -496,6 +931,10 @@ enum CustomerStatus {
 /// corporate). Process 3-4 (Onboarding/KYC).
 model Customer {
   id                      String                   @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String                   @default(dbgenerated())
+  organization            Organization             @relation(fields: [organizationId], references: [id])
   prospectId              String?                  @unique
   prospect                Prospect?                @relation(fields: [prospectId], references: [id])
   customerType            CustomerType
@@ -506,6 +945,19 @@ model Customer {
   familyName              String? // individual only
   registrationNumber      String? // corporate: commercial registration number
   nationalIdEnc           String? // individual -- ENCRYPT
+  /// Part B §11 — screening discriminators. Individual only.
+  ///
+  /// Stored in the CLEAR, unlike `nationalIdEnc`, and that is deliberate:
+  /// their entire purpose is to be COMPARED against a sanctions/PEP list
+  /// entry so a real person is not confused with a listed one. Name-only
+  /// matching against ~19,000 entries produces false positives constantly;
+  /// date of birth and nationality are what separate a true match from a
+  /// coincidence of names. Encrypting them would defeat the control they
+  /// exist for. They are Confidential — the Customer's own classification —
+  /// not Highly Confidential like an identity-document number.
+  dateOfBirth             DateTime?                @db.Date
+  /// ISO 3166-1 alpha-2, upper case. Constrained in the database.
+  nationality             String?
   taxRegistrationNumber   String?
   registeredAddress       String?
   natureOfBusiness        String?
@@ -517,6 +969,13 @@ model Customer {
   // channel explicitly). Language already lives in `languagePreference`.
   preferredContactChannel InteractionChannel?
   status                  CustomerStatus           @default(PENDING_KYC)
+  /// Part III §7 — how this record entered the system. LEGACY_IMPORT rows came
+  /// from an office's pre-platform spreadsheet and did NOT go through this
+  /// system own maker/checker KYC, so they must never be read as if they had.
+  /// The import leaves them at status PENDING_KYC with a DRAFT KYCRecord;
+  /// this column is the provenance that says WHY, and survives the file later
+  /// being completed properly.
+  source                  CustomerSource           @default(PLATFORM)
   classification          DataClassification       @default(CONFIDENTIAL)
   ownerUserId             String
   createdAt               DateTime                 @default(now())
@@ -553,23 +1012,35 @@ model Customer {
 
   @@index([legalName])
   @@index([status])
+  @@index([organizationId])
 }
 
 /// Process 3 — corporate KYC: Ultimate Beneficial Owner identification.
 model UltimateBeneficialOwner {
-  id                    String   @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   customerId            String
-  customer              Customer @relation(fields: [customerId], references: [id])
+  customer              Customer     @relation(fields: [customerId], references: [id])
   fullName              String // computed from the 4 parts below (see composeFullName) — historical rows keep only this field, parts null
   givenName             String? // Jordanian national-ID convention (Part F item #4)
   fatherName            String?
   grandfatherName       String?
   familyName            String?
   nationalIdEnc         String // -- ENCRYPT
-  ownershipPercent      Decimal? @db.Decimal(5, 2)
-  isAuthorizedSignatory Boolean  @default(false)
-  isPep                 Boolean  @default(false)
-  createdAt             DateTime @default(now())
+  /// Part B §11 — screening discriminators. See `Customer.dateOfBirth` for
+  /// why these are not encrypted.
+  dateOfBirth           DateTime?    @db.Date
+  /// ISO 3166-1 alpha-2, upper case. Constrained in the database.
+  nationality           String?
+  ownershipPercent      Decimal?     @db.Decimal(5, 2)
+  isAuthorizedSignatory Boolean      @default(false)
+  isPep                 Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Part 4.1 note — a natural person covered by a policy who is NOT the
@@ -577,6 +1048,10 @@ model UltimateBeneficialOwner {
 /// its own consent/DSR record.
 model InsuredPerson {
   id             String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String             @default(dbgenerated())
+  organization   Organization       @relation(fields: [organizationId], references: [id])
   customerId     String // the contracting Customer this person is covered under
   customer       Customer           @relation(fields: [customerId], references: [id])
   policyId       String?
@@ -591,6 +1066,8 @@ model InsuredPerson {
   consentRecords      ConsentRecord[]
   dataSubjectRequests DataSubjectRequest[] @relation("DsrInsuredPerson")
   legalHolds          LegalHold[]
+
+  @@index([organizationId])
 }
 
 /// Process 3-4 (Customer Acquisition/Onboarding) KYC lifecycle — mirrors the
@@ -599,6 +1076,14 @@ model InsuredPerson {
 /// terminal for THIS row (same pattern as Lead's CONVERTED_TO_PROSPECT): the
 /// actual re-KYC cycle is a new KYCRecord for the same Customer, not a loop
 /// back on this one.
+/// Part III §7 — provenance for a Customer row.
+enum CustomerSource {
+  /// Created through this platform own intake flow.
+  PLATFORM
+  /// Loaded from an office legacy system by the bulk importer.
+  LEGACY_IMPORT
+}
+
 enum KycStatus {
   DRAFT
   SUBMITTED
@@ -612,32 +1097,71 @@ enum KycStatus {
 
 /// Process 3.1 KYC file (per the Part 3.1 "Core Data Entities" row).
 model KYCRecord {
-  id               String    @id @default(uuid())
+  id               String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String       @default(dbgenerated())
+  organization     Organization @relation(fields: [organizationId], references: [id])
   customerId       String
-  customer         Customer  @relation(fields: [customerId], references: [id])
-  status           KycStatus @default(DRAFT)
-  isEdd            Boolean   @default(false) // enhanced due diligence
+  customer         Customer     @relation(fields: [customerId], references: [id])
+  status           KycStatus    @default(DRAFT)
+  isEdd            Boolean      @default(false) // enhanced due diligence
   submittedAt      DateTime?
   // Maker/checker (Part 3.1 Approval row) — capturer != approver
   createdByUserId  String
   approvedByUserId String?
   approvedAt       DateTime?
   nextReviewDueAt  DateTime? // risk-based refresh schedule
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
-  screeningResults ScreeningResult[]
-  screeningMatches ScreeningMatch[]
-  riskRating       RiskRating?
+  screeningResults  ScreeningResult[]
+  screeningMatches  ScreeningMatch[]
+  riskRating        RiskRating?
+  screeningRequests ScreeningRequest[]
+  holdReleases      ScreeningHoldRelease[]
 
   @@index([customerId])
   @@index([status])
+  @@index([organizationId])
 }
 
 enum ScreeningType {
   SANCTIONS
   PEP
   AML
+}
+
+/// What a screening ATTEMPT concluded — five values behind
+/// `ScreeningOutcome`'s three. The distinction "we checked and found nothing"
+/// vs "we could not check" is the single most consequential one in this
+/// module, and `ScreeningOutcome` alone cannot express it.
+enum ScreeningAttemptOutcome {
+  /// A populated source was searched and the subject was not on it. The only
+  /// outcome that may map to `ScreeningOutcome.CLEAR`.
+  NO_MATCH
+  POTENTIAL_MATCH
+  /// No provider configured. Say so; never NO_MATCH.
+  NOT_CONFIGURED
+  /// Configured, but the attempt failed. Explicitly NOT no-match.
+  SCREENING_FAILED
+  /// Answered, but the data cannot support a decision (empty or stale).
+  UNABLE_TO_SCREEN
+}
+
+/// Which screening implementation answered. Selected by configuration.
+enum ScreeningProviderKind {
+  built_in
+  on_premise
+  commercial
+}
+
+/// PEP is first-class, not a flavour of sanctions — the obligations attached
+/// to each are different.
+enum ScreeningListType {
+  SANCTIONS
+  PEP
+  WATCHLIST
 }
 
 enum ScreeningOutcome {
@@ -650,6 +1174,10 @@ enum ScreeningOutcome {
 /// material data change, and recurring batch.
 model ScreeningResult {
   id                      String           @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String           @default(dbgenerated())
+  organization            Organization     @relation(fields: [organizationId], references: [id])
   kycRecordId             String
   kycRecord               KYCRecord        @relation(fields: [kycRecordId], references: [id])
   screeningType           ScreeningType
@@ -658,7 +1186,94 @@ model ScreeningResult {
   listSource              String?
   escalatedToComplianceAt DateTime?
 
+  /// The attempt that produced this result — which provider, which dataset,
+  /// and why it failed if it did.
+  screeningRequestId String?
+  screeningRequest   ScreeningRequest?        @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  provider           ScreeningProviderKind?
+  /// The five-value outcome behind `result`. A DB CHECK
+  /// (`ScreeningResult_clear_requires_no_match`) makes it impossible to store
+  /// a CLEAR result from any attempt other than NO_MATCH.
+  attemptOutcome     ScreeningAttemptOutcome?
+  datasetVersion     String?
+
   @@index([kycRecordId])
+  @@index([screeningRequestId])
+  @@index([organizationId])
+}
+
+/// One screening ATTEMPT: what was asked, of whom, and what came back.
+///
+/// Separate from `ScreeningResult` (which is per `ScreeningType`) because one
+/// attempt produces several results, and because the attempt is where the
+/// provider, dataset, correlation id and failure reason live. It is also the
+/// idempotency record: a retried job recognises work it already did instead of
+/// opening a second set of cases.
+model ScreeningRequest {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  kycRecordId    String
+  kycRecord      KYCRecord    @relation(fields: [kycRecordId], references: [id])
+  /// Ties this attempt to the provider's logs, its audit rows and its cases.
+  correlationId  String
+  /// Derived from (KYC file, subject set, provider, dataset). UNIQUE — the
+  /// constraint IS the idempotency guarantee, not a preceding findFirst.
+  /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
+  /// the platform. A bare @unique here is not only a functional bug (two
+  /// offices legitimately produce the same value); it leaks across tenants on
+  /// its own — a uniqueness-violation error confirms the value already exists
+  /// for SOMEONE, with no row ever returned. See @@unique below.
+  idempotencyKey String
+
+  /// Part B §12 — a hash of the IDENTITY ATTRIBUTES actually screened
+  /// (every subject's name, date of birth and nationality), independent of
+  /// provider and dataset.
+  ///
+  /// `idempotencyKey` cannot serve this purpose: it deliberately folds in the
+  /// provider and dataset, so it changes when the deployment switches
+  /// provider even though the same people were screened. This answers the
+  /// different question "are the people on this file still the people we
+  /// checked?" — which is what makes a UBO added after screening, or a
+  /// corrected date of birth, visible instead of silent.
+  subjectFingerprint String?
+
+  provider       ScreeningProviderKind
+  providerName   String
+  datasetVersion String?
+
+  /// Part B §13 — what DECIDED this attempt, recorded with it.
+  ///
+  /// A reviewer opening a six-month-old match has to know which matching
+  /// rules and which thresholds produced it. Without these, lowering a review
+  /// threshold silently makes every historical match uninterpretable: the
+  /// score is stored, but the line it was compared against is not.
+  algorithmVersion String?
+  /// The high/review/low bands in force, as configured at attempt time.
+  thresholds       Json?
+
+  outcome        ScreeningAttemptOutcome
+  /// Set for NOT_CONFIGURED / SCREENING_FAILED / UNABLE_TO_SCREEN. Never
+  /// contains credentials or subject PII.
+  failureReason  String?
+  candidateCount Int                     @default(0)
+  casesOpened    Int                     @default(0)
+
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  durationMs        Int?
+  requestedByUserId String?
+
+  results ScreeningResult[]
+  matches ScreeningMatch[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([kycRecordId, startedAt(sort: Desc)])
+  @@index([outcome])
+  @@index([correlationId])
+  @@index([organizationId])
 }
 
 enum RiskLevel {
@@ -669,12 +1284,18 @@ enum RiskLevel {
 /// Process 3.1/47 — customer risk classification driving screening
 /// frequency and EDD depth.
 model RiskRating {
-  id          String    @id @default(uuid())
-  kycRecordId String    @unique
-  kycRecord   KYCRecord @relation(fields: [kycRecordId], references: [id])
-  level       RiskLevel
-  reason      String?
-  ratedAt     DateTime  @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  kycRecordId    String       @unique
+  kycRecord      KYCRecord    @relation(fields: [kycRecordId], references: [id])
+  level          RiskLevel
+  reason         String?
+  ratedAt        DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 enum InteractionChannel {
@@ -696,6 +1317,10 @@ enum InteractionChannel {
 /// building a 360° Customer View.
 model Interaction {
   id             String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String             @default(dbgenerated())
+  organization   Organization       @relation(fields: [organizationId], references: [id])
   customerId     String
   customer       Customer           @relation(fields: [customerId], references: [id])
   channel        InteractionChannel
@@ -705,6 +1330,7 @@ model Interaction {
   createdAt      DateTime           @default(now())
 
   @@index([customerId])
+  @@index([organizationId])
 }
 
 /// Process 8 (Cross-Selling) status. OPEN once the detection sweep flags a
@@ -738,6 +1364,10 @@ enum CrossSellStatus {
 /// `skipDuplicates`, so a re-run or a concurrent run adds nothing.
 model CrossSellOpportunity {
   id               String          @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String          @default(dbgenerated())
+  organization     Organization    @relation(fields: [organizationId], references: [id])
   customerId       String
   customer         Customer        @relation(fields: [customerId], references: [id])
   gapLine          String // a benchmark insuranceLine the customer holds no in-force policy for, e.g. "Public Liability"
@@ -753,6 +1383,7 @@ model CrossSellOpportunity {
 
   @@unique([customerId, gapLine])
   @@index([status])
+  @@index([organizationId])
 }
 
 /// Process 9 (Up-Selling) status. OPEN once the detection sweep flags
@@ -790,6 +1421,10 @@ enum UpSellStatus {
 /// migration 20260827220000.
 model UpSellRecommendation {
   id                String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
   customerId        String
   customer          Customer     @relation(fields: [customerId], references: [id])
   /// Σ of the "Property All Risks" line's `sumInsuredBasis` over the
@@ -810,6 +1445,7 @@ model UpSellRecommendation {
 
   @@index([customerId])
   @@index([status])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -818,35 +1454,45 @@ model UpSellRecommendation {
 
 /// Part 3.2 core data entity.
 model RiskProfile {
-  id                        String   @id @default(uuid())
+  id                        String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String       @default(dbgenerated())
+  organization              Organization @relation(fields: [organizationId], references: [id])
   customerId                String
-  customer                  Customer @relation(fields: [customerId], references: [id])
+  customer                  Customer     @relation(fields: [customerId], references: [id])
   siteLabel                 String? // for multi-site/multi-entity clients (repeated per location)
   priorClaimsHistorySummary String?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
 
   assets            Asset[]
   needsAssessments  NeedsAssessment[]
   insurancePrograms InsuranceProgram[]
 
   @@index([customerId])
+  @@index([organizationId])
 }
 
 /// Part 3.2 — asset data (building value, equipment, stock, fleet size...).
 model Asset {
-  id                    String      @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   riskProfileId         String
-  riskProfile           RiskProfile @relation(fields: [riskProfileId], references: [id])
+  riskProfile           RiskProfile  @relation(fields: [riskProfileId], references: [id])
   assetType             String // building | equipment | stock | vehicle | other
   description           String?
-  declaredValue         Decimal?    @db.Decimal(18, 3)
-  annualGrossProfit     Decimal?    @db.Decimal(18, 3) // BI indemnity basis
+  declaredValue         Decimal?     @db.Decimal(18, 3)
+  annualGrossProfit     Decimal?     @db.Decimal(18, 3) // BI indemnity basis
   indemnityPeriodMonths Int?
   fleetVehicleCount     Int?
-  createdAt             DateTime    @default(now())
+  createdAt             DateTime     @default(now())
 
   @@index([riskProfileId])
+  @@index([organizationId])
 }
 
 enum NeedsAssessmentStatus {
@@ -869,6 +1515,10 @@ enum NeedsAssessmentStatus {
 /// 11+, not built yet.
 model NeedsAssessment {
   id                       String                @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String                @default(dbgenerated())
+  organization             Organization          @relation(fields: [organizationId], references: [id])
   riskProfileId            String
   riskProfile              RiskProfile           @relation(fields: [riskProfileId], references: [id])
   questionnaireAnswers     Json
@@ -883,6 +1533,7 @@ model NeedsAssessment {
   @@index([riskProfileId])
   @@index([status])
   @@index([createdByUserId])
+  @@index([organizationId])
 }
 
 /// Process 7 — Product Recommendation / Program Design (backlog Part C #7).
@@ -902,6 +1553,10 @@ enum InsuranceProgramStatus {
 
 model InsuranceProgram {
   id                String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String                 @default(dbgenerated())
+  organization      Organization           @relation(fields: [organizationId], references: [id])
   riskProfileId     String
   riskProfile       RiskProfile            @relation(fields: [riskProfileId], references: [id])
   status            InsuranceProgramStatus @default(DRAFT)
@@ -920,16 +1575,22 @@ model InsuranceProgram {
   // (riskProfileId WHERE status <> 'SUPERSEDED') that Prisma can't express
   // here — see migration 20260827180000.
   @@index([riskProfileId])
+  @@index([organizationId])
 }
 
 model InsuranceProgramLine {
   id                 String           @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String           @default(dbgenerated())
+  organization       Organization     @relation(fields: [organizationId], references: [id])
   insuranceProgramId String
   insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
   insuranceLine      String // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
   sumInsuredBasis    Decimal?         @db.Decimal(18, 3)
 
   @@index([insuranceProgramId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -953,6 +1614,10 @@ enum OpportunityStatus {
 /// or renewal). May close-lost and never become a Policy.
 model Opportunity {
   id                     String            @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId         String            @default(dbgenerated())
+  organization           Organization      @relation(fields: [organizationId], references: [id])
   customerId             String
   customer               Customer          @relation(fields: [customerId], references: [id])
   insuranceProgramId     String?
@@ -981,17 +1646,22 @@ model Opportunity {
   @@index([customerId])
   @@index([status])
   @@index([insuranceProgramId])
+  @@index([organizationId])
 }
 
 /// Process 11 — RFQ / Market Submission per product/line to a shortlist of
 /// insurers.
 model RFQ {
-  id                    String      @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   opportunityId         String
-  opportunity           Opportunity @relation(fields: [opportunityId], references: [id])
+  opportunity           Opportunity  @relation(fields: [opportunityId], references: [id])
   insuranceLine         String
-  issuedAt              DateTime    @default(now())
-  followUpThresholdDays Int         @default(9) // Part 3.7-style configurable follow-up
+  issuedAt              DateTime     @default(now())
+  followUpThresholdDays Int          @default(9) // Part 3.7-style configurable follow-up
   // Process 11 (backlog Part C #11) provenance — the Placement Officer who
   // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
   issuedByUserId        String?
@@ -1005,6 +1675,7 @@ model RFQ {
   // an RFQ per insurance line"). Re-marketing a line is a deliberate future
   // relaxation (Negotiation #15 / Client Decision #17).
   @@unique([opportunityId, insuranceLine])
+  @@index([organizationId])
 }
 
 enum RfqInsurerStatus {
@@ -1019,6 +1690,10 @@ enum RfqInsurerStatus {
 /// no response), with SLA follow-up alerting.
 model RFQInsurer {
   id                  String           @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String           @default(dbgenerated())
+  organization        Organization     @relation(fields: [organizationId], references: [id])
   rfqId               String
   rfq                 RFQ              @relation(fields: [rfqId], references: [id])
   insurerId           String
@@ -1034,6 +1709,7 @@ model RFQInsurer {
   @@index([insurerId])
   // The nightly follow-up sweep (backlog Part C #11) filters on status.
   @@index([status])
+  @@index([organizationId])
 }
 
 /// Process 13 — insurer quotation (backlog Part C #13). Versioned, NEVER
@@ -1065,26 +1741,30 @@ model RFQInsurer {
 /// own `@unique` additionally serializes two concurrent revisions of the
 /// same node (only one successor can exist).
 model Quotation {
-  id                    String     @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   rfqId                 String
-  rfq                   RFQ        @relation(fields: [rfqId], references: [id])
+  rfq                   RFQ          @relation(fields: [rfqId], references: [id])
   insurerId             String
-  insurer               Insurer    @relation(fields: [insurerId], references: [id])
-  versionNumber         Int        @default(1)
-  previousVersionId     String?    @unique
-  previousVersion       Quotation? @relation("QuotationVersionChain", fields: [previousVersionId], references: [id])
-  nextVersion           Quotation? @relation("QuotationVersionChain")
-  isCurrentVersion      Boolean    @default(true)
-  premium               Decimal    @db.Decimal(18, 3)
-  currency              String     @default("JOD")
-  deductible            Decimal?   @db.Decimal(18, 3)
+  insurer               Insurer      @relation(fields: [insurerId], references: [id])
+  versionNumber         Int          @default(1)
+  previousVersionId     String?      @unique
+  previousVersion       Quotation?   @relation("QuotationVersionChain", fields: [previousVersionId], references: [id])
+  nextVersion           Quotation?   @relation("QuotationVersionChain")
+  isCurrentVersion      Boolean      @default(true)
+  premium               Decimal      @db.Decimal(18, 3)
+  currency              String       @default("JOD")
+  deductible            Decimal?     @db.Decimal(18, 3)
   limits                Json?
   biPeriodMonths        Int?
-  liabilityLimit        Decimal?   @db.Decimal(18, 3)
+  liabilityLimit        Decimal?     @db.Decimal(18, 3)
   exclusions            String?
   conditions            String?
-  commissionRatePercent Decimal?   @db.Decimal(5, 2)
-  receivedAt            DateTime   @default(now())
+  commissionRatePercent Decimal?     @db.Decimal(5, 2)
+  receivedAt            DateTime     @default(now())
   /// Backlog Part C #13 provenance — the Placement Officer who captured this
   /// version. Bare scalar, no relation; the AuditLogEntry CREATE row is the
   /// authoritative trail (same shape as RFQ.issuedByUserId, migration
@@ -1103,6 +1783,7 @@ model Quotation {
 
   @@index([rfqId])
   @@index([insurerId])
+  @@index([organizationId])
 }
 
 /// Process 14 — Quote Comparison (backlog Part C #14). Structured comparison
@@ -1117,10 +1798,14 @@ model Quotation {
 /// build best-effort advances the parent `Opportunity`
 /// QUOTES_RECEIVED -> COMPARISON_BUILT through the workflow engine.
 model ComparisonMatrix {
-  id              String   @id @default(uuid())
-  rfqId           String   @unique
-  rfq             RFQ      @relation(fields: [rfqId], references: [id])
-  builtAt         DateTime @default(now())
+  id              String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String       @default(dbgenerated())
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  rfqId           String       @unique
+  rfq             RFQ          @relation(fields: [rfqId], references: [id])
+  builtAt         DateTime     @default(now())
   missingInsurers String[] // insurer ids: on the RFQ shortlist, no current Quotation, not DECLINED — flagged in the output
   /// Backlog Part C #14 provenance — the Placement Officer who built this
   /// matrix. Bare scalar, no relation; the AuditLogEntry row is the
@@ -1128,10 +1813,16 @@ model ComparisonMatrix {
   builtByUserId   String?
 
   rows ComparisonMatrixRow[]
+
+  @@index([organizationId])
 }
 
 model ComparisonMatrixRow {
   id                  String           @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String           @default(dbgenerated())
+  organization        Organization     @relation(fields: [organizationId], references: [id])
   comparisonMatrixId  String
   comparisonMatrix    ComparisonMatrix @relation(fields: [comparisonMatrixId], references: [id])
   quotationId         String
@@ -1149,6 +1840,7 @@ model ComparisonMatrixRow {
   @@unique([comparisonMatrixId, quotationId])
   @@index([comparisonMatrixId])
   @@index([quotationId])
+  @@index([organizationId])
 }
 
 /// Process 16 — the broker's documented, reasoned advice — retained as
@@ -1179,30 +1871,35 @@ model ComparisonMatrixRow {
 /// a configured band) carried a materially lower commission rate.
 /// `coiCompetingQuotationId` / `coiCommissionDiffPercent` explain the flag.
 model Recommendation {
-  id                        String      @id @default(uuid())
-  opportunityId             String      @unique
-  opportunity               Opportunity @relation(fields: [opportunityId], references: [id])
-  recommendedQuotationId    String      @unique
-  recommendedQuotation      Quotation   @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
+  id                        String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String       @default(dbgenerated())
+  organization              Organization @relation(fields: [organizationId], references: [id])
+  opportunityId             String       @unique
+  opportunity               Opportunity  @relation(fields: [opportunityId], references: [id])
+  recommendedQuotationId    String       @unique
+  recommendedQuotation      Quotation    @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
   rationale                 String // free-text overall summary
   rationaleFactors          Json // { coverage, price, financialStrength, claimsService, deductible, policyConditions } — a non-empty note each
   draftedByUserId           String
   // Snapshot at draft: recommendedQuotation.premium > Opportunity.targetPremiumThreshold
-  approvalRequired          Boolean     @default(false)
+  approvalRequired          Boolean      @default(false)
   // Snapshot at draft: COI heuristic (comparable competing quote, materially lower commission)
-  conflictOfInterestFlagged Boolean     @default(false)
+  conflictOfInterestFlagged Boolean      @default(false)
   coiCompetingQuotationId   String?
-  coiCommissionDiffPercent  Decimal?    @db.Decimal(5, 2)
+  coiCommissionDiffPercent  Decimal?     @db.Decimal(5, 2)
   // Maker/checker: senior-officer approval required above a configurable premium threshold
   approvedByUserId          String?
   approvedAt                DateTime?
   sentToClientAt            DateTime?
   sentByUserId              String?
-  createdAt                 DateTime    @default(now())
+  createdAt                 DateTime     @default(now())
 
   conflictOfInterestDisclosure ConflictOfInterestDisclosure?
 
   @@index([draftedByUserId])
+  @@index([organizationId])
 }
 
 /// Process 50 / Part 3.3, 7.3 — mandatory disclosure whenever a
@@ -1215,6 +1912,10 @@ model Recommendation {
 /// their own conflict — `assertDifferentActors`, Part 5.2).
 model ConflictOfInterestDisclosure {
   id                          String         @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId              String         @default(dbgenerated())
+  organization                Organization   @relation(fields: [organizationId], references: [id])
   recommendationId            String         @unique
   recommendation              Recommendation @relation(fields: [recommendationId], references: [id])
   competingQuotationId        String?
@@ -1224,6 +1925,7 @@ model ConflictOfInterestDisclosure {
   acknowledgedAt              DateTime       @default(now())
 
   @@index([competingQuotationId])
+  @@index([organizationId])
 }
 
 enum ClientDecisionType {
@@ -1248,6 +1950,10 @@ enum ClientDecisionType {
 /// client's stated decision is a factual, single-actor Sales/Placement act).
 model ClientDecision {
   id               String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String             @default(dbgenerated())
+  organization     Organization       @relation(fields: [organizationId], references: [id])
   opportunityId    String             @unique
   opportunity      Opportunity        @relation(fields: [opportunityId], references: [id])
   decision         ClientDecisionType
@@ -1262,6 +1968,8 @@ model ClientDecision {
   /// Recommendation.sentByUserId / RFQ.issuedByUserId).
   capturedByUserId String?
   decidedAt        DateTime           @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -1284,13 +1992,22 @@ enum PolicyStatus {
 /// Part 4.1 core entity — the bound insurance contract.
 model Policy {
   id               String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String       @default(dbgenerated())
+  organization     Organization @relation(fields: [organizationId], references: [id])
   opportunityId    String       @unique
   opportunity      Opportunity  @relation(fields: [opportunityId], references: [id])
   customerId       String
   customer         Customer     @relation(fields: [customerId], references: [id])
   insurerId        String
   insurer          Insurer      @relation(fields: [insurerId], references: [id])
-  policyNumber     String?      @unique
+  /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
+  /// the platform. A bare @unique here is not only a functional bug (two
+  /// offices legitimately produce the same value); it leaks across tenants on
+  /// its own — a uniqueness-violation error confirms the value already exists
+  /// for SOMEONE, with no row ever returned. See @@unique below.
+  policyNumber     String?
   insuranceLine    String
   status           PolicyStatus @default(PLACEMENT_CONFIRMED)
   inceptionDate    DateTime?
@@ -1324,9 +2041,11 @@ model Policy {
   renewalCase             RenewalCase?
   documents               Document[]              @relation("PolicyDocuments")
 
+  @@unique([organizationId, policyNumber])
   @@index([customerId])
   @@index([status])
   @@index([expiryDate])
+  @@index([organizationId])
 }
 
 /// Requested/issued coverage snapshot — limits, sums insured, named perils,
@@ -1339,6 +2058,10 @@ model Policy {
 /// partial UNIQUE here, so it lives in raw SQL in that migration.
 model PolicySchedule {
   id                  String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String       @default(dbgenerated())
+  organization        Organization @relation(fields: [organizationId], references: [id])
   policyId            String
   policy              Policy       @relation(fields: [policyId], references: [id])
   effectiveFrom       DateTime
@@ -1352,46 +2075,65 @@ model PolicySchedule {
   createdAt           DateTime     @default(now())
 
   @@index([policyId, effectiveFrom])
+  @@index([organizationId])
 }
 
 /// Process 18 (interim state) — urgent cover before full policy issuance,
 /// with a tracked expiry.
 model CoverNote {
-  id        String   @id @default(uuid())
-  policyId  String   @unique
-  policy    Policy   @relation(fields: [policyId], references: [id])
-  issuedAt  DateTime @default(now())
-  expiresAt DateTime
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  policyId       String       @unique
+  policy         Policy       @relation(fields: [policyId], references: [id])
+  issuedAt       DateTime     @default(now())
+  expiresAt      DateTime
+
+  @@index([organizationId])
 }
 
 /// Process 20 — MANDATORY maker/checker line-by-line comparison of
 /// Requested Coverage vs Issued Policy. The single largest source of PI
 /// claims per the source model if skipped.
 model PolicyChecking {
-  id                             String    @id @default(uuid())
-  policyId                       String    @unique
-  policy                         Policy    @relation(fields: [policyId], references: [id])
+  id                             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                 String       @default(dbgenerated())
+  organization                   Organization @relation(fields: [organizationId], references: [id])
+  policyId                       String       @unique
+  policy                         Policy       @relation(fields: [policyId], references: [id])
   placedByUserId                 String // maker — the officer who placed the cover
   checkedByUserId                String? // checker — MUST differ from placedByUserId (app-enforced)
   checklistResult                Json? // structured field-by-field comparison
-  discrepancyFound               Boolean   @default(false)
+  discrepancyFound               Boolean      @default(false)
   discrepancyDetail              String?
-  discrepancyLoggedAsPiRiskEvent Boolean   @default(false)
+  discrepancyLoggedAsPiRiskEvent Boolean      @default(false)
   complianceOverrideByUserId     String? // discrepancy cannot be bypassed without logged override
   checkedAt                      DateTime?
-  createdAt                      DateTime  @default(now())
+  createdAt                      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Process 21 — delivery date, method, recipient, confirmation, receipt
 /// acknowledgement.
 model DeliveryRecord {
-  id                    String    @id @default(uuid())
-  policyId              String    @unique
-  policy                Policy    @relation(fields: [policyId], references: [id])
-  deliveredAt           DateTime  @default(now())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  policyId              String       @unique
+  policy                Policy       @relation(fields: [policyId], references: [id])
+  deliveredAt           DateTime     @default(now())
   method                String // email | portal | courier | in_person
   recipient             String
   receiptAcknowledgedAt DateTime?
+
+  @@index([organizationId])
 }
 
 enum EndorsementType {
@@ -1422,6 +2164,10 @@ enum EndorsementStatus {
 /// stays ACTIVE until APPLY) and mint a duplicate Refund + CommissionReversal.
 model Endorsement {
   id                              String            @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                  String            @default(dbgenerated())
+  organization                    Organization      @relation(fields: [organizationId], references: [id])
   policyId                        String
   policy                          Policy            @relation(fields: [policyId], references: [id])
   type                            EndorsementType
@@ -1451,44 +2197,63 @@ model Endorsement {
   cancellation       Cancellation?
 
   @@index([policyId])
+  @@index([organizationId])
 }
 
 /// Process 22/37 — cancellation request, always paired with a commission
 /// reversal (Part 3.5 rule: "the two numbers must move together").
 model Cancellation {
-  id               String      @id @default(uuid())
-  endorsementId    String      @unique
-  endorsement      Endorsement @relation(fields: [endorsementId], references: [id])
+  id               String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String       @default(dbgenerated())
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  endorsementId    String       @unique
+  endorsement      Endorsement  @relation(fields: [endorsementId], references: [id])
   reason           String
   basis            String // short_period | pro_rata
-  returnPremium    Decimal     @db.Decimal(18, 3)
+  returnPremium    Decimal      @db.Decimal(18, 3)
   clientNotifiedAt DateTime?
-  createdAt        DateTime    @default(now())
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Process 37 — refund workflow. Maker/checker: raiser != Finance approver,
 /// gated by a configurable value threshold.
 model Refund {
-  id                           String      @id @default(uuid())
-  endorsementId                String      @unique
-  endorsement                  Endorsement @relation(fields: [endorsementId], references: [id])
-  amount                       Decimal     @db.Decimal(18, 3)
+  id                           String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId               String       @default(dbgenerated())
+  organization                 Organization @relation(fields: [organizationId], references: [id])
+  endorsementId                String       @unique
+  endorsement                  Endorsement  @relation(fields: [endorsementId], references: [id])
+  amount                       Decimal      @db.Decimal(18, 3)
   reason                       String // cancellation | premium_reduction | coverage_change | overpayment
   raisedByUserId               String
   approvedByUserId             String? // MUST differ from raisedByUserId (app-enforced)
   approvalThresholdMatrixLevel String?
   paidAt                       DateTime?
-  createdAt                    DateTime    @default(now())
+  createdAt                    DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Process 35-37 — commission reversal tied 1:1 to a negative
 /// endorsement/cancellation premium adjustment.
 model CommissionReversal {
-  id            String      @id @default(uuid())
-  endorsementId String      @unique
-  endorsement   Endorsement @relation(fields: [endorsementId], references: [id])
-  amount        Decimal     @db.Decimal(18, 3)
-  createdAt     DateTime    @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  endorsementId  String       @unique
+  endorsement    Endorsement  @relation(fields: [endorsementId], references: [id])
+  amount         Decimal      @db.Decimal(18, 3)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -1512,11 +2277,20 @@ enum ClaimStatus {
 /// resolve via PolicySchedule.effectiveFrom/effectiveTo, not Policy alone.
 model Claim {
   id                         String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId             String             @default(dbgenerated())
+  organization               Organization       @relation(fields: [organizationId], references: [id])
   policyId                   String
   policy                     Policy             @relation("ClaimPolicy", fields: [policyId], references: [id])
   customerId                 String
   customer                   Customer           @relation("ClaimCustomer", fields: [customerId], references: [id])
-  claimNumber                String?            @unique
+  /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
+  /// the platform. A bare @unique here is not only a functional bug (two
+  /// offices legitimately produce the same value); it leaks across tenants on
+  /// its own — a uniqueness-violation error confirms the value already exists
+  /// for SOMEONE, with no row ever returned. See @@unique below.
+  claimNumber                String?
   status                     ClaimStatus        @default(NOTIFIED)
   lossDate                   DateTime
   lossLocation               String?
@@ -1538,20 +2312,28 @@ model Claim {
   followUpAlerts ClaimFollowUpAlert[]
   complaints     Complaint[]
 
+  @@unique([organizationId, claimNumber])
   @@index([policyId])
   @@index([status])
   @@index([lossDate])
+  @@index([organizationId])
 }
 
 /// Process 25 — claim form, police report, medical report, photos,
 /// invoices, repair estimate, expert report.
 model ClaimDocument {
-  id         String   @id @default(uuid())
-  claimId    String
-  claim      Claim    @relation(fields: [claimId], references: [id])
-  documentId String
-  document   Document @relation(fields: [documentId], references: [id])
-  docType    String // claim_form | police_report | medical_report | photo | invoice | repair_estimate | expert_report | correspondence
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  claimId        String
+  claim          Claim        @relation(fields: [claimId], references: [id])
+  documentId     String
+  document       Document     @relation(fields: [documentId], references: [id])
+  docType        String // claim_form | police_report | medical_report | photo | invoice | repair_estimate | expert_report | correspondence
+
+  @@index([organizationId])
 }
 
 /// Part 3.7 core data entity — explicit status-history trail, named
@@ -1567,6 +2349,10 @@ model ClaimDocument {
 /// even if the caller-side pre-check is later weakened.
 model ClaimStatusHistory {
   id              String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String       @default(dbgenerated())
+  organization    Organization @relation(fields: [organizationId], references: [id])
   claimId         String
   claim           Claim        @relation(fields: [claimId], references: [id])
   fromStatus      ClaimStatus?
@@ -1575,6 +2361,7 @@ model ClaimStatusHistory {
   changedAt       DateTime     @default(now())
 
   @@unique([claimId, toStatus])
+  @@index([organizationId])
 }
 
 /// Process 28 — four DISTINCT figures, never collapsed into one number
@@ -1589,45 +2376,63 @@ model ClaimStatusHistory {
 /// NOT Claim.isLargeClaim) OR brokerProcessedPayment is true; `settleCore`
 /// refuses `Claim -> SETTLED` structurally while that is unmet.
 model Settlement {
-  id                       String    @id @default(uuid())
-  claimId                  String    @unique
-  claim                    Claim     @relation(fields: [claimId], references: [id])
-  estimatedLoss            Decimal   @db.Decimal(18, 3)
-  approvedAmount           Decimal?  @db.Decimal(18, 3)
-  deductible               Decimal?  @db.Decimal(18, 3)
-  netSettlement            Decimal?  @db.Decimal(18, 3)
+  id                       String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String       @default(dbgenerated())
+  organization             Organization @relation(fields: [organizationId], references: [id])
+  claimId                  String       @unique
+  claim                    Claim        @relation(fields: [claimId], references: [id])
+  estimatedLoss            Decimal      @db.Decimal(18, 3)
+  approvedAmount           Decimal?     @db.Decimal(18, 3)
+  deductible               Decimal?     @db.Decimal(18, 3)
+  netSettlement            Decimal?     @db.Decimal(18, 3)
   // true when the broker (not the insurer direct) processes the payout —
   // forces a second approver regardless of amount (Process 28).
-  brokerProcessedPayment   Boolean   @default(false)
+  brokerProcessedPayment   Boolean      @default(false)
   // large claims / broker-processed payments require a second approver
   approvedByUserId         String?
   secondApproverUserId     String?
   clientPaymentConfirmedAt DateTime?
-  createdAt                DateTime  @default(now())
+  createdAt                DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Process 23 — additional data for third-party-involved claims, with a
 /// subrogation/recovery flag (distinct piece of state, own process).
 model ThirdPartyClaimant {
-  id                      String   @id @default(uuid())
-  claimId                 String   @unique
-  claim                   Claim    @relation(fields: [claimId], references: [id])
+  id                      String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String       @default(dbgenerated())
+  organization            Organization @relation(fields: [organizationId], references: [id])
+  claimId                 String       @unique
+  claim                   Claim        @relation(fields: [claimId], references: [id])
   fullName                String?
   contactDetailsEnc       String? // -- ENCRYPT
-  subrogationRecoveryFlag Boolean  @default(false)
-  recoveryAmount          Decimal? @db.Decimal(18, 3)
+  subrogationRecoveryFlag Boolean      @default(false)
+  recoveryAmount          Decimal?     @db.Decimal(18, 3)
+
+  @@index([organizationId])
 }
 
 /// Process 24/26 — insurer/loss-adjuster assignment tracking.
 model Adjuster {
-  id                       String    @id @default(uuid())
-  claimId                  String    @unique
-  claim                    Claim     @relation(fields: [claimId], references: [id])
+  id                       String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String       @default(dbgenerated())
+  organization             Organization @relation(fields: [organizationId], references: [id])
+  claimId                  String       @unique
+  claim                    Claim        @relation(fields: [claimId], references: [id])
   name                     String
   firm                     String?
-  assignedAt               DateTime  @default(now())
+  assignedAt               DateTime     @default(now())
   surveyCompletedAt        DateTime?
   investigationCompletedAt DateTime?
+
+  @@index([organizationId])
 }
 
 /// Process 27 — system-generated follow-up alert once insurer non-response
@@ -1643,13 +2448,18 @@ model Adjuster {
 /// row. The sweep + a manual re-run rely on this: raise is `create` +
 /// P2002 -> "already alerted".
 model ClaimFollowUpAlert {
-  id          String    @id @default(uuid())
-  claimId     String
-  claim       Claim     @relation(fields: [claimId], references: [id])
-  triggeredAt DateTime  @default(now())
-  resolvedAt  DateTime?
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  claimId        String
+  claim          Claim        @relation(fields: [claimId], references: [id])
+  triggeredAt    DateTime     @default(now())
+  resolvedAt     DateTime?
 
   @@index([claimId])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -1671,17 +2481,22 @@ enum InvoiceStatus {
 /// adjustment, cancellation, renewal. Distinct from Invoice, which is the
 /// billing document raised against one or more of these transactions.
 model PremiumTransaction {
-  id                   String   @id @default(uuid())
+  id                   String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String       @default(dbgenerated())
+  organization         Organization @relation(fields: [organizationId], references: [id])
   policyId             String
-  policy               Policy   @relation(fields: [policyId], references: [id])
+  policy               Policy       @relation(fields: [policyId], references: [id])
   transactionType      String // new_business_premium | endorsement_adjustment | cancellation | renewal_premium
-  amount               Decimal  @db.Decimal(18, 3)
-  currency             String   @default("JOD")
+  amount               Decimal      @db.Decimal(18, 3)
+  currency             String       @default("JOD")
   relatedEndorsementId String?
-  occurredAt           DateTime @default(now())
-  createdAt            DateTime @default(now())
+  occurredAt           DateTime     @default(now())
+  createdAt            DateTime     @default(now())
 
   @@index([policyId])
+  @@index([organizationId])
 }
 
 /// Process 31 — premium + tax + fees, net of commission, with due dates.
@@ -1702,6 +2517,10 @@ model PremiumTransaction {
 /// unconstrained.
 model Invoice {
   id                 String        @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String        @default(dbgenerated())
+  organization       Organization  @relation(fields: [organizationId], references: [id])
   policyId           String?
   policy             Policy?       @relation(fields: [policyId], references: [id])
   customerId         String
@@ -1724,6 +2543,7 @@ model Invoice {
   @@index([customerId])
   @@index([status])
   @@index([policyId])
+  @@index([organizationId])
 }
 
 /// Process 32 — Invoice -> Collection -> Receipt -> Reconciliation ->
@@ -1756,6 +2576,10 @@ model Invoice {
 /// `Receipt_invoiceId_key` — the difference is that this one is load-bearing.
 model Receipt {
   id               String          @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String          @default(dbgenerated())
+  organization     Organization    @relation(fields: [organizationId], references: [id])
   invoiceId        String
   invoice          Invoice         @relation(fields: [invoiceId], references: [id])
   amount           Decimal         @db.Decimal(18, 3)
@@ -1781,12 +2605,17 @@ model Receipt {
   remittance Remittance?
 
   @@index([invoiceId, receivedAt])
+  @@index([organizationId])
 }
 
 /// Process 32/34 — remittance to insurer per agreed arrangement (broker may
 /// collect on behalf of insurer).
 model Remittance {
   id               String          @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String          @default(dbgenerated())
+  organization     Organization    @relation(fields: [organizationId], references: [id])
   receiptId        String          @unique
   receipt          Receipt         @relation(fields: [receiptId], references: [id])
   insurerId        String
@@ -1797,6 +2626,8 @@ model Remittance {
   /// (optional).
   paymentChannelId String?
   paymentChannel   PaymentChannel? @relation(fields: [paymentChannelId], references: [id])
+
+  @@index([organizationId])
 }
 
 /// Process 38 — a governed, approved payment channel for a customer (money IN,
@@ -1810,28 +2641,33 @@ model Remittance {
 /// `PaymentChannel_owner_exactly_one` CHECK (migration 20260903140000): exactly
 /// one of (customerId, insurerId) is set and it matches `ownerType`.
 model PaymentChannel {
-  id           String    @id @default(uuid())
-  ownerType    String // customer | insurer
-  customerId   String?
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ownerType      String // customer | insurer
+  customerId     String?
   // onDelete: Restrict — SET NULL (Prisma's default for an optional relation)
   // would break `PaymentChannel_owner_exactly_one` on a hard delete of the owner.
-  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  insurerId    String?
-  insurer      Insurer?  @relation(fields: [insurerId], references: [id], onDelete: Restrict)
-  channelType  String // bank_transfer | cheque | card | cash
-  label        String
-  bankName     String?
-  accountLast4 String? // masked — at most 4 digits; NEVER the full number
-  currency     String    @default("JOD")
-  status       String    @default("active") // active | disabled
-  disabledAt   DateTime?
-  createdAt    DateTime  @default(now())
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  insurerId      String?
+  insurer        Insurer?     @relation(fields: [insurerId], references: [id], onDelete: Restrict)
+  channelType    String // bank_transfer | cheque | card | cash
+  label          String
+  bankName       String?
+  accountLast4   String? // masked — at most 4 digits; NEVER the full number
+  currency       String       @default("JOD")
+  status         String       @default("active") // active | disabled
+  disabledAt     DateTime?
+  createdAt      DateTime     @default(now())
 
   receipts    Receipt[]
   remittances Remittance[]
 
   @@index([ownerType, customerId])
   @@index([ownerType, insurerId])
+  @@index([organizationId])
 }
 
 /// Process 35 — insurer- and product-specific commission rate table
@@ -1849,18 +2685,23 @@ model PaymentChannel {
 /// onto each CommissionLedgerEntry at calculate time. DRAFTED default 0 — no
 /// governed tax-rate source is encoded in the system yet.
 model CommissionAgreement {
-  id             String    @id @default(uuid())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
   insurerId      String
-  insurer        Insurer   @relation(fields: [insurerId], references: [id])
+  insurer        Insurer      @relation(fields: [insurerId], references: [id])
   insuranceLine  String
-  ratePercent    Decimal   @db.Decimal(5, 2)
-  vatRatePercent Decimal   @default(0) @db.Decimal(5, 2)
-  effectiveFrom  DateTime  @default(now())
+  ratePercent    Decimal      @db.Decimal(5, 2)
+  vatRatePercent Decimal      @default(0) @db.Decimal(5, 2)
+  effectiveFrom  DateTime     @default(now())
   effectiveTo    DateTime?
 
   ledgerEntries CommissionLedgerEntry[]
 
   @@index([insurerId, insuranceLine])
+  @@index([organizationId])
 }
 
 /// Process 35–36 — the governed commission earned on a policy. #35 records the
@@ -1888,6 +2729,10 @@ model CommissionAgreement {
 /// the full earned commission is clawed back.
 model CommissionLedgerEntry {
   id                        String               @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String               @default(dbgenerated())
+  organization              Organization         @relation(fields: [organizationId], references: [id])
   policyId                  String
   policy                    Policy               @relation(fields: [policyId], references: [id])
   commissionAgreementId     String?
@@ -1918,6 +2763,7 @@ model CommissionLedgerEntry {
   createdAt                 DateTime             @default(now())
 
   @@unique([policyId])
+  @@index([organizationId])
 }
 
 /// Process 39 — every reconciliation mismatch (insurer statement vs. broker
@@ -1942,13 +2788,17 @@ model CommissionLedgerEntry {
 /// `ReconciliationException_one_open_per_invoice` (migration 20260903150000,
 /// raw SQL: `WHERE "status" <> 'resolved' AND "invoiceId" IS NOT NULL`).
 model ReconciliationException {
-  id                     String    @id @default(uuid())
+  id                     String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId         String       @default(dbgenerated())
+  organization           Organization @relation(fields: [organizationId], references: [id])
   invoiceId              String?
-  invoice                Invoice?  @relation(fields: [invoiceId], references: [id])
-  insurerStatementAmount Decimal   @db.Decimal(18, 3)
-  brokerRecordAmount     Decimal   @db.Decimal(18, 3)
-  varianceAmount         Decimal   @db.Decimal(18, 3)
-  status                 String    @default("open") // open | investigating | resolved
+  invoice                Invoice?     @relation(fields: [invoiceId], references: [id])
+  insurerStatementAmount Decimal      @db.Decimal(18, 3)
+  brokerRecordAmount     Decimal      @db.Decimal(18, 3)
+  varianceAmount         Decimal      @db.Decimal(18, 3)
+  status                 String       @default("open") // open | investigating | resolved
   raisedByUserId         String?
   investigatedByUserId   String?
   resolvedByUserId       String?
@@ -1956,22 +2806,29 @@ model ReconciliationException {
   /// not personal data). Mandatory on resolve.
   resolutionNote         String?
   resolvedAt             DateTime?
-  createdAt              DateTime  @default(now())
+  createdAt              DateTime     @default(now())
 
   @@index([invoiceId])
   @@index([status])
+  @@index([organizationId])
 }
 
 /// Process 32/7.3 — client funds must be identifiable and reconcilable
 /// separately from the broker's own operating funds at all times.
 model ClientFundsLedgerEntry {
-  id         String   @id @default(uuid())
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-  amount     Decimal  @db.Decimal(18, 3)
-  direction  String // in | out
-  reference  String?
-  recordedAt DateTime @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  amount         Decimal      @db.Decimal(18, 3)
+  direction      String // in | out
+  reference      String?
+  recordedAt     DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -1991,25 +2848,29 @@ model ClientFundsLedgerEntry {
 /// fulfil / cancel) is logged verbatim (what was done / why cancelled — a
 /// business note, not personal data). No maker/checker.
 model ServiceRequest {
-  id                String    @id @default(uuid())
+  id                String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
   customerId        String
-  customer          Customer  @relation(fields: [customerId], references: [id])
+  customer          Customer     @relation(fields: [customerId], references: [id])
   policyId          String?
-  policy            Policy?   @relation(fields: [policyId], references: [id])
+  policy            Policy?      @relation(fields: [policyId], references: [id])
   requestType       String // certificate | copy | change | other
   /// Free text — what specifically is requested (which policy / for whom /
   /// what change). Optional; not personal data by policy.
   detail            String?
-  status            String    @default("open") // open | in_progress | fulfilled | cancelled
-  slaTimerId        String?   @unique
-  slaTimer          SlaTimer? @relation(fields: [slaTimerId], references: [id])
+  status            String       @default("open") // open | in_progress | fulfilled | cancelled
+  slaTimerId        String?      @unique
+  slaTimer          SlaTimer?    @relation(fields: [slaTimerId], references: [id])
   raisedByUserId    String?
   assignedToUserId  String?
   fulfilledByUserId String?
   /// What was done (fulfil) / why it was cancelled — mandatory at closure,
   /// logged verbatim.
   outcomeNote       String?
-  createdAt         DateTime  @default(now())
+  createdAt         DateTime     @default(now())
   closedAt          DateTime?
 
   @@index([customerId])
@@ -2017,6 +2878,7 @@ model ServiceRequest {
   // "my queue" read (assignedToUserId filter).
   @@index([status, createdAt])
   @@index([assignedToUserId])
+  @@index([organizationId])
 }
 
 enum ComplaintStatus {
@@ -2042,6 +2904,10 @@ enum ComplaintStatus {
 /// best-effort, resolved when the complaint is resolved / escalated.
 model Complaint {
   id                        String          @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String          @default(dbgenerated())
+  organization              Organization    @relation(fields: [organizationId], references: [id])
   customerId                String
   customer                  Customer        @relation(fields: [customerId], references: [id])
   claimId                   String?
@@ -2072,17 +2938,23 @@ model Complaint {
   @@index([status, createdAt])
   @@index([claimId])
   @@index([responsibleEmployeeUserId])
+  @@index([organizationId])
 }
 
 model ComplaintAction {
-  id            String    @id @default(uuid())
-  complaintId   String
-  complaint     Complaint @relation(fields: [complaintId], references: [id])
-  actionText    String
-  takenByUserId String
-  takenAt       DateTime  @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  complaintId    String
+  complaint      Complaint    @relation(fields: [complaintId], references: [id])
+  actionText     String
+  takenByUserId  String
+  takenAt        DateTime     @default(now())
 
   @@index([complaintId])
+  @@index([organizationId])
 }
 
 /// Process 42 — escalation to management / the regulator / the Insurance
@@ -2090,15 +2962,20 @@ model ComplaintAction {
 /// internally (a `complaint.escalate` action; the complaint moves to
 /// `ESCALATED`).
 model EscalationRecord {
-  id                String    @id @default(uuid())
+  id                String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
   complaintId       String
-  complaint         Complaint @relation(fields: [complaintId], references: [id])
+  complaint         Complaint    @relation(fields: [complaintId], references: [id])
   escalatedTo       String // management | regulator | dispute_resolution_committee
   escalatedByUserId String?
-  escalatedAt       DateTime  @default(now())
+  escalatedAt       DateTime     @default(now())
   reason            String?
 
   @@index([complaintId])
+  @@index([organizationId])
 }
 
 enum CommunicationDirection {
@@ -2134,6 +3011,10 @@ enum CommunicationDirection {
 /// `Interaction` #10).
 model CommunicationLog {
   id               String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String                 @default(dbgenerated())
+  organization     Organization           @relation(fields: [organizationId], references: [id])
   customerId       String?
   channel          InteractionChannel
   templateId       String?
@@ -2162,29 +3043,42 @@ model CommunicationLog {
   @@index([rfqId])
   @@index([rfqInsurerId])
   @@index([consentRecordId])
+  @@index([organizationId])
 }
 
 /// Process 45 — satisfaction feedback post-issuance, post-claim,
 /// post-renewal.
 model CustomerFeedback {
-  id          String   @id @default(uuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id])
-  context     String // post_issuance | post_claim | post_renewal
-  score       Int?
-  comments    String?
-  submittedAt DateTime @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  context        String // post_issuance | post_claim | post_renewal
+  score          Int?
+  comments       String?
+  submittedAt    DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Process 46 — at-risk renewals / lapsed clients, retention workflow.
 model RetentionCase {
-  id         String    @id @default(uuid())
-  customerId String
-  customer   Customer  @relation(fields: [customerId], references: [id])
-  reason     String // renewal_inactivity | lapse_risk
-  status     String    @default("open")
-  createdAt  DateTime  @default(now())
-  closedAt   DateTime?
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  reason         String // renewal_inactivity | lapse_risk
+  status         String       @default("open")
+  createdAt      DateTime     @default(now())
+  closedAt       DateTime?
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -2206,6 +3100,10 @@ enum RenewalStatus {
 /// time before expiry (default 90 days).
 model RenewalCase {
   id                          String        @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId              String        @default(dbgenerated())
+  organization                Organization  @relation(fields: [organizationId], references: [id])
   policyId                    String        @unique
   policy                      Policy        @relation(fields: [policyId], references: [id])
   status                      RenewalStatus @default(RENEWAL_DUE)
@@ -2219,26 +3117,40 @@ model RenewalCase {
   opportunity    Opportunity?
   lossRatio      LossRatio?
   recommendation RenewalRecommendation?
+
+  @@index([organizationId])
 }
 
 /// Process 30/9 — Claims ÷ Premium for a given client/policy/line/period.
 /// Computed and surfaced BEFORE the renewal recommendation is drafted.
 model LossRatio {
-  id            String      @id @default(uuid())
-  renewalCaseId String      @unique
-  renewalCase   RenewalCase @relation(fields: [renewalCaseId], references: [id])
-  periodClaims  Decimal     @db.Decimal(18, 3)
-  periodPremium Decimal     @db.Decimal(18, 3)
-  ratio         Decimal     @db.Decimal(7, 4)
-  computedAt    DateTime    @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  renewalCaseId  String       @unique
+  renewalCase    RenewalCase  @relation(fields: [renewalCaseId], references: [id])
+  periodClaims   Decimal      @db.Decimal(18, 3)
+  periodPremium  Decimal      @db.Decimal(18, 3)
+  ratio          Decimal      @db.Decimal(7, 4)
+  computedAt     DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 model RenewalRecommendation {
-  id            String      @id @default(uuid())
-  renewalCaseId String      @unique
-  renewalCase   RenewalCase @relation(fields: [renewalCaseId], references: [id])
-  rationale     String
-  createdAt     DateTime    @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  renewalCaseId  String       @unique
+  renewalCase    RenewalCase  @relation(fields: [renewalCaseId], references: [id])
+  rationale      String
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -2247,36 +3159,54 @@ model RenewalRecommendation {
 
 /// Process 51/Part 7.1 — the broker's own CBJ license status.
 model BrokerLicense {
-  id                   String    @id @default(uuid())
+  id                   String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String       @default(dbgenerated())
+  organization         Organization @relation(fields: [organizationId], references: [id])
   licenseNumber        String
   scopeOfAuthorization String?
   issuedAt             DateTime?
   expiresAt            DateTime
-  status               String    @default("active") // active | lapsed
+  status               String       @default("active") // active | lapsed
+
+  @@index([organizationId])
 }
 
 /// Part 7.1 — the broker's own Professional Indemnity insurance — a broker
 /// without valid PI cover is itself a licensing breach.
 model ProfessionalIndemnityPolicy {
-  id                   String   @id @default(uuid())
+  id                   String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String       @default(dbgenerated())
+  organization         Organization @relation(fields: [organizationId], references: [id])
   insurerName          String
-  coverageLimit        Decimal  @db.Decimal(18, 3)
+  coverageLimit        Decimal      @db.Decimal(18, 3)
   expiresAt            DateTime
   claimsHistorySummary String?
 
   riskEvents ProfessionalIndemnityRiskEvent[]
+
+  @@index([organizationId])
 }
 
 /// Process 54 — exposures from advice/placement errors (e.g. requested Sum
 /// Insured not matching amount sent to insurer).
 model ProfessionalIndemnityRiskEvent {
   id                     String                       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId         String                       @default(dbgenerated())
+  organization           Organization                 @relation(fields: [organizationId], references: [id])
   piPolicyId             String?
   piPolicy               ProfessionalIndemnityPolicy? @relation(fields: [piPolicyId], references: [id])
   sourcePolicyCheckingId String? // links back to a PolicyChecking discrepancy
   description            String
   mitigationAction       String?
   loggedAt               DateTime                     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Part 7.2 — transaction monitoring for unusual patterns (unusually large
@@ -2302,6 +3232,10 @@ model ProfessionalIndemnityRiskEvent {
 /// for the same customer, a real `@code-reviewer` BLOCKER on the first pass).
 model TransactionMonitoringAlert {
   id                            String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                String             @default(dbgenerated())
+  organization                  Organization       @relation(fields: [organizationId], references: [id])
   customerId                    String?
   customer                      Customer?          @relation(fields: [customerId], references: [id])
   patternType                   String // large_premium_payment | frequent_cancellations | frequent_refunds | third_party_payment_source | other
@@ -2319,6 +3253,7 @@ model TransactionMonitoringAlert {
   @@index([customerId])
   @@index([status])
   @@index([patternType])
+  @@index([organizationId])
 }
 
 enum WatchlistSource {
@@ -2349,16 +3284,16 @@ enum WatchlistSource {
 /// alleged-conduct text — DRAFTED, same status as `kyc-aml-sla-timers.md`'s
 /// figures until PRIV-STD-02 is consulted.
 model WatchlistEntry {
-  id              String             @id @default(uuid())
-  source          WatchlistSource
-  sourceRecordId  String
-  fullName        String
-  normalizedName  String
-  listProgram     String? // OFAC "Program", or UN "UN_LIST_TYPE"/"REFERENCE_NUMBER"
-  remarks         String? // OFAC "Remarks", or UN "COMMENTS1"
-  classification  DataClassification @default(HIGHLY_CONFIDENTIAL) // DRAFTED pending PRIV-STD-02 — see model comment
-  syncRunId       String // the WatchlistSyncRun that last confirmed this row is still on the source list
-  syncedAt        DateTime           @default(now())
+  id               String                  @id @default(uuid())
+  source           WatchlistSource
+  sourceRecordId   String
+  fullName         String
+  normalizedName   String
+  listProgram      String? // OFAC "Program", or UN "UN_LIST_TYPE"/"REFERENCE_NUMBER"
+  remarks          String? // OFAC "Remarks", or UN "COMMENTS1"
+  classification   DataClassification      @default(HIGHLY_CONFIDENTIAL) // DRAFTED pending PRIV-STD-02 — see model comment
+  syncRunId        String // the WatchlistSyncRun that last confirmed this row is still on the source list
+  syncedAt         DateTime                @default(now())
   /// Process 49 (fuzzy matching) — `fullName` reduced to a canonical token
   /// set by `canonicalNameTokens()`: lower-cased, punctuation stripped,
   /// de-duplicated, sorted, and collapsed through the curated
@@ -2376,12 +3311,23 @@ model WatchlistEntry {
   /// what the `normalizedName` floor is for), and
   /// `WatchlistEntryRepository.backfillCanonicalTokens` rewrites them at the
   /// start of every sync rather than waiting for a fetch to succeed.
-  canonicalTokens String[]
-  matches         ScreeningMatch[]
+  canonicalTokens  String[]
+  /// Part B §6 — which generation of the list this row belongs to. A screening
+  /// reads only the PUBLISHED generation, which is what makes a sync invisible
+  /// to readers until it is complete.
+  /// Required: an entry with no generation would be invisible to the
+  /// published-generation reader AND exempt from the generation-scoped unique
+  /// key (Postgres treats NULLs as distinct), so it could silently duplicate.
+  datasetVersionId String
+  datasetVersion   WatchlistDatasetVersion @relation(fields: [datasetVersionId], references: [id], onDelete: Cascade)
+  matches          ScreeningMatch[]
 
-  @@unique([source, sourceRecordId])
+  /// Scoped to the generation: the same list entry legitimately exists in the
+  /// published generation and in the one being downloaded beside it.
+  @@unique([source, sourceRecordId, datasetVersionId])
   @@index([normalizedName])
   @@index([source])
+  @@index([datasetVersionId])
 }
 
 /// Process 49 — one row per sync attempt (scheduled every 12h, matching the
@@ -2421,6 +3367,10 @@ model WatchlistEntry {
 /// list entry. Reads are audit-logged with `isSensitiveDataAccess`.
 model ScreeningMatch {
   id                  String          @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String          @default(dbgenerated())
+  organization        Organization    @relation(fields: [organizationId], references: [id])
   kycRecordId         String
   kycRecord           KYCRecord       @relation(fields: [kycRecordId], references: [id])
   /// Nullable, and `SET NULL` rather than `Cascade`: `pruneStale` deletes an
@@ -2437,29 +3387,88 @@ model ScreeningMatch {
   entrySourceRecordId String?
   entryFullName       String
   entryListProgram    String?
+
+  /// The attempt that raised this candidate.
+  screeningRequestId String?
+  screeningRequest   ScreeningRequest?      @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  provider           ScreeningProviderKind?
+  /// SANCTIONS / PEP / WATCHLIST. Defaults to SANCTIONS because every match
+  /// that existed before providers came from OFAC/UN, which are sanctions
+  /// lists — a backfill that guessed PEP would be fabricating a
+  /// determination.
+  listType           ScreeningListType      @default(SANCTIONS)
+  /// The provider's own entity id, so a reviewer can look the candidate up.
+  providerEntityId   String?
+  /// 0..1. NULL for the built-in matcher, which is deterministic set logic
+  /// rather than a similarity engine — a fabricated fraction would be false
+  /// precision.
+  matchScore         Float?
+  /// Part B §13 — the review threshold this candidate was measured against,
+  /// and the matcher version that raised it. Stored per match rather than
+  /// looked up later: the configuration moves, and a match must stay
+  /// readable against the rules that actually produced it.
+  reviewThreshold    Float?
+  algorithmVersion   String?
+  /// Which attributes agreed (name / dateOfBirth / nationality / ...). A
+  /// name-only agreement is very different evidence from name+DOB+nationality.
+  matchedAttributes  String[]               @default([])
+  /// For a PEP candidate: the position that makes them politically exposed.
+  pepPosition        String?
   /// The name that actually matched. NOT always the customer's own legal
   /// name — screening covers UBOs too, and the reviewer needs to know which
   /// subject triggered it. Display-only: see `subjectCanonical`.
-  subjectName         String
+  subjectName        String
   /// `canonicalNameTokens(subjectName).join(' ')` — what the match was
   /// actually made on, and what the duplicate-suppression UNIQUE keys on.
   /// Keying that on the RAW name meant re-casing or re-spacing a customer's
   /// legal name minted a second queue item that a prior `cleared` decision
   /// did not suppress.
-  subjectCanonical    String
+  subjectCanonical   String
   /// `exact` (identical after canonicalisation) or `fuzzy` (the entry's
   /// tokens are contained in the subject's). Surfaced so a reviewer can
   /// triage: an exact hit deserves more scrutiny than a subset one.
-  matchType           String
-  /// `pending` | `cleared` | `confirmed`.
-  status              String          @default("pending")
-  detectedAt          DateTime        @default(now())
-  reviewedByUserId    String?
-  reviewedAt          DateTime?
+  matchType          String
+  /// The DECISION: `pending` | `cleared` | `confirmed`.
+  ///
+  /// Distinct from `caseStatus` below, which is the WORKFLOW state, and they
+  /// answer different questions. "Has anyone looked at this yet?" is workflow;
+  /// "was it a real match?" is the decision. Collapsing them would make
+  /// "assigned but not yet decided" unrepresentable.
+  status             String                 @default("pending")
+
+  /// Part B §16 — the case workflow.
+  ///
+  ///   OPEN          detected, nobody owns it
+  ///   ASSIGNED      a named reviewer owns it
+  ///   UNDER_REVIEW  that reviewer has started work
+  ///   ESCALATED     raised to someone else, with a written reason
+  ///   CLOSED        a decision was recorded; terminal
+  ///
+  /// A decision may only be recorded from UNDER_REVIEW or ESCALATED — not from
+  /// OPEN. Deciding a case nobody ever picked up is exactly the rubber-stamp
+  /// this queue exists to prevent, so the transition table makes it
+  /// unreachable rather than discouraged.
+  caseStatus        ScreeningCaseStatus @default(OPEN)
+  assignedToUserId  String?
+  assignedByUserId  String?
+  assignedAt        DateTime?
+  reviewStartedAt   DateTime?
+  escalatedToUserId String?
+  escalatedAt       DateTime?
+  /// Mandatory when escalating — enforced in the database.
+  escalationReason  String?
+  closedAt          DateTime?
+  closedByUserId    String?
+
+  notes ScreeningCaseNote[]
+
+  detectedAt       DateTime  @default(now())
+  reviewedByUserId String?
+  reviewedAt       DateTime?
   /// Mandatory when a decision is recorded — the business justification for
   /// clearing or confirming, kept verbatim (a justification, not personal
   /// data — the same treatment `Refund.reason` gets).
-  reviewReason        String?
+  reviewReason     String?
 
   /// One open item per (KYC file, list entry, CANONICAL subject name): a
   /// re-screen of the same customer must not manufacture a duplicate queue
@@ -2467,6 +3476,46 @@ model ScreeningMatch {
   @@unique([kycRecordId, watchlistEntryId, subjectCanonical])
   @@index([status])
   @@index([kycRecordId])
+  /// The "my queue" read.
+  @@index([assignedToUserId, caseStatus])
+  @@index([caseStatus])
+  @@index([organizationId])
+}
+
+/// Part B §16 — a note on a screening case.
+///
+/// Separate from `reviewReason`, deliberately: that field is the JUSTIFICATION
+/// for the final decision and is written once, at closure. These are the
+/// working record — what was checked, who was contacted, what a document said —
+/// and there are many of them over a case's life.
+///
+/// Append-only. A case note that can be edited is not evidence of what the
+/// reviewer knew at the time, which is the only reason to keep one.
+model ScreeningCaseNote {
+  id               String         @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String         @default(dbgenerated())
+  organization     Organization   @relation(fields: [organizationId], references: [id])
+  screeningMatchId String
+  screeningMatch   ScreeningMatch @relation(fields: [screeningMatchId], references: [id], onDelete: Cascade)
+  /// Free text by a reviewer about a screening finding. It may name the
+  /// subject, so it inherits the match's own Highly Confidential handling and
+  /// is never copied into an audit payload.
+  note             String
+  authorUserId     String
+  createdAt        DateTime       @default(now())
+
+  @@index([screeningMatchId, createdAt])
+  @@index([organizationId])
+}
+
+enum ScreeningCaseStatus {
+  OPEN
+  ASSIGNED
+  UNDER_REVIEW
+  ESCALATED
+  CLOSED
 }
 
 model WatchlistSyncRun {
@@ -2476,18 +3525,31 @@ model WatchlistSyncRun {
   completedAt  DateTime?
   status       String          @default("running") // running | succeeded | failed
   recordCount  Int?
+  /// Part B §21 — how many entries this run saw for the FIRST time.
+  ///
+  /// Only additions matter for re-screening: an entry leaving a list cannot
+  /// create a match that did not exist before, but one arriving can. A file
+  /// screened before the most recent ADDING run was checked against a list
+  /// that has since grown, which the screening hold reports.
+  addedCount   Int?
   errorMessage String?
 }
 
 /// Process 51 — configurable compliance calendar for CBJ regulatory
 /// filings/reporting obligations.
 model ComplianceCalendarItem {
-  id                      String    @id @default(uuid())
+  id                      String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String       @default(dbgenerated())
+  organization            Organization @relation(fields: [organizationId], references: [id])
   obligationName          String
   ownerUserId             String
   dueDate                 DateTime
   evidenceOfSubmissionRef String?
   submittedAt             DateTime?
+
+  @@index([organizationId])
 }
 
 /// Process 53 / narrative process 37 ("إدارة مخاطر الوسيط نفسه") — the
@@ -2499,24 +3561,36 @@ model ComplianceCalendarItem {
 /// (ProfessionalIndemnityRiskEvent) because Part 3 gives it a dedicated
 /// deep-dive; the other five share this generic register.
 model RiskRegisterItem {
-  id               String    @id @default(uuid())
+  id               String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId   String       @default(dbgenerated())
+  organization     Organization @relation(fields: [organizationId], references: [id])
   riskType         String // operational | cyber | financial | compliance | reputational
   description      String
   mitigationAction String?
-  status           String    @default("open")
-  loggedAt         DateTime  @default(now())
+  status           String       @default("open")
+  loggedAt         DateTime     @default(now())
   closedAt         DateTime?
+
+  @@index([organizationId])
 }
 
 /// Process 57 — internal audit findings and remediation tracker.
 model InternalAuditFinding {
-  id                String    @id @default(uuid())
+  id                String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
   auditPeriodLabel  String
   finding           String
   remediationAction String?
-  status            String    @default("open")
-  loggedAt          DateTime  @default(now())
+  status            String       @default("open")
+  loggedAt          DateTime     @default(now())
   closedAt          DateTime?
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -2527,11 +3601,17 @@ model InternalAuditFinding {
 /// documents, backups, integrations) with owners and classification.
 model InformationAsset {
   id             String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String             @default(dbgenerated())
+  organization   Organization       @relation(fields: [organizationId], references: [id])
   name           String
   assetType      String // customer_data | policy_data | document_store | backup | integration | other
   ownerUserId    String
   classification DataClassification
   createdAt      DateTime           @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -2560,6 +3640,10 @@ enum IncidentClassification {
 /// Management co-sign) -> Notified -> Recovered -> Closed (RCA mandatory).
 model IncidentReport {
   id                             String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                 String                 @default(dbgenerated())
+  organization                   Organization           @relation(fields: [organizationId], references: [id])
   title                          String
   description                    String
   severity                       String // low | medium | high | critical
@@ -2582,6 +3666,8 @@ model IncidentReport {
   recoveredAt                    DateTime?
   closedAt                       DateTime?
   createdAt                      DateTime               @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -2604,6 +3690,10 @@ enum ConsentPurpose {
 /// are ALWAYS two separate, independently-actionable controls (Part 6.3).
 model ConsentRecord {
   id                 String         @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String         @default(dbgenerated())
+  organization       Organization   @relation(fields: [organizationId], references: [id])
   customerId         String?
   customer           Customer?      @relation(fields: [customerId], references: [id])
   insuredPersonId    String?
@@ -2626,6 +3716,7 @@ model ConsentRecord {
 
   @@index([customerId])
   @@index([leadId])
+  @@index([organizationId])
 }
 
 enum DsrType {
@@ -2652,6 +3743,10 @@ enum DsrStatus {
 /// retentionScheduleReference.
 model DataSubjectRequest {
   id                             String         @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                 String         @default(dbgenerated())
+  organization                   Organization   @relation(fields: [organizationId], references: [id])
   customerId                     String?
   customer                       Customer?      @relation("DsrCustomer", fields: [customerId], references: [id])
   insuredPersonId                String?
@@ -2694,6 +3789,7 @@ model DataSubjectRequest {
   @@index([customerId])
   @@index([insuredPersonId])
   @@index([dpoHandlerUserId])
+  @@index([organizationId])
 }
 
 /// Part 6.2 (M06) — retention periods per record category against a
@@ -2701,14 +3797,26 @@ model DataSubjectRequest {
 /// one schedule row per category, not a free-running log (Process #52
 /// widening: the original model had no constraint stopping a duplicate).
 model RetentionScheduleItem {
-  id                        String    @id @default(uuid())
-  recordCategory            String    @unique
+  id                        String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId            String       @default(dbgenerated())
+  organization              Organization @relation(fields: [organizationId], references: [id])
+  /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
+  /// the platform. A bare @unique here is not only a functional bug (two
+  /// offices legitimately produce the same value); it leaks across tenants on
+  /// its own — a uniqueness-violation error confirms the value already exists
+  /// for SOMEONE, with no row ever returned. See @@unique below.
+  recordCategory            String
   retentionPeriodMonths     Int
   legalBasis                String?
   confirmedByLegalCounselAt DateTime?
 
   disposalBatches DisposalBatch[]
   legalHolds      LegalHold[]
+
+  @@unique([organizationId, recordCategory])
+  @@index([organizationId])
 }
 
 /// Part 6.2 (M06) — records under active Legal Hold (releasedAt IS NULL)
@@ -2727,6 +3835,10 @@ model RetentionScheduleItem {
 /// attestation alone.
 model LegalHold {
   id                      String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String                 @default(dbgenerated())
+  organization            Organization           @relation(fields: [organizationId], references: [id])
   scope                   String // description / entity reference under hold
   reason                  String
   placedAt                DateTime               @default(now())
@@ -2743,6 +3855,7 @@ model LegalHold {
   @@index([releasedAt])
   @@index([customerId])
   @@index([insuredPersonId])
+  @@index([organizationId])
 }
 
 enum DisposalBatchStatus {
@@ -2758,6 +3871,10 @@ enum DisposalBatchStatus {
 /// Destruction. 30-day SLA from batch approval.
 model DisposalBatch {
   id                      String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String                 @default(dbgenerated())
+  organization            Organization           @relation(fields: [organizationId], references: [id])
   retentionScheduleItemId String?
   retentionScheduleItem   RetentionScheduleItem? @relation(fields: [retentionScheduleItemId], references: [id])
   status                  DisposalBatchStatus    @default(NOMINATED)
@@ -2774,27 +3891,40 @@ model DisposalBatch {
 
   @@index([retentionScheduleItemId])
   @@index([status])
+  @@index([organizationId])
 }
 
 /// A DisposalBatch cannot reach Closed without this attached.
 model CertificateOfDestruction {
   id              String        @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String        @default(dbgenerated())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
   disposalBatchId String        @unique
   disposalBatch   DisposalBatch @relation(fields: [disposalBatchId], references: [id])
   issuedAt        DateTime      @default(now())
   issuedByUserId  String
+
+  @@index([organizationId])
 }
 
 /// Part 6.2 — any transfer of personal data outside Jordan is blocked
 /// unless exactly one of three bases is recorded.
 model CrossBorderTransferRecord {
-  id                    String   @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   description           String
   destinationCountry    String
   legalBasis            String // statutory_exception | standard_contractual_clauses | explicit_consent
   legalBasisEvidenceRef String?
   approvedByUserId      String?
-  transferredAt         DateTime @default(now())
+  transferredAt         DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Part 7.5 / Part 9.3 (M07) — insurers, reinsurers, loss adjusters, IT/
@@ -2803,6 +3933,10 @@ model CrossBorderTransferRecord {
 /// both describe the same register in these two source documents.
 model Vendor {
   id                               String                   @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId                   String                   @default(dbgenerated())
+  organization                     Organization             @relation(fields: [organizationId], references: [id])
   name                             String
   vendorType                       String // insurer | reinsurer | loss_adjuster | it_cloud | printing_archiving | marketing_call_centre | other
   riskTier                         String? // low | medium | high — assigned before any data is shared or access granted
@@ -2816,14 +3950,20 @@ model Vendor {
 
   dataProcessingAgreements DataProcessingAgreement[]
   dataSharingApprovals     DataSharingApproval[]
+
+  @@index([organizationId])
 }
 
 /// Part 7.5 — mandatory for Medium/High tier before go-live; High tier
 /// additionally requires DPO approval before first data share.
 model DataProcessingAgreement {
-  id                  String    @id @default(uuid())
+  id                  String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String       @default(dbgenerated())
+  organization        Organization @relation(fields: [organizationId], references: [id])
   vendorId            String
-  vendor              Vendor    @relation(fields: [vendorId], references: [id])
+  vendor              Vendor       @relation(fields: [vendorId], references: [id])
   signedAt            DateTime?
   // Maker/checker (Part 5.2): the Relationship Owner who assessed this
   // vendor and prepared the agreement — MUST differ from dpoApprovedByUserId
@@ -2831,6 +3971,8 @@ model DataProcessingAgreement {
   assessedByUserId    String?
   dpoApprovedByUserId String? // required for High tier
   expiresAt           DateTime?
+
+  @@index([organizationId])
 }
 
 /// Part 10.6/M08 — the data-sharing channel picklist. CONFIDENTIAL/
@@ -2855,6 +3997,10 @@ enum DataSharingChannel {
 /// a recognized regulatory channel (e.g. CBJ Data Portal/iFile).
 model DataSharingApproval {
   id                  String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String             @default(dbgenerated())
+  organization        Organization       @relation(fields: [organizationId], references: [id])
   vendorId            String?
   vendor              Vendor?            @relation(fields: [vendorId], references: [id])
   description         String
@@ -2868,6 +4014,7 @@ model DataSharingApproval {
   createdAt           DateTime           @default(now())
 
   @@index([classification])
+  @@index([organizationId])
 }
 
 enum DpiaOutcome {
@@ -2880,7 +4027,11 @@ enum DpiaOutcome {
 /// system, campaign or vendor integration involving personal data goes
 /// live. Any single "Yes" -> mandatory DPO review within 5 business days.
 model DpiaScreening {
-  id                       String      @id @default(uuid())
+  id                       String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String       @default(dbgenerated())
+  organization             Organization @relation(fields: [organizationId], references: [id])
   subjectDescription       String // the product/system/campaign/vendor integration being screened
   qSensitiveData           Boolean
   qLargeScaleProcessing    Boolean
@@ -2892,7 +4043,9 @@ model DpiaScreening {
   dpoReviewedAt            DateTime?
   dpoSpotCheckedAt         DateTime? // for all-"No" auto-approved results
   escalatedToFullDpiaAt    DateTime?
-  createdAt                DateTime    @default(now())
+  createdAt                DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Part 6.2 — bilingual, version-controlled privacy notice text presented
@@ -2902,27 +4055,38 @@ model DpiaScreening {
 /// race where two concurrent publishes for the same touchpoint could
 /// otherwise land on the same versionNumber.
 model PrivacyNotice {
-  id                String    @id @default(uuid())
+  id                String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId    String       @default(dbgenerated())
+  organization      Organization @relation(fields: [organizationId], references: [id])
   touchpoint        String // lead_capture | onboarding_kyc | needs_risk_assessment | rfq_market_placement | claims | group_medical_life_motor_fleet | renewal_cross_sell
-  versionNumber     Int       @default(1)
+  versionNumber     Int          @default(1)
   textAr            String
   textEn            String
   legallyReviewedAt DateTime?
-  publishedAt       DateTime  @default(now())
+  publishedAt       DateTime     @default(now())
 
-  @@unique([touchpoint, versionNumber])
+  @@unique([organizationId, touchpoint, versionNumber])
+  @@index([organizationId])
 }
 
 /// Part 9.3 — system-maintained Records of Processing Activities register.
 model RopaEntry {
-  id                    String   @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   processingActivity    String
   categoriesOfData      String[]
   purpose               String
   recipients            String[]
   retentionPeriodMonths Int?
-  updatedAt             DateTime @updatedAt
-  createdAt             DateTime @default(now())
+  updatedAt             DateTime     @updatedAt
+  createdAt             DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -2943,7 +4107,11 @@ model RopaEntry {
 /// AML gotcha) enforce "at most one target per owner per period label" and
 /// "at most one target per branch per period label" independently.
 model SalesTarget {
-  id                 String   @id @default(uuid())
+  id                 String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId     String       @default(dbgenerated())
+  organization       Organization @relation(fields: [organizationId], references: [id])
   ownerUserId        String?
   branchId           String?
   periodLabel        String
@@ -2951,12 +4119,13 @@ model SalesTarget {
   periodEnd          DateTime
   targetNewProspects Int
   createdByUserId    String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   @@index([ownerUserId])
   @@index([branchId])
   @@index([periodStart, periodEnd])
+  @@index([organizationId])
 }
 
 /// Process 60 — score insurers on Quote Response, Claims Service, Price,
@@ -2971,17 +4140,22 @@ model SalesTarget {
 /// `insurer-performance.config.ts` and `ibms-brain/meta/context/
 /// insurer-performance.md`.
 model InsurerPerformanceScore {
-  id                  String   @id @default(uuid())
+  id                  String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId      String       @default(dbgenerated())
+  organization        Organization @relation(fields: [organizationId], references: [id])
   insurerId           String
-  insurer             Insurer  @relation(fields: [insurerId], references: [id])
+  insurer             Insurer      @relation(fields: [insurerId], references: [id])
   periodLabel         String
-  quoteResponseScore  Decimal  @db.Decimal(5, 2)
-  claimsServiceScore  Decimal  @db.Decimal(5, 2)
-  priceScore          Decimal  @db.Decimal(5, 2)
-  serviceQualityScore Decimal  @db.Decimal(5, 2)
-  computedAt          DateTime @default(now())
+  quoteResponseScore  Decimal      @db.Decimal(5, 2)
+  claimsServiceScore  Decimal      @db.Decimal(5, 2)
+  priceScore          Decimal      @db.Decimal(5, 2)
+  serviceQualityScore Decimal      @db.Decimal(5, 2)
+  computedAt          DateTime     @default(now())
 
   @@unique([insurerId, periodLabel])
+  @@index([organizationId])
 }
 
 /// Process 61 — employee KPI achievement vs target. A monthly periodic job
@@ -3002,17 +4176,22 @@ model InsurerPerformanceScore {
 /// `employee-performance.config.ts` and `ibms-brain/meta/context/
 /// employee-performance.md`.
 model EmployeePerformanceRecord {
-  id                   String   @id @default(uuid())
+  id                   String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String       @default(dbgenerated())
+  organization         Organization @relation(fields: [organizationId], references: [id])
   employeeId           String
-  employee             Employee @relation(fields: [employeeId], references: [id])
+  employee             Employee     @relation(fields: [employeeId], references: [id])
   periodLabel          String
   newClients           Int?
-  premiumWritten       Decimal? @db.Decimal(18, 3)
-  commissionEarned     Decimal? @db.Decimal(18, 3)
-  renewalRatePercent   Decimal? @db.Decimal(5, 2)
-  crossSellRatePercent Decimal? @db.Decimal(5, 2)
+  premiumWritten       Decimal?     @db.Decimal(18, 3)
+  commissionEarned     Decimal?     @db.Decimal(18, 3)
+  renewalRatePercent   Decimal?     @db.Decimal(5, 2)
+  crossSellRatePercent Decimal?     @db.Decimal(5, 2)
 
   @@unique([employeeId, periodLabel])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3023,39 +4202,57 @@ model EmployeePerformanceRecord {
 /// site loss, cyberattack/ransomware, key-staff unavailability, insurer
 /// service interruption).
 model BcpDrPlan {
-  id             String    @id @default(uuid())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
   scenario       String // system_outage | office_site_loss | cyberattack_ransomware | key_staff_unavailability | insurer_service_interruption
   planDocumentId String?
   rtoHours       Int?
   rpoHours       Int?
   lastTestedAt   DateTime?
   nextTestDueAt  DateTime?
+
+  @@index([organizationId])
 }
 
 /// Process 74 — product knowledge, insurer appetite, rate guides,
 /// regulatory updates for staff.
 model KnowledgeBaseArticle {
-  id          String   @id @default(uuid())
-  title       String
-  titleAr     String?
-  category    String // product_knowledge | insurer_appetite | rate_guide | regulatory_update
-  bodyEn      String?
-  bodyAr      String?
-  publishedAt DateTime @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  title          String
+  titleAr        String?
+  category       String // product_knowledge | insurer_appetite | rate_guide | regulatory_update
+  bodyEn         String?
+  bodyAr         String?
+  publishedAt    DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 /// Part 11.2 — bilingual master data: coverage types, exclusion clauses,
 /// notification templates maintained in parallel EN/AR, not machine-
 /// translated at render time for regulator-facing documents.
 model DocumentTemplate {
-  id            String   @id @default(uuid())
-  templateType  String // quotation_comparison | recommendation_report | policy_schedule_summary | invoice | certificate | complaint_acknowledgement | notification
-  nameEn        String
-  nameAr        String
-  bodyEn        String
-  bodyAr        String
-  versionNumber Int      @default(1)
-  updatedAt     DateTime @updatedAt
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  templateType   String // quotation_comparison | recommendation_report | policy_schedule_summary | invoice | certificate | complaint_acknowledgement | notification
+  nameEn         String
+  nameAr         String
+  bodyEn         String
+  bodyAr         String
+  versionNumber  Int          @default(1)
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3066,16 +4263,185 @@ model DocumentTemplate {
 /// Insurer Database): products, classes, contact persons, underwriters,
 /// claims contacts, commission agreements, credit terms, SLAs, financial
 /// strength, performance history.
+/// Part I §5 (multi-tenancy) — GLOBAL, like `Role`/`Permission` and the
+/// watchlist cache (§3.1): one row per real-world insurance company, shared by
+/// every Organization on the platform. Deliberately carries NO
+/// `organizationId`, so `tenantScopeExtension` leaves it unfiltered and no RLS
+/// policy applies — two offices dealing with the same insurer must see the
+/// same company, not two divergent copies of it.
+///
+/// What is genuinely different per office — the negotiated commission, the
+/// contact person, the credit terms — lives on `Insurer`, which is scoped.
+/// Part I §6 (multi-tenancy Phase 3 step 11) — the office's OWN corporate
+/// mailbox, connected by OAuth.
+///
+/// The platform never sends mail "as itself". Every outbound message leaves
+/// from the office's real authenticated account (e.g. info@alsalam-insurance.jo),
+/// which solves three things at once: recipients recognise the sender,
+/// deliverability reputation belongs to the office rather than a shared
+/// platform domain, and no bulk-sending infrastructure has to be operated at
+/// all.
+///
+/// Tenant-scoped, one row per Organization. An office's mailbox credential is
+/// about as sensitive as a row in this system gets, so it is governed by BOTH
+/// isolation layers like any other tenant table — see the RLS policy in
+/// migration 20260930100000.
+model OrganizationEmailIntegration {
+  id                   String                 @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId       String                 @default(dbgenerated())
+  organization         Organization           @relation(fields: [organizationId], references: [id])
+  provider             EmailProviderKind
+  /// The mailbox messages are actually sent FROM. Stored so the address can be
+  /// shown and audited without a round trip to the provider.
+  connectedEmail       String
+  /// -- ENCRYPT. The long-lived OAuth refresh token, encrypted with the same
+  /// field-level service as national IDs (`EncryptionService`, purpose
+  /// `oauth`). Never returned by any API, never logged.
+  oauthRefreshTokenEnc String // -- ENCRYPT
+  /// Microsoft identifies the directory the mailbox lives in; Google does not
+  /// need it. Null for GOOGLE_WORKSPACE.
+  providerTenantId     String?
+  connectedByUserId    String?
+  connectedAt          DateTime               @default(now())
+  /// Send health. A mailbox whose consent was withdrawn at the provider fails
+  /// at send time, not at connect time, so the failure has to be recorded
+  /// where an administrator will see it.
+  lastSucceededAt      DateTime?
+  lastFailedAt         DateTime?
+  lastError            String?
+  status               EmailIntegrationStatus @default(ACTIVE)
+  updatedAt            DateTime               @updatedAt
+
+  /// One mailbox per office. Scoped rather than global: this IS the tenant key
+  /// (Phase 1 step 5 — a unique that is only `organizationId` is the one case
+  /// where scoping it means exactly this).
+  @@unique([organizationId])
+  @@index([organizationId])
+}
+
+/// Part I §6. A closed set, because "which API do we call to send this" has no
+/// sensible default — an unknown provider must fail to construct, not fall
+/// back to something.
+enum EmailProviderKind {
+  MICROSOFT365
+  GOOGLE_WORKSPACE
+}
+
+enum EmailIntegrationStatus {
+  ACTIVE
+  /// Disconnected deliberately by an administrator here.
+  REVOKED
+  /// The provider rejected the stored credential — consent withdrawn, mailbox
+  /// deleted, or the token invalidated at their end.
+  ERROR
+}
+
+model InsurerMaster {
+  id           String   @id @default(uuid())
+  /// Unique platform-wide, which is what makes "one row per real company"
+  /// enforceable rather than a convention. Divergent duplicate records are the
+  /// exact failure §5 exists to prevent.
+  legalName    String   @unique
+  legalNameAr  String?
+  /// e.g. ["MOTOR","LIFE","MARINE","HEALTH"] — what this company writes at
+  /// all, distinct from `InsurerProduct`, which is what ONE office actually
+  /// places with them.
+  linesOffered String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  formTemplates InsurerFormTemplate[]
+  relationships Insurer[]
+}
+
+/// Part I §5 — an insurer's official submission form for one product line,
+/// mapped ONCE by whoever first deals with that insurer+line and then reused,
+/// unmodified, by every other Organization. Global for the same reason as
+/// `InsurerMaster`: re-mapping the same PDF per office is the duplicated work
+/// this model removes.
+///
+/// Before a mapping exists the uploaded file is just an unstructured
+/// `Document`; it becomes a live e-form only once its fields are defined.
+model InsurerFormTemplate {
+  id                String        @id @default(uuid())
+  insurerMasterId   String
+  insurerMaster     InsurerMaster @relation(fields: [insurerMasterId], references: [id])
+  insuranceLine     String
+  version           Int           @default(1)
+  /// The originally uploaded PDF/Word this mapping was derived from.
+  sourceDocumentRef String?
+  createdAt         DateTime      @default(now())
+
+  fields InsurerFormField[]
+
+  /// One version of a given line's form per insurer. A re-map is a NEW
+  /// version, never an edit of the one other offices are already submitting
+  /// against.
+  @@unique([insurerMasterId, insuranceLine, version])
+  @@index([insurerMasterId])
+}
+
+/// Part I §5 — one mapped field of an insurer's form. `labelAr` alongside
+/// `labelEn` because the platform's primary language is Arabic; it is optional
+/// only because the source form may be English-only, in which case there is no
+/// Arabic label to record rather than an empty one to invent.
+model InsurerFormField {
+  id           String               @id @default(uuid())
+  templateId   String
+  template     InsurerFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  fieldKey     String
+  labelEn      String
+  labelAr      String?
+  dataType     InsurerFormFieldType
+  isRequired   Boolean              @default(false)
+  /// Only meaningful for ENUM fields; empty for every other type.
+  options      String[]
+  displayOrder Int
+
+  @@unique([templateId, fieldKey])
+  @@index([templateId])
+}
+
+/// Part I §5 renders this as a bare `String` with the values in a comment. An
+/// enum instead, so an unmappable type is unrepresentable rather than caught at
+/// read time by whatever renders the form.
+enum InsurerFormFieldType {
+  TEXT
+  NUMBER
+  DATE
+  ENUM
+  BOOLEAN
+}
+
+/// Part I §5 — ONE OFFICE'S working relationship with a master insurer, not
+/// the insurer itself. The company's identity moved to `InsurerMaster`; what
+/// stays here is what genuinely differs per office and must never be visible
+/// to another one: the negotiated commercial terms and the named contacts.
 model Insurer {
-  id                      String   @id @default(uuid())
-  name                    String
-  nameAr                  String?
-  contactEmail            String?
-  contactPhone            String?
-  claimsContact           String?
+  id              String        @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String        @default(dbgenerated())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  insurerMasterId String
+  insurerMaster   InsurerMaster @relation(fields: [insurerMasterId], references: [id])
+
+  /// Part I §10.2 — three DIFFERENT people, not one generic contact: pricing
+  /// and RFQ, claims, and underwriting.
+  rfqContactName          String?
+  rfqContactEmail         String?
+  /// Not in §5's model. Kept so the migration does not silently drop the
+  /// existing `Insurer.contactPhone` column's data — §10.2's list is a
+  /// minimum, and step 10 is explicitly a column-by-column migration.
+  rfqContactPhone         String?
+  claimsContactName       String?
+  claimsContactEmail      String?
   underwriterContact      String? // Part 4.1 "underwriters"
   creditTermsDays         Int? // narrative process 31 "Credit Terms"
   financialStrengthRating String? // narrative process 31 "Financial Strength"
+  isActive                Boolean  @default(true)
   createdAt               DateTime @default(now())
 
   products             InsurerProduct[]
@@ -3087,29 +4453,47 @@ model Insurer {
   remittances          Remittance[]
   paymentChannels      PaymentChannel[]
   performanceScores    InsurerPerformanceScore[]
+
+  /// One relationship row per office per real insurer. Without this an office
+  /// could hold two divergent sets of commercial terms for the same company.
+  @@unique([organizationId, insurerMasterId])
+  @@index([organizationId])
+  @@index([insurerMasterId])
 }
 
 /// Narrative process 31 — "Products / Classes" per insurer, the lines of
 /// business the insurer underwrites and the broker can place with them.
 model InsurerProduct {
-  id            String  @id @default(uuid())
-  insurerId     String
-  insurer       Insurer @relation(fields: [insurerId], references: [id])
-  insuranceLine String
-  productName   String?
-  isActive      Boolean @default(true)
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  insurerId      String
+  insurer        Insurer      @relation(fields: [insurerId], references: [id])
+  insuranceLine  String
+  productName    String?
+  isActive       Boolean      @default(true)
+
+  @@index([organizationId])
 }
 
 /// Narrative process 33 ("إدارة اتفاقيات الخدمات") / Part 4.1 "SLAs" —
 /// Response Time, Claim Handling SLA, Quote Response SLA, Policy Issuance
 /// SLA per insurer; the system monitors compliance against these.
 model InsurerSlaAgreement {
-  id            String   @id @default(uuid())
-  insurerId     String
-  insurer       Insurer  @relation(fields: [insurerId], references: [id])
-  slaType       String // response_time | claim_handling | quote_response | policy_issuance
-  targetDays    Int
-  effectiveFrom DateTime @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  insurerId      String
+  insurer        Insurer      @relation(fields: [insurerId], references: [id])
+  slaType        String // response_time | claim_handling | quote_response | policy_issuance
+  targetDays     Int
+  effectiveFrom  DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3139,6 +4523,10 @@ enum DocumentCategory {
 /// HIGHEST level present — never averaged (Part 6.1).
 model Document {
   id                       String             @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId           String             @default(dbgenerated())
+  organization             Organization       @relation(fields: [organizationId], references: [id])
   policyId                 String?
   policy                   Policy?            @relation("PolicyDocuments", fields: [policyId], references: [id])
   // Process 3-4 (Customer Acquisition/Onboarding) — APPLICATION_PROPOSAL
@@ -3163,6 +4551,7 @@ model Document {
   @@index([policyId])
   @@index([customerId])
   @@index([classification])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3175,20 +4564,25 @@ model Document {
 /// updated after insert; no update/delete path should exist at the
 /// application layer for this table.
 model AuditLogEntry {
-  id                    String      @id @default(uuid())
+  id                    String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   userId                String
-  user                  User        @relation("AuditLogUser", fields: [userId], references: [id])
+  user                  User         @relation("AuditLogUser", fields: [userId], references: [id])
   action                AuditAction
   entityType            String // polymorphic: "Customer" | "Policy" | "Claim" | ...
   entityId              String
   beforeValue           Json?
   afterValue            Json?
-  isSensitiveDataAccess Boolean     @default(false) // Part 10.3: reads of Sensitive Personal Data specifically flagged
-  occurredAt            DateTime    @default(now())
+  isSensitiveDataAccess Boolean      @default(false) // Part 10.3: reads of Sensitive Personal Data specifically flagged
+  occurredAt            DateTime     @default(now())
 
   @@index([entityType, entityId])
   @@index([userId])
   @@index([occurredAt])
+  @@index([organizationId])
 }
 
 /// Part 10.3 — detected anomalous access pattern over AuditLogEntry (bulk
@@ -3204,6 +4598,10 @@ enum AccessAnomalyPatternType {
 
 model AccessAnomalyAlert {
   id                      String                   @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId          String                   @default(dbgenerated())
+  organization            Organization             @relation(fields: [organizationId], references: [id])
   userId                  String
   user                    User                     @relation("AccessAnomalyAlertUser", fields: [userId], references: [id])
   patternType             AccessAnomalyPatternType
@@ -3216,6 +4614,189 @@ model AccessAnomalyAlert {
   @@index([userId])
   @@index([patternType])
   @@index([detectedAt])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// CONFIGURABLE SLA POLICIES
+// ============================================================================
+
+/// How an SLA duration is measured.
+///
+/// `BUSINESS_DAYS` is NOT `value * 24h` — it walks the configured working
+/// calendar (Jordan's weekend is Friday+Saturday, and `SlaHoliday` rows are
+/// skipped too). Getting that wrong silently moves a statutory deadline.
+enum SlaDurationUnit {
+  MINUTES
+  HOURS
+  BUSINESS_DAYS
+  CALENDAR_DAYS
+  MONTHS
+}
+
+/// Which working calendar a BUSINESS_DAYS duration walks.
+enum SlaCalendarType {
+  /// Jordan default: Friday+Saturday weekend, plus any `SlaHoliday` rows.
+  JORDAN_STANDARD
+  /// Round the clock — every day counts. For SLAs that genuinely do not
+  /// pause for weekends (e.g. a breach-containment clock).
+  CONTINUOUS_24_7
+  /// Weekend days supplied per-policy via `customWeekendDays`.
+  CUSTOM
+}
+
+/// WHERE AN SLA COMES FROM. The whole reason this table exists.
+///
+/// A duration alone cannot tell you whether missing it breaks the law or
+/// breaks an internal target, and the system must never present the second as
+/// the first. `SLA_REGISTRY` carried this only as free text inside `citation`,
+/// mixing genuine PDPL rows with ones whose own citation said "DRAFT,
+/// UNSOURCED" — indistinguishable to any consumer, and to any UI.
+enum SlaSourceType {
+  /// Backed by law/regulation. `sourceReference` + `sourceDocument` are
+  /// MANDATORY (enforced in `SlaPolicyService`, and by a CHECK constraint).
+  REGULATORY
+  /// The broker's own governance decision. The honest home for a drafted
+  /// figure with no authority behind it.
+  INTERNAL_POLICY
+  /// Owed to a counterparty under an agreement.
+  CONTRACTUAL
+  /// An operational/service target, not a commitment to anyone external.
+  OPERATIONAL
+  OTHER
+}
+
+enum SlaPolicyStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+/// One configurable SLA rule. Replaces the hard-coded `SLA_REGISTRY` const as
+/// the RUNTIME source of truth: changing "3 business days" to "5" is a row
+/// update, not a code change and redeploy.
+///
+/// The registry remains in code as the SEED baseline and as the compile-time
+/// list of known workflow names — it is where a new workflow declares itself.
+/// What it no longer is, is the thing the application reads at runtime.
+///
+/// `processType` matches `SlaTimer.workflowName` / `SlaRegistryEntry
+/// .workflowName`. `workflowState` narrows a policy to one state of that
+/// process where a workflow needs different deadlines at different stages;
+/// NULL means "the whole process".
+model SlaPolicy {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  /// Stable human-facing identifier, e.g. "SLA-DSR-ACCESS". Quoted in
+  /// governance documents, so it must not change when the duration does.
+  /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
+  /// the platform. A bare @unique here is not only a functional bug (two
+  /// offices legitimately produce the same value); it leaks across tenants on
+  /// its own — a uniqueness-violation error confirms the value already exists
+  /// for SOMEONE, with no row ever returned. See @@unique below.
+  policyCode     String
+  policyName     String
+  processType    String
+  /// NULL = applies to the whole process.
+  workflowState  String?
+  description    String?
+
+  durationValue Int
+  durationUnit  SlaDurationUnit
+
+  calendarType      SlaCalendarType @default(JORDAN_STANDARD)
+  /// `SlaCalendarType.CUSTOM` only — `Date#getUTCDay()` numbering (0=Sunday).
+  customWeekendDays Int[]           @default([])
+  /// "HH:MM", 24h. Both NULL = the clock runs across the whole day. Only
+  /// meaningful for MINUTES/HOURS durations.
+  workingHoursStart String?
+  workingHoursEnd   String?
+  timezone          String          @default("Asia/Amman")
+
+  sourceType      SlaSourceType
+  /// e.g. "PDPL Art. 23(b)" or "INTERNAL-POLICY-AML-002". MANDATORY when
+  /// `sourceType` is REGULATORY.
+  sourceReference String?
+  /// e.g. "PRIV-SOP-05". MANDATORY when `sourceType` is REGULATORY.
+  sourceDocument  String?
+  sourceSection   String?
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  escalationEnabled Boolean @default(true)
+  /// Fraction of the SLA elapsed at which a record is "approaching due"
+  /// (0.8 = at 80%). Drives the APPROACHING_DUE status, not an escalation
+  /// write — the escalation stages below do that.
+  warningThreshold  Float   @default(0.8)
+
+  status SlaPolicyStatus @default(DRAFT)
+
+  createdByUserId String
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  escalations SlaPolicyEscalation[]
+  timers      SlaTimer[]
+
+  /// Read path: "the ACTIVE policy for this process (and state) right now".
+  @@unique([organizationId, policyCode])
+  @@index([processType, workflowState, status])
+  @@index([status, effectiveFrom])
+  @@index([organizationId])
+}
+
+/// One escalation stage of a policy. `offsetValue` is SIGNED and relative to
+/// the policy's own due date: 0 is the deadline itself, negative is an
+/// early-warning stage before it (the DSR T-3-business-days DPO alert).
+model SlaPolicyEscalation {
+  id             String          @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String          @default(dbgenerated())
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  slaPolicyId    String
+  slaPolicy      SlaPolicy       @relation(fields: [slaPolicyId], references: [id], onDelete: Cascade)
+  stageOrder     Int
+  offsetValue    Int
+  offsetUnit     SlaDurationUnit
+  /// Free text: several targets named by the lex have no RBAC role yet
+  /// (General Manager, Legal Counsel). NULL = the deadline is tracked but no
+  /// named party is escalated to.
+  escalateTo     String?
+
+  @@unique([slaPolicyId, stageOrder])
+  @@index([organizationId])
+}
+
+/// A non-working day for business-day SLA math.
+///
+/// `business-days.util.ts` accounted for the weekend ONLY, and said so: "treat
+/// a computed business-day deadline as a lower bound rather than an exact one
+/// until a public-holiday calendar is supplied". This is that calendar.
+///
+/// `observedOn` is a DATE, not a timestamp — a holiday is a whole day in the
+/// policy's timezone, not an instant.
+model SlaHoliday {
+  id              String           @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId  String           @default(dbgenerated())
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  observedOn      DateTime         @db.Date
+  name            String
+  /// NULL = applies to every calendar. Set to scope a holiday to one.
+  calendarType    SlaCalendarType?
+  createdByUserId String?
+  createdAt       DateTime         @default(now())
+
+  @@unique([organizationId, observedOn, calendarType])
+  @@index([observedOn])
+  @@index([organizationId])
 }
 
 // ============================================================================
@@ -3228,19 +4809,179 @@ model AccessAnomalyAlert {
 /// ServiceRequest/Complaint and any other SLA-bearing workflow described
 /// across Parts 2-9.
 model SlaTimer {
-  id           String    @id @default(uuid())
-  entityType   String // polymorphic: "DataSubjectRequest" | "Complaint" | "ClaimFollowUpAlert" | ...
-  entityId     String
-  workflowName String // e.g. "dsr_access", "consent_withdrawal", "disposal_batch_execution"
-  dueAt        DateTime
-  escalatedAt  DateTime?
-  escalatedTo  String? // role or user escalated to
-  resolvedAt   DateTime?
-  createdAt    DateTime  @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  entityType     String // polymorphic: "DataSubjectRequest" | "Complaint" | "ClaimFollowUpAlert" | ...
+  entityId       String
+  workflowName   String // e.g. "dsr_access", "consent_withdrawal", "disposal_batch_execution"
+  dueAt          DateTime
+  escalatedAt    DateTime?
+  escalatedTo    String? // role or user escalated to
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  /// Which configured policy produced `dueAt`. Nullable: timers created
+  /// before SLA policies existed have none, and a caller may still compute a
+  /// domain-specific due date without going through a policy. When set, it is
+  /// what lets a reader answer "was this deadline regulatory or internal?"
+  /// about a HISTORICAL timer, even after the policy is later edited.
+  slaPolicyId String?
+  slaPolicy   SlaPolicy? @relation(fields: [slaPolicyId], references: [id])
+
+  /// PAUSE/RESUME. `pausedAt` set = the clock is stopped. `pausedTotalMs`
+  /// accumulates completed pauses, so remaining time is
+  /// `dueAt + pausedTotalMs (+ now - pausedAt while paused) - now`. Storing
+  /// accumulated pause rather than mutating `dueAt` keeps the ORIGINAL
+  /// deadline legible next to the adjusted one — a regulator asking "when was
+  /// this due?" gets a different answer from "how long did you have?", and
+  /// both are recoverable.
+  pausedAt      DateTime?
+  pausedTotalMs Int       @default(0)
+  pauseReason   String?
+
+  /// Stamped once by the escalation sweep when the adjusted deadline passes
+  /// unresolved, so a breach is a queryable fact rather than a comparison
+  /// every reader has to redo (and get the pause arithmetic right in).
+  breachedAt DateTime?
 
   serviceRequest ServiceRequest?
   complaint      Complaint?
 
   @@index([entityType, entityId])
   @@index([dueAt])
+  /// Declared here because migration 20260921100000 creates it in raw SQL and
+  /// the schema never mentioned it — so `prisma migrate diff` proposed DROPPING
+  /// a live index on an FK column. Declaring it is the fix; stripping the drop
+  /// every time would leave the divergence in place forever.
+  @@index([slaPolicyId])
+  @@index([organizationId])
+}
+
+/// A screening hold that a compliance user accepted in writing so a workflow
+/// could proceed (task Part B §17).
+///
+/// This exists because "the approver knew" is not a control. A REVIEW_REQUIRED
+/// hold is released only by naming, in writing, what is being accepted — and
+/// the acceptance is a row, attributable and queryable, not a line in a log
+/// that rotates. A BLOCKED hold has no release path at all and never produces
+/// one of these.
+model ScreeningHoldRelease {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  kycRecordId    String
+  kycRecord      KYCRecord    @relation(fields: [kycRecordId], references: [id])
+
+  /// The level in force when it was released. Always REVIEW_REQUIRED today —
+  /// stored rather than assumed so a later policy change stays legible in the
+  /// history.
+  level      ScreeningHoldLevel
+  /// The conditions accepted, as `ScreeningHoldCondition` names. A snapshot:
+  /// re-evaluating later can give a different answer, and this is what the
+  /// releaser actually saw.
+  conditions String[]           @default([])
+  /// The evaluator's own operator-facing detail lines at release time. Free of
+  /// subject PII by construction (see `screening-hold.config.ts`).
+  detail     String
+
+  /// Mandatory. The business justification, kept verbatim — the same treatment
+  /// `ScreeningMatch.reviewReason` and `Refund.reason` get.
+  reason           String
+  releasedByUserId String
+  releasedAt       DateTime @default(now())
+
+  /// What the release let happen, so a reviewer can trace effect to cause.
+  workflow String @default("kyc_decision")
+
+  @@index([kycRecordId, releasedAt(sort: Desc)])
+  @@index([releasedByUserId])
+  @@index([organizationId])
+}
+
+enum ScreeningHoldLevel {
+  NO_HOLD
+  REVIEW_REQUIRED
+  BLOCKED
+}
+
+/// Part B §6/§7 — one downloaded, validated, published generation of a
+/// sanctions list.
+///
+/// ## Why this exists: the reader must never see a half-written list
+///
+/// The sync used to upsert ~19,000 rows in chunks and then delete whatever it
+/// had not stamped. Neither step is a transaction, so a screening running
+/// during a sync could observe a list that was partly the old generation and
+/// partly the new one — and worse, one where the entries a subject would have
+/// matched had already been pruned but their replacements had not yet landed.
+/// A sanctions check against a half-written list produces a CLEAR result, which
+/// is the failure mode this whole module exists to prevent.
+///
+/// So entries are written against a VERSION, and a screening reads only the
+/// version that is currently PUBLISHED. Writing happens entirely outside what
+/// any reader can see; publishing is a single transaction that flips one row.
+/// A reader therefore sees the old complete generation or the new complete
+/// generation, never a mixture.
+///
+/// ## The lifecycle
+///
+///   DOWNLOADED  rows are being written; no reader can see them
+///   VALIDATED   the plausibility checks passed; still invisible
+///   PUBLISHED   readers now see exactly this generation
+///   SUPERSEDED  a newer generation was published; kept for rollback
+///   REJECTED    validation failed; never visible, kept for the audit trail
+///
+/// A generation can only be published from VALIDATED. Rollback re-publishes a
+/// SUPERSEDED generation whose rows are still present, which is why superseded
+/// generations are retained rather than pruned immediately.
+model WatchlistDatasetVersion {
+  id     String               @id @default(uuid())
+  source WatchlistSource
+  status DatasetVersionStatus @default(DOWNLOADED)
+
+  /// Human-readable and stable, e.g. `OFAC_SDN@2026-09-10T18:00:00.000Z`.
+  /// This is what a `ScreeningResult.datasetVersion` records, so a historical
+  /// screening stays traceable to the exact generation it was made against
+  /// even after that generation's rows are gone.
+  version     String  @unique
+  recordCount Int?
+  /// Entries in this generation that were not in the previously published one.
+  addedCount  Int?
+  /// SHA-256 of the raw feed, so an identical re-download is recognisable.
+  checksum    String?
+
+  downloadedAt    DateTime  @default(now())
+  validatedAt     DateTime?
+  publishedAt     DateTime?
+  supersededAt    DateTime?
+  rejectedAt      DateTime?
+  /// Why validation refused this generation. Never contains feed content.
+  rejectionReason String?
+
+  syncRunId         String?
+  /// Null when the 12-hourly scheduler published it; set when a person did.
+  publishedByUserId String?
+  /// Set when this publication is a ROLLBACK — the generation it displaced.
+  rolledBackFromId  String?
+  /// Mandatory on a rollback: a person overriding the newest list owes a
+  /// written reason, the same rule the screening match queue follows.
+  rollbackReason    String?
+
+  entries WatchlistEntry[]
+
+  @@index([source, status])
+  @@index([source, downloadedAt(sort: Desc)])
+}
+
+enum DatasetVersionStatus {
+  DOWNLOADED
+  VALIDATED
+  PUBLISHED
+  SUPERSEDED
+  REJECTED
 }

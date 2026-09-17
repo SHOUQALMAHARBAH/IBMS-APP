@@ -71,6 +71,14 @@ export const REDACT_PATHS: readonly string[] = [
   '*.nationalIdEnc',
   '*.contactPhoneEnc',
   '*.contactEmailEnc',
+  // Part I §6 — an office's mailbox credential, and the OAuth material used to
+  // obtain or renew it.
+  '*.oauthRefreshTokenEnc',
+  '*.refresh_token',
+  '*.access_token',
+  '*.client_secret',
+  '*.clientSecret',
+  '*.authorizationCode',
 ];
 
 function isTestEnv(env: Env): boolean {

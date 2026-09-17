@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -25,12 +26,13 @@ import {
   profileFieldValueStyle,
 } from '../../../../components/prospect/prospect.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 export default function NeedsAssessmentDetailPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
@@ -53,24 +55,24 @@ export default function NeedsAssessmentDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This needs assessment could not be found — it may not exist, or you may not have access to it.'
+          ? t('nadNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this needs assessment — try again.',
+            : t('nadLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function handleSubmitForReview() {
     if (!assessment) return;
@@ -82,7 +84,7 @@ export default function NeedsAssessmentDetailPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : 'Could not submit for review — try again.',
+          : t('nadSubmitError'),
       );
     } finally {
       setSubmitting(false);
@@ -92,8 +94,8 @@ export default function NeedsAssessmentDetailPage() {
   if (isLoading || !user) return null;
 
   const isCreator = assessment?.createdByUserId === user.id;
-  const isManager = user.roles.includes(MANAGER_ROLE);
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isManager = hasPermission(user, 'needs-assessment.approve');
+  const isPlacement = hasPermission(user, 'program.assemble');
   const inReview =
     assessment?.status === 'PENDING_REVIEW' || assessment?.status === 'REVIEWED';
 
@@ -104,7 +106,7 @@ export default function NeedsAssessmentDetailPage() {
         onClick={() => router.push('/needs-assessments')}
         style={{ cursor: 'pointer' }}
       >
-        ← All needs assessments
+        {t('nadBackToList')}
       </button>
 
       {loadError ? (
@@ -115,25 +117,25 @@ export default function NeedsAssessmentDetailPage() {
 
       {assessment ? (
         <>
-          <h1>Needs assessment</h1>
-          <p style={{ opacity: 0.8 }}>Status: {assessment.status}</p>
+          <h1>{t('nadHeading')}</h1>
+          <p style={{ opacity: 0.8 }}>Status: {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}</p>
 
           <ConsentCaptureWidget
             customerId={assessment.customerId}
             purpose="UNDERWRITING"
-            label="Needs & risk assessment consent"
+            label={t('nadConsent')}
             defaultConsentTextVersion="underwriting-notice-v1"
           />
           <PrivacyNoticeDisplay
             touchpoint="needs_risk_assessment"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={coveragePreviewStyle}>
-            <strong>Recommended coverage</strong>
+            <strong>{t('nadRecommendedCoverage')}</strong>
             {assessment.recommendedCoverageLines.length === 0 ? (
-              <p style={{ opacity: 0.6, margin: '0.5rem 0 0' }}>
-                No coverage lines recommended from the current answers.
+              <p style={{ color: 'var(--ink-secondary)', margin: '0.5rem 0 0' }}>
+                {t('nadNoCoverageLines')}
               </p>
             ) : (
               <ul style={coverageTagListStyle}>
@@ -148,13 +150,13 @@ export default function NeedsAssessmentDetailPage() {
 
           <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
             <div>
-              <div style={profileFieldLabelStyle}>Reviewed by</div>
+              <div style={profileFieldLabelStyle}>{t('nadReviewedBy')}</div>
               <div style={profileFieldValueStyle}>
                 {assessment.reviewedByUserId ?? '—'}
               </div>
             </div>
             <div>
-              <div style={profileFieldLabelStyle}>Approved by</div>
+              <div style={profileFieldLabelStyle}>{t('nadApprovedBy')}</div>
               <div style={profileFieldValueStyle}>
                 {assessment.approvedByUserId ?? '—'}
               </div>
@@ -175,7 +177,7 @@ export default function NeedsAssessmentDetailPage() {
                 style={buttonStyle}
                 onClick={() => void handleSubmitForReview()}
               >
-                {submitting ? 'Submitting…' : 'Submit for review'}
+                {submitting ? t('nadSubmitting') : t('nadSubmitButton')}
               </button>
               {actionError ? (
                 <p role="alert" style={errorStyle}>
@@ -194,7 +196,7 @@ export default function NeedsAssessmentDetailPage() {
 
           {inReview && !isManager ? (
             <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
-              Awaiting review and approval by a Branch/Department Manager.
+              {t('nadAwaitingManager')}
             </p>
           ) : null}
 
@@ -208,19 +210,18 @@ export default function NeedsAssessmentDetailPage() {
                 )
               }
             >
-              Assemble insurance program →
+              {t('nadAssembleProgramButton')}
             </button>
           ) : null}
 
           {assessment.status === 'APPROVED' && !isPlacement ? (
             <p style={{ opacity: 0.7, marginTop: '1.5rem' }}>
-              Approved — a Placement/Technical Officer can now assemble the
-              insurance program.
+              {t('nadApprovedPlacementNote')}
             </p>
           ) : null}
 
           <section style={{ marginTop: '2rem' }}>
-            <h2>Answers</h2>
+            <h2>{t('nadAnswers')}</h2>
             <ul>
               {questions.map((q) => (
                 <li key={q.id}>

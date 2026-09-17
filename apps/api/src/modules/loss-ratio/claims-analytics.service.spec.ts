@@ -11,6 +11,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 const d = (s: string) => new Prisma.Decimal(s);
 const actor: AuthenticatedUser = {
   id: 'mgr-1',
+  organizationId: 'org-1',
   email: 'mgr@ibms.test',
   roles: ['BRANCH_DEPARTMENT_MANAGER'],
   sessionId: 's-1',

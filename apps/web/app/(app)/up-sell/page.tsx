@@ -1,6 +1,8 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -23,9 +25,8 @@ import {
 } from '../../../components/up-sell/up-sell.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDate } from '../../../lib/i18n/format';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
-const CAN_SCAN_ROLES = ['SALES_RELATIONSHIP_OFFICER', 'BRANCH_DEPARTMENT_MANAGER'];
 
 function RecommendationRow({
   recommendation,
@@ -36,7 +37,7 @@ function RecommendationRow({
   canConvert: boolean;
   onChanged: (updated: UpSellRecommendation) => void;
 }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [reason, setReason] = useState('');
@@ -67,8 +68,8 @@ function RecommendationRow({
           flexWrap: 'wrap',
         }}
       >
-        <strong>Under-insurance flagged</strong>
-        <span style={upSellBadgeStyle}>{recommendation.status}</span>
+        <strong>{t('upsUnderInsuranceFlagged')}</strong>
+        <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
       </div>
       <div style={upSellFigureRowStyle}>
         <span>Designed Sum Insured (JOD): {recommendation.currentSumInsured}</span>
@@ -90,11 +91,11 @@ function RecommendationRow({
             onClick={() =>
               void run(
                 () => convertUpSellRecommendation(recommendation.id),
-                'Could not convert — try again.',
+                t('upsConvertError'),
               )
             }
           >
-            {busy ? 'Working…' : 'Convert'}
+            {busy ? t('upsWorking') : t('upsConvertButton')}
           </button>
           {dismissing ? (
             <>
@@ -102,13 +103,13 @@ function RecommendationRow({
                 htmlFor={`reason-${recommendation.id}`}
                 style={cardMetaStyle}
               >
-                Why is the increase not being pursued?
+                {t('upsWhyNotPursued')}
               </label>
               <input
                 id={`reason-${recommendation.id}`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. client declined the increase"
+                placeholder={t('upsDismissPlaceholder')}
                 style={{ minWidth: '18rem' }}
               />
               <button
@@ -122,11 +123,11 @@ function RecommendationRow({
                         recommendation.id,
                         reason.trim(),
                       ),
-                    'Could not dismiss — try again.',
+                    t('upsDismissError'),
                   )
                 }
               >
-                Confirm dismiss
+                {t('upsConfirmDismiss')}
               </button>
               <button
                 type="button"
@@ -158,10 +159,11 @@ function RecommendationRow({
 }
 
 function UpSellForCustomer({ customerId }: { customerId: string }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
-  const canConvert = user?.roles.includes(CAN_CONVERT_ROLE) ?? false;
+  const canConvert = hasPermission(user, 'up-sell.convert');
   const canScan =
-    user?.roles.some((role) => CAN_SCAN_ROLES.includes(role)) ?? false;
+    hasPermission(user, 'up-sell.detect');
 
   const [recommendations, setRecommendations] = useState<
     UpSellRecommendation[] | null
@@ -178,21 +180,21 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the up-sell.read permission, so there's nothing to show here."
+          ? t('upsNoPermission')
           : err instanceof ApiError && err.status === 404
-            ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+            ? t('upsCustomerNotFound')
             : err instanceof ApiError
               ? err.message
-              : 'Could not load up-sell recommendations — try again.',
+              : t('upsLoadError'),
       );
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function runScan() {
     setScanError(null);
@@ -203,10 +205,10 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setScanError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the up-sell.detect permission."
+          ? t('upsNoPermissionDetect')
           : err instanceof ApiError
             ? err.message
-            : 'Could not run the scan — try again.',
+            : t('upsScanError'),
       );
     } finally {
       setScanning(false);
@@ -226,7 +228,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!recommendations) return <p>Loading…</p>;
+  if (!recommendations) return <p>{t('upsLoading')}</p>;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -237,7 +239,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
           style={{ ...buttonStyle, width: 'auto' }}
           onClick={() => void runScan()}
         >
-          {scanning ? 'Scanning…' : 'Scan for under-insurance now'}
+          {scanning ? t('upsScanning') : t('upsScanButton')}
         </button>
       ) : null}
       {scanError ? (
@@ -248,7 +250,7 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
 
       {scan ? (
         <div style={upSellPanelStyle}>
-          <strong>Last scan</strong>
+          <strong>{t('upsLastScan')}</strong>
           <div style={upSellFigureRowStyle}>
             <span>Designed Sum Insured (JOD): {scan.currentSumInsured}</span>
             <span>Current asset value (JOD): {scan.currentAssetValue}</span>
@@ -256,23 +258,21 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
           </div>
           <div style={cardMetaStyle}>
             {scan.currentSumInsured === '0.000'
-              ? 'No designed property Sum Insured to compare against — assemble an insurance program first.'
+              ? t('upsNoDesignedSi')
               : scan.isUnderinsured
                 ? scan.flagged
                   ? `Under-insured by more than ${scan.thresholdPercent}% — a recommendation was raised.`
                   : scan.suppressedByPriorResolution
-                    ? 'Under-insured, but a prior recommendation at this asset value was already actioned — not re-raised.'
-                    : 'Under-insured — a recommendation is already open.'
+                    ? t('upsAlreadyActioned')
+                    : t('upsAlreadyOpen')
                 : `Adequately insured (within ${scan.thresholdPercent}% of asset value).`}
           </div>
         </div>
       ) : null}
 
       {recommendations.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          No up-sell recommendations for this customer. The nightly scan raises
-          one when a customer&apos;s surveyed asset value grows materially past
-          their designed property Sum Insured.
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+          {t('upsEmptyForCustomer')}
         </p>
       ) : (
         <div style={{ marginTop: '1rem' }}>
@@ -292,21 +292,18 @@ function UpSellForCustomer({ customerId }: { customerId: string }) {
 
 function UpSellFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and open its up-sell recommendations from there.
+        <SentenceWithLink
+          sentence={t('upsNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -315,24 +312,21 @@ function UpSellFlow() {
 }
 
 export default function UpSellPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Up-sell</h1>
+      <h1>{t('upsHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 9 — a nightly job compares each customer&apos;s designed
-        property Sum Insured against the current value of their surveyed assets
-        and proposes an increase where the gap is material. Convert a
-        recommendation to take the increase forward, or dismiss it with a
-        reason.
+        {t('upsIntro')}
       </p>
       <Suspense fallback={null}>
         <UpSellFlow />

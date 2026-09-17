@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -61,8 +62,8 @@ test("lists sync runs with the sync/batch buttons", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Sanctions & PEP watchlist sync" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "OFAC_SDN" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "UN_CONSOLIDATED" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "OFAC SDN" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "UN consolidated list" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Sync watchlists now" }),
   ).toBeVisible();
@@ -90,7 +91,7 @@ test("watchlist-sync screen has no serious/critical accessibility violations @a1
   await mockStatus(page);
 
   await page.goto("/watchlist-sync");
-  await expect(page.getByRole("cell", { name: "OFAC_SDN" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "OFAC SDN" })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter(

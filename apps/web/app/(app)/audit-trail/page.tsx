@@ -1,7 +1,9 @@
 'use client';
 
 import { type CSSProperties, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
+import { Pagination } from '../../../components/ui/Pagination';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
   browseAuditTrail,
@@ -13,50 +15,52 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', margin: '0.75rem 0' };
 
-function messageFor(err: unknown, permission: string, fallback: string): string {
+function messageFor(err: unknown, noPermission: string, fallback: string): string {
   return err instanceof ApiError && err.status === 403
-    ? `You don't hold the ${permission} permission.`
+    ? noPermission
     : err instanceof ApiError
       ? err.message
       : fallback;
 }
 
 function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
+  const { t } = useLanguage();
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ borderCollapse: 'collapse', minWidth: '60rem' }}>
         <thead>
           <tr>
-            <th style={head}>Occurred</th>
-            <th style={head}>Action</th>
-            <th style={head}>Entity</th>
-            <th style={head}>User</th>
-            <th style={head}>Sensitive</th>
+            <th style={head}>{t('atColOccurred')}</th>
+            <th style={head}>{t('atColAction')}</th>
+            <th style={head}>{t('atColEntity')}</th>
+            <th style={head}>{t('atColUser')}</th>
+            <th style={head}>{t('atColSensitive')}</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
               <td style={cell} colSpan={5}>
-                No entries.
+                {t('atNone')}
               </td>
             </tr>
           ) : (
             rows.map((r) => (
               <tr key={r.id}>
                 <td style={cell}>{r.occurredAt.replace('T', ' ').slice(0, 19)}</td>
-                <td style={cell}>{r.action}</td>
+                <td style={cell}>{t(ENUM_LABEL.AuditAction[r.action])}</td>
                 <td style={cell}>
                   {r.entityType} <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
                 </td>
@@ -74,10 +78,23 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
 export default function AuditTrailPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   const [browseEntityType, setBrowseEntityType] = useState('');
   const [browseEntityId, setBrowseEntityId] = useState('');
   const [browseRows, setBrowseRows] = useState<AuditLogEntry[] | null>(null);
+  // The filters that produced the rows currently on screen — NOT the live
+  // input values. Paging has to re-send the query that produced the set being
+  // paged, or typing a new filter and then clicking Next would ask for page 2
+  // of a search that was never run.
+  const [browseApplied, setBrowseApplied] = useState<{
+    entityType?: string;
+    entityId?: string;
+    to?: string;
+  }>({});
+  const [browsePage, setBrowsePage] = useState(0);
+  const [browseTotal, setBrowseTotal] = useState(0);
+  const [browsePageSize, setBrowsePageSize] = useState(0);
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [browseBusy, setBrowseBusy] = useState(false);
 
@@ -94,22 +111,53 @@ export default function AuditTrailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   async function runBrowse(ev: React.FormEvent) {
     ev.preventDefault();
+    const filters = {
+      entityType: browseEntityType || undefined,
+      entityId: browseEntityId || undefined,
+      // Pinned to the instant this browse was submitted, and reused for every
+      // page of it.
+      //
+      // This is the one list whose own reads APPEND to the table they read:
+      // each browse records a PDPL access row, which sorts to the top and
+      // shifts every later page down by one. Without the pin, clicking Next
+      // shows a row the previous page already showed, and hides one entirely.
+      // An audit browse reading "as at the moment you searched" is also the
+      // more honest thing for it to mean.
+      to: new Date().toISOString(),
+    };
+    setBrowseApplied(filters);
+    await browseTo(0, filters);
+  }
+
+  // The audit log is the fastest-growing table here, so it is read a page at a
+  // time. A new search restarts at page 0 through the submit above; paging
+  // re-sends the filters that produced the set, never the live inputs.
+  async function browseTo(
+    nextPage: number,
+    filters: {
+      entityType?: string;
+      entityId?: string;
+      to?: string;
+    } = browseApplied,
+  ) {
     setBrowseBusy(true);
     setBrowseError(null);
     try {
-      setBrowseRows(
-        await browseAuditTrail({
-          entityType: browseEntityType || undefined,
-          entityId: browseEntityId || undefined,
-        }),
-      );
+      const result = await browseAuditTrail({
+        ...filters,
+        ...(nextPage ? { page: nextPage } : {}),
+      });
+      setBrowseRows(result.items);
+      setBrowseTotal(result.total);
+      setBrowsePageSize(result.pageSize);
+      setBrowsePage(result.page);
     } catch (err) {
       setBrowseRows(null);
-      setBrowseError(messageFor(err, 'audit-log.read', 'Could not browse the audit log — try again.'));
+      setBrowseError(messageFor(err, t('atNoPermissionFor', { permission: 'audit-log.read' }), t('atLogLoadError')));
     } finally {
       setBrowseBusy(false);
     }
@@ -123,7 +171,7 @@ export default function AuditTrailPage() {
       setWfRows(await getWorkflowHistory(wfEntityType, wfEntityId));
     } catch (err) {
       setWfRows(null);
-      setWfError(messageFor(err, 'workflow-history.read', 'Could not load workflow history — try again.'));
+      setWfError(messageFor(err, t('atNoPermissionFor', { permission: 'workflow-history.read' }), t('atWorkflowLoadError')));
     } finally {
       setWfBusy(false);
     }
@@ -137,7 +185,7 @@ export default function AuditTrailPage() {
       setDocHistory(await getDocumentHistory(documentId));
     } catch (err) {
       setDocHistory(null);
-      setDocError(messageFor(err, 'document-history.read', 'Could not load document history — try again.'));
+      setDocError(messageFor(err, t('atNoPermissionFor', { permission: 'document-history.read' }), t('atDocumentLoadError')));
     } finally {
       setDocBusy(false);
     }
@@ -147,35 +195,32 @@ export default function AuditTrailPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Audit Trail</h1>
+      <h1>{t('atHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The External Auditor&rsquo;s read-only lens (Part 5.1): logs,
-        document history, and workflow-state transition history for a
-        defined engagement period. Access itself is time-boxed via each
-        user&rsquo;s own account settings, not configured here.
+        {t('atIntro')}
       </p>
 
       <section style={sectionStyle}>
-        <h2>Audit log</h2>
+        <h2>{t('atAuditLogHeading')}</h2>
         <form onSubmit={runBrowse} style={formStyle}>
           <label>
-            Entity type{' '}
+            {t('atEntityTypeLabel')}{' '}
             <input
-              aria-label="Entity type"
+              aria-label={t('atEntityTypeLabel')}
               value={browseEntityType}
               onChange={(e) => setBrowseEntityType(e.target.value)}
             />
           </label>
           <label>
-            Entity id{' '}
+            {t('atEntityIdLabel')}{' '}
             <input
-              aria-label="Entity id"
+              aria-label={t('atEntityIdLabel')}
               value={browseEntityId}
               onChange={(e) => setBrowseEntityId(e.target.value)}
             />
           </label>
           <button type="submit" disabled={browseBusy}>
-            {browseBusy ? 'Loading…' : 'Browse'}
+            {browseBusy ? t('atLoading') : t('atBrowseButton')}
           </button>
         </form>
         {browseError ? (
@@ -183,32 +228,43 @@ export default function AuditTrailPage() {
             {browseError}
           </p>
         ) : null}
-        {browseRows ? <AuditLogTable rows={browseRows} /> : null}
+        {browseRows ? (
+          <>
+            <AuditLogTable rows={browseRows} />
+            <Pagination
+              page={browsePage}
+              pageSize={browsePageSize}
+              total={browseTotal}
+              busy={browseBusy}
+              onPageChange={(next) => void browseTo(next)}
+            />
+          </>
+        ) : null}
       </section>
 
       <section style={sectionStyle}>
-        <h2>Workflow history</h2>
+        <h2>{t('atWorkflowHistoryHeading')}</h2>
         <form onSubmit={runWorkflowHistory} style={formStyle}>
           <label>
-            Entity type{' '}
+            {t('atWorkflowEntityTypeLabel')}{' '}
             <input
-              aria-label="Workflow entity type"
+              aria-label={t('atWorkflowEntityTypeLabel')}
               value={wfEntityType}
               onChange={(e) => setWfEntityType(e.target.value)}
               required
             />
           </label>
           <label>
-            Entity id{' '}
+            {t('atWorkflowEntityIdLabel')}{' '}
             <input
-              aria-label="Workflow entity id"
+              aria-label={t('atWorkflowEntityIdLabel')}
               value={wfEntityId}
               onChange={(e) => setWfEntityId(e.target.value)}
               required
             />
           </label>
           <button type="submit" disabled={wfBusy}>
-            {wfBusy ? 'Loading…' : 'Look up'}
+            {wfBusy ? t('atLoading') : t('atLookUpButton')}
           </button>
         </form>
         {wfError ? (
@@ -220,19 +276,19 @@ export default function AuditTrailPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2>Document history</h2>
+        <h2>{t('atDocumentHistoryHeading')}</h2>
         <form onSubmit={runDocumentHistory} style={formStyle}>
           <label>
-            Document id{' '}
+            {t('atDocumentIdLabel')}{' '}
             <input
-              aria-label="Document id"
+              aria-label={t('atDocumentIdLabel')}
               value={documentId}
               onChange={(e) => setDocumentId(e.target.value)}
               required
             />
           </label>
           <button type="submit" disabled={docBusy}>
-            {docBusy ? 'Loading…' : 'Look up'}
+            {docBusy ? t('atLoading') : t('atLookUpButton')}
           </button>
         </form>
         {docError ? (
@@ -242,17 +298,17 @@ export default function AuditTrailPage() {
         ) : null}
         {docHistory ? (
           <>
-            <h3>Versions</h3>
+            <h3>{t('atColVersions')}</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>Version</th>
-                    <th style={head}>File</th>
-                    <th style={head}>Category</th>
-                    <th style={head}>Classification</th>
-                    <th style={head}>Uploaded by</th>
-                    <th style={head}>Created</th>
+                    <th style={head}>{t('atColVersion')}</th>
+                    <th style={head}>{t('atColFile')}</th>
+                    <th style={head}>{t('atColCategory')}</th>
+                    <th style={head}>{t('atColClassification')}</th>
+                    <th style={head}>{t('atColUploadedBy')}</th>
+                    <th style={head}>{t('atColCreated')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -263,8 +319,8 @@ export default function AuditTrailPage() {
                         {v.isRequestedVersion ? ' (requested)' : ''}
                       </td>
                       <td style={cell}>{v.fileName}</td>
-                      <td style={cell}>{v.category}</td>
-                      <td style={cell}>{v.classification}</td>
+                      <td style={cell}>{t(ENUM_LABEL.DocumentCategory[v.category])}</td>
+                      <td style={cell}>{t(ENUM_LABEL.DataClassification[v.classification])}</td>
                       <td style={cell}>{v.uploadedByUserId}</td>
                       <td style={cell}>{v.createdAt.slice(0, 10)}</td>
                     </tr>
@@ -272,7 +328,7 @@ export default function AuditTrailPage() {
                 </tbody>
               </table>
             </div>
-            <h3>Audit trail</h3>
+            <h3>{t('atHeading')}</h3>
             <AuditLogTable rows={docHistory.auditTrail} />
           </>
         ) : null}

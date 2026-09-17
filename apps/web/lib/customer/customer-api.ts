@@ -2,6 +2,7 @@
 // customer module (customer.controller.ts). Mirrors lib/prospect/
 // prospect-api.ts's conventions (thin typed wrappers over apiGet/apiPost).
 
+import type { Paginated } from '../api/paginated';
 import { apiGet, apiPost } from '../auth/api-client';
 
 export type CustomerType = 'INDIVIDUAL' | 'CORPORATE';
@@ -23,6 +24,12 @@ export interface Customer {
   fatherName: string | null;
   grandfatherName: string | null;
   familyName: string | null;
+  // Part B §11 screening discriminators. The api has always returned these in
+  // the clear - deliberately, so a reviewer can tell two people of the same
+  // name apart - but the web type never declared them. CustomerPicker is the
+  // first thing to need exactly that.
+  dateOfBirth: string | null;
+  nationality: string | null;
   registrationNumber: string | null;
   taxRegistrationNumber: string | null;
   registeredAddress: string | null;
@@ -62,6 +69,9 @@ export interface CreateCustomerInput {
 }
 
 export interface ListCustomersFilter {
+  /** 0-based. Out-of-range values are clamped server-side. */
+  page?: number;
+
   ownerUserId?: string;
   status?: CustomerStatus;
   /** Part F item #6 — bilingual full-text search over legalName. */
@@ -120,11 +130,16 @@ export function createCustomer(input: CreateCustomerInput): Promise<Customer> {
   return apiPost('/customers', input);
 }
 
-export function listCustomers(filter: ListCustomersFilter = {}): Promise<Customer[]> {
+export function listCustomers(
+  filter: ListCustomersFilter = {},
+): Promise<Paginated<Customer>> {
   const params = new URLSearchParams();
   if (filter.ownerUserId) params.set('ownerUserId', filter.ownerUserId);
   if (filter.status) params.set('status', filter.status);
   if (filter.search) params.set('search', filter.search);
+  // Sent only when past the first page, so the common request keeps the URL
+  // it always had and the server's own default decides the size.
+  if (filter.page) params.set('page', String(filter.page));
   const qs = params.toString();
   return apiGet(`/customers${qs ? `?${qs}` : ''}`);
 }

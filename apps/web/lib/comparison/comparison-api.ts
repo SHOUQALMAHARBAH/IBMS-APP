@@ -4,6 +4,7 @@
 // with no quote to compare are flagged.
 
 import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
+import type { RfqInsurerStatus } from '../rfq/rfq-api';
 import type { QuotationVersion } from '../quotation/quotation-api';
 
 export interface ComparisonRow {
@@ -17,7 +18,9 @@ export interface ComparisonRow {
 export interface FlaggedInsurer {
   id: string;
   name: string;
-  status: string | null;
+  /** The insurer's own RFQ state, printed to a person - so it is the real
+   *  vocabulary, not `string`, and goes through ENUM_LABEL. */
+  status: RfqInsurerStatus | null;
 }
 
 export interface ComparisonMatrix {

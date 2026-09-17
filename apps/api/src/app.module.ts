@@ -1,15 +1,18 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggingModule } from './common/logging/logging.module';
+import { OrgContextModule } from './common/org-context/org-context.module';
+import { OrgContextMiddleware } from './common/org-context/org-context.middleware';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
+import { ScreeningProvidersModule } from './modules/screening-providers/screening-providers.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { ProspectModule } from './modules/prospect/prospect.module';
@@ -34,6 +37,7 @@ import { ClaimModule } from './modules/claim/claim.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { CommissionModule } from './modules/commission/commission.module';
 import { SlaDashboardModule } from './modules/sla-dashboard/sla-dashboard.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { PdplModule } from './modules/pdpl/pdpl.module';
 import { ComplianceRiskModule } from './modules/compliance-risk/compliance-risk.module';
 import { InternalControlsModule } from './modules/internal-controls/internal-controls.module';
@@ -58,9 +62,17 @@ import { InformationAssetModule } from './modules/supporting-operations/informat
 import { DocumentModule } from './modules/supporting-operations/document.module';
 import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.module';
 import { KnowledgeBaseArticleModule } from './modules/supporting-operations/knowledge-base-article.module';
+import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
+import { EmailModule } from './modules/email/email.module';
+import { ScheduledJobsGuard } from './common/scheduled-jobs.guard';
+import { OrganizationModule } from './modules/organization/organization.module';
 
 @Module({
   imports: [
+    // Multi-tenancy Phase 2 (step 7). Global, and listed first because
+    // PrismaService itself depends on it — every tenant-scoped query is
+    // filtered by the Organization this module carries.
+    OrgContextModule,
     // In Docker/CI, real env vars are already in process.env and these files
     // simply won't exist — ConfigModule does not error when they're missing.
     ConfigModule.forRoot({
@@ -85,6 +97,7 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // Depends on AuthModule's exported UserRepository (system service
     // account lookup for escalation-sweep audit rows) — imported after it.
     SlaModule,
+    ScreeningProvidersModule,
     // Imported after AuthModule — see rbac.module.ts's PermissionsGuard
     // comment for why global-guard execution order depends on this.
     RbacModule,
@@ -258,6 +271,7 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // Manager, Exec, Auditor). No migration, no seed change; a best-effort READ
     // audit row per read. Separate from SlaModule (the engine + sweep).
     SlaDashboardModule,
+    NotificationModule,
     // Part D (PDPL foundations, `IMPROVEMENTS.md` §5.1 / backlog Process #52)
     // — M03 Consent Management: capture a consent decision at a defined
     // touchpoint, withdraw it through a two-step request/confirm flow that
@@ -419,8 +433,27 @@ import { KnowledgeBaseArticleModule } from './modules/supporting-operations/know
     // categories. No new permission, no migration — kb.publish was
     // already pre-seeded.
     KnowledgeBaseArticleModule,
+    InsurerMasterModule,
+    EmailModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [ScheduledJobsGuard, AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * Multi-tenancy Phase 2 (step 7) — opens an Organization context for EVERY
+   * route, with no exclusions.
+   *
+   * Deliberately not narrowed to authenticated routes: the store starts empty
+   * and only becomes an Organization once `JwtStrategy` resolves one, so
+   * applying it everywhere costs an anonymous route nothing while guaranteeing
+   * there is no route whose handler runs outside a context. A route list here
+   * would be one more thing to forget when adding a controller — the exact
+   * failure mode spec §8 warns about ("a missed table is a real isolation
+   * hole"), applied to routes.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(OrgContextMiddleware).forRoutes('*');
+  }
+}

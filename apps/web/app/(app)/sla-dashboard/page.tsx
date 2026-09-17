@@ -3,11 +3,12 @@
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 import {
   formatSlaDuration,
   getSlaDashboardSummary,
   getSlaDashboardTimers,
-  slaStateFilterLabel,
   slaStateLabel,
   SLA_TIMER_STATE_FILTERS,
   type SlaDashboardSummary,
@@ -20,26 +21,39 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'end',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 const leftCell: CSSProperties = { ...cell, textAlign: 'start' };
 const leftHead: CSSProperties = { ...head, textAlign: 'start' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
-const NO_PERMISSION =
-  "You don't hold the sla-dashboard.view permission, so there's nothing to show here.";
+/** Timer state / filter -> label key. These were English constants in
+ * lib/sla/sla-dashboard-api.ts; this page is their only consumer, so the
+ * labelling moved here where a translator is in scope. */
+const STATE_FILTER_LABEL_KEY: Record<string, TranslationKey> = {
+  on_track: 'slaDashStateOnTrack',
+  due_soon: 'slaDashStateDueSoon',
+  breached: 'slaDashStateBreached',
+  escalated: 'slaDashStateEscalated',
+  resolved_on_time: 'slaDashStateResolvedOnTime',
+  resolved_late: 'slaDashStateResolvedLate',
+  open: 'slaDashStateOpen',
+  open_breached: 'slaDashStateOpenBreached',
+  at_risk: 'slaDashStateAtRisk',
+  resolved: 'slaDashStateResolved',
+};
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div
       style={{
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 8,
         padding: '0.6rem 0.9rem',
         minWidth: '7.5rem',
@@ -60,18 +74,26 @@ function fmtDate(iso: string): string {
 export default function SlaDashboardPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  // Aliased: this page already binds `t` to the per-workflow totals row
+  // (`t!.onTrack`), so the translator cannot take that name here.
+  const { t: tr } = useLanguage();
 
   const [summary, setSummary] = useState<SlaDashboardSummary | null>(null);
   const [timers, setTimers] = useState<SlaTimerRow[] | null>(null);
   const [stateFilter, setStateFilter] = useState<SlaTimerStateFilter>('open');
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const messageFor = (err: unknown, fallback: string) =>
-    err instanceof ApiError && err.status === 403
-      ? NO_PERMISSION
-      : err instanceof ApiError
-        ? err.message
-        : fallback;
+  // useCallback so the two loaders below can depend on it honestly: it closes
+  // over `tr`, which changes when the language does.
+  const messageFor = useCallback(
+    (err: unknown, fallback: string) =>
+      err instanceof ApiError && err.status === 403
+        ? tr('slaDashNoPermission')
+        : err instanceof ApiError
+          ? err.message
+          : fallback,
+    [tr],
+  );
 
   const loadSummary = useCallback(async () => {
     try {
@@ -79,9 +101,9 @@ export default function SlaDashboardPage() {
       setLoadError(null);
     } catch (err) {
       setSummary(null);
-      setLoadError(messageFor(err, 'Could not load the SLA dashboard — try again.'));
+      setLoadError(messageFor(err, tr('slaDashLoadError')));
     }
-  }, []);
+  }, [messageFor, tr]);
 
   const loadTimers = useCallback(async (state: SlaTimerStateFilter) => {
     try {
@@ -89,10 +111,10 @@ export default function SlaDashboardPage() {
     } catch (err) {
       setTimers(null);
       setLoadError((prev) =>
-        prev ?? messageFor(err, 'Could not load the timer list — try again.'),
+        prev ?? messageFor(err, tr('slaDashTimerLoadError')),
       );
     }
-  }, []);
+  }, [messageFor, tr]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
@@ -112,11 +134,9 @@ export default function SlaDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>SLA dashboard</h1>
+      <h1>{tr('slaDashHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Every module&rsquo;s SLA timers in one view — what is on track, due soon,
-        breached or escalated, and how each workflow is performing against its
-        configured turnaround. Live, computed on read.
+        {tr('slaDashIntro')}
       </p>
 
       {loadError ? (
@@ -127,7 +147,7 @@ export default function SlaDashboardPage() {
 
       {!summary ? (
         loadError ? null : (
-          <p>Loading&hellip;</p>
+          <p>{tr('slaDashLoading')}</p>
         )
       ) : (
         <>
@@ -135,21 +155,21 @@ export default function SlaDashboardPage() {
             <div
               style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}
             >
-              <Stat label="Timers" value={t!.total} />
-              <Stat label="On track" value={t!.onTrack} />
-              <Stat label="Due soon" value={t!.dueSoon} />
-              <Stat label="Breached" value={t!.breached} />
-              <Stat label="Escalated" value={t!.escalated} />
+              <Stat label={tr('slaDashColTimers')} value={t!.total} />
+              <Stat label={tr('slaDashOnTrack')} value={t!.onTrack} />
+              <Stat label={tr('slaDashDueSoon')} value={t!.dueSoon} />
+              <Stat label={tr('slaDashBreached')} value={t!.breached} />
+              <Stat label={tr('slaDashEscalated')} value={t!.escalated} />
               <Stat
-                label="Resolved"
+                label={tr('slaDashResolved')}
                 value={t!.resolvedOnTime + t!.resolvedLate}
               />
               <Stat
-                label="Breach rate"
+                label={tr('slaDashBreachRate')}
                 value={`${(Number(t!.breachRate) * 100).toFixed(1)}%`}
               />
             </div>
-            <p style={{ opacity: 0.6, fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
               &ldquo;Due soon&rdquo; = unresolved and due within{' '}
               {formatSlaDuration(summary.dueSoonWindow)}. Breach rate =
               late-or-breached over all timers that have reached a deadline.
@@ -158,27 +178,27 @@ export default function SlaDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>By workflow</h2>
+            <h2>{tr('slaDashByWorkflow')}</h2>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
                 <thead>
                   <tr>
-                    <th style={leftHead}>Workflow</th>
-                    <th style={leftHead}>Entity</th>
-                    <th style={head}>SLA</th>
-                    <th style={head}>On track</th>
-                    <th style={head}>Due soon</th>
-                    <th style={head}>Breached</th>
-                    <th style={head}>Escalated</th>
-                    <th style={head}>Resolved</th>
-                    <th style={head}>Oldest overdue</th>
+                    <th style={leftHead}>{tr('slaDashColWorkflow')}</th>
+                    <th style={leftHead}>{tr('slaDashColEntity')}</th>
+                    <th style={head}>{tr('slaDashColSla')}</th>
+                    <th style={head}>{tr('slaDashOnTrack')}</th>
+                    <th style={head}>{tr('slaDashDueSoon')}</th>
+                    <th style={head}>{tr('slaDashBreached')}</th>
+                    <th style={head}>{tr('slaDashEscalated')}</th>
+                    <th style={head}>{tr('slaDashResolved')}</th>
+                    <th style={head}>{tr('slaDashOldestOverdue')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.byWorkflow.length === 0 ? (
                     <tr>
                       <td style={leftCell} colSpan={9}>
-                        No SLA timers yet.
+                        {tr('slaDashNoTimers')}
                       </td>
                     </tr>
                   ) : (
@@ -188,8 +208,8 @@ export default function SlaDashboardPage() {
                           {w.label}
                           {w.drafted ? (
                             <span
-                              title="The configured SLA figure is a drafted / unsourced default."
-                              style={{ opacity: 0.6 }}
+                              title={tr('slaDashDraftNote')}
+                              style={{ color: 'var(--ink-secondary)' }}
                             >
                               {' '}
                               (drafted)
@@ -221,16 +241,16 @@ export default function SlaDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>By entity type</h2>
+            <h2>{tr('slaDashByEntityType')}</h2>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                 <thead>
                   <tr>
-                    <th style={leftHead}>Entity type</th>
-                    <th style={head}>Timers</th>
-                    <th style={head}>Entities</th>
-                    <th style={head}>Breached</th>
-                    <th style={head}>Escalated</th>
+                    <th style={leftHead}>{tr('slaDashColEntityType')}</th>
+                    <th style={head}>{tr('slaDashColTimers')}</th>
+                    <th style={head}>{tr('slaDashColEntities')}</th>
+                    <th style={head}>{tr('slaDashBreached')}</th>
+                    <th style={head}>{tr('slaDashEscalated')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -249,7 +269,7 @@ export default function SlaDashboardPage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Timers</h2>
+            <h2>{tr('slaDashColTimers')}</h2>
             <label
               style={{
                 display: 'inline-flex',
@@ -257,9 +277,9 @@ export default function SlaDashboardPage() {
                 margin: '0.5rem 0',
               }}
             >
-              Show
+              {tr('slaDashShow')}
               <select
-                aria-label="Timer state filter"
+                aria-label={tr('slaDashStateFilterAria')}
                 value={stateFilter}
                 onChange={(ev) =>
                   setStateFilter(ev.target.value as SlaTimerStateFilter)
@@ -267,7 +287,7 @@ export default function SlaDashboardPage() {
               >
                 {SLA_TIMER_STATE_FILTERS.map((s) => (
                   <option key={s} value={s}>
-                    {slaStateFilterLabel(s)}
+                    {STATE_FILTER_LABEL_KEY[s] ? tr(STATE_FILTER_LABEL_KEY[s]) : s}
                   </option>
                 ))}
               </select>
@@ -276,25 +296,25 @@ export default function SlaDashboardPage() {
               <table style={{ borderCollapse: 'collapse', minWidth: '52rem' }}>
                 <thead>
                   <tr>
-                    <th style={leftHead}>Workflow</th>
-                    <th style={leftHead}>Entity</th>
-                    <th style={leftHead}>State</th>
-                    <th style={head}>Due</th>
-                    <th style={head}>Overdue</th>
-                    <th style={leftHead}>Escalates to</th>
+                    <th style={leftHead}>{tr('slaDashColWorkflow')}</th>
+                    <th style={leftHead}>{tr('slaDashColEntity')}</th>
+                    <th style={leftHead}>{tr('slaDashColState')}</th>
+                    <th style={head}>{tr('slaDashColDue')}</th>
+                    <th style={head}>{tr('slaDashOverdue')}</th>
+                    <th style={leftHead}>{tr('slaDashEscalatesTo')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {timers == null ? (
                     <tr>
                       <td style={leftCell} colSpan={6}>
-                        Loading&hellip;
+                        {tr('slaDashLoading')}
                       </td>
                     </tr>
                   ) : timers.length === 0 ? (
                     <tr>
                       <td style={leftCell} colSpan={6}>
-                        No timers in this state.
+                        {tr('slaDashNoTimersInState')}
                       </td>
                     </tr>
                   ) : (

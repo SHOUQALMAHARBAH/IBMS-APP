@@ -3,12 +3,51 @@
 // apps/api's /audit-trail endpoints. audit-log.read /
 // document-history.read / workflow-history.read.
 
+import type { Paginated } from '../api/paginated';
 import { apiGet } from '../auth/api-client';
+
+export type AuditAction =
+  | 'CREATE'
+  | 'READ'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'TRANSITION'
+  | 'EXPORT'
+  | 'PRINT'
+  | 'LOGIN'
+  | 'LOGIN_FAILED'
+  | 'LOGOUT'
+  | 'PASSWORD_RESET_REQUESTED'
+  | 'PASSWORD_RESET_COMPLETED'
+  | 'MFA_ENROLLED'
+  | 'MFA_VERIFIED'
+  | 'MFA_FAILED'
+  | 'STEP_UP_VERIFIED'
+  | 'ACCESS_WINDOW_EXPIRED';
+
+export type DocumentCategory =
+  | 'APPLICATION_PROPOSAL'
+  | 'RISK_SURVEY'
+  | 'QUOTATION'
+  | 'COMPARISON'
+  | 'RECOMMENDATION'
+  | 'CLIENT_APPROVAL'
+  | 'POLICY'
+  | 'ENDORSEMENT'
+  | 'INVOICE'
+  | 'RECEIPT'
+  | 'CLAIM'
+  | 'CORRESPONDENCE'
+  | 'OTHER';
+
+export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'HIGHLY_CONFIDENTIAL';
 
 export interface AuditLogEntry {
   id: string;
   userId: string;
-  action: string;
+  action: AuditAction;
   entityType: string;
   entityId: string;
   beforeValue: unknown;
@@ -21,8 +60,8 @@ export interface DocumentVersion {
   id: string;
   versionNumber: number;
   fileName: string;
-  category: string;
-  classification: string;
+  category: DocumentCategory;
+  classification: DataClassification;
   uploadedByUserId: string;
   deletionLocked: boolean;
   deletionOverrideByUserId: string | null;
@@ -43,7 +82,10 @@ export function browseAuditTrail(filters: {
   action?: string;
   from?: string;
   to?: string;
-}): Promise<AuditLogEntry[]> {
+  /** 0-based. Omitted on the first page, so the common request keeps the URL
+   *  it has always had. */
+  page?: number;
+}): Promise<Paginated<AuditLogEntry>> {
   const params = new URLSearchParams();
   if (filters.entityType) params.set('entityType', filters.entityType);
   if (filters.entityId) params.set('entityId', filters.entityId);
@@ -51,6 +93,7 @@ export function browseAuditTrail(filters: {
   if (filters.action) params.set('action', filters.action);
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
+  if (filters.page) params.set('page', String(filters.page));
   const qs = params.toString();
   return apiGet(`/audit-trail${qs ? `?${qs}` : ''}`);
 }

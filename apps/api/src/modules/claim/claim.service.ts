@@ -21,6 +21,7 @@ import { WorkflowTransitionService } from '../workflow/workflow-transition.servi
 import { EncryptionService } from '../security/encryption.service';
 import { encryptEntityFields } from '../security/encrypted-fields';
 import { CLAIM_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 import { formatMoney, quantizeMoney } from '../../common/money.util';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import {
@@ -1905,12 +1906,59 @@ export class ClaimService {
   async list(
     query: ListClaimsQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<ClaimView[]> {
+  ): Promise<Paginated<ClaimView>> {
     const scopes = [query.policyId, query.customerId].filter((v) => v != null);
-    if (scopes.length !== 1) {
+    if (scopes.length > 1) {
       throw new UnprocessableEntityException(
-        'Provide exactly one of policyId or customerId.',
+        'Provide at most one of policyId or customerId.',
       );
+    }
+
+    if (scopes.length === 0) {
+      // The claims QUEUE — the Claims Officer's own work surface, and the
+      // only route to a claim for a caller with no policy or customer in
+      // hand. It did not exist before: this branch used to be a 422, which
+      // left the one role that works this entire book unable to list it.
+      //
+      // Visibility is the SAME rule the two scoped branches enforce per row
+      // via `assertCustomerVisible`, expressed as a query filter instead: a
+      // caller in `CLAIM_CROSS_OWNER_ROLES` passes `null` and reaches the
+      // whole book, everyone else is pinned to Customers they own. It has to
+      // be part of the query — paginating a read that was filtered afterwards
+      // would let the page size decide what the caller cannot see, which is
+      // exactly the `DpoWorkspaceService` defect.
+      const filter = {
+        ownerUserId: this.canReachAnyCustomer(actor) ? null : actor.id,
+        status: query.status,
+        search: query.search,
+        alertOpen: query.alertOpen === 'true',
+      };
+      const window = pageWindow(query.page);
+      const [rows, total] = await Promise.all([
+        this.claims.findManyForActor(filter, window),
+        this.claims.countForActor(filter),
+      ]);
+      // `entityId` names the scope, not a row — the ClaimsAnalytics precedent
+      // for a book-wide read. Counts and ids only, never claim content.
+      await this.auditSensitiveRead(
+        actor,
+        'Claim',
+        filter.ownerUserId === null ? 'queue:book-wide' : `queue:${actor.id}`,
+        rows.length > 0,
+        {
+          view: 'claims-queue',
+          count: rows.length,
+          total,
+          page: window.page,
+          claimIds: rows.map((r) => r.id),
+        },
+      );
+      return {
+        items: rows.map((r) => this.toView(r)),
+        total,
+        page: window.page,
+        pageSize: window.pageSize,
+      };
     }
 
     let rows: ClaimWithContext[];
@@ -1934,7 +1982,10 @@ export class ClaimService {
       claimIds: rows.map((r) => r.id),
     });
 
-    return rows.map((r) => this.toView(r));
+    // Same envelope as the queue branch, deliberately: one response shape per
+    // endpoint rather than one per branch. These two are bounded by
+    // construction (`CLAIM_LIST_LIMIT`), so the page control hides itself.
+    return wholeSet(rows.map((r) => this.toView(r)));
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<ClaimView> {
@@ -1956,6 +2007,14 @@ export class ClaimService {
    * audit anomaly detector (bulk / repeated sensitive reads) can see it.
    * Mirrors `CrmService.get360View`.
    */
+  /** The Claims Officer works the whole claims book (a cross-book
+   *  operational role), and Manager / Executive get the org-wide view. A
+   *  Sales/Relationship Officer holding `claim.read` sees only claims on a
+   *  Customer they own. Same list the per-row checks already trust. */
+  private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
+    return actor.roles.some((role) => CROSS_OWNER_ROLES.includes(role));
+  }
+
   private async auditSensitiveRead(
     actor: AuthenticatedUser,
     entityType: 'Claim' | 'Policy' | 'Customer',

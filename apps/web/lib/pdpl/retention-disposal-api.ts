@@ -13,6 +13,13 @@ export const DISPOSAL_METHODS = [
   'certified_shredding',
 ] as const;
 
+export type DisposalBatchStatus =
+  | 'NOMINATED'
+  | 'MANAGER_APPROVED'
+  | 'DPO_APPROVED'
+  | 'EXECUTED'
+  | 'CLOSED';
+
 export interface RetentionScheduleItem {
   id: string;
   recordCategory: string;
@@ -38,7 +45,7 @@ export interface LegalHold {
 export interface DisposalBatch {
   id: string;
   retentionScheduleItemId: string | null;
-  status: string;
+  status: DisposalBatchStatus;
   nominatedByUserId: string;
   managerApprovedAt: string | null;
   dpoApprovedByUserId: string | null;

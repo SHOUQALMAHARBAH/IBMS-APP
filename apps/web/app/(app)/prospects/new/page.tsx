@@ -1,21 +1,24 @@
 'use client';
 
 import { Suspense, useEffect } from 'react';
+import { SentenceWithLink } from '../../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { type Prospect } from '../../../../lib/prospect/prospect-api';
 import { ProspectConversionForm } from '../../../../components/prospect/ProspectConversionForm';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { hasPermission } from '../../../../lib/auth/permissions';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 
 // Roles the seeded permission grid grants `prospect.capture` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
 // same convention as leads/page.tsx's CAN_CREATE_LEAD_ROLES. The backend
 // independently enforces this on POST /prospects regardless.
-const CAN_CAPTURE_PROSPECT_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 function ConvertProspectForm() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   // leadFullName is a display-only prefill hint passed by the pipeline
   // board, which already holds the full Lead in memory — never trusted as
@@ -31,11 +34,11 @@ function ConvertProspectForm() {
   if (!leadId) {
     return (
       <p role="alert" style={errorStyle}>
-        No lead selected — go back to the{' '}
-        <button type="button" onClick={() => router.push('/leads')} style={{ textDecoration: 'underline' }}>
-          pipeline
-        </button>{' '}
-        and convert a qualified lead from there.
+        <SentenceWithLink
+          sentence={t('prospnNoLeadSelected')}
+          linkLabel={t('prospnPipelineLink')}
+          onLinkClick={() => router.push('/leads')}
+        />
       </p>
     );
   }
@@ -50,24 +53,23 @@ function ConvertProspectForm() {
 }
 
 export default function NewProspectPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
-  const canCaptureProspect = user.roles.some((role) => CAN_CAPTURE_PROSPECT_ROLES.includes(role));
+  const canCaptureProspect = hasPermission(user, 'prospect.capture');
 
   return (
     <main style={pageStyle}>
-      <h1>Qualify prospect</h1>
+      <h1>{t('prosnHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 2 — convert a qualified lead into a prospect and capture its qualification
-        profile (sector, activity, size, location, contact, products of interest, expected
-        premium).
+        {t('prosnIntro')}
       </p>
       {canCaptureProspect ? (
         <Suspense fallback={null}>
@@ -75,7 +77,7 @@ export default function NewProspectPage() {
         </Suspense>
       ) : (
         <p role="alert" style={errorStyle}>
-          You don&apos;t hold the prospect.capture permission, so there&apos;s nothing to do here.
+          {t('prosnNoPermission')}
         </p>
       )}
     </main>

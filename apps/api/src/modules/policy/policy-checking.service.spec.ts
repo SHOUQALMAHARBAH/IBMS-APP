@@ -18,6 +18,7 @@ import type { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
 function checker(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'chk-1',
+    organizationId: 'org-1',
     email: 'chk@ibms.test',
     roles: ['POLICY_CHECKING_OFFICER'],
     sessionId: 'session-1',

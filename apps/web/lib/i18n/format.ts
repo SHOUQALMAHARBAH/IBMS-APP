@@ -27,7 +27,11 @@ const AR_LOCALE = 'ar';
  *  business context expects, rather than US-style MM/DD/YYYY. */
 const EN_LOCALE = 'en-GB';
 
-const LOCALE_BY_LANGUAGE: Record<Language, string> = {
+/** Exported so `./plurals.ts` selects its CLDR category against the SAME
+ *  locale tags this file formats numbers and dates with. Two copies of
+ *  'ar' vs 'ar-JO' would eventually disagree, and the disagreement would
+ *  show up as a plural form that does not match the numeral beside it. */
+export const LOCALE_BY_LANGUAGE: Record<Language, string> = {
   AR: AR_LOCALE,
   EN: EN_LOCALE,
 };
@@ -51,6 +55,18 @@ export function formatMoney(
         maximumFractionDigits: 3,
       })}`
     : `${currency} ${value}`;
+}
+
+/**
+ * A plain number, grouped for the locale.
+ *
+ * Arabic resolves to `'ar'` rather than `'ar-JO'` (see the note on
+ * LOCALE_BY_LANGUAGE), so the digits stay Western and only the grouping
+ * separators follow the locale — which is what every other figure in this app
+ * does and what the placeholders deliberately do not fight.
+ */
+export function formatNumber(value: number, language: Language): string {
+  return value.toLocaleString(LOCALE_BY_LANGUAGE[language]);
 }
 
 /** Locale-aware `Date.prototype.toLocaleDateString()` replacement. */

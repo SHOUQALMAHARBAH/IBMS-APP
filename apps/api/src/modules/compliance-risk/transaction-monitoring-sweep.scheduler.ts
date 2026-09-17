@@ -1,14 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import {
   TransactionMonitoringService,
   type TransactionMonitoringSweepResult,
 } from './transaction-monitoring.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as the other schedulers.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 48 — "Monitor unusual patterns" (backlog Part C #48's first
@@ -24,24 +20,30 @@ export class TransactionMonitoringSweepScheduler {
   );
 
   constructor(
-    private readonly users: UserRepository,
     private readonly monitoring: TransactionMonitoringService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 09:00 UTC daily.
   @Cron('0 9 * * *', { name: 'transaction-monitoring-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Transaction-monitoring sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Transaction-monitoring sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     let result: TransactionMonitoringSweepResult;
     try {
-      result = await this.monitoring.runSweep(systemUser.id);
+      result = await this.monitoring.runSweep(systemUserId);
     } catch (err) {
       this.logger.error(
         `Transaction-monitoring sweep failed: ${(err as Error).message}`,

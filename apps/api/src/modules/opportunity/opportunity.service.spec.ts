@@ -16,6 +16,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'plc-1',
+    organizationId: 'org-1',
     email: 'placement@ibms.test',
     roles: ['PLACEMENT_TECHNICAL_OFFICER'],
     sessionId: 'session-1',

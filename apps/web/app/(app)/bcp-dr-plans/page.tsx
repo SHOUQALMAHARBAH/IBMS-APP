@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -15,13 +16,14 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
@@ -32,6 +34,7 @@ function isOverdue(nextTestDueAt: string | null): boolean {
 }
 
 export default function BcpDrPlansPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -48,7 +51,7 @@ export default function BcpDrPlansPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -58,20 +61,20 @@ export default function BcpDrPlansPage() {
       setCoverage(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the bcp-dr.manage permission."
+          ? t('bcpNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load BCP/DR plans — try again.',
+            : t('bcpLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -86,7 +89,7 @@ export default function BcpDrPlansPage() {
       setRpoHours('');
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not create the plan.');
+      setActionError(err instanceof ApiError ? err.message : t('bcpCreateError'));
     }
   }
 
@@ -102,7 +105,7 @@ export default function BcpDrPlansPage() {
       setTestingId(null);
       await load();
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not record the test.');
+      setActionError(err instanceof ApiError ? err.message : t('bcpRecordTestError'));
     }
   }
 
@@ -110,11 +113,9 @@ export default function BcpDrPlansPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Business Continuity &amp; Disaster Recovery</h1>
+      <h1>{t('bcpHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        A plan (with RTO/RPO and test history) for each of the five named
-        scenarios: system outage, office/site loss, cyberattack/ransomware,
-        key-staff unavailability, insurer-side service interruption.
+        {t('bcpIntro')}
       </p>
 
       {loadError ? (
@@ -133,16 +134,16 @@ export default function BcpDrPlansPage() {
           <section key={entry.scenario} style={sectionStyle}>
             <h2>
               {entry.scenario}{' '}
-              {entry.hasPlan ? null : <span style={{ color: '#b91c1c' }}>— no plan on file</span>}
+              {entry.hasPlan ? null : <span style={{ color: '#b91c1c' }}>{t('bcpNoPlanOnFile')}</span>}
             </h2>
             {entry.plans.length > 0 ? (
               <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                 <thead>
                   <tr>
-                    <th style={head}>RTO (hrs)</th>
-                    <th style={head}>RPO (hrs)</th>
-                    <th style={head}>Last tested</th>
-                    <th style={head}>Next test due</th>
+                    <th style={head}>{t('bcpColRto')}</th>
+                    <th style={head}>{t('bcpColRpo')}</th>
+                    <th style={head}>{t('bcpColLastTested')}</th>
+                    <th style={head}>{t('bcpColNextTestDue')}</th>
                     <th style={head} />
                   </tr>
                 </thead>
@@ -173,12 +174,12 @@ export default function BcpDrPlansPage() {
                               onChange={(e) => setNextTestDueAt(e.target.value)}
                             />{' '}
                             <button type="button" onClick={() => submitTest(plan.id)}>
-                              Save
+                              {t('commonSave')}
                             </button>
                           </>
                         ) : (
                           <button type="button" onClick={() => startTest(plan)}>
-                            Record test
+                            {t('bcpRecordTestButton')}
                           </button>
                         )}
                       </td>
@@ -190,30 +191,30 @@ export default function BcpDrPlansPage() {
           </section>
         ))
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('bcpLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Record a new plan</h2>
+        <h2>{t('bcpCreateHeading')}</h2>
         <label style={labelStyle}>
-          Scenario
+          {t('bcpScenario')}
           <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
             {BCP_DR_SCENARIOS.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {t(ENUM_LABEL.BcpDrScenario[s])}
               </option>
             ))}
           </select>
         </label>
         <label style={labelStyle}>
-          RTO (hours)
+          {t('bcpRtoHours')}
           <input type="number" min={0} value={rtoHours} onChange={(e) => setRtoHours(e.target.value)} />
         </label>
         <label style={labelStyle}>
-          RPO (hours)
+          {t('bcpRpoHours')}
           <input type="number" min={0} value={rpoHours} onChange={(e) => setRpoHours(e.target.value)} />
         </label>
-        <button type="submit">Record plan</button>
+        <button type="submit">{t('bcpSubmitButton')}</button>
       </form>
     </main>
   );

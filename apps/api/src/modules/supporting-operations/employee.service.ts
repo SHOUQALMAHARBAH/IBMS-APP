@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type {
   AccessDeprovisioningChecklist,
@@ -12,6 +13,7 @@ import type {
   SecurityAwarenessTraining,
 } from '@ibms/db';
 import { EmployeeRepository } from '../../repositories/employee.repository';
+import { DepartmentRepository } from '../../repositories/department.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
@@ -53,6 +55,7 @@ export class EmployeeService {
 
   constructor(
     private readonly employees: EmployeeRepository,
+    private readonly departments: DepartmentRepository,
     private readonly audit: AuditService,
     private readonly encryption: EncryptionService,
     private readonly reveal: SensitiveFieldRevealService,
@@ -79,12 +82,37 @@ export class EmployeeService {
         )
       : undefined;
 
+    // Spec §4.1.2 — the org-chart department, validated tenant-scoped so an
+    // Office A record can never be filed under an Office B department.
+    if (dto.departmentId) {
+      const department = await this.departments.findById(dto.departmentId);
+      if (!department) {
+        throw new UnprocessableEntityException(
+          "Unknown department. Pick one of this office's own departments.",
+        );
+      }
+    }
+
     if (dto.userId) {
       const user = await this.employees.findUserById(dto.userId);
       if (!user) throw new NotFoundException('User not found');
       if (user.employeeId) {
         throw new ConflictException(
           'This user account is already linked to another employee record',
+        );
+      }
+      // Refuse a department disagreement BEFORE creating anything. `linkUser`
+      // enforces the same rule atomically and is the real guard, but it runs
+      // after the Employee row exists — catching it here means a rejected
+      // request leaves nothing behind instead of an orphaned employee.
+      if (
+        dto.departmentId &&
+        user.departmentId &&
+        dto.departmentId !== user.departmentId
+      ) {
+        throw new ConflictException(
+          'This employee record and the account being linked name different departments. ' +
+            'Clear one of them, or link the account to an employee in its own department.',
         );
       }
     }
@@ -115,6 +143,7 @@ export class EmployeeService {
       familyName: dto.familyName,
       nationalIdEnc: encrypted.nationalIdEnc,
       position: dto.position,
+      departmentId: dto.departmentId,
       hireDate,
       licensedRole: dto.licensedRole,
       confidentialityAgreementSignedAt,
@@ -122,7 +151,17 @@ export class EmployeeService {
     });
 
     if (dto.userId) {
-      await this.employees.linkUser(employee.id, dto.userId);
+      const link = await this.employees.linkUser(employee.id, dto.userId);
+      // The pre-checks above already rejected every one of these, so reaching
+      // here means the state changed underneath us between then and now. Fail
+      // loudly rather than returning an employee whose account never linked.
+      if (link.outcome !== 'LINKED') {
+        throw new ConflictException(
+          link.outcome === 'DEPARTMENT_CONFLICT'
+            ? 'The account being linked names a different department than this employee record.'
+            : `Could not link that user account (${link.outcome}).`,
+        );
+      }
     }
 
     await this.safeAudit({

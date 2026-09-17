@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -88,7 +89,7 @@ test("lists Data Subject Requests with SLA state and the log form", async ({
     page.getByRole("heading", { name: "Data Subject Requests" }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "ACCESS" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "IN_PROGRESS" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "In progress" })).toBeVisible();
   await expect(page.getByLabel("Type")).toBeVisible();
   await expect(page.getByRole("button", { name: "Log request" })).toBeVisible();
   // IN_PROGRESS + DPO -> Fulfil / Partially fulfil / Reject / Assign visible;

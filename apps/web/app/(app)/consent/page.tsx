@@ -1,6 +1,8 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -14,30 +16,27 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
-const CONSENT_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'DATA_PROTECTION_OFFICER',
-];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 export default function ConsentPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.some((r) => CONSENT_ROLES.includes(r));
+  const { t } = useLanguage();
+  const canManage = hasPermission(user, 'consent.manage');
 
   const [rows, setRows] = useState<ConsentRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -63,23 +62,23 @@ export default function ConsentPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the consent.manage permission."
+          ? t('consNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load consent records — try again.',
+            : t('consLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -101,7 +100,7 @@ export default function ConsentPage() {
       await load(filterCustomerId.trim() || undefined);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'The submit failed — try again.',
+        err instanceof ApiError ? err.message : t('consSubmitError'),
       );
     } finally {
       setBusy(false);
@@ -121,7 +120,7 @@ export default function ConsentPage() {
       );
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'The request failed — try again.',
+        err instanceof ApiError ? err.message : t('consRequestError'),
       );
     } finally {
       setBusyId(null);
@@ -137,7 +136,7 @@ export default function ConsentPage() {
       await load(filterCustomerId.trim() || undefined);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'The withdrawal failed — try again.',
+        err instanceof ApiError ? err.message : t('consWithdrawError'),
       );
     } finally {
       setBusyId(null);
@@ -153,15 +152,9 @@ export default function ConsentPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Consent management</h1>
+      <h1>{t('consHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Capture a consent decision (grant or explicit decline) at a defined
-        touchpoint. Consent and contractual-necessity processing are always
-        two separate, independently-actionable controls (PRIV-SOP-04) —
-        marketing consent is never combined with any other purpose. Withdrawal
-        is a two-step flow: request it (starts a 2-business-day SLA clock),
-        then confirm it (reflects it in the register and, for a MARKETING
-        consent, immediately blocks further marketing sends).
+        {t('consIntro')}
       </p>
 
       {canManage ? (
@@ -177,9 +170,9 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Data subject
+            {t('consDataSubjectFieldLabel')}
             <select
-              aria-label="Data subject kind"
+              aria-label={t('consDataSubjectKindLabel')}
               value={ownerKind}
               onChange={(e) =>
                 setOwnerKind(
@@ -187,44 +180,53 @@ export default function ConsentPage() {
                 )
               }
             >
-              <option value="customer">Customer</option>
-              <option value="insuredPerson">Insured person</option>
-              <option value="lead">Lead</option>
+              <option value="customer">{t('consKindCustomer')}</option>
+              <option value="insuredPerson">{t('consKindInsuredPerson')}</option>
+              <option value="lead">{t('consKindLead')}</option>
             </select>
           </label>
-          <label
-            style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-          >
-            {ownerKind === 'customer'
-              ? 'Customer ID'
-              : ownerKind === 'insuredPerson'
-                ? 'Insured person ID'
-                : 'Lead ID'}
-            <input
-              aria-label={
-                ownerKind === 'customer'
-                  ? 'Customer ID'
-                  : ownerKind === 'insuredPerson'
-                    ? 'Insured person ID'
-                    : 'Lead ID'
-              }
+          {/* Only the customer branch gets a picker. An InsuredPerson has no
+              list endpoint and a Lead's is a different search entirely, so
+              those two keep the id field rather than get a picker that cannot
+              search anything. */}
+          {ownerKind === 'customer' ? (
+            <CustomerPicker
               value={ownerId}
-              onChange={(e) => setOwnerId(e.target.value)}
+              onChange={setOwnerId}
+              label={t('consCustomerIdLabel')}
               required
             />
-          </label>
+          ) : (
+            <label
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
+            >
+              {ownerKind === 'insuredPerson'
+                ? t('consInsuredPersonIdLabel')
+                : t('consLeadIdLabel')}
+              <input
+                aria-label={
+                  ownerKind === 'insuredPerson'
+                    ? t('consInsuredPersonIdLabel')
+                    : t('consLeadIdLabel')
+                }
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value)}
+                required
+              />
+            </label>
+          )}
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Purpose
+            {t('consPurposeLabel')}
             <select
-              aria-label="Purpose"
+              aria-label={t('consPurposeLabel')}
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
             >
               {CONSENT_PURPOSES.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {t(ENUM_LABEL.ConsentPurpose[p])}
                 </option>
               ))}
             </select>
@@ -232,30 +234,30 @@ export default function ConsentPage() {
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Decision
+            {t('consDecisionLabel')}
             <select
-              aria-label="Decision"
+              aria-label={t('consDecisionLabel')}
               value={decision}
               onChange={(e) => setDecision(e.target.value as 'grant' | 'decline')}
             >
-              <option value="grant">Grant</option>
-              <option value="decline">Decline</option>
+              <option value="grant">{t('consGrant')}</option>
+              <option value="decline">{t('consDecline')}</option>
             </select>
           </label>
           <label
             style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
           >
-            Consent text version
+            {t('consTextVersionLabel')}
             <input
-              aria-label="Consent text version"
-              placeholder="e.g. privacy-notice-v1.2"
+              aria-label={t('consTextVersionLabel')}
+              placeholder={t('consTextVersionPlaceholder')}
               value={consentTextVersion}
               onChange={(e) => setConsentTextVersion(e.target.value)}
               required
             />
           </label>
           <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-            {busy ? 'Saving…' : 'Record decision'}
+            {busy ? t('consSavingButton') : t('consRecordButton')}
           </button>
         </form>
       ) : null}
@@ -267,14 +269,14 @@ export default function ConsentPage() {
         <label
           style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
         >
-          Filter by customer ID
+          {t('consFilterLabel')}
           <input
-            aria-label="Filter by customer ID"
+            aria-label={t('consFilterLabel')}
             value={filterCustomerId}
             onChange={(e) => setFilterCustomerId(e.target.value)}
           />
         </label>
-        <button type="submit">Filter</button>
+        <button type="submit">{t('consFilterButton')}</button>
       </form>
 
       {notice ? <p style={{ opacity: 0.8 }}>{notice}</p> : null}
@@ -291,19 +293,19 @@ export default function ConsentPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No consent records.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('consNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '56rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Data subject</th>
-                  <th style={head}>Purpose</th>
-                  <th style={head}>Marketing</th>
-                  <th style={head}>Decision</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>Text version</th>
-                  <th style={head}>Actions</th>
+                  <th style={head}>{t('consDataSubjectLabel')}</th>
+                  <th style={head}>{t('consPurposeLabel')}</th>
+                  <th style={head}>{t('consColMarketing')}</th>
+                  <th style={head}>{t('consDecisionLabel')}</th>
+                  <th style={head}>{t('consColStatus')}</th>
+                  <th style={head}>{t('consColTextVersion')}</th>
+                  <th style={head}>{t('consColActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,13 +318,13 @@ export default function ConsentPage() {
                     </td>
                     <td style={cell}>{r.purpose}</td>
                     <td style={cell}>{r.isMarketing ? 'Yes' : 'No'}</td>
-                    <td style={cell}>{r.granted ? 'Granted' : 'Declined'}</td>
+                    <td style={cell}>{r.granted ? t('consStatusGranted') : t('consStatusDeclined')}</td>
                     <td style={cell}>
                       {r.withdrawnAt
                         ? `Withdrawn ${r.withdrawnAt.slice(0, 10)}`
                         : r.isActive
                           ? 'Active'
-                          : 'Never granted'}
+                          : t('consStatusNeverGranted')}
                     </td>
                     <td style={cell}>{r.consentTextVersion}</td>
                     <td style={cell}>
@@ -333,14 +335,14 @@ export default function ConsentPage() {
                             disabled={busyId === r.id}
                             onClick={() => void onRequestWithdrawal(r.id)}
                           >
-                            Request withdrawal
+                            {t('consRequestWithdrawal')}
                           </button>
                           <button
                             type="button"
                             disabled={busyId === r.id}
                             onClick={() => void onConfirmWithdrawal(r.id)}
                           >
-                            Confirm withdrawal
+                            {t('consConfirmWithdrawal')}
                           </button>
                         </div>
                       ) : (
@@ -353,7 +355,12 @@ export default function ConsentPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        // This page previously rendered NOTHING while fetching — one of the
+        // four states directive §2 requires. Guarded on loadError so the
+        // error and a "Loading…" line cannot appear together.
+        <p>{t('consLoading')}</p>
+      )}
     </main>
   );
 }

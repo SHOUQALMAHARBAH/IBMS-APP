@@ -1,15 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import {
   ScreeningService,
   type ScreeningBatchResult,
 } from './screening.service';
 import { SANCTIONS_RESCREEN_CRON } from '../compliance-risk/watchlist-sync.config';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as SlaTimerService/AccessRecertificationScheduler.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /** Process 3-4 / 49 — "Run sanctions/PEP/AML screening ... on a recurring
  * batch" (backlog Part C #3-4) / "a recurring batch against updated lists"
@@ -27,23 +23,29 @@ export class ScreeningBatchScheduler {
   private readonly logger = new Logger(ScreeningBatchScheduler.name);
 
   constructor(
-    private readonly users: UserRepository,
     private readonly screening: ScreeningService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   @Cron(SANCTIONS_RESCREEN_CRON, { name: 'recurring-screening-batch' })
   async runBatch(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Recurring screening batch skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Screening re-screen batch',
+      this.logger,
+      (systemUserId) => this.runBatchForOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async runBatchForOrganization(systemUserId: string): Promise<void> {
     let result: ScreeningBatchResult;
     try {
-      result = await this.screening.runRecurringBatch(systemUser.id);
+      result = await this.screening.runRecurringBatch(systemUserId);
     } catch (err) {
       this.logger.error(
         `Recurring screening batch could not run: ${(err as Error).message}`,

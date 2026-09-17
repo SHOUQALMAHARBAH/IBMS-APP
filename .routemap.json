@@ -1,0 +1,1532 @@
+{
+ "acknowledgePolicyReceipt": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(id)}/delivery/acknowledge-receipt",
+  "permission": "policy.deliver"
+ },
+ "activateSlaPolicy": {
+  "verb": "POST",
+  "path": "/sla/policies/${encodeURIComponent(id)}/activate",
+  "permission": "sla.policy.manage"
+ },
+ "addAsset": {
+  "verb": "POST",
+  "path": "/risk-profiles/${riskProfileId}/assets",
+  "permission": "risk-profile.create"
+ },
+ "addComplaintAction": {
+  "verb": "POST",
+  "path": "/complaints/${id}/actions",
+  "permission": "complaint.log"
+ },
+ "addCustomerDocument": {
+  "verb": "POST",
+  "path": "/customers/${customerId}/documents",
+  "permission": "kyc.capture"
+ },
+ "addRfqInsurers": {
+  "verb": "POST",
+  "path": "/rfqs/${rfqId}/insurers",
+  "permission": "rfq.create"
+ },
+ "addUbo": {
+  "verb": "POST",
+  "path": "/customers/${customerId}/ubos",
+  "permission": "ubo.record"
+ },
+ "advanceEndorsement": {
+  "verb": "POST",
+  "path": "/endorsements/${encodeURIComponent(id)}/advance",
+  "permission": "endorsement.create"
+ },
+ "applyDsrExtension": {
+  "verb": "POST",
+  "path": "/dsr/${id}/apply-extension",
+  "permission": "dsr.handle"
+ },
+ "applyEndorsement": {
+  "verb": "POST",
+  "path": "/endorsements/${encodeURIComponent(id)}/apply",
+  "permission": "endorsement.apply"
+ },
+ "approveCommissionOverride": {
+  "verb": "POST",
+  "path": "/commission/entries/${entryId}/override/approve",
+  "permission": "commission-override.approve"
+ },
+ "approveDataSharingApproval": {
+  "verb": "POST",
+  "path": "/data-sharing-approvals/${id}/approve",
+  "permission": "data-sharing.approve"
+ },
+ "approveEndorsementRefund": {
+  "verb": "POST",
+  "path": "/refunds/${encodeURIComponent(refundId)}/approve",
+  "permission": "refund.approve"
+ },
+ "approveKyc": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/approve",
+  "permission": "kyc.approve"
+ },
+ "approveNeedsAssessment": {
+  "verb": "POST",
+  "path": "/needs-assessments/${id}/approve",
+  "permission": "needs-assessment.approve"
+ },
+ "approveRecommendation": {
+  "verb": "POST",
+  "path": "/recommendations/${id}/approve",
+  "permission": "recommendation.approve"
+ },
+ "assembleInsuranceProgram": {
+  "verb": "POST",
+  "path": "/insurance-programs",
+  "permission": "program.assemble"
+ },
+ "assessIncidentImpact": {
+  "verb": "POST",
+  "path": "/incidents/${id}/assess-impact",
+  "permission": "incident.contain"
+ },
+ "assignComplaint": {
+  "verb": "POST",
+  "path": "/complaints/${id}/assign",
+  "permission": "complaint.log"
+ },
+ "assignDsr": {
+  "verb": "POST",
+  "path": "/dsr/${id}/assign",
+  "permission": "dsr.handle"
+ },
+ "assignServiceRequest": {
+  "verb": "POST",
+  "path": "/service-requests/${id}/assign",
+  "permission": "service-request.manage"
+ },
+ "attachClaimDocuments": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/documents",
+  "permission": "claim.document"
+ },
+ "attachPolicyDocuments": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(id)}/documents",
+  "permission": "document.manage"
+ },
+ "buildComparison": {
+  "verb": "POST",
+  "path": "/comparison-matrices",
+  "permission": "comparison.build"
+ },
+ "calculateCommission": {
+  "verb": "POST",
+  "path": "/commission/entries",
+  "permission": "commission.calculate"
+ },
+ "calculateEndorsementAdjustment": {
+  "verb": "POST",
+  "path": "/endorsements/${encodeURIComponent(id)}/calculate-adjustment",
+  "permission": "endorsement.apply"
+ },
+ "cancelServiceRequest": {
+  "verb": "POST",
+  "path": "/service-requests/${id}/cancel",
+  "permission": "service-request.manage"
+ },
+ "captureClientDecision": {
+  "verb": "POST",
+  "path": "/client-decisions",
+  "permission": "client-decision.capture"
+ },
+ "captureQuotation": {
+  "verb": "POST",
+  "path": "/quotations",
+  "permission": "quotation.capture"
+ },
+ "checkPolicy": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(id)}/checking",
+  "permission": "policy.check"
+ },
+ "classifyIncident": {
+  "verb": "POST",
+  "path": "/incidents/${id}/classify",
+  "permission": "incident.classify"
+ },
+ "closeClaim": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/closure",
+  "permission": "claim.close"
+ },
+ "closeComplaint": {
+  "verb": "POST",
+  "path": "/complaints/${id}/close",
+  "permission": "complaint.close"
+ },
+ "closeDisposalBatch": {
+  "verb": "POST",
+  "path": "/disposal-batches/${id}/close",
+  "permission": "retention.dispose.approve"
+ },
+ "closeDsr": {
+  "verb": "POST",
+  "path": "/dsr/${id}/close",
+  "permission": "dsr.close"
+ },
+ "closeIncident": {
+  "verb": "POST",
+  "path": "/incidents/${id}/close",
+  "permission": "incident.contain"
+ },
+ "closeInternalAuditFinding": {
+  "verb": "POST",
+  "path": "/internal-audit-findings/${id}/close",
+  "permission": "internal-audit.close"
+ },
+ "closeRetentionCase": {
+  "verb": "POST",
+  "path": "/retention-cases/${id}/close",
+  "permission": "retention-case.manage"
+ },
+ "closeRiskRegisterItem": {
+  "verb": "POST",
+  "path": "/risk-register/${id}/close",
+  "permission": "risk-register.manage"
+ },
+ "closeTransactionMonitoringAlert": {
+  "verb": "POST",
+  "path": "/transaction-monitoring-alerts/${id}/close",
+  "permission": "aml.monitor"
+ },
+ "coSignIncident": {
+  "verb": "POST",
+  "path": "/incidents/${id}/co-sign",
+  "permission": "incident.classify"
+ },
+ "completeDeprovisioningChecklist": {
+  "verb": "POST",
+  "path": "/employees/${employeeId}/deprovisioning-checklist/complete",
+  "permission": "deprovisioning.execute"
+ },
+ "completeTraining": {
+  "verb": "PATCH",
+  "path": "/employees/${employeeId}/trainings/${trainingId}/complete",
+  "permission": "training.record"
+ },
+ "computeEmployeePerformance": {
+  "verb": "POST",
+  "path": "/employee-performance/compute",
+  "permission": "employee-performance.view"
+ },
+ "computeInsurerPerformance": {
+  "verb": "POST",
+  "path": "/insurer-performance/compute",
+  "permission": "insurer-performance.view"
+ },
+ "confirmConsentWithdrawal": {
+  "verb": "POST",
+  "path": "/consent-records/${id}/confirm-withdrawal",
+  "permission": "consent.manage"
+ },
+ "confirmRetentionScheduleItem": {
+  "verb": "POST",
+  "path": "/retention-schedule/${id}/confirm",
+  "permission": "retention-schedule.manage"
+ },
+ "containIncident": {
+  "verb": "POST",
+  "path": "/incidents/${id}/contain",
+  "permission": "incident.contain"
+ },
+ "convertCrossSellOpportunity": {
+  "verb": "POST",
+  "path": "/cross-sell-opportunities/${id}/convert",
+  "permission": "cross-sell.convert"
+ },
+ "convertLeadToProspect": {
+  "verb": "POST",
+  "path": "/prospects",
+  "permission": "prospect.capture"
+ },
+ "convertUpSellRecommendation": {
+  "verb": "POST",
+  "path": "/up-sell-recommendations/${id}/convert",
+  "permission": "up-sell.convert"
+ },
+ "createBcpDrPlan": {
+  "verb": "POST",
+  "path": "/bcp-dr-plans",
+  "permission": "bcp-dr.manage"
+ },
+ "createBranch": {
+  "verb": "POST",
+  "path": "/admin/branches",
+  "permission": "user.manage"
+ },
+ "createBrokerLicense": {
+  "verb": "POST",
+  "path": "/broker-license",
+  "permission": "license.manage"
+ },
+ "createCommissionAgreement": {
+  "verb": "POST",
+  "path": "/commission/agreements",
+  "permission": "commission-rate.manage"
+ },
+ "createCommunication": {
+  "verb": "POST",
+  "path": "/communications",
+  "permission": "communication.send"
+ },
+ "createComplaint": {
+  "verb": "POST",
+  "path": "/complaints",
+  "permission": "complaint.log"
+ },
+ "createComplianceCalendarItem": {
+  "verb": "POST",
+  "path": "/compliance-calendar",
+  "permission": "compliance-calendar.manage"
+ },
+ "createConsentRecord": {
+  "verb": "POST",
+  "path": "/consent-records",
+  "permission": "consent.manage"
+ },
+ "createCrossBorderTransfer": {
+  "verb": "POST",
+  "path": "/cross-border-transfers",
+  "permission": "cross-border-transfer.approve"
+ },
+ "createCustomer": {
+  "verb": "POST",
+  "path": "/customers",
+  "permission": "customer.create"
+ },
+ "createDataSharingApproval": {
+  "verb": "POST",
+  "path": "/data-sharing-approvals",
+  "permission": "data-sharing.request"
+ },
+ "createDepartment": {
+  "verb": "POST",
+  "path": "/admin/departments",
+  "permission": "user.manage"
+ },
+ "createDocumentVersion": {
+  "verb": "POST",
+  "path": "/documents/${id}/versions",
+  "permission": "document.manage"
+ },
+ "createDpiaScreening": {
+  "verb": "POST",
+  "path": "/dpia-screenings",
+  "permission": "dpia.review"
+ },
+ "createDsr": {
+  "verb": "POST",
+  "path": "/dsr",
+  "permission": "dsr.log"
+ },
+ "createEmployee": {
+  "verb": "POST",
+  "path": "/employees",
+  "permission": "employee.manage"
+ },
+ "createFeedback": {
+  "verb": "POST",
+  "path": "/feedback",
+  "permission": "feedback.log"
+ },
+ "createIncident": {
+  "verb": "POST",
+  "path": "/incidents",
+  "permission": "incident.report"
+ },
+ "createInformationAsset": {
+  "verb": "POST",
+  "path": "/information-assets",
+  "permission": "information-asset.manage"
+ },
+ "createInternalAuditFinding": {
+  "verb": "POST",
+  "path": "/internal-audit-findings",
+  "permission": "internal-audit.record"
+ },
+ "createInvoice": {
+  "verb": "POST",
+  "path": "/invoices",
+  "permission": "invoice.create"
+ },
+ "createKnowledgeBaseArticle": {
+  "verb": "POST",
+  "path": "/knowledge-base-articles",
+  "permission": "kb.publish"
+ },
+ "createLead": {
+  "verb": "POST",
+  "path": "/leads",
+  "permission": "lead.create"
+ },
+ "createLegalHold": {
+  "verb": "POST",
+  "path": "/legal-holds",
+  "permission": "legal-hold.manage"
+ },
+ "createNeedsAssessment": {
+  "verb": "POST",
+  "path": "/needs-assessments",
+  "permission": "needs-assessment.create"
+ },
+ "createOpportunity": {
+  "verb": "POST",
+  "path": "/opportunities",
+  "permission": "opportunity.create"
+ },
+ "createPaymentChannel": {
+  "verb": "POST",
+  "path": "/payment-channels",
+  "permission": "payment-channel.manage"
+ },
+ "createPiPolicy": {
+  "verb": "POST",
+  "path": "/pi-policy",
+  "permission": "pi-policy.manage"
+ },
+ "createRetentionCase": {
+  "verb": "POST",
+  "path": "/retention-cases",
+  "permission": "retention-case.manage"
+ },
+ "createRetentionScheduleItem": {
+  "verb": "POST",
+  "path": "/retention-schedule",
+  "permission": "retention-schedule.manage"
+ },
+ "createRfq": {
+  "verb": "POST",
+  "path": "/rfqs",
+  "permission": "rfq.create"
+ },
+ "createRiskProfile": {
+  "verb": "POST",
+  "path": "/risk-profiles",
+  "permission": "risk-profile.create"
+ },
+ "createRiskRegisterItem": {
+  "verb": "POST",
+  "path": "/risk-register",
+  "permission": "risk-register.manage"
+ },
+ "createRopaEntry": {
+  "verb": "POST",
+  "path": "/ropa-entries",
+  "permission": "ropa.manage"
+ },
+ "createSalesTarget": {
+  "verb": "POST",
+  "path": "/sales-targets",
+  "permission": "sales-target.manage"
+ },
+ "createServiceRequest": {
+  "verb": "POST",
+  "path": "/service-requests",
+  "permission": "service-request.manage"
+ },
+ "createTransactionMonitoringAlert": {
+  "verb": "POST",
+  "path": "/transaction-monitoring-alerts",
+  "permission": "aml.monitor"
+ },
+ "createVendor": {
+  "verb": "POST",
+  "path": "/vendors",
+  "permission": "vendor.manage"
+ },
+ "createVendorDpa": {
+  "verb": "POST",
+  "path": "/vendors/${vendorId}/data-processing-agreements",
+  "permission": "vendor.manage"
+ },
+ "currentPrivacyNotice": {
+  "verb": "POST",
+  "path": "/privacy-notices",
+  "permission": "privacy-notice.publish"
+ },
+ "deactivateSlaPolicy": {
+  "verb": "POST",
+  "path": "/sla/policies/${encodeURIComponent(id)}/deactivate",
+  "permission": "sla.policy.manage"
+ },
+ "decideClaimAssessment": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/assessment/decision",
+  "permission": "claim.assess"
+ },
+ "decideRecertificationItem": {
+  "verb": "POST",
+  "path": "/access-recertification/items/${itemId}/decision",
+  "permission": "access-recertification.review"
+ },
+ "declineDataSharingApproval": {
+  "verb": "POST",
+  "path": "/data-sharing-approvals/${id}/decline",
+  "permission": "data-sharing.approve"
+ },
+ "deleteAsset": {
+  "verb": "DELETE",
+  "path": "/risk-profiles/${riskProfileId}/assets/${assetId}",
+  "permission": "risk-profile.create"
+ },
+ "deleteDocument": {
+  "verb": "DELETE",
+  "path": "/documents/${id}",
+  "permission": "document.delete-override"
+ },
+ "detectCrossSell": {
+  "verb": "POST",
+  "path": "/cross-sell-opportunities/detect",
+  "permission": "cross-sell.detect"
+ },
+ "detectReconciliation": {
+  "verb": "POST",
+  "path": "/reconciliation-exceptions/detect",
+  "permission": "reconciliation-exception.investigate"
+ },
+ "detectUpSell": {
+  "verb": "POST",
+  "path": "/up-sell-recommendations/detect",
+  "permission": "up-sell.detect"
+ },
+ "disablePaymentChannel": {
+  "verb": "POST",
+  "path": "/payment-channels/${id}/disable",
+  "permission": "payment-channel.manage"
+ },
+ "disableTotp": {
+  "verb": "POST",
+  "path": "/auth/mfa/totp/disable",
+  "permission": "(no @RequirePermissions)"
+ },
+ "discloseConflictOfInterest": {
+  "verb": "POST",
+  "path": "/recommendations/${id}/conflict-of-interest-disclosure",
+  "permission": "conflict-of-interest.disclose"
+ },
+ "dismissCrossSellOpportunity": {
+  "verb": "POST",
+  "path": "/cross-sell-opportunities/${id}/dismiss",
+  "permission": "cross-sell.convert"
+ },
+ "dismissUpSellRecommendation": {
+  "verb": "POST",
+  "path": "/up-sell-recommendations/${id}/dismiss",
+  "permission": "up-sell.convert"
+ },
+ "dpoApproveDisposalBatch": {
+  "verb": "POST",
+  "path": "/disposal-batches/${id}/dpo-approve",
+  "permission": "retention.dispose.approve"
+ },
+ "dpoApproveDpa": {
+  "verb": "POST",
+  "path": "/data-processing-agreements/${id}/dpo-approve",
+  "permission": "dpa.approve"
+ },
+ "draftRecommendation": {
+  "verb": "POST",
+  "path": "/recommendations",
+  "permission": "recommendation.draft"
+ },
+ "enrollTotp": {
+  "verb": "POST",
+  "path": "/auth/mfa/totp/enroll",
+  "permission": "(no @RequirePermissions)"
+ },
+ "escalateComplaint": {
+  "verb": "POST",
+  "path": "/complaints/${id}/escalate",
+  "permission": "complaint.escalate"
+ },
+ "escalateDpiaToFullDpia": {
+  "verb": "POST",
+  "path": "/dpia-screenings/${id}/escalate",
+  "permission": "dpia.review"
+ },
+ "escalateTransactionMonitoringAlert": {
+  "verb": "POST",
+  "path": "/transaction-monitoring-alerts/${id}/escalate",
+  "permission": "aml.escalate"
+ },
+ "executeDisposalBatch": {
+  "verb": "POST",
+  "path": "/disposal-batches/${id}/execute",
+  "permission": "retention.dispose.approve"
+ },
+ "exportRopaRegister": {
+  "verb": "GET",
+  "path": "/ropa-entries/export",
+  "permission": "ropa.manage"
+ },
+ "finalizeInsuranceProgram": {
+  "verb": "POST",
+  "path": "/insurance-programs/${id}/finalize",
+  "permission": "program.assemble"
+ },
+ "forgotPassword": {
+  "verb": "POST",
+  "path": "/auth/forgot-password",
+  "permission": "(no @RequirePermissions)"
+ },
+ "fulfilDsr": {
+  "verb": "POST",
+  "path": "/dsr/${id}/fulfil",
+  "permission": "dsr.handle"
+ },
+ "fulfilServiceRequest": {
+  "verb": "POST",
+  "path": "/service-requests/${id}/fulfil",
+  "permission": "service-request.manage"
+ },
+ "generatePlanningExport": {
+  "verb": "POST",
+  "path": "/planning-export",
+  "permission": "planning-export.generate"
+ },
+ "getBrokerLicense": {
+  "verb": "GET",
+  "path": "/broker-license",
+  "permission": "license.manage"
+ },
+ "getComparisonForRfq": {
+  "verb": "GET",
+  "path": "/comparison-matrices",
+  "permission": "comparison.read"
+ },
+ "getConsolidatedRiskProfiles": {
+  "verb": "GET",
+  "path": "/risk-profiles/consolidated",
+  "permission": "risk-profile.read"
+ },
+ "getCrossSellOpportunity": {
+  "verb": "GET",
+  "path": "/cross-sell-opportunities/${id}",
+  "permission": "cross-sell.read"
+ },
+ "getCurrentPiPolicy": {
+  "verb": "GET",
+  "path": "/pi-policy/current",
+  "permission": "pi-policy.manage"
+ },
+ "getCustomer": {
+  "verb": "GET",
+  "path": "/customers/${id}",
+  "permission": "customer.360-view.read"
+ },
+ "getCustomer360": {
+  "verb": "GET",
+  "path": "/customers/${customerId}/360-view",
+  "permission": "customer.360-view.read"
+ },
+ "getDocumentHistory": {
+  "verb": "GET",
+  "path": "/audit-trail/documents/${documentId}/history",
+  "permission": "document-history.read"
+ },
+ "getDpoWorkspaceSummary": {
+  "verb": "GET",
+  "path": "/dpo-workspace/summary",
+  "permission": "dpo-workspace.view"
+ },
+ "getEmployee": {
+  "verb": "GET",
+  "path": "/employees/${id}",
+  "permission": "employee.manage"
+ },
+ "getInsuranceProgram": {
+  "verb": "GET",
+  "path": "/insurance-programs/${id}",
+  "permission": "program.read"
+ },
+ "getKpiDashboardSummary": {
+  "verb": "GET",
+  "path": "/kpi-dashboard",
+  "permission": "kpi-dashboard.view"
+ },
+ "getKycRecord": {
+  "verb": "GET",
+  "path": "/kyc-records/${kycId}",
+  "permission": "(no @RequirePermissions)"
+ },
+ "getLatestEmployeePerformance": {
+  "verb": "GET",
+  "path": "/employee-performance/${employeeId}/latest",
+  "permission": "employee-performance.view"
+ },
+ "getLatestInsurerPerformance": {
+  "verb": "GET",
+  "path": "/insurer-performance/${insurerId}/latest",
+  "permission": "insurer-performance.view"
+ },
+ "getLossRatioBreakdown": {
+  "verb": "GET",
+  "path": "/claims-analytics/loss-ratio",
+  "permission": "claims-analytics.view"
+ },
+ "getMarketingConsentStatus": {
+  "verb": "GET",
+  "path": "/communications/consent-status",
+  "permission": "communication.send"
+ },
+ "getNeedsAssessment": {
+  "verb": "GET",
+  "path": "/needs-assessments/${id}",
+  "permission": "needs-assessment.read"
+ },
+ "getOpportunity": {
+  "verb": "GET",
+  "path": "/opportunities/${id}",
+  "permission": "opportunity.read"
+ },
+ "getPendingMatchCount": {
+  "verb": "GET",
+  "path": "/screening/matches/pending-count",
+  "permission": "sanctions-pep.screen"
+ },
+ "getPolicyFileClassification": {
+  "verb": "GET",
+  "path": "/documents/classification-summary",
+  "permission": "document.manage"
+ },
+ "getPortfolioAnalysis": {
+  "verb": "GET",
+  "path": "/portfolio-analysis",
+  "permission": "portfolio-analysis.view"
+ },
+ "getProfitabilityAnalysis": {
+  "verb": "GET",
+  "path": "/profitability-analysis",
+  "permission": "profitability-analysis.view"
+ },
+ "getProspect": {
+  "verb": "GET",
+  "path": "/prospects/${id}",
+  "permission": "prospect.read"
+ },
+ "getQuestionnaire": {
+  "verb": "GET",
+  "path": "/needs-assessments/questionnaire",
+  "permission": "needs-assessment.read"
+ },
+ "getRenewalCase": {
+  "verb": "GET",
+  "path": "/renewal-cases/${encodeURIComponent(id)}",
+  "permission": "renewal.read"
+ },
+ "getRfq": {
+  "verb": "GET",
+  "path": "/rfqs/${id}",
+  "permission": "rfq.read"
+ },
+ "getRiskProfile": {
+  "verb": "GET",
+  "path": "/risk-profiles/${id}",
+  "permission": "risk-profile.read"
+ },
+ "getScreeningConfig": {
+  "verb": "GET",
+  "path": "/screening/providers/config",
+  "permission": "sanctions-pep.screen"
+ },
+ "getScreeningHealth": {
+  "verb": "GET",
+  "path": "/screening/providers/health",
+  "permission": "sanctions-pep.screen"
+ },
+ "getScreeningHold": {
+  "verb": "GET",
+  "path": "/kyc-records/${kycId}/screening-hold",
+  "permission": "(no @RequirePermissions)"
+ },
+ "getScreeningOverview": {
+  "verb": "GET",
+  "path": "/screening/overview",
+  "permission": "sanctions-pep.screen"
+ },
+ "getSecurityConfig": {
+  "verb": "GET",
+  "path": "/auth/security-config",
+  "permission": "security-config.read"
+ },
+ "getSelfApprovalAudit": {
+  "verb": "GET",
+  "path": "/internal-controls/self-approval-audit",
+  "permission": "internal-controls.view"
+ },
+ "getSlaDashboardSummary": {
+  "verb": "GET",
+  "path": "/sla-dashboard/summary",
+  "permission": "sla-dashboard.view"
+ },
+ "getSlaPolicy": {
+  "verb": "GET",
+  "path": "/sla/policies/${encodeURIComponent(id)}",
+  "permission": "sla.policy.read"
+ },
+ "getUpSellRecommendation": {
+  "verb": "GET",
+  "path": "/up-sell-recommendations/${id}",
+  "permission": "up-sell.read"
+ },
+ "getVendor": {
+  "verb": "GET",
+  "path": "/vendors/${id}",
+  "permission": "vendor.manage"
+ },
+ "getVendorDataShareReadiness": {
+  "verb": "GET",
+  "path": "/vendors/${id}/data-share-readiness",
+  "permission": "vendor.manage"
+ },
+ "getWatchlistSyncStatus": {
+  "verb": "GET",
+  "path": "/watchlist-sync/status",
+  "permission": "sanctions-pep.screen"
+ },
+ "getWorkflowHistory": {
+  "verb": "GET",
+  "path": "/audit-trail/workflow-history",
+  "permission": "workflow-history.read"
+ },
+ "grantRole": {
+  "verb": "POST",
+  "path": "/admin/users/${encodeURIComponent(userId)}/roles",
+  "permission": "user.manage"
+ },
+ "heartbeat": {
+  "verb": "POST",
+  "path": "/auth/session/heartbeat",
+  "permission": "(no @RequirePermissions)"
+ },
+ "investigateReconciliationException": {
+  "verb": "POST",
+  "path": "/reconciliation-exceptions/${id}/investigate",
+  "permission": "reconciliation-exception.investigate"
+ },
+ "issueCertificateOfDestruction": {
+  "verb": "POST",
+  "path": "/disposal-batches/${id}/certificate",
+  "permission": "retention.dispose.approve"
+ },
+ "listBcpDrPlans": {
+  "verb": "GET",
+  "path": "/bcp-dr-plans/coverage",
+  "permission": "bcp-dr.manage"
+ },
+ "listBranches": {
+  "verb": "GET",
+  "path": "/admin/branches",
+  "permission": "user.manage"
+ },
+ "listClaimsForPolicy": {
+  "verb": "GET",
+  "path": "/claims",
+  "permission": "claim.read"
+ },
+ "listClientDecisionsForOpportunity": {
+  "verb": "GET",
+  "path": "/client-decisions",
+  "permission": "client-decision.read"
+ },
+ "listCommissionEntriesForPolicy": {
+  "verb": "GET",
+  "path": "/commission/entries",
+  "permission": "financial-report.view"
+ },
+ "listCommissionInsurers": {
+  "verb": "GET",
+  "path": "/commission/insurers",
+  "permission": "commission-rate.manage"
+ },
+ "listCrossBorderTransfers": {
+  "verb": "GET",
+  "path": "/cross-border-transfers",
+  "permission": "cross-border-transfer.approve"
+ },
+ "listCrossSellOpportunities": {
+  "verb": "GET",
+  "path": "/cross-sell-opportunities",
+  "permission": "cross-sell.read"
+ },
+ "listCustomerDocuments": {
+  "verb": "GET",
+  "path": "/customers/${customerId}/documents",
+  "permission": "customer.360-view.read"
+ },
+ "listDepartments": {
+  "verb": "GET",
+  "path": "/admin/departments",
+  "permission": "user.manage"
+ },
+ "listEmployees": {
+  "verb": "GET",
+  "path": "/employees",
+  "permission": "employee.manage"
+ },
+ "listEndorsementsForPolicy": {
+  "verb": "GET",
+  "path": "/policies/${encodeURIComponent(policyId)}/endorsements",
+  "permission": "endorsement.read"
+ },
+ "listInsurancePrograms": {
+  "verb": "GET",
+  "path": "/insurance-programs",
+  "permission": "program.read"
+ },
+ "listInteractions": {
+  "verb": "GET",
+  "path": "/customers/${customerId}/interactions",
+  "permission": "customer.360-view.read"
+ },
+ "listInvoicesForPolicy": {
+  "verb": "GET",
+  "path": "/invoices",
+  "permission": "client-accounting.read"
+ },
+ "listMyRecertificationItems": {
+  "verb": "GET",
+  "path": "/access-recertification/items",
+  "permission": "access-recertification.review"
+ },
+ "listOpportunities": {
+  "verb": "GET",
+  "path": "/opportunities",
+  "permission": "opportunity.read"
+ },
+ "listPiPolicies": {
+  "verb": "GET",
+  "path": "/pi-policy",
+  "permission": "pi-policy.manage"
+ },
+ "listPoliciesForOpportunity": {
+  "verb": "GET",
+  "path": "/policies",
+  "permission": "policy.read"
+ },
+ "listQuotationsForOpportunity": {
+  "verb": "GET",
+  "path": "/quotations",
+  "permission": "quotation.read"
+ },
+ "listQuotationsForRfq": {
+  "verb": "GET",
+  "path": "/quotations",
+  "permission": "quotation.read"
+ },
+ "listRecommendationsForOpportunity": {
+  "verb": "GET",
+  "path": "/recommendations",
+  "permission": "recommendation.read"
+ },
+ "listRetentionSchedule": {
+  "verb": "GET",
+  "path": "/retention-schedule",
+  "permission": "retention-schedule.manage"
+ },
+ "listRfqCommunications": {
+  "verb": "GET",
+  "path": "/rfqs/${rfqId}/communications",
+  "permission": "rfq.read"
+ },
+ "listRfqs": {
+  "verb": "GET",
+  "path": "/rfqs",
+  "permission": "rfq.read"
+ },
+ "listRiskProfiles": {
+  "verb": "GET",
+  "path": "/risk-profiles",
+  "permission": "risk-profile.read"
+ },
+ "listRopaEntries": {
+  "verb": "GET",
+  "path": "/ropa-entries",
+  "permission": "ropa.manage"
+ },
+ "listScreeningMatches": {
+  "verb": "GET",
+  "path": "/screening/matches",
+  "permission": "sanctions-pep.screen"
+ },
+ "listSelectableInsurers": {
+  "verb": "GET",
+  "path": "/rfqs/selectable-insurers",
+  "permission": "rfq.create"
+ },
+ "listUbos": {
+  "verb": "GET",
+  "path": "/customers/${customerId}/ubos",
+  "permission": "customer.360-view.read"
+ },
+ "listUpSellRecommendations": {
+  "verb": "GET",
+  "path": "/up-sell-recommendations",
+  "permission": "up-sell.read"
+ },
+ "listUsers": {
+  "verb": "GET",
+  "path": "/admin/users",
+  "permission": "user.manage"
+ },
+ "listVendorDpas": {
+  "verb": "GET",
+  "path": "/vendors/${vendorId}/data-processing-agreements",
+  "permission": "vendor.manage"
+ },
+ "logInteraction": {
+  "verb": "POST",
+  "path": "/customers/${customerId}/interactions",
+  "permission": "interaction.log"
+ },
+ "logPiRiskEvent": {
+  "verb": "POST",
+  "path": "/pi-risk-events",
+  "permission": "pi-policy.manage"
+ },
+ "logRfqCommunication": {
+  "verb": "POST",
+  "path": "/rfqs/${rfqId}/communications",
+  "permission": "rfq.communication.log"
+ },
+ "managerApproveDisposalBatch": {
+  "verb": "POST",
+  "path": "/disposal-batches/${id}/manager-approve",
+  "permission": "retention.dispose.nominate"
+ },
+ "markBrokerLicenseLapsed": {
+  "verb": "POST",
+  "path": "/broker-license/mark-lapsed",
+  "permission": "license.manage"
+ },
+ "me": {
+  "verb": "GET",
+  "path": "/auth/me",
+  "permission": "(no @RequirePermissions)"
+ },
+ "nominateDisposalBatch": {
+  "verb": "POST",
+  "path": "/disposal-batches",
+  "permission": "retention.dispose.nominate"
+ },
+ "notifyClaim": {
+  "verb": "POST",
+  "path": "/claims",
+  "permission": "claim.notify"
+ },
+ "notifyEndorsementClient": {
+  "verb": "POST",
+  "path": "/endorsements/${encodeURIComponent(id)}/notify-client",
+  "permission": "endorsement.apply"
+ },
+ "notifyIncidentAffectedSubjects": {
+  "verb": "POST",
+  "path": "/incidents/${id}/notify-affected-subjects",
+  "permission": "incident.notify-regulator"
+ },
+ "notifyIncidentRegulators": {
+  "verb": "POST",
+  "path": "/incidents/${id}/notify-regulators",
+  "permission": "incident.notify-regulator"
+ },
+ "notifyIncidentSeniorManagement": {
+  "verb": "POST",
+  "path": "/incidents/${id}/notify-senior-management",
+  "permission": "incident.classify"
+ },
+ "overrideDeletionLock": {
+  "verb": "POST",
+  "path": "/documents/${id}/deletion-override",
+  "permission": "document.delete-override"
+ },
+ "partiallyFulfilDsr": {
+  "verb": "POST",
+  "path": "/dsr/${id}/partially-fulfil",
+  "permission": "dsr.handle"
+ },
+ "placePolicy": {
+  "verb": "POST",
+  "path": "/policies",
+  "permission": "policy.create"
+ },
+ "provisionUser": {
+  "verb": "POST",
+  "path": "/admin/users",
+  "permission": "user.manage"
+ },
+ "raiseCommissionOverride": {
+  "verb": "POST",
+  "path": "/commission/entries/${entryId}/override",
+  "permission": "commission-override.raise"
+ },
+ "reassembleInsuranceProgram": {
+  "verb": "POST",
+  "path": "/insurance-programs/${id}/reassemble",
+  "permission": "program.assemble"
+ },
+ "reconcileInvoice": {
+  "verb": "POST",
+  "path": "/invoices/${invoiceId}/reconcile",
+  "permission": "receipt.record"
+ },
+ "recordAdjusterProgress": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/assessment/adjuster-progress",
+  "permission": "claim.assess"
+ },
+ "recordBcpDrPlanTest": {
+  "verb": "POST",
+  "path": "/bcp-dr-plans/${id}/record-test",
+  "permission": "bcp-dr.manage"
+ },
+ "recordClaimSettlement": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/settlement",
+  "permission": "claim.settle.approve"
+ },
+ "recordComplianceSubmission": {
+  "verb": "POST",
+  "path": "/compliance-calendar/${id}/record-submission",
+  "permission": "compliance-calendar.manage"
+ },
+ "recordDpiaReview": {
+  "verb": "POST",
+  "path": "/dpia-screenings/${id}/review",
+  "permission": "dpia.review"
+ },
+ "recordDpiaSpotCheck": {
+  "verb": "POST",
+  "path": "/dpia-screenings/${id}/spot-check",
+  "permission": "dpia.review"
+ },
+ "recordInternalAuditFindingRemediation": {
+  "verb": "POST",
+  "path": "/internal-audit-findings/${id}/remediation",
+  "permission": "internal-audit.record"
+ },
+ "recordPiClaimsHistory": {
+  "verb": "POST",
+  "path": "/pi-policy/${id}/claims-history",
+  "permission": "pi-policy.manage"
+ },
+ "recordPiRiskEventMitigation": {
+  "verb": "POST",
+  "path": "/pi-risk-events/${id}/mitigation",
+  "permission": "pi-policy.manage"
+ },
+ "recordPolicyDelivery": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(id)}/delivery",
+  "permission": "policy.deliver"
+ },
+ "recordPolicyIssuance": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(id)}/issuance",
+  "permission": "policy.issue"
+ },
+ "recordPrivacyNoticeLegalReview": {
+  "verb": "POST",
+  "path": "/privacy-notices/${id}/legal-review",
+  "permission": "privacy-notice.publish"
+ },
+ "recordReceipt": {
+  "verb": "POST",
+  "path": "/invoices/${invoiceId}/receipt",
+  "permission": "receipt.record"
+ },
+ "recordRemittance": {
+  "verb": "POST",
+  "path": "/invoices/${invoiceId}/remittance",
+  "permission": "remittance.record"
+ },
+ "recordRiskRegisterMitigation": {
+  "verb": "POST",
+  "path": "/risk-register/${id}/mitigation",
+  "permission": "risk-register.manage"
+ },
+ "recordTraining": {
+  "verb": "POST",
+  "path": "/employees/${employeeId}/trainings",
+  "permission": "training.record"
+ },
+ "recordVendorAnnualReview": {
+  "verb": "POST",
+  "path": "/vendors/${id}/annual-review",
+  "permission": "vendor.manage"
+ },
+ "recoverIncident": {
+  "verb": "POST",
+  "path": "/incidents/${id}/recover",
+  "permission": "incident.contain"
+ },
+ "registerClaim": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/registration",
+  "permission": "claim.register"
+ },
+ "rejectDsr": {
+  "verb": "POST",
+  "path": "/dsr/${id}/reject",
+  "permission": "dsr.handle"
+ },
+ "rejectKyc": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/reject",
+  "permission": "kyc.approve"
+ },
+ "rejectNeedsAssessment": {
+  "verb": "POST",
+  "path": "/needs-assessments/${id}/reject",
+  "permission": "needs-assessment.approve"
+ },
+ "releaseLegalHold": {
+  "verb": "POST",
+  "path": "/legal-holds/${id}/release",
+  "permission": "legal-hold.manage"
+ },
+ "renewBrokerLicense": {
+  "verb": "POST",
+  "path": "/broker-license/renew",
+  "permission": "license.manage"
+ },
+ "reopenInsuranceProgram": {
+  "verb": "POST",
+  "path": "/insurance-programs/${id}/reopen",
+  "permission": "program.assemble"
+ },
+ "reportTransactionMonitoringAlertToAuthority": {
+  "verb": "POST",
+  "path": "/transaction-monitoring-alerts/${id}/report-to-authority",
+  "permission": "aml.escalate"
+ },
+ "requestCancellation": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(policyId)}/cancellation",
+  "permission": "cancellation.create"
+ },
+ "requestConsentWithdrawal": {
+  "verb": "POST",
+  "path": "/consent-records/${id}/request-withdrawal",
+  "permission": "consent.manage"
+ },
+ "requestEndorsement": {
+  "verb": "POST",
+  "path": "/policies/${encodeURIComponent(policyId)}/endorsements",
+  "permission": "endorsement.create"
+ },
+ "rerunScreening": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/rerun-screening",
+  "permission": "screening.run"
+ },
+ "resetPassword": {
+  "verb": "POST",
+  "path": "/auth/reset-password",
+  "permission": "(no @RequirePermissions)"
+ },
+ "resolveClaimFollowUpAlert": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/follow-up-alerts/${encodeURIComponent(\n      alertId,\n    )}/resolve",
+  "permission": "claim.followup.manage"
+ },
+ "resolveComplaint": {
+  "verb": "POST",
+  "path": "/complaints/${id}/resolve",
+  "permission": "complaint.log"
+ },
+ "resolveReconciliationException": {
+  "verb": "POST",
+  "path": "/reconciliation-exceptions/${id}/resolve",
+  "permission": "reconciliation-exception.resolve"
+ },
+ "returnNeedsAssessment": {
+  "verb": "POST",
+  "path": "/needs-assessments/${id}/return",
+  "permission": "needs-assessment.approve"
+ },
+ "revealCustomerField": {
+  "verb": "POST",
+  "path": "/customers/${id}/reveal-field",
+  "permission": "customer.360-view.read"
+ },
+ "revealEmployeeField": {
+  "verb": "POST",
+  "path": "/employees/${id}/reveal-field",
+  "permission": "employee.manage"
+ },
+ "reviewLegalHold": {
+  "verb": "POST",
+  "path": "/legal-holds/${id}/review",
+  "permission": "legal-hold.manage"
+ },
+ "reviewNeedsAssessment": {
+  "verb": "POST",
+  "path": "/needs-assessments/${id}/review",
+  "permission": "needs-assessment.approve"
+ },
+ "reviewScreeningMatch": {
+  "verb": "POST",
+  "path": "/screening/matches/${encodeURIComponent(id)}/review",
+  "permission": "sanctions-pep.screen"
+ },
+ "reviseQuotation": {
+  "verb": "POST",
+  "path": "/quotations/${id}/revise",
+  "permission": "quotation.negotiate"
+ },
+ "revokeRole": {
+  "verb": "POST",
+  "path": "/admin/users/${encodeURIComponent(userId)}/roles/revoke",
+  "permission": "user.manage"
+ },
+ "revokeVendorAccess": {
+  "verb": "POST",
+  "path": "/vendors/${id}/revoke-access",
+  "permission": "vendor.manage"
+ },
+ "runClaimFollowUpSweep": {
+  "verb": "POST",
+  "path": "/claims/follow-up-sweep",
+  "permission": "claim.followup.manage"
+ },
+ "runRecurringScreeningBatch": {
+  "verb": "POST",
+  "path": "/screening/recurring-batch",
+  "permission": "sanctions-pep.screen"
+ },
+ "runRenewalSweep": {
+  "verb": "POST",
+  "path": "/renewal-cases/detect",
+  "permission": "renewal.manage"
+ },
+ "runRetentionSweep": {
+  "verb": "POST",
+  "path": "/retention-cases/sweep",
+  "permission": "retention-case.manage"
+ },
+ "runScreening": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/run-screening",
+  "permission": "screening.run"
+ },
+ "runTransactionMonitoringSweep": {
+  "verb": "POST",
+  "path": "/transaction-monitoring-alerts/detect",
+  "permission": "aml.monitor"
+ },
+ "runWatchlistSync": {
+  "verb": "POST",
+  "path": "/watchlist-sync/run",
+  "permission": "sanctions-pep.screen"
+ },
+ "scheduleReview": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/schedule-review",
+  "permission": "kyc.review.schedule"
+ },
+ "secondApproveClaimSettlement": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/settlement/second-approve",
+  "permission": "claim.settle.second-approve"
+ },
+ "sendRecommendation": {
+  "verb": "POST",
+  "path": "/recommendations/${id}/send",
+  "permission": "recommendation.send"
+ },
+ "setRenewalFlags": {
+  "verb": "PATCH",
+  "path": "/renewal-cases/${encodeURIComponent(id)}/flags",
+  "permission": "renewal.manage"
+ },
+ "setTargetPremiumThreshold": {
+  "verb": "PATCH",
+  "path": "/opportunities/${id}/target-premium-threshold",
+  "permission": "opportunity.set-target-threshold"
+ },
+ "setVendorRiskTier": {
+  "verb": "PATCH",
+  "path": "/vendors/${id}/risk-tier",
+  "permission": "vendor.manage"
+ },
+ "settleCommission": {
+  "verb": "POST",
+  "path": "/commission/entries/${entryId}/settle",
+  "permission": "commission.reconcile"
+ },
+ "signDpa": {
+  "verb": "POST",
+  "path": "/data-processing-agreements/${id}/sign",
+  "permission": "vendor.manage"
+ },
+ "startComplaint": {
+  "verb": "POST",
+  "path": "/complaints/${id}/start",
+  "permission": "complaint.log"
+ },
+ "startDsr": {
+  "verb": "POST",
+  "path": "/dsr/${id}/start",
+  "permission": "dsr.handle"
+ },
+ "startKyc": {
+  "verb": "POST",
+  "path": "/customers/${customerId}/kyc",
+  "permission": "kyc.capture"
+ },
+ "startRecertificationCycle": {
+  "verb": "POST",
+  "path": "/access-recertification/cycles",
+  "permission": "access-recertification.cycle.start"
+ },
+ "startServiceRequest": {
+  "verb": "POST",
+  "path": "/service-requests/${id}/start",
+  "permission": "service-request.manage"
+ },
+ "stepUp": {
+  "verb": "POST",
+  "path": "/auth/step-up",
+  "permission": "(no @RequirePermissions)"
+ },
+ "submitClaimForAssessment": {
+  "verb": "POST",
+  "path": "/claims/${encodeURIComponent(claimId)}/assessment/submit",
+  "permission": "claim.assess"
+ },
+ "submitKyc": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/submit",
+  "permission": "kyc.capture"
+ },
+ "submitNeedsAssessment": {
+  "verb": "POST",
+  "path": "/needs-assessments/${id}/submit",
+  "permission": "needs-assessment.create"
+ },
+ "terminateEmployee": {
+  "verb": "POST",
+  "path": "/employees/${employeeId}/terminate",
+  "permission": "deprovisioning.execute"
+ },
+ "terminateVendor": {
+  "verb": "POST",
+  "path": "/vendors/${id}/terminate",
+  "permission": "vendor.manage"
+ },
+ "transitionLead": {
+  "verb": "POST",
+  "path": "/leads/${leadId}/transition",
+  "permission": "lead.transition"
+ },
+ "transitionRenewalCase": {
+  "verb": "POST",
+  "path": "/renewal-cases/${encodeURIComponent(id)}/transition",
+  "permission": "renewal.manage"
+ },
+ "transitionRfqInsurer": {
+  "verb": "POST",
+  "path": "/rfq-insurers/${submissionId}/transition",
+  "permission": "rfq.insurer.update"
+ },
+ "triggerEdd": {
+  "verb": "POST",
+  "path": "/kyc-records/${kycId}/trigger-edd",
+  "permission": "kyc.edd.trigger"
+ },
+ "updateAsset": {
+  "verb": "PATCH",
+  "path": "/risk-profiles/${riskProfileId}/assets/${assetId}",
+  "permission": "risk-profile.create"
+ },
+ "updateBcpDrPlan": {
+  "verb": "PATCH",
+  "path": "/bcp-dr-plans/${id}",
+  "permission": "bcp-dr.manage"
+ },
+ "updateDeprovisioningChecklist": {
+  "verb": "PATCH",
+  "path": "/employees/${employeeId}/deprovisioning-checklist",
+  "permission": "deprovisioning.execute"
+ },
+ "updateInformationAsset": {
+  "verb": "PATCH",
+  "path": "/information-assets/${id}",
+  "permission": "information-asset.manage"
+ },
+ "updateKnowledgeBaseArticle": {
+  "verb": "PATCH",
+  "path": "/knowledge-base-articles/${id}",
+  "permission": "kb.publish"
+ },
+ "updateLanguagePreference": {
+  "verb": "PATCH",
+  "path": "/auth/me/language",
+  "permission": "(no @RequirePermissions)"
+ },
+ "updateNeedsAssessment": {
+  "verb": "PATCH",
+  "path": "/needs-assessments/${id}",
+  "permission": "needs-assessment.create"
+ },
+ "updateRetentionScheduleItem": {
+  "verb": "PATCH",
+  "path": "/retention-schedule/${id}",
+  "permission": "retention-schedule.manage"
+ },
+ "updateRopaEntry": {
+  "verb": "PATCH",
+  "path": "/ropa-entries/${id}",
+  "permission": "ropa.manage"
+ },
+ "updateSalesTarget": {
+  "verb": "PATCH",
+  "path": "/sales-targets/${id}",
+  "permission": "sales-target.manage"
+ },
+ "updateSecurityConfig": {
+  "verb": "PUT",
+  "path": "/auth/security-config",
+  "permission": "security-config.manage"
+ },
+ "updateSlaPolicy": {
+  "verb": "PATCH",
+  "path": "/sla/policies/${encodeURIComponent(id)}",
+  "permission": "sla.policy.manage"
+ },
+ "updateSlaPolicySource": {
+  "verb": "PATCH",
+  "path": "/sla/policies/${encodeURIComponent(id)}/source",
+  "permission": "sla.policy.regulatory"
+ },
+ "updateVendor": {
+  "verb": "PATCH",
+  "path": "/vendors/${id}",
+  "permission": "vendor.manage"
+ },
+ "verifyDsrIdentity": {
+  "verb": "POST",
+  "path": "/dsr/${id}/verify-identity",
+  "permission": "dsr.handle"
+ },
+ "verifyMfaChallenge": {
+  "verb": "POST",
+  "path": "/auth/logout",
+  "permission": "(no @RequirePermissions)"
+ },
+ "verifyTotpEnrollment": {
+  "verb": "POST",
+  "path": "/auth/mfa/totp/enroll/verify",
+  "permission": "(no @RequirePermissions)"
+ }
+}

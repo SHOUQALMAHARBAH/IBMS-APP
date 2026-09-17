@@ -34,10 +34,16 @@ export class RetentionScheduleRepository {
     });
   }
 
+  /** `findFirst`, not `findUnique`: multi-tenancy Phase 1 step 5 moved the
+   * UNIQUE to (organizationId, recordCategory), because each office keeps its
+   * OWN PDPL retention schedule — a global unique on `recordCategory` meant
+   * only one office on the platform could have a "customer_kyc" row at all.
+   * Equivalent while one Organization exists. PHASE 2 must scope this to the
+   * resolved organizationId and restore a unique read. */
   findByRecordCategory(
     recordCategory: string,
   ): Promise<RetentionScheduleItem | null> {
-    return this.prisma.client.retentionScheduleItem.findUnique({
+    return this.prisma.client.retentionScheduleItem.findFirst({
       where: { recordCategory },
     });
   }

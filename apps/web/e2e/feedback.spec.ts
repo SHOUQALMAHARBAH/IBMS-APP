@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -64,7 +65,7 @@ test("lists feedback with score/comments and the log form", async ({
   await expect(
     page.getByRole("cell", { name: "The adjuster was responsive throughout." }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "post_issuance" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "After policy issuance" })).toBeVisible();
   await expect(page.getByLabel("Context")).toBeVisible();
   await expect(page.getByLabel("Score")).toBeVisible();
   await expect(

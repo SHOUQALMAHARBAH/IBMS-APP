@@ -28,14 +28,8 @@ import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCapture
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate } from '../../../../lib/i18n/format';
 import type { TranslationKey } from '../../../../lib/i18n/translations';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
-const MANAGER_ROLE = 'BRANCH_DEPARTMENT_MANAGER';
-const COMPLIANCE_ROLE = 'COMPLIANCE_OFFICER';
-const SALES_ROLE = 'SALES_RELATIONSHIP_OFFICER';
-const POLICY_CHECK_ROLE = 'POLICY_CHECKING_OFFICER';
-const CLAIMS_ROLE = 'CLAIMS_OFFICER';
-const FINANCE_ROLE = 'FINANCE_COLLECTIONS_OFFICER';
 
 const OPPORTUNITY_STATUS_LABEL_KEY: Record<OpportunityStatus, TranslationKey> = {
   NEEDS_CONFIRMED: 'oppStatusNeedsConfirmed',
@@ -106,24 +100,46 @@ export default function OpportunityDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
-  const isManager = user.roles.includes(MANAGER_ROLE);
-  const isCompliance = user.roles.includes(COMPLIANCE_ROLE);
-  const isSales = user.roles.includes(SALES_ROLE);
-  const isPolicyChecker = user.roles.includes(POLICY_CHECK_ROLE);
-  const isClaims = user.roles.includes(CLAIMS_ROLE);
-  const isFinance = user.roles.includes(FINANCE_ROLE);
+  // §10.4 — one permission per control, named after what the endpoint behind
+  // that control actually enforces. The role flags this replaces were coarse
+  // in both directions: `isClaims` gated six different claim permissions and
+  // `isFinance` four finance ones, so granting any single one of them to
+  // another role updated the API and left this screen unchanged.
+  const canCaptureQuotation = hasPermission(user, 'quotation.capture');
+  const canNegotiate = hasPermission(user, 'quotation.negotiate');
+  const canDiscloseCoi = hasPermission(user, 'conflict-of-interest.disclose');
+  const canCaptureDecision = hasPermission(user, 'client-decision.capture');
+  const canPlacePolicy = hasPermission(user, 'policy.create');
+  const canCheckPolicy = hasPermission(user, 'policy.check');
+  const canDeliverPolicy = hasPermission(user, 'policy.deliver');
+  const canManageEndorsement = hasPermission(user, 'endorsement.create');
+  const canApproveRefund = hasPermission(user, 'refund.approve');
+  const canInvoice = hasPermission(user, 'invoice.create');
+  const canCollect = hasPermission(user, 'receipt.record');
+  const canCalculateCommission = hasPermission(user, 'commission.calculate');
+  const canApproveOverride = hasPermission(user, 'commission-override.approve');
+  const canNotifyClaim = hasPermission(user, 'claim.notify');
+  const canRegisterClaim = hasPermission(user, 'claim.register');
+  const canDocumentClaim = hasPermission(user, 'claim.document');
+  const canAssessClaim = hasPermission(user, 'claim.assess');
+  const canFollowUpClaim = hasPermission(user, 'claim.followup.manage');
+  const canSettleClaim = hasPermission(user, 'claim.settle.approve');
+  const canSecondApproveSettlement = hasPermission(
+    user,
+    'claim.settle.second-approve',
+  );
+  const canCloseClaim = hasPermission(user, 'claim.close');
 
   return (
     <main style={pageStyle}>
@@ -179,7 +195,7 @@ export default function OpportunityDetailPage() {
           ) : null}
 
           <div style={rfqActionsStyle}>
-            {isPlacement ? (
+            {canCaptureQuotation ? (
               <button
                 type="button"
                 style={buttonStyle}
@@ -196,7 +212,7 @@ export default function OpportunityDetailPage() {
           {rfqs === null ? (
             <p>{t('commonLoading')}</p>
           ) : rfqs.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('oppRfqsNone')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('oppRfqsNone')}</p>
           ) : (
             <div style={{ marginTop: '1rem' }}>
               {rfqs.map((rfq) => (
@@ -237,42 +253,42 @@ export default function OpportunityDetailPage() {
 
           <RecommendationSection
             opportunity={opportunity}
-            isPlacement={isPlacement}
-            isManager={isManager}
-            isCompliance={isCompliance}
+            isPlacement={canCaptureQuotation}
+            isManager={canNegotiate}
+            isCompliance={canDiscloseCoi}
             onOpportunityChanged={() => void load()}
           />
 
           <ClientDecisionSection
             opportunity={opportunity}
-            canCapture={isSales || isPlacement}
+            canCapture={canCaptureDecision}
             onOpportunityChanged={() => void load()}
           />
 
           <PolicySection
             opportunity={opportunity}
-            isPlacement={isPlacement}
-            canCheck={isPolicyChecker}
-            canDeliver={isSales || isPlacement}
+            isPlacement={canPlacePolicy}
+            canCheck={canCheckPolicy}
+            canDeliver={canDeliverPolicy}
             onOpportunityChanged={() => void load()}
           />
 
           <EndorsementSection
             opportunityId={opportunity.id}
-            canManage={isPlacement}
-            canApproveRefund={isManager}
+            canManage={canManageEndorsement}
+            canApproveRefund={canApproveRefund}
           />
 
           <FinanceSection
             opportunityId={opportunity.id}
-            canInvoice={isFinance}
-            canCollect={isFinance}
+            canInvoice={canInvoice}
+            canCollect={canCollect}
           />
 
           <CommissionSection
             opportunityId={opportunity.id}
-            canCalculate={isFinance}
-            canApproveOverride={isManager}
+            canCalculate={canCalculateCommission}
+            canApproveOverride={canApproveOverride}
           />
 
           <ConsentCaptureWidget
@@ -284,14 +300,14 @@ export default function OpportunityDetailPage() {
 
           <ClaimSection
             opportunityId={opportunity.id}
-            canNotify={isSales || isClaims}
-            canRegister={isClaims}
-            canDocument={isClaims}
-            canAssess={isClaims}
-            canFollowUp={isClaims}
-            canSettle={isClaims || isManager}
-            canSecondApproveSettlement={isManager || isFinance}
-            canClose={isClaims}
+            canNotify={canNotifyClaim}
+            canRegister={canRegisterClaim}
+            canDocument={canDocumentClaim}
+            canAssess={canAssessClaim}
+            canFollowUp={canFollowUpClaim}
+            canSettle={canSettleClaim}
+            canSecondApproveSettlement={canSecondApproveSettlement}
+            canClose={canCloseClaim}
           />
         </>
       ) : null}

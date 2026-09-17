@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -10,26 +11,28 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
-const ROLES = ['DATA_PROTECTION_OFFICER'];
+const ROLES = [
+  'dpo-workspace.view',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const sectionStyle: CSSProperties = { margin: '2rem 0' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 export default function DpoWorkspacePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canView = hasAny(user?.roles, ROLES);
+  const { t } = useLanguage();
+  const canView = hasAnyPermission(user, ROLES);
 
   const [summary, setSummary] = useState<DpoWorkspaceSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -41,32 +44,32 @@ export default function DpoWorkspacePage() {
     } catch (err) {
       setSummary(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not load the DPO Workspace — try again.',
+        err instanceof ApiError && err.status === 403
+          ? t('dpowNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('dpowLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>DPO Workspace</h1>
+      <h1>{t('dpowHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Consent status, the open DSR queue with SLA countdowns, the
-        incident/breach register, the DPIA register, the active Legal Hold
-        register, and the cross-border transfer register — on one screen.
+        {t('dpowIntro')}
       </p>
 
       {loadError ? (
@@ -77,12 +80,12 @@ export default function DpoWorkspacePage() {
 
       {!canView ? null : !summary ? (
         loadError ? null : (
-          <p>Loading&hellip;</p>
+          <p>{t('dpowLoading')}</p>
         )
       ) : (
         <>
           <section style={sectionStyle}>
-            <h2>Consent status</h2>
+            <h2>{t('dpowConsentStatus')}</h2>
             <div style={{ display: 'flex', gap: '1.5rem' }}>
               <span>Active: {summary.consentStatus.activeCount}</span>
               <span>Withdrawn: {summary.consentStatus.withdrawnCount}</span>
@@ -91,25 +94,25 @@ export default function DpoWorkspacePage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>DSR queue</h2>
+            <h2>{t('dpowDsrQueue')}</h2>
             {summary.dsrQueue.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No open Data Subject Requests.</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoOpenDsr')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
                   <thead>
                     <tr>
-                      <th style={head}>Type</th>
-                      <th style={head}>Status</th>
-                      <th style={head}>SLA due</th>
-                      <th style={head}>Days until due</th>
+                      <th style={head}>{t('dpowColType')}</th>
+                      <th style={head}>{t('dpowColStatus')}</th>
+                      <th style={head}>{t('dpowColSlaDue')}</th>
+                      <th style={head}>{t('dpowColDaysUntilDue')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.dsrQueue.map((d) => (
                       <tr key={d.id}>
-                        <td style={cell}>{d.type}</td>
-                        <td style={cell}>{d.status}</td>
+                        <td style={cell}>{t(ENUM_LABEL.DsrType[d.type])}</td>
+                        <td style={cell}>{t(ENUM_LABEL.DsrStatus[d.status])}</td>
                         <td style={cell}>{d.slaDueAt.slice(0, 10)}</td>
                         <td style={cell}>
                           {d.daysUntilDue < 0
@@ -125,25 +128,25 @@ export default function DpoWorkspacePage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Incident / breach register</h2>
+            <h2>{t('dpowIncidentRegister')}</h2>
             {summary.incidentRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No open incidents.</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoOpenIncidents')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                   <thead>
                     <tr>
-                      <th style={head}>Title</th>
-                      <th style={head}>Severity</th>
-                      <th style={head}>Status</th>
+                      <th style={head}>{t('dpowColTitle')}</th>
+                      <th style={head}>{t('dpowColSeverity')}</th>
+                      <th style={head}>{t('dpowColStatus')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.incidentRegister.map((i) => (
                       <tr key={i.id}>
                         <td style={cell}>{i.title}</td>
-                        <td style={cell}>{i.severity}</td>
-                        <td style={cell}>{i.status}</td>
+                        <td style={cell}>{t(ENUM_LABEL.IncidentSeverity[i.severity])}</td>
+                        <td style={cell}>{t(ENUM_LABEL.IncidentStatus[i.status])}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -153,24 +156,24 @@ export default function DpoWorkspacePage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>DPIA register (awaiting review)</h2>
+            <h2>{t('dpowDpiaRegister')}</h2>
             {summary.dpiaRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No DPIA screenings awaiting review.</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoDpiaAwaiting')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                   <thead>
                     <tr>
-                      <th style={head}>Subject</th>
-                      <th style={head}>Outcome</th>
-                      <th style={head}>Review due</th>
+                      <th style={head}>{t('dpowColSubject')}</th>
+                      <th style={head}>{t('dpowColOutcome')}</th>
+                      <th style={head}>{t('dpowColReviewDue')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.dpiaRegister.map((d) => (
                       <tr key={d.id}>
                         <td style={cell}>{d.subjectDescription}</td>
-                        <td style={cell}>{d.outcome}</td>
+                        <td style={cell}>{t(ENUM_LABEL.DpiaOutcome[d.outcome])}</td>
                         <td style={cell}>{d.dpoReviewDueAt ? d.dpoReviewDueAt.slice(0, 10) : '—'}</td>
                       </tr>
                     ))}
@@ -181,16 +184,16 @@ export default function DpoWorkspacePage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Legal Hold register (active)</h2>
+            <h2>{t('dpowHoldRegister')}</h2>
             {summary.legalHoldRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No active Legal Holds.</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoHolds')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                   <thead>
                     <tr>
-                      <th style={head}>Scope</th>
-                      <th style={head}>Next review due</th>
+                      <th style={head}>{t('dpowColScope')}</th>
+                      <th style={head}>{t('dpowColNextReviewDue')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -207,17 +210,17 @@ export default function DpoWorkspacePage() {
           </section>
 
           <section style={sectionStyle}>
-            <h2>Cross-border transfer register</h2>
+            <h2>{t('dpowCbtRegister')}</h2>
             {summary.crossBorderTransferRegister.length === 0 ? (
-              <p style={{ opacity: 0.6 }}>No cross-border transfers logged yet.</p>
+              <p style={{ color: 'var(--ink-secondary)' }}>{t('dpowNoCbt')}</p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
                   <thead>
                     <tr>
-                      <th style={head}>Destination</th>
-                      <th style={head}>Legal basis</th>
-                      <th style={head}>Transferred at</th>
+                      <th style={head}>{t('dpowColDestination')}</th>
+                      <th style={head}>{t('dpowColLegalBasis')}</th>
+                      <th style={head}>{t('dpowColTransferredAt')}</th>
                     </tr>
                   </thead>
                   <tbody>

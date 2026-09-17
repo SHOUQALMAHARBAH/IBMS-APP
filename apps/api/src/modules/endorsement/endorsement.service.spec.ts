@@ -22,6 +22,7 @@ const EXPIRY = new Date(INCEPTION.getTime() + 360 * DAY);
 function placement(over?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'placement-1',
+    organizationId: 'org-1',
     email: 'placement@ibms.test',
     roles: ['PLACEMENT_TECHNICAL_OFFICER'],
     sessionId: 'session-1',

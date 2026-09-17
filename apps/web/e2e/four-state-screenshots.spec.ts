@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F item #8 — "Four-state (loading/empty/error/populated) screenshot
 // evidence per screen" — a verification DISCIPLINE overlay on items #1-7,
@@ -37,7 +38,7 @@ async function mockAuth(
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles, languagePreference } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, languagePreference, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -89,13 +90,20 @@ const CUSTOMER_AR = {
   contactEmail: "***@example.test",
 };
 
+// `/customers` and `/policies` are among the five paged lists: they return
+// `{ items, total, page, pageSize }`, on its scoped branches too, so the
+// client has one response shape rather than one per branch.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async ({
   page,
 }) => {
   await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"], "AR");
 
   // loading
-  const g = gate([CUSTOMER_AR]);
+  const g = gate(paged([CUSTOMER_AR]));
   await page.route("http://localhost:4000/customers", g.route);
   await page.goto("/customers");
   await expect(page.getByText("جارٍ التحميل…")).toBeVisible();
@@ -107,7 +115,7 @@ test("four-state screenshots: /customers (item #6 search, item #3 bidi)", async 
 
   // empty
   await page.route("http://localhost:4000/customers", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
   await page.goto(page.url());
   await expect(page.getByText("لا يوجد عملاء بعد.")).toBeVisible();
@@ -222,7 +230,8 @@ test("four-state screenshots: /watchlist-sync (item #2 RTL layout mirroring)", a
     route.fulfill({ status: 200, json: [] }),
   );
   await page.goto("/watchlist-sync");
-  await expect(page.getByText("No sync has run yet.")).toBeVisible();
+  // Rendered in AR, so the Arabic empty state is what proves the state.
+  await expect(page.getByText("لم تُنفَّذ أي مزامنة بعد.")).toBeVisible();
   await capture(page, "watchlist-sync", "empty");
   await page.unroute("http://localhost:4000/watchlist-sync/status**");
 
@@ -240,7 +249,12 @@ test("four-state screenshots: /watchlist-sync (item #2 RTL layout mirroring)", a
     route.fulfill({ status: 200, json: SYNC_RUNS }),
   );
   await page.goto(page.url());
-  await expect(page.getByRole("cell", { name: "OFAC_SDN" })).toBeVisible();
+  // The label, not the stored code — and this screen renders in Arabic, so
+  // asserting the Arabic label is what proves the enum is actually translated
+  // rather than merely relabelled in English.
+  await expect(
+    page.getByRole("cell", { name: "قائمة OFAC للمصنّفين" }),
+  ).toBeVisible();
   await capture(page, "watchlist-sync", "populated");
 });
 
@@ -626,7 +640,10 @@ async function mockOpportunityDetailBase(page: Page) {
     route.fulfill({ status: 200, json: { notice: null } }),
   );
   await page.route("http://localhost:4000/claims**", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({
+      status: 200,
+      json: { items: [], total: 0, page: 0, pageSize: 50 },
+    }),
   );
 }
 
@@ -659,7 +676,7 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
     (route) => route.fulfill({ status: 200, json: [] }),
   );
   await page.route("http://localhost:4000/policies?opportunityId=opp-1", (route) =>
-    route.fulfill({ status: 200, json: [] }),
+    route.fulfill({ status: 200, json: paged([]) }),
   );
   await page.goto("/opportunities/opp-1");
   await expect(page.getByText("No RFQs yet.", { exact: false })).toBeVisible();
@@ -676,7 +693,7 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
     (route) => route.fulfill({ status: 200, json: [RECOMMENDATION] }),
   );
   await page.route("http://localhost:4000/policies?opportunityId=opp-1", (route) =>
-    route.fulfill({ status: 200, json: [POLICY] }),
+    route.fulfill({ status: 200, json: paged([POLICY]) }),
   );
   await page.route("http://localhost:4000/invoices?policyId=pol-1", (route) =>
     route.fulfill({ status: 200, json: [INVOICE] }),
@@ -725,7 +742,8 @@ test("four-state screenshots: /prospects (item #6 bilingual search)", async ({
   const g = gate([PROSPECT_AR]);
   await page.route("http://localhost:4000/prospects**", g.route);
   await page.goto("/prospects");
-  await expect(page.getByText("Loading…")).toBeVisible();
+  // Rendered in AR, so the Arabic loading text is what proves the state.
+  await expect(page.getByText("جارٍ التحميل…")).toBeVisible();
   await capture(page, "prospects", "loading");
   g.resolve();
   await expect(page.getByText("شركة النخبة للتجارة")).toBeVisible();
@@ -736,7 +754,7 @@ test("four-state screenshots: /prospects (item #6 bilingual search)", async ({
     route.fulfill({ status: 200, json: [] }),
   );
   await page.goto(page.url());
-  await expect(page.getByText("No prospects yet.")).toBeVisible();
+  await expect(page.getByText("لا يوجد عملاء مرتقبون بعد.")).toBeVisible();
   await capture(page, "prospects", "empty");
   await page.unroute("http://localhost:4000/prospects**");
 
@@ -769,7 +787,8 @@ test("four-state screenshots: /vendors (item #6 bilingual search)", async ({
   const g = gate([VENDOR_AR]);
   await page.route("http://localhost:4000/vendors**", g.route);
   await page.goto("/vendors");
-  await expect(page.getByText("Loading…")).toBeVisible();
+  // Rendered in AR, so the Arabic loading text is what proves the state.
+  await expect(page.getByText("جارٍ التحميل…")).toBeVisible();
   await capture(page, "vendors", "loading");
   g.resolve();
   await expect(page.getByText("شركة الأمان لخدمات تقييم الأضرار")).toBeVisible();
@@ -780,7 +799,7 @@ test("four-state screenshots: /vendors (item #6 bilingual search)", async ({
     route.fulfill({ status: 200, json: [] }),
   );
   await page.goto(page.url());
-  await expect(page.getByText("No vendors recorded yet.")).toBeVisible();
+  await expect(page.getByText("لا توجد سجلات مورّدين بعد.")).toBeVisible();
   await capture(page, "vendors", "empty");
   await page.unroute("http://localhost:4000/vendors**");
 

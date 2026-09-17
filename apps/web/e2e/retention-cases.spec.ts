@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -63,9 +64,9 @@ test("lists retention cases with reason/status and the open form", async ({
   await expect(
     page.getByRole("heading", { name: "Customer retention" }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "lapse_risk" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Lapse risk" })).toBeVisible();
   await expect(
-    page.getByRole("cell", { name: "renewal_inactivity" }),
+    page.getByRole("cell", { name: "Renewal inactivity" }),
   ).toBeVisible();
   await expect(page.getByLabel("Reason")).toBeVisible();
   await expect(
@@ -97,7 +98,14 @@ test("retention screen has no serious/critical accessibility violations @a11y", 
   await mockRetentionCases(page);
 
   await page.goto("/retention-cases");
-  await expect(page.getByRole("cell", { name: "lapse_risk" })).toBeVisible();
+  // The LABEL, not the raw enum token. This assertion still read "lapse_risk"
+  // after the bilingual pass relabelled it — the non-@a11y test above was
+  // corrected and this copy was not, and `npm run e2e` is
+  // `--grep-invert @a11y`, so nothing ran it until the a11y suite did.
+  await expect(page.getByRole("cell", { name: "Lapse risk" })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "lapse_risk", exact: true }),
+  ).toHaveCount(0);
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter(

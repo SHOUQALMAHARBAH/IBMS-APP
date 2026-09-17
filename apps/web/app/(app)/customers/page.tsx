@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listCustomers, type Customer } from '../../../lib/customer/customer-api';
+import { Pagination } from '../../../components/ui/Pagination';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { cardMetaStyle, cardStyle, pageStyle } from '../../../components/lead/lead.styles';
@@ -11,6 +12,7 @@ import { listGridStyle } from '../../../components/prospect/prospect.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import type { TranslationKey } from '../../../lib/i18n/translations';
 import type { CustomerStatus, CustomerType } from '../../../lib/customer/customer-api';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 const TYPE_LABEL_KEY: Record<CustomerType, TranslationKey> = {
   INDIVIDUAL: 'customerTypeIndividual',
@@ -27,7 +29,6 @@ const STATUS_LABEL_KEY: Record<CustomerStatus, TranslationKey> = {
 // Roles the seeded permission grid grants `customer.create` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
 // same convention as leads/page.tsx's CAN_CREATE_LEAD_ROLES.
-const CAN_CREATE_CUSTOMER_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -42,11 +43,22 @@ export default function CustomersPage() {
   // not search-as-you-type (this app has no debounce utility anywhere).
   const [search, setSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(0);
 
-  const loadCustomers = useCallback(async (term: string) => {
+  const loadCustomers = useCallback(async (term: string, nextPage = 0) => {
     try {
-      const result = await listCustomers(term ? { search: term } : {});
-      setCustomers(result);
+      const result = await listCustomers({
+        ...(term ? { search: term } : {}),
+        ...(nextPage ? { page: nextPage } : {}),
+      });
+      setCustomers(result.items);
+      setTotal(result.total);
+      // The server's size, not a constant repeated here: it clamps what was
+      // asked for, so this is the only honest source for the range label.
+      setPageSize(result.pageSize);
+      setPage(result.page);
       setLoadError(null);
     } catch (err) {
       setLoadError(
@@ -66,18 +78,18 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadCustomers(searchTerm);
     })();
-  }, [user, searchTerm, loadCustomers]);
+  }, [user, searchTerm, loadCustomers, t]);
 
   if (isLoading || !user) return null;
 
-  const canCreateCustomer = user.roles.some((role) => CAN_CREATE_CUSTOMER_ROLES.includes(role));
+  const canCreateCustomer = hasPermission(user, 'customer.create');
 
   return (
     <main style={pageStyle}>
@@ -114,7 +126,7 @@ export default function CustomersPage() {
       ) : null}
       {customers !== null && !loadError ? (
         customers.length === 0 ? (
-          <p style={{ opacity: 0.6, marginTop: '1rem' }}>
+          <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
             {searchTerm ? t('customersNoneMatch') : t('customersNoneYet')}
           </p>
         ) : (
@@ -139,6 +151,15 @@ export default function CustomersPage() {
           </div>
         )
       ) : null}
+      {/* Below the list, and it hides itself when everything fits on one
+          page — see the component. The search term travels with the page so
+          paging a filtered list stays filtered. */}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={(next) => void loadCustomers(searchTerm, next)}
+      />
     </main>
   );
 }

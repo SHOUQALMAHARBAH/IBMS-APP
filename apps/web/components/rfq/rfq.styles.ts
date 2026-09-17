@@ -5,7 +5,7 @@ export const rfqCardStyle: CSSProperties = {
   width: '100%',
   textAlign: 'start',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   cursor: 'pointer',
   marginBottom: '0.75rem',
@@ -14,9 +14,9 @@ export const rfqCardStyle: CSSProperties = {
 export const rfqPanelStyle: CSSProperties = {
   marginTop: '1rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
-  background: 'rgba(128,128,128,0.05)',
+  background: 'var(--surface-sunken)',
 };
 
 export const rfqTableStyle: CSSProperties = {
@@ -28,7 +28,7 @@ export const rfqTableStyle: CSSProperties = {
 export const rfqCellStyle: CSSProperties = {
   textAlign: 'start',
   padding: '0.5rem 0.6rem',
-  borderBottom: '1px solid rgba(128,128,128,0.2)',
+  borderBottom: '1px solid var(--border-subtle)',
   verticalAlign: 'top',
 };
 
@@ -37,7 +37,7 @@ export const rfqBadgeStyle: CSSProperties = {
   padding: '0.1rem 0.5rem',
   borderRadius: '0.75rem',
   fontSize: '0.8rem',
-  border: '1px solid rgba(128,128,128,0.4)',
+  border: '1px solid var(--border-strong)',
 };
 
 export const rfqActionsStyle: CSSProperties = {
@@ -55,7 +55,7 @@ export const insurerPickerStyle: CSSProperties = {
   marginTop: '0.5rem',
   maxHeight: '16rem',
   overflowY: 'auto',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   padding: '0.75rem',
 };

@@ -1,17 +1,17 @@
 // Process 3-4 — the KYC lifecycle. Talks to apps/api's kyc.controller.ts.
 // Mirrors lib/lead/lead-api.ts's conventions.
 
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPost } from "../auth/api-client";
 
 export type KycStatus =
-  | 'DRAFT'
-  | 'SUBMITTED'
-  | 'SCREENING'
-  | 'EDD'
-  | 'COMPLIANCE_REVIEW'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'PERIODIC_REVIEW_DUE';
+  | "DRAFT"
+  | "SUBMITTED"
+  | "SCREENING"
+  | "EDD"
+  | "COMPLIANCE_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "PERIODIC_REVIEW_DUE";
 
 export interface KycRecord {
   id: string;
@@ -32,7 +32,7 @@ export interface KycRecord {
 // see KycRecordRepository.findMany's `include` (apps/api). Neither
 // legalName nor customerType is sensitive.
 export interface KycQueueRecord extends KycRecord {
-  customer: { legalName: string; customerType: 'INDIVIDUAL' | 'CORPORATE' };
+  customer: { legalName: string; customerType: "INDIVIDUAL" | "CORPORATE" };
 }
 
 export interface ListKycRecordsFilter {
@@ -41,14 +41,14 @@ export interface ListKycRecordsFilter {
 }
 
 export const KYC_STATUS_LABEL: Record<KycStatus, string> = {
-  DRAFT: 'Draft',
-  SUBMITTED: 'Submitted',
-  SCREENING: 'Screening',
-  EDD: 'Enhanced due diligence',
-  COMPLIANCE_REVIEW: 'Compliance review',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-  PERIODIC_REVIEW_DUE: 'Periodic review due',
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  SCREENING: "Screening",
+  EDD: "Enhanced due diligence",
+  COMPLIANCE_REVIEW: "Compliance review",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  PERIODIC_REVIEW_DUE: "Periodic review due",
 };
 
 export function startKyc(customerId: string): Promise<KycRecord> {
@@ -71,26 +71,77 @@ export function triggerEdd(kycId: string): Promise<KycRecord> {
   return apiPost(`/kyc-records/${kycId}/trigger-edd`, undefined);
 }
 
-export function approveKyc(kycId: string, reason?: string): Promise<KycRecord> {
-  return apiPost(`/kyc-records/${kycId}/approve`, { reason });
+/**
+ * Part B §17. `screeningHoldReason` is the written acceptance of a
+ * REVIEW_REQUIRED screening hold. Omitting it when one is in force is refused
+ * by the API with 400 — the UI asks for it first, but the enforcement is the
+ * server's, not this function's.
+ */
+export function approveKyc(
+  kycId: string,
+  reason?: string,
+  screeningHoldReason?: string,
+): Promise<KycRecord> {
+  return apiPost(`/kyc-records/${kycId}/approve`, {
+    reason,
+    screeningHoldReason,
+  });
 }
 
 export function rejectKyc(kycId: string, reason: string): Promise<KycRecord> {
   return apiPost(`/kyc-records/${kycId}/reject`, { reason });
 }
 
-export function scheduleReview(kycId: string, nextReviewDueAt?: string): Promise<KycRecord> {
+export function scheduleReview(
+  kycId: string,
+  nextReviewDueAt?: string,
+): Promise<KycRecord> {
   return apiPost(`/kyc-records/${kycId}/schedule-review`, { nextReviewDueAt });
 }
 
-export function listKycRecords(filter: ListKycRecordsFilter = {}): Promise<KycQueueRecord[]> {
+export function listKycRecords(
+  filter: ListKycRecordsFilter = {},
+): Promise<KycQueueRecord[]> {
   const params = new URLSearchParams();
-  if (filter.status) params.set('status', filter.status);
-  if (filter.customerId) params.set('customerId', filter.customerId);
+  if (filter.status) params.set("status", filter.status);
+  if (filter.customerId) params.set("customerId", filter.customerId);
   const qs = params.toString();
-  return apiGet(`/kyc-records${qs ? `?${qs}` : ''}`);
+  return apiGet(`/kyc-records${qs ? `?${qs}` : ""}`);
 }
 
 export function getKycRecord(kycId: string): Promise<KycRecord> {
   return apiGet(`/kyc-records/${kycId}`);
+}
+
+/** Part B §17 — what is holding this file, and whether it can be released. */
+export type ScreeningHoldLevel = "NO_HOLD" | "REVIEW_REQUIRED" | "BLOCKED";
+
+export interface ScreeningHoldReason {
+  condition: string;
+  level: ScreeningHoldLevel;
+  detail: string;
+}
+
+export interface ScreeningHoldRelease {
+  id: string;
+  level: string;
+  conditions: string[];
+  reason: string;
+  releasedByUserId: string;
+  releasedAt: string;
+  workflow: string;
+}
+
+export interface ScreeningHoldView {
+  kycRecordId: string;
+  level: ScreeningHoldLevel;
+  releasable: boolean;
+  reasons: ScreeningHoldReason[];
+  releases: ScreeningHoldRelease[];
+  lastScreenedAt: string | null;
+  configurationProblems: string[];
+}
+
+export function getScreeningHold(kycId: string): Promise<ScreeningHoldView> {
+  return apiGet(`/kyc-records/${kycId}/screening-hold`);
 }

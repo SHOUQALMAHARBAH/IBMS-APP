@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { LossRatio, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
 
 export interface PolicyLossRatioInputs {
   id: string;
@@ -126,7 +127,7 @@ export class LossRatioRepository {
         issuedPremium: true,
         requestedPremium: true,
         customer: { select: { legalName: true } },
-        insurer: { select: { name: true } },
+        insurer: { select: INSURER_IDENTITY_SELECT },
         claims: {
           where: { status: { in: ['SETTLED', 'CLOSED'] } },
           select: { settlement: { select: { netSettlement: true } } },
@@ -141,7 +142,7 @@ export class LossRatioRepository {
       customerLegalName: p.customer.legalName,
       insuranceLine: p.insuranceLine,
       insurerId: p.insurerId,
-      insurerName: p.insurer.name,
+      insurerName: insurerName(p.insurer),
       policyRef: p.policyNumber ?? p.id,
       premium: p.issuedPremium ?? p.requestedPremium,
       claimNetSettlements: p.claims.map(

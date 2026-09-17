@@ -27,6 +27,7 @@
     "test:a11y": "turbo run test:a11y",
     "db:generate": "npm run generate --workspace=@ibms/db",
     "db:validate": "npm run validate --workspace=@ibms/db",
+    "db:format": "npm run format --workspace=@ibms/db",
     "db:migrate:dev": "npm run migrate:dev --workspace=@ibms/db",
     "db:migrate:deploy": "npm run migrate:deploy --workspace=@ibms/db",
     "db:migrate:status": "npm run migrate:status --workspace=@ibms/db",
@@ -34,6 +35,7 @@
     "db:test:migrate:deploy": "npm run migrate:test:deploy --workspace=@ibms/db",
     "db:test:migrate:status": "npm run migrate:test:status --workspace=@ibms/db",
     "db:studio": "npm run studio --workspace=@ibms/db",
+    "db:provision-app-role": "node scripts/provision-app-role.mjs",
     "db:seed": "npm run seed --workspace=@ibms/db",
     "db:test:seed": "npm run seed:test --workspace=@ibms/db",
     "db:backup:drill": "bash scripts/backup-restore-drill.sh"

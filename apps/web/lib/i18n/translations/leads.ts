@@ -25,6 +25,7 @@ export const LEADS = {
     leadsAddedMessage: 'تمت إضافة العميل المحتمل "{name}" إلى مسارك.',
     leadsCreateError: 'تعذر إنشاء العميل المحتمل — حاول مرة أخرى.',
     leadsUpdateError: 'تعذر تحديث هذا العميل المحتمل — حاول مرة أخرى.',
+    leadsCardAria: 'عميل محتمل: {name}',
 
     leadStatusNew: 'جديد',
     leadStatusContacted: 'تم التواصل',
@@ -72,6 +73,7 @@ export const LEADS = {
     leadsAddedMessage: 'Lead "{name}" added to your pipeline.',
     leadsCreateError: 'Could not create the lead — try again.',
     leadsUpdateError: 'Could not update this lead — try again.',
+    leadsCardAria: 'Lead: {name}',
 
     leadStatusNew: 'New',
     leadStatusContacted: 'Contacted',

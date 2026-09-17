@@ -1,6 +1,8 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -16,25 +18,27 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
-const MONITOR_ROLE = 'COMPLIANCE_OFFICER';
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 export default function TransactionMonitoringPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canMonitor = !!user && user.roles.includes(MONITOR_ROLE);
+  const { t } = useLanguage();
+  const canMonitor = hasPermission(user, 'aml.monitor');
 
   const [rows, setRows] = useState<TransactionMonitoringAlert[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,23 +60,23 @@ export default function TransactionMonitoringPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the aml.monitor permission."
+          ? t('tmNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load transaction-monitoring alerts — try again.',
+            : t('tmLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -82,7 +86,7 @@ export default function TransactionMonitoringPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('tmActionError'),
       );
     } finally {
       setBusy(false);
@@ -116,13 +120,9 @@ export default function TransactionMonitoringPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>AML/CFT transaction monitoring</h1>
+      <h1>{t('tmHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Unusually large premium payments, frequent cancellations/refunds, and
-        third-party payment sources are flagged automatically (nightly sweep,
-        or run it now). Escalate a flagged pattern to suspicious activity,
-        then report it to the competent authority — the record stays here as
-        evidence either way.
+        {t('tmIntro')}
       </p>
 
       {canMonitor ? (
@@ -136,28 +136,23 @@ export default function TransactionMonitoringPage() {
               maxWidth: '30rem',
             }}
           >
+            <CustomerPicker
+              value={customerId}
+              onChange={setCustomerId}
+              label={t('tmCustomerIdOptionalLabel')}
+            />
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
             >
-              Customer ID (optional)
-              <input
-                aria-label="Customer ID"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-              />
-            </label>
-            <label
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
-            >
-              Pattern
+              {t('tmPatternLabel')}
               <select
-                aria-label="Pattern"
+                aria-label={t('tmPatternLabel')}
                 value={patternType}
                 onChange={(e) => setPatternType(e.target.value)}
               >
                 {TRANSACTION_MONITORING_PATTERN_TYPES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {t(ENUM_LABEL.TransactionMonitoringPattern[p])}
                   </option>
                 ))}
               </select>
@@ -165,20 +160,20 @@ export default function TransactionMonitoringPage() {
             <label
               style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}
             >
-              Detail
+              {t('tmDetailLabel')}
               <textarea
-                aria-label="Detail"
+                aria-label={t('tmDetailLabel')}
                 value={detailText}
                 onChange={(e) => setDetailText(e.target.value)}
                 rows={3}
               />
             </label>
             <button type="submit" disabled={busy} style={{ marginTop: '0.3rem' }}>
-              {busy ? 'Saving…' : 'Log alert'}
+              {busy ? t('tmSavingButton') : t('tmLogButton')}
             </button>
           </form>
           <button type="button" disabled={busy} onClick={() => void sweep()}>
-            Run detection sweep now
+            {t('tmRunSweepButton')}
           </button>
           {sweepMessage ? <p style={{ opacity: 0.75 }}>{sweepMessage}</p> : null}
         </>
@@ -197,19 +192,19 @@ export default function TransactionMonitoringPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No transaction-monitoring alerts.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('tmNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '55rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Customer</th>
-                  <th style={head}>Pattern</th>
-                  <th style={head}>Status</th>
-                  <th style={head}>Escalated</th>
-                  <th style={head}>Reported</th>
-                  <th style={head}>Detected</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('tmColCustomer')}</th>
+                  <th style={head}>{t('tmPatternLabel')}</th>
+                  <th style={head}>{t('tmColStatus')}</th>
+                  <th style={head}>{t('tmColEscalated')}</th>
+                  <th style={head}>{t('tmColReported')}</th>
+                  <th style={head}>{t('tmColDetected')}</th>
+                  <th style={head}>{t('tmColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,7 +212,7 @@ export default function TransactionMonitoringPage() {
                   <tr key={r.id}>
                     <td style={cell}>{r.customerId ? `${r.customerId.slice(0, 8)}…` : '—'}</td>
                     <td style={cell}>{r.patternType}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.TransactionMonitoringStatus[r.status])}</td>
                     <td style={cell}>{r.escalatedToSuspiciousActivity ? 'yes' : 'no'}</td>
                     <td style={cell}>{r.reportedToAuthorityAt ? 'yes' : 'no'}</td>
                     <td style={cell}>{r.detectedAt.slice(0, 10)}</td>
@@ -232,7 +227,7 @@ export default function TransactionMonitoringPage() {
                                 void run(() => escalateTransactionMonitoringAlert(r.id))
                               }
                             >
-                              Escalate
+                              {t('tmEscalateButton')}
                             </button>
                           ) : !r.reportedToAuthorityAt ? (
                             <button
@@ -244,7 +239,7 @@ export default function TransactionMonitoringPage() {
                                 )
                               }
                             >
-                              Report to authority
+                              {t('tmReportButton')}
                             </button>
                           ) : null}
                           <button
@@ -252,7 +247,7 @@ export default function TransactionMonitoringPage() {
                             disabled={busy}
                             onClick={() => void run(() => closeTransactionMonitoringAlert(r.id))}
                           >
-                            Close
+                            {t('tmCloseButton')}
                           </button>
                         </div>
                       ) : null}
@@ -263,7 +258,12 @@ export default function TransactionMonitoringPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        // The loading state directive §2 requires; this page rendered
+        // nothing at all while fetching. Guarded on loadError so an error
+        // and a "Loading…" line never appear together.
+        <p>{t('tmLoading')}</p>
+      )}
     </main>
   );
 }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -785,7 +786,7 @@ async function mockRfqApi(
       };
       return route.fulfill({ status: 201, json: policy });
     }
-    return route.fulfill({ status: 200, json: policy ? [policy] : [] });
+    return route.fulfill({ status: 200, json: paged(policy ? [policy] : []) });
   });
 
   // Process 31-32 — the premium invoice + its collection cycle. Starts empty;
@@ -1322,7 +1323,12 @@ async function mockRfqApi(
       claimRows.push(row);
       return route.fulfill({ status: 201, json: row });
     }
-    return route.fulfill({ status: 200, json: claimRows });
+    // `GET /claims` returns the same paged envelope on every branch now
+    // (scoped or queue), so the mock has to carry it too.
+    return route.fulfill({
+      status: 200,
+      json: { items: claimRows, total: claimRows.length, page: 0, pageSize: 50 },
+    });
   });
 
   // One route for the whole /rfqs prefix — the last-registered route wins in
@@ -1411,14 +1417,14 @@ async function driveClaimToVerdict(
   await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill(opts.estimatedLoss);
   await page.getByRole("button", { name: "Notify claim" }).click();
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
 
   await page.getByLabel("Insurer claim reference").fill(opts.insurerRef);
   await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   for (const [docType, fileName] of [
     ["claim_form", "cf.pdf"],
@@ -1442,11 +1448,27 @@ async function driveClaimToVerdict(
 
   await page.getByRole("button", { name: "Submit for assessment" }).click();
   await expect(
-    page.getByText("UNDER_ASSESSMENT", { exact: true }),
+    page.getByText("Under assessment", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("Assessment verdict").selectOption(opts.verdict);
   await page.getByRole("button", { name: "Record verdict" }).click();
-  await expect(page.getByText(`verdict ${opts.verdict}`)).toBeVisible();
+  // The <select> is driven by the stored code; the line below it now reads
+  // the label, so the assertion maps one to the other.
+  const VERDICT_LABEL: Record<string, string> = {
+    APPROVED: "Approved",
+    PARTIALLY_APPROVED: "Partially approved",
+    DECLINED: "Declined",
+  };
+  await expect(
+    page.getByText(`Verdict ${VERDICT_LABEL[opts.verdict]}`),
+  ).toBeVisible();
+}
+
+// `/policies` is one of the five paged lists: it returns
+// `{ items, total, page, pageSize }`, on its scoped branches too, so the
+// client has one response shape rather than one per branch.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
 }
 
 test("opens an opportunity and lists its RFQs", async ({ page }) => {
@@ -1500,6 +1522,7 @@ test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page 
   await page.goto("/rfqs/rfq-1");
   await expect(page.getByRole("heading", { name: "Correspondence" })).toBeVisible();
   await page.getByLabel("Direction").selectOption("INBOUND");
+  await page.getByLabel("Channel").selectOption("CALL");
   await page.getByLabel("Exchange").fill("Please send 3 years of loss history for site 2.");
   await page.getByRole("button", { name: "Log exchange" }).click();
 
@@ -1507,6 +1530,17 @@ test("logs a broker<->insurer exchange on the RFQ detail screen", async ({ page 
   await expect(
     page.getByText("Please send 3 years of loss history for site 2."),
   ).toBeVisible();
+
+  // This screen's own channel wording, not the communications screen's. Four
+  // `commChannel*` keys were declared in BOTH rfq.ts and customer-service.ts,
+  // and the merge in translations.ts spreads customer-service last — so this
+  // row rendered "Phone call" and "Customer portal" instead. `exact` matters:
+  // a substring match on "Call" is satisfied by "Phone call" and would have
+  // passed against the bug.
+  const logRow = page.getByRole("row").filter({ hasText: "Please send 3 years" });
+  await expect(logRow.getByText("Call", { exact: true })).toBeVisible();
+  await expect(logRow.getByText("Phone call")).toHaveCount(0);
+  await expect(logRow.getByText("Inbound", { exact: true })).toBeVisible();
 });
 
 test("a non-Placement user sees the list but no create controls", async ({ page }) => {
@@ -1594,7 +1628,7 @@ test("builds the comparison matrix and shows the missing-insurer flag", async ({
     page.getByRole("button", { name: "Rebuild comparison" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Middle East Assurance (NO_RESPONSE)"),
+    page.getByText("Middle East Assurance (No response)"),
   ).toBeVisible();
 });
 
@@ -1823,7 +1857,7 @@ test("places a policy from an accepted opportunity and records its issuance", as
   await page.getByRole("button", { name: "Place policy" }).click();
 
   await expect.poll(() => placed?.inceptionDate).toBe("2026-10-01");
-  await expect(page.getByText("PLACEMENT_CONFIRMED")).toBeVisible();
+  await expect(page.getByText("Placement confirmed")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Download schedule summary (PDF)" }),
   ).toHaveCount(0);
@@ -1837,7 +1871,7 @@ test("places a policy from an accepted opportunity and records its issuance", as
 
   await expect.poll(() => issued?.policyNumber).toBe("POL-WEB-1");
   await expect.poll(() => issued?.issuedPremium).toBe("118500.000");
-  await expect(page.getByText("ISSUED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Issued", { exact: true })).toBeVisible();
   await expect(page.getByText("POL-WEB-1")).toBeVisible();
 
   // Part F item #7 — a schedule now exists, so both buttons appear and
@@ -1941,7 +1975,7 @@ test("records policy delivery and the client receipt acknowledgement", async ({
   await expect(page.getByText("awaiting client acknowledgement")).toBeVisible();
 
   await page.getByRole("button", { name: "Acknowledge receipt" }).click();
-  await expect(page.getByText("ACTIVE", { exact: true })).toBeVisible();
+  await expect(page.getByText("Active", { exact: true })).toBeVisible();
 });
 
 test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
@@ -1973,7 +2007,7 @@ test("raises a positive endorsement on an ACTIVE policy", async ({ page }) => {
     .click();
 
   await expect.poll(() => requested?.premiumAmount).toBe("2500.000");
-  await expect(page.getByText("REQUESTED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Requested", { exact: true })).toBeVisible();
   await expect(
     page.getByText("Premium adjustment JOD 2,500.000"),
   ).toBeVisible();
@@ -2034,7 +2068,7 @@ test("raises a premium invoice from the Billing block — commission netted, tot
   await expect(
     page.getByText("JOD 115,350.000", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
 
   // Part F item #7 — an invoice now exists, so the download button
   // appears and produces a real bilingual PDF download.
@@ -2087,10 +2121,10 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await page.getByLabel("Fees amount").fill("150.000");
   await page.getByLabel("Due date").fill("2026-12-01");
   await page.getByRole("button", { name: "Issue invoice" }).click();
-  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
 
   // 1a. Process 32 — a PART payment. The money is booked, but the invoice
-  //     stays INVOICED: only the instalment that completes it moves it on,
+  //     stays Invoiced: only the instalment that completes it moves it on,
   //     which is what keeps it on the #33 ageing report for the remainder.
   await page.getByLabel("Instalment amount").fill("15,350.000".replace(",", ""));
   // The payment reference is MANDATORY — it is the idempotency key, and the
@@ -2099,7 +2133,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   // client's money twice (two Receipts, two `in` ledger rows).
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-1");
   await page.getByRole("button", { name: "Record collection" }).click();
-  await expect(page.getByText("INVOICED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Invoiced");
   await expect(page.getByText("JOD 15,350.000")).toBeVisible();
   // The remaining balance is shown while the invoice is part-paid.
   await expect(page.getByText("Outstanding balance")).toBeVisible();
@@ -2111,7 +2145,7 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   //     idempotently rather than booking a second.
   await page.getByLabel("Payment reference").fill("E2E-INSTALMENT-2");
   await page.getByRole("button", { name: "Record collection" }).click();
-  await expect(page.getByText("COLLECTED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Collected");
   // Collected is now the pooled total of BOTH instalments — which equals the
   // invoiced total, so the figure legitimately appears TWICE ("Total due" and
   // "Collected"). Asserting the count says exactly that, where a bare
@@ -2123,13 +2157,13 @@ test("walks the collection cycle from the Billing block: receipt -> reconcile ->
   await page
     .getByRole("button", { name: "Reconcile collected funds" })
     .click();
-  await expect(page.getByText("RECONCILED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Reconciled");
 
   // 3. remit the net premium (120000 - 14400)
   await page
     .getByRole("button", { name: /Remit JOD 105,600.000 to insurer/ })
     .click();
-  await expect(page.getByText("REMITTED", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("invoice-status")).toHaveText("Remitted");
   await expect(page.getByText("Remitted to insurer")).toBeVisible();
   await expect(page.getByText(/JOD 105,600.000 on/)).toBeVisible();
 
@@ -2171,7 +2205,7 @@ test("notifies a claim against an issued policy", async ({ page }) => {
 
   await expect.poll(() => notified?.estimatedLoss).toBe("30000.000");
   await expect.poll(() => notified?.causeOfLoss).toContain("warehouse roof");
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
   await expect(page.getByText("large claim", { exact: false })).toBeVisible();
   await expect(
     page.getByText("coverage version in force", { exact: false }),
@@ -2250,7 +2284,7 @@ test("registers a NOTIFIED claim with the insurer and assigns the adjuster", asy
   await page.getByLabel("Cause of loss").fill("Burst riser main flooded unit 4.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
 
   // the registration form appears on the NOTIFIED claim
   await page.getByLabel("Insurer claim reference").fill("INS-CLM-2026-9001");
@@ -2264,7 +2298,7 @@ test("registers a NOTIFIED claim with the insurer and assigns the adjuster", asy
     .poll(() => registered?.insurerClaimReference)
     .toBe("INS-CLM-2026-9001");
   await expect.poll(() => registered?.adjuster.name).toBe("Cunningham Lindsey");
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
   await expect(
     page.getByText("adjuster Cunningham Lindsey", { exact: false }),
   ).toBeVisible();
@@ -2295,14 +2329,14 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await page.getByLabel("Cause of loss").fill("Storm ripped the roof sheeting.");
   await page.getByLabel("Estimated loss").fill("14000.000");
   await page.getByRole("button", { name: "Notify claim" }).click();
-  await expect(page.getByText("NOTIFIED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Notified", { exact: true })).toBeVisible();
 
   await page.getByLabel("Insurer claim reference").fill("INS-DOC-1");
   await page.getByLabel("Loss adjuster").fill("Cunningham Lindsey");
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // the documentation checklist shows the missing mandatory docs
   await expect(page.getByText("missing claim_form, photo, repair_estimate")).toBeVisible();
@@ -2313,7 +2347,7 @@ test("files claim documentation and tracks the mandatory checklist", async ({
   await page.getByRole("button", { name: "File document" }).click();
 
   await expect.poll(() => attached?.documents[0].docType).toBe("claim_form");
-  await expect(page.getByText("DOCUMENTATION_IN_PROGRESS", { exact: true })).toBeVisible();
+  await expect(page.getByText("Documentation in progress", { exact: true })).toBeVisible();
   await expect(page.getByText("missing photo, repair_estimate")).toBeVisible();
 });
 
@@ -2345,7 +2379,7 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // file every mandatory document
   for (const [docType, fileName] of [
@@ -2372,14 +2406,14 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
 
   // submit for assessment, then record the verdict
   await page.getByRole("button", { name: "Submit for assessment" }).click();
-  await expect(page.getByText("UNDER_ASSESSMENT", { exact: true })).toBeVisible();
+  await expect(page.getByText("Under assessment", { exact: true })).toBeVisible();
   await page
     .getByLabel("Assessment verdict")
     .selectOption("PARTIALLY_APPROVED");
   await page.getByRole("button", { name: "Record verdict" }).click();
 
   // the verdict shows and the decision control is gone
-  await expect(page.getByText("verdict PARTIALLY_APPROVED")).toBeVisible();
+  await expect(page.getByText("Verdict Partially approved")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record verdict" }),
   ).toHaveCount(0);
@@ -2419,7 +2453,7 @@ test("raises an insurer non-response follow-up alert via the sweep and resolves 
   await page
     .getByRole("button", { name: "Register & assign adjuster" })
     .click();
-  await expect(page.getByText("REGISTERED", { exact: true })).toBeVisible();
+  await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // no alert yet
   await expect(page.getByText("Insurer follow-up alert")).toHaveCount(0);

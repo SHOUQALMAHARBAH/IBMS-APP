@@ -4,7 +4,8 @@ import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
 import { AppNav } from '../../components/app/AppNav';
-import { contentStyle, shellStyle } from '../../components/app/app.styles';
+import { AppNavbar } from '../../components/app/AppNavbar';
+import { contentStyle, shellRowStyle, shellStyle } from '../../components/app/app.styles';
 
 // Wraps every authenticated screen (`app/(app)/*`) in the sidebar shell and
 // gates the whole subtree on a session. Each child page still runs its own
@@ -22,8 +23,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div style={shellStyle}>
-      <AppNav />
-      <div style={contentStyle}>{children}</div>
+      <AppNavbar />
+      <div style={shellRowStyle}>
+        <AppNav />
+        <div style={contentStyle}>{children}</div>
+      </div>
     </div>
   );
 }

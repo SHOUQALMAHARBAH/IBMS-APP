@@ -6,6 +6,7 @@ import { PdfRendererService } from '../document-generation/pdf-renderer.service'
 import type { DocumentLanguage } from '../document-generation/document-html.util';
 import { buildPolicyScheduleSummaryHtml } from './policy-schedule-summary.template';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { insurerName } from '../../repositories/insurer-identity';
 
 const POLICY_SCHEDULE_SUMMARY_TEMPLATE_TYPE = 'policy_schedule_summary';
 
@@ -76,7 +77,9 @@ export class PolicyScheduleSummaryDocumentService {
       {
         policyId: policy.id,
         customerLegalName: customer.legalName,
-        insurerName: policy.insurer?.name ?? policy.insurerId,
+        insurerName: policy.insurer
+          ? insurerName(policy.insurer)
+          : policy.insurerId,
         policyNumber: policy.policyNumber,
         insuranceLine: policy.insuranceLine,
         inceptionDate: policy.inceptionDate,

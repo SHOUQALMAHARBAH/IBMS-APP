@@ -3,6 +3,12 @@ import {
   type SlaDuration,
 } from '../../common/business-days.util';
 import {
+  effectiveDueAt,
+  remainingMs,
+  slaStatus,
+  type SlaStatus,
+} from '../sla/sla-status.config';
+import {
   findSlaRegistryEntry,
   type SlaRegistryEntry,
 } from '../sla/sla-registry.config';
@@ -140,6 +146,17 @@ export interface SlaTimerLike {
   escalatedTo: string | null;
   resolvedAt: Date | null;
   createdAt: Date;
+  /** Pause state. Optional so callers predating SLA policies still typecheck;
+   * absent behaves as "never paused", which is what those rows are. */
+  pausedAt?: Date | null;
+  pausedTotalMs?: number;
+  breachedAt?: Date | null;
+  /** The policy that set this deadline, when one did. */
+  slaPolicy?: {
+    policyCode: string;
+    sourceType: string;
+    warningThreshold: number;
+  } | null;
 }
 
 /** Strips a `SlaTimerService` stage suffix (`workflow::target`) back to the
@@ -213,6 +230,24 @@ export interface SlaTimerRow {
   ageDays: number;
   /** see {@link overdueDaysFor} — `null` unless breached / escalated / resolved_late. */
   overdueDays: number | null;
+
+  /** The pause-aware lifecycle status (`sla-status.config.ts`). Distinct from
+   * `state`, which is the dashboard's own bucketing and predates pause: a
+   * paused clock is PAUSED here and would otherwise read as breached. */
+  slaStatus: SlaStatus;
+  /** Milliseconds to the pause-adjusted deadline; negative once overdue,
+   * `null` while paused (a stopped clock has no meaningful countdown). */
+  remainingMs: number | null;
+  /** `dueAt` shifted by accumulated pause. `dueAt` itself is never moved. */
+  effectiveDueAt: string;
+  /** TRUE only when the deadline came from a policy whose source is
+   * REGULATORY. A screen reporting a breach must be able to say whether what
+   * was breached is the law. */
+  isRegulatory: boolean;
+  /** `REGULATORY` / `INTERNAL_POLICY` / ... , or null for a timer created
+   * before SLA policies existed. */
+  sourceType: string | null;
+  policyCode: string | null;
 }
 
 function registryFacts(
@@ -228,6 +263,11 @@ function registryFacts(
   return {
     label: entry?.label ?? base,
     entityType: entry?.entityType ?? fallbackEntityType,
+    // Registry-only fallback for a timer with no policy. Deliberately
+    // `startsWith`, never `includes`: one registry citation contains the
+    // phrase "no independent PRIV-SOP figure identified", and a substring
+    // match reads that NEGATION as a citation. Where a policy EXISTS its
+    // `sourceType` is authoritative and this is not consulted.
     drafted: entry ? entry.citation.startsWith('DRAFT') : false,
     configuredDuration: entry?.duration ?? null,
   };
@@ -241,6 +281,14 @@ export function deriveSlaTimerRow(
   const base = baseWorkflowName(timer.workflowName);
   const facts = registryFacts(base, timer.entityType);
   const state = classifyTimer(timer, now, dueSoonCutoff);
+  const timerState = {
+    dueAt: timer.dueAt,
+    createdAt: timer.createdAt,
+    resolvedAt: timer.resolvedAt,
+    pausedAt: timer.pausedAt ?? null,
+    pausedTotalMs: timer.pausedTotalMs ?? 0,
+    breachedAt: timer.breachedAt ?? null,
+  };
   return {
     id: timer.id,
     entityType: timer.entityType,
@@ -257,6 +305,24 @@ export function deriveSlaTimerRow(
     createdAt: timer.createdAt.toISOString(),
     ageDays: wholeDaysBetween(timer.createdAt, now),
     overdueDays: overdueDaysFor(timer, now, state),
+
+    // The pause-aware view, alongside the dashboard's own bucketing. Both are
+    // reported because `state` predates pause and would call a paused clock
+    // breached; `slaStatus` is the one a screen should show a human.
+    slaStatus: slaStatus(
+      timerState,
+      now,
+      timer.slaPolicy?.warningThreshold ?? 0.8,
+    ),
+    remainingMs: remainingMs(timerState, now),
+    effectiveDueAt: effectiveDueAt(timerState, now).toISOString(),
+    // Authoritative when a policy exists. `facts.drafted` is only the
+    // registry-only fallback for a timer created before policies did.
+    isRegulatory: timer.slaPolicy
+      ? timer.slaPolicy.sourceType === 'REGULATORY'
+      : !facts.drafted,
+    sourceType: timer.slaPolicy?.sourceType ?? null,
+    policyCode: timer.slaPolicy?.policyCode ?? null,
   };
 }
 

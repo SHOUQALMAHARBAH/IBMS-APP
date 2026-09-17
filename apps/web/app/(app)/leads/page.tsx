@@ -10,12 +10,12 @@ import { LeadIntakeForm } from '../../../components/lead/LeadIntakeForm';
 import { LeadPipelineBoard } from '../../../components/lead/LeadPipelineBoard';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 // Roles the seeded permission grid grants `lead.create` to
 // (packages/db/prisma/seed-data/permissions.ts) — a client-side hint only,
 // same convention as access-recertification's CAN_START_CYCLE_ROLES. The
 // backend independently enforces this on POST /leads regardless.
-const CAN_CREATE_LEAD_ROLES = ['SALES_RELATIONSHIP_OFFICER'];
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -43,18 +43,18 @@ export default function LeadsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadLeads();
     })();
-  }, [user, loadLeads]);
+  }, [user, loadLeads, t]);
 
   if (isLoading || !user) return null;
 
-  const canCreateLead = user.roles.some((role) => CAN_CREATE_LEAD_ROLES.includes(role));
+  const canCreateLead = hasPermission(user, 'lead.create');
 
   function handleLeadCreated(lead: Lead) {
     setLeads((prev) => (prev ? [lead, ...prev] : [lead]));

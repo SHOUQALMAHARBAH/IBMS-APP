@@ -32,7 +32,8 @@ const agreementRow = (over: Record<string, unknown> = {}) => ({
   vatRatePercent: d('0'),
   effectiveFrom: new Date('2026-09-03T00:00:00.000Z'),
   effectiveTo: null,
-  insurer: { name: 'Acme Insurance' },
+  // Post Part I §5 split: the name lives on the global InsurerMaster.
+  insurer: { insurerMaster: { legalName: 'Acme Insurance' } },
   ...over,
 });
 

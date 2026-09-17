@@ -12,12 +12,14 @@ import type { CustomerRepository } from '../../repositories/customer.repository'
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { ScreeningService } from './screening.service';
+import type { ScreeningHoldService } from './screening-hold.service';
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'sales-1',
+    organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
     sessionId: 'session-1',
@@ -80,6 +82,12 @@ function makeDeps() {
   });
   const screening = { run } as unknown as ScreeningService;
 
+  // Part B §17. Defaults to "no hold" so the pre-existing cases keep testing
+  // what they were written to test; the hold's own behaviour is covered by
+  // screening-hold.config.spec.ts and the kyc-screening-hold e2e.
+  const assertClearToProceed = vi.fn().mockResolvedValue(null);
+  const holds = { assertClearToProceed } as unknown as ScreeningHoldService;
+
   const computeDueAt = vi.fn().mockReturnValue(new Date('2026-09-05'));
   const startTimer = vi.fn().mockResolvedValue([]);
   const resolve = vi.fn().mockResolvedValue({ count: 1 });
@@ -96,6 +104,7 @@ function makeDeps() {
       audit,
       workflow,
       screening,
+      holds,
       sla,
     ),
     mocks: {
@@ -110,6 +119,7 @@ function makeDeps() {
       record,
       transition,
       run,
+      assertClearToProceed,
       computeDueAt,
       startTimer,
       resolve,

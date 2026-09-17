@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -91,7 +92,16 @@ test("lists complaints with SLA + escalation state and the log form", async ({
       name: "The settlement was 200 JOD below the assessed amount",
     }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: "ESCALATED" })).toBeVisible();
+  // The status column now renders a label, not the raw enum token
+  // (directive §2). Asserting "Escalated" rather than "ESCALATED" is the
+  // point of the change, not an accommodation to it.
+  await expect(page.getByRole("cell", { name: "Escalated" })).toBeVisible();
+  // `exact` matters: getByRole name matching is case-INSENSITIVE by default,
+  // so a bare "ESCALATED" would still match the "Escalated" label and this
+  // assertion would prove nothing.
+  await expect(
+    page.getByRole("cell", { name: "ESCALATED", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Category")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Log complaint" }),

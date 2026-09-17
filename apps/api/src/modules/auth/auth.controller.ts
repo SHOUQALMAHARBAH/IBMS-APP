@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
   Patch,
   Post,
   Put,
@@ -22,6 +23,10 @@ import { SkipMfaRequired } from './decorators/skip-mfa-required.decorator';
 import { RequireRoles } from './decorators/require-roles.decorator';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
+import {
+  ChangePasswordDto,
+  ForceChangePasswordDto,
+} from './dto/password-change.dto';
 import {
   AuthRateLimit,
   PasswordRateLimit,
@@ -54,6 +59,12 @@ const meSchema = {
     fullName: { type: 'string' as const },
     languagePreference: { type: 'string' as const },
     roles: { type: 'array' as const, items: { type: 'string' as const } },
+    /** Part IV §10.4 — the caller's RESOLVED permission codes, sorted. The
+     * single source the frontend drives every conditional render from. */
+    permissions: {
+      type: 'array' as const,
+      items: { type: 'string' as const },
+    },
     mfaEnabled: { type: 'boolean' as const },
     mfaPolicySatisfied: { type: 'boolean' as const },
     accessValidUntil: { type: 'string' as const, nullable: true },
@@ -65,6 +76,7 @@ const meSchema = {
     'id',
     'email',
     'fullName',
+    'permissions',
     'roles',
     'mfaEnabled',
     'mfaPolicySatisfied',
@@ -105,8 +117,63 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.login(dto, requestMeta(req));
+    // Part II §4.3.1 — an onboarding outcome is returned as-is, WITHOUT setting
+    // a session cookie: the caller gets a token that reaches the mandatory
+    // password change and nothing else.
+    if ('outcome' in result) return result;
     if ('mfaRequired' in result) return result;
     return issuedSessionResponse(res, result);
+  }
+
+  /**
+   * Part II §4.3.1 — the one mandatory password change.
+   *
+   * Public because the caller has no session yet, by design. Authorisation
+   * comes from the onboarding token in the body, which `login` issued only
+   * after verifying the password.
+   */
+  @Public()
+  @Post('password/force-change')
+  @HttpCode(200)
+  @AuthRateLimit()
+  async forceChangePassword(
+    @Body() dto: ForceChangePasswordDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.forceChangePassword(dto, requestMeta(req));
+    return issuedSessionResponse(res, result);
+  }
+
+  /** Part II §4.7 — self-service change, post-onboarding. Revokes every other
+   * session for this user. */
+  @SkipMfaRequired()
+  @Post('password/change')
+  @HttpCode(200)
+  changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.auth.changePassword(user.id, user.sessionId, dto);
+  }
+
+  /** Part II §4.4 — the devices this user has chosen to trust. */
+  @Get('trusted-devices')
+  listTrustedDevices(@CurrentUser() user: AuthenticatedUser) {
+    return this.auth.listTrustedDevices(user.id);
+  }
+
+  /**
+   * Part II §4.4 — revokes one trusted device, forcing the MFA prompt again on
+   * it. A user may only revoke their own.
+   */
+  @Post('trusted-devices/:id/revoke')
+  @HttpCode(200)
+  revokeTrustedDevice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.auth.revokeTrustedDevice(user.id, id);
   }
 
   @Public()

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -43,7 +44,7 @@ const COMMUNICATIONS = [
   {
     id: "comm-2",
     customerId: "11111111-1111-1111-1111-111111111111",
-    channel: "EMAIL",
+    channel: "CALL",
     templateId: "promo-v1",
     languageUsed: "AR",
     direction: "OUTBOUND",
@@ -81,6 +82,14 @@ test("lists communications with the marketing flag and the send form", async ({
     page.getByRole("cell", { name: "Your renewal documents" }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "New motor product" })).toBeVisible();
+
+  // This screen's own channel wording. `rfq.ts` used to re-declare four
+  // `commChannel*` keys that this dictionary owns; the rename that resolved
+  // the collision moved the RFQ screen off them, and this asserts the
+  // communications wording survived it. Both rows' channels are checked so
+  // the column is genuinely exercised, not just present.
+  await expect(page.getByRole("cell", { name: "Phone call", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Email", exact: true })).toBeVisible();
   await expect(page.getByLabel("Channel")).toBeVisible();
   await expect(page.getByLabel("Marketing")).toBeVisible();
   await expect(

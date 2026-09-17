@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { DEFAULT_PAGE_SIZE } from '../../common/pagination';
 import { CustomerService } from './customer.service';
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { ProspectRepository } from '../../repositories/prospect.repository';
@@ -15,6 +16,7 @@ import type { CreateCustomerDto } from './dto/create-customer.dto';
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
   return {
     id: 'sales-1',
+    organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
     sessionId: 'session-1',
@@ -32,6 +34,8 @@ function makeDeps() {
   );
   const findById = vi.fn();
   const findMany = vi.fn().mockResolvedValue([]);
+  // list() runs the page read and its count together, so the mock needs both.
+  const countMany = vi.fn().mockResolvedValue(0);
   const createUbo = vi
     .fn()
     .mockImplementation((input) => Promise.resolve({ ...input }));
@@ -44,6 +48,7 @@ function makeDeps() {
     create,
     findById,
     findMany,
+    countMany,
     createUbo,
     findUbosByCustomerId,
     createDocument,
@@ -91,6 +96,7 @@ function makeDeps() {
       create,
       findById,
       findMany,
+      countMany,
       createUbo,
       findUbosByCustomerId,
       createDocument,
@@ -189,6 +195,9 @@ describe('CustomerService', () => {
 
       expect(mocks.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ ownerUserId: 'sales-1' }),
+        // The page window is now part of the call — an unwindowed list read
+        // is the bug this endpoint was paginated to remove.
+        expect.objectContaining({ take: DEFAULT_PAGE_SIZE, skip: 0 }),
       );
     });
 
@@ -202,6 +211,7 @@ describe('CustomerService', () => {
 
       expect(mocks.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ ownerUserId: 'sales-2' }),
+        expect.objectContaining({ take: DEFAULT_PAGE_SIZE, skip: 0 }),
       );
     });
 
@@ -217,7 +227,8 @@ describe('CustomerService', () => {
         },
       ]);
 
-      const [customer] = await service.list({}, makeUser({ id: 'sales-1' }));
+      const { items } = await service.list({}, makeUser({ id: 'sales-1' }));
+      const [customer] = items;
 
       expect(customer).not.toHaveProperty('nationalIdEnc');
       expect(customer).not.toHaveProperty('contactPhoneEnc');

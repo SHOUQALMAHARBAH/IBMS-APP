@@ -11,24 +11,27 @@ import {
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
+import { formatMoney } from '../../../../lib/i18n/format';
 
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 const statStyle: CSSProperties = { fontSize: '1.4rem', fontWeight: 600 };
 
 function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdownRow[] }) {
+  const { t } = useLanguage();
   return (
     <section style={sectionStyle}>
       <h3>{title}</h3>
       {rows.length === 0 ? (
-        <p>No data.</p>
+        <p>{t('dashNoData')}</p>
       ) : (
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Group</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Claims (JOD)</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Premium (JOD)</th>
-              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>Ratio</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dashColGroup')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dclmColClaims')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dclmColPremium')}</th>
+              <th style={{ textAlign: 'start', padding: '0.25rem 0.5rem' }}>{t('dclmColRatio')}</th>
             </tr>
           </thead>
           <tbody>
@@ -53,6 +56,7 @@ function LossRatioTable({ title, rows }: { title: string; rows: LossRatioBreakdo
 }
 
 export default function ClaimsDashboardPage() {
+  const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -66,7 +70,7 @@ export default function ClaimsDashboardPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -83,13 +87,13 @@ export default function ClaimsDashboardPage() {
       setSummary(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the dashboard.claims.view permission."
+          ? t('dclmNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the Claims Dashboard — try again.',
+            : t('dclmLoadError'),
       );
     }
-  }, [branchId, insuranceLine, insurerId, asOf]);
+  }, [branchId, insuranceLine, insurerId, asOf, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -98,7 +102,7 @@ export default function ClaimsDashboardPage() {
     })();
     // Filters apply on explicit "Apply filters" submit only — see below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, t]);
 
   function applyFilters(ev: React.FormEvent) {
     ev.preventDefault();
@@ -109,11 +113,9 @@ export default function ClaimsDashboardPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Claims Dashboard</h1>
+      <h1>{t('dclmHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Every metric here is a live snapshot as of a reference date (default
-        today) — open vs. closed claims, outstanding claims value, claims
-        ageing, and loss ratio by client/line/insurer.
+        {t('dclmIntro')}
       </p>
 
       <form
@@ -121,27 +123,27 @@ export default function ClaimsDashboardPage() {
         style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Branch ID
-          <input aria-label="Branch ID filter" value={branchId} onChange={(e) => setBranchId(e.target.value)} />
+          {t('dashBranchIdLabel')}
+          <input aria-label={t('dashBranchIdFilterAria')} value={branchId} onChange={(e) => setBranchId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurance line
+          {t('dashInsuranceLineLabel')}
           <input
-            aria-label="Insurance line filter"
+            aria-label={t('dashInsuranceLineFilterAria')}
             dir="auto"
             value={insuranceLine}
             onChange={(e) => setInsuranceLine(e.target.value)}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          Insurer ID
-          <input aria-label="Insurer ID filter" value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
+          {t('dashInsurerIdLabel')}
+          <input aria-label={t('dashInsurerIdFilterAria')} value={insurerId} onChange={(e) => setInsurerId(e.target.value)} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          As of
-          <input aria-label="As of date" placeholder="YYYY-MM-DD" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+          {t('dashAsOf')}
+          <input aria-label={t('dashAsOfDateAria')} placeholder={t('dashDatePlaceholder')} value={asOf} onChange={(e) => setAsOf(e.target.value)} />
         </label>
-        <button type="submit">Apply filters</button>
+        <button type="submit">{t('dashApplyFilters')}</button>
       </form>
 
       {loadError ? (
@@ -152,58 +154,68 @@ export default function ClaimsDashboardPage() {
 
       {summary ? (
         <>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem' }}>As of {summary.asOf.slice(0, 10)}.</p>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>As of {summary.asOf.slice(0, 10)}.</p>
 
           <section style={sectionStyle}>
-            <h2>Open vs. closed claims</h2>
+            <h2>{t('dclmOpenVsClosed')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.openClaimsCount}</div>
-                <div>Open</div>
+                <div>{t('dclmOpen')}</div>
               </div>
               <div>
                 <div style={statStyle}>{summary.closedClaimsCount}</div>
-                <div>Closed</div>
+                <div>{t('dclmClosed')}</div>
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Outstanding claims value</h2>
-            <div style={statStyle}>{summary.outstandingClaimsValueJod} JOD</div>
+            <h2>{t('dclmOutstandingValue')}</h2>
+            <div style={statStyle}>
+              {formatMoney(summary.outstandingClaimsValueJod, language)}
+            </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Claims ageing (open claims)</h2>
+            <h2>{t('dclmAgeing')}</h2>
             <div style={{ display: 'flex', gap: '2rem' }}>
               <div>
                 <div style={statStyle}>{summary.ageing.d0_30.count}</div>
-                <div>0-30 days ({summary.ageing.d0_30.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing0To30')} ({formatMoney(summary.ageing.d0_30.valueJod, language)})
+                </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d31_60.count}</div>
-                <div>31-60 days ({summary.ageing.d31_60.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing31To60')} ({formatMoney(summary.ageing.d31_60.valueJod, language)})
+                </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d61_90.count}</div>
-                <div>61-90 days ({summary.ageing.d61_90.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing61To90')} ({formatMoney(summary.ageing.d61_90.valueJod, language)})
+                </div>
               </div>
               <div>
                 <div style={statStyle}>{summary.ageing.d90_plus.count}</div>
-                <div>90+ days ({summary.ageing.d90_plus.valueJod} JOD)</div>
+                <div>
+                  {t('dclmAgeing90Plus')} ({formatMoney(summary.ageing.d90_plus.valueJod, language)})
+                </div>
               </div>
             </div>
           </section>
 
           <section style={sectionStyle}>
-            <h2>Loss ratio</h2>
-            <LossRatioTable title="By client" rows={summary.lossRatioByClient} />
-            <LossRatioTable title="By line" rows={summary.lossRatioByLine} />
-            <LossRatioTable title="By insurer" rows={summary.lossRatioByInsurer} />
+            <h2>{t('dclmLossRatio')}</h2>
+            <LossRatioTable title={t('dclmByClient')} rows={summary.lossRatioByClient} />
+            <LossRatioTable title={t('dclmByLine')} rows={summary.lossRatioByLine} />
+            <LossRatioTable title={t('dclmByInsurer')} rows={summary.lossRatioByInsurer} />
           </section>
         </>
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dashLoading')}</p>
       )}
     </main>
   );

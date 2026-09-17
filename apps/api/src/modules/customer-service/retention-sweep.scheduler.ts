@@ -1,14 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UserRepository } from '../../repositories/user.repository';
 import {
   RetentionCaseService,
   type RetentionSweepResult,
 } from './retention-case.service';
-
-// Kept in sync with packages/db/prisma/seed.ts's SYSTEM_ACCOUNT_EMAIL — same
-// convention as the other schedulers.
-const SYSTEM_ACCOUNT_EMAIL = 'system@ibms.internal';
+import { PerOrganizationRunner } from '../../common/org-context/per-organization.runner';
 
 /**
  * Process 46 — "Automatically open a retention case on renewal inactivity or
@@ -30,24 +26,30 @@ export class RetentionSweepScheduler {
   private readonly logger = new Logger(RetentionSweepScheduler.name);
 
   constructor(
-    private readonly users: UserRepository,
     private readonly retentionCases: RetentionCaseService,
+    private readonly perOrganization: PerOrganizationRunner,
   ) {}
 
   // 08:00 UTC daily.
   @Cron('0 8 * * *', { name: 'retention-case-detection-sweep' })
   async runSweep(): Promise<void> {
-    const systemUser = await this.users.findByEmail(SYSTEM_ACCOUNT_EMAIL);
-    if (!systemUser) {
-      this.logger.error(
-        `Retention-case sweep skipped — system service account "${SYSTEM_ACCOUNT_EMAIL}" not found (has npm run db:seed been run?)`,
-      );
-      return;
-    }
+    await this.perOrganization.forEach(
+      'Retention-case sweep',
+      this.logger,
+      (systemUserId) => this.sweepOrganization(systemUserId),
+    );
+  }
 
+  /**
+   * One Organization's slice of this sweep. Multi-tenancy Phase 2 (step 7):
+   * every query below is filtered to the Organization `forEach` established,
+   * and `systemUserId` is THAT office's own service account — not a single
+   * platform-wide one.
+   */
+  private async sweepOrganization(systemUserId: string): Promise<void> {
     let result: RetentionSweepResult;
     try {
-      result = await this.retentionCases.runSweep(systemUser.id);
+      result = await this.retentionCases.runSweep(systemUserId);
     } catch (err) {
       this.logger.error(
         `Retention-case sweep failed: ${(err as Error).message}`,

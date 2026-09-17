@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -17,17 +18,19 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '28rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function DocumentsPage() {
+  const { t, tPlural } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -47,7 +50,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async (pid: string) => {
     try {
@@ -57,13 +60,13 @@ export default function DocumentsPage() {
       setDocuments(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the document.manage permission."
+          ? t('docNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load documents — try again.',
+            : t('docLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   async function onLookup(e: FormEvent) {
     e.preventDefault();
@@ -89,7 +92,7 @@ export default function DocumentsPage() {
       setVersioningId(null);
       await load(policyId);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not create a new version.');
+      setActionError(err instanceof ApiError ? err.message : t('docVersionError'));
     }
   }
 
@@ -102,7 +105,7 @@ export default function DocumentsPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : "Could not unlock — you may not hold document.delete-override.",
+          : t('docUnlockError'),
       );
     }
   }
@@ -113,7 +116,7 @@ export default function DocumentsPage() {
       await deleteDocument(id);
       await load(policyId);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'Could not delete the document.');
+      setActionError(err instanceof ApiError ? err.message : t('docDeleteError'));
     }
   }
 
@@ -127,10 +130,10 @@ export default function DocumentsPage() {
     } catch (err) {
       setSummaryError(
         err instanceof ApiError && err.status === 404
-          ? 'Policy not found.'
+          ? t('docPolicyNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not compute the classification summary.',
+            : t('docComputeError'),
       );
     }
   }
@@ -139,18 +142,17 @@ export default function DocumentsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Documents</h1>
+      <h1>{t('docHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The Part 4.2 electronic Insurance File — version control and the
-        deletion lock override for one policy&apos;s documents.
+        {t('docIntro')}
       </p>
 
       <form onSubmit={onLookup} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
         <label style={labelStyle}>
-          Policy ID
+          {t('docPolicyIdLabel')}
           <input value={policyId} onChange={(e) => setPolicyId(e.target.value)} required />
         </label>
-        <button type="submit">Look up documents</button>
+        <button type="submit">{t('docLookUp')}</button>
       </form>
 
       {loadError ? (
@@ -166,16 +168,16 @@ export default function DocumentsPage() {
 
       {documents ? (
         documents.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No documents recorded for this policy.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('docNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
             <thead>
               <tr>
-                <th style={head}>File</th>
-                <th style={head}>Category</th>
-                <th style={head}>Classification</th>
-                <th style={head}>Version</th>
-                <th style={head}>Deletion</th>
+                <th style={head}>{t('docColFile')}</th>
+                <th style={head}>{t('docColCategory')}</th>
+                <th style={head}>{t('docColClassification')}</th>
+                <th style={head}>{t('docColVersion')}</th>
+                <th style={head}>{t('docColDeletion')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -183,23 +185,23 @@ export default function DocumentsPage() {
               {documents.map((doc) => (
                 <tr key={doc.id}>
                   <td style={cell}>{doc.fileName}</td>
-                  <td style={cell}>{doc.category}</td>
-                  <td style={cell}>{doc.classification}</td>
+                  <td style={cell}>{t(ENUM_LABEL.DocumentCategory[doc.category])}</td>
+                  <td style={cell}>{t(ENUM_LABEL.DataClassification[doc.classification])}</td>
                   <td style={cell}>{doc.versionNumber}</td>
-                  <td style={cell}>{doc.deletionLocked ? 'Locked' : 'Unlocked'}</td>
+                  <td style={cell}>{doc.deletionLocked ? t('docLocked') : t('docUnlocked')}</td>
                   <td style={cell}>
                     {versioningId === doc.id ? null : (
                       <button type="button" onClick={() => startVersion(doc)}>
-                        New version
+                        {t('docNewVersionButton')}
                       </button>
                     )}
                     {doc.deletionLocked ? (
                       <button type="button" onClick={() => onUnlock(doc.id)}>
-                        Unlock for deletion
+                        {t('docUnlockButton')}
                       </button>
                     ) : (
                       <button type="button" onClick={() => onDelete(doc.id)}>
-                        Delete
+                        {t('commonDelete')}
                       </button>
                     )}
                   </td>
@@ -218,13 +220,13 @@ export default function DocumentsPage() {
           }}
           style={formStyle}
         >
-          <h2>Record a new version</h2>
+          <h2>{t('docVersionHeading')}</h2>
           <label style={labelStyle}>
-            File name
+            {t('docFileName')}
             <input value={versionFileName} onChange={(e) => setVersionFileName(e.target.value)} required />
           </label>
           <label style={labelStyle}>
-            Storage reference
+            {t('docStorageReference')}
             <input
               value={versionStorageRef}
               onChange={(e) => setVersionStorageRef(e.target.value)}
@@ -232,20 +234,20 @@ export default function DocumentsPage() {
             />
           </label>
           <label style={labelStyle}>
-            Classification
+            {t('docColClassification')}
             <select
               value={versionClassification}
               onChange={(e) => setVersionClassification(e.target.value as DataClassification)}
             >
               {DATA_CLASSIFICATIONS.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(ENUM_LABEL.DataClassification[c])}
                 </option>
               ))}
             </select>
           </label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit">Save version</button>
+            <button type="submit">{t('docSaveVersionButton')}</button>
             <button type="button" onClick={() => setVersioningId(null)}>
               Cancel
             </button>
@@ -254,16 +256,15 @@ export default function DocumentsPage() {
       ) : null}
 
       <form onSubmit={onLookupSummary} style={formStyle}>
-        <h2>Policy file classification</h2>
+        <h2>{t('docPolicyClassification')}</h2>
         <p style={{ opacity: 0.75 }}>
-          The highest classification present across a policy&apos;s electronic
-          file — never averaged.
+          {t('docClassificationSummaryIntro')}
         </p>
         <label style={labelStyle}>
-          Policy ID
+          {t('docPolicyIdLabel')}
           <input value={summaryPolicyId} onChange={(e) => setSummaryPolicyId(e.target.value)} required />
         </label>
-        <button type="submit">Compute</button>
+        <button type="submit">{t('docComputeButton')}</button>
         {summaryError ? (
           <p role="alert" style={errorStyle}>
             {summaryError}
@@ -271,10 +272,15 @@ export default function DocumentsPage() {
         ) : null}
         {summary ? (
           <p>
-            {summary.documentCount} document(s) — highest classification:{' '}
-            <strong>{summary.highestClassification ?? 'none'}</strong>
+            {tPlural('docsDocumentCount', summary.documentCount)}{' '}
+            {t('docsHighestClassification')}{' '}
+            <strong>
+              {summary.highestClassification ?? t('docsClassificationNone')}
+            </strong>
           </p>
-        ) : null}
+        ) : loadError ? null : (
+        <p>{t('docLoading')}</p>
+      )}
       </form>
     </main>
   );

@@ -9,11 +9,11 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { KycQueue } from '../../../../components/customer/KycQueue';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
 // Roles the seeded permission grid grants `kyc.approve` to — the queue is
 // COMPLIANCE_OFFICER-only; the backend independently enforces this
 // regardless of what this page renders.
-const CAN_APPROVE_KYC_ROLES = ['COMPLIANCE_OFFICER'];
 
 export default function KycQueuePage() {
   const router = useRouter();
@@ -41,18 +41,18 @@ export default function KycQueuePage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await loadQueue();
     })();
-  }, [user, loadQueue]);
+  }, [user, loadQueue, t]);
 
   if (isLoading || !user) return null;
 
-  const canApprove = user.roles.some((role) => CAN_APPROVE_KYC_ROLES.includes(role));
+  const canApprove = hasPermission(user, 'kyc.approve');
 
   function handleItemChanged(updated: KycRecord) {
     // The decision/screening endpoints return the generic KYCRecord shape,

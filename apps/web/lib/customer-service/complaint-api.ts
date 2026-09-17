@@ -59,7 +59,7 @@ export const COMPLAINT_CATEGORIES = [
   'premium_dispute',
   'unanswered_claim',
   'other',
-];
+] as const;
 
 export function listComplaints(
   opts: {

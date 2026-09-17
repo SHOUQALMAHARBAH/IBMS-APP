@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { IncidentReport, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** The one terminal state; everything else is still open. */
+const CLOSED_INCIDENT_STATUS = 'CLOSED' as IncidentReport['status'];
+
 export interface CreateIncidentInput {
   title: string;
   description: string;
@@ -37,6 +40,20 @@ export class IncidentRepository {
 
   findById(id: string): Promise<IncidentReport | null> {
     return this.prisma.client.incidentReport.findUnique({ where: { id } });
+  }
+
+  /**
+   * The open incident register (Part D §5.1 item #9) — same reasoning as
+   * `DsrRepository.findOpenQueue`: filtered in SQL so an old unresolved
+   * incident is never evicted by newer ones, ordered oldest first so a cap
+   * truncates the least urgent tail rather than the most urgent head.
+   */
+  findOpenRegister(take: number): Promise<IncidentReport[]> {
+    return this.prisma.client.incidentReport.findMany({
+      where: { status: { not: CLOSED_INCIDENT_STATUS } },
+      orderBy: { reportedAt: 'asc' },
+      take,
+    });
   }
 
   findMany(scope: IncidentScope, take: number): Promise<IncidentReport[]> {

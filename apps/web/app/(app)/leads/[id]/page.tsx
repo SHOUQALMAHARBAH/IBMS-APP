@@ -8,12 +8,17 @@ import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
 import { profileFieldLabelStyle, profileFieldValueStyle, profileGridStyle } from '../../../../components/prospect/prospect.styles';
+import type { LeadSource, LeadStatus } from '../../../../lib/lead/lead-api';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
+import { leadStatusLabelKey } from '../../../../lib/lead/lead-status';
 
+// Typed, not `string`: these two are printed to a person, so they go through
+// ENUM_LABEL, and that lookup only compiles against the real vocabulary.
 interface LeadDetail {
   id: string;
   fullName: string;
-  source: string;
-  status: string;
+  source: LeadSource;
+  status: LeadStatus;
   contactPhone?: string | null;
   contactEmail?: string | null;
   marketingConsentGranted: boolean;
@@ -21,31 +26,15 @@ interface LeadDetail {
   updatedAt: string;
 }
 
-const STATUS_LABEL_MAP: Record<string, string> = {
-  NEW: 'New',
-  CONTACTED: 'Contacted',
-  QUALIFIED: 'Qualified',
-  CONVERTED_TO_PROSPECT: 'Converted',
-};
-
-const STATUS_LABEL_MAP_AR: Record<string, string> = {
-  NEW: 'جديد',
-  CONTACTED: 'تم التواصل',
-  QUALIFIED: 'مؤهل',
-  CONVERTED_TO_PROSPECT: 'تم التحويل',
-};
-
 export default function LeadDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { t } = useLanguage();
 
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading2, setIsLoading2] = useState(true);
-
-  const isArabic = language === 'AR';
 
   const load = useCallback(async () => {
     try {
@@ -56,19 +45,19 @@ export default function LeadDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
-          ? (isArabic ? 'غير موجود' : 'Not found')
+          ? (t('leaddNotFound'))
           : err instanceof ApiError
             ? err.message
-            : (isArabic ? 'يرجى المحاولة مرة أخرى' : 'Please try again'),
+            : (t('leaddPleaseTryAgain')),
       );
     } finally {
       setIsLoading2(false);
     }
-  }, [params.id, isArabic]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -79,14 +68,14 @@ export default function LeadDetailPage() {
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
   if (isLoading2) {
     return (
       <div style={pageStyle}>
-        <p>{isArabic ? 'جاري التحميل...' : 'Loading...'}</p>
+        <p>{t('leaddLoading')}</p>
       </div>
     );
   }
@@ -100,7 +89,7 @@ export default function LeadDetailPage() {
           style={smallButtonStyle}
           onClick={() => router.push('/leads')}
         >
-          {isArabic ? 'العودة إلى القائمة' : 'Back to List'}
+          {t('leaddBackToList')}
         </button>
       </div>
     );
@@ -109,49 +98,52 @@ export default function LeadDetailPage() {
   if (!lead) {
     return (
       <div style={pageStyle}>
-        <p>{isArabic ? 'غير موجود' : 'Not found'}</p>
+        <p>{t('leaddNotFound2')}</p>
       </div>
     );
   }
 
-  const statusLabels = isArabic ? STATUS_LABEL_MAP_AR : STATUS_LABEL_MAP;
-  const displayStatus = statusLabels[lead.status] || lead.status;
+  // One shared, enum-exact mapping (lib/lead/lead-status.ts). The two local
+  // maps this replaced listed only four of the five statuses — DISQUALIFIED
+  // was missing, so it rendered as the raw token in both languages.
+  const statusKey = leadStatusLabelKey(lead.status);
+  const displayStatus = statusKey ? t(statusKey) : lead.status;
 
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: '1.5rem' }}>
-        {isArabic ? 'تفاصيل العميل المرتقب' : 'Lead Details'} — <bdi>{lead.fullName}</bdi>
+        {t('leaddLeadDetails')} — <bdi>{lead.fullName}</bdi>
       </h1>
 
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-          {isArabic ? 'المعلومات الأساسية' : 'Basic Information'}
+          {t('leaddBasicInformation')}
         </h2>
         <div style={profileGridStyle}>
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'الاسم الكامل' : 'Full Name'}</div>
+            <div style={profileFieldLabelStyle}>{t('leaddFullName')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{lead.fullName}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'الحالة' : 'Status'}</div>
+            <div style={profileFieldLabelStyle}>{t('leaddStatus')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{displayStatus}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'المصدر' : 'Source'}</div>
+            <div style={profileFieldLabelStyle}>{t('leaddSource')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.source}</bdi>
+              <bdi>{t(ENUM_LABEL.LeadSource[lead.source])}</bdi>
             </div>
           </div>
 
           {lead.contactPhone && (
             <div>
-              <div style={profileFieldLabelStyle}>{isArabic ? 'الهاتف' : 'Phone'}</div>
+              <div style={profileFieldLabelStyle}>{t('leaddPhone')}</div>
               <div style={profileFieldValueStyle}>
                 <bdi dir="ltr">{lead.contactPhone}</bdi>
               </div>
@@ -160,7 +152,7 @@ export default function LeadDetailPage() {
 
           {lead.contactEmail && (
             <div>
-              <div style={profileFieldLabelStyle}>{isArabic ? 'البريد الإلكتروني' : 'Email'}</div>
+              <div style={profileFieldLabelStyle}>{t('leaddEmail')}</div>
               <div style={profileFieldValueStyle}>
                 <bdi dir="ltr">{lead.contactEmail}</bdi>
               </div>
@@ -168,23 +160,23 @@ export default function LeadDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'موافقة التسويق' : 'Marketing Consent'}</div>
+            <div style={profileFieldLabelStyle}>{t('leaddMarketingConsent')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{lead.marketingConsentGranted ? (isArabic ? 'نعم' : 'Yes') : (isArabic ? 'لا' : 'No')}</bdi>
+              <bdi>{lead.marketingConsentGranted ? (t('leaddYes')) : (t('leaddNo'))}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'تاريخ الإنشاء' : 'Created'}</div>
+            <div style={profileFieldLabelStyle}>{t('leaddCreated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(lead.createdAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
+              <bdi>{new Date(lead.createdAt).toLocaleDateString(t('leaddEnUs'))}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'آخر تحديث' : 'Updated'}</div>
+            <div style={profileFieldLabelStyle}>{t('leaddUpdated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(lead.updatedAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
+              <bdi>{new Date(lead.updatedAt).toLocaleDateString(t('leaddEnUs2'))}</bdi>
             </div>
           </div>
         </div>
@@ -195,7 +187,7 @@ export default function LeadDetailPage() {
         style={smallButtonStyle}
         onClick={() => router.push('/leads')}
       >
-        {isArabic ? 'العودة' : 'Back'}
+        {t('leaddBack')}
       </button>
     </div>
   );

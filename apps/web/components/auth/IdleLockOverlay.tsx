@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, type CSSProperties, type FormEvent } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import { useRouter } from 'next/navigation';
 import { useIdleTimer } from '../../lib/auth/use-idle-timer';
 import { logout, stepUp, type MeResponse } from '../../lib/auth/auth-api';
@@ -12,6 +13,7 @@ interface IdleLockOverlayProps {
 }
 
 export function IdleLockOverlay({ user, onLockedOut }: IdleLockOverlayProps) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -47,19 +49,19 @@ export function IdleLockOverlay({ user, onLockedOut }: IdleLockOverlayProps) {
       setCode('');
       unlock();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not unlock — try again.');
+      setError(err instanceof ApiError ? err.message : t('authUnlockError'));
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Session locked" style={overlayStyle}>
+    <div role="dialog" aria-modal="true" aria-label={t('authSessionLocked')} style={overlayStyle}>
       <form onSubmit={(e) => void handleUnlock(e)} style={cardStyle}>
-        <h2 style={{ marginTop: 0 }}>Session locked</h2>
-        <p style={{ opacity: 0.8 }}>You&apos;ve been idle for a while. Re-enter your password to continue.</p>
+        <h2 style={{ marginTop: 0 }}>{t('authSessionLocked')}</h2>
+        <p style={{ opacity: 0.8 }}>{t('authIdlePrompt')}</p>
         <label htmlFor="unlock-password" style={labelStyle}>
-          Password
+          {t('authPasswordLabel')}
         </label>
         <input
           id="unlock-password"
@@ -73,7 +75,7 @@ export function IdleLockOverlay({ user, onLockedOut }: IdleLockOverlayProps) {
         {user.mfaEnabled ? (
           <>
             <label htmlFor="unlock-code" style={labelStyle}>
-              Authentication code
+              {t('authMfaCodeLabel')}
             </label>
             <input
               id="unlock-code"
@@ -88,16 +90,14 @@ export function IdleLockOverlay({ user, onLockedOut }: IdleLockOverlayProps) {
           </>
         ) : null}
         {error ? (
-          <p role="alert" style={{ color: '#d33', fontSize: '0.9rem' }}>
+          <p role="alert" style={{ color: 'var(--danger-ink)', fontSize: '0.9rem' }}>
             {error}
           </p>
         ) : null}
         <button type="submit" disabled={isSubmitting} style={buttonStyle}>
-          {isSubmitting ? 'Unlocking…' : 'Unlock'}
+          {isSubmitting ? t('authUnlocking') : t('authUnlockButton')}
         </button>
-        <button type="button" onClick={handleHardLogout} style={linkButtonStyle}>
-          Sign out instead
-        </button>
+        <button type="button" onClick={handleHardLogout} style={linkButtonStyle}>{t('authSignOutInstead')}</button>
       </form>
     </div>
   );

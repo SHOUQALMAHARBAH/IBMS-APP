@@ -3,7 +3,8 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -139,6 +140,64 @@ async function createIndividualCustomer(
     })
     .expect(201);
   return res.body as CustomerBody;
+}
+
+/**
+ * One obviously fictional `WatchlistEntry`, so the built-in screening provider
+ * has a POPULATED list to report "no match" against.
+ *
+ * Added when Part B §17 (workflow holds) landed. Before it, this file's
+ * "standard (no hit)" test passed only when db-test happened to carry entries
+ * from some earlier run: with an empty cache the provider correctly answers
+ * UNABLE_TO_SCREEN, which is now a REVIEW_REQUIRED hold and refuses the
+ * approval. The test's own premise is "screened, and nothing was found", so
+ * the fix is to make that premise true rather than to weaken the control —
+ * and the test stops depending on ambient database state either way.
+ */
+async function seedWatchlistFixtureEntry(): Promise<void> {
+  // Part B §6 — at most ONE generation per source may be PUBLISHED (a partial
+  // unique index enforces it). A fixture that assumed an empty slate would hit
+  // that constraint against any generation db-test already holds, so clear the
+  // source first. Deleting the generation cascades to its rows.
+  await prisma.watchlistDatasetVersion.deleteMany({
+    where: { source: 'OFAC_SDN' },
+  });
+  await prisma.watchlistEntry.deleteMany({ where: { source: 'OFAC_SDN' } });
+  const run = await prisma.watchlistSyncRun.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'succeeded',
+      startedAt: new Date(),
+      completedAt: new Date(),
+    },
+  });
+  // Part B §6 — an entry belongs to a GENERATION, and only a PUBLISHED
+  // generation is visible to a screening. A fixture that skipped this would
+  // insert rows no screening can see, and the test would silently assert
+  // nothing.
+  const version = await prisma.watchlistDatasetVersion.create({
+    data: {
+      source: 'OFAC_SDN',
+      status: 'PUBLISHED',
+      version: `OFAC_SDN@fixture-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      recordCount: 1,
+      downloadedAt: new Date(),
+      validatedAt: new Date(),
+      publishedAt: new Date(),
+      syncRunId: run.id,
+    },
+  });
+  await prisma.watchlistEntry.create({
+    data: {
+      source: 'OFAC_SDN',
+      sourceRecordId: `e2e-customer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      fullName: 'Zzz Fictional Screening Fixture',
+      normalizedName: 'zzz fictional screening fixture',
+      canonicalTokens: ['fictional', 'fixture', 'screening', 'zzz'],
+      syncRunId: run.id,
+      datasetVersionId: version.id,
+    },
+  });
 }
 
 describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () => {
@@ -378,7 +437,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get('/customers?search=trade')
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -410,7 +471,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get(`/customers?search=${encodeURIComponent('سيارة')}`)
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -449,7 +512,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get('/customers?search=Ahmad')
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -481,7 +546,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get(`/customers?search=${encodeURIComponent('خالد')}`)
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customerId);
     });
 
@@ -502,8 +569,97 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get('/customers?search=')
         .set(bearer(sales.accessToken))
         .expect(200);
-      const ids = (res.body as CustomerBody[]).map((c) => c.id);
+      const ids = (res.body as { items: CustomerBody[] }).items.map(
+        (c) => c.id,
+      );
       expect(ids).toContain(customer.id);
+    });
+
+    it('pages the list: two pages, disjoint rows, a stable total', async () => {
+      const app = await boot();
+      // A fresh owner, so this caller's whole book is exactly the three rows
+      // created below and the assertions are about a known set rather than
+      // whatever db-test has accumulated.
+      const sales = await makeUser(
+        app,
+        'cust-paging',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      await createIndividualCustomer(app, sales.accessToken, `Awwal ${unique}`);
+      await createIndividualCustomer(app, sales.accessToken, `Thani ${unique}`);
+      await createIndividualCustomer(
+        app,
+        sales.accessToken,
+        `Thalith ${unique}`,
+      );
+
+      const pageOf = async (qs: string) => {
+        const res = await request(app.getHttpServer())
+          .get(`/customers?${qs}`)
+          .set(bearer(sales.accessToken))
+          .expect(200);
+        return res.body as {
+          items: CustomerBody[];
+          total: number;
+          page: number;
+          pageSize: number;
+        };
+      };
+
+      const first = await pageOf('pageSize=2');
+      expect(first.items).toHaveLength(2);
+      expect(first.page).toBe(0);
+      expect(first.pageSize).toBe(2);
+      // `total` is the whole matching set, not this page — it is what the page
+      // control renders "of N" from and how it knows when to stop.
+      expect(first.total).toBe(3);
+
+      const second = await pageOf('page=1&pageSize=2');
+      expect(second.items).toHaveLength(1);
+      expect(second.page).toBe(1);
+      expect(second.total).toBe(3);
+
+      // The two pages must not overlap, or paging through the list would show
+      // the same customer twice and skip another.
+      const firstIds = first.items.map((c) => c.id);
+      const secondIds = second.items.map((c) => c.id);
+      expect(firstIds).toHaveLength(new Set(firstIds).size);
+      expect(firstIds.some((id) => secondIds.includes(id))).toBe(false);
+      expect(new Set([...firstIds, ...secondIds]).size).toBe(3);
+
+      // Past the end is an empty page, not an error: the client may hold a
+      // stale page number after rows are deleted.
+      const past = await pageOf('page=9&pageSize=2');
+      expect(past.items).toHaveLength(0);
+      expect(past.total).toBe(3);
+    });
+
+    it('clamps a hostile page size instead of running the unbounded query', async () => {
+      const app = await boot();
+      const sales = await makeUser(
+        app,
+        'cust-paging-clamp',
+        'SALES_RELATIONSHIP_OFFICER',
+      );
+
+      // The whole point of MAX_PAGE_SIZE: `?pageSize=100000` is the unbounded
+      // read this work exists to remove, so it is clamped rather than obeyed.
+      const res = await request(app.getHttpServer())
+        .get('/customers?pageSize=100000')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      const body = res.body as { pageSize: number; items: CustomerBody[] };
+      expect(body.pageSize).toBe(200);
+      expect(body.items.length).toBeLessThanOrEqual(200);
+
+      // A negative page is clamped to the first one rather than producing a
+      // negative OFFSET, which Postgres would reject outright.
+      const negative = await request(app.getHttpServer())
+        .get('/customers?page=-5')
+        .set(bearer(sales.accessToken))
+        .expect(200);
+      expect((negative.body as { page: number }).page).toBe(0);
     });
 
     it('a nonsense search term matches nothing', async () => {
@@ -519,7 +675,11 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         .get(`/customers?search=${nonsense}`)
         .set(bearer(sales.accessToken))
         .expect(200);
-      expect(res.body as CustomerBody[]).toHaveLength(0);
+      const page = res.body as { items: CustomerBody[]; total: number };
+      expect(page.items).toHaveLength(0);
+      // `total` counts the whole matching set, so an empty page here is a
+      // genuinely empty result rather than a page past the end of one.
+      expect(page.total).toBe(0);
     });
   });
 
@@ -650,6 +810,9 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
   describe('full KYC lifecycle — standard (no hit)', () => {
     it('submit -> run-screening -> approve activates the Customer, and a self-approval is rejected', async () => {
       const app = await boot();
+      // The premise of this test is "screened, and nothing was found" — which
+      // needs a list to have been searched. See the helper.
+      await seedWatchlistFixtureEntry();
       const sales = await makeUser(
         app,
         'kyc-owner-a',

@@ -3,7 +3,8 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -497,5 +498,68 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       .post(`/legal-holds/${hold.id}/release`)
       .set(bearer(dpo.accessToken))
       .expect(201);
+  });
+
+  /**
+   * Part V cross-cutting item 5 (Phase 6) — the small-office edge case §10.5
+   * names: ONE person holding both the Branch/Department Manager and the DPO
+   * title.
+   *
+   * The pre-existing dual-control test above proves a manager cannot approve —
+   * but it proves it with a 403, because that manager holds no
+   * `retention.dispose.approve` at all. That is the permission gate, not
+   * maker/checker. This user holds BOTH roles and therefore DOES hold the
+   * permission, so the only thing left standing between them and approving
+   * their own destruction batch is `assertDifferentActors` and the
+   * `DisposalBatch_maker_checker_distinct` CHECK. Untested until now.
+   */
+  it('refuses self-approval by one person holding BOTH the manager and DPO roles (item 5)', async () => {
+    const app = await boot();
+    const both = await makeUser(
+      app,
+      'disposal-dual-role',
+      'BRANCH_DEPARTMENT_MANAGER',
+      'DATA_PROTECTION_OFFICER',
+    );
+
+    const category = `dual-role-${Date.now()}`;
+    const item = await request(app.getHttpServer())
+      .post('/retention-schedule')
+      .set(bearer(both.accessToken))
+      .send({
+        recordCategory: category,
+        retentionPeriodMonths: 12,
+        legalBasis: 'PDPL Article 5',
+      })
+      .expect(201);
+    const itemId = (item.body as { id: string }).id;
+
+    const batch = await request(app.getHttpServer())
+      .post('/disposal-batches')
+      .set(bearer(both.accessToken))
+      .send({ retentionScheduleItemId: itemId })
+      .expect(201);
+    const batchId = (batch.body as { id: string }).id;
+
+    // Holds the permission — so this is NOT a 403. It is the maker/checker
+    // rule refusing a second signature from the first signatory.
+    const refused = await request(app.getHttpServer())
+      .post(`/disposal-batches/${batchId}/dpo-approve`)
+      .set(bearer(both.accessToken))
+      .expect(403);
+    // Also a 403, like the permission refusal in the test above — so the
+    // MESSAGE is what distinguishes them, and asserting it is the only way
+    // this test proves maker/checker rather than re-proving the guard.
+    expect((refused.body as { message: string }).message).toContain(
+      'the checker must be a different user than the maker',
+    );
+    expect(JSON.stringify(refused.body)).toMatch(/same|different|actor/i);
+
+    // And the batch really did not move — the refusal is not cosmetic.
+    const still = await prisma.disposalBatch.findUniqueOrThrow({
+      where: { id: batchId },
+    });
+    expect(still.dpoApprovedByUserId).toBeNull();
+    expect(still.status).toBe('NOMINATED');
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -11,12 +12,14 @@ import { assembleInsuranceProgram } from '../../../../lib/insurance-program/insu
 import { ApiError } from '../../../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import { useLanguage } from '../../../../lib/i18n/language-context';
 import {
   coverageTagListStyle,
   coverageTagStyle,
 } from '../../../../components/needs-assessment/needs-assessment.styles';
 
 function AssembleFlow() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const needsAssessmentId = searchParams.get('needsAssessmentId') ?? '';
@@ -34,19 +37,19 @@ function AssembleFlow() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'That needs assessment could not be found — it may not exist, or you may not have access to it.'
+          ? t('iprognNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the needs assessment — try again.',
+            : t('iprognLoadError'),
       );
     }
-  }, [needsAssessmentId]);
+  }, [needsAssessmentId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function handleAssemble() {
     setAssembleError(null);
@@ -58,7 +61,7 @@ function AssembleFlow() {
       setAssembleError(
         err instanceof ApiError
           ? err.message
-          : 'Could not assemble the program — try again.',
+          : t('iprognAssembleError'),
       );
       setBusy(false);
     }
@@ -67,8 +70,7 @@ function AssembleFlow() {
   if (!needsAssessmentId) {
     return (
       <p role="alert" style={errorStyle}>
-        No needs assessment selected — open an approved needs assessment and
-        assemble the program from there.
+        {t('iprognNoAssessmentSelected')}
       </p>
     );
   }
@@ -80,28 +82,27 @@ function AssembleFlow() {
       </p>
     );
   }
-  if (!assessment) return <p>Loading…</p>;
+  if (!assessment) return <p>{t('iprognLoading')}</p>;
 
   const isApproved = assessment.status === 'APPROVED';
 
   return (
     <>
       <p style={{ opacity: 0.8 }}>
-        Needs assessment {assessment.id.slice(0, 8)} — status {assessment.status}.
+        Needs assessment {assessment.id.slice(0, 8)} — status {t(ENUM_LABEL.NeedsAssessmentStatus[assessment.status])}.
       </p>
 
       {!isApproved ? (
         <p role="alert" style={errorStyle}>
-          A program can only be assembled from an <strong>approved</strong>{' '}
-          needs assessment. This one is {assessment.status}.
+          {t('iprognOnlyApproved')} <strong>{t('iprognApprovedWord')}</strong>.{' '}
+          {t('iprognThisOneIs', { status: assessment.status })}
         </p>
       ) : null}
 
-      <h2 style={{ marginTop: '1.5rem' }}>Coverage lines to assemble</h2>
+      <h2 style={{ marginTop: '1.5rem' }}>{t('iprognCoverageLines')}</h2>
       {assessment.recommendedCoverageLines.length === 0 ? (
-        <p style={{ opacity: 0.6 }}>
-          This needs assessment recommends no coverage lines — nothing to
-          assemble.
+        <p style={{ color: 'var(--ink-secondary)' }}>
+          {t('iprognNoLines')}
         </p>
       ) : (
         <ul style={coverageTagListStyle}>
@@ -114,9 +115,7 @@ function AssembleFlow() {
       )}
 
       <p style={{ opacity: 0.7, fontSize: '0.85rem', marginTop: '1rem' }}>
-        Property All Risks and Business Interruption lines are seeded with the
-        Sum Insured derived from the risk survey; every other line&apos;s basis
-        is set later at the quotation stage.
+        {t('iprognIntro')}
       </p>
 
       <button
@@ -125,7 +124,7 @@ function AssembleFlow() {
         style={buttonStyle}
         onClick={() => void handleAssemble()}
       >
-        {busy ? 'Assembling…' : 'Assemble insurance program'}
+        {busy ? t('iprognAssembling') : t('iprognAssembleButton')}
       </button>
 
       {assembleError ? (
@@ -138,12 +137,13 @@ function AssembleFlow() {
 }
 
 export default function NewInsuranceProgramPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
@@ -156,7 +156,7 @@ export default function NewInsuranceProgramPage() {
       >
         ← Back
       </button>
-      <h1>Assemble an insurance program</h1>
+      <h1>{t('iprognHeading')}</h1>
       <Suspense fallback={null}>
         <AssembleFlow />
       </Suspense>

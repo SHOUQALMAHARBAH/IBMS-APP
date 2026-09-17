@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F — Bilingual UI (backlog Part 11), item #3: "Bidirectional (bidi)
 // text handling for mixed-content fields" — e.g. an Arabic customer name, an
@@ -29,7 +30,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 

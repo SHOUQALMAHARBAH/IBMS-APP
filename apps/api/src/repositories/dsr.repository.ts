@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { DataSubjectRequest, DsrStatus, DsrType, Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** The one terminal state; everything else is still the DPO's problem. */
+const CLOSED_DSR_STATUS = 'CLOSED' as DsrStatus;
+
 export interface DsrScope {
   customerId?: string;
   insuredPersonId?: string;
@@ -64,6 +67,26 @@ export class DsrRepository {
   findById(id: string): Promise<DataSubjectRequest | null> {
     return this.prisma.client.dataSubjectRequest.findUnique({
       where: { id },
+    });
+  }
+
+  /**
+   * The DPO's open-request queue (Part D §5.1 item #9).
+   *
+   * Filtered in SQL and ordered OLDEST FIRST, both load-bearing. The previous
+   * shape — take the N most recent, then drop the closed ones in memory — has
+   * two failure modes that get worse as the table grows: an open request older
+   * than the window never reaches the queue at all, and the request that falls
+   * out first is the oldest, which for a statutory-deadline queue is precisely
+   * the one closest to breaching. Filtering first means the cap applies to
+   * OPEN requests only; ordering ascending means that if the cap is ever hit,
+   * what it truncates is the least urgent tail, never the most urgent head.
+   */
+  findOpenQueue(take: number): Promise<DataSubjectRequest[]> {
+    return this.prisma.client.dataSubjectRequest.findMany({
+      where: { status: { not: CLOSED_DSR_STATUS } },
+      orderBy: { createdAt: 'asc' },
+      take,
     });
   }
 

@@ -32,12 +32,12 @@ import {
   rfqTableStyle,
 } from '../../../../components/rfq/rfq.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDate, formatDateTime } from '../../../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../../../lib/i18n/translations';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const PLACEMENT_ROLE = 'PLACEMENT_TECHNICAL_OFFICER';
 
 // The medium of a broker<->insurer exchange. The API accepts the full
 // InteractionChannel enum; this is the practical subset for placement work.
@@ -53,16 +53,16 @@ const RFQ_INSURER_STATUS_LABEL_KEY: Record<RfqInsurerStatus, TranslationKey> = {
 };
 
 const COMM_DIRECTION_BADGE_LABEL_KEY: Record<CommunicationDirection, TranslationKey> = {
-  INBOUND: 'commDirectionInboundBadge',
-  OUTBOUND: 'commDirectionOutboundBadge',
+  INBOUND: 'rfqCommDirectionInboundBadge',
+  OUTBOUND: 'rfqCommDirectionOutboundBadge',
 };
 
 const COMM_CHANNEL_LABEL_KEY: Record<(typeof COMM_CHANNELS)[number], TranslationKey> = {
-  EMAIL: 'commChannelEmail',
-  CALL: 'commChannelCall',
-  PORTAL: 'commChannelPortal',
-  MEETING: 'commChannelMeeting',
-  OTHER: 'commChannelOther',
+  EMAIL: 'rfqCommChannelEmail',
+  CALL: 'rfqCommChannelCall',
+  PORTAL: 'rfqCommChannelPortal',
+  MEETING: 'rfqCommChannelMeeting',
+  OTHER: 'rfqCommChannelOther',
 };
 
 function fmt(value: string | null, language: Language): string {
@@ -126,7 +126,7 @@ export default function RfqDetailPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -134,7 +134,7 @@ export default function RfqDetailPage() {
       await load();
       await loadComms();
     })();
-  }, [user, load, loadComms]);
+  }, [user, load, loadComms, t]);
 
   async function changeStatus(submissionId: string, toStatus: RfqInsurerStatus) {
     setRowError(null);
@@ -217,7 +217,7 @@ export default function RfqDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const isPlacement = user.roles.includes(PLACEMENT_ROLE);
+  const isPlacement = hasPermission(user, 'rfq.insurer.update');
   const shortlistedIds = new Set(
     rfq?.insurerSubmissions.map((s) => s.insurerId) ?? [],
   );
@@ -260,15 +260,15 @@ export default function RfqDetailPage() {
           />
           <PrivacyNoticeDisplay
             touchpoint="rfq_market_placement"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <h2 style={{ marginTop: '2rem' }}>{t('rfqSubmissionsHeading')}</h2>
-          <p style={{ opacity: 0.6, fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
             {t('rfqSubmissionsHint')}
           </p>
           {rfq.insurerSubmissions.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rfqSubmissionsNone')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rfqSubmissionsNone')}</p>
           ) : (
             <table style={rfqTableStyle}>
               <thead>
@@ -372,7 +372,7 @@ export default function RfqDetailPage() {
                         ))}
                       {insurers.filter((i) => !shortlistedIds.has(i.id))
                         .length === 0 ? (
-                        <span style={{ opacity: 0.6 }}>
+                        <span style={{ color: 'var(--ink-secondary)' }}>
                           {t('rfqAllInsurersAlreadyOnRfq')}
                         </span>
                       ) : null}
@@ -431,7 +431,7 @@ export default function RfqDetailPage() {
           {comms === null ? (
             <p>{t('commonLoading')}</p>
           ) : comms.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t('rfqCorrespondenceNone')}</p>
+            <p style={{ color: 'var(--ink-secondary)' }}>{t('rfqCorrespondenceNone')}</p>
           ) : (
             <table style={rfqTableStyle}>
               <thead>

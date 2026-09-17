@@ -43,32 +43,32 @@ const PROPOSAL_FORM_SKELETON_AR = (lineAr: string) =>
 
 export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
   {
-    templateType: 'proposal_form_motor',
-    nameEn: 'Motor Insurance Proposal Form',
-    nameAr: 'نموذج طلب تأمين المركبات',
-    bodyEn: PROPOSAL_FORM_SKELETON_EN('Motor'),
-    bodyAr: PROPOSAL_FORM_SKELETON_AR('المركبات'),
+    templateType: "proposal_form_motor",
+    nameEn: "Motor Insurance Proposal Form",
+    nameAr: "نموذج طلب تأمين المركبات",
+    bodyEn: PROPOSAL_FORM_SKELETON_EN("Motor"),
+    bodyAr: PROPOSAL_FORM_SKELETON_AR("المركبات"),
   },
   {
-    templateType: 'proposal_form_general',
-    nameEn: 'General Insurance Proposal Form (Property/Liability/Marine)',
-    nameAr: 'نموذج طلب تأمين عام (ممتلكات / مسؤولية / بحري)',
-    bodyEn: PROPOSAL_FORM_SKELETON_EN('General'),
-    bodyAr: PROPOSAL_FORM_SKELETON_AR('عام'),
+    templateType: "proposal_form_general",
+    nameEn: "General Insurance Proposal Form (Property/Liability/Marine)",
+    nameAr: "نموذج طلب تأمين عام (ممتلكات / مسؤولية / بحري)",
+    bodyEn: PROPOSAL_FORM_SKELETON_EN("General"),
+    bodyAr: PROPOSAL_FORM_SKELETON_AR("عام"),
   },
   {
-    templateType: 'proposal_form_health',
-    nameEn: 'Health Insurance Proposal Form (Group/Individual Medical)',
-    nameAr: 'نموذج طلب التأمين الصحي (جماعي / فردي)',
-    bodyEn: PROPOSAL_FORM_SKELETON_EN('Health'),
-    bodyAr: PROPOSAL_FORM_SKELETON_AR('صحي'),
+    templateType: "proposal_form_health",
+    nameEn: "Health Insurance Proposal Form (Group/Individual Medical)",
+    nameAr: "نموذج طلب التأمين الصحي (جماعي / فردي)",
+    bodyEn: PROPOSAL_FORM_SKELETON_EN("Health"),
+    bodyAr: PROPOSAL_FORM_SKELETON_AR("صحي"),
   },
   {
-    templateType: 'proposal_form_life',
-    nameEn: 'Life Insurance Proposal Form (Group/Individual Life)',
-    nameAr: 'نموذج طلب التأمين على الحياة (جماعي / فردي)',
-    bodyEn: PROPOSAL_FORM_SKELETON_EN('Life'),
-    bodyAr: PROPOSAL_FORM_SKELETON_AR('على الحياة'),
+    templateType: "proposal_form_life",
+    nameEn: "Life Insurance Proposal Form (Group/Individual Life)",
+    nameAr: "نموذج طلب التأمين على الحياة (جماعي / فردي)",
+    bodyEn: PROPOSAL_FORM_SKELETON_EN("Life"),
+    bodyAr: PROPOSAL_FORM_SKELETON_AR("على الحياة"),
   },
   /**
    * Part F item #7 — the first of `templateType`'s 6 real (non-proposal-
@@ -83,18 +83,18 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
    * fallback-default text never silently diverge.
    */
   {
-    templateType: 'complaint_acknowledgement',
-    nameEn: 'Complaint Acknowledgement',
-    nameAr: 'إشعار استلام شكوى',
+    templateType: "complaint_acknowledgement",
+    nameEn: "Complaint Acknowledgement",
+    nameAr: "إشعار استلام شكوى",
     bodyEn:
-      'Thank you for contacting us. We confirm that we have received your ' +
-      'complaint and that it has been logged for review. Our team will ' +
-      'investigate the matter and keep you informed of its progress.\n' +
-      'We appreciate your patience and your continued trust in us.',
+      "Thank you for contacting us. We confirm that we have received your " +
+      "complaint and that it has been logged for review. Our team will " +
+      "investigate the matter and keep you informed of its progress.\n" +
+      "We appreciate your patience and your continued trust in us.",
     bodyAr:
-      'شكراً لتواصلكم معنا. نؤكد استلام شكواكم وتسجيلها للمراجعة. سيقوم ' +
-      'فريقنا بدراسة الموضوع وإبقائكم على اطلاع بمستجداته.\n' +
-      'نقدّر صبركم وثقتكم المستمرة بنا.',
+      "شكراً لتواصلكم معنا. نؤكد استلام شكواكم وتسجيلها للمراجعة. سيقوم " +
+      "فريقنا بدراسة الموضوع وإبقائكم على اطلاع بمستجداته.\n" +
+      "نقدّر صبركم وثقتكم المستمرة بنا.",
   },
   /**
    * Part F item #7 — the second of `templateType`'s 6 real document types
@@ -107,20 +107,20 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
    * the seeded and fallback-default text never silently diverge.
    */
   {
-    templateType: 'quotation_comparison',
-    nameEn: 'Quotation Comparison',
-    nameAr: 'مقارنة عروض التأمين',
+    templateType: "quotation_comparison",
+    nameEn: "Quotation Comparison",
+    nameAr: "مقارنة عروض التأمين",
     bodyEn:
-      'The following is a structured comparison of the quotations ' +
-      'received for this insurance requirement. Coverage, exclusions, ' +
-      'deductibles, limits, and insurer service quality have all been ' +
-      'considered alongside price — this comparison should never be ' +
-      'read on price alone.',
+      "The following is a structured comparison of the quotations " +
+      "received for this insurance requirement. Coverage, exclusions, " +
+      "deductibles, limits, and insurer service quality have all been " +
+      "considered alongside price — this comparison should never be " +
+      "read on price alone.",
     bodyAr:
-      'فيما يلي مقارنة منظّمة لعروض التأمين الواردة لهذا الطلب. تم النظر ' +
-      'في التغطية والاستثناءات والتحملات وحدود التغطية وجودة خدمة شركة ' +
-      'التأمين إلى جانب السعر — لا ينبغي قراءة هذه المقارنة بناءً على ' +
-      'السعر فقط.',
+      "فيما يلي مقارنة منظّمة لعروض التأمين الواردة لهذا الطلب. تم النظر " +
+      "في التغطية والاستثناءات والتحملات وحدود التغطية وجودة خدمة شركة " +
+      "التأمين إلى جانب السعر — لا ينبغي قراءة هذه المقارنة بناءً على " +
+      "السعر فقط.",
   },
   /**
    * Part F item #7 — the third of `templateType`'s 6 real document types
@@ -135,20 +135,20 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
    * diverge.
    */
   {
-    templateType: 'recommendation_report',
-    nameEn: 'Recommendation Report',
-    nameAr: 'تقرير التوصية',
+    templateType: "recommendation_report",
+    nameEn: "Recommendation Report",
+    nameAr: "تقرير التوصية",
     bodyEn:
-      'Based on a structured comparison of the quotations received for ' +
-      'this insurance requirement, we recommend the following. Our ' +
-      'assessment considered coverage, price, insurer financial ' +
-      'strength, claims service, deductible, and policy conditions ' +
-      'together — never price alone.',
+      "Based on a structured comparison of the quotations received for " +
+      "this insurance requirement, we recommend the following. Our " +
+      "assessment considered coverage, price, insurer financial " +
+      "strength, claims service, deductible, and policy conditions " +
+      "together — never price alone.",
     bodyAr:
-      'بناءً على مقارنة منظّمة لعروض التأمين الواردة لهذا الطلب، نوصي ' +
-      'بما يلي. أخذ تقييمنا بعين الاعتبار التغطية والسعر والقوة المالية ' +
-      'لشركة التأمين وخدمة المطالبات والتحمل وشروط الوثيقة معاً — وليس ' +
-      'السعر فقط.',
+      "بناءً على مقارنة منظّمة لعروض التأمين الواردة لهذا الطلب، نوصي " +
+      "بما يلي. أخذ تقييمنا بعين الاعتبار التغطية والسعر والقوة المالية " +
+      "لشركة التأمين وخدمة المطالبات والتحمل وشروط الوثيقة معاً — وليس " +
+      "السعر فقط.",
   },
   /**
    * Part F item #7 — the fourth of `templateType`'s 6 real document types
@@ -163,20 +163,20 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
    * diverge.
    */
   {
-    templateType: 'policy_schedule_summary',
-    nameEn: 'Policy Schedule Summary',
-    nameAr: 'ملخص جدول الوثيقة',
+    templateType: "policy_schedule_summary",
+    nameEn: "Policy Schedule Summary",
+    nameAr: "ملخص جدول الوثيقة",
     bodyEn:
-      'This document summarizes the coverage currently in force under ' +
-      'this policy, as recorded from the insurer-issued schedule. ' +
-      'Please review the limits, sums insured, named perils and ' +
-      'extensions below, and contact us promptly if anything does not ' +
-      'match your requirements.',
+      "This document summarizes the coverage currently in force under " +
+      "this policy, as recorded from the insurer-issued schedule. " +
+      "Please review the limits, sums insured, named perils and " +
+      "extensions below, and contact us promptly if anything does not " +
+      "match your requirements.",
     bodyAr:
-      'يلخّص هذا المستند التغطية السارية حالياً بموجب هذه الوثيقة، كما ' +
-      'وردت في الجدول الصادر عن شركة التأمين. يرجى مراجعة الحدود ' +
-      'ومبالغ التأمين والأخطار المسماة والامتدادات أدناه، والتواصل ' +
-      'معنا فوراً في حال وجود أي تعارض مع متطلباتكم.',
+      "يلخّص هذا المستند التغطية السارية حالياً بموجب هذه الوثيقة، كما " +
+      "وردت في الجدول الصادر عن شركة التأمين. يرجى مراجعة الحدود " +
+      "ومبالغ التأمين والأخطار المسماة والامتدادات أدناه، والتواصل " +
+      "معنا فوراً في حال وجود أي تعارض مع متطلباتكم.",
   },
   /**
    * Part F item #7 — the fifth of `templateType`'s 6 real document types
@@ -192,17 +192,17 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
    * fallback-default text never silently diverge.
    */
   {
-    templateType: 'invoice',
-    nameEn: 'Premium Invoice',
-    nameAr: 'فاتورة قسط التأمين',
+    templateType: "invoice",
+    nameEn: "Premium Invoice",
+    nameAr: "فاتورة قسط التأمين",
     bodyEn:
-      'This is your invoice for the insurance premium below. Please ' +
-      'arrange payment by the due date shown. Contact us promptly if ' +
-      'you have any questions about this invoice.',
+      "This is your invoice for the insurance premium below. Please " +
+      "arrange payment by the due date shown. Contact us promptly if " +
+      "you have any questions about this invoice.",
     bodyAr:
-      'هذه فاتورتكم لقسط التأمين المبيّن أدناه. يرجى ترتيب السداد قبل ' +
-      'تاريخ الاستحقاق المذكور. يرجى التواصل معنا فوراً في حال وجود أي ' +
-      'استفسار بخصوص هذه الفاتورة.',
+      "هذه فاتورتكم لقسط التأمين المبيّن أدناه. يرجى ترتيب السداد قبل " +
+      "تاريخ الاستحقاق المذكور. يرجى التواصل معنا فوراً في حال وجود أي " +
+      "استفسار بخصوص هذه الفاتورة.",
   },
   /**
    * Part F item #7 — the sixth and final of `templateType`'s 6 real
@@ -219,17 +219,17 @@ export const DOCUMENT_TEMPLATES: DocumentTemplateSeed[] = [
    * seeded and fallback-default text never silently diverge.
    */
   {
-    templateType: 'certificate_of_insurance',
-    nameEn: 'Certificate of Insurance',
-    nameAr: 'شهادة تأمين',
+    templateType: "certificate_of_insurance",
+    nameEn: "Certificate of Insurance",
+    nameAr: "شهادة تأمين",
     bodyEn:
-      'This certificate is issued as a summary of coverage currently in ' +
-      'force and is not evidence of a contract of insurance — the ' +
-      'policy wording governs. Please contact us promptly if any detail ' +
-      'below does not match your requirements.',
+      "This certificate is issued as a summary of coverage currently in " +
+      "force and is not evidence of a contract of insurance — the " +
+      "policy wording governs. Please contact us promptly if any detail " +
+      "below does not match your requirements.",
     bodyAr:
-      'تصدر هذه الشهادة كملخص للتغطية السارية حالياً وليست دليلاً على ' +
-      'عقد التأمين — تحكمها شروط الوثيقة. يرجى التواصل معنا فوراً في ' +
-      'حال وجود أي تعارض بين ما ورد أدناه ومتطلباتكم.',
+      "تصدر هذه الشهادة كملخص للتغطية السارية حالياً وليست دليلاً على " +
+      "عقد التأمين — تحكمها شروط الوثيقة. يرجى التواصل معنا فوراً في " +
+      "حال وجود أي تعارض بين ما ورد أدناه ومتطلباتكم.",
   },
 ];

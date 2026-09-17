@@ -144,7 +144,7 @@ export class ConsentService {
     const requestedAt = new Date();
     let dueAt: Date | null = null;
     try {
-      const dueAtComputed = this.slaTimer.computeDueAt(
+      const dueAtComputed = await this.slaTimer.computeDueAt(
         CONSENT_SLA_WORKFLOW,
         requestedAt,
       );

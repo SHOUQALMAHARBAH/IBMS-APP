@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -68,7 +69,7 @@ test("the search box re-fetches with a search querystring and renders the filter
   await expect(page.getByRole("cell", { name: "Acme Office Supplies" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "Nour Printing House" })).toBeVisible();
 
-  await page.getByLabel("Search").fill("Nour");
+  await page.getByLabel("Search", { exact: true }).fill("Nour");
   await page.getByRole("button", { name: "Search" }).click();
 
   await expect(page.getByRole("cell", { name: "Nour Printing House" })).toBeVisible();

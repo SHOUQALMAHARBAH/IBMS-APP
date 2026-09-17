@@ -1,6 +1,8 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -12,19 +14,20 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
-const FINANCE_ROLE = 'FINANCE_COLLECTIONS_OFFICER';
-const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'];
+const CHANNEL_TYPES = ['bank_transfer', 'cheque', 'card', 'cash'] as const;
 
 const cellStyle: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
 const headCellStyle: CSSProperties = {
   ...cellStyle,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 const labelStyle: CSSProperties = {
   display: 'flex',
@@ -35,7 +38,8 @@ const labelStyle: CSSProperties = {
 export default function PaymentChannelsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && user.roles.includes(FINANCE_ROLE);
+  const { t } = useLanguage();
+  const canManage = hasPermission(user, 'payment-channel.manage');
 
   const [rows, setRows] = useState<PaymentChannel[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -57,24 +61,24 @@ export default function PaymentChannelsPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the payment-channel.manage permission, so there's nothing to show here."
+          ? t('pcNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the payment-channel list — try again.',
+            : t('pcLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -100,7 +104,7 @@ export default function PaymentChannelsPage() {
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not add the payment channel — try again.',
+          : t('pcAddError'),
       );
     } finally {
       setBusy(false);
@@ -115,7 +119,7 @@ export default function PaymentChannelsPage() {
       await load();
     } catch (err) {
       setFormError(
-        err instanceof ApiError ? err.message : 'Could not disable it — try again.',
+        err instanceof ApiError ? err.message : t('pcDisableError'),
       );
     } finally {
       setBusy(false);
@@ -126,12 +130,9 @@ export default function PaymentChannelsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Payment channels</h1>
+      <h1>{t('pcHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The approved payment channels for customers (money in, on a collection
-        receipt) and insurers (money out, on a remittance). Finance maintains
-        this list; a channel is usable the moment it is added and stays so until
-        it is disabled. Only the last few digits of an account are ever stored.
+        {t('pcIntro')}
       </p>
 
       {canManage ? (
@@ -146,61 +147,73 @@ export default function PaymentChannelsPage() {
           }}
         >
           <label style={labelStyle}>
-            Owner
+            {t('pcOwnerFieldLabel')}
             <select
-              aria-label="Owner type"
+              aria-label={t('pcOwnerTypeAria')}
               value={ownerType}
               onChange={(e) => setOwnerType(e.target.value)}
             >
-              <option value="customer">Customer</option>
-              <option value="insurer">Insurer</option>
+              <option value="customer">{t('pcCustomer')}</option>
+              <option value="insurer">{t('pcInsurer')}</option>
             </select>
           </label>
-          <label style={labelStyle}>
-            {ownerType === 'customer' ? 'Customer ID' : 'Insurer ID'}
-            <input
-              aria-label="Owner id"
+          {/* The insurer branch keeps the id field: insurers are a different
+              list with a different search, and a customer picker there would
+              be worse than the box it replaced. */}
+          {ownerType === 'customer' ? (
+            <CustomerPicker
               value={ownerId}
-              onChange={(e) => setOwnerId(e.target.value)}
+              onChange={setOwnerId}
+              label={t('pcCustomerIdLabel')}
               required
             />
-          </label>
+          ) : (
+            <label style={labelStyle}>
+              {t('pcInsurerIdLabel')}
+              <input
+                aria-label={t('pcOwnerIdAria')}
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value)}
+                required
+              />
+            </label>
+          )}
           <label style={labelStyle}>
-            Channel type
+            {t('pcChannelTypeLabel')}
             <select
-              aria-label="Channel type"
+              aria-label={t('pcChannelTypeLabel')}
               value={channelType}
               onChange={(e) => setChannelType(e.target.value)}
             >
-              {CHANNEL_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {CHANNEL_TYPES.map((opt) => (
+                <option key={opt} value={opt}>
+                  {t(ENUM_LABEL.PaymentChannelType[opt])}
                 </option>
               ))}
             </select>
           </label>
           <label style={labelStyle}>
-            Label
+            {t('pcLabelLabel')}
             <input
-              aria-label="Label"
+              aria-label={t('pcLabelLabel')}
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="Cairo Amman Bank — JOD"
+              placeholder={t('pcBankPlaceholder')}
               required
             />
           </label>
           <label style={labelStyle}>
-            Bank name
+            {t('pcBankNameLabel')}
             <input
-              aria-label="Bank name"
+              aria-label={t('pcBankNameLabel')}
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
             />
           </label>
           <label style={labelStyle}>
-            Account (last 2–4 digits)
+            {t('pcAccountLabel')}
             <input
-              aria-label="Account last 4"
+              aria-label={t('pcAccountAria')}
               value={accountLast4}
               onChange={(e) => setAccountLast4(e.target.value)}
               inputMode="numeric"
@@ -208,7 +221,7 @@ export default function PaymentChannelsPage() {
             />
           </label>
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Add channel'}
+            {busy ? t('pcSavingButton') : t('pcAddButton')}
           </button>
         </form>
       ) : null}
@@ -225,19 +238,19 @@ export default function PaymentChannelsPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No payment channels yet.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('pcNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '48rem' }}>
               <thead>
                 <tr>
-                  <th style={headCellStyle}>Owner</th>
-                  <th style={headCellStyle}>Owner ID</th>
-                  <th style={headCellStyle}>Type</th>
-                  <th style={headCellStyle}>Label</th>
-                  <th style={headCellStyle}>Bank</th>
-                  <th style={headCellStyle}>Acct</th>
-                  <th style={headCellStyle}>Status</th>
+                  <th style={headCellStyle}>{t('pcOwnerLabel')}</th>
+                  <th style={headCellStyle}>{t('pcOwnerIdLabel')}</th>
+                  <th style={headCellStyle}>{t('pcColType')}</th>
+                  <th style={headCellStyle}>{t('pcLabelLabel')}</th>
+                  <th style={headCellStyle}>{t('pcColBank')}</th>
+                  <th style={headCellStyle}>{t('pcColAccount')}</th>
+                  <th style={headCellStyle}>{t('pcColStatus')}</th>
                   <th style={headCellStyle} />
                 </tr>
               </thead>
@@ -253,7 +266,7 @@ export default function PaymentChannelsPage() {
                       {r.accountLast4 ? `••••${r.accountLast4}` : '—'}
                     </td>
                     <td style={cellStyle}>
-                      {r.isActive ? <strong>Active</strong> : 'Disabled'}
+                      {r.isActive ? <strong>{t('pcActive')}</strong> : t('pcDisabled')}
                     </td>
                     <td style={cellStyle}>
                       {canManage && r.isActive ? (
@@ -262,7 +275,7 @@ export default function PaymentChannelsPage() {
                           disabled={busy}
                           onClick={() => void disable(r.id)}
                         >
-                          Disable
+                          {t('pcDisableButton')}
                         </button>
                       ) : null}
                     </td>
@@ -273,7 +286,7 @@ export default function PaymentChannelsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('pcLoading')}</p>
       )}
     </main>
   );

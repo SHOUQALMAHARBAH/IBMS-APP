@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiPost, setAccessToken } from './api-client';
 import { me as fetchMe, type MeResponse } from './auth-api';
-import { IdleLockOverlay } from '../../components/auth/IdleLockOverlay';
 
 interface AuthContextValue {
   user: MeResponse | null;
@@ -57,10 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ user, isLoading, refreshUser, clearUser }), [user, isLoading, refreshUser, clearUser]);
 
   return (
-    <AuthContext.Provider value={value}>
-      {children}
-      {user ? <IdleLockOverlay user={user} onLockedOut={clearUser} /> : null}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
 }
 

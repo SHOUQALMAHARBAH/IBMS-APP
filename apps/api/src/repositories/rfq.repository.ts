@@ -8,6 +8,7 @@ import type {
   RFQInsurer,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { INSURER_IDENTITY_SELECT, insurerIdentity } from './insurer-identity';
 
 export interface CreateRfqInput {
   opportunityId: string;
@@ -20,14 +21,7 @@ export interface CreateRfqInput {
  * shape every RFQ read returns. */
 export type RfqInsurerWithInsurer = Prisma.RFQInsurerGetPayload<{
   include: {
-    insurer: {
-      select: {
-        id: true;
-        name: true;
-        nameAr: true;
-        financialStrengthRating: true;
-      };
-    };
+    insurer: { select: typeof INSURER_IDENTITY_SELECT };
   };
 }>;
 
@@ -41,14 +35,7 @@ export type RfqWithSubmissions = Prisma.RFQGetPayload<{
  * per-insurer status change is resolved against `rfq.opportunity.customerId`. */
 export type RfqInsurerWithParents = Prisma.RFQInsurerGetPayload<{
   include: {
-    insurer: {
-      select: {
-        id: true;
-        name: true;
-        nameAr: true;
-        financialStrengthRating: true;
-      };
-    };
+    insurer: { select: typeof INSURER_IDENTITY_SELECT };
     rfq: { include: { opportunity: true } };
   };
 }>;
@@ -65,13 +52,6 @@ export interface SelectableInsurer {
   nameAr: string | null;
   financialStrengthRating: string | null;
 }
-
-const INSURER_IDENTITY_SELECT = {
-  id: true,
-  name: true,
-  nameAr: true,
-  financialStrengthRating: true,
-} as const;
 
 /** Input for one broker<->insurer correspondence row on an RFQ (backlog
  * Part C #12). `sentAt` is when the exchange happened (defaults to now());
@@ -265,14 +245,17 @@ export class RfqRepository {
    * #11 — "select an insurer shortlist"). Read-only — there is no Insurer
    * module yet (narrative Process 31). */
   async findSelectableInsurers(): Promise<SelectableInsurer[]> {
-    const insurers = await this.prisma.client.insurer.findMany({
+    const rows = await this.prisma.client.insurer.findMany({
       select: INSURER_IDENTITY_SELECT,
     });
+    const insurers = rows.map(insurerIdentity);
     // Sorted in JS, not via Prisma `orderBy` (plain Postgres default
-    // collation) — Insurer.name is genuinely bilingual (Part F item #4), and
-    // a fixed 'ar' locale is the only way to get Arabic-aware ordering
-    // without a DB-level ICU collation migration. A small, unpaginated
-    // lookup list, so an in-memory sort is negligible cost.
+    // collation) — the insurer's legal name is genuinely bilingual (Part F
+    // item #4), and a fixed 'ar' locale is the only way to get Arabic-aware
+    // ordering without a DB-level ICU collation migration. Now that the name
+    // lives on the GLOBAL `InsurerMaster`, ordering by it in SQL would mean
+    // ordering by a joined column, which is a second reason to keep it here.
+    // A small, unpaginated lookup list, so an in-memory sort is negligible.
     return insurers.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }
 

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -65,7 +66,7 @@ test("lists open exceptions with the exact variance amount", async ({
   ).toBeVisible();
 
   await expect(page.getByRole("cell", { name: "5000.000" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "open", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Open", exact: true })).toBeVisible();
 
   // Finance sees the detect form + the per-row actions
   await expect(page.getByLabel("Statement lines")).toBeVisible();

@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -15,31 +16,27 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { hasPermission } from '../../../lib/auth/permissions';
 
-const MANAGE_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
 const head: CSSProperties = {
   ...cell,
   fontWeight: 600,
-  borderBottom: '2px solid #d1d5db',
+  borderBottom: '2px solid var(--border-default)',
 };
 
 export default function RenewalCasesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const isArabic = language === 'AR';
-  const canManage = !!user && user.roles.some((r) => MANAGE_ROLES.includes(r));
+  const canManage = hasPermission(user, 'renewal.manage');
 
   const [rows, setRows] = useState<RenewalCase[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -55,27 +52,23 @@ export default function RenewalCasesPage() {
       setRows(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? isArabic
-            ? 'لا تملك صلاحية renewal.read.'
-            : "You don't hold the renewal.read permission."
+          ? t('renNoPermission')
           : err instanceof ApiError
             ? err.message
-            : isArabic
-              ? 'تعذّر تحميل حالات التجديد — حاول مرة أخرى.'
-              : 'Could not load renewal cases — try again.',
+            : t('renCouldNotLoadRenewalCases'),
       );
     }
-  }, [isArabic]);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -87,9 +80,7 @@ export default function RenewalCasesPage() {
       setActionError(
         err instanceof ApiError
           ? err.message
-          : isArabic
-            ? 'فشل الإجراء — حاول مرة أخرى.'
-            : 'That action failed — try again.',
+          : t('renThatActionFailedTryAgain'),
       );
     } finally {
       setBusy(false);
@@ -112,17 +103,15 @@ export default function RenewalCasesPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>{isArabic ? 'حالات التجديد' : 'Renewal cases'}</h1>
+      <h1>{t('renRenewalCases')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {isArabic
-          ? 'تُفتح حالة التجديد تلقائياً قبل انتهاء الوثيقة بمدة الإشعار المحددة (٩٠ يوماً افتراضياً). هذه هي الحالة التي يقرأها كل من احتساب نسبة الخسارة وكنس حالات الاحتفاظ ومؤقت اتفاقية مستوى الخدمة.'
-          : 'A renewal case opens automatically at the configured lead time before a policy expires (90 days by default). It is the record the loss-ratio recompute, the retention sweep and the renewal SLA timer all key off.'}
+        {t('renARenewalCaseOpensAutomatically')}
       </p>
 
       {canManage ? (
         <>
           <button type="button" disabled={busy} onClick={() => void sweep()}>
-            {isArabic ? 'تشغيل كنس التجديد الآن' : 'Run renewal sweep now'}
+            {t('renRunRenewalSweepNow')}
           </button>
           {sweepMessage ? (
             <p style={{ opacity: 0.75 }}>{sweepMessage}</p>
@@ -143,28 +132,26 @@ export default function RenewalCasesPage() {
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>
-            {isArabic
-              ? 'لا توجد حالات تجديد.'
-              : 'No renewal cases — nothing is inside the lead-time window yet.'}
+          <p style={{ color: 'var(--ink-secondary)' }}>
+            {t('renNoRenewalCasesNothingIs')}
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '58rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>{isArabic ? 'العميل' : 'Customer'}</th>
-                  <th style={head}>{isArabic ? 'الوثيقة' : 'Policy'}</th>
-                  <th style={head}>{isArabic ? 'الفرع' : 'Line'}</th>
-                  <th style={head}>{isArabic ? 'الانتهاء' : 'Expires'}</th>
-                  <th style={head}>{isArabic ? 'الحالة' : 'Status'}</th>
+                  <th style={head}>{t('renCustomer')}</th>
+                  <th style={head}>{t('renPolicy')}</th>
+                  <th style={head}>{t('renLine')}</th>
+                  <th style={head}>{t('renExpires')}</th>
+                  <th style={head}>{t('renStatus')}</th>
                   <th style={head}>
-                    {isArabic ? 'نسبة الخسارة' : 'Loss ratio'}
+                    {t('renLossRatio')}
                   </th>
                   <th style={head}>
-                    {isArabic ? 'إعادة التسويق' : 'Re-marketing'}
+                    {t('renReMarketing')}
                   </th>
-                  <th style={head}>{isArabic ? 'إجراء' : 'Action'}</th>
+                  <th style={head}>{t('renAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,13 +161,11 @@ export default function RenewalCasesPage() {
                     <td style={cell}>{r.policyNumber ?? '—'}</td>
                     <td style={cell}>{r.insuranceLine}</td>
                     <td style={cell}>{r.expiryDate?.slice(0, 10) ?? '—'}</td>
-                    <td style={cell}>{r.status}</td>
+                    <td style={cell}>{t(ENUM_LABEL.RenewalStatus[r.status])}</td>
                     <td style={cell}>{r.lossRatio?.ratio ?? '—'}</td>
                     <td style={cell}>
                       {r.requiresRemarketing
-                        ? isArabic
-                          ? 'مطلوبة'
-                          : 'Required'
+                        ? t('renRequired')
                         : '—'}
                     </td>
                     <td style={cell}>
@@ -201,7 +186,7 @@ export default function RenewalCasesPage() {
                                 void run(() => transitionRenewalCase(r.id, next))
                               }
                             >
-                              {next}
+                              {t(ENUM_LABEL.RenewalStatus[next])}
                             </button>
                           ))}
                           {!r.insurerTermsWorsened ? (
@@ -216,9 +201,7 @@ export default function RenewalCasesPage() {
                                 )
                               }
                             >
-                              {isArabic
-                                ? 'شروط المؤمِّن ساءت'
-                                : 'Insurer terms worsened'}
+                              {t('renInsurerTermsWorsened')}
                             </button>
                           ) : null}
                           {!r.riskChangedSinceLastRenewal ? (
@@ -233,7 +216,7 @@ export default function RenewalCasesPage() {
                                 )
                               }
                             >
-                              {isArabic ? 'تغيّر الخطر' : 'Risk changed'}
+                              {t('renRiskChanged')}
                             </button>
                           ) : null}
                         </div>
@@ -245,7 +228,9 @@ export default function RenewalCasesPage() {
             </table>
           </div>
         )
-      ) : null}
+      ) : loadError ? null : (
+        <p>{t('renLoading')}</p>
+      )}
     </main>
   );
 }

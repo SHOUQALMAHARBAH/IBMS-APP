@@ -1,6 +1,10 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import type { TranslationKey } from '../../../lib/i18n/translations';
+import type { TimelineEvent } from '../../../lib/crm/crm-api';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
+import { SentenceWithLink } from '../../../components/ui/SentenceWithLink';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -26,28 +30,42 @@ import {
 } from '../../../components/crm/crm.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../lib/i18n/format';
+import { hasPermission } from '../../../lib/auth/permissions';
 
 // Client-side hint only — the API enforces `interaction.log` on write
 // regardless. Matches the seeded grant list for that permission (a superset
 // of the `customer.360-view.read` roles: Placement/Claims/Finance can log a
 // touchpoint but cannot read the 360° timeline back).
-const CAN_LOG_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-];
+
+/**
+ * A timeline row's status comes from whichever module raised it, so one
+ * lookup table cannot serve it: a POLICY row carries a PolicyStatus, a CLAIM
+ * row a ClaimStatus, a COMPLAINT row a ComplaintStatus, and an INTERACTION
+ * row has no status at all. `kind` is what says which — this picks the map
+ * from it rather than guessing from the value, which would collide the moment
+ * two vocabularies share a word (CLOSED is in two of these three).
+ */
+function timelineStatusLabel(event: TimelineEvent): TranslationKey | null {
+  if (!event.status) return null;
+  const map =
+    event.kind === 'POLICY'
+      ? ENUM_LABEL.PolicyStatus
+      : event.kind === 'CLAIM'
+        ? ENUM_LABEL.ClaimStatus
+        : event.kind === 'COMPLAINT'
+          ? ENUM_LABEL.ComplaintStatus
+          : null;
+  // An unknown value is rendered as-is rather than crashing or blanking: the
+  // server owns these vocabularies and may add one before the UI knows it.
+  return (map as Record<string, TranslationKey> | null)?.[event.status] ?? null;
+}
 
 function TimelineList({ view }: { view: Customer360View }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   if (view.timeline.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-        Nothing on this customer&apos;s timeline yet. Log the first interaction
-        above — policies, claims and complaints will appear here too once those
-        modules exist.
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+        {t('crmTimelineEmpty')}
       </p>
     );
   }
@@ -55,12 +73,17 @@ function TimelineList({ view }: { view: Customer360View }) {
     <div style={{ marginTop: '1rem' }}>
       {view.timeline.map((event) => (
         <div key={`${event.kind}-${event.refId}`} style={crmTimelineItemStyle}>
-          <span style={crmKindBadgeStyle}>{event.kind}</span>
+          <span style={crmKindBadgeStyle}>
+            {t(ENUM_LABEL.TimelineEventKind[event.kind])}
+          </span>
           <div>
             <div>
               <strong>{event.title}</strong>
-              {event.status ? (
-                <span style={{ opacity: 0.7 }}> — {event.status}</span>
+              {timelineStatusLabel(event) ? (
+                <span style={{ opacity: 0.7 }}>
+                  {' '}
+                  — {t(timelineStatusLabel(event)!)}
+                </span>
               ) : null}
             </div>
             {event.detail ? <div>{event.detail}</div> : null}
@@ -80,8 +103,9 @@ interface ViewError {
 }
 
 function CrmForCustomer({ customerId }: { customerId: string }) {
+  const { t } = useLanguage();
   const { user } = useAuth();
-  const canLog = user?.roles.some((role) => CAN_LOG_ROLES.includes(role)) ?? false;
+  const canLog = hasPermission(user, 'interaction.log');
 
   const [view, setView] = useState<Customer360View | null>(null);
   const [viewError, setViewError] = useState<ViewError | null>(null);
@@ -104,21 +128,21 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         status,
         message:
           status === 403
-            ? "You don't hold the customer.360-view.read permission, so the 360° timeline isn't shown here."
+            ? t('crmNoPermission')
             : status === 404
-              ? 'This customer could not be found — it may not exist, or you may not have access to it.'
+              ? t('crmCustomerNotFound')
               : err instanceof ApiError
                 ? err.message
-                : 'Could not load this customer view — try again.',
+                : t('crmLoadError'),
       });
     }
-  }, [customerId]);
+  }, [customerId, t]);
 
   useEffect(() => {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   async function submit() {
     setLogError(null);
@@ -128,7 +152,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     if (occurredAt) {
       const parsed = new Date(occurredAt);
       if (Number.isNaN(parsed.getTime())) {
-        setLogError('Enter a valid date and time, or leave the date blank.');
+        setLogError(t('crmInvalidDate'));
         return;
       }
       occurredAtIso = parsed.toISOString();
@@ -148,10 +172,10 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
     } catch (err) {
       setLogError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the interaction.log permission."
+          ? t('crmNoPermissionLog')
           : err instanceof ApiError
             ? err.message
-            : 'Could not log the interaction — try again.',
+            : t('crmLogError'),
       );
     } finally {
       setSubmitting(false);
@@ -168,7 +192,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
       </p>
     );
   }
-  if (!view && !viewError) return <p>Loading…</p>;
+  if (!view && !viewError) return <p>{t('crmLoading')}</p>;
 
   return (
     <div style={{ marginTop: '1rem' }}>
@@ -178,7 +202,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
             <bdi>{view.customer.legalName}</bdi>
           </h2>
           <p style={{ opacity: 0.8, marginTop: '0.2rem' }}>
-            {view.customer.customerType} — Status: {view.customer.status}
+            {view.customer.customerType} — Status: {t(ENUM_LABEL.CustomerStatus[view.customer.status])}
           </p>
           <div style={crmCountRowStyle}>
             <span>Interactions: {view.counts.interactions}</span>
@@ -191,7 +215,7 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
 
       {canLog ? (
         <div style={crmPanelStyle}>
-          <strong>Log an interaction</strong>
+          <strong>{t('crmLogHeading')}</strong>
           <div style={crmFormRowStyle}>
             <div>
               <label htmlFor="crm-channel" style={cardMetaStyle}>
@@ -207,27 +231,27 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
               >
                 {INTERACTION_CHANNELS.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {t(ENUM_LABEL.InteractionChannel[c])}
                   </option>
                 ))}
               </select>
             </div>
             <div style={{ flex: '1 1 20rem' }}>
               <label htmlFor="crm-summary" style={cardMetaStyle}>
-                What happened?
+                {t('crmWhatHappened')}
               </label>
               <br />
               <input
                 id="crm-summary"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                placeholder="e.g. Called to confirm the renewal terms"
+                placeholder={t('crmDetailPlaceholder')}
                 style={{ width: '100%' }}
               />
             </div>
             <div>
               <label htmlFor="crm-occurred" style={cardMetaStyle}>
-                When (optional — defaults to now)
+                {t('crmWhenOptional')}
               </label>
               <br />
               <input
@@ -243,11 +267,11 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
               style={{ ...buttonStyle, width: 'auto' }}
               onClick={() => void submit()}
             >
-              {submitting ? 'Logging…' : 'Log interaction'}
+              {submitting ? t('crmLogging') : t('crmLogButton')}
             </button>
           </div>
           {logOk ? (
-            <p style={{ ...cardMetaStyle, opacity: 1 }}>Interaction logged.</p>
+            <p style={{ ...cardMetaStyle, opacity: 1 }}>{t('crmLogged')}</p>
           ) : null}
           {logError ? (
             <p role="alert" style={errorStyle}>
@@ -261,13 +285,12 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
         </p>
       ) : null}
 
-      <h3 style={{ marginTop: '1.5rem' }}>Timeline</h3>
+      <h3 style={{ marginTop: '1.5rem' }}>{t('crmTimeline')}</h3>
       {view ? (
         <TimelineList view={view} />
       ) : (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          The 360° timeline needs the <code>customer.360-view.read</code>{' '}
-          permission. You can still log interactions above.
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>
+          {t('crmTimelineNeedsPermission')}
         </p>
       )}
     </div>
@@ -276,21 +299,18 @@ function CrmForCustomer({ customerId }: { customerId: string }) {
 
 function CrmFlow() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') ?? '';
 
   if (!customerId) {
     return (
       <p role="alert" style={errorStyle}>
-        No customer selected — open a customer from{' '}
-        <button
-          type="button"
-          onClick={() => router.push('/customers')}
-          style={{ textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Customers
-        </button>{' '}
-        and open its relationship timeline from there.
+        <SentenceWithLink
+          sentence={t('crmNoCustomerSelected')}
+          linkLabel={t('navCustomers')}
+          onLinkClick={() => router.push('/customers')}
+        />
       </p>
     );
   }
@@ -299,23 +319,21 @@ function CrmFlow() {
 }
 
 export default function CrmPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
   return (
     <main style={pageStyle}>
-      <h1>Relationship (CRM)</h1>
+      <h1>{t('crmHeading')}</h1>
       <p style={{ opacity: 0.8 }}>
-        Process 10 — log every customer touchpoint (meeting, call, email,
-        WhatsApp, visit, proposal, renewal, claim, complaint) and see the
-        360° timeline: interactions today, plus policies, claims and complaints
-        once those modules land.
+        {t('crmIntro')}
       </p>
       <Suspense fallback={null}>
         <CrmFlow />

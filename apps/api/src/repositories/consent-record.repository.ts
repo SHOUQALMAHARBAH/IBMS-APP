@@ -64,6 +64,44 @@ export class ConsentRecordRepository {
     return this.prisma.client.consentRecord.findUnique({ where: { id } });
   }
 
+  /**
+   * The three consent counts the DPO workspace reports, computed by the
+   * database over EVERY row rather than by scanning a capped page and counting
+   * in memory.
+   *
+   * The old shape read the 1,000 most recent records and tallied them, which
+   * silently under-reported the moment the table passed that many — it already
+   * had. A compliance figure that quietly describes a subset of the records is
+   * worse than one that is expensive, and three counts are neither.
+   *
+   * The three buckets partition the table exactly, mirroring
+   * `deriveConsentView`'s `isActive = granted && withdrawnAt === null`:
+   * active (granted, not withdrawn), withdrawn (withdrawnAt set, whatever
+   * `granted` says), declined (never granted, never withdrawn).
+   *
+   * One interactive transaction, so the three counts are a single consistent
+   * snapshot — the capped scan they replace was at least that, and three
+   * independent reads would not be.
+   */
+  countByConsentState(): Promise<{
+    activeCount: number;
+    withdrawnCount: number;
+    declinedCount: number;
+  }> {
+    return this.prisma.client.$transaction(async (tx) => {
+      const activeCount = await tx.consentRecord.count({
+        where: { granted: true, withdrawnAt: null },
+      });
+      const withdrawnCount = await tx.consentRecord.count({
+        where: { withdrawnAt: { not: null } },
+      });
+      const declinedCount = await tx.consentRecord.count({
+        where: { granted: false, withdrawnAt: null },
+      });
+      return { activeCount, withdrawnCount, declinedCount };
+    });
+  }
+
   findMany(
     scope: {
       customerId?: string;

@@ -13,6 +13,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 
 const TARGET: SalesTarget = {
   id: 'target-1',
+  organizationId: 'org-1',
   ownerUserId: 'sales-1',
   branchId: null,
   periodLabel: '2026-Q4',
@@ -47,12 +48,14 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
 
 const SALES_OFFICER: AuthenticatedUser = {
   id: 'sales-1',
+  organizationId: 'org-1',
   email: 'sales@ibms.test',
   roles: ['SALES_RELATIONSHIP_OFFICER'],
   sessionId: 's-1',
 };
 const MANAGER: AuthenticatedUser = {
   id: 'manager-1',
+  organizationId: 'org-1',
   email: 'manager@ibms.test',
   roles: ['BRANCH_DEPARTMENT_MANAGER'],
   sessionId: 's-2',

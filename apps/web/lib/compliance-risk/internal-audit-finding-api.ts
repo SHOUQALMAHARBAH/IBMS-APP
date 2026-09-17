@@ -6,12 +6,14 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 
+export type InternalAuditFindingStatus = 'open' | 'closed';
+
 export interface InternalAuditFinding {
   id: string;
   auditPeriodLabel: string;
   finding: string;
   remediationAction: string | null;
-  status: string;
+  status: InternalAuditFindingStatus;
   loggedAt: string;
   closedAt: string | null;
 }

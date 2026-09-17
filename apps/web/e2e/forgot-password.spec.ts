@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+// These four screens render pre-authentication, so there is no
+// `user.languagePreference` to read and `LanguageProvider` falls back to the
+// schema default — Arabic. Until this pass they were hard-coded English, so
+// the assertions below passed by accident; they now pin the language the way
+// the authenticated specs do (which force EN through their /auth/me mock).
+// The Arabic default itself is asserted separately, at the end of this file.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ibms.languagePreference', 'EN');
+  });
+});
+
 test("renders the forgot-password form", async ({ page }) => {
   await page.goto("/forgot-password");
   await expect(page.getByRole("heading", { name: "Forgot password" })).toBeVisible();

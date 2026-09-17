@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { INSURER_IDENTITY_SELECT, insurerName } from './insurer-identity';
 
 export interface LineOrInsurerGroup {
   key: string;
@@ -65,13 +66,14 @@ export class PortfolioAnalysisRepository {
       );
   }
 
-  findInsurerNames(
+  async findInsurerNames(
     insurerIds: string[],
   ): Promise<{ id: string; name: string }[]> {
-    return this.prisma.client.insurer.findMany({
+    const rows = await this.prisma.client.insurer.findMany({
       where: { id: { in: insurerIds } },
-      select: { id: true, name: true },
+      select: INSURER_IDENTITY_SELECT,
     });
+    return rows.map((r) => ({ id: r.id, name: insurerName(r) }));
   }
 
   /** Every issued policy's premium + its customer's segment/owner, capped

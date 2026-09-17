@@ -3,8 +3,10 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { Prisma, prisma, type RoleName } from '@ibms/db';
+import { prisma } from './tenant-prisma';
+import { Prisma, type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
+import { makeInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -236,9 +238,7 @@ async function issuedPolicy(
       insuranceLine: 'Property All Risks',
     },
   });
-  const insurer = await prisma.insurer.create({
-    data: { name: `Claim E2E ${tag} ins ${rand}` },
-  });
+  const insurer = await makeInsurer(`Claim E2E ${tag} ins ${rand}`);
   await prisma.rFQInsurer.create({
     data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
   });
@@ -391,7 +391,9 @@ describe('Claim Notification + Registration + Documentation + Assessment + Follo
       .get(`/claims?policyId=${policyId}`)
       .set(bearer(clm.accessToken))
       .expect(200);
-    expect((list.body as ClaimBody[]).length).toBe(2);
+    // `GET /claims` returns the same paged envelope on every branch —
+    // scoped or queue — so the client has one shape per endpoint.
+    expect((list.body as { items: ClaimBody[] }).items.length).toBe(2);
 
     // reads of a HIGHLY_CONFIDENTIAL Claim are audited as sensitive-data
     // access (Part 10.3 / sensitive-data-handling.md) — one for the list, one
@@ -411,6 +413,97 @@ describe('Claim Notification + Registration + Documentation + Assessment + Follo
     expect(sensitiveReads.length).toBeGreaterThanOrEqual(2);
     // never the claim narrative
     expect(JSON.stringify(sensitiveReads)).not.toContain('warehouse roof');
+  });
+
+  it('the claims QUEUE: a Claims Officer can list its own book with no policy or customer in hand', async () => {
+    // The gap this closes. `GET /claims` used to demand exactly one of
+    // policyId/customerId, so the one role whose entire job is this book had
+    // no way to ask "what am I responsible for" — and the only screen that
+    // listed claims sat behind an `opportunity.read` a CLAIMS_OFFICER does
+    // not hold. Structurally the Policy Checking Officer gap again.
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'clm-queue-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'CLAIMS_OFFICER',
+    );
+    const clm = await makeUser(app, 'clm-queue-officer', 'CLAIMS_OFFICER');
+    const { policyId } = await issuedPolicy(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'queue',
+      { inceptionDate: '2026-01-01', expiryDate: '2027-01-01' },
+    );
+
+    const created = await request(app.getHttpServer())
+      .post('/claims')
+      .set(bearer(clm.accessToken))
+      .send({
+        policyId,
+        lossDate: '2026-08-02',
+        causeOfLoss: 'Queue fixture loss.',
+        estimatedLoss: '1200.000',
+      })
+      .expect(201);
+    const claimId = (created.body as ClaimBody).id;
+
+    // Unscoped: a 200 with the paged envelope, not the old 422.
+    const queue = await request(app.getHttpServer())
+      .get('/claims')
+      .set(bearer(clm.accessToken))
+      .expect(200);
+    const body = queue.body as {
+      items: ClaimBody[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(typeof body.total).toBe('number');
+    // Scope by THIS test's own id — db-test is cumulative, so a global count
+    // would be answering a different question on every run.
+    expect(body.items.some((c) => c.id === claimId)).toBe(true);
+
+    // Supplying both scopes is still refused.
+    await request(app.getHttpServer())
+      .get(
+        `/claims?policyId=${policyId}&customerId=${'00000000-0000-4000-8000-000000000000'}`,
+      )
+      .set(bearer(clm.accessToken))
+      .expect(422);
+
+    // A status filter that excludes the row removes it from BOTH the page and
+    // the total — the count runs on the same where the page does.
+    const settled = await request(app.getHttpServer())
+      .get('/claims?status=SETTLED')
+      .set(bearer(clm.accessToken))
+      .expect(200);
+    expect(
+      (settled.body as { items: ClaimBody[] }).items.some(
+        (c) => c.id === claimId,
+      ),
+    ).toBe(false);
+
+    // An unknown status is a 400 from the DTO, never a silently empty page.
+    await request(app.getHttpServer())
+      .get('/claims?status=NOT_A_STATUS')
+      .set(bearer(clm.accessToken))
+      .expect(400);
+
+    // The queue read is audited as sensitive access, naming the SCOPE rather
+    // than a row, and carrying no claim narrative.
+    const queueReads = await prisma.auditLogEntry.findMany({
+      where: {
+        action: 'READ',
+        entityType: 'Claim',
+        userId: clm.userId,
+        entityId: 'queue:book-wide',
+      },
+    });
+    expect(queueReads.length).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(queueReads)).not.toContain('Queue fixture loss');
   });
 
   it('rejects a loss outside the coverage period', async () => {

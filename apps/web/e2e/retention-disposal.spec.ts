@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -125,7 +126,7 @@ test("lists the retention schedule, Legal Holds, and disposal batches with their
     page.getByRole("button", { name: "Record review" }).first(),
   ).toBeVisible();
 
-  await expect(page.getByRole("cell", { name: "DPO_APPROVED" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "DPO approved" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record execution" }),
   ).toBeVisible();
@@ -136,6 +137,42 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
 }) => {
   await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
   await mockRegister(page);
+
+  // The customer is chosen from a picker now, not typed as a UUID, so the
+  // picker's own search has to have something to offer.
+  await page.route("http://localhost:4000/customers**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        items: [
+          {
+            id: "cust-new",
+            prospectId: null,
+            customerType: "CORPORATE",
+            legalName: "Al-Ufuq Trading Co.",
+            givenName: null,
+            fatherName: null,
+            grandfatherName: null,
+            familyName: null,
+            dateOfBirth: null,
+            nationality: null,
+            registrationNumber: "REG-1001",
+            taxRegistrationNumber: null,
+            registeredAddress: null,
+            natureOfBusiness: null,
+            languagePreference: "EN",
+            status: "ACTIVE",
+            ownerUserId: "user-1",
+            createdAt: "2026-08-26T00:00:00.000Z",
+            updatedAt: "2026-08-26T00:00:00.000Z",
+          },
+        ],
+        total: 1,
+        page: 0,
+        pageSize: 50,
+      },
+    }),
+  );
 
   await page.goto("/retention-disposal");
   await expect(page.getByText("Customer cust-123…")).toBeVisible();
@@ -163,9 +200,12 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
     return route.fulfill({ status: 200, json: HOLDS });
   });
 
+
   await page.getByLabel("Legal hold scope").fill("New hold");
   await page.getByLabel("Legal hold reason").fill("New reason");
-  await page.getByLabel("Legal hold customer ID").fill("cust-new");
+  await page
+    .getByLabel("Customer (optional)")
+    .selectOption("cust-new");
   await page.getByRole("button", { name: "Place hold" }).click();
 
   await expect.poll(() => lastCreateBody).not.toBeNull();
@@ -176,16 +216,24 @@ test("shows a Legal Hold's named subject and lets a DPO place a new hold naming 
   });
 });
 
-test("a user without the schedule permission sees the underlying error message", async ({
+test("a user without the schedule permission sees the translated 403 message", async ({
   page,
 }) => {
   await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
   await mockRegister(page, { scheduleStatus: 403 });
 
   await page.goto("/retention-disposal");
+  // The screen's own translated 403 copy, not the API's English message.
+  // This page used to pass `err.message` straight through, so the raw
+  // server string reached the user in both languages — and this test
+  // asserted exactly that. The absence check is what makes it a proof:
+  // without it the old behaviour satisfies the new assertion too.
+  await expect(
+    page.getByText("retention/disposal register", { exact: false }),
+  ).toBeVisible();
   await expect(
     page.getByText("You do not hold a permission required", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("retention-disposal screen has no serious/critical accessibility violations @a11y", async ({

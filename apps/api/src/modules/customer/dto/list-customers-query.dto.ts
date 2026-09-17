@@ -1,9 +1,28 @@
-import { IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { CustomerStatus } from '@ibms/db';
 import { emptyStringToUndefined } from '../../../common/dto.util';
 
 export class ListCustomersQueryDto {
+  /** 0-based. Out-of-range values are clamped rather than rejected — see
+   *  `common/pagination.ts`. */
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt()
+  page?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt()
+  pageSize?: number;
+
   @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsUUID()

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useLanguage } from '../../lib/i18n/language-context';
 import { startRecertificationCycle } from '../../lib/access-recertification/access-recertification-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../auth/auth-form.styles';
@@ -11,6 +12,7 @@ interface StartCyclePanelProps {
 }
 
 export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
+  const { t } = useLanguage();
   const [cycleLabel, setCycleLabel] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
       setDueAt('');
       onCycleStarted();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not start the cycle — try again.');
+      setError(err instanceof ApiError ? err.message : t('acrStartCycleError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -40,30 +42,25 @@ export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
 
   return (
     <section style={sectionStyle}>
-      <h2 style={{ marginTop: 0 }}>Start a new recertification cycle</h2>
+      <h2 style={{ marginTop: 0 }}>{t('acrStartCycleHeading')}</h2>
       <p style={{ opacity: 0.8, fontSize: '0.9rem' }}>
-        A cycle also runs automatically every quarter. Use this to start one on demand — every user
-        currently holding an active role gets an item, assigned to an eligible reviewer.
+        {t('acrQuarterlyNote')}
       </p>
       <form onSubmit={(e) => void handleSubmit(e)}>
         <div style={formRowStyle}>
           <div style={fieldStyle}>
-            <label htmlFor="cycle-label" style={labelStyle}>
-              Cycle label
-            </label>
+            <label htmlFor="cycle-label" style={labelStyle}>{t('acrCycleLabel')}</label>
             <input
               id="cycle-label"
               required
               value={cycleLabel}
               onChange={(e) => setCycleLabel(e.target.value)}
               style={inputStyle}
-              placeholder="e.g. Q1-2026 ad hoc"
+              placeholder={t('acrCycleNamePlaceholder')}
             />
           </div>
           <div style={fieldStyle}>
-            <label htmlFor="cycle-due-at" style={labelStyle}>
-              Due date (optional — defaults to 15 days)
-            </label>
+            <label htmlFor="cycle-due-at" style={labelStyle}>{t('acrCycleDueDate')}</label>
             <input
               id="cycle-due-at"
               type="date"
@@ -73,7 +70,7 @@ export function StartCyclePanel({ onCycleStarted }: StartCyclePanelProps) {
             />
           </div>
           <button type="submit" disabled={isSubmitting} style={{ ...buttonStyle, marginTop: 0, width: 'auto' }}>
-            {isSubmitting ? 'Starting…' : 'Start cycle'}
+            {isSubmitting ? t('secStartingButton') : 'Start cycle'}
           </button>
         </div>
         {message ? <p style={successStyle}>{message}</p> : null}

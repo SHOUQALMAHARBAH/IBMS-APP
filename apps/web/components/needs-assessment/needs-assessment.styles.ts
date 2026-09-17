@@ -7,7 +7,7 @@ export const questionRowStyle: CSSProperties = {
   alignItems: 'baseline',
   justifyContent: 'space-between',
   padding: '0.75rem 0',
-  borderBottom: '1px solid rgba(128,128,128,0.2)',
+  borderBottom: '1px solid var(--border-subtle)',
 };
 
 export const questionPromptStyle: CSSProperties = {
@@ -17,9 +17,9 @@ export const questionPromptStyle: CSSProperties = {
 export const coveragePreviewStyle: CSSProperties = {
   marginTop: '1.5rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
-  background: 'rgba(128,128,128,0.05)',
+  background: 'var(--surface-sunken)',
 };
 
 export const coverageTagListStyle: CSSProperties = {
@@ -34,7 +34,7 @@ export const coverageTagListStyle: CSSProperties = {
 export const coverageTagStyle: CSSProperties = {
   padding: '0.25rem 0.6rem',
   fontSize: '0.85rem',
-  border: '1px solid rgba(128,128,128,0.4)',
+  border: '1px solid var(--border-strong)',
   borderRadius: '999px',
 };
 
@@ -48,7 +48,7 @@ export const listGridStyle: CSSProperties = {
 export const reviewPanelStyle: CSSProperties = {
   marginTop: '2rem',
   padding: '1.5rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
 };
 

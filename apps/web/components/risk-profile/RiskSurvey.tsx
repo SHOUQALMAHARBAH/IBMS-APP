@@ -17,6 +17,8 @@ import {
   labelStyle,
 } from '../auth/auth-form.styles';
 import { sectionStyle, smallButtonStyle } from '../lead/lead.styles';
+import { useLanguage } from '../../lib/i18n/language-context';
+import type { TranslationKey } from '../../lib/i18n/translations';
 import {
   assetCellStyle,
   assetFieldStyle,
@@ -28,12 +30,14 @@ import {
   summaryPanelStyle,
 } from './risk-profile.styles';
 
-const TYPE_LABELS: Record<AssetType, string> = {
-  building: 'Building',
-  equipment: 'Plant & equipment',
-  stock: 'Stock / contents',
-  vehicle: 'Vehicle fleet',
-  other: 'Other',
+// Module scope has no translator, so this maps to label KEYS and each
+// consumer resolves them.
+const TYPE_LABEL_KEY: Record<AssetType, TranslationKey> = {
+  building: 'rsTypeBuilding',
+  equipment: 'rsTypePlant',
+  stock: 'rsTypeStock',
+  vehicle: 'rsTypeFleet',
+  other: 'rsTypeOther',
 };
 
 function Figure({ label, value }: { label: string; value: string }) {
@@ -55,6 +59,7 @@ export function RiskSurvey({
   /** Lets the parent screen show the site label / customer once it's known. */
   onLoaded?: (profile: RiskProfileWithSurvey) => void;
 }) {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<RiskProfileWithSurvey | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -76,13 +81,13 @@ export function RiskSurvey({
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This risk profile could not be found — it may not exist, or you may not have access to it.'
+          ? t('rsNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the risk survey — try again.',
+            : t('rsLoadError'),
       );
     }
-  }, [riskProfileId, onLoaded]);
+  }, [riskProfileId, onLoaded, t]);
 
   useEffect(() => {
     void (async () => {
@@ -126,7 +131,7 @@ export function RiskSurvey({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not add the asset — try again.',
+          : t('rsAddError'),
       );
     } finally {
       setSaving(false);
@@ -142,7 +147,7 @@ export function RiskSurvey({
       setFormError(
         err instanceof ApiError
           ? err.message
-          : 'Could not remove the asset — try again.',
+          : t('rsRemoveError'),
       );
     }
   }
@@ -154,31 +159,29 @@ export function RiskSurvey({
       </p>
     );
   }
-  if (!profile) return <p>Loading risk survey…</p>;
+  if (!profile) return <p>{t('rsLoading')}</p>;
 
   const { assets, sumInsured } = profile;
   const isVehicle = assetType === 'vehicle';
 
   return (
     <section style={sectionStyle}>
-      <h2 style={{ marginTop: 0 }}>Asset survey</h2>
+      <h2 style={{ marginTop: 0 }}>{t('rsAssetSurvey')}</h2>
       <p style={{ opacity: 0.8 }}>
-        Process 6 — the detailed building / equipment / stock / annual-profit /
-        fleet survey for this location. The Sum Insured and indemnity period
-        below are derived from it.
+        {t('rsSurveyIntro')}
       </p>
 
       <div style={summaryPanelStyle}>
-        <strong>Derived Sum Insured</strong>
+        <strong>{t('rsDerivedSi')}</strong>
         <div style={summaryGridStyle}>
-          <Figure label="Property (JOD)" value={sumInsured.propertySumInsured} />
+          <Figure label={t('rsProperty')} value={sumInsured.propertySumInsured} />
           <Figure
-            label="Business Interruption (JOD)"
+            label={t('rsBusinessInterruption')}
             value={sumInsured.businessInterruptionSumInsured}
           />
-          <Figure label="Total (JOD)" value={sumInsured.totalSumInsured} />
+          <Figure label={t('rsTotal')} value={sumInsured.totalSumInsured} />
           <Figure
-            label="Indemnity period"
+            label={t('rsIndemnityPeriod')}
             value={
               sumInsured.indemnityPeriodMonths == null
                 ? '—'
@@ -186,33 +189,31 @@ export function RiskSurvey({
             }
           />
           <Figure
-            label="Fleet vehicles"
+            label={t('rsFleetVehicles')}
             value={String(sumInsured.fleetVehicleCount)}
           />
         </div>
       </div>
 
       {assets.length === 0 ? (
-        <p style={{ opacity: 0.6, marginTop: '1rem' }}>
-          No assets surveyed yet for this location.
-        </p>
+        <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('rpNoAssetsYet')}</p>
       ) : (
         <table style={assetTableStyle}>
           <thead>
             <tr>
-              <th style={assetCellStyle}>Type</th>
-              <th style={assetCellStyle}>Description</th>
-              <th style={assetCellStyle}>Declared value</th>
-              <th style={assetCellStyle}>Annual gross profit</th>
-              <th style={assetCellStyle}>Indemnity (mo)</th>
-              <th style={assetCellStyle}>Fleet</th>
+              <th style={assetCellStyle}>{t('rsColType')}</th>
+              <th style={assetCellStyle}>{t('rsColDescription')}</th>
+              <th style={assetCellStyle}>{t('rsColDeclaredValue')}</th>
+              <th style={assetCellStyle}>{t('rsColAnnualGrossProfit')}</th>
+              <th style={assetCellStyle}>{t('rsColIndemnityMonths')}</th>
+              <th style={assetCellStyle}>{t('rsColFleet')}</th>
               {canEdit ? <th style={assetCellStyle}>&nbsp;</th> : null}
             </tr>
           </thead>
           <tbody>
             {assets.map((asset) => (
               <tr key={asset.id}>
-                <td style={assetCellStyle}>{TYPE_LABELS[asset.assetType]}</td>
+                <td style={assetCellStyle}>{t(TYPE_LABEL_KEY[asset.assetType])}</td>
                 <td style={assetCellStyle}>{asset.description ?? '—'}</td>
                 <td style={assetCellStyle}>{asset.declaredValue ?? '—'}</td>
                 <td style={assetCellStyle}>{asset.annualGrossProfit ?? '—'}</td>
@@ -225,7 +226,9 @@ export function RiskSurvey({
                     <button
                       type="button"
                       style={smallButtonStyle}
-                      aria-label={`Remove ${TYPE_LABELS[asset.assetType]} asset`}
+                      aria-label={t('rsRemoveAssetAria', {
+                        type: t(TYPE_LABEL_KEY[asset.assetType]),
+                      })}
                       onClick={() => void handleRemove(asset.id)}
                     >
                       Remove
@@ -241,27 +244,23 @@ export function RiskSurvey({
       {canEdit ? (
         <form onSubmit={(e) => void handleAddAsset(e)} style={assetFormStyle}>
           <div style={assetFieldStyle}>
-            <label htmlFor="asset-type" style={labelStyle}>
-              Asset type
-            </label>
+            <label htmlFor="asset-type" style={labelStyle}>{t('rpAssetType')}</label>
             <select
               id="asset-type"
               value={assetType}
               onChange={(e) => setAssetType(e.target.value as AssetType)}
               style={inputStyle}
             >
-              {ASSET_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABELS[t]}
+              {ASSET_TYPES.map((at) => (
+                <option key={at} value={at}>
+                  {t(TYPE_LABEL_KEY[at])}
                 </option>
               ))}
             </select>
           </div>
 
           <div style={assetFieldStyle}>
-            <label htmlFor="asset-description" style={labelStyle}>
-              Description (optional)
-            </label>
+            <label htmlFor="asset-description" style={labelStyle}>{t('rpAssetDescription')}</label>
             <input
               id="asset-description"
               value={description}
@@ -272,9 +271,7 @@ export function RiskSurvey({
 
           {isVehicle ? (
             <div style={assetFieldStyle}>
-              <label htmlFor="asset-fleet" style={labelStyle}>
-                Number of vehicles
-              </label>
+              <label htmlFor="asset-fleet" style={labelStyle}>{t('rpVehicleCount')}</label>
               <input
                 id="asset-fleet"
                 type="number"
@@ -287,35 +284,29 @@ export function RiskSurvey({
           ) : (
             <>
               <div style={assetFieldStyle}>
-                <label htmlFor="asset-declared" style={labelStyle}>
-                  Declared value (JOD)
-                </label>
+                <label htmlFor="asset-declared" style={labelStyle}>{t('rpDeclaredValue')}</label>
                 <input
                   id="asset-declared"
                   inputMode="decimal"
-                  placeholder="e.g. 500000.000"
+                  placeholder={t('rsValuePlaceholder')}
                   value={declaredValue}
                   onChange={(e) => setDeclaredValue(e.target.value)}
                   style={inputStyle}
                 />
               </div>
               <div style={assetFieldStyle}>
-                <label htmlFor="asset-profit" style={labelStyle}>
-                  Annual gross profit (JOD)
-                </label>
+                <label htmlFor="asset-profit" style={labelStyle}>{t('rpAnnualGrossProfit')}</label>
                 <input
                   id="asset-profit"
                   inputMode="decimal"
-                  placeholder="Business Interruption basis"
+                  placeholder={t('rsBiBasis')}
                   value={annualGrossProfit}
                   onChange={(e) => setAnnualGrossProfit(e.target.value)}
                   style={inputStyle}
                 />
               </div>
               <div style={assetFieldStyle}>
-                <label htmlFor="asset-indemnity" style={labelStyle}>
-                  Indemnity period (months)
-                </label>
+                <label htmlFor="asset-indemnity" style={labelStyle}>{t('rpIndemnityPeriod')}</label>
                 <input
                   id="asset-indemnity"
                   type="number"
@@ -334,7 +325,7 @@ export function RiskSurvey({
             disabled={saving}
             style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
           >
-            {saving ? 'Adding…' : 'Add asset'}
+            {saving ? t('rsAdding') : t('rsAddButton')}
           </button>
           {formError ? (
             <p role="alert" style={{ ...errorStyle, flexBasis: '100%' }}>

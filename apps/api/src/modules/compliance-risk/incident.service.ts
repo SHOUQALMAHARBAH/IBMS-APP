@@ -95,7 +95,7 @@ export class IncidentService {
       await this.startSlaTimerBestEffort(
         row.id,
         INCIDENT_CONTAINMENT_WORKFLOW,
-        this.slaTimer.computeDueAt(
+        await this.slaTimer.computeDueAt(
           INCIDENT_CONTAINMENT_WORKFLOW,
           row.reportedAt,
         ),
@@ -213,18 +213,20 @@ export class IncidentService {
           classification: dto.classification,
           classifiedByDpoUserId: actor.id,
         },
-        sideEffect: () =>
-          dto.classification === 'MATERIAL'
-            ? this.startSlaTimerBestEffort(
-                id,
-                INCIDENT_SENIOR_MANAGEMENT_WORKFLOW,
-                this.slaTimer.computeDueAt(
-                  INCIDENT_SENIOR_MANAGEMENT_WORKFLOW,
-                  new Date(),
-                ),
-                actor.id,
-              )
-            : Promise.resolve(),
+        // async, because the deadline is now read from the configured SLA
+        // policy rather than a compile-time constant.
+        sideEffect: async () => {
+          if (dto.classification !== 'MATERIAL') return;
+          await this.startSlaTimerBestEffort(
+            id,
+            INCIDENT_SENIOR_MANAGEMENT_WORKFLOW,
+            await this.slaTimer.computeDueAt(
+              INCIDENT_SENIOR_MANAGEMENT_WORKFLOW,
+              new Date(),
+            ),
+            actor.id,
+          );
+        },
       });
     } catch (err) {
       if (err instanceof ConflictException) {

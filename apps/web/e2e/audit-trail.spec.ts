@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 const ME_BASE = {
   id: "user-1",
@@ -19,7 +20,7 @@ async function mockAuth(page: Page, roles: string[]) {
     route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
   );
   await page.route("**/auth/me", (route) =>
-    route.fulfill({ status: 200, json: { ...ME_BASE, roles } }),
+    route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
 }
 
@@ -56,12 +57,19 @@ const DOCUMENT_HISTORY = {
   auditTrail: AUDIT_ROWS,
 };
 
+// The audit-log browse returns `{ items, total, page, pageSize }` — it is one
+// of the five paged lists. Workflow/document history are NOT paged: they are
+// bounded by the entity they belong to, and still return bare arrays.
+function paged<T>(items: T[]) {
+  return { items, total: items.length, page: 0, pageSize: 50 };
+}
+
 test("browses the audit log, looks up workflow history, and looks up document history", async ({
   page,
 }) => {
   await mockAuth(page, ["EXTERNAL_AUDITOR"]);
   await page.route("http://localhost:4000/audit-trail?**", (route) =>
-    route.fulfill({ status: 200, json: AUDIT_ROWS }),
+    route.fulfill({ status: 200, json: paged(AUDIT_ROWS) }),
   );
   await page.route("http://localhost:4000/audit-trail/workflow-history**", (route) =>
     route.fulfill({ status: 200, json: AUDIT_ROWS }),
@@ -75,7 +83,7 @@ test("browses the audit log, looks up workflow history, and looks up document hi
 
   await page.getByLabel("Entity type").first().fill("Lead");
   await page.getByRole("button", { name: "Browse" }).click();
-  await expect(page.getByRole("cell", { name: "TRANSITION" }).first()).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Status change" }).first()).toBeVisible();
 
   await page.getByLabel("Workflow entity type").fill("Lead");
   await page.getByLabel("Workflow entity id").fill("lead-1");

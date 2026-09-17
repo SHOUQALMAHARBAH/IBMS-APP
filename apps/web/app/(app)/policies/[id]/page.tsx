@@ -1,9 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PolicyCheckingBlock } from '../../../../components/policy/PolicyCheckingBlock';
+import { hasAnyPermission } from '../../../../lib/auth/permissions';
+import type { PolicyChecking, PolicyStatus } from '../../../../lib/policy/policy-api';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import { useLanguage } from '../../../../lib/i18n/language-context';
+import { policyStatusLabelKey } from '../../../../lib/policy/policy-status';
 import { ApiError, apiGet } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
@@ -12,7 +16,12 @@ import { profileFieldLabelStyle, profileFieldValueStyle, profileGridStyle } from
 interface PolicyDetail {
   id: string;
   policyNumber: string | null;
-  status: string;
+  // The real vocabulary, not `string`: PolicyCheckingBlock decides whether a
+  // check may be recorded from it.
+  status: PolicyStatus;
+  /** Populated once a check has been recorded. The endpoint has always
+   *  returned it; this page simply never declared it. */
+  checking: PolicyChecking | null;
   inceptionDate: string;
   customer?: {
     id: string;
@@ -31,37 +40,15 @@ interface PolicyDetail {
   updatedAt: string;
 }
 
-const STATUS_LABEL_MAP: Record<string, string> = {
-  PLACEMENT_REQUESTED: 'Placement Requested',
-  PLACEMENT_CONFIRMED: 'Placement Confirmed',
-  ISSUED: 'Issued',
-  CHECKED: 'Checked',
-  DELIVERED: 'Delivered',
-  CANCELLED: 'Cancelled',
-  EXPIRED: 'Expired',
-};
-
-const STATUS_LABEL_MAP_AR: Record<string, string> = {
-  PLACEMENT_REQUESTED: 'طلب وضع',
-  PLACEMENT_CONFIRMED: 'وضع مؤكد',
-  ISSUED: 'صادر',
-  CHECKED: 'تم الفحص',
-  DELIVERED: 'تم التسليم',
-  CANCELLED: 'ملغي',
-  EXPIRED: 'منتهي الصلاحية',
-};
-
 export default function PolicyDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { t } = useLanguage();
 
   const [policy, setPolicy] = useState<PolicyDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading2, setIsLoading2] = useState(true);
-
-  const isArabic = language === 'AR';
 
   const load = useCallback(async () => {
     try {
@@ -72,19 +59,19 @@ export default function PolicyDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
-          ? (isArabic ? 'غير موجود' : 'Not found')
+          ? (t('poldNotFound'))
           : err instanceof ApiError
             ? err.message
-            : (isArabic ? 'يرجى المحاولة مرة أخرى' : 'Please try again'),
+            : (t('poldPleaseTryAgain')),
       );
     } finally {
       setIsLoading2(false);
     }
-  }, [params.id, isArabic]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
@@ -95,14 +82,14 @@ export default function PolicyDetailPage() {
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   if (isLoading || !user) return null;
 
   if (isLoading2) {
     return (
       <div style={pageStyle}>
-        <p>{isArabic ? 'جاري التحميل...' : 'Loading...'}</p>
+        <p>{t('poldLoading')}</p>
       </div>
     );
   }
@@ -116,7 +103,7 @@ export default function PolicyDetailPage() {
           style={smallButtonStyle}
           onClick={() => router.push('/opportunities')}
         >
-          {isArabic ? 'العودة إلى القائمة' : 'Back to List'}
+          {t('poldBackToList')}
         </button>
       </div>
     );
@@ -125,29 +112,34 @@ export default function PolicyDetailPage() {
   if (!policy) {
     return (
       <div style={pageStyle}>
-        <p>{isArabic ? 'غير موجود' : 'Not found'}</p>
+        <p>{t('poldNotFound2')}</p>
       </div>
     );
   }
 
-  const statusLabels = isArabic ? STATUS_LABEL_MAP_AR : STATUS_LABEL_MAP;
-  const displayStatus = statusLabels[policy.status] || policy.status;
+  // One shared, enum-exact mapping (lib/policy/policy-status.ts) rather than
+  // the two local Record<string, string> maps this page used to carry. Those
+  // listed PLACEMENT_REQUESTED and CHECKED — neither is a real PolicyStatus —
+  // and omitted CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED and ACTIVE, so a
+  // completed policy showed the literal token "ACTIVE" in both languages.
+  const statusKey = policyStatusLabelKey(policy.status);
+  const displayStatus = statusKey ? t(statusKey) : policy.status;
 
   return (
     <div style={pageStyle}>
       <h1 style={{ marginBottom: '1.5rem' }}>
-        {isArabic ? 'تفاصيل الوثيقة' : 'Policy Details'} {policy.policyNumber && `— ${policy.policyNumber}`}
+        {t('poldPolicyDetails')} {policy.policyNumber && `— ${policy.policyNumber}`}
       </h1>
 
       {/* Core Policy Information */}
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-          {isArabic ? 'المعلومات الأساسية' : 'Basic Information'}
+          {t('poldBasicInformation')}
         </h2>
         <div style={profileGridStyle}>
           {policy.policyNumber && (
             <div>
-              <div style={profileFieldLabelStyle}>{isArabic ? 'رقم الوثيقة' : 'Policy Number'}</div>
+              <div style={profileFieldLabelStyle}>{t('poldPolicyNumber')}</div>
               <div style={profileFieldValueStyle}>
                 <bdi dir="ltr">{policy.policyNumber}</bdi>
               </div>
@@ -155,22 +147,22 @@ export default function PolicyDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'الحالة' : 'Status'}</div>
+            <div style={profileFieldLabelStyle}>{t('poldStatus')}</div>
             <div style={profileFieldValueStyle}>
               <bdi>{displayStatus}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'تاريخ البداية' : 'Inception Date'}</div>
+            <div style={profileFieldLabelStyle}>{t('poldInceptionDate')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.inceptionDate).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
+              <bdi>{new Date(policy.inceptionDate).toLocaleDateString(t('poldEnUs'))}</bdi>
             </div>
           </div>
 
           {policy.customer && (
             <div>
-              <div style={profileFieldLabelStyle}>{isArabic ? 'العميل' : 'Customer'}</div>
+              <div style={profileFieldLabelStyle}>{t('poldCustomer')}</div>
               <div style={profileFieldValueStyle}>
                 <bdi>{policy.customer.legalName}</bdi>
               </div>
@@ -178,16 +170,16 @@ export default function PolicyDetailPage() {
           )}
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'تاريخ الإنشاء' : 'Created'}</div>
+            <div style={profileFieldLabelStyle}>{t('poldCreated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.createdAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
+              <bdi>{new Date(policy.createdAt).toLocaleDateString(t('poldEnUs2'))}</bdi>
             </div>
           </div>
 
           <div>
-            <div style={profileFieldLabelStyle}>{isArabic ? 'آخر تحديث' : 'Updated'}</div>
+            <div style={profileFieldLabelStyle}>{t('poldUpdated')}</div>
             <div style={profileFieldValueStyle}>
-              <bdi>{new Date(policy.updatedAt).toLocaleDateString(isArabic ? 'ar-JO' : 'en-US')}</bdi>
+              <bdi>{new Date(policy.updatedAt).toLocaleDateString(t('poldEnUs3'))}</bdi>
             </div>
           </div>
         </div>
@@ -197,12 +189,12 @@ export default function PolicyDetailPage() {
       {policy.recommendation?.recommendedQuotation && (
         <div style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>
-            {isArabic ? 'الشروط التجارية' : 'Commercial Terms'}
+            {t('poldCommercialTerms')}
           </h2>
           <div style={profileGridStyle}>
             {policy.recommendation.recommendedQuotation.insurer && (
               <div>
-                <div style={profileFieldLabelStyle}>{isArabic ? 'شركة التأمين' : 'Insurer'}</div>
+                <div style={profileFieldLabelStyle}>{t('poldInsurer')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>{policy.recommendation.recommendedQuotation.insurer.name}</bdi>
                 </div>
@@ -210,7 +202,7 @@ export default function PolicyDetailPage() {
             )}
 
             <div>
-              <div style={profileFieldLabelStyle}>{isArabic ? 'القسط' : 'Premium'}</div>
+              <div style={profileFieldLabelStyle}>{t('poldPremium')}</div>
               <div style={profileFieldValueStyle}>
                 <bdi>{policy.recommendation.recommendedQuotation.premium}</bdi>
               </div>
@@ -218,7 +210,7 @@ export default function PolicyDetailPage() {
 
             {policy.recommendation.recommendedQuotation.deductible && (
               <div>
-                <div style={profileFieldLabelStyle}>{isArabic ? 'الخصم' : 'Deductible'}</div>
+                <div style={profileFieldLabelStyle}>{t('poldDeductible')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>{policy.recommendation.recommendedQuotation.deductible}</bdi>
                 </div>
@@ -227,7 +219,7 @@ export default function PolicyDetailPage() {
 
             {policy.recommendation.recommendedQuotation.commission && (
               <div>
-                <div style={profileFieldLabelStyle}>{isArabic ? 'العمولة' : 'Commission'}</div>
+                <div style={profileFieldLabelStyle}>{t('poldCommission')}</div>
                 <div style={profileFieldValueStyle}>
                   <bdi>{policy.recommendation.recommendedQuotation.commission}</bdi>
                 </div>
@@ -237,12 +229,22 @@ export default function PolicyDetailPage() {
         </div>
       )}
 
+      {/* Process 20. This is the screen a Policy Checking Officer can
+          actually reach: their three permissions do not include
+          `opportunity.read`, so the copy of this block on /opportunities/[id]
+          was unreachable for the one role whose job it is. */}
+      <PolicyCheckingBlock
+        policy={policy}
+        canCheck={hasAnyPermission(user, ['policy.check'])}
+        onChecked={load}
+      />
+
       <button
         type="button"
         style={smallButtonStyle}
-        onClick={() => router.push('/opportunities')}
+        onClick={() => router.push('/policies')}
       >
-        {isArabic ? 'العودة' : 'Back'}
+        {t('poldBack')}
       </button>
     </div>
   );

@@ -21,13 +21,23 @@ function buildEncryption(): EncryptionService {
 }
 
 describe('ENCRYPTED_FIELDS — the exact Part 10.2 field map', () => {
-  it('covers exactly the five entities and fields named in the A.3 backlog item', () => {
+  it('covers exactly the entities and fields it is meant to, and nothing else', () => {
+    // Exact equality on purpose: this map is deliberately hand-kept rather than
+    // derived from the Prisma DMMF, so a new `-- ENCRYPT` field has to be added
+    // HERE too — and this assertion is what makes that a reviewed change
+    // instead of something that silently starts, or fails to start, encrypting.
+    //
+    // The five A.3 entities, plus OrganizationEmailIntegration added by
+    // multi-tenancy Phase 3 step 11 (Part I §6): not personal data, but the
+    // same treatment, because it is the credential that sends mail as a real
+    // company.
     expect(ENCRYPTED_FIELDS).toEqual({
       Customer: ['nationalIdEnc', 'contactPhoneEnc', 'contactEmailEnc'],
       UltimateBeneficialOwner: ['nationalIdEnc'],
       InsuredPerson: ['nationalIdEnc'],
       Employee: ['nationalIdEnc'],
       ThirdPartyClaimant: ['contactDetailsEnc'],
+      OrganizationEmailIntegration: ['oauthRefreshTokenEnc'],
     });
   });
 });

@@ -9,7 +9,7 @@ export const programTableStyle: CSSProperties = {
 export const programCellStyle: CSSProperties = {
   textAlign: 'start',
   padding: '0.5rem 0.6rem',
-  borderBottom: '1px solid rgba(128,128,128,0.2)',
+  borderBottom: '1px solid var(--border-subtle)',
   verticalAlign: 'top',
 };
 
@@ -22,9 +22,9 @@ export const programCellNumStyle: CSSProperties = {
 export const programPanelStyle: CSSProperties = {
   marginTop: '1rem',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
-  background: 'rgba(128,128,128,0.05)',
+  background: 'var(--surface-sunken)',
 };
 
 export const programListCardStyle: CSSProperties = {
@@ -32,7 +32,7 @@ export const programListCardStyle: CSSProperties = {
   width: '100%',
   textAlign: 'start',
   padding: '1rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
   cursor: 'pointer',
   marginBottom: '0.75rem',

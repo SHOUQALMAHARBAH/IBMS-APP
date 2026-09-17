@@ -36,6 +36,8 @@ export const INTERACTION_CHANNELS: InteractionChannel[] = [
   'OTHER',
 ];
 
+export type CustomerStatus = 'PENDING_KYC' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+
 export interface Interaction {
   id: string;
   customerId: string;
@@ -89,7 +91,7 @@ export interface Customer360View {
     id: string;
     legalName: string;
     customerType: string;
-    status: string;
+    status: CustomerStatus;
     ownerUserId: string;
   };
   interactions: Interaction[];

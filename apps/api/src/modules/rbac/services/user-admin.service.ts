@@ -9,6 +9,8 @@ import {
 import { Prisma, RoleName, type User } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
 import { PasswordService } from '../../auth/services/password.service';
+import { EmployeeRepository } from '../../../repositories/employee.repository';
+import { resolveDisplayName } from '../../../common/display-name.util';
 import { AuditService } from '../../audit/audit.service';
 import type { RecordAuditEntryInput } from '../../audit/audit.service';
 import { PermissionsService } from './permissions.service';
@@ -17,6 +19,8 @@ import {
   segregationSignal,
   type SegregationSignal,
 } from '../checker-roles.config';
+import { DepartmentRepository } from '../../../repositories/department.repository';
+import { BranchRepository } from '../../../repositories/branch.repository';
 
 /** A book-wide admin list is a console view, not a report — capped like every
  * other unbounded read in this codebase (`ANALYTICS_POLICY_LIMIT` et al). */
@@ -57,7 +61,10 @@ export class UserAdminService {
   private readonly logger = new Logger(UserAdminService.name);
 
   constructor(
+    private readonly departments: DepartmentRepository,
+    private readonly branches: BranchRepository,
     private readonly users: UserRepository,
+    private readonly employees: EmployeeRepository,
     private readonly passwords: PasswordService,
     private readonly permissions: PermissionsService,
     private readonly audit: AuditService,
@@ -108,6 +115,66 @@ export class UserAdminService {
       );
     }
 
+    // Part II §4.2.2 — the Department must exist, and the tenant-scoped read
+    // means it must exist in THIS office: an Office A admin naming an Office B
+    // department id gets the same "unknown" answer as one naming a department
+    // that does not exist anywhere, which is the only answer that leaks nothing.
+    const department = await this.departments.findById(dto.departmentId);
+    if (!department) {
+      throw new UnprocessableEntityException(
+        "Unknown department. Pick one of this office's own departments.",
+      );
+    }
+
+    // §4.2.2 — Branch is validated exactly like Department, and for the same
+    // reason: the tenant-scoped read means an Office A admin naming an Office B
+    // branch id gets "unknown", never a hint that the row exists elsewhere.
+    const branch = await this.branches.findById(dto.branchId);
+    if (!branch) {
+      throw new UnprocessableEntityException(
+        "Unknown branch. Pick one of this office's own branches.",
+      );
+    }
+
+    // The HR record, when the admin names one. Validated exactly like
+    // Department and Branch above, and for the same reason: a tenant-scoped
+    // read means an Office A admin naming an Office B employee gets "unknown"
+    // rather than a hint that the row exists somewhere.
+    //
+    // Link-only. An Employee is never CREATED here: it needs a national ID,
+    // which is Highly Confidential under Part 10.2, and a user-provisioning
+    // form is not where that should first be typed.
+    let employeeName: string | null = null;
+    if (dto.employeeId) {
+      const employee = await this.employees.findById(dto.employeeId);
+      employeeName = employee?.fullName ?? null;
+      if (!employee) {
+        throw new UnprocessableEntityException(
+          "Unknown employee. Pick one of this office's own employee records.",
+        );
+      }
+      // `User.employeeId` is @unique, so the database would refuse a second
+      // link with a P2002 that reads like an email collision. Answering here
+      // says which constraint was actually hit, and to whom.
+      const existing = await this.users.findByEmployeeId(dto.employeeId);
+      if (existing) {
+        throw new ConflictException(
+          'That employee record is already linked to another account.',
+        );
+      }
+      // The SAME department rule `EmployeeService.create` applies when it
+      // links from the other direction. Linking is reachable both ways — HR
+      // can create the employee naming an existing account, or (here) an
+      // admin can create the account naming an existing employee — and a rule
+      // enforced on only one of those paths is not a rule.
+      if (employee.departmentId && employee.departmentId !== dto.departmentId) {
+        throw new ConflictException(
+          'This employee record and the account being created name different departments. ' +
+            "Pick the employee's own department, or link an employee from this one.",
+        );
+      }
+    }
+
     const passwordHash = await this.passwords.hash(dto.password);
     let user: User;
     try {
@@ -116,6 +183,9 @@ export class UserAdminService {
         email: dto.email,
         passwordHash,
         languagePreference: dto.languagePreference,
+        departmentId: department.id,
+        branchId: branch.id,
+        employeeId: dto.employeeId,
         roleIds: roles.map((r) => r.id),
         accessValidFrom,
         accessValidUntil,
@@ -146,6 +216,16 @@ export class UserAdminService {
         email: user.email,
         fullName: user.fullName,
         roles: requested,
+        // §4.2.4 names these explicitly — "who created, for whom, which
+        // role(s), WHICH DEPARTMENT/BRANCH, which Organization". Both ids and
+        // both names: an id alone is unreadable in an audit export years
+        // later, and a rename would silently rewrite history if only the id
+        // were kept. The Organization is not repeated here — every
+        // AuditLogEntry row is already tenant-scoped by its own column.
+        departmentId: department.id,
+        departmentName: department.name,
+        branchId: branch.id,
+        branchName: branch.name,
         accessValidFrom: accessValidFrom?.toISOString() ?? null,
         accessValidUntil: accessValidUntil?.toISOString() ?? null,
       },
@@ -162,7 +242,12 @@ export class UserAdminService {
 
     return {
       id: user.id,
-      fullName: user.fullName,
+      // Resolved, so the row the admin sees immediately after creating an
+      // account matches what the list will show on the next load.
+      fullName: resolveDisplayName({
+        fullName: user.fullName,
+        employee: employeeName ? { fullName: employeeName } : null,
+      }),
       email: user.email,
       isActive: user.isActive,
       mfaEnabled: user.mfaEnabled,
@@ -409,10 +494,11 @@ function toAdminUserView(row: {
   accessValidUntil: Date | null;
   createdAt: Date;
   roles: RoleName[];
+  employee?: { fullName: string } | null;
 }): AdminUserView {
   return {
     id: row.id,
-    fullName: row.fullName,
+    fullName: resolveDisplayName(row),
     email: row.email,
     isActive: row.isActive,
     mfaEnabled: row.mfaEnabled,

@@ -9,7 +9,7 @@ export const pageStyle: CSSProperties = {
 export const sectionStyle: CSSProperties = {
   marginTop: '2rem',
   padding: '1.5rem',
-  border: '1px solid rgba(128,128,128,0.3)',
+  border: '1px solid var(--border-default)',
   borderRadius: '0.5rem',
 };
 
@@ -37,14 +37,14 @@ export const tableStyle: CSSProperties = {
 export const thStyle: CSSProperties = {
   textAlign: 'start',
   padding: '0.5rem',
-  borderBottom: '1px solid rgba(128,128,128,0.3)',
+  borderBottom: '1px solid var(--border-default)',
   fontSize: '0.85rem',
   opacity: 0.75,
 };
 
 export const tdStyle: CSSProperties = {
   padding: '0.5rem',
-  borderBottom: '1px solid rgba(128,128,128,0.15)',
+  borderBottom: '1px solid var(--border-subtle)',
   verticalAlign: 'top',
 };
 
@@ -53,15 +53,15 @@ export const roleBadgeStyle: CSSProperties = {
   fontSize: '0.75rem',
   padding: '0.15rem 0.5rem',
   borderRadius: '999px',
-  border: '1px solid rgba(128,128,128,0.4)',
+  border: '1px solid var(--border-strong)',
   marginInlineEnd: '0.25rem',
   marginBottom: '0.25rem',
 };
 
 export const adminBadgeStyle: CSSProperties = {
   ...roleBadgeStyle,
-  borderColor: '#d33',
-  color: '#d33',
+  borderColor: 'var(--danger-ink)',
+  color: 'var(--danger-ink)',
   fontWeight: 'bold',
 };
 

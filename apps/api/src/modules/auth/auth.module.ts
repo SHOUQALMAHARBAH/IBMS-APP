@@ -1,3 +1,4 @@
+import { PermissionsModule } from '../rbac/permissions.module';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -16,16 +17,32 @@ import { MfaRequiredGuard } from './guards/mfa-required.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { StepUpGuard } from './guards/step-up.guard';
 import { UserRepository } from '../../repositories/user.repository';
+import { OrganizationRepository } from '../../repositories/organization.repository';
 import { RefreshTokenRepository } from '../../repositories/refresh-token.repository';
 import { UserSessionRepository } from '../../repositories/user-session.repository';
 import { MfaCredentialRepository } from '../../repositories/mfa-credential.repository';
 import { PasswordResetTokenRepository } from '../../repositories/password-reset-token.repository';
 import { SecurityConfigRepository } from '../../repositories/security-config.repository';
+import { EmailModule } from '../email/email.module';
+import { TrustedDeviceService } from './services/trusted-device.service';
+import { TrustedDeviceRepository } from '../../repositories/trusted-device.repository';
+import { PasswordHistoryRepository } from '../../repositories/password-history.repository';
+import { TenantMatchGuard } from './guards/tenant-match.guard';
+import { OrganizationModule } from '../organization/organization.module';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({})],
+  imports: [
+    OrganizationModule,
+    EmailModule,
+    PassportModule,
+    JwtModule.register({}),
+    PermissionsModule,
+  ],
   controllers: [AuthController, SsoController],
   providers: [
+    TrustedDeviceService,
+    TrustedDeviceRepository,
+    PasswordHistoryRepository,
     AuthService,
     PasswordService,
     TokenService,
@@ -34,6 +51,7 @@ import { SecurityConfigRepository } from '../../repositories/security-config.rep
     SecurityConfigService,
     JwtStrategy,
     UserRepository,
+    OrganizationRepository,
     RefreshTokenRepository,
     UserSessionRepository,
     MfaCredentialRepository,
@@ -43,6 +61,11 @@ import { SecurityConfigRepository } from '../../repositories/security-config.rep
     // gate, then role gate, then step-up freshness. Each is a no-op when
     // its route has no matching decorator (see each guard's canActivate).
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Part II §4.10.3 — immediately after the JWT guard, so the session's
+    // Organization is known, and BEFORE the onboarding/role guards: a token
+    // used on another office's address is refused regardless of what it is
+    // otherwise entitled to do.
+    { provide: APP_GUARD, useClass: TenantMatchGuard },
     { provide: APP_GUARD, useClass: MfaRequiredGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: StepUpGuard },

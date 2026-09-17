@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -14,17 +15,19 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { useLanguage } from '../../../lib/i18n/language-context';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '32rem' };
 const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
 
 export default function KnowledgeBasePage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -44,7 +47,7 @@ export default function KnowledgeBasePage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   const load = useCallback(async () => {
     try {
@@ -54,20 +57,20 @@ export default function KnowledgeBasePage() {
       setArticles(null);
       setLoadError(
         err instanceof ApiError && err.status === 403
-          ? "You don't hold the kb.publish permission."
+          ? t('kbNoPermission')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load the knowledge base — try again.',
+            : t('kbLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -86,7 +89,7 @@ export default function KnowledgeBasePage() {
       setBodyAr('');
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not publish the article.');
+      setFormError(err instanceof ApiError ? err.message : t('kbPublishError'));
     }
   }
 
@@ -106,7 +109,7 @@ export default function KnowledgeBasePage() {
       setEditingId(null);
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Could not update the article.');
+      setFormError(err instanceof ApiError ? err.message : t('kbUpdateError'));
     }
   }
 
@@ -114,11 +117,9 @@ export default function KnowledgeBasePage() {
 
   return (
     <main style={pageStyle}>
-      <h1>Knowledge Base</h1>
+      <h1>{t('kbHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        Product knowledge, insurer appetite, rate guides, and regulatory
-        updates for staff. Each article may be published in English,
-        Arabic, or both.
+        {t('kbIntro')}
       </p>
 
       {loadError ? (
@@ -129,15 +130,15 @@ export default function KnowledgeBasePage() {
 
       {articles ? (
         articles.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No articles published yet.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('kbNone')}</p>
         ) : (
           <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
             <thead>
               <tr>
-                <th style={head}>Title</th>
+                <th style={head}>{t('kbColTitle')}</th>
                 <th style={head}>العنوان</th>
-                <th style={head}>Category</th>
-                <th style={head}>Published</th>
+                <th style={head}>{t('kbColCategory')}</th>
+                <th style={head}>{t('kbColPublished')}</th>
                 <th style={head} />
               </tr>
             </thead>
@@ -165,7 +166,7 @@ export default function KnowledgeBasePage() {
                       article.titleAr ?? '—'
                     )}
                   </td>
-                  <td style={cell}>{article.category}</td>
+                  <td style={cell}>{t(ENUM_LABEL.KbCategory[article.category])}</td>
                   <td style={cell}>{article.publishedAt.slice(0, 10)}</td>
                   <td style={cell}>
                     {editingId === article.id ? (
@@ -184,13 +185,13 @@ export default function KnowledgeBasePage() {
           </table>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('kbLoading')}</p>
       )}
 
       <form onSubmit={onCreate} style={formStyle}>
-        <h2>Publish a new article</h2>
+        <h2>{t('kbPublishSection')}</h2>
         <label style={labelStyle}>
-          Title (English)
+          {t('kbTitleEn')}
           <input value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label style={labelStyle}>
@@ -202,13 +203,13 @@ export default function KnowledgeBasePage() {
           <select value={category} onChange={(e) => setCategory(e.target.value as KbCategory)}>
             {KB_CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(ENUM_LABEL.KbCategory[c])}
               </option>
             ))}
           </select>
         </label>
         <label style={labelStyle}>
-          Body (English, optional)
+          {t('kbBodyEn')}
           <textarea value={bodyEn} onChange={(e) => setBodyEn(e.target.value)} rows={4} />
         </label>
         <label style={labelStyle}>
@@ -220,7 +221,7 @@ export default function KnowledgeBasePage() {
             {formError}
           </p>
         ) : null}
-        <button type="submit">Publish article</button>
+        <button type="submit">{t('kbPublishButton')}</button>
       </form>
     </main>
   );

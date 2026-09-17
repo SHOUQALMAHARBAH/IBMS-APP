@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
@@ -25,17 +26,17 @@ import {
   upSellFigureRowStyle,
 } from '../../../../components/up-sell/up-sell.styles';
 import { ConsentCaptureWidget } from '../../../../components/pdpl/ConsentCaptureWidget';
-import { PrivacyNoticeDisplay, NOTICE_READ_ROLES } from '../../../../components/pdpl/PrivacyNoticeDisplay';
+import { PrivacyNoticeDisplay } from '../../../../components/pdpl/PrivacyNoticeDisplay';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { formatDateTime } from '../../../../lib/i18n/format';
+import { hasPermission } from '../../../../lib/auth/permissions';
 
-const CAN_CONVERT_ROLE = 'SALES_RELATIONSHIP_OFFICER';
 
 export default function UpSellRecommendationDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { user, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [recommendation, setRecommendation] =
     useState<UpSellRecommendation | null>(null);
@@ -52,24 +53,24 @@ export default function UpSellRecommendationDetailPage() {
     } catch (err) {
       setLoadError(
         err instanceof ApiError && (err.status === 403 || err.status === 404)
-          ? 'This up-sell recommendation could not be found — it may not exist, or you may not have access to it.'
+          ? t('upsdNotFound')
           : err instanceof ApiError
             ? err.message
-            : 'Could not load this up-sell recommendation — try again.',
+            : t('upsdLoadError'),
       );
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(
     fn: () => Promise<UpSellRecommendation>,
@@ -89,7 +90,7 @@ export default function UpSellRecommendationDetailPage() {
 
   if (isLoading || !user) return null;
 
-  const canConvert = user.roles.includes(CAN_CONVERT_ROLE);
+  const canConvert = hasPermission(user, 'up-sell.convert');
 
   return (
     <main style={pageStyle}>
@@ -104,7 +105,7 @@ export default function UpSellRecommendationDetailPage() {
         }
         style={{ cursor: 'pointer' }}
       >
-        ← All up-sell recommendations
+        {t('upsdBackToList')}
       </button>
 
       {loadError ? (
@@ -115,26 +116,26 @@ export default function UpSellRecommendationDetailPage() {
 
       {recommendation ? (
         <>
-          <h1>Under-insurance recommendation</h1>
+          <h1>{t('upsdHeading')}</h1>
           <p style={{ opacity: 0.8 }}>
-            <span style={upSellBadgeStyle}>{recommendation.status}</span>
+            <span style={upSellBadgeStyle}>{t(ENUM_LABEL.UpSellStatus[recommendation.status])}</span>
           </p>
 
           <ConsentCaptureWidget
             customerId={recommendation.customerId}
             purpose="MARKETING"
-            label="Up-sell consent"
+            label={t('upsdConsent')}
             defaultConsentTextVersion="privacy-notice-v1.2"
           />
           <PrivacyNoticeDisplay
             touchpoint="renewal_cross_sell"
-            canRead={!!user && user.roles.some((r) => NOTICE_READ_ROLES.includes(r))}
+            canRead={hasPermission(user, 'privacy-notice.read')}
           />
 
           <div style={upSellFigureRowStyle}>
             <div>
               <div style={profileFieldLabelStyle}>
-                Designed Sum Insured (JOD)
+                {t('upsDesignedSumInsured')}
               </div>
               <div style={profileFieldValueStyle}>
                 {recommendation.currentSumInsured}
@@ -142,7 +143,7 @@ export default function UpSellRecommendationDetailPage() {
             </div>
             <div>
               <div style={profileFieldLabelStyle}>
-                Current asset value (JOD)
+                {t('upsCurrentAssetValue')}
               </div>
               <div style={profileFieldValueStyle}>
                 {recommendation.currentAssetValue}
@@ -159,14 +160,14 @@ export default function UpSellRecommendationDetailPage() {
             }}
           >
             <div>
-              <div style={profileFieldLabelStyle}>Flagged</div>
+              <div style={profileFieldLabelStyle}>{t('upsdFlagged')}</div>
               <div style={profileFieldValueStyle}>
                 {formatDateTime(recommendation.detectedAt, language)}
               </div>
             </div>
             {recommendation.resolvedAt ? (
               <div>
-                <div style={profileFieldLabelStyle}>Resolved</div>
+                <div style={profileFieldLabelStyle}>{t('upsdResolved')}</div>
                 <div style={profileFieldValueStyle}>
                   {formatDateTime(recommendation.resolvedAt, language)}
                 </div>
@@ -174,7 +175,7 @@ export default function UpSellRecommendationDetailPage() {
             ) : null}
             {recommendation.dismissReason ? (
               <div>
-                <div style={profileFieldLabelStyle}>Dismiss reason</div>
+                <div style={profileFieldLabelStyle}>{t('upsdDismissReason')}</div>
                 <div style={profileFieldValueStyle}>
                   {recommendation.dismissReason}
                 </div>
@@ -191,19 +192,19 @@ export default function UpSellRecommendationDetailPage() {
                 onClick={() =>
                   void run(
                     () => convertUpSellRecommendation(recommendation.id),
-                    'Could not convert — try again.',
+                    t('upsConvertError'),
                   )
                 }
               >
-                {busy ? 'Working…' : 'Convert'}
+                {busy ? t('upsWorking') : t('upsConvertButton')}
               </button>
               {dismissing ? (
                 <>
                   <input
-                    aria-label="Why is the increase not being pursued?"
+                    aria-label={t('upsdWhyNotPursued')}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. client declined the increase"
+                    placeholder={t('upsDismissPlaceholder')}
                     style={{ minWidth: '18rem' }}
                   />
                   <button
@@ -217,11 +218,11 @@ export default function UpSellRecommendationDetailPage() {
                             recommendation.id,
                             reason.trim(),
                           ),
-                        'Could not dismiss — try again.',
+                        t('upsDismissError'),
                       )
                     }
                   >
-                    Confirm dismiss
+                    {t('upsConfirmDismiss')}
                   </button>
                   <button
                     type="button"

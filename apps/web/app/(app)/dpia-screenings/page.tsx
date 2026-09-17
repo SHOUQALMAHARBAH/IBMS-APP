@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -14,20 +15,22 @@ import {
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
+import { hasAnyPermission } from '../../../lib/auth/permissions';
+import { useLanguage } from '../../../lib/i18n/language-context';
+import type { TranslationKey } from '../../../lib/i18n/translations';
 
-const ROLES = ['DATA_PROTECTION_OFFICER'];
+const ROLES = [
+  'dpia.review',
+];
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
-  borderBottom: '1px solid #e5e7eb',
+  borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
   verticalAlign: 'top',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid #d1d5db' };
+const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
 
-function hasAny(roles: string[] | undefined, allowed: string[]): boolean {
-  return !!roles && roles.some((r) => allowed.includes(r));
-}
 
 const INITIAL_ANSWERS = {
   qSensitiveData: false,
@@ -37,18 +40,25 @@ const INITIAL_ANSWERS = {
   qNewDigitalChannel: false,
 };
 
-const QUESTIONS: { key: keyof typeof INITIAL_ANSWERS; label: string }[] = [
-  { key: 'qSensitiveData', label: 'Involves sensitive data?' },
-  { key: 'qLargeScaleProcessing', label: 'Large-scale processing?' },
-  { key: 'qCrossBorderTransfer', label: 'Cross-border transfer?' },
-  { key: 'qNewTechnologyMonitoring', label: 'New technology / monitoring?' },
-  { key: 'qNewDigitalChannel', label: 'New digital channel?' },
+// The five screening questions. Module scope has no translator, so each
+// carries its label KEY and the component resolves it — the alternative,
+// building the list inside the component, would rebuild it every render.
+const QUESTIONS: {
+  key: keyof typeof INITIAL_ANSWERS;
+  labelKey: TranslationKey;
+}[] = [
+  { key: 'qSensitiveData', labelKey: 'dpiaQSensitive' },
+  { key: 'qLargeScaleProcessing', labelKey: 'dpiaQLargeScale' },
+  { key: 'qCrossBorderTransfer', labelKey: 'dpiaQCrossBorder' },
+  { key: 'qNewTechnologyMonitoring', labelKey: 'dpiaQNewTech' },
+  { key: 'qNewDigitalChannel', labelKey: 'dpiaQNewChannel' },
 ];
 
 export default function DpiaScreeningsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = hasAny(user?.roles, ROLES);
+  const { t } = useLanguage();
+  const canManage = hasAnyPermission(user, ROLES);
 
   const [rows, setRows] = useState<DpiaScreening[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -65,22 +75,24 @@ export default function DpiaScreeningsPage() {
     } catch (err) {
       setRows(null);
       setLoadError(
-        err instanceof ApiError
-          ? err.message
-          : 'Could not load DPIA screenings — try again.',
+        err instanceof ApiError && err.status === 403
+          ? t('dpiaNoPermission')
+          : err instanceof ApiError
+            ? err.message
+            : t('dpiaLoadError'),
       );
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
   useEffect(() => {
     if (!user) return;
     void (async () => {
       await load();
     })();
-  }, [user, load]);
+  }, [user, load, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -90,7 +102,7 @@ export default function DpiaScreeningsPage() {
       await load();
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : 'That action failed — try again.',
+        err instanceof ApiError ? err.message : t('dpiaActionError'),
       );
     } finally {
       setBusy(false);
@@ -110,12 +122,9 @@ export default function DpiaScreeningsPage() {
 
   return (
     <main style={pageStyle}>
-      <h1>DPIA Screening</h1>
+      <h1>{t('dpiaHeading')}</h1>
       <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        The 5-question screening form. Any single &quot;Yes&quot; requires
-        DPO review within 5 business days; an all-&quot;No&quot; result
-        auto-approves subject to a spot-check; a materially high-risk case
-        under review can be escalated to a Full DPIA.
+        {t('dpiaIntro')}
       </p>
 
       {actionError ? (
@@ -135,9 +144,9 @@ export default function DpiaScreeningsPage() {
           style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end', margin: '0.75rem 0' }}
         >
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            Subject
+            {t('dpiaSubjectFieldLabel')}
             <input
-              aria-label="Subject description"
+              aria-label={t('dpiaSubjectLabel')}
               value={subjectDescription}
               onChange={(e) => setSubjectDescription(e.target.value)}
               required
@@ -150,34 +159,34 @@ export default function DpiaScreeningsPage() {
                 checked={answers[q.key]}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.key]: e.target.checked }))}
               />
-              {q.label}
+              {t(q.labelKey)}
             </label>
           ))}
           <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Submit screening'}
+            {busy ? t('dpiaSavingButton') : t('dpiaSubmitButton')}
           </button>
         </form>
       ) : null}
 
       {rows ? (
         rows.length === 0 ? (
-          <p style={{ opacity: 0.6 }}>No DPIA screenings yet.</p>
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('dpiaNone')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', minWidth: '64rem' }}>
               <thead>
                 <tr>
-                  <th style={head}>Subject</th>
-                  <th style={head}>Outcome</th>
-                  <th style={head}>Review due</th>
-                  <th style={head}>Action</th>
+                  <th style={head}>{t('dpiaColSubject')}</th>
+                  <th style={head}>{t('dpiaColOutcome')}</th>
+                  <th style={head}>{t('dpiaColReviewDue')}</th>
+                  <th style={head}>{t('dpiaColAction')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td style={cell}>{r.subjectDescription}</td>
-                    <td style={cell}>{r.outcome}</td>
+                    <td style={cell}>{t(ENUM_LABEL.DpiaOutcome[r.outcome])}</td>
                     <td style={cell}>{r.dpoReviewDueAt ? r.dpoReviewDueAt.slice(0, 10) : '—'}</td>
                     <td style={cell}>
                       {!canManage ? (
@@ -188,7 +197,7 @@ export default function DpiaScreeningsPage() {
                           disabled={busy}
                           onClick={() => void run(() => recordDpiaSpotCheck(r.id))}
                         >
-                          Spot-check
+                          {t('dpiaSpotCheckButton')}
                         </button>
                       ) : r.outcome === 'DPO_REVIEW_REQUIRED' && !r.dpoReviewedAt ? (
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -197,14 +206,14 @@ export default function DpiaScreeningsPage() {
                             disabled={busy}
                             onClick={() => void run(() => recordDpiaReview(r.id))}
                           >
-                            Record review
+                            {t('dpiaRecordReviewButton')}
                           </button>
                           <button
                             type="button"
                             disabled={busy}
                             onClick={() => void run(() => escalateDpiaToFullDpia(r.id))}
                           >
-                            Escalate to Full DPIA
+                            {t('dpiaEscalateButton')}
                           </button>
                         </div>
                       ) : (
@@ -218,7 +227,7 @@ export default function DpiaScreeningsPage() {
           </div>
         )
       ) : loadError ? null : (
-        <p>Loading&hellip;</p>
+        <p>{t('dpiaLoading')}</p>
       )}
     </main>
   );

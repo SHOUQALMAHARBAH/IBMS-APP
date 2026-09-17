@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { permissionsForRoles } from "./fixtures/role-permissions";
 
 // Part F — Bilingual UI (backlog Part 11), item #5 (sub-problem #1 of 3, by
 // explicit user scoping decision): "locale-aware number/date formatting."
@@ -54,7 +55,7 @@ async function mockAuth(page: Page) {
       status: 200,
       json: {
         ...ME_BASE,
-        roles: ["FINANCE_COLLECTIONS_OFFICER"],
+        roles: ["FINANCE_COLLECTIONS_OFFICER"], permissions: permissionsForRoles(["FINANCE_COLLECTIONS_OFFICER"]),
         languagePreference: currentLanguage,
       },
     });
@@ -68,7 +69,7 @@ async function mockAuth(page: Page) {
       status: 200,
       json: {
         ...ME_BASE,
-        roles: ["FINANCE_COLLECTIONS_OFFICER"],
+        roles: ["FINANCE_COLLECTIONS_OFFICER"], permissions: permissionsForRoles(["FINANCE_COLLECTIONS_OFFICER"]),
         languagePreference: currentLanguage,
       },
     });

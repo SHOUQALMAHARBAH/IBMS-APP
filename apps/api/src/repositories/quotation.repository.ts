@@ -2,13 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma, Quotation } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NormalizedQuotationTerms } from '../modules/quotation/quotation.config';
-
-const INSURER_IDENTITY_SELECT = {
-  id: true,
-  name: true,
-  nameAr: true,
-  financialStrengthRating: true,
-} as const;
+import { INSURER_IDENTITY_SELECT } from './insurer-identity';
 
 const RFQ_CONTEXT_SELECT = {
   id: true,

@@ -9,15 +9,15 @@ import type {
   Prisma,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
-
-const INSURER_IDENTITY_SELECT = {
-  id: true,
-  name: true,
-  nameAr: true,
-} as const;
+import { INSURER_IDENTITY_SELECT } from './insurer-identity';
 
 const POLICY_INCLUDE = {
   insurer: { select: INSURER_IDENTITY_SELECT },
+  // Identity only — the book-wide list has to say WHICH client each policy
+  // belongs to, and `customerId` alone does not. Deliberately two columns and
+  // not the Customer row: a policy read must not become a route to a
+  // customer's wider file.
+  customer: { select: { id: true, legalName: true } },
   schedules: { orderBy: { effectiveFrom: 'desc' } },
   documents: { orderBy: { createdAt: 'desc' } },
   // Process 20 — the one maker/checker quality-control row (or null).
@@ -31,6 +31,52 @@ const POLICY_INCLUDE = {
 export type PolicyWithContext = Prisma.PolicyGetPayload<{
   include: typeof POLICY_INCLUDE;
 }>;
+
+/**
+ * The book-wide policy list is paginated, not capped. It was capped until
+ * `common/pagination.ts` existed — the comment here used to say so, and said
+ * the reason was that no list endpoint in this codebase took a page param.
+ * Five now do, this is one of them, and the old cap silently dropped the
+ * oldest tail of a book that outgrew it.
+ *
+ * Paging is only safe because every filter is applied in the query (see
+ * `findManyForActor`), so the window narrows a set the caller is already
+ * entitled to see. Ordered newest-first, same as before.
+ */
+
+export interface ListPoliciesFilter {
+  /** `null` = this caller reaches the whole book. Otherwise, only policies
+   * whose Customer is owned by this user id. */
+  ownerUserId: string | null;
+  status?: PolicyStatus;
+  /** Matched against policy number, insurance line and the customer's legal
+   * name — the three things someone actually has to hand when looking for a
+   * policy. */
+  search?: string;
+}
+
+function buildPolicyListWhere(
+  filter: ListPoliciesFilter,
+): Prisma.PolicyWhereInput {
+  const where: Prisma.PolicyWhereInput = {};
+
+  if (filter.ownerUserId !== null) {
+    where.customer = { ownerUserId: filter.ownerUserId };
+  }
+  if (filter.status) {
+    where.status = filter.status;
+  }
+  if (filter.search) {
+    const contains = { contains: filter.search, mode: 'insensitive' } as const;
+    where.OR = [
+      { policyNumber: contains },
+      { insuranceLine: contains },
+      { customer: { legalName: contains } },
+    ];
+  }
+
+  return where;
+}
 
 export interface CreatePolicyInput {
   opportunityId: string;
@@ -116,6 +162,44 @@ export class PolicyRepository {
       where: { customerId },
       include: POLICY_INCLUDE,
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * The book-wide policy list behind `GET /policies` with no
+   * opportunity/customer scope — the Policy Checking Officer's work surface,
+   * and the only path to a policy for a role that has no customer in hand.
+   *
+   * `ownerUserId` is the visibility filter and it is applied HERE, in the
+   * SQL `where`, never to the rows afterwards. A caller who reaches the whole
+   * book (Placement/Manager/Executive/Policy Checking — see
+   * `POLICY_CROSS_OWNER_ROLES`) passes `null`; anyone else passes their own
+   * id and sees only policies on Customers they own.
+   *
+   * Filtering before the window rather than after it is the standing rule
+   * from the `DpoWorkspaceService` defect: a bounded read that is filtered in
+   * memory lets the bound silently decide what the caller cannot see. Every
+   * filter below is part of the query, so the window bounds the MATCHING
+   * rows, not the rows scanned.
+   */
+  findManyForActor(
+    filter: ListPoliciesFilter,
+    window: { take: number; skip: number },
+  ): Promise<PolicyWithContext[]> {
+    return this.prisma.client.policy.findMany({
+      where: buildPolicyListWhere(filter),
+      include: POLICY_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: window.take,
+      skip: window.skip,
+    });
+  }
+
+  /** Counts on the SAME `where` the page query runs, so the two can never
+   *  disagree about what is being counted. */
+  countForActor(filter: ListPoliciesFilter): Promise<number> {
+    return this.prisma.client.policy.count({
+      where: buildPolicyListWhere(filter),
     });
   }
 

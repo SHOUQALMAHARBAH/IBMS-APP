@@ -56,7 +56,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
     void (async () => {
       await load();
     })();
-  }, [load]);
+  }, [load, t]);
 
   if (loadError) {
     return (
@@ -69,7 +69,7 @@ function OpportunitiesForCustomer({ customerId }: { customerId: string }) {
 
   if (opportunities.length === 0) {
     return (
-      <p style={{ opacity: 0.6, marginTop: '1rem' }}>{t('oppListNoneYet')}</p>
+      <p style={{ color: 'var(--ink-secondary)', marginTop: '1rem' }}>{t('oppListNoneYet')}</p>
     );
   }
 
@@ -137,7 +137,7 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, t]);
 
   if (isLoading || !user) return null;
 
