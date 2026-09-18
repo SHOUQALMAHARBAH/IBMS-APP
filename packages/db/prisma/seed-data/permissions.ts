@@ -810,11 +810,43 @@ const complianceRisk: PermissionSeed[] = [
     description: "Execute incident containment actions",
     roles: [ADMIN, COMPLIANCE],
   },
+  // Classification and the Senior Management co-sign are two halves of one
+  // control, and until Phase 2 a single code gated BOTH — so the role NAME was
+  // the only thing telling them apart (`incident.service.ts` refused a
+  // non-DPO classify and a non-Executive co-sign by name). A custom role was in
+  // neither check and could reach neither action, and one code could not express
+  // "may classify but not co-sign" at all.
+  //
+  // Split into three. `incident.senior-management.notify` exists because the
+  // notification stamp had no role narrowing, so BOTH the DPO and Executive
+  // Management could make it; narrowing `incident.classify` to the DPO alone
+  // would have silently taken that from Executive Management.
+  //
+  // An office CAN grant both halves to one role. Instance-level independence
+  // does not depend on this split: `assertDifferentActors` still refuses a
+  // co-sign by whoever recorded the classification, so nobody co-signs their own
+  // work however the roles are arranged. Phase 3's permission matrix warns on
+  // the combination rather than refusing it — a small office may legitimately
+  // want it.
   {
     code: "incident.classify",
     module: "compliance-risk",
     description:
-      "Classify an incident as Material (requires DPO + Senior Management co-sign)",
+      "Classify an incident as Material or Non-Material (the DPO half of the pair; the co-sign is a separate permission)",
+    roles: [DPO],
+  },
+  {
+    code: "incident.classification.co-sign",
+    module: "compliance-risk",
+    description:
+      "Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it",
+    roles: [EXEC],
+  },
+  {
+    code: "incident.senior-management.notify",
+    module: "compliance-risk",
+    description:
+      "Record that Senior Management was notified of a Material incident (a manual stamp, not part of the classify/co-sign pair)",
     roles: [DPO, EXEC],
   },
   {

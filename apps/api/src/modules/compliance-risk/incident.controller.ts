@@ -72,13 +72,13 @@ export class IncidentController {
     return this.incidents.classify(id, dto, user);
   }
 
-  @RequirePermissions('incident.classify')
+  @RequirePermissions('incident.classification.co-sign')
   @Post(':id/co-sign')
   coSign(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.incidents.coSign(id, user);
   }
 
-  @RequirePermissions('incident.classify')
+  @RequirePermissions('incident.senior-management.notify')
   @Post(':id/notify-senior-management')
   notifySeniorManagement(
     @Param('id') id: string,

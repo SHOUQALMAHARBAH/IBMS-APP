@@ -36,6 +36,12 @@ const CONTAIN_ROLES = [
 const CLASSIFY_ROLES = [
   'incident.classify',
 ];
+const CO_SIGN_ROLES = [
+  'incident.classification.co-sign',
+];
+const NOTIFY_SENIOR_ROLES = [
+  'incident.senior-management.notify',
+];
 const NOTIFY_REGULATOR_ROLES = [
   'incident.notify-regulator',
 ];
@@ -58,16 +64,18 @@ export default function IncidentsPage() {
   const canReport = hasAnyPermission(user, REPORT_ROLES);
   const canContain = hasAnyPermission(user, CONTAIN_ROLES);
   const canClassify = hasAnyPermission(user, CLASSIFY_ROLES);
-  // §10.4 has exactly one documented exception in this app, and it is here.
-  // Classify and co-sign BOTH require incident.classify, so the permission
-  // cannot distinguish them — but they are a maker/checker pair (DPO
-  // classifies, Executive Management co-signs, assertDifferentActors enforces
-  // it). Gating both on the shared permission would offer each user a control
-  // the server will always refuse, which is the very thing §10.4 exists to
-  // prevent. So these two stay ROLE checks deliberately: the role is the
-  // finer-grained fact here, not a stale copy of the grid.
-  const isDpo = !!user && user.roles.includes('DATA_PROTECTION_OFFICER');
-  const isExec = !!user && user.roles.includes('EXECUTIVE_MANAGEMENT');
+  // §10.4's one documented exception in this app USED to be here: classify and
+  // co-sign both required `incident.classify`, so the permission could not tell
+  // them apart and these were role-name checks deliberately — the role really
+  // was the finer-grained fact.
+  //
+  // Phase 2 split the code in two, so the premise is gone and so is the
+  // exception. Every control on this screen is back to being gated by the same
+  // permission the server enforces, which is what §10.4 asks for — and a role an
+  // office defines now gets the buttons its grants entitle it to, instead of
+  // none.
+  const canCoSign = hasAnyPermission(user, CO_SIGN_ROLES);
+  const canNotifySenior = hasAnyPermission(user, NOTIFY_SENIOR_ROLES);
   const canNotifyRegulators = hasAnyPermission(user, NOTIFY_REGULATOR_ROLES);
 
   const [incidents, setIncidents] = useState<IncidentReport[] | null>(null);
@@ -236,7 +244,7 @@ export default function IncidentsPage() {
                           {t('incAssessButton')}
                         </button>
                       ) : null}
-                      {isDpo && inc.status === 'IMPACT_ASSESSED' ? (
+                      {canClassify && inc.status === 'IMPACT_ASSESSED' ? (
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
                           <button
                             type="button"
@@ -254,7 +262,7 @@ export default function IncidentsPage() {
                           </button>
                         </div>
                       ) : null}
-                      {isExec &&
+                      {canCoSign &&
                       inc.status === 'CLASSIFIED' &&
                       inc.classification === 'MATERIAL' &&
                       !inc.seniorManagementCoSignUserId ? (
@@ -262,7 +270,7 @@ export default function IncidentsPage() {
                           {t('incCoSignButton')}
                         </button>
                       ) : null}
-                      {canClassify &&
+                      {canNotifySenior &&
                       inc.classification === 'MATERIAL' &&
                       !inc.seniorManagementNotifiedAt ? (
                         <button
