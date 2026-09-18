@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { OrgContextService } from '../../../common/org-context/org-context.service';
-import type { RoleName } from '@ibms/db';
 import { UserSessionRepository } from '../../../repositories/user-session.repository';
 import { UserRepository } from '../../../repositories/user.repository';
 import { AuditService } from '../../audit/audit.service';
@@ -10,7 +9,7 @@ import {
   SessionIdleTimeoutException,
   SessionRevokedException,
 } from '../auth.exceptions';
-import { requiresHardwareToken, type AuthenticatedUser } from '../auth.types';
+import type { AuthenticatedUser } from '../auth.types';
 
 /**
  * Part II §4.1.5 — the hard cap on one sign-in, regardless of activity ("e.g.
@@ -199,9 +198,5 @@ export class SessionService {
 
   listActive(userId: string) {
     return this.sessions.findActiveByUser(userId);
-  }
-
-  requiresHardwareToken(roles: RoleName[]): boolean {
-    return requiresHardwareToken(roles);
   }
 }

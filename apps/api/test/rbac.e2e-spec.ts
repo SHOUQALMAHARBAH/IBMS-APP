@@ -9,6 +9,23 @@ import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
+/** The eleven roles `packages/db/prisma/seed.ts` seeds. Asserted as a subset of
+ *  what `GET /rbac/roles` returns, never as the whole of it — see the comment
+ *  at that assertion. */
+const SEEDED_ROLE_NAMES = [
+  'SALES_RELATIONSHIP_OFFICER',
+  'PLACEMENT_TECHNICAL_OFFICER',
+  'POLICY_CHECKING_OFFICER',
+  'CLAIMS_OFFICER',
+  'FINANCE_COLLECTIONS_OFFICER',
+  'COMPLIANCE_OFFICER',
+  'BRANCH_DEPARTMENT_MANAGER',
+  'DATA_PROTECTION_OFFICER',
+  'SYSTEM_SECURITY_ADMINISTRATOR',
+  'EXECUTIVE_MANAGEMENT',
+  'EXTERNAL_AUDITOR',
+];
+
 interface IssuedSessionBody {
   accessToken: string;
   user: { id: string };
@@ -173,7 +190,20 @@ describe('RBAC / access recertification (e2e)', () => {
         .get('/rbac/roles')
         .set(bearer(admin.accessToken))
         .expect(200);
-      expect((roles.body as unknown[]).length).toBe(11);
+      // A SUPERSET check, not `length === 11`.
+      //
+      // Two reasons the exact count was the wrong assertion, and office-scoped
+      // custom roles made both of them real. This database is cumulative, so any
+      // spec that creates a role — several now do — moves a global count; and
+      // the whole point of this project is that an office defines roles beyond
+      // the legacy eleven, so a catalogue of exactly eleven stops being the
+      // expected state the moment Phase 3 ships. What must hold is that every
+      // seeded role is still there.
+      const names = (roles.body as { name: string }[]).map((r) => r.name);
+      expect(names).toEqual(expect.arrayContaining(SEEDED_ROLE_NAMES));
+      expect(new Set(names).size, 'no duplicate role names in one office').toBe(
+        names.length,
+      );
 
       const permissions = await request(app.getHttpServer())
         .get('/rbac/permissions')

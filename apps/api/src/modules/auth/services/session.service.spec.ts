@@ -268,20 +268,10 @@ describe('SessionService.isStepUpFresh', () => {
   });
 });
 
-describe('SessionService.requiresHardwareToken', () => {
-  it('is true for a privileged role', () => {
-    const { service } = buildService();
-    expect(
-      service.requiresHardwareToken(['SYSTEM_SECURITY_ADMINISTRATOR']),
-    ).toBe(true);
-    expect(service.requiresHardwareToken(['DATA_PROTECTION_OFFICER'])).toBe(
-      true,
-    );
-  });
-
-  it('is false for a non-privileged role and no roles', () => {
-    const { service } = buildService();
-    expect(service.requiresHardwareToken(['CLAIMS_OFFICER'])).toBe(false);
-    expect(service.requiresHardwareToken([])).toBe(false);
-  });
-});
+// `SessionService.requiresHardwareToken` is gone, and so are the two tests that
+// covered it. It was a one-line wrapper around a role-NAME list, typed to the
+// legacy `RoleName` enum, with no caller outside this file — so the tests were
+// the only thing keeping it alive. The obligation is now a column on `Role`
+// (`requiresHardwareToken`), resolved by `roleSecurityAttributes` and covered by
+// `trusted-device.service.spec.ts`, the role seed spec, and
+// `apps/api/test/role-security-attributes.e2e-spec.ts`.

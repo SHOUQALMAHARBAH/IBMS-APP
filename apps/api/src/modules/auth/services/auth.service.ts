@@ -22,7 +22,10 @@ import { TokenService } from './token.service';
 import { MfaService } from './mfa.service';
 import { SessionService } from './session.service';
 import { SecurityConfigService } from './security-config.service';
-import { requiresHardwareToken } from '../auth.types';
+import {
+  roleSecurityAttributes,
+  type RoleSecurityAttributes,
+} from '../auth.types';
 import { TrustedDeviceService } from './trusted-device.service';
 import { PasswordHistoryRepository } from '../../../repositories/password-history.repository';
 import type { SignupDto } from '../dto/signup.dto';
@@ -199,13 +202,18 @@ export class AuthService {
       };
     }
 
-    const roles = await this.users.getRoleNames(user.id);
-
     // Part II §4.4 — a live trust on THIS device lets a standard role skip the
     // prompt. Never for an always-MFA role, and never without a password first:
     // this shortens the second factor, it never replaces the first.
+    //
+    // Resolved from the roles' own security attributes, not their names: a name
+    // list could not recognise a role an office defined, so a custom role
+    // silently qualified for the skip (see `RoleSecurityAttributes`).
     if (user.mfaEnabled) {
-      const skip = await this.trustedDevices.maySkipMfa(user.id, roles, {
+      const security = roleSecurityAttributes(
+        await this.users.getRoleRefs(user.id),
+      );
+      const skip = await this.trustedDevices.maySkipMfa(user.id, security, {
         fingerprint: dto.deviceFingerprint,
         userAgent: meta.userAgent,
         ipAddress: meta.ipAddress,
@@ -395,8 +403,10 @@ export class AuthService {
     // second factor, and nowhere else: granting it on a password-only step
     // would let a stolen password mint its own MFA bypass.
     if (dto.trustDevice) {
-      const roles = await this.users.getRoleNames(user.id);
-      await this.trustedDevices.trust(user.id, roles, {
+      const security = roleSecurityAttributes(
+        await this.users.getRoleRefs(user.id),
+      );
+      await this.trustedDevices.trust(user.id, security, {
         fingerprint: dto.deviceFingerprint,
         userAgent: meta.userAgent,
         ipAddress: meta.ipAddress,
@@ -773,7 +783,10 @@ export class AuthService {
       roles,
       permissions,
       mfaEnabled: user.mfaEnabled,
-      mfaPolicySatisfied: this.mfaPolicySatisfied(user, roles),
+      mfaPolicySatisfied: this.mfaPolicySatisfied(
+        user,
+        roleSecurityAttributes(roleRefs),
+      ),
       accessValidUntil: user.accessValidUntil,
       // Both spellings, not one resolved string: the caller knows which
       // language it is rendering in and `nameAr` is nullable, so picking here
@@ -807,11 +820,14 @@ export class AuthService {
     return this.me(userId, sessionId);
   }
 
-  private mfaPolicySatisfied(user: User, roles: readonly string[]): boolean {
-    // WebAuthn is not implemented yet (see A.1 plan) — privileged roles can
-    // never satisfy the hardware-token requirement today, so this is
+  private mfaPolicySatisfied(
+    user: User,
+    security: RoleSecurityAttributes,
+  ): boolean {
+    // WebAuthn is not implemented yet (see A.1 plan) — a role flagged for the
+    // hardware-token requirement can never satisfy it today, so this is
     // surfaced to the frontend as a banner, never used to block login.
-    return user.mfaEnabled && !requiresHardwareToken(roles);
+    return user.mfaEnabled && !security.requiresHardwareToken;
   }
 
   private assertAccessWindowActive(user: User): void {
@@ -867,7 +883,10 @@ export class AuthService {
       config.accessTokenTtlMinutes,
     );
     await this.users.recordSuccessfulLogin(user.id);
-    const roles = await this.users.getRoleNames(user.id);
+    // Names for display in the response, obligations for `mfaPolicySatisfied`
+    // — one read, two uses.
+    const roleRefs = await this.users.getRoleRefs(user.id);
+    const roles = roleRefs.map((r) => r.name);
     await this.audit.record({
       userId: user.id,
       action: 'LOGIN',
@@ -885,7 +904,10 @@ export class AuthService {
         fullName: user.fullName,
         roles,
         mfaEnabled: user.mfaEnabled,
-        mfaPolicySatisfied: this.mfaPolicySatisfied(user, roles),
+        mfaPolicySatisfied: this.mfaPolicySatisfied(
+          user,
+          roleSecurityAttributes(roleRefs),
+        ),
       },
     };
   }

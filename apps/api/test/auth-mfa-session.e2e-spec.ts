@@ -56,8 +56,11 @@ function secretFromOtpAuthUri(uri: string): string {
 /** Signs up, enrols MFA and grants roles — the pre-Phase-4 shortcut, used for
  * accounts whose onboarding is not itself what a test is about. */
 async function makeUser(
+  // `string[]`, not `RoleName[]`: office-scoped custom roles mean a role name is
+  // free text, and one test below deliberately creates a role that is in no
+  // enum and in no hard-coded list.
   label: string,
-  roles: RoleName[],
+  roles: string[],
 ): Promise<{
   accessToken: string;
   id: string;
@@ -732,6 +735,95 @@ describe('Part V auth — trusted devices (items 6, 7)', () => {
         `${role} must always be challenged`,
       ).toBe(true);
     }
+  }, 240_000);
+
+  it('a CUSTOM role, named in no list anywhere, is challenged too and refused a trust grant', async () => {
+    // Phase 2 workstream A, at the HTTP boundary — the fail-open bug, stated as
+    // a test.
+    //
+    // Until this phase, the three roles above were the contents of a hard-coded
+    // `ALWAYS_MFA_ROLES` array matched on role NAME. A role an office invents
+    // matched nothing in it, so it silently qualified for the trusted-device
+    // skip that those three cannot have: a security control weakened by a
+    // configuration screen. Nobody could hit it yet only because Phase 3's Role
+    // screen does not exist, which is why Phase 2 has to land first.
+    //
+    // Now the obligation is a column on `Role` defaulting to the strict value,
+    // so a role nobody classified arrives strict.
+    const roleName = `Office Manager ${tag}`;
+    const custom = await ensureRole(roleName);
+
+    // Nothing in this test said anything about MFA when creating that role. The
+    // column default did, which is the whole point.
+    const stored = await prisma.role.findUniqueOrThrow({
+      where: { id: custom.id },
+      select: { requiresMfaAlways: true, requiresHardwareToken: true },
+    });
+    expect(stored.requiresMfaAlways).toBe(true);
+    expect(stored.requiresHardwareToken).toBe(true);
+
+    const fingerprint = `device-${tag}-custom-role`;
+    const user = await makeUser(`custom-role-${tag}`, [roleName]);
+
+    // First login on this device is challenged, as it would be for anyone.
+    const first = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: user.email,
+        password: PASSWORD,
+        deviceFingerprint: fingerprint,
+      })
+      .expect(200);
+    expect((first.body as LoginBody).mfaRequired).toBe(true);
+
+    // Answer it and ask to trust the device. This is the ONLY moment a grant is
+    // ever allowed — right after a verified second factor — so it is the moment
+    // that matters. The request succeeds; the grant must not.
+    const verified = await request(app!.getHttpServer())
+      .post('/auth/mfa/totp/challenge/verify')
+      .send({
+        mfaChallengeToken: (first.body as LoginBody).mfaChallengeToken,
+        code: authenticator.generate(user.totpSecret),
+        trustDevice: true,
+        deviceFingerprint: fingerprint,
+      })
+      .expect(200);
+
+    // The hardware-token obligation reaches the client fail-closed too: a role
+    // nobody classified cannot satisfy a policy WebAuthn has not shipped for.
+    expect(
+      (verified.body as { user?: { mfaPolicySatisfied?: boolean } }).user
+        ?.mfaPolicySatisfied,
+    ).toBe(false);
+
+    const trusts = await prisma.trustedDevice.findMany({
+      where: { userId: user.id, revokedAt: null },
+    });
+    expect(
+      trusts,
+      'no trust may be stored for an always-MFA caller',
+    ).toHaveLength(0);
+
+    // And the same device is challenged again next time — proving the refusal
+    // was real and not merely unrecorded.
+    const again = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: user.email,
+        password: PASSWORD,
+        deviceFingerprint: fingerprint,
+      })
+      .expect(200);
+    expect((again.body as LoginBody).mfaRequired).toBe(true);
+
+    // Clean the custom role up. This database is CUMULATIVE across runs, so a
+    // role left behind here accumulates one per run and moves any count of the
+    // role catalogue — which is exactly how this test broke `rbac.e2e-spec.ts`
+    // the first time it ran. The assignment goes first; the FK is RESTRICT.
+    await prisma.userRoleAssignment.deleteMany({
+      where: { roleId: custom.id },
+    });
+    await prisma.role.deleteMany({ where: { id: custom.id } });
   }, 240_000);
 });
 
