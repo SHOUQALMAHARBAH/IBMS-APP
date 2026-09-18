@@ -14,6 +14,12 @@ export interface RecertificationItem {
   subjectFullName: string;
   subjectEmail: string;
   subjectRoles: string[];
+  /** Whether this subject can administer users (`user.manage`), resolved
+   *  server-side. The table badges it as Part 5.1's "the administrator is NOT
+   *  exempt". Not derivable here: role names are office-chosen, so comparing
+   *  against 'SYSTEM_SECURITY_ADMINISTRATOR' would stop badging an office's own
+   *  administrator role. */
+  subjectIsUserAdministrator: boolean;
   reviewerUserId: string;
   decision: RecertificationDecision | null;
   reviewedAt: string | null;

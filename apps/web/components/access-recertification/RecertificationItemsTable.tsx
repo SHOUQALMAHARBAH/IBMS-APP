@@ -22,8 +22,6 @@ import {
 } from './access-recertification.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
 
-const ADMIN_ROLE = 'SYSTEM_SECURITY_ADMINISTRATOR';
-
 const DECISION_LABEL: Record<RecertificationDecision, string> = {
   confirmed: 'Confirmed',
   revoked: 'Revoked',
@@ -77,7 +75,11 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
       </thead>
       <tbody>
         {items.map((item) => {
-          const isAdminSubject = item.subjectRoles.includes(ADMIN_ROLE);
+          // Server-supplied, not derived from the role names. A name comparison
+          // here would stop badging an office's own administrator role — the one
+          // account Part 5.1 singles out as not exempt from recertification, and
+          // therefore the one this badge exists for.
+          const isAdminSubject = item.subjectIsUserAdministrator;
           const isDeciding = decidingItemId === item.id;
           return (
             <tr key={item.id}>
@@ -90,13 +92,11 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                 {isAdminSubject ? (
                   <span style={adminBadgeStyle}>{t('acrAdminNotExempt')}</span>
                 ) : null}
-                {item.subjectRoles
-                  .filter((role) => role !== ADMIN_ROLE)
-                  .map((role) => (
-                    <span key={role} style={roleBadgeStyle}>
-                      {role.replaceAll('_', ' ')}
-                    </span>
-                  ))}
+                {item.subjectRoles.map((role) => (
+                  <span key={role} style={roleBadgeStyle}>
+                    {role.replaceAll('_', ' ')}
+                  </span>
+                ))}
               </td>
               <td style={tdStyle}>{item.cycleLabel}</td>
               <td style={tdStyle}>

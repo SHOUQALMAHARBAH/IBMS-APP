@@ -56,16 +56,30 @@ function stripComments(source: string): string {
     .join('\n');
 }
 
+/**
+ * The whole tree, read ONCE.
+ *
+ * Three assertions each walking ~900 files and re-reading every one of them was
+ * three times the work and three times the window in which a file could be
+ * rewritten underneath the scan — which is the only explanation I could find for
+ * one unreproducible red run of this spec during Phase 2 (it passed in
+ * isolation, passed a full 233-file suite twice afterwards, and an independent
+ * scan of the same tree found zero offenders). Reading once is cheaper and
+ * narrower regardless of whether that was the cause.
+ */
+const SOURCES: { path: string; code: string }[] = sourceFiles(API_SRC).map(
+  (file) => ({
+    path: relative(API_SRC, file).split(sep).join('/'),
+    code: stripComments(readFileSync(file, 'utf8')),
+  }),
+);
+
 function offenders(pattern: RegExp): string[] {
   const hits: string[] = [];
-  for (const file of sourceFiles(API_SRC)) {
-    const code = stripComments(readFileSync(file, 'utf8'));
-    const lines = code.split('\n');
-    lines.forEach((line, index) => {
+  for (const { path, code } of SOURCES) {
+    code.split('\n').forEach((line, index) => {
       if (pattern.test(line)) {
-        hits.push(
-          `${relative(API_SRC, file).split(sep).join('/')}:${index + 1}: ${line.trim()}`,
-        );
+        hits.push(`${path}:${index + 1}: ${line.trim()}`);
       }
     });
   }
@@ -88,16 +102,9 @@ describe('no route is gated on a role NAME', () => {
     // The shape a reimplementation would take. `AuthenticatedUser.roles` still
     // exists and is legitimate for display and diagnostics — what must not come
     // back is a GUARD deciding access from it.
-    const guardFiles = sourceFiles(API_SRC).filter((f) =>
-      f.endsWith('.guard.ts'),
-    );
-    const bad: string[] = [];
-    for (const file of guardFiles) {
-      const code = stripComments(readFileSync(file, 'utf8'));
-      if (/\.roles\b/.test(code)) {
-        bad.push(relative(API_SRC, file).split(sep).join('/'));
-      }
-    }
+    const bad = SOURCES.filter(
+      ({ path, code }) => path.endsWith('.guard.ts') && /\.roles\b/.test(code),
+    ).map(({ path }) => path);
     expect(bad).toEqual([]);
   });
 });

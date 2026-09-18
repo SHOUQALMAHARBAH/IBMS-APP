@@ -28,6 +28,19 @@ export interface RecertificationItemView {
   subjectFullName: string;
   subjectEmail: string;
   subjectRoles: string[];
+  /**
+   * Whether this subject can administer users — Part 5.1's "the administrator is
+   * NOT exempt from recertification of its own access", which the review screen
+   * badges so a reviewer cannot skim past it.
+   *
+   * Resolved SERVER-SIDE, from `user.manage`. The screen used to derive it by
+   * comparing the subject's role names against
+   * 'SYSTEM_SECURITY_ADMINISTRATOR', which would silently stop badging an
+   * office's own administrator role — the exact account the badge exists to draw
+   * attention to. A client cannot answer this question at all once role names
+   * are office-chosen.
+   */
+  subjectIsUserAdministrator: boolean;
   reviewerUserId: string;
   decision: string | null;
   reviewedAt: Date | null;
@@ -182,13 +195,17 @@ export class AccessRecertificationService {
     if (items.length === 0) return [];
 
     const subjectIds = [...new Set(items.map((i) => i.subjectUserId))];
-    const [subjects, rolesBySubject] = await Promise.all([
+    const [subjects, rolesBySubject, administrators] = await Promise.all([
       this.users.findSummariesByIds(subjectIds),
       // One query for every subject's roles, not one per item — see
       // UserRepository.getRoleNamesByIds.
       this.users.getRoleNamesByIds(subjectIds),
+      // One query for the whole page, same reason. Resolved through the same
+      // capability the last-administrator guard and `getAdminAccessItems` use.
+      this.roles.findActiveUserIdsWithPermission('user.manage'),
     ]);
     const subjectById = new Map(subjects.map((s) => [s.id, s]));
+    const administratorIds = new Set(administrators);
 
     return items.map((item) => {
       const subject = subjectById.get(item.subjectUserId);
@@ -200,6 +217,7 @@ export class AccessRecertificationService {
         subjectFullName: subject?.fullName ?? '(deleted user)',
         subjectEmail: subject?.email ?? '',
         subjectRoles: rolesBySubject.get(item.subjectUserId) ?? [],
+        subjectIsUserAdministrator: administratorIds.has(item.subjectUserId),
         reviewerUserId: item.reviewerUserId,
         decision: item.decision,
         reviewedAt: item.reviewedAt,

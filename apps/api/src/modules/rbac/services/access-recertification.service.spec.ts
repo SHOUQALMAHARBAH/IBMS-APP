@@ -401,6 +401,10 @@ describe('AccessRecertificationService', () => {
           subjectFullName: 'Sales Officer',
           subjectEmail: 'sales@ibms.test',
           subjectRoles: ['SALES_RELATIONSHIP_OFFICER'],
+          // Resolved server-side from `user.manage`, so the review screen does
+          // not have to compare role names it can no longer interpret. This
+          // subject is not an administrator.
+          subjectIsUserAdministrator: false,
           reviewerUserId: 'reviewer-1',
           decision: null,
           reviewedAt: null,
