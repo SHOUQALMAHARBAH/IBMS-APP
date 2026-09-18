@@ -21,6 +21,7 @@ function checker(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     organizationId: 'org-1',
     email: 'chk@ibms.test',
     roles: ['POLICY_CHECKING_OFFICER'],
+    roleIds: [],
     sessionId: 'session-1',
     ...overrides,
   };

@@ -277,7 +277,7 @@ npm install
 # Postgres only, for local (non-Docker) app dev:
 docker compose up -d db
 npm run db:migrate:dev
-npm run db:seed   # 11 roles + full permission grid — RBAC needs these to exist
+npm run db:seed   # per-office roles + the global permission catalogue — RBAC needs these
 
 # Everything else, run natively:
 npm run dev
@@ -409,7 +409,7 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run db:test:migrate:deploy` | Apply existing migrations to `db-test`, no schema drift |
 | `npm run db:test:migrate:status` | Check `db-test` migration history against `schema.prisma` for drift |
 | `npm run db:studio` | Prisma Studio (dev DB) |
-| `npm run db:seed` | Seed the dev DB — the 11 roles + full permission grid (`packages/db/prisma/seed.ts`), idempotent |
+| `npm run db:seed` | Seed the dev DB — the default office's roles + the global permission catalogue (`packages/db/prisma/seed.ts`), idempotent. Roles are OFFICE-SCOPED as of 2026-09-18; a role name is unique per `Organization`, not globally |
 | `npm run db:test:seed` | Same seed, against `db-test` |
 | `npm run seed:demo -w api` | Demo data for two Organizations — employees, leads, ~500 customers and full sales-to-policy pipelines — created through the real HTTP API, **dev DB only** (never `.env.test`). Scale is env-configurable; accounts come back with MFA off, so sign in with the password and pair an authenticator at Settings → Security — the run now **fails, naming accounts**, if any is left enrolled with a secret nobody holds. See `apps/api/scripts/README-SEED-DEMO.md` |
 
@@ -668,6 +668,43 @@ build actually is today:
   because letting a non-DPO approve changes a dual-control path. Fuzzy sanctions
   matching beyond the curated transliteration table (§10.1) is deferred by
   decision. See CLAUDE.md § What's New for the per-phase record.
+
+- **Custom office-scoped RBAC — Phase 1 of 5 complete.** A second scope addition on
+  top of multi-tenancy, and the same kind of retrofit: the whole backlog was built
+  against a fixed catalogue of 11 roles shared by every office, and that is being
+  replaced with roles each office defines for itself. `MULTI-TENANCY-SPEC.md`'s
+  reasoning applies here too — it changes an assumption a lot of files depend on, so
+  it goes one phase at a time and each phase ships whole.
+
+  **What exists (Phase 1).** `Role` carries `organizationId`, `nameAr` and `nameEn`;
+  `Role.name` is `@@unique([organizationId, name])` instead of globally unique, so two
+  offices may each have a role called "Manager"; `RolePermission` is tenant-scoped too,
+  with a composite FK `(roleId, organizationId)` → `Role(id, organizationId)` making it
+  impossible for a grant to claim an office its role does not belong to; RLS policies
+  on both. Authorization resolves permissions from **`roleId`, never a role name** —
+  `AuthenticatedUser` carries `roleIds` beside the names it keeps for display — because
+  a name-keyed lookup returns every same-named role across every office and hands the
+  caller their union. `Permission` remains a single GLOBAL catalogue: it describes what
+  the software can do, and only the grants are per-office. The legacy 11 survive as
+  ordinary per-office rows with their old machine names, and the migration's blocking
+  gate was a per-user effective-permission diff before vs after — empty across both
+  organizations, so no access changed.
+
+  **What does NOT exist yet, and is not a defect to chase.** No office can create a
+  role: there is no Role CRUD API or screen, and `status`/`isSystem` are not on the
+  model, so `Role.name` being editable is theoretical until Phase 3. Twelve decision
+  points still branch on a role NAME rather than a permission. Ten of them fail CLOSED
+  (the five cross-owner visibility lists, the recertification reviewer pool, the
+  segregation-of-duties signal, SLA escalation routing, and 17 `@RequireRoles` sites);
+  **two fail OPEN** — `ALWAYS_MFA_ROLES` and `PRIVILEGED_ROLES`, where a custom role
+  would silently qualify for the trusted-device MFA skip and the hardware-token
+  exemption. Neither is reachable today because no custom role can exist, which is
+  exactly why **Phase 2 must land before Phase 3**. Maker/checker is unaffected and
+  needs no work: it compares user IDs at 62 call sites, backed by 17 database CHECK
+  constraints, so holding several roles cannot weaken separation of duties. The
+  `RoleName` enum type and the pre-migration global role rows are deliberately kept for
+  at least one release so rollback stays cheap. See CLAUDE.md § What's New for the
+  per-phase record, including the two cross-tenant leaks Phase 1 closed.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

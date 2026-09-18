@@ -30,6 +30,7 @@ const user = (): AuthenticatedUser => ({
   organizationId: 'org-1',
   email: 'u1@ibms.test',
   roles: ['CLAIMS_OFFICER'],
+  roleIds: [],
   sessionId: 's1',
 });
 

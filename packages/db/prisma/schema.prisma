@@ -306,6 +306,8 @@ model Organization {
   renewalCases                    RenewalCase[]
   renewalRecommendations          RenewalRecommendation[]
   retentionCases                  RetentionCase[]
+  roles                           Role[]
+  rolePermissions                 RolePermission[]
   retentionScheduleItems          RetentionScheduleItem[]
   rfqs                            RFQ[]
   rfQInsurers                     RFQInsurer[]
@@ -649,15 +651,55 @@ model SecurityConfig {
   @@index([organizationId])
 }
 
-/// Part 5.1 — role catalogue.
+/// Part 5.1 — role catalogue, now OFFICE-SCOPED and fully custom.
+///
+/// A Role is nothing more than a named bundle of Permission grants. There is
+/// no fixed business-role catalogue anywhere in this system: each office's
+/// administrator creates exactly the roles it needs, names them however it
+/// wants, and assigns whatever permission combination suits. One office may
+/// have three roles, another eight, another a single role holding everything a
+/// one-person office needs — all equally valid.
+///
+/// `name` is DELIBERATELY not globally unique. Two offices can each have a
+/// role literally called "Manager"; they are different rows, with different
+/// ids and almost certainly different grants, and must never be conflated.
+/// That is precisely why authorization resolves by `roleId` and NEVER by name
+/// — a name-keyed lookup or cache is a cross-tenant leak the moment two
+/// offices reuse a name. See `PermissionRepository.findCodesForRoles` and
+/// `PermissionsService`, both of which key on id for this reason.
 model Role {
-  id          String   @id @default(uuid())
-  name        RoleName @unique
-  description String?
-  createdAt   DateTime @default(now())
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  ///
+  /// Adding this column is what brings Role under application-layer tenant
+  /// scoping at all: `TENANT_SCOPED_MODELS` is derived from the DMMF as
+  /// "every model carrying an organizationId", so the extension picks this up
+  /// automatically with no change to the isolation code itself.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  /// Free text, not an enum. Was `RoleName` until office-scoped custom roles
+  /// landed; the legacy 11 survive as ordinary per-office rows carrying their
+  /// old machine name.
+  name           String
+  /// Display names. Arabic is this system's primary language, so a role that
+  /// exists only in Latin script shows up untranslated mid-sentence on an
+  /// Arabic page.
+  nameAr         String
+  nameEn         String
+  description    String?
+  createdAt      DateTime     @default(now())
 
   users       UserRoleAssignment[]
   permissions RolePermission[]
+
+  @@unique([organizationId, name])
+  /// Not a business rule — `id` is already unique on its own. This exists so
+  /// `RolePermission`'s composite foreign key `(roleId, organizationId)` has a
+  /// unique target to reference, which is what makes it impossible for a grant
+  /// to claim an Organization its role does not belong to. See RolePermission.
+  @@unique([id, organizationId])
+  @@index([organizationId])
 }
 
 /// Part 4.1 core entity ("User / Role / Permission", n..n Role<->Permission)
@@ -674,13 +716,35 @@ model Permission {
 }
 
 model RolePermission {
-  id           String     @id @default(uuid())
-  roleId       String
-  role         Role       @relation(fields: [roleId], references: [id])
-  permissionId String
-  permission   Permission @relation(fields: [permissionId], references: [id])
+  id String @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization this grant belongs to.
+  /// Supplied by `tenantScopeExtension`, never by hand.
+  ///
+  /// This column is DENORMALIZED from `Role.organizationId`, which the first
+  /// draft of office-scoped roles deliberately avoided — the worry being that a
+  /// drifted copy would be the row actually granting access. It is here because
+  /// the alternative did not work: `tenantScopeExtension` sets the
+  /// `app.current_org_id` session variable ONLY for models it considers
+  /// tenant-scoped, i.e. those carrying this column. A table with an RLS policy
+  /// but no `organizationId` therefore has a policy nothing can ever satisfy —
+  /// every read returns zero rows, and a permission grid that reads empty locks
+  /// every user out of everything.
+  ///
+  /// The drift worry is answered structurally instead of by convention: a
+  /// composite foreign key `(roleId, organizationId)` -> `Role(id,
+  /// organizationId)` (raw SQL, migration 20261003110000 — Prisma models the
+  /// single-column relation below and does not express this one) makes a
+  /// disagreeing pair unINSERTable. `Role` carries the matching
+  /// `@@unique([id, organizationId])` the reference needs.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  roleId         String
+  role           Role         @relation(fields: [roleId], references: [id])
+  permissionId   String
+  permission     Permission   @relation(fields: [permissionId], references: [id])
 
   @@unique([roleId, permissionId])
+  @@index([organizationId])
 }
 
 /// Explicit many-to-many: a user may hold more than one role (Part 5.1 notes

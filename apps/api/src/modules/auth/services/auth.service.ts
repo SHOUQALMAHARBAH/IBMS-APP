@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { RoleName, User } from '@ibms/db';
+import type { User } from '@ibms/db';
 import { resolveDisplayName } from '../../../common/display-name.util';
 import { PermissionsService } from '../../rbac/services/permissions.service';
 import { UserRepository } from '../../../repositories/user.repository';
@@ -67,7 +67,7 @@ export interface PublicUser {
   id: string;
   email: string;
   fullName: string;
-  roles: RoleName[];
+  roles: string[];
   mfaEnabled: boolean;
   mfaPolicySatisfied: boolean;
 }
@@ -744,16 +744,23 @@ export class AuthService {
   async me(userId: string, sessionId: string) {
     const user = await this.users.findByIdWithDepartment(userId);
     if (!user) throw new NotFoundException('User not found');
-    const roles = await this.users.getRoleNames(userId);
+    const roleRefs = await this.users.getRoleRefs(userId);
+    const roles = roleRefs.map((r) => r.name);
     const config = await this.securityConfig.get();
     const stepUpFresh = await this.sessions.isStepUpFresh(sessionId);
     // Part IV §10.4 — the single source the frontend drives every conditional
     // render from. Roles alone are not enough: the permission grid is what
     // actually decides what an action requires, and a UI branching on role
     // names re-implements that mapping in a second place, where it drifts.
-    // Sorted so the response is stable and diffable.
+    // That is doubly true now that an office names its own roles — a role
+    // called "Manager" means whatever that office made it mean.
+    // Resolved from role IDS, never the names above: see
+    // `PermissionRepository.findCodesForRoles`. Sorted so the response is
+    // stable and diffable.
     const permissions = [
-      ...(await this.permissionsService.getCodesForRoles(roles)),
+      ...(await this.permissionsService.getCodesForRoles(
+        roleRefs.map((r) => r.id),
+      )),
     ].sort();
 
     return {
@@ -800,7 +807,7 @@ export class AuthService {
     return this.me(userId, sessionId);
   }
 
-  private mfaPolicySatisfied(user: User, roles: RoleName[]): boolean {
+  private mfaPolicySatisfied(user: User, roles: readonly string[]): boolean {
     // WebAuthn is not implemented yet (see A.1 plan) — privileged roles can
     // never satisfy the hardware-token requirement today, so this is
     // surfaced to the frontend as a banner, never used to block login.

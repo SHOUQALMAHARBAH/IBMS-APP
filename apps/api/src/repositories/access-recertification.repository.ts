@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type {
   AccessRecertificationCycle,
   AccessRecertificationItem,
-  RoleName,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -33,7 +32,7 @@ export class AccessRecertificationRepository {
     return assignments.map((a) => a.userId);
   }
 
-  async getActiveRoleNamesForUser(userId: string): Promise<RoleName[]> {
+  async getActiveRoleNamesForUser(userId: string): Promise<string[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { userId, revokedAt: null },
       include: { role: true },

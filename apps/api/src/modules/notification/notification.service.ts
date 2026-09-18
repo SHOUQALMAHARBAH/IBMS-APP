@@ -43,7 +43,9 @@ export class NotificationService {
     items: NotificationItem[];
     total: number;
   }> {
-    const granted = await this.permissions.getCodesForRoles(user.roles);
+    // Role IDS — resolving by name would union every same-named role's grants
+    // across offices. See `PermissionRepository.findCodesForRoles`.
+    const granted = await this.permissions.getCodesForRoles(user.roleIds);
     const now = new Date();
     const items: NotificationItem[] = [];
 

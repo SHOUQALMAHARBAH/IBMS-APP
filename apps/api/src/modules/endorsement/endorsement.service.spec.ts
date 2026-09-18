@@ -25,6 +25,7 @@ function placement(over?: Partial<AuthenticatedUser>): AuthenticatedUser {
     organizationId: 'org-1',
     email: 'placement@ibms.test',
     roles: ['PLACEMENT_TECHNICAL_OFFICER'],
+    roleIds: [],
     sessionId: 'session-1',
     ...over,
   };

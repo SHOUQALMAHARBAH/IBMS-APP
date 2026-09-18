@@ -199,9 +199,7 @@ export class PolicyService {
    * cross-book control function, like Compliance for KYC). Sales sees only
    * policies on a Customer they own. */
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      (POLICY_CROSS_OWNER_ROLES as readonly string[]).includes(role),
-    );
+    return actor.roles.some((role) => POLICY_CROSS_OWNER_ROLES.includes(role));
   }
 
   /** Logged, not thrown — the real write already committed. */

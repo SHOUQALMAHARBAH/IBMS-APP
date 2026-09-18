@@ -71,7 +71,7 @@ export class NeedsAssessmentService {
 
   private canViewAll(actor: AuthenticatedUser): boolean {
     return actor.roles.some((role) =>
-      (CUSTOMER_FILE_CROSS_OWNER_ROLES as readonly string[]).includes(role),
+      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
     );
   }
 

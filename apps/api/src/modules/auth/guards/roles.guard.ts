@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import type { RoleName } from '@ibms/db';
 import { REQUIRE_ROLES_KEY } from '../decorators/require-roles.decorator';
 import type { AuthenticatedUser } from '../auth.types';
 
@@ -15,7 +14,7 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const required = this.reflector.getAllAndOverride<RoleName[] | undefined>(
+    const required = this.reflector.getAllAndOverride<string[] | undefined>(
       REQUIRE_ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );

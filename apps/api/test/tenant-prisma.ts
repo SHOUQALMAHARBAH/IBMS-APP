@@ -102,3 +102,34 @@ export const prisma = new Proxy(scoped, {
 /** The unscoped client, for the few specs that must see across Organizations
  * (tenant-isolation proofs) or touch a global model directly. */
 export { rawPrisma };
+
+/**
+ * Get or create a Role by name inside the seeded Organization.
+ *
+ * Office-scoped custom roles made `Role.name` non-unique — the constraint is
+ * now `(organizationId, name)` — so the five-line `upsert({ where: { name } })`
+ * that used to sit inline in 72 specs no longer type-checks, and the correct
+ * replacement needs the compound key plus the two display-name columns.
+ *
+ * That belongs in one place rather than 72. Pushing `TEST_ORGANIZATION_ID` into
+ * every spec's fixture body would teach the suite to name an Organization by
+ * hand, which is exactly the habit `prisma` above exists to avoid.
+ *
+ * `create` deliberately omits `organizationId`: the scoped client stamps it,
+ * the same way it does for every other fixture write here.
+ *
+ * `nameAr`/`nameEn` fall back to the machine name. A fixture is not the place
+ * to invent Arabic display copy, and no assertion in the suite reads them —
+ * the real bilingual names for the migrated roles are set by migration
+ * `20261003100000_office_scoped_custom_roles`, and Phase 3's Role screen is
+ * where an office edits them.
+ */
+export async function ensureRole(name: string): Promise<{ id: string }> {
+  return prisma.role.upsert({
+    where: {
+      organizationId_name: { organizationId: TEST_ORGANIZATION_ID, name },
+    },
+    update: {},
+    create: { name, nameAr: name, nameEn: name },
+  });
+}

@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from './tenant-prisma';
+import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
@@ -131,11 +131,7 @@ async function grantRoleDirect(
   userId: string,
   roleName: RoleName,
 ): Promise<void> {
-  const role = await prisma.role.upsert({
-    where: { name: roleName },
-    update: {},
-    create: { name: roleName },
-  });
+  const role = await ensureRole(roleName);
   const activeGrant = await prisma.userRoleAssignment.findFirst({
     where: { userId, roleId: role.id, revokedAt: null },
   });
@@ -343,7 +339,9 @@ describe('User admin / provisioning (e2e)', () => {
     expect((revoked.body as RolesBody).roles).not.toContain('CLAIMS_OFFICER');
 
     // The audit record of WHEN access was withdrawn must survive.
-    const role = await prisma.role.findUniqueOrThrow({
+    // `name` is unique per office now, not globally — and the scoped client
+    // already pins this spec to the seeded Organization.
+    const role = await prisma.role.findFirstOrThrow({
       where: { name: 'CLAIMS_OFFICER' },
     });
     const assignment = await prisma.userRoleAssignment.findFirst({

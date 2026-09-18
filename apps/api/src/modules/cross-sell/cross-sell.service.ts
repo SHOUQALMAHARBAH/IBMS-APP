@@ -69,9 +69,7 @@ export class CrossSellService {
   ) {}
 
   private canViewAllOwners(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      (VIEW_ALL_OWNERS_ROLES as readonly string[]).includes(role),
-    );
+    return actor.roles.some((role) => VIEW_ALL_OWNERS_ROLES.includes(role));
   }
 
   /** Logged, not thrown — the real write already committed; an audit hiccup

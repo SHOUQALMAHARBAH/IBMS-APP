@@ -4,7 +4,12 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { type RoleName } from '@ibms/db';
-import { prisma, rawPrisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
+import {
+  TEST_ORGANIZATION_ID,
+  ensureRole,
+  prisma,
+  rawPrisma,
+} from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
@@ -162,11 +167,7 @@ async function makeUserInDefaultOrg(
     .expect(200);
 
   for (const role of roles) {
-    const roleRow = await prisma.role.upsert({
-      where: { name: role },
-      update: {},
-      create: { name: role },
-    });
+    const roleRow = await ensureRole(role);
     const existing = await prisma.userRoleAssignment.findFirst({
       where: { userId: body.user.id, roleId: roleRow.id, revokedAt: null },
     });
@@ -181,6 +182,12 @@ async function makeUserInDefaultOrg(
 
 let officeA: { accessToken: string; id: string };
 let isolationAdmin: { accessToken: string; id: string };
+/** A deliberately ROLE-LESS account, used by the office-scoped-roles block
+ *  below to prove what a single custom role grants and nothing more. Created
+ *  here rather than in that block because `signup` refuses to guess an
+ *  Organization once office B exists, and office B is stood up at the end of
+ *  this same hook. */
+let sharedRoleUser: { accessToken: string; id: string };
 let customerAId: string;
 let customerBId: string;
 
@@ -237,6 +244,15 @@ async function removeOfficeB(): Promise<void> {
     where: { organizationId: ORG_B_ID },
   });
   await rawPrisma.user.deleteMany({ where: { organizationId: ORG_B_ID } });
+  // Roles became office-scoped, so office B now owns Role rows whose
+  // `organizationId` foreign key is ON DELETE RESTRICT — leave them and the
+  // Organization delete below fails, which is exactly how a crashed run would
+  // pin office B in place forever. Grants go first (above), then the grid, then
+  // the roles themselves.
+  await rawPrisma.rolePermission.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
+  await rawPrisma.role.deleteMany({ where: { organizationId: ORG_B_ID } });
   await rawPrisma.organization.deleteMany({ where: { id: ORG_B_ID } });
 }
 
@@ -256,6 +272,7 @@ beforeAll(async () => {
   isolationAdmin = await makeUserInDefaultOrg(app, 'isolation-admin', [
     'SYSTEM_SECURITY_ADMINISTRATOR',
   ]);
+  sharedRoleUser = await makeUserInDefaultOrg(app, 'shared-role-user', []);
 
   // Office A's customer, created through the API so it goes through both layers.
   const createdA = await request(app.getHttpServer())
@@ -1011,5 +1028,239 @@ describe('Part V — a bulk import cannot write into another office (item 11)', 
         'spoofed2.csv',
       )
       .expect(422);
+  });
+});
+
+/**
+ * Office-scoped custom roles, Phase 1 — the isolation property that did not
+ * exist before and cannot be proved anywhere else.
+ *
+ * `Role.name` used to be globally UNIQUE, which is what made a name-keyed
+ * permission lookup safe. It is now unique only per office, so two offices can
+ * each define a role called "Manager" holding entirely different permissions.
+ * Everything below probes the same question from a different layer: can one
+ * office's grants reach the other's?
+ */
+describe('Part V — office-scoped custom roles cannot leak across offices', () => {
+  const SHARED_ROLE_NAME = 'Manager';
+  /** Office A's "Manager" may QC a policy; office B's may approve a claim
+   *  settlement. Deliberately disjoint, so a leak in either direction is
+   *  unmistakable — and both are real codes from the seeded catalogue, checked
+   *  rather than assumed (`policy.approve`, the first guess here, does not
+   *  exist: an unverified fixture string asserts only that it is a string). */
+  const A_ONLY_PERMISSION = 'policy.check';
+  const B_ONLY_PERMISSION = 'claim.settle.approve';
+
+  let roleAId: string;
+  let roleBId: string;
+
+  beforeAll(async () => {
+    const [permA, permB] = await Promise.all([
+      rawPrisma.permission.findUniqueOrThrow({
+        where: { code: A_ONLY_PERMISSION },
+      }),
+      rawPrisma.permission.findUniqueOrThrow({
+        where: { code: B_ONLY_PERMISSION },
+      }),
+    ]);
+
+    // Written as the OWNER: office B has no authenticated path yet (subdomain
+    // resolution is Phase 4), and the point is a real foreign row to probe.
+    const roleA = await rawPrisma.role.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        name: SHARED_ROLE_NAME,
+        nameAr: 'مدير',
+        nameEn: 'Manager',
+        // `organizationId` named by hand on the nested grant too: this is the
+        // RAW client, so nothing stamps it, and the column's default
+        // (`current_setting('app.current_org_id', true)`) is NULL outside a
+        // scoped request — which the new FK rejects rather than accepting an
+        // unattributed grant. Loud, by design.
+        permissions: {
+          create: [
+            { organizationId: TEST_ORGANIZATION_ID, permissionId: permA.id },
+          ],
+        },
+      },
+    });
+    const roleB = await rawPrisma.role.create({
+      data: {
+        organizationId: ORG_B_ID,
+        name: SHARED_ROLE_NAME,
+        nameAr: 'مدير',
+        nameEn: 'Manager',
+        permissions: {
+          create: [{ organizationId: ORG_B_ID, permissionId: permB.id }],
+        },
+      },
+    });
+    roleAId = roleA.id;
+    roleBId = roleB.id;
+  }, 60_000);
+
+  afterAll(async () => {
+    // Office A's role is not covered by removeOfficeB(), so it has to go here
+    // or it survives into every spec file that runs after this one — and its
+    // name would then collide with the next run's fixture.
+    // Guarded: if beforeAll threw, these ids are undefined and an unguarded
+    // deleteMany fails with a validation error that masks the real cause.
+    const created = [roleAId, roleBId].filter(
+      (id): id is string => typeof id === 'string',
+    );
+    if (created.length === 0) return;
+    await rawPrisma.rolePermission.deleteMany({
+      where: { roleId: { in: created } },
+    });
+    await rawPrisma.userRoleAssignment.deleteMany({
+      where: { roleId: { in: created } },
+    });
+    await rawPrisma.role.deleteMany({ where: { id: { in: created } } });
+  });
+
+  it('both offices hold a role of the identical name — the old schema forbade this', async () => {
+    const both = await rawPrisma.role.findMany({
+      where: { name: SHARED_ROLE_NAME },
+      select: { id: true, organizationId: true },
+    });
+    expect(both).toHaveLength(2);
+    expect(new Set(both.map((r) => r.organizationId))).toEqual(
+      new Set([TEST_ORGANIZATION_ID, ORG_B_ID]),
+    );
+    // Different rows, so authorization has something unambiguous to key on.
+    expect(roleAId).not.toBe(roleBId);
+  });
+
+  it("resolving office A's Manager never returns office B's grants (test #10)", async () => {
+    // THE REGRESSION THIS BLOCK EXISTS FOR, at the database layer.
+    //
+    // `findCodesForRoles` used to filter on `role: { name: { in: roles } }`.
+    // Run against the two rows above, that returns BOTH offices' grants — the
+    // union — and hands office A a permission it was never granted. Keyed on
+    // roleId it cannot, because a uuid belongs to exactly one office.
+    const codesForA = await rawPrisma.rolePermission.findMany({
+      where: { roleId: { in: [roleAId] } },
+      select: { permission: { select: { code: true } } },
+    });
+    const codesForB = await rawPrisma.rolePermission.findMany({
+      where: { roleId: { in: [roleBId] } },
+      select: { permission: { select: { code: true } } },
+    });
+    expect(codesForA.map((c) => c.permission.code)).toEqual([
+      A_ONLY_PERMISSION,
+    ]);
+    expect(codesForB.map((c) => c.permission.code)).toEqual([
+      B_ONLY_PERMISSION,
+    ]);
+
+    // And the query the OLD code shape would have run, to show what it returns.
+    // This is not a supported call path any more — it is the counter-example,
+    // and it is why the repository takes ids.
+    const byName = await rawPrisma.rolePermission.findMany({
+      where: { role: { name: SHARED_ROLE_NAME } },
+      select: { permission: { select: { code: true } } },
+    });
+    expect(byName.map((c) => c.permission.code).sort()).toEqual(
+      [A_ONLY_PERMISSION, B_ONLY_PERMISSION].sort(),
+    );
+  });
+
+  it("a real office-A user granted 'Manager' gets only office A's permission, through the live API", async () => {
+    // The end-to-end statement: not just that the query is right, but that a
+    // signed-in user's effective permissions — the thing every guard reads —
+    // carry office A's grant and not office B's.
+    await prisma.userRoleAssignment.create({
+      data: { userId: sharedRoleUser.id, roleId: roleAId },
+    });
+
+    const me = await request(app!.getHttpServer())
+      .get('/auth/me')
+      .set(bearer(sharedRoleUser.accessToken))
+      .expect(200);
+    const body = me.body as { roles: string[]; permissions: string[] };
+
+    expect(body.roles).toContain(SHARED_ROLE_NAME);
+    expect(body.permissions).toContain(A_ONLY_PERMISSION);
+    expect(body.permissions).not.toContain(B_ONLY_PERMISSION);
+  }, 60_000);
+
+  it("office A cannot see, edit or delete office B's role (test #11)", async () => {
+    // The scoped client is what every service uses. Office B's role is simply
+    // not there — a 404-shaped absence, not a 403.
+    const visible = await prisma.role.findMany({
+      where: { name: SHARED_ROLE_NAME },
+      select: { id: true },
+    });
+    expect(visible.map((r) => r.id)).toEqual([roleAId]);
+    expect(await prisma.role.findFirst({ where: { id: roleBId } })).toBeNull();
+
+    // An UPDATE naming office B's id by hand touches nothing — the extension
+    // adds office A's organizationId to the where, so the row does not match.
+    const updated = await prisma.role.updateMany({
+      where: { id: roleBId },
+      data: { nameEn: 'Hijacked' },
+    });
+    expect(updated.count).toBe(0);
+
+    const deleted = await prisma.role.deleteMany({ where: { id: roleBId } });
+    expect(deleted.count).toBe(0);
+
+    // Still intact, and still office B's.
+    const untouched = await rawPrisma.role.findUniqueOrThrow({
+      where: { id: roleBId },
+    });
+    expect(untouched.nameEn).toBe('Manager');
+    expect(untouched.organizationId).toBe(ORG_B_ID);
+  });
+
+  it('Postgres RLS refuses the other office Role and RolePermission rows independently', async () => {
+    // Layer 2, checked as the application role rather than the owner — the only
+    // way to observe a policy at all, since Postgres exempts a table's owner.
+    // Role and RolePermission had NO policy before this phase.
+    const rolesAsA = await asAppRole<{ id: string }>(
+      TEST_ORGANIZATION_ID,
+      `SELECT id FROM "Role" WHERE name = '${SHARED_ROLE_NAME}'`,
+    );
+    expect(rolesAsA.map((r) => r.id)).toEqual([roleAId]);
+
+    const rolesAsB = await asAppRole<{ id: string }>(
+      ORG_B_ID,
+      `SELECT id FROM "Role" WHERE name = '${SHARED_ROLE_NAME}'`,
+    );
+    expect(rolesAsB.map((r) => r.id)).toEqual([roleBId]);
+
+    // RolePermission carries its own organizationId (migration 20261003110000
+    // — an RLS policy on a model the extension does not scope can never match),
+    // kept honest by a composite FK to Role(id, organizationId).
+    const gridAsA = await asAppRole<{ roleId: string }>(
+      TEST_ORGANIZATION_ID,
+      `SELECT "roleId" FROM "RolePermission" WHERE "roleId" IN ('${roleAId}', '${roleBId}')`,
+    );
+    expect(gridAsA.map((r) => r.roleId)).toEqual([roleAId]);
+
+    // Fail-closed: no session variable set at all sees NOTHING, never
+    // everything. `current_setting(..., true)` is NULL and `= NULL` is NULL.
+    const rolesNoOrg = await asAppRole<{ id: string }>(
+      null,
+      `SELECT id FROM "Role" WHERE name = '${SHARED_ROLE_NAME}'`,
+    );
+    expect(rolesNoOrg).toHaveLength(0);
+    const gridNoOrg = await asAppRole<{ roleId: string }>(
+      null,
+      `SELECT "roleId" FROM "RolePermission" WHERE "roleId" IN ('${roleAId}', '${roleBId}')`,
+    );
+    expect(gridNoOrg).toHaveLength(0);
+  }, 60_000);
+
+  it('confirms both tables really have RLS enabled, not just a policy written', async () => {
+    // A policy on a table with RLS switched off is inert and looks correct.
+    const rows = await ownerQuery<{ relname: string; relrowsecurity: boolean }>(
+      `SELECT relname, relrowsecurity FROM pg_class
+        WHERE relname IN ('Role', 'RolePermission') ORDER BY relname`,
+    );
+    expect(rows).toEqual([
+      { relname: 'Role', relrowsecurity: true },
+      { relname: 'RolePermission', relrowsecurity: true },
+    ]);
   });
 });

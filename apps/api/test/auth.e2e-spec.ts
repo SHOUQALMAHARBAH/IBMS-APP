@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
+import { ensureRole, prisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
@@ -486,11 +486,7 @@ describe('Auth (e2e)', () => {
         adminEmail,
       );
       await enrollMfa(app, adminToken);
-      const role = await prisma.role.upsert({
-        where: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
-        update: {},
-        create: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
-      });
+      const role = await ensureRole('SYSTEM_SECURITY_ADMINISTRATOR');
       await prisma.userRoleAssignment.create({
         data: { userId: adminId, roleId: role.id },
       });

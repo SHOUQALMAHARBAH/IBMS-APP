@@ -33,15 +33,44 @@ describe('tenantScopeExtension — which models it covers', () => {
 
   it('leaves the spec §3.1 global models alone', () => {
     for (const global of [
-      'Role',
+      // `Permission` is the catalogue of what the SOFTWARE can do — identical
+      // for every office, and every office's role screen must read all of it.
       'Permission',
-      'RolePermission',
       'WatchlistEntry',
       'WatchlistDatasetVersion',
       'WatchlistSyncRun',
       'Organization',
     ]) {
       expect(TENANT_SCOPED_MODELS.has(global)).toBe(false);
+    }
+  });
+
+  it('now scopes Role and RolePermission, which used to be global', () => {
+    // Office-scoped custom roles: both gained `organizationId`, so the
+    // DMMF-derived set picks them up with no change to the extension itself.
+    // That is the whole argument for deriving the set from the schema rather
+    // than hand-listing it — and this assertion is the proof, because it is the
+    // ONLY thing that had to change here when they stopped being global.
+    expect(TENANT_SCOPED_MODELS.has('Role')).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has('RolePermission')).toBe(true);
+  });
+
+  it('a model with an RLS policy must be in the scoped set, or the policy is unsatisfiable', () => {
+    // The lesson from migration 20261003110000, kept as a guard rather than a
+    // comment. The extension sets `app.current_org_id` ONLY for models in this
+    // set, so an RLS policy reading that variable on a model outside it can
+    // never match a row — every read returns empty and every user is locked out
+    // of everything. That is exactly what shipping the RolePermission policy
+    // without the column did.
+    //
+    // If a future migration adds `tenant_isolation` to another table, that
+    // table's model belongs here too.
+    for (const rlsProtected of [
+      'Role',
+      'RolePermission',
+      'UserRoleAssignment',
+    ]) {
+      expect(TENANT_SCOPED_MODELS.has(rlsProtected)).toBe(true);
     }
   });
 

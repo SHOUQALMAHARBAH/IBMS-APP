@@ -457,10 +457,20 @@ async function ensureActor(
     data: { mfaEnabled: false, mustChangePassword: false, lockedUntil: null, failedLoginAttempts: 0 },
   });
 
+  // Roles are office-scoped now, and this script uses the RAW client, so the
+  // Organization has to be named explicitly — the compound key rather than the
+  // old global-unique `{ name }`. Two demo offices can therefore both have a
+  // "SALES_RELATIONSHIP_OFFICER" without colliding, which is exactly the
+  // property the demo is meant to show off.
   const role = await rawPrisma.role.upsert({
-    where: { name: def.role },
+    where: { organizationId_name: { organizationId: orgId, name: def.role } },
     update: {},
-    create: { name: def.role },
+    create: {
+      organizationId: orgId,
+      name: def.role,
+      nameAr: def.role,
+      nameEn: def.role,
+    },
   });
   const existingGrant = await rawPrisma.userRoleAssignment.findFirst({
     where: { userId: user.id, roleId: role.id, revokedAt: null },

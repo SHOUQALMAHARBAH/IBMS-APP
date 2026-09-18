@@ -20,6 +20,7 @@ function deliverer(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     organizationId: 'org-1',
     email: 'plc@ibms.test',
     roles: ['PLACEMENT_TECHNICAL_OFFICER'],
+    roleIds: [],
     sessionId: 'session-1',
     ...overrides,
   };

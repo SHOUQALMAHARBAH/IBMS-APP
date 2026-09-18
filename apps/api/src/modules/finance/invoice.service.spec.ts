@@ -21,6 +21,7 @@ const actor: AuthenticatedUser = {
   organizationId: 'org-1',
   email: 'finance@ibms.test',
   roles: ['FINANCE_COLLECTIONS_OFFICER'],
+  roleIds: [],
   sessionId: 's-1',
 };
 

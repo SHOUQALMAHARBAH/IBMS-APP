@@ -137,12 +137,16 @@ export class SessionService {
     }
 
     await this.sessions.touchActivity(sessionId, new Date(now + idleMs));
-    const roles = await this.users.getRoleNames(userId);
+    // Ids AND names in one query: authorization resolves permissions from the
+    // ids (a role name is only unique within an office now), while /auth/me and
+    // the role-name checks still awaiting Phase 2 read the names.
+    const roleRefs = await this.users.getRoleRefs(userId);
     return {
       id: user.id,
       organizationId: user.organizationId,
       email: user.email,
-      roles,
+      roleIds: roleRefs.map((r) => r.id),
+      roles: roleRefs.map((r) => r.name),
       sessionId,
     };
   }

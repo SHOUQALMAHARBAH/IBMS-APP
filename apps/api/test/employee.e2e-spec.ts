@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from './tenant-prisma';
+import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
@@ -91,11 +91,7 @@ async function makeUser(
     .expect(200);
 
   for (const roleName of roles) {
-    const role = await prisma.role.upsert({
-      where: { name: roleName },
-      update: {},
-      create: { name: roleName },
-    });
+    const role = await ensureRole(roleName);
     // Partial UNIQUE `UserRoleAssignment_one_active_per_user_role` (migration
     // 20260920140000) means a revoked grant is HISTORY and a new grant is a
     // new row — so this creates one only when no active grant exists, rather

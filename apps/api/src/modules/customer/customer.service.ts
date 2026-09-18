@@ -282,7 +282,7 @@ export class CustomerService {
     >
   > {
     const canViewAllOwners = actor.roles.some((role) =>
-      (CUSTOMER_CROSS_OWNER_ROLES as readonly string[]).includes(role),
+      CUSTOMER_CROSS_OWNER_ROLES.includes(role),
     );
     // Part F item #6 — resolve the search term to a set of ids first, then
     // filter the existing Prisma query by them, rather than duplicating

@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type {
-  MfaMethod,
-  Role,
-  RoleName,
-  User,
-  UserRoleAssignment,
-} from '@ibms/db';
+import type { MfaMethod, Role, User, UserRoleAssignment } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrgContextService } from '../common/org-context/org-context.service';
+
+/** One of a caller's active roles. `id` is what authorization resolves from;
+ * `name` is office-chosen free text, for display only. */
+export interface RoleRef {
+  id: string;
+  name: string;
+}
 
 @Injectable()
 export class UserRepository {
@@ -141,20 +142,34 @@ export class UserRepository {
     });
   }
 
-  async getRoleNames(userId: string): Promise<RoleName[]> {
+  /**
+   * A caller's active roles as `{ id, name }` pairs — the id for authorization,
+   * the name for display.
+   *
+   * The auth path needs both and must not pay for two queries to get them:
+   * `PermissionsService` resolves grants from role IDS (office-scoped custom
+   * roles made names ambiguous across offices — see
+   * `PermissionRepository.findCodesForRoles`), while `/auth/me` and the
+   * not-yet-converted role-name checks still read names.
+   */
+  async getRoleRefs(userId: string): Promise<RoleRef[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { userId, revokedAt: null },
-      include: { role: true },
+      select: { role: { select: { id: true, name: true } } },
     });
-    return assignments.map((a) => a.role.name);
+    return assignments.map((a) => ({ id: a.role.id, name: a.role.name }));
+  }
+
+  async getRoleNames(userId: string): Promise<string[]> {
+    return (await this.getRoleRefs(userId)).map((r) => r.name);
   }
 
   /** Active (non-revoked) role names for a set of users, keyed by user id,
    * in ONE query. `AccessRecertificationService.listItemsForReviewer` fired
    * one `getRoleNames` per item — for a large cycle that fanned out to N
    * concurrent queries and could exhaust the connection pool. */
-  async getRoleNamesByIds(userIds: string[]): Promise<Map<string, RoleName[]>> {
-    const byUser = new Map<string, RoleName[]>();
+  async getRoleNamesByIds(userIds: string[]): Promise<Map<string, string[]>> {
+    const byUser = new Map<string, string[]>();
     if (userIds.length === 0) return byUser;
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { userId: { in: userIds }, revokedAt: null },
@@ -258,7 +273,7 @@ export class UserRepository {
       accessValidFrom: Date | null;
       accessValidUntil: Date | null;
       createdAt: Date;
-      roles: RoleName[];
+      roles: string[];
       employee: { fullName: string } | null;
     }[]
   > {
@@ -297,11 +312,21 @@ export class UserRepository {
     return this.prisma.client.user.count();
   }
 
-  findRoleByName(name: RoleName): Promise<Role | null> {
-    return this.prisma.client.role.findUnique({ where: { name } });
+  /**
+   * A role by name, WITHIN the caller's own office.
+   *
+   * `findFirst`, not `findUnique`: a role name is only unique per office now
+   * (`@@unique([organizationId, name])`), and `findFirst` is one of the
+   * operations `tenantScopeExtension` injects `organizationId` into — so this
+   * cannot return another office's role even though the name may exist there
+   * too. Spelling the compound key by hand would mean naming the organization
+   * at the call site, which is the habit the extension exists to remove.
+   */
+  findRoleByName(name: string): Promise<Role | null> {
+    return this.prisma.client.role.findFirst({ where: { name } });
   }
 
-  findRolesByNames(names: RoleName[]): Promise<Role[]> {
+  findRolesByNames(names: string[]): Promise<Role[]> {
     return this.prisma.client.role.findMany({ where: { name: { in: names } } });
   }
 
