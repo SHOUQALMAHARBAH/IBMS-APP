@@ -716,7 +716,7 @@ model Permission {
 }
 
 model RolePermission {
-  id String @id @default(uuid())
+  id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization this grant belongs to.
   /// Supplied by `tenantScopeExtension`, never by hand.
   ///
