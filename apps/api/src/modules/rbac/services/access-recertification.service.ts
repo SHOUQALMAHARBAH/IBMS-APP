@@ -40,20 +40,33 @@ export interface RecertificationItemView {
  * foreign key, so an item stands for "this user's whole access", and a
  * "revoked" decision withdraws every active role they hold).
  *
- * Reviewer assignment: no manager-hierarchy field exists on User/Employee
- * yet, so the reviewer pool is every active COMPLIANCE_OFFICER or
- * BRANCH_DEPARTMENT_MANAGER, falling back to EXECUTIVE_MANAGEMENT — see
- * ibms-brain/meta/context/roles-and-segregation-of-duties.md. The
- * reviewer != subject invariant (maker-checker-segregation.md) is never
+ * Reviewer assignment: no manager-hierarchy field exists on User/Employee yet,
+ * so the pool is PERMISSION-keyed, in two tiers that predate this phase —
+ * holders of `access-recertification.review.routine` are assigned first,
+ * falling back to any holder of `access-recertification.review`. Seeded, that is
+ * Compliance and line Managers first and Executive Management as the genuine
+ * fallback, exactly as before; see
+ * ibms-brain/meta/context/roles-and-segregation-of-duties.md.
+ *
+ * Until Phase 2 those two tiers were two hard-coded lists of role NAMES, which
+ * an office defining its own roles appeared in neither of. The cycle then found
+ * no eligible reviewer for anybody, skipped every subject with a warning, and
+ * completed having recertified nothing — a compliance control reporting success
+ * while doing nothing. Keying on permissions is what fixes that; keeping TWO
+ * codes is what preserves the ordering, since one code cannot express a
+ * preference between roles that all hold it.
+ *
+ * The reviewer != subject invariant (maker-checker-segregation.md) is never
  * relaxed: pickReviewer throws rather than ever assigning self-review, and
  * startCycle catches that per subject — skipping (with a logged warning)
  * rather than letting one subject with no eligible reviewer block
  * recertifying everyone else in the org. decide() asserts the invariant
  * again independently, in case it's ever violated some other way.
  *
- * System/Security Administrator subjects are never skipped here — Part
- * 5.1 explicitly calls that role out as the one NOT exempt from
- * recertification of its own access.
+ * Administrator subjects are never skipped here — Part 5.1 explicitly calls
+ * that role out as the one NOT exempt from recertification of its own access.
+ * Since Phase 2 "administrator" means "holds `user.manage`", so an office's own
+ * administrator role is covered too.
  */
 @Injectable()
 export class AccessRecertificationService {
@@ -75,13 +88,21 @@ export class AccessRecertificationService {
     const cycle = await this.repo.createCycle(cycleLabel, dueAt);
     const subjectUserIds = await this.repo.findActiveSubjectUserIds();
 
-    const [complianceOfficers, managers, executives] = await Promise.all([
-      this.roles.findActiveUserIdsByRoleName('COMPLIANCE_OFFICER'),
-      this.roles.findActiveUserIdsByRoleName('BRANCH_DEPARTMENT_MANAGER'),
-      this.roles.findActiveUserIdsByRoleName('EXECUTIVE_MANAGEMENT'),
+    // Two queries, two tiers. The fallback pool is every ELIGIBLE reviewer
+    // rather than "the ones that are not routine": a routine reviewer appearing
+    // in both is harmless, because the primary tier is exhausted first, and
+    // expressing it as a subtraction would mis-handle a user who holds both a
+    // routine and a fallback role.
+    const [routinePool, eligiblePool] = await Promise.all([
+      this.roles.findActiveUserIdsWithPermission(
+        'access-recertification.review.routine',
+      ),
+      this.roles.findActiveUserIdsWithPermission(
+        'access-recertification.review',
+      ),
     ]);
-    const primaryPool = [...new Set([...complianceOfficers, ...managers])];
-    const fallbackPool = [...new Set(executives)];
+    const primaryPool = [...new Set(routinePool)];
+    const fallbackPool = [...new Set(eligiblePool)];
 
     const pairs: { subjectUserId: string; reviewerUserId: string }[] = [];
     for (const subjectUserId of subjectUserIds) {
@@ -240,16 +261,26 @@ export class AccessRecertificationService {
     return decided;
   }
 
-  /** The dedicated review record the backlog calls out: surfaces exactly
-   * the items whose subject currently holds SYSTEM_SECURITY_ADMINISTRATOR,
-   * for reporting/spot-checking that admin access really was reviewed. */
+  /**
+   * The dedicated review record the backlog calls out: surfaces exactly the
+   * items whose subject can administer users, for reporting and spot-checking
+   * that administrator access really was reviewed.
+   *
+   * Keyed on `user.manage`, not on a role named SYSTEM_SECURITY_ADMINISTRATOR.
+   * Part 5.1 names the administrator as the one role NOT exempt from
+   * recertification of its own access — a report that found administrators by
+   * name would have quietly omitted an office's own administrator role, which is
+   * precisely the account this report exists to prove was reviewed.
+   *
+   * Same capability the last-administrator guard in `UserAdminService` uses, and
+   * resolved through the same query, so the two cannot drift apart on what
+   * "administrator" means.
+   */
   async getAdminAccessItems(
     cycleId: string,
   ): Promise<AccessRecertificationItem[]> {
     const adminUserIds = new Set(
-      await this.roles.findActiveUserIdsByRoleName(
-        'SYSTEM_SECURITY_ADMINISTRATOR',
-      ),
+      await this.roles.findActiveUserIdsWithPermission('user.manage'),
     );
     const items = await this.repo.findItemsByCycle(cycleId);
     return items.filter((item) => adminUserIds.has(item.subjectUserId));
@@ -266,8 +297,10 @@ export class AccessRecertificationService {
     if (fallback) return fallback;
     throw new Error(
       `No eligible reviewer (other than the subject) found for user ${subjectUserId} — ` +
-        'assign at least one active COMPLIANCE_OFFICER, BRANCH_DEPARTMENT_MANAGER, or ' +
-        'EXECUTIVE_MANAGEMENT other than this user before starting a cycle.',
+        'grant `access-recertification.review` to at least one active user other ' +
+        'than this one before starting a cycle, and ' +
+        '`access-recertification.review.routine` to whichever roles should take ' +
+        'routine reviews.',
     );
   }
 }

@@ -65,17 +65,32 @@ function makeDeps(overrides?: {
     revokeAllActiveRoleAssignmentsForUser,
   } as unknown as AccessRecertificationRepository;
 
-  const roleByName: Record<string, string[]> = {
-    COMPLIANCE_OFFICER: overrides?.complianceOfficers ?? [],
-    BRANCH_DEPARTMENT_MANAGER: overrides?.managers ?? [],
-    EXECUTIVE_MANAGEMENT: overrides?.executives ?? [],
-    SYSTEM_SECURITY_ADMINISTRATOR: overrides?.admins ?? [],
+  // Keyed on PERMISSION since Phase 2. The two reviewer tiers are two codes,
+  // deliberately: all three seeded reviewer roles hold the eligibility code, so
+  // one code cannot express which of them to assign first. `routine` is the
+  // preference; `review` is every eligible reviewer and therefore the fallback.
+  const usersByPermission: Record<string, string[]> = {
+    'access-recertification.review.routine': [
+      ...(overrides?.complianceOfficers ?? []),
+      ...(overrides?.managers ?? []),
+    ],
+    // Executives FIRST, deliberately. This query returns users in assignment-row
+    // order, which is arbitrary — so a test that listed the routine reviewers
+    // first would pass whether the tiers were honoured or flattened, because
+    // `pickReviewer` takes the first eligible id either way. Putting the fallback
+    // reviewer at the front is what makes the preference test discriminating.
+    'access-recertification.review': [
+      ...(overrides?.executives ?? []),
+      ...(overrides?.complianceOfficers ?? []),
+      ...(overrides?.managers ?? []),
+    ],
+    'user.manage': overrides?.admins ?? [],
   };
   const roles = {
-    findActiveUserIdsByRoleName: vi
+    findActiveUserIdsWithPermission: vi
       .fn()
-      .mockImplementation((name: string) =>
-        Promise.resolve(roleByName[name] ?? []),
+      .mockImplementation((code: string) =>
+        Promise.resolve(usersByPermission[code] ?? []),
       ),
   } as unknown as RoleRepository;
 
@@ -122,6 +137,30 @@ describe('AccessRecertificationService', () => {
       const { service, mocks } = makeDeps({
         activeSubjectUserIds: ['sales-1'],
         complianceOfficers: ['compliance-1'],
+      });
+
+      await service.startCycle('Q1', new Date(), 'admin-1');
+
+      expect(mocks.createManyItems).toHaveBeenCalledWith('cycle-1', [
+        { subjectUserId: 'sales-1', reviewerUserId: 'compliance-1' },
+      ]);
+    });
+
+    it('PREFERS a routine reviewer over a fallback one when both are available', async () => {
+      // The ordering, asserted positively. The fallback test below proves an
+      // Executive IS used when nothing else can be; this proves one is not used
+      // when something else can.
+      //
+      // Worth its own test because the ordering survived Phase 2 only
+      // deliberately: all three seeded reviewer roles hold
+      // `access-recertification.review`, so keying the pool on that one code
+      // would have flattened the tiers and let an Executive be assigned while a
+      // Compliance Officer was sitting there. The second code
+      // (`...review.routine`) is what keeps the preference expressible.
+      const { service, mocks } = makeDeps({
+        activeSubjectUserIds: ['sales-1'],
+        complianceOfficers: ['compliance-1'],
+        executives: ['exec-1'],
       });
 
       await service.startCycle('Q1', new Date(), 'admin-1');
@@ -372,7 +411,11 @@ describe('AccessRecertificationService', () => {
   });
 
   describe('getAdminAccessItems', () => {
-    it('returns only items whose subject holds SYSTEM_SECURITY_ADMINISTRATOR', async () => {
+    it('returns only items whose subject can administer users (user.manage), whatever their role is called', async () => {
+      // Keyed on the permission since Phase 2. By role NAME this report would
+      // quietly omit an office's own administrator role — which is exactly the
+      // account Part 5.1 singles out as NOT exempt from recertification, and so
+      // exactly the one this report exists to prove was reviewed.
       const { service, mocks } = makeDeps({ admins: ['admin-1'] });
       mocks.findItemsByCycle.mockResolvedValue([
         { id: 'item-1', subjectUserId: 'admin-1' },

@@ -20,34 +20,45 @@ export class RoleRepository {
   }
 
   /**
-   * Active (non-revoked) user ids currently holding a named role, within the
-   * caller's own office.
+   * Active (non-revoked) user ids holding ANY role that grants `code`, within
+   * the caller's own office.
    *
-   * Resolves the role to an ID FIRST and then filters assignments on `roleId`,
-   * rather than filtering `role: { name }` in a nested relation clause as this
-   * used to. Two reasons:
+   * The answer to "who in this office can do X", which is what a reviewer pool
+   * and a last-administrator guard actually need. This replaced a
+   * `findActiveUserIdsByRoleName`: asking by role NAME cannot answer that
+   * question once an office defines its own roles, and that method had no other
+   * caller once both of those switched over.
    *
-   *  - A role name identifies a role only within one office now. The extension
-   *    scopes the top-level `UserRoleAssignment` query, but a NESTED relation
-   *    filter is not something it rewrites — so `role: { name }` would have
-   *    matched on a name belonging to any office and leaned on assignment rows
-   *    never pointing across an organization to stay correct. That invariant
-   *    holds, but an authorization query should not depend on one it cannot see.
-   *  - An office may simply not define the role. Returning `[]` explicitly is
-   *    clearer than an empty join, and it is a real case: the reviewer-pool
-   *    lookups in `AccessRecertificationService` ask for roles that
-   *    `demo-office-b`, for one, does not have.
+   * ## The tenant trap this is written around
+   *
+   * `tenantScopeExtension` scopes the TOP-LEVEL model of a query, and only for
+   * models carrying `organizationId`. It does not rewrite nested relation
+   * filters. So the org-scoped step here is the `RolePermission` read — that
+   * model carries `organizationId` (Phase 2 of the office-scoped rework added
+   * it, after an RLS policy that joined through `Role` turned out to be
+   * unsatisfiable and locked every user out of everything).
+   *
+   * The one nested filter is `permission: { code }`, and it is safe by design
+   * rather than by luck: `Permission` is a deliberately GLOBAL catalogue with no
+   * organization at all, so there is no other office's row for it to match.
+   *
+   * Getting this wrong fails SILENTLY EMPTY — a reviewer pool with nobody in it,
+   * a cycle that recertifies nothing and reports success — which is why
+   * `tenant-isolation.e2e-spec.ts` covers it with two offices that each define a
+   * role of the same name granting the same code.
    */
-  async findActiveUserIdsByRoleName(roleName: string): Promise<string[]> {
-    const role = await this.prisma.client.role.findFirst({
-      where: { name: roleName },
-      select: { id: true },
+  async findActiveUserIdsWithPermission(code: string): Promise<string[]> {
+    const grants = await this.prisma.client.rolePermission.findMany({
+      where: { permission: { code } },
+      select: { roleId: true },
     });
-    if (!role) return [];
+    if (grants.length === 0) return [];
+
+    const roleIds = [...new Set(grants.map((g) => g.roleId))];
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
-      where: { revokedAt: null, roleId: role.id },
+      where: { revokedAt: null, roleId: { in: roleIds } },
       select: { userId: true },
     });
-    return assignments.map((a) => a.userId);
+    return [...new Set(assignments.map((a) => a.userId))];
   }
 }

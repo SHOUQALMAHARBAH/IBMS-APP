@@ -1217,6 +1217,24 @@ const admin: PermissionSeed[] = [
       "Review and decide an access-recertification item (never one's own)",
     roles: [MANAGER, COMPLIANCE, EXEC],
   },
+  // The reviewer pool has always been TWO TIERS: Compliance and line Managers
+  // are assigned routinely, and Executive Management is a genuine fallback used
+  // only when no routine reviewer other than the subject exists. That ordering
+  // lived in the shape of `startCycle`'s code, as two lists — which a single
+  // permission cannot express, because all three roles hold the same one.
+  //
+  // So the eligibility code above is UNCHANGED (it still gates `decide()`, and
+  // an Executive assigned as fallback must still be able to decide), and this
+  // second code marks the roles to prefer when ASSIGNING. An office grants it to
+  // whichever of its own roles should take routine reviews; granting nobody is
+  // legitimate and simply makes every eligible reviewer a fallback.
+  {
+    code: "access-recertification.review.routine",
+    module: "admin",
+    description:
+      "Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review)",
+    roles: [MANAGER, COMPLIANCE],
+  },
   {
     code: "encryption-key.read",
     module: "admin",

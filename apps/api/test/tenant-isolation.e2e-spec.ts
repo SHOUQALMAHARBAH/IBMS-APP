@@ -1184,6 +1184,118 @@ describe('Part V — office-scoped custom roles cannot leak across offices', () 
     expect(body.permissions).not.toContain(B_ONLY_PERMISSION);
   }, 60_000);
 
+  it("'who in this office can do X' never reaches into the other office", async () => {
+    // Phase 2 workstream E added `RoleRepository.findActiveUserIdsWithPermission`
+    // — the query behind the recertification reviewer pool and the
+    // last-administrator guard. It walks RolePermission -> UserRoleAssignment,
+    // and `tenantScopeExtension` scopes only the TOP-LEVEL model of a query.
+    //
+    // Getting that wrong fails SILENTLY: a reviewer pool that quietly contains
+    // another office's users, or quietly contains nobody. Neither throws. So the
+    // isolation is asserted here rather than left to the invariant that
+    // assignment rows never cross an organization.
+    //
+    // Both offices hold a role of the SAME NAME, and here both are given the
+    // SAME permission, so a name-keyed or unscoped query could not tell them
+    // apart. That is the whole point of the fixture.
+    const shared = await rawPrisma.permission.findUniqueOrThrow({
+      where: { code: 'access-recertification.review' },
+    });
+    // Both holders are written directly rather than signed up: `POST
+    // /auth/signup` refuses once a second Organization exists (it has no
+    // subdomain to resolve against until Phase 4), and this test needs a row in
+    // each office, not a session in either.
+    const holderA = await rawPrisma.user.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        fullName: 'Office A Reviewer',
+        email: uniqueEmail('perm-query-a'),
+        passwordHash: 'x',
+        isActive: true,
+        languagePreference: 'AR',
+      },
+    });
+    const holderB = await rawPrisma.user.create({
+      data: {
+        organizationId: ORG_B_ID,
+        fullName: 'Office B Reviewer',
+        email: uniqueEmail('perm-query-b'),
+        passwordHash: 'x',
+        isActive: true,
+        languagePreference: 'AR',
+      },
+    });
+
+    try {
+      await rawPrisma.rolePermission.createMany({
+        data: [
+          {
+            organizationId: TEST_ORGANIZATION_ID,
+            roleId: roleAId,
+            permissionId: shared.id,
+          },
+          {
+            organizationId: ORG_B_ID,
+            roleId: roleBId,
+            permissionId: shared.id,
+          },
+        ],
+      });
+      await rawPrisma.userRoleAssignment.createMany({
+        data: [
+          {
+            organizationId: TEST_ORGANIZATION_ID,
+            userId: holderA.id,
+            roleId: roleAId,
+          },
+          {
+            organizationId: ORG_B_ID,
+            userId: holderB.id,
+            roleId: roleBId,
+          },
+        ],
+      });
+
+      // The query as the application runs it: through the scoped client, inside
+      // office A's context.
+      const grants = await prisma.rolePermission.findMany({
+        where: { permission: { code: 'access-recertification.review' } },
+        select: { roleId: true },
+      });
+      const roleIds = [...new Set(grants.map((g) => g.roleId))];
+      expect(roleIds, "office B's role must not appear").not.toContain(roleBId);
+      expect(roleIds).toContain(roleAId);
+
+      const assignments = await prisma.userRoleAssignment.findMany({
+        where: { revokedAt: null, roleId: { in: roleIds } },
+        select: { userId: true },
+      });
+      const userIds = new Set(assignments.map((a) => a.userId));
+      expect(userIds, "office A's holder is found").toContain(holderA.id);
+      expect(userIds, "office B's holder is NOT").not.toContain(holderB.id);
+
+      // And the counter-example, as the other tests in this block do: the same
+      // question asked WITHOUT scoping returns both offices' holders. This is
+      // what the query would have done had the scoping step been left to a
+      // nested relation filter.
+      const unscoped = await rawPrisma.rolePermission.findMany({
+        where: { permission: { code: 'access-recertification.review' } },
+        select: { roleId: true },
+      });
+      expect(unscoped.map((g) => g.roleId)).toContain(roleBId);
+    } finally {
+      await rawPrisma.userRoleAssignment.deleteMany({
+        where: { userId: { in: [holderA.id, holderB.id] } },
+      });
+      await rawPrisma.rolePermission.deleteMany({
+        where: { permissionId: shared.id, roleId: { in: [roleAId, roleBId] } },
+      });
+      await rawPrisma.user.deleteMany({
+        where: { id: { in: [holderA.id, holderB.id] } },
+      });
+    }
+  }, 120_000);
+
   it("office A cannot see, edit or delete office B's role (test #11)", async () => {
     // The scoped client is what every service uses. Office B's role is simply
     // not there — a 404-shaped absence, not a 403.

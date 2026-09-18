@@ -126,6 +126,51 @@ async function makeUser(
   return { accessToken, userId, email };
 }
 
+/** A role with a name no list in this codebase knows, holding exactly the given
+ *  permission codes — what an office actually builds after Phase 3. */
+async function makeCustomRole(
+  name: string,
+  codes: string[],
+): Promise<{ id: string }> {
+  const role = await prisma.role.create({
+    data: {
+      name,
+      nameEn: name,
+      nameAr: name,
+      requiresMfaAlways: false,
+      requiresHardwareToken: false,
+    },
+  });
+  const permissions = await prisma.permission.findMany({
+    where: { code: { in: codes } },
+    select: { id: true, code: true },
+  });
+  // A mistyped code would otherwise grant nothing and make the test fail for a
+  // reason that looks like the behaviour under test.
+  expect(permissions.map((r) => r.code).sort()).toEqual([...codes].sort());
+  await prisma.rolePermission.createMany({
+    data: permissions.map((perm) => ({
+      roleId: role.id,
+      permissionId: perm.id,
+    })),
+  });
+  return role;
+}
+
+/** `makeUser`, but granting a role by ID — `grantRole` upserts by NAME, which
+ *  would resolve a custom role to a fresh one with no permissions. */
+async function makeUserWithRoleId(
+  app: INestApplication<App>,
+  label: string,
+  roleId: string,
+): Promise<{ accessToken: string; userId: string; email: string }> {
+  const created = await makeUser(app, label);
+  await prisma.userRoleAssignment.create({
+    data: { userId: created.userId, roleId },
+  });
+  return created;
+}
+
 /** AccessRecertificationService.startCycle always assigns the FIRST
  * eligible (!= subject) member of the reviewer pool — not "whoever started
  * the cycle". The test DB accumulates COMPLIANCE_OFFICER/
@@ -136,18 +181,27 @@ async function makeUser(
  * only, and only ever touches the (test-only) db-test database.
  */
 async function resetReviewerPool(): Promise<void> {
-  await prisma.userRoleAssignment.updateMany({
+  // Keyed on the PERMISSION since Phase 2, not on the three legacy role names.
+  // A name-keyed reset would leave any custom reviewer role in the pool and make
+  // "who becomes the reviewer" nondeterministic again — including the roles the
+  // custom-role test below creates.
+  const grants = await prisma.rolePermission.findMany({
     where: {
-      revokedAt: null,
-      role: {
-        name: {
+      permission: {
+        code: {
           in: [
-            'COMPLIANCE_OFFICER',
-            'BRANCH_DEPARTMENT_MANAGER',
-            'EXECUTIVE_MANAGEMENT',
+            'access-recertification.review',
+            'access-recertification.review.routine',
           ],
         },
       },
+    },
+    select: { roleId: true },
+  });
+  await prisma.userRoleAssignment.updateMany({
+    where: {
+      revokedAt: null,
+      roleId: { in: [...new Set(grants.map((g) => g.roleId))] },
     },
     data: { revokedAt: new Date() },
   });
@@ -229,6 +283,93 @@ describe('RBAC / access recertification (e2e)', () => {
         .set(bearer(plain.accessToken))
         .expect(403);
     });
+
+    it('runs a full cycle for an office whose reviewers are CUSTOM roles only', async () => {
+      // Phase 2 workstream E, and the case that is broken before it.
+      //
+      // The reviewer pool used to be three hard-coded role NAMES. An office that
+      // had built its own roles matched none of them, so `pickReviewer` threw for
+      // every subject, `startCycle` skipped every one with a warning, and the
+      // cycle completed having recertified NOBODY — a compliance control
+      // reporting success while doing nothing. Nothing failed; there was simply
+      // no work in the cycle.
+      const app = await boot();
+      await resetReviewerPool();
+
+      const tag = Date.now();
+      const reviewerRole = await makeCustomRole(`Access Reviewer ${tag}`, [
+        'access-recertification.cycle.start',
+        'access-recertification.review',
+        'access-recertification.review.routine',
+      ]);
+      const subjectRole = await makeCustomRole(`Ordinary Staff ${tag}`, [
+        'lead.list.read',
+      ]);
+
+      try {
+        const reviewer = await makeUserWithRoleId(
+          app,
+          'recert-custom-reviewer',
+          reviewerRole.id,
+        );
+        const subject = await makeUserWithRoleId(
+          app,
+          'recert-custom-subject',
+          subjectRole.id,
+        );
+
+        const cycleRes = await request(app.getHttpServer())
+          .post('/access-recertification/cycles')
+          .set(bearer(reviewer.accessToken))
+          .send({ cycleLabel: `custom-roles-${tag}` })
+          .expect(201);
+        const cycleId = (cycleRes.body as CycleBody).id;
+
+        const itemsRes = await request(app.getHttpServer())
+          .get('/access-recertification/items')
+          .query({ cycleId })
+          .set(bearer(reviewer.accessToken))
+          .expect(200);
+        const items = itemsRes.body as RecertificationItemBody[];
+
+        // The cycle did real work: the ordinary-staff subject has an item, and
+        // its reviewer is the custom role's holder. Before this phase there would
+        // have been no item at all.
+        const subjectItem = items.find(
+          (i) => i.subjectUserId === subject.userId,
+        );
+        expect(
+          subjectItem,
+          'a custom-role office must still recertify its staff',
+        ).toBeDefined();
+        expect(subjectItem!.reviewerUserId).toBe(reviewer.userId);
+
+        // And the reviewer is never their own reviewer: with one pool member they
+        // are skipped entirely rather than self-assigned, which is the same
+        // behaviour the seeded-role test below pins.
+        expect(
+          items.find((i) => i.subjectUserId === reviewer.userId),
+        ).toBeUndefined();
+
+        // The decision itself works for a custom role — eligibility to decide is
+        // `access-recertification.review`, which this role holds.
+        await request(app.getHttpServer())
+          .post(`/access-recertification/items/${subjectItem!.id}/decision`)
+          .set(bearer(reviewer.accessToken))
+          .send({ decision: 'confirmed' })
+          .expect(201);
+      } finally {
+        // db-test is cumulative.
+        const ids = [reviewerRole.id, subjectRole.id];
+        await prisma.userRoleAssignment.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.rolePermission.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.role.deleteMany({ where: { id: { in: ids } } });
+      }
+    }, 300_000);
 
     it('a Compliance Officer starting a cycle never becomes the reviewer of their own item, and reviews the subject assigned to them', async () => {
       const app = await boot();
