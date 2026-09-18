@@ -67,7 +67,16 @@ function makeDeps(over: Record<string, unknown> = {}) {
     hash: vi.fn().mockResolvedValue('hashed'),
     ...(over.passwords as object),
   };
-  const permissions = { invalidateCache: vi.fn() };
+  const permissions = {
+    invalidateCache: vi.fn(),
+    // Phase 2 — the segregation signal now asks what a role actually GRANTS
+    // rather than what it is called, so provisioning and granting resolve each
+    // role's codes. An empty set means "this role carries no checker
+    // permission", which is the quiet path most of these tests want; the tests
+    // that are about the signal override it.
+    getCodesForRoles: vi.fn().mockResolvedValue(new Set<string>()),
+    ...(over.permissions as object),
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   // Part II §4.2.2 — provisioning now resolves a Department, scoped to the
   // caller's own office.
@@ -520,6 +529,11 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   // single-handed. maker-checker-segregation.md is explicit that admin
   // consoles are NOT exempt from that rule, so this is not a lex gap — it is a
   // gap in what the system can see. These pin the visibility half.
+  //
+  // Phase 2 re-keyed the signal from role NAMES to the checker PERMISSIONS a
+  // role grants, so these tests now say what the role grants rather than only
+  // what it is called. That is the whole change: a role an office defines,
+  // holding `policy.check`, used to be handed out with no signal at all.
 
   it('records a signal when a CHECKER role is granted', async () => {
     const deps = makeDeps({
@@ -528,6 +542,9 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
           id: 'r-comp',
           name: RoleName.COMPLIANCE_OFFICER,
         }),
+      },
+      permissions: {
+        getCodesForRoles: vi.fn().mockResolvedValue(new Set(['kyc.approve'])),
       },
     });
     await deps.service.grantRole('u-1', RoleName.COMPLIANCE_OFFICER, actor.id);
@@ -544,6 +561,11 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
           id: 'r-fin',
           name: RoleName.FINANCE_COLLECTIONS_OFFICER,
         }),
+      },
+      permissions: {
+        getCodesForRoles: vi
+          .fn()
+          .mockResolvedValue(new Set(['refund.approve'])),
       },
     });
     // The administrator grants the checker role to their own account.
@@ -583,7 +605,11 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   it('signals on PROVISION too, not only on a later grant', async () => {
     // Provisioning a fresh account that already carries a checker role is the
     // exact "second identity" shape, so it must be as visible as a grant.
-    const deps = makeDeps();
+    const deps = makeDeps({
+      permissions: {
+        getCodesForRoles: vi.fn().mockResolvedValue(new Set(['kyc.approve'])),
+      },
+    });
     await deps.service.provision(
       {
         fullName: 'Second Identity',

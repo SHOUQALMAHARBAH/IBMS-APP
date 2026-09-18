@@ -17,6 +17,7 @@ import { PermissionsService } from './permissions.service';
 import type { ProvisionUserDto } from '../dto/provision-user.dto';
 import {
   segregationSignal,
+  type GrantedRole,
   type SegregationSignal,
 } from '../checker-roles.config';
 import { DepartmentRepository } from '../../../repositories/department.repository';
@@ -251,7 +252,7 @@ export class UserAdminService {
 
     await this.recordSegregationSignal(
       segregationSignal({
-        roles: requested,
+        roles: await this.grantedRoles(roles),
         subjectUserId: user.id,
         actorUserId,
       }),
@@ -304,7 +305,7 @@ export class UserAdminService {
 
     await this.recordSegregationSignal(
       segregationSignal({
-        roles: [roleName],
+        roles: await this.grantedRoles([role]),
         subjectUserId: userId,
         actorUserId,
       }),
@@ -433,6 +434,25 @@ export class UserAdminService {
   }
 
   /**
+   * Resolves what each role being granted actually grants.
+   *
+   * One lookup per role rather than one for the union, so the signal can say
+   * WHICH role carried the checker permission — the union would flag the grant
+   * without naming the cause. Every lookup is keyed on a role ID and cached, and
+   * this runs once per provisioning call, so the cost is nil.
+   */
+  private async grantedRoles(
+    roles: readonly { id: string; name: string }[],
+  ): Promise<GrantedRole[]> {
+    return Promise.all(
+      roles.map(async (role) => ({
+        name: role.name,
+        permissions: await this.permissions.getCodesForRoles([role.id]),
+      })),
+    );
+  }
+
+  /**
    * Emits a distinct, queryable record when an administrator hands out the
    * CHECKER half of a maker/checker pair.
    *
@@ -461,9 +481,13 @@ export class UserAdminService {
     if (!signal) return;
 
     const roles = signal.checkerRoles.join(', ');
+    // The permissions, not only the role names. A name is no longer an identity:
+    // two offices may each define a "Reviewer" granting different things, so the
+    // name alone does not tell Compliance what was actually handed over.
+    const why = signal.checkerPermissions.join(', ');
     const message = signal.selfGrant
-      ? `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted THEMSELVES the checker role(s) ${roles} via ${context.via}. One identity now holds both halves of a maker/checker pair.`
-      : `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted checker role(s) ${roles} to user ${context.subjectUserId} via ${context.via}. Verify this is not a second identity for an existing maker.`;
+      ? `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted THEMSELVES the checker role(s) ${roles} (${why}) via ${context.via}. One identity now holds both halves of a maker/checker pair.`
+      : `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted checker role(s) ${roles} (${why}) to user ${context.subjectUserId} via ${context.via}. Verify this is not a second identity for an existing maker.`;
 
     // Self-grant is the shape that needs no second account at all, so it is
     // the stronger signal and is logged as an error rather than a warning.
@@ -477,6 +501,7 @@ export class UserAdminService {
       entityId: context.subjectUserId,
       afterValue: {
         checkerRoles: signal.checkerRoles,
+        checkerPermissions: signal.checkerPermissions,
         selfGrant: signal.selfGrant,
         grantedByUserId: context.actorUserId,
         grantedToUserId: context.subjectUserId,
