@@ -19,7 +19,7 @@ import { OpportunityRepository } from '../../repositories/opportunity.repository
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import {
   buildNegotiationHistory,
   normalizeQuotationTerms,
@@ -104,7 +104,7 @@ const QUOTABLE_FROM: readonly RfqInsurerStatus[] = [
  * factual, single-actor Placement record. Visibility mirrors
  * `RfqService`: a quotation inherits its RFQ's Opportunity's Customer's
  * visibility (the owning Sales/Relationship Officer, or a
- * `CUSTOMER_FILE_CROSS_OWNER_ROLES` holder working the whole book).
+ * `customer-file.all-owners.read` holder working the whole book).
  */
 @Injectable()
 export class QuotationService {
@@ -120,9 +120,7 @@ export class QuotationService {
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed. */

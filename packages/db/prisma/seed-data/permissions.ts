@@ -1194,6 +1194,74 @@ const admin: PermissionSeed[] = [
   },
 ];
 
+// ----------------------------------------------------------------------
+// Cross-owner visibility (office-scoped custom RBAC, Phase 2 workstream C)
+// ----------------------------------------------------------------------
+//
+// Each of these answers one question: "may this caller see a record they do not
+// own?" Until Phase 2 each was a hard-coded list of role NAMES in
+// `apps/api/src/common/rbac-visibility.util.ts`. A role an office defines
+// appeared in none of them, so it saw only what it owned however its
+// permissions had been granted — failing closed, but wrong, and silently.
+//
+// Every grant below is exactly the list that rule held before, so no existing
+// user's visibility changes. `.all-owners.read` rather than
+// `.view-all-owners`: the External Auditor holds cross-owner reach on customers
+// and `permissions.spec.ts` proves that role read-only BY CONSTRUCTION from the
+// `.read`/`.view` suffix — a name needing that check widened would have traded a
+// real safety property for a nicer-reading code.
+const crossOwnerVisibility: PermissionSeed[] = [
+  {
+    code: "lead.all-owners.read",
+    module: "commercial-front-office",
+    description:
+      "See leads and prospects owned by another Sales/Relationship Officer — the org-wide pipeline view, not one's own",
+    roles: [MANAGER, EXEC],
+  },
+  {
+    code: "customer.all-owners.read",
+    module: "customer",
+    description:
+      "See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)",
+    roles: [MANAGER, EXEC, COMPLIANCE, AUDITOR],
+  },
+  {
+    code: "customer-file.all-owners.read",
+    module: "commercial-front-office",
+    description:
+      "See any customer's COMMERCIAL file — risk profile, needs assessment, insurance program, opportunity, RFQ, quotation, comparison, client decision — regardless of owner",
+    roles: [PLACEMENT, MANAGER, EXEC],
+  },
+  {
+    code: "policy.all-owners.read",
+    module: "insurance-operations",
+    description:
+      "See any Policy regardless of who owns its Customer (the Policy Checking Officer's Process 20 quality control is a cross-book control function)",
+    roles: [PLACEMENT, MANAGER, EXEC, POLICY_CHECK],
+  },
+  {
+    code: "claim.all-owners.read",
+    module: "claims",
+    description:
+      "See any Claim regardless of who owns its Customer — the Claims Officer works the whole claims book",
+    roles: [CLAIMS, MANAGER, EXEC],
+  },
+  {
+    code: "endorsement.all-owners.read",
+    module: "insurance-operations",
+    description:
+      "See any Endorsement regardless of owner (Finance handles the premium adjustment an endorsement produces)",
+    roles: [PLACEMENT, MANAGER, EXEC, FINANCE],
+  },
+  {
+    code: "recommendation.all-owners.read",
+    module: "commercial-front-office",
+    description:
+      "See any broker Recommendation regardless of owner — Compliance must reach any of them to clear a conflict-of-interest disclosure the conflicted officer cannot self-clear",
+    roles: [PLACEMENT, MANAGER, EXEC, COMPLIANCE],
+  },
+];
+
 // SLA policies are a GOVERNANCE artefact, not an engineering one — the whole
 // point of making them configurable is that Compliance/Management can change a
 // deadline without a code change. Hence Compliance + Manager + Exec, not ADMIN.
@@ -1242,5 +1310,6 @@ export const PERMISSIONS: PermissionSeed[] = [
   ...supportingOperations,
   ...pdpl,
   ...admin,
+  ...crossOwnerVisibility,
   ...slaGovernance,
 ];

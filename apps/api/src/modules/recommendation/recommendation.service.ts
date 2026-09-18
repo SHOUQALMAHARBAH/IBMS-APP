@@ -16,7 +16,7 @@ import { QuotationRepository } from '../../repositories/quotation.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllRecommendationOwners } from '../../common/rbac-visibility.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
 import {
   approvalRequired,
@@ -122,17 +122,17 @@ export class RecommendationService {
   ) {}
 
   /** Placement / Manager / Executive work the whole commercial book
-   * (`CUSTOMER_FILE_CROSS_OWNER_ROLES`), and a Compliance Officer must be
-   * able to reach any recommendation to clear its conflict-of-interest
-   * disclosure — `conflict-of-interest.disclose` is a Compliance grant, and
-   * the conflicted officer cannot self-clear (maker/checker). Sales sees
-   * only recommendations on a Customer they own. */
+   * plus Compliance, which must be able to reach any recommendation to clear
+   * its conflict-of-interest disclosure — `conflict-of-interest.disclose` is a
+   * Compliance grant, and the conflicted officer cannot self-clear
+   * (maker/checker). Sales sees only recommendations on a Customer they own.
+   *
+   * That union is why this is its own permission rather than
+   * `customer-file.all-owners.read`: the two sets differ by exactly Compliance,
+   * and collapsing them would have silently given Compliance cross-owner reach
+   * over the whole commercial file, or taken away the one reach it needs. */
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some(
-      (role) =>
-        CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role) ||
-        role === 'COMPLIANCE_OFFICER',
-    );
+    return canReadAllRecommendationOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed. */

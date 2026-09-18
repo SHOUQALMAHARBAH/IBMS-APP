@@ -12,7 +12,7 @@ import { LeadRepository } from '../../repositories/lead.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { quantizeMoney } from '../../common/money.util';
-import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllLeadOwners } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateProspectDto } from './dto/create-prospect.dto';
 import type { ListProspectsQueryDto } from './dto/list-prospects-query.dto';
@@ -137,9 +137,7 @@ export class ProspectService {
     query: ListProspectsQueryDto,
     actor: AuthenticatedUser,
   ): Promise<Prospect[]> {
-    const canViewAllOwners = actor.roles.some((role) =>
-      VIEW_ALL_OWNERS_ROLES.includes(role),
-    );
+    const canViewAllOwners = canReadAllLeadOwners(actor);
     // Part F item #6 — resolve the search term to a set of ids first, then
     // filter the existing Prisma query by them.
     return this.prospects.findMany({
@@ -152,9 +150,7 @@ export class ProspectService {
 
   async get(id: string, actor: AuthenticatedUser): Promise<Prospect> {
     const prospect = await this.prospects.findById(id);
-    const canViewAllOwners = actor.roles.some((role) =>
-      VIEW_ALL_OWNERS_ROLES.includes(role),
-    );
+    const canViewAllOwners = canReadAllLeadOwners(actor);
     if (
       !prospect ||
       (!canViewAllOwners && prospect.salesOwnerUserId !== actor.id)

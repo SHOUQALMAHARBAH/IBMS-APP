@@ -20,7 +20,7 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { EncryptionService } from '../security/encryption.service';
 import { encryptEntityFields } from '../security/encrypted-fields';
-import { CLAIM_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllClaimOwners } from '../../common/rbac-visibility.util';
 import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
 import { formatMoney, quantizeMoney } from '../../common/money.util';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
@@ -67,8 +67,6 @@ import type { RecordSettlementDto } from './dto/record-settlement.dto';
 import type { CloseClaimDto } from './dto/close-claim.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { LossRatioService } from '../loss-ratio/loss-ratio.service';
-
-const CROSS_OWNER_ROLES: readonly string[] = CLAIM_CROSS_OWNER_ROLES;
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -266,7 +264,7 @@ export class ClaimService {
   ) {}
 
   private canReachAnyClaim(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((r) => CROSS_OWNER_ROLES.includes(r));
+    return canReadAllClaimOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed. */
@@ -1922,7 +1920,7 @@ export class ClaimService {
       //
       // Visibility is the SAME rule the two scoped branches enforce per row
       // via `assertCustomerVisible`, expressed as a query filter instead: a
-      // caller in `CLAIM_CROSS_OWNER_ROLES` passes `null` and reaches the
+      // caller holding `claim.all-owners.read` passes `null` and reaches the
       // whole book, everyone else is pinned to Customers they own. It has to
       // be part of the query — paginating a read that was filtered afterwards
       // would let the page size decide what the caller cannot see, which is
@@ -2010,9 +2008,9 @@ export class ClaimService {
   /** The Claims Officer works the whole claims book (a cross-book
    *  operational role), and Manager / Executive get the org-wide view. A
    *  Sales/Relationship Officer holding `claim.read` sees only claims on a
-   *  Customer they own. Same list the per-row checks already trust. */
+   *  Customer they own. Same permission the per-row checks already trust. */
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) => CROSS_OWNER_ROLES.includes(role));
+    return canReadAllClaimOwners(actor);
   }
 
   private async auditSensitiveRead(

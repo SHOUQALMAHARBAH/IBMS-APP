@@ -31,6 +31,21 @@ export interface AuthenticatedUser {
    * PERMISSION, never on a name.
    */
   roles: string[];
+  /**
+   * The permission codes these roles grant, resolved once per request.
+   *
+   * Phase 2 added this so the cross-owner visibility rules in
+   * `common/rbac-visibility.util.ts` could become permission checks without
+   * making ~20 services async or giving each one a new dependency. Resolved by
+   * `PermissionsService.getCodesForRoles(roleIds)` — keyed on role IDS, never
+   * names, and cached, so this is the same call `PermissionsGuard` already makes
+   * on every permission-gated request rather than a second round trip.
+   *
+   * A `Set` rather than an array because every consumer asks "does it contain
+   * this code". Never serialised to a response: `/auth/me` builds its own sorted
+   * array for the client.
+   */
+  permissions: ReadonlySet<string>;
   sessionId: string;
 }
 

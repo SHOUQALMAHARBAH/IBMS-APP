@@ -10,9 +10,10 @@ import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateProspectDto } from './dto/create-prospect.dto';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -20,7 +21,7 @@ function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
 function makeDeps() {

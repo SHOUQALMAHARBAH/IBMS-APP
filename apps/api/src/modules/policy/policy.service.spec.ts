@@ -18,9 +18,10 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'plc-1',
     organizationId: 'org-1',
     email: 'plc@ibms.test',
@@ -28,14 +29,14 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
-/** A Sales officer is NOT in CUSTOMER_FILE_CROSS_OWNER_ROLES, so visibility
+/** A Sales officer does not hold `policy.all-owners.read`, so visibility
  * is scoped to Customers they own — used to exercise the not-visible branch
  * (a Placement officer can reach the whole book). */
 function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'sales-2',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -43,7 +44,7 @@ function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-2',
     ...overrides,
-  };
+  });
 }
 
 function p2002(): Prisma.PrismaClientKnownRequestError {
@@ -732,13 +733,15 @@ describe('PolicyService', () => {
     it('pins an owner-limited caller to its own book, and passes the filters through', async () => {
       const { service, mocks } = makeDeps();
 
+      // `sales({ id })`, not `{ ...placement(), roles: [...] }`. Overriding the
+      // roles on an already-built actor no longer changes what it can see:
+      // Phase 2 resolves cross-owner visibility from `permissions`, which the
+      // fixture derives from the roles it was BUILT with. Spreading a Placement
+      // officer and relabelling its roles would keep Placement's reach and turn
+      // this into a cross-owner test that still passed its own assertion.
       await service.list(
         { status: 'ISSUED', search: 'Rawabi' },
-        {
-          ...placement(),
-          id: 'sales-1',
-          roles: ['SALES_RELATIONSHIP_OFFICER'],
-        },
+        sales({ id: 'sales-1' }),
       );
 
       // The visibility rule reaches the repository as a QUERY filter — if it

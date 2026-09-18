@@ -4,6 +4,7 @@ import { UserSessionRepository } from '../../../repositories/user-session.reposi
 import { UserRepository } from '../../../repositories/user.repository';
 import { AuditService } from '../../audit/audit.service';
 import { SecurityConfigService } from './security-config.service';
+import { PermissionsService } from '../../rbac/services/permissions.service';
 import {
   AccessWindowExpiredException,
   SessionIdleTimeoutException,
@@ -31,6 +32,7 @@ export class SessionService {
     private readonly securityConfig: SecurityConfigService,
     private readonly audit: AuditService,
     private readonly orgContext: OrgContextService,
+    private readonly permissions: PermissionsService,
   ) {}
 
   async create(params: {
@@ -140,12 +142,17 @@ export class SessionService {
     // ids (a role name is only unique within an office now), while /auth/me and
     // the role-name checks still awaiting Phase 2 read the names.
     const roleRefs = await this.users.getRoleRefs(userId);
+    const roleIds = roleRefs.map((r) => r.id);
     return {
       id: user.id,
       organizationId: user.organizationId,
       email: user.email,
-      roleIds: roleRefs.map((r) => r.id),
+      roleIds,
       roles: roleRefs.map((r) => r.name),
+      // Resolved here so the visibility rules in `rbac-visibility.util.ts` can
+      // stay synchronous predicates. Cached and keyed on role ids, so this is
+      // the same lookup `PermissionsGuard` makes rather than an extra query.
+      permissions: await this.permissions.getCodesForRoles(roleIds),
       sessionId,
     };
   }

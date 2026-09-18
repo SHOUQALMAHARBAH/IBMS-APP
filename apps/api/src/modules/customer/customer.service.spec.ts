@@ -12,9 +12,10 @@ import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -22,7 +23,7 @@ function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
 function makeDeps() {

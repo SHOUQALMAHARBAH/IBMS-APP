@@ -7,7 +7,7 @@ import type { Lead, LeadStatus } from '@ibms/db';
 import { LeadRepository } from '../../repositories/lead.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllLeadOwners } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateLeadDto } from './dto/create-lead.dto';
 import type { ListLeadsQueryDto } from './dto/list-leads-query.dto';
@@ -59,9 +59,7 @@ export class LeadService {
    * authorization"). Manager/Executive get the org-wide view the grid
    * grants them. */
   list(query: ListLeadsQueryDto, actor: AuthenticatedUser): Promise<Lead[]> {
-    const canViewAllOwners = actor.roles.some((role) =>
-      VIEW_ALL_OWNERS_ROLES.includes(role),
-    );
+    const canViewAllOwners = canReadAllLeadOwners(actor);
     return this.leads.findMany({
       source: query.source,
       status: query.status,

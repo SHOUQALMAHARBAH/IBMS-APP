@@ -18,13 +18,14 @@ import type { LossRatioService } from '../loss-ratio/loss-ratio.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { NotifyClaimDto } from './dto/notify-claim.dto';
 import type { RegisterClaimDto } from './dto/register-claim.dto';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 const INCEPTION = new Date('2026-01-01T00:00:00.000Z');
 const ENDORSED_AT = new Date('2026-06-01T00:00:00.000Z');
 const EXPIRY = new Date('2027-01-01T00:00:00.000Z');
 
 function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'clm-1',
     organizationId: 'org-1',
     email: 'claims@ibms.test',
@@ -32,12 +33,12 @@ function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 's-1',
     ...overrides,
-  };
+  });
 }
 /** Sales is scoped to Customers they own — used to exercise the not-visible
  * branch. */
 function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'sales-9',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -45,7 +46,7 @@ function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 's-9',
     ...overrides,
-  };
+  });
 }
 
 interface Opts {

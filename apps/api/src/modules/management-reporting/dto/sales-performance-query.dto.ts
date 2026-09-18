@@ -6,7 +6,7 @@ import { emptyStringToUndefined, trimIfString } from '../../../common/dto.util';
  * Process 59 — `GET /sales-performance?ownerUserId=&branchId=&periodLabel=`
  * (`dashboard.sales.view`). A Sales/Relationship Officer is forced to their
  * own `ownerUserId` regardless of what's passed here (the `lead.service.ts`
- * `VIEW_ALL_OWNERS_ROLES` shape) — Manager/Executive may pass either
+ * `lead.all-owners.read` shape) — Manager/Executive may pass either
  * `ownerUserId` OR `branchId` (`SalesPerformanceService.resolveScope`
  * 422s on both or neither). `periodLabel` omitted resolves the target
  * whose window contains "now" for that scope; given, it looks up that

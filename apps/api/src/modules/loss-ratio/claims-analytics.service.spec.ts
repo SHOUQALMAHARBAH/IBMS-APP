@@ -7,16 +7,17 @@ import type {
 } from '../../repositories/loss-ratio.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 const d = (s: string) => new Prisma.Decimal(s);
-const actor: AuthenticatedUser = {
+const actor: AuthenticatedUser = withCrossOwnerPermissions({
   id: 'mgr-1',
   organizationId: 'org-1',
   email: 'mgr@ibms.test',
   roles: ['BRANCH_DEPARTMENT_MANAGER'],
   roleIds: [],
   sessionId: 's-1',
-};
+});
 
 function makeDeps(
   policies: Awaited<

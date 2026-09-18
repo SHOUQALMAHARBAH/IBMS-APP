@@ -55,7 +55,7 @@ export interface Customer360View {
  *
  *   - READING (the interaction list, the 360° view) mirrors
  *     `CustomerService.get()`: the owning Sales Officer, or a
- *     `CUSTOMER_CROSS_OWNER_ROLES` holder (Manager / Executive / Compliance
+ *     `customer.all-owners.read` holder (Manager / Executive / Compliance
  *     / External Auditor). NotFoundException either way so a response can't
  *     be used as an existence oracle — same pattern as
  *     `cross-sell.service.ts`.

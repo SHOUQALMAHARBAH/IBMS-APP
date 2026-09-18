@@ -18,16 +18,10 @@ import { ScreeningHoldService } from './screening-hold.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { applyDuration } from '../../common/business-days.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
+import { canReadAllCustomerOwners } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { ScheduleReviewDto } from './dto/schedule-review.dto';
 import type { ListKycRecordsQueryDto } from './dto/list-kyc-records-query.dto';
-
-const CROSS_OWNER_ROLES = [
-  'BRANCH_DEPARTMENT_MANAGER',
-  'EXECUTIVE_MANAGEMENT',
-  'COMPLIANCE_OFFICER',
-  'EXTERNAL_AUDITOR',
-] as const;
 
 // Re-KYC cadence by risk level — DRAFT, UNSOURCED, same caveat as the SLA
 // durations in sla-registry.config.ts. See
@@ -89,10 +83,12 @@ export class KycService {
     private readonly sla: SlaTimerService,
   ) {}
 
+  /** The same reach as any other read of a Customer file, so it is the same
+   *  permission. This file kept its own byte-identical copy of the role list
+   *  before Phase 2, which is exactly the duplication that lets two answers to
+   *  one question drift apart. */
   private isCrossOwner(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      (CROSS_OWNER_ROLES as readonly string[]).includes(role),
-    );
+    return canReadAllCustomerOwners(actor);
   }
 
   async start(customerId: string, actorUserId: string): Promise<KYCRecord> {

@@ -19,7 +19,7 @@ import { InsuranceProgramRepository } from '../../repositories/insurance-program
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import { isFollowUpDue } from './rfq.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -107,7 +107,7 @@ function isUniqueViolation(err: unknown): boolean {
  *
  * Visibility mirrors InsuranceProgramService / OpportunityService: an RFQ
  * inherits its Opportunity's Customer's visibility — the owning
- * Sales/Relationship Officer, or a CUSTOMER_FILE_CROSS_OWNER_ROLES holder
+ * Sales/Relationship Officer, or a `customer-file.all-owners.read` holder
  * (Placement/Manager/Executive) working the whole book.
  */
 @Injectable()
@@ -124,9 +124,7 @@ export class RfqService {
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed. */
