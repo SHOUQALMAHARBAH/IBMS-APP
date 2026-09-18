@@ -707,6 +707,16 @@ build actually is today:
   separately grantable; and role names are validated as bounded strings, so an office's
   own role can actually be assigned. 167 permission codes became 177.
 
+  **Phase 3 prep, landed separately.** `role.manage`/`permission.manage` gated
+  read-only GETs, so they are now `role.read`/`permission.read` — with a NEW
+  `role.manage` meaning "change a role", which Phase 3's CRUD will gate on. There is
+  deliberately no `permission.manage`: `Permission` is a global catalogue an office
+  grants from and never writes to. Role assignment also moved from name-addressed to
+  **id-addressed** (`{ roleId }` / `{ roleIds }`), which removes the rename-mid-request
+  race and the last place on that surface where something security-relevant was
+  addressed by a name an office can edit. Every response there now returns a user's
+  roles the same way: `{ id, name }`.
+
   **What does NOT exist yet, and is not a defect to chase.** No office can create a
   role: there is no Role CRUD API or screen, and `status`/`isSystem` are not on the
   model, so `Role.name` being editable is theoretical until Phase 3. Four decision
