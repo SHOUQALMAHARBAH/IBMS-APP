@@ -33,6 +33,10 @@ const ITEMS = [
     subjectFullName: "Sales Officer",
     subjectEmail: "sales@ibms.test",
     subjectRoles: ["SALES_RELATIONSHIP_OFFICER"],
+    // Phase 2 — the admin badge is a SERVER-supplied fact now, not derived from
+    // the role names. A client cannot answer "can this subject administer
+    // users?" once role names are office-chosen.
+    subjectIsUserAdministrator: false,
     reviewerUserId: "user-1",
     decision: null,
     reviewedAt: null,
@@ -46,6 +50,7 @@ const ITEMS = [
     subjectFullName: "Admin Person",
     subjectEmail: "admin@ibms.test",
     subjectRoles: ["SYSTEM_SECURITY_ADMINISTRATOR"],
+    subjectIsUserAdministrator: true,
     reviewerUserId: "user-1",
     decision: null,
     reviewedAt: null,
