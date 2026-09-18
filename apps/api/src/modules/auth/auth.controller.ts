@@ -20,7 +20,6 @@ import { AuthService } from './services/auth.service';
 import { SecurityConfigService } from './services/security-config.service';
 import { Public } from './decorators/public.decorator';
 import { SkipMfaRequired } from './decorators/skip-mfa-required.decorator';
-import { RequireRoles } from './decorators/require-roles.decorator';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import {
@@ -319,14 +318,12 @@ export class AuthController {
     return { ok: true };
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('security-config.read')
   @Get('security-config')
   getSecurityConfig() {
     return this.securityConfig.get();
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('security-config.manage')
   @Put('security-config')
   updateSecurityConfig(

@@ -469,7 +469,7 @@ describe('Auth (e2e)', () => {
     it('is forbidden for an ordinary user and allowed for SYSTEM_SECURITY_ADMINISTRATOR', async () => {
       const app = await boot();
       // Both users enroll MFA first — otherwise MfaRequiredGuard (which
-      // runs before RolesGuard in the guard chain) would block them with
+      // runs before PermissionsGuard in the guard chain) would block them with
       // 403 MFA_ENROLLMENT_REQUIRED regardless of role, and this test
       // wouldn't actually be isolating RBAC behavior.
       const plainEmail = uniqueEmail('plain');

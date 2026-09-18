@@ -10,7 +10,6 @@ import {
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { UserAdminService } from '../services/user-admin.service';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
-import { RequireRoles } from '../../auth/decorators/require-roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 import { ProvisionUserDto } from '../dto/provision-user.dto';
@@ -37,7 +36,7 @@ const adminUserSchema = {
 /**
  * Backlog A.2 — user provisioning and role assignment, the surface the
  * `user.manage` permission was seeded for and which had no endpoint until
- * now. Gated by both `@RequireRoles` and `@RequirePermissions`, the same
+ * now. Gated by `@RequirePermissions`, the same
  * belt-and-braces pattern `RbacController` uses for the read-only catalogue.
  *
  * Frontend: apps/web/app/(app)/settings/users/page.tsx.
@@ -47,7 +46,6 @@ const adminUserSchema = {
 export class UserAdminController {
   constructor(private readonly userAdmin: UserAdminService) {}
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('user.manage')
   @Get()
   @ApiOkResponse({
@@ -65,7 +63,6 @@ export class UserAdminController {
     return this.userAdmin.list(page ?? 0);
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('user.manage')
   @Post()
   @ApiOkResponse({
@@ -79,7 +76,6 @@ export class UserAdminController {
     return this.userAdmin.provision(dto, user.id);
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('user.manage')
   @Post(':id/roles')
   grantRole(
@@ -92,7 +88,6 @@ export class UserAdminController {
 
   /** A POST, not a DELETE — the grant row is never deleted, only stamped
    * `revokedAt` (see `UserRoleAssignment.revokedAt` in the schema). */
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('user.manage')
   @Post(':id/roles/revoke')
   revokeRole(
@@ -103,14 +98,12 @@ export class UserAdminController {
     return this.userAdmin.revokeRole(id, dto.role, user.id);
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('user.manage')
   @Post(':id/deactivate')
   deactivate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.userAdmin.setActive(id, false, user.id);
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('user.manage')
   @Post(':id/activate')
   activate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

@@ -6,7 +6,6 @@ import {
   ConnectEmailIntegrationDto,
 } from './dto/connect-email-integration.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
-import { RequireRoles } from '../auth/decorators/require-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -37,14 +36,12 @@ export class EmailIntegrationController {
   /** Where to send the administrator to grant consent. Returns `state` for the
    * caller to store and compare on the way back — an authorization code
    * accepted without that check can be replayed from another site. */
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('email.integration.manage')
   @Get('authorize-url')
   authorizeUrl(@Query() query: AuthorizeUrlQueryDto) {
     return this.integrations.authorizeUrl(query.provider);
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('email.integration.manage')
   @Post('connect')
   connect(
@@ -65,14 +62,12 @@ export class EmailIntegrationController {
   /** Sends a real message, to the office's own connected mailbox — proving
    * end-to-end delivery without mailing anyone who did not ask to be part of a
    * configuration test. */
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('email.integration.manage')
   @Post('test')
   sendTest(@CurrentUser() user: AuthenticatedUser) {
     return this.integrations.sendTest(user.id);
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('email.integration.manage')
   @Post('revoke')
   revoke(@CurrentUser() user: AuthenticatedUser) {

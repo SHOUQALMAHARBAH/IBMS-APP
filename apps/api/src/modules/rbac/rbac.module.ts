@@ -43,7 +43,7 @@ import { EmployeeRepository } from '../../repositories/employee.repository';
     RoleRepository,
     AccessRecertificationRepository,
     // Global guard — see permissions.guard.ts. Runs after AuthModule's
-    // JwtAuthGuard/MfaRequiredGuard/RolesGuard/StepUpGuard (module import
+    // JwtAuthGuard/MfaRequiredGuard/StepUpGuard (module import
     // order in AppModule determines global-guard execution order).
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
