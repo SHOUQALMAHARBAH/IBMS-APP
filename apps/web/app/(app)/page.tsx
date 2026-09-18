@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
-import type { RoleName } from '../../lib/admin/user-admin-api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -50,7 +49,14 @@ export default function HomePage() {
           roles:
             user.roles.length > 0
               ? user.roles
-                  .map((r) => t(ENUM_LABEL.RoleName[r as RoleName]))
+                  // A role an office defines has no translation key, so it shows
+                  // its own name. `/auth/me` returns names for display only —
+                  // authorization reads `permissions`.
+                  .map((r) => {
+                    const key =
+                      ENUM_LABEL.RoleName[r as keyof typeof ENUM_LABEL.RoleName];
+                    return key ? t(key) : r;
+                  })
                   .join(', ')
               : t('homeNoRole'),
         })}

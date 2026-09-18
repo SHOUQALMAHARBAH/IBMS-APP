@@ -5,16 +5,17 @@ import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
-  ROLE_NAMES,
   grantRole,
   listBranches,
   listDepartments,
+  listRoles,
   listUsers,
   provisionUser,
   revokeRole,
   setUserActive,
   type AdminUser,
   type OrgUnit,
+  type RoleCatalogueEntry,
   type RoleName,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
@@ -23,6 +24,10 @@ import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { listEmployees, type EmployeeListRow } from '../../../../lib/supporting-operations/employee-api';
+
+/** The keys `ENUM_LABEL.RoleName` actually has — the eleven seeded names. A role
+ *  an office defines is deliberately NOT one of these. */
+type LegacyRoleName = keyof typeof ENUM_LABEL.RoleName;
 
 const cell: CSSProperties = {
   padding: '0.4rem 0.75rem',
@@ -48,6 +53,37 @@ export default function UserAdminPage() {
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
   const canLinkEmployee = hasPermission(user, 'employee.manage');
+  const canReadRoles = hasPermission(user, 'role.manage');
+
+  /**
+   * How a role is named on screen.
+   *
+   * The eleven seeded roles keep their translated labels — those are real Arabic
+   * copy the office did not write. A role an office DEFINES has no translation
+   * key and never will, so it falls back to the bilingual display names stored on
+   * the role itself, and finally to the machine name. That ordering is what lets
+   * a custom role appear here without making the legacy eleven suddenly render in
+   * English only.
+   *
+   * Declared inside the component so it closes over `t` and `isArabic` rather
+   * than taking them as parameters: `t` is typed to a union of every translation
+   * key, which no honest parameter type can restate.
+   */
+  const roleLabel = (entry: RoleCatalogueEntry): string => {
+    const key = ENUM_LABEL.RoleName[entry.name as LegacyRoleName];
+    if (key) return t(key);
+    return (isArabic ? entry.nameAr : entry.nameEn) || entry.name;
+  };
+
+  /** The same question for a bare name: a role a user holds when the caller
+   *  cannot read the catalogue (`GET /rbac/roles` needs `role.manage`), or one
+   *  removed since the grant was made. */
+  const roleLabelForName = (name: string): string => {
+    const entry = roleCatalogue.find((e) => e.name === name);
+    if (entry) return roleLabel(entry);
+    const key = ENUM_LABEL.RoleName[name as LegacyRoleName];
+    return key ? t(key) : name;
+  };
 
   const [rows, setRows] = useState<AdminUser[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -59,7 +95,11 @@ export default function UserAdminPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [roles, setRoles] = useState<RoleName[]>([]);
-  const [grantChoice, setGrantChoice] = useState<RoleName>(ROLE_NAMES[0]);
+  const [grantChoice, setGrantChoice] = useState<RoleName>('');
+  // The office's OWN catalogue, fetched rather than hard-coded — a custom role
+  // has to be offerable here or Phase 3 could create one this screen cannot
+  // grant.
+  const [roleCatalogue, setRoleCatalogue] = useState<RoleCatalogueEntry[]>([]);
   // Part II §4.2.2 — Department and Branch are required, and are deliberately
   // rendered as their own labelled dropdowns rather than folded in with Roles.
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
@@ -101,22 +141,28 @@ export default function UserAdminPage() {
     if (!user || !isAdmin) return;
     void (async () => {
       try {
-        const [depts, brs, emps] = await Promise.all([
+        const [depts, brs, emps, cat] = await Promise.all([
           listDepartments(),
           listBranches(),
           // Only when the caller can read it — GET /employees needs
           // employee.manage, and a 403 here would blank the other two.
           canLinkEmployee ? listEmployees() : Promise.resolve([]),
+          // Same shape of guard: GET /rbac/roles needs `role.manage`, which a
+          // holder of `user.manage` does not necessarily have.
+          canReadRoles ? listRoles() : Promise.resolve([]),
         ]);
         setDepartments(depts);
         setBranches(brs);
         setEmployees(emps);
+        setRoleCatalogue(cat);
+        // The grant dropdown's default is whatever the office actually has.
+        setGrantChoice((current) => current || (cat[0]?.name ?? ''));
       } catch {
         // The form's own error line covers a failed submit; an empty dropdown
         // is self-explanatory and must not blank the user list beside it.
       }
     })();
-  }, [user, isAdmin, canLinkEmployee, t]);
+  }, [user, isAdmin, canLinkEmployee, canReadRoles, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -276,9 +322,9 @@ export default function UserAdminPage() {
           </label>
           <fieldset style={{ border: '1px solid var(--border-subtle)', padding: '0.5rem' }}>
             <legend>{t('usrRoles')}</legend>
-            {ROLE_NAMES.map((role) => (
+            {roleCatalogue.map((entry) => (
               <label
-                key={role}
+                key={entry.id}
                 style={{
                   display: 'block',
                   fontWeight: 400,
@@ -287,10 +333,10 @@ export default function UserAdminPage() {
               >
                 <input
                   type="checkbox"
-                  checked={roles.includes(role)}
-                  onChange={() => toggleRole(role)}
+                  checked={roles.includes(entry.name)}
+                  onChange={() => toggleRole(entry.name)}
                 />{' '}
-                {role}
+                {roleLabel(entry)}
               </label>
             ))}
           </fieldset>
@@ -361,7 +407,7 @@ export default function UserAdminPage() {
                               key={role}
                               style={{ display: 'block', fontSize: '0.85rem' }}
                             >
-                              {t(ENUM_LABEL.RoleName[role])}
+                              {roleLabelForName(role)}
                               {isAdmin ? (
                                 <button
                                   type="button"
@@ -399,9 +445,9 @@ export default function UserAdminPage() {
                                 setGrantChoice(e.target.value as RoleName)
                               }
                             >
-                              {ROLE_NAMES.map((role) => (
-                                <option key={role} value={role}>
-                                  {t(ENUM_LABEL.RoleName[role])}
+                              {roleCatalogue.map((entry) => (
+                                <option key={entry.id} value={entry.name}>
+                                  {roleLabel(entry)}
                                 </option>
                               ))}
                             </select>

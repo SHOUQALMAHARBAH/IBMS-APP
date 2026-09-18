@@ -180,6 +180,30 @@ async function makeUserWithRoleId(
  * depends on knowing exactly who it'll be — scoped to these three roles
  * only, and only ever touches the (test-only) db-test database.
  */
+/** Provisioning requires a Department AND a Branch (Part II §4.2.2), created
+ *  through their own endpoints rather than inserted, so the only path an
+ *  administrator really has stays exercised. */
+async function orgUnitsFor(
+  app: INestApplication<App>,
+  accessToken: string,
+  tag: number,
+): Promise<{ departmentId: string; branchId: string }> {
+  const department = await request(app.getHttpServer())
+    .post('/admin/departments')
+    .set(bearer(accessToken))
+    .send({ name: `DTO Dept ${tag}`, nameAr: `قسم ${tag}` })
+    .expect(201);
+  const branch = await request(app.getHttpServer())
+    .post('/admin/branches')
+    .set(bearer(accessToken))
+    .send({ name: `DTO Branch ${tag}`, nameAr: `فرع ${tag}` })
+    .expect(201);
+  return {
+    departmentId: (department.body as { id: string }).id,
+    branchId: (branch.body as { id: string }).id,
+  };
+}
+
 async function resetReviewerPool(): Promise<void> {
   // Keyed on the PERMISSION since Phase 2, not on the three legacy role names.
   // A name-keyed reset would leave any custom reviewer role in the pool and make
@@ -267,6 +291,123 @@ describe('RBAC / access recertification (e2e)', () => {
         50,
       );
     });
+  });
+
+  describe('role names are free text, not the legacy enum', () => {
+    it('accepts a CUSTOM role name on provisioning and on a later grant', async () => {
+      // Phase 2 workstream H. `ProvisionUserDto` and `RoleAssignmentDto`
+      // validated `roles` against the legacy `RoleName` enum, so every custom
+      // name was rejected with a 400 before the service could look it up — Phase
+      // 3 could have created a role that no endpoint would assign.
+      const app = await boot();
+      const tag = Date.now();
+      const custom = await makeCustomRole(`Client Liaison ${tag}`, [
+        'lead.list.read',
+      ]);
+      const second = await makeCustomRole(`Renewals Desk ${tag}`, [
+        'renewal.read',
+      ]);
+      const admin = await makeUser(
+        app,
+        'dto-admin',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const orgUnits = await orgUnitsFor(app, admin.accessToken, tag);
+
+      try {
+        const provisioned = await request(app.getHttpServer())
+          .post('/admin/users')
+          .set(bearer(admin.accessToken))
+          .send({
+            fullName: 'Custom Role Holder',
+            email: uniqueEmail('custom-role-holder'),
+            password: PASSWORD,
+            departmentId: orgUnits.departmentId,
+            branchId: orgUnits.branchId,
+            roles: [`Client Liaison ${tag}`],
+          })
+          .expect(201);
+        const provisionedId = (provisioned.body as { id: string }).id;
+        expect((provisioned.body as { roles: string[] }).roles).toEqual([
+          `Client Liaison ${tag}`,
+        ]);
+
+        // And a second custom role granted afterwards, through the other DTO.
+        const granted = await request(app.getHttpServer())
+          .post(`/admin/users/${provisionedId}/roles`)
+          .set(bearer(admin.accessToken))
+          .send({ role: `Renewals Desk ${tag}` })
+          .expect(201);
+        expect((granted.body as { roles: string[] }).roles.sort()).toEqual(
+          [`Client Liaison ${tag}`, `Renewals Desk ${tag}`].sort(),
+        );
+      } finally {
+        const ids = [custom.id, second.id];
+        await prisma.userRoleAssignment.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.rolePermission.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.role.deleteMany({ where: { id: { in: ids } } });
+      }
+    }, 300_000);
+
+    it('rejects an UNKNOWN role with 422, not 400 — the lookup decides, not the validator', async () => {
+      // The distinction matters: 400 means "this could never be a role name",
+      // which is no longer something a validator can know. 422 means "no such
+      // role in THIS office", which is the scoped lookup answering — and that
+      // scoping is what stops one office probing another's role names.
+      const app = await boot();
+      const tag = Date.now();
+      const admin = await makeUser(
+        app,
+        'dto-admin-unknown',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const target = await makeUser(app, 'dto-target');
+
+      await request(app.getHttpServer())
+        .post(`/admin/users/${target.userId}/roles`)
+        .set(bearer(admin.accessToken))
+        .send({ role: `No Such Role ${tag}` })
+        .expect(422);
+
+      const orgUnits = await orgUnitsFor(app, admin.accessToken, tag);
+      await request(app.getHttpServer())
+        .post('/admin/users')
+        .set(bearer(admin.accessToken))
+        .send({
+          fullName: 'Unknown Role',
+          email: uniqueEmail('unknown-role'),
+          password: PASSWORD,
+          departmentId: orgUnits.departmentId,
+          branchId: orgUnits.branchId,
+          roles: [`No Such Role ${tag}`],
+        })
+        .expect(422);
+    }, 300_000);
+
+    it('still rejects a malformed name with 400 — the shape is bounded even though the vocabulary is not', async () => {
+      // Relaxing the vocabulary is not the same as accepting anything. These
+      // values reach audit rows and log lines, so an empty name, an
+      // over-long one, and one carrying a control character are all still 400.
+      const app = await boot();
+      const admin = await makeUser(
+        app,
+        'dto-admin-malformed',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const target = await makeUser(app, 'dto-target-malformed');
+
+      for (const role of ['', 'x'.repeat(101), 'Bad\nName']) {
+        await request(app.getHttpServer())
+          .post(`/admin/users/${target.userId}/roles`)
+          .set(bearer(admin.accessToken))
+          .send({ role })
+          .expect(400);
+      }
+    }, 300_000);
   });
 
   describe('access-recertification cycle lifecycle', () => {

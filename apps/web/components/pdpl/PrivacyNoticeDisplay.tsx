@@ -12,13 +12,6 @@ import { ApiError } from '../../lib/auth/api-client';
 // capture. Claims and Group Medical/Life & Motor Fleet remain the SAME
 // documented gap Consent already has — no web UI/CRUD exists for either
 // yet, so there is nowhere for a display widget to mount.
-const NOTICE_READ_ROLES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'CLAIMS_OFFICER',
-  'DATA_PROTECTION_OFFICER',
-  'COMPLIANCE_OFFICER',
-];
 
 interface Props {
   touchpoint: string;
@@ -84,5 +77,3 @@ export function PrivacyNoticeDisplay({ touchpoint, canRead }: Props) {
     </section>
   );
 }
-
-export { NOTICE_READ_ROLES };
