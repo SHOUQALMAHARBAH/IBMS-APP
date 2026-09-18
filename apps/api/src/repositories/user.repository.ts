@@ -9,6 +9,13 @@ import { OrgContextService } from '../common/org-context/org-context.service';
 export interface RoleRef {
   id: string;
   name: string;
+  /** Part II §4.4 — this role never skips the MFA prompt. A column on `Role`,
+   *  strict by default, because the list of role NAMES it replaced matched no
+   *  custom role and therefore failed OPEN. See `roleSecurityAttributes`. */
+  requiresMfaAlways: boolean;
+  /** Part 10.1 — this role is flagged for the WebAuthn hardware-token
+   *  requirement. Same shape, same reason. */
+  requiresHardwareToken: boolean;
 }
 
 @Injectable()
@@ -155,9 +162,20 @@ export class UserRepository {
   async getRoleRefs(userId: string): Promise<RoleRef[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { userId, revokedAt: null },
-      select: { role: { select: { id: true, name: true } } },
+      // The two security attributes ride along on a join that already existed,
+      // so resolving them costs no extra query.
+      select: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            requiresMfaAlways: true,
+            requiresHardwareToken: true,
+          },
+        },
+      },
     });
-    return assignments.map((a) => ({ id: a.role.id, name: a.role.name }));
+    return assignments.map((a) => a.role);
   }
 
   async getRoleNames(userId: string): Promise<string[]> {

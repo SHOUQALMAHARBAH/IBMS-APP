@@ -668,7 +668,7 @@ model SecurityConfig {
 /// offices reuse a name. See `PermissionRepository.findCodesForRoles` and
 /// `PermissionsService`, both of which key on id for this reason.
 model Role {
-  id             String       @id @default(uuid())
+  id                    String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   ///
@@ -676,19 +676,35 @@ model Role {
   /// scoping at all: `TENANT_SCOPED_MODELS` is derived from the DMMF as
   /// "every model carrying an organizationId", so the extension picks this up
   /// automatically with no change to the isolation code itself.
-  organizationId String       @default(dbgenerated())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
   /// Free text, not an enum. Was `RoleName` until office-scoped custom roles
   /// landed; the legacy 11 survive as ordinary per-office rows carrying their
   /// old machine name.
-  name           String
+  name                  String
   /// Display names. Arabic is this system's primary language, so a role that
   /// exists only in Latin script shows up untranslated mid-sentence on an
   /// Arabic page.
-  nameAr         String
-  nameEn         String
-  description    String?
-  createdAt      DateTime     @default(now())
+  nameAr                String
+  nameEn                String
+  description           String?
+  /// Part II §4.4 — this role never skips the MFA prompt, trusted device or
+  /// not. A SECURITY ATTRIBUTE of the role, deliberately not a permission:
+  /// a permission can be revoked from the Role screen, which would let an
+  /// administrator switch the control off from the very UI this project adds.
+  ///
+  /// Defaults to the STRICT value so a role an office invents is strict until
+  /// someone deliberately relaxes it. The pre-custom-roles code answered this
+  /// question from a hard-coded list of role NAMES (`ALWAYS_MFA_ROLES`), which
+  /// matched no custom role and therefore handed it the exemption the list
+  /// existed to deny — the control failed OPEN.
+  requiresMfaAlways     Boolean      @default(true)
+  /// Part 10.1 — this role must present a hardware-token factor once WebAuthn
+  /// ships. Same reasoning, same default, same fail-open history
+  /// (`PRIVILEGED_ROLES`). Surfaced to the client as `mfaPolicySatisfied`; it
+  /// has never blocked a login and still does not.
+  requiresHardwareToken Boolean      @default(true)
+  createdAt             DateTime     @default(now())
 
   users       UserRoleAssignment[]
   permissions RolePermission[]
