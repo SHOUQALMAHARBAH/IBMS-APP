@@ -31,6 +31,13 @@ export interface RoleSeed {
   requiresHardwareToken: boolean;
 }
 
+/** Every role in this file is one the PLATFORM defines, so all eleven are
+ *  `isSystem` — the Role screen refuses to rename, retire or re-grant them. That
+ *  flag GRANTS NOTHING; it is read by the CRUD guards and by nothing else.
+ *  Written here rather than per-row because there is no seeded role for which it
+ *  is false, and a per-row field would invite one. */
+export const SEEDED_ROLES_ARE_SYSTEM = true;
+
 export const ROLES: RoleSeed[] = [
   {
     name: RoleName.SALES_RELATIONSHIP_OFFICER,

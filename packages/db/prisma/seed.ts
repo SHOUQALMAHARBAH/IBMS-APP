@@ -1,6 +1,6 @@
 import { PrismaClient, RoleName } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { ROLES } from "./seed-data/roles";
+import { ROLES, SEEDED_ROLES_ARE_SYSTEM } from "./seed-data/roles";
 import { PERMISSIONS } from "./seed-data/permissions";
 import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
@@ -543,6 +543,12 @@ async function main() {
         // migrated before this seed ran disagreeing with a freshly seeded one.
         requiresMfaAlways: role.requiresMfaAlways,
         requiresHardwareToken: role.requiresHardwareToken,
+        // Written on the update path too: a database migrated before this seed
+        // ran must end up agreeing with a freshly seeded one, and `isSystem`
+        // defaults to FALSE on the column (an office's own roles are the common
+        // case), so omitting it here would leave the legacy eleven editable on a
+        // seeded-from-empty database.
+        isSystem: SEEDED_ROLES_ARE_SYSTEM,
       },
       create: {
         organizationId: DEFAULT_ORGANIZATION_ID,
@@ -552,6 +558,7 @@ async function main() {
         description: role.description,
         requiresMfaAlways: role.requiresMfaAlways,
         requiresHardwareToken: role.requiresHardwareToken,
+        isSystem: SEEDED_ROLES_ARE_SYSTEM,
       },
     });
   }

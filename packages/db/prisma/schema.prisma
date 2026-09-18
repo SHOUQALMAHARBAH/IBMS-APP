@@ -340,6 +340,15 @@ model Organization {
   vendors                         Vendor[]
 }
 
+/// Whether a Role still grants anything. Retirement rather than deletion — see
+/// the comment on `Role.status` for why there is no delete.
+enum RoleStatus {
+  ACTIVE
+  /// Retired. Keeps its history and its name (so an audit row still reads
+  /// correctly) and grants nothing.
+  INACTIVE
+}
+
 enum OrgStatus {
   ACTIVE
   /// e.g. non-payment — blocks login, data retained.
@@ -704,6 +713,32 @@ model Role {
   /// (`PRIVILEGED_ROLES`). Surfaced to the client as `mfaPolicySatisfied`; it
   /// has never blocked a login and still does not.
   requiresHardwareToken Boolean      @default(true)
+  /// Whether this role still grants anything.
+  ///
+  /// An office RETIRES a role rather than deleting it: `UserRoleAssignment` and
+  /// `RolePermission` both point here, and those rows ARE the record of who held
+  /// what and when — which `UserRoleAssignment.revokedAt` exists to preserve. So
+  /// there is no `DELETE /rbac/roles/:id`, only this.
+  ///
+  /// INACTIVE has to be enforced in every query that DECIDES access, not just on
+  /// the screen. `PermissionRepository.findCodesForRoles` is the authorization
+  /// path; `UserRepository.findActiveHoldersOfPermission` and
+  /// `roleGrantsPermission` are what the last-administrator lockout guard counts.
+  /// A retired role that still satisfied those would keep granting everything it
+  /// ever granted — and would let an office retire its only administrator role
+  /// and then revoke the grant, with the guard waving both through because it
+  /// still saw a "surviving" holder.
+  status                RoleStatus   @default(ACTIVE)
+  /// A role the PLATFORM defines rather than the office: the eleven converted
+  /// legacy rows and `OFFICE_ADMINISTRATOR`.
+  ///
+  /// ⚠️ GRANTS NOTHING. Read by the Role CRUD guards — which refuse to rename,
+  /// retire or re-grant one of these — and by nothing else. Authorization never
+  /// reads it. A flag called "system" on a Role is exactly where an
+  /// `if (isSystem) allow` bypass would be smuggled in, so there is a test whose
+  /// only job is to prove a user holding an isSystem role with no permissions
+  /// reaches nothing.
+  isSystem              Boolean      @default(false)
   createdAt             DateTime     @default(now())
 
   users       UserRoleAssignment[]
