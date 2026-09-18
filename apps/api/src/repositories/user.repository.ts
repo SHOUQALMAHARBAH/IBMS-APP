@@ -161,7 +161,16 @@ export class UserRepository {
    */
   async getRoleRefs(userId: string): Promise<RoleRef[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
-      where: { userId, revokedAt: null },
+      // ACTIVE roles only. A retired role is filtered out of the SESSION
+      // entirely, not just out of `findCodesForRoles` — so it contributes no
+      // permissions (defence in depth, since the id never reaches the permission
+      // lookup) and does not appear in `/auth/me`'s `roles` either.
+      //
+      // The alternative — leaving it visible for honesty — was considered and
+      // rejected: a role listed on the caller's own profile that grants nothing is
+      // more confusing than absent, and the unified User/Employee screen is where
+      // a retired grant is shown, with its status, to whoever administers it.
+      where: { userId, revokedAt: null, role: { status: 'ACTIVE' } },
       // The two security attributes ride along on a join that already existed,
       // so resolving them costs no extra query.
       select: {
@@ -471,7 +480,13 @@ export class UserRepository {
     now = new Date(),
   ): Promise<{ userId: string; roleId: string }[]> {
     const grants = await this.prisma.client.rolePermission.findMany({
-      where: { permission: { code } },
+      // A RETIRED role is not a holder. Without this the last-administrator guard
+      // would count a role the office has already retired as a survivor — so an
+      // office could retire its only administrator role and then revoke the
+      // grant, and the guard would wave both through because it still saw
+      // somebody holding `user.manage`. That is the lockout the guard exists to
+      // prevent, reached by two steps that each look safe.
+      where: { permission: { code }, role: { status: 'ACTIVE' } },
       select: { roleId: true },
     });
     if (grants.length === 0) return [];
@@ -506,7 +521,9 @@ export class UserRepository {
    *  an administrator role?", which a name comparison used to answer. */
   async roleGrantsPermission(roleId: string, code: string): Promise<boolean> {
     const grant = await this.prisma.client.rolePermission.findFirst({
-      where: { roleId, permission: { code } },
+      // ACTIVE only, for the same reason as the holder read above: this decides
+      // whether the lockout guard runs at all, and a retired role grants nothing.
+      where: { roleId, permission: { code }, role: { status: 'ACTIVE' } },
       select: { roleId: true },
     });
     return grant !== null;

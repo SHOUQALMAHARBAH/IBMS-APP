@@ -49,7 +49,10 @@ export class RoleRepository {
    */
   async findActiveUserIdsWithPermission(code: string): Promise<string[]> {
     const grants = await this.prisma.client.rolePermission.findMany({
-      where: { permission: { code } },
+      // ACTIVE only: a recertification reviewer pool or an administrator-subject
+      // report built from a retired role would name people who can no longer do
+      // the thing the report is about.
+      where: { permission: { code }, role: { status: 'ACTIVE' } },
       select: { roleId: true },
     });
     if (grants.length === 0) return [];

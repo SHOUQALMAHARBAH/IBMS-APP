@@ -40,11 +40,27 @@ export class PermissionRepository {
    *
    * Callers must source the ids from the actor's own `UserRoleAssignment` rows
    * (which are themselves tenant-scoped), never from client input.
+   *
+   * ---------------------------------------------------------------------------
+   * A RETIRED ROLE GRANTS NOTHING, AND THIS IS WHERE THAT IS TRUE
+   * ---------------------------------------------------------------------------
+   * `Role.status` is not a screen affordance. This method is the authorization
+   * path — every `@RequirePermissions` gate and every cross-owner visibility rule
+   * resolves through it — so an INACTIVE role that still matched here would keep
+   * granting everything it ever granted, and retiring a role would be a button
+   * that appears to work and does nothing.
+   *
+   * The status filter is a NESTED relation clause, which `tenantScopeExtension`
+   * does not rewrite. That is safe here rather than lucky: the top-level
+   * `RolePermission` read is already org-scoped by the extension, and Phase 1's
+   * composite FK `(roleId, organizationId)` -> `Role(id, organizationId)` makes it
+   * impossible for a grant to point at another office's role, so the join cannot
+   * reach outside the caller's own office to find an ACTIVE row.
    */
   async findCodesForRoles(roleIds: string[]): Promise<string[]> {
     if (roleIds.length === 0) return [];
     const links = await this.prisma.client.rolePermission.findMany({
-      where: { roleId: { in: roleIds } },
+      where: { roleId: { in: roleIds }, role: { status: 'ACTIVE' } },
       select: { permission: { select: { code: true } } },
     });
     return [...new Set(links.map((l) => l.permission.code))];
