@@ -7,8 +7,8 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
-  Matches,
 } from 'class-validator';
 
 /**
@@ -73,26 +73,20 @@ export class ProvisionUserDto {
    * At least one role — provisioning a zero-role account is exactly the
    * unusable state this endpoint exists to avoid.
    *
-   * Names, validated as bounded strings rather than against the legacy
-   * `RoleName` enum: an office defines its own roles, and `@IsEnum` rejected
-   * every custom name with a 400 before the service could even look it up. The
-   * service resolves each name inside the caller's own office and answers 422
-   * for anything unknown, which is both the real check and what stops one
-   * office probing another's role names.
+   * Role IDS, not names. A name is unique only within an office and an office
+   * can edit it, so it is not an identity; see `RoleAssignmentDto` for the
+   * rename-mid-request race that removes. The service resolves every id on the
+   * tenant-scoped client and answers 422 if any is unknown, which is both the
+   * real check and what keeps one office from probing another's roles.
    *
-   * `ArrayMaxSize` is a sanity bound on one request, no longer "the size of the
+   * `ArrayMaxSize` is a sanity bound on one request, not "the size of the
    * catalogue" — an office may define more than eleven roles.
    */
   @IsArray()
   @ArrayNotEmpty()
   @ArrayMaxSize(50)
-  @IsString({ each: true })
-  @Length(1, 100, { each: true })
-  @Matches(/^[^\p{C}]+$/u, {
-    each: true,
-    message: 'each role must not contain control characters',
-  })
-  roles!: string[];
+  @IsUUID('4', { each: true })
+  roleIds!: string[];
 
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window.
    * `AuthService.assertAccessWindowActive` enforces both bounds at login. */

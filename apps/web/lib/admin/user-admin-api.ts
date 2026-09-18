@@ -16,7 +16,7 @@ import { apiGet, apiPost } from '../auth/api-client';
 export type RoleName = string;
 
 /** One role as the catalogue returns it, with the display names an office edits.
- *  `GET /rbac/roles` needs `role.manage`. */
+ *  `GET /rbac/roles` needs `role.read`. */
 export interface RoleCatalogueEntry {
   id: string;
   name: string;
@@ -40,7 +40,10 @@ export interface AdminUser {
   accessValidFrom: string | null;
   accessValidUntil: string | null;
   createdAt: string;
-  roles: RoleName[];
+  /** Id AND name. The id is what a revoke addresses; the name is what the table
+   *  shows. Matching a displayed name back to an id in the browser is exactly
+   *  the habit the id-addressed API removes. */
+  roles: { id: string; name: RoleName }[];
 }
 
 /** Part II §4.2.2 — a Branch or a Department, as the provisioning form's two
@@ -66,7 +69,9 @@ export interface ProvisionUserInput {
    *  linked, that record's four-part official name becomes the display name
    *  everywhere, and this free-text `fullName` stops being shown. */
   employeeId?: string;
-  roles: RoleName[];
+  /** Role IDS. A name is unique only within an office and an office can edit it,
+   *  so it is not an identity — see the API's `RoleAssignmentDto`. */
+  roleIds: string[];
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window. */
   accessValidFrom?: string;
   accessValidUntil?: string;
@@ -106,19 +111,21 @@ export function createBranch(input: {
 
 export function grantRole(
   userId: string,
-  role: RoleName,
+  roleId: string,
 ): Promise<{ userId: string; roles: RoleName[] }> {
-  return apiPost(`/admin/users/${encodeURIComponent(userId)}/roles`, { role });
+  return apiPost(`/admin/users/${encodeURIComponent(userId)}/roles`, {
+    roleId,
+  });
 }
 
 /** A POST, not a DELETE — the grant row is never deleted, only stamped
  * `revokedAt`, so the audit record of when access was withdrawn survives. */
 export function revokeRole(
   userId: string,
-  role: RoleName,
+  roleId: string,
 ): Promise<{ userId: string; roles: RoleName[] }> {
   return apiPost(`/admin/users/${encodeURIComponent(userId)}/roles/revoke`, {
-    role,
+    roleId,
   });
 }
 

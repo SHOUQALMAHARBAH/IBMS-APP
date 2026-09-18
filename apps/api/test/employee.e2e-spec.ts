@@ -456,7 +456,7 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
           password: 'Another-Correct-Horse-7!',
           departmentId,
           branchId,
-          roles: ['SALES_RELATIONSHIP_OFFICER'],
+          roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
         })
         .expect(201);
       return (res.body as { id: string }).id;

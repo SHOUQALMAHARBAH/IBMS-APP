@@ -54,7 +54,10 @@ export interface AdminUserView {
   accessValidFrom: string | null;
   accessValidUntil: string | null;
   createdAt: string;
-  roles: string[];
+  /** Id AND name. The id is what a grant or revoke addresses; the name is what a
+   *  person reads. Returning names alone forced the client to match text back to
+   *  an id, which is the habit this phase removes. */
+  roles: { id: string; name: string }[];
 }
 
 /**
@@ -123,12 +126,16 @@ export class UserAdminService {
 
     // De-duplicate before resolving so ["SALES","SALES"] does not become two
     // `UserRoleAssignment` creates and trip the @@unique inside our own write.
-    const requested = [...new Set(dto.roles)];
-    const roles = await this.users.findRolesByNames(requested);
+    const requested = [...new Set(dto.roleIds)];
+    const roles = await this.users.findRolesByIds(requested);
     if (roles.length !== requested.length) {
-      const found = new Set(roles.map((r) => r.name));
+      const found = new Set(roles.map((r) => r.id));
       throw new UnprocessableEntityException(
-        `Unknown role(s): ${requested.filter((r) => !found.has(r)).join(', ')}. Run \`npm run db:seed\` to install the 11-role catalogue.`,
+        `Unknown role id(s): ${requested
+          .filter((id) => !found.has(id))
+          .join(
+            ', ',
+          )}. A role id belongs to one office; an id from another office reads as unknown here, which is deliberate.`,
       );
     }
 
@@ -232,7 +239,7 @@ export class UserAdminService {
         userId: user.id,
         email: user.email,
         fullName: user.fullName,
-        roles: requested,
+        roleIds: requested,
         // §4.2.4 names these explicitly — "who created, for whom, which
         // role(s), WHICH DEPARTMENT/BRANCH, which Organization". Both ids and
         // both names: an id alone is unreadable in an audit export years
@@ -273,23 +280,24 @@ export class UserAdminService {
       accessValidFrom: user.accessValidFrom?.toISOString() ?? null,
       accessValidUntil: user.accessValidUntil?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
-      roles: requested,
+      roles: roles.map((role) => ({ id: role.id, name: role.name })),
     };
   }
 
   async grantRole(
     userId: string,
-    roleName: string,
+    roleId: string,
     actorUserId: string,
-  ): Promise<{ userId: string; roles: string[] }> {
+  ): Promise<{ userId: string; roles: { id: string; name: string }[] }> {
     const user = await this.users.findById(userId);
     if (!user) throw new NotFoundException(`User ${userId} not found.`);
 
-    const role = await this.users.findRoleByName(roleName);
+    // By ID. The lookup is tenant-scoped, so another office's role id resolves
+    // to nothing and gets the same answer an id that never existed gets —
+    // which is what stops this endpoint being a probe.
+    const role = await this.users.findRoleById(roleId);
     if (!role) {
-      throw new UnprocessableEntityException(
-        `Unknown role ${roleName}. Run \`npm run db:seed\` to install the 11-role catalogue.`,
-      );
+      throw new UnprocessableEntityException(`Unknown role id ${roleId}.`);
     }
 
     await this.users.grantRole(userId, role.id);
@@ -298,7 +306,9 @@ export class UserAdminService {
       action: 'UPDATE',
       entityType: 'UserRoleAssignment',
       entityId: `${userId}:${role.id}`,
-      afterValue: { userId, role: roleName, granted: true },
+      // Both: the id is the identity, the name is what a human reading the audit
+      // trail recognises — and a later rename must not rewrite history.
+      afterValue: { userId, roleId: role.id, role: role.name, granted: true },
     });
 
     await this.recordSegregationSignal(
@@ -313,20 +323,23 @@ export class UserAdminService {
     // The permission grid is cached for 60s per role-combination; an admin
     // must not have to wait out the TTL to see their own grant take effect.
     this.permissions.invalidateCache();
-    return { userId, roles: await this.users.getRoleNames(userId) };
+    // The same `{ id, name }` shape `AdminUserView.roles` uses: one answer to
+    // "what roles does this user hold" across every response on this surface,
+    // rather than names here and objects there.
+    return { userId, roles: await this.heldRoles(userId) };
   }
 
   async revokeRole(
     userId: string,
-    roleName: string,
+    roleId: string,
     actorUserId: string,
-  ): Promise<{ userId: string; roles: string[] }> {
+  ): Promise<{ userId: string; roles: { id: string; name: string }[] }> {
     const user = await this.users.findById(userId);
     if (!user) throw new NotFoundException(`User ${userId} not found.`);
 
-    const role = await this.users.findRoleByName(roleName);
+    const role = await this.users.findRoleById(roleId);
     if (!role) {
-      throw new UnprocessableEntityException(`Unknown role ${roleName}.`);
+      throw new UnprocessableEntityException(`Unknown role id ${roleId}.`);
     }
 
     // Lockout guard: `user.manage` is what grants roles back, so removing the
@@ -375,7 +388,7 @@ export class UserAdminService {
       : await this.users.revokeRole(userId, role.id);
     if (revoked === 0) {
       throw new ConflictException(
-        `User ${userId} does not hold an active ${roleName} grant.`,
+        `User ${userId} does not hold an active ${role.name} grant.`,
       );
     }
 
@@ -384,10 +397,13 @@ export class UserAdminService {
       action: 'UPDATE',
       entityType: 'UserRoleAssignment',
       entityId: `${userId}:${role.id}`,
-      afterValue: { userId, role: roleName, granted: false },
+      afterValue: { userId, roleId: role.id, role: role.name, granted: false },
     });
     this.permissions.invalidateCache();
-    return { userId, roles: await this.users.getRoleNames(userId) };
+    // The same `{ id, name }` shape `AdminUserView.roles` uses: one answer to
+    // "what roles does this user hold" across every response on this surface,
+    // rather than names here and objects there.
+    return { userId, roles: await this.heldRoles(userId) };
   }
 
   /** Backlog A.1/#66 — de-provisioning. `AuthService.login` refuses an
@@ -454,6 +470,15 @@ export class UserAdminService {
       afterValue: { isActive },
     });
     return { userId, isActive };
+  }
+
+  /** A user's active roles as `{ id, name }` — the id is what a later grant or
+   *  revoke addresses, the name is what a person reads. */
+  private async heldRoles(
+    userId: string,
+  ): Promise<{ id: string; name: string }[]> {
+    const refs = await this.users.getRoleRefs(userId);
+    return refs.map((ref) => ({ id: ref.id, name: ref.name }));
   }
 
   /**
@@ -557,7 +582,7 @@ function toAdminUserView(row: {
   accessValidFrom: Date | null;
   accessValidUntil: Date | null;
   createdAt: Date;
-  roles: string[];
+  roles: { id: string; name: string }[];
   employee?: { fullName: string } | null;
 }): AdminUserView {
   return {

@@ -1,25 +1,28 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsUUID } from 'class-validator';
 
 /**
- * Backlog A.2 — grant or revoke a single role, addressed by NAME.
+ * Backlog A.2 — grant or revoke a single role, addressed by ID.
  *
- * Validated as a bounded string, not against the legacy `RoleName` enum.
- * Office-scoped custom roles make a role name free text an office chooses, and
- * `@IsEnum(RoleName)` rejected every one of them with a 400 — so Phase 3 could
- * have created a role that no endpoint would assign. The real check is
- * `UserAdminService`'s own lookup, which resolves the name inside the caller's
- * office and answers 422 for anything it does not find; that is also what keeps
- * one office from probing another's role names, since the lookup is scoped.
+ * ## Why an id and not a name
  *
- * `Matches` bounds the shape rather than the vocabulary: printable characters,
- * no control characters or newlines, because this value is echoed into audit
- * rows and log lines.
+ * A role name is unique only WITHIN an office, so a name is not an identity —
+ * the same reasoning that made `PermissionRepository.findCodesForRoles` take
+ * ids in Phase 1. Addressing by name was not a security hole here (the lookup
+ * was office-scoped, so a name from another office simply resolved to nothing),
+ * but it left a real rename-mid-request race: an administrator renaming a role
+ * between the client rendering the list and submitting the grant would get a
+ * 422 for a role that exists, or — worse, once an office reuses a freed name —
+ * a grant of the wrong role. A uuid cannot drift.
+ *
+ * It also removes the last place in this API where something
+ * security-relevant is addressed by a name an office can edit.
+ *
+ * The id is validated as a uuid, but `UserAdminService` is what decides whether
+ * it EXISTS: the lookup runs on the tenant-scoped client, so another office's
+ * role id resolves to nothing and answers 422 — indistinguishable from an id
+ * that never existed, which is what stops one office probing another's roles.
  */
 export class RoleAssignmentDto {
-  @IsString()
-  @Length(1, 100)
-  @Matches(/^[^\p{C}]+$/u, {
-    message: 'role must not contain control characters',
-  })
-  role!: string;
+  @IsUUID()
+  roleId!: string;
 }

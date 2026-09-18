@@ -42,17 +42,19 @@ export class RbacController {
     private readonly permissions: PermissionRepository,
   ) {}
 
-  @RequirePermissions('role.manage')
+  // `role.read`, not `role.manage`: this reads the catalogue. `role.manage` now
+  // means changing it, and Phase 3's CRUD is what will carry that.
+  @RequirePermissions('role.read')
   @Get('roles')
   @ApiOkResponse({
-    description: 'The 11-role catalogue.',
+    description: "The office's own role catalogue.",
     schema: roleListSchema,
   })
   listRoles() {
     return this.roles.findAll();
   }
 
-  @RequirePermissions('permission.manage')
+  @RequirePermissions('permission.read')
   @Get('permissions')
   @ApiOkResponse({
     description: 'The full permission grid.',

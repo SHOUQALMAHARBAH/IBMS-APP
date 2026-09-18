@@ -28,15 +28,38 @@ const SALES_ROLE = {
   name: RoleName.SALES_RELATIONSHIP_OFFICER,
   description: null,
 };
+const COMPLIANCE_ROLE = {
+  id: 'role-compliance',
+  name: RoleName.COMPLIANCE_OFFICER,
+  description: null,
+};
+const FINANCE_ROLE = {
+  id: 'role-finance',
+  name: RoleName.FINANCE_COLLECTIONS_OFFICER,
+  description: null,
+};
+const AUDITOR_ROLE = {
+  id: 'role-auditor',
+  name: RoleName.EXTERNAL_AUDITOR,
+  description: null,
+};
+const DPO_ROLE = {
+  id: 'role-dpo',
+  name: RoleName.DATA_PROTECTION_OFFICER,
+  description: null,
+};
 
 function makeDeps(over: Record<string, unknown> = {}) {
   const users = {
     findById: vi.fn().mockResolvedValue({ id: 'u-1' }),
-    findRoleByName: vi.fn().mockResolvedValue(SALES_ROLE),
-    findRolesByNames: vi.fn().mockResolvedValue([SALES_ROLE]),
-    getRoleNames: vi
-      .fn()
-      .mockResolvedValue([RoleName.SALES_RELATIONSHIP_OFFICER]),
+    // By ID since the Phase 3 prep step: a role name is unique only within an
+    // office and an office can edit it, so it was never an identity.
+    findRoleById: vi.fn().mockResolvedValue(SALES_ROLE),
+    findRolesByIds: vi.fn().mockResolvedValue([SALES_ROLE]),
+    // `getRoleRefs`, not `getRoleNames`: every response on this surface returns
+    // a user's roles as `{ id, name }` since the Phase 3 prep step, because the
+    // id is what a later grant or revoke addresses.
+    getRoleRefs: vi.fn().mockResolvedValue([SALES_ROLE]),
     grantRole: vi.fn().mockResolvedValue({ id: 'ura-1' }),
     revokeRole: vi.fn().mockResolvedValue(1),
     setActive: vi.fn().mockResolvedValue(1),
@@ -134,7 +157,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         password: 'Sup3rSecret!Pass',
         departmentId: 'dept-1',
         branchId: 'branch-1',
-        roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+        roleIds: [SALES_ROLE.id],
       },
       actor.id,
     );
@@ -142,7 +165,12 @@ describe('UserAdminService.provision (backlog A.2)', () => {
     expect(deps.users.provision).toHaveBeenCalledWith(
       expect.objectContaining({ roleIds: ['role-sales'] }),
     );
-    expect(view.roles).toEqual([RoleName.SALES_RELATIONSHIP_OFFICER]);
+    // Id AND name: the id is what a later revoke addresses, the name is what the
+    // screen shows. Returning names alone made the client match text back to an
+    // id, which is the habit this step removes.
+    expect(view.roles).toEqual([
+      { id: SALES_ROLE.id, name: RoleName.SALES_RELATIONSHIP_OFFICER },
+    ]);
   });
 
   it('never lets the password or its hash reach the audit trail', async () => {
@@ -154,7 +182,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         password: 'Sup3rSecret!Pass',
         departmentId: 'dept-1',
         branchId: 'branch-1',
-        roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+        roleIds: [SALES_ROLE.id],
       },
       actor.id,
     );
@@ -172,7 +200,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         password: 'Sup3rSecret!Pass',
         departmentId: 'dept-1',
         branchId: 'branch-1',
-        roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+        roleIds: [SALES_ROLE.id],
       },
       actor.id,
     );
@@ -214,7 +242,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           password: 'Sup3rSecret!Pass',
           departmentId: 'dept-1',
           branchId: 'another-office-branch',
-          roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+          roleIds: [SALES_ROLE.id],
         },
         actor.id,
       ),
@@ -231,7 +259,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         password: 'Sup3rSecret!Pass',
         departmentId: 'dept-1',
         branchId: 'branch-1',
-        roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+        roleIds: [SALES_ROLE.id],
       },
       actor.id,
     );
@@ -252,7 +280,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           password: 'weak',
           departmentId: 'dept-1',
           branchId: 'branch-1',
-          roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+          roleIds: [SALES_ROLE.id],
         },
         actor.id,
       ),
@@ -269,10 +297,8 @@ describe('UserAdminService.provision (backlog A.2)', () => {
         password: 'Sup3rSecret!Pass',
         departmentId: 'dept-1',
         branchId: 'branch-1',
-        roles: [
-          RoleName.SALES_RELATIONSHIP_OFFICER,
-          RoleName.SALES_RELATIONSHIP_OFFICER,
-        ],
+        // The same id twice — deduplicated before the lookup.
+        roleIds: [SALES_ROLE.id, SALES_ROLE.id],
       },
       actor.id,
     );
@@ -283,7 +309,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
 
   it('422s a role that is not in the seeded catalogue', async () => {
     const deps = makeDeps({
-      users: { findRolesByNames: vi.fn().mockResolvedValue([]) },
+      users: { findRolesByIds: vi.fn().mockResolvedValue([]) },
     });
     await expect(
       deps.service.provision(
@@ -293,7 +319,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           password: 'Sup3rSecret!Pass',
           departmentId: 'dept-1',
           branchId: 'branch-1',
-          roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+          roleIds: [SALES_ROLE.id],
         },
         actor.id,
       ),
@@ -310,7 +336,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           password: 'Sup3rSecret!Pass',
           departmentId: 'dept-1',
           branchId: 'branch-1',
-          roles: [RoleName.EXTERNAL_AUDITOR],
+          roleIds: [AUDITOR_ROLE.id],
           accessValidFrom: '2026-10-01T00:00:00.000Z',
           accessValidUntil: '2026-09-01T00:00:00.000Z',
         },
@@ -338,7 +364,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
           password: 'Sup3rSecret!Pass',
           departmentId: 'dept-1',
           branchId: 'branch-1',
-          roles: [RoleName.SALES_RELATIONSHIP_OFFICER],
+          roleIds: [SALES_ROLE.id],
         },
         actor.id,
       ),
@@ -349,11 +375,7 @@ describe('UserAdminService.provision (backlog A.2)', () => {
 describe('UserAdminService role assignment', () => {
   it('grants a role and invalidates the permission cache so it takes effect at once', async () => {
     const deps = makeDeps();
-    await deps.service.grantRole(
-      'u-1',
-      RoleName.SALES_RELATIONSHIP_OFFICER,
-      actor.id,
-    );
+    await deps.service.grantRole('u-1', SALES_ROLE.id, actor.id);
     expect(deps.users.grantRole).toHaveBeenCalledWith('u-1', 'role-sales');
     expect(deps.permissions.invalidateCache).toHaveBeenCalled();
   });
@@ -363,11 +385,7 @@ describe('UserAdminService role assignment', () => {
       users: { findById: vi.fn().mockResolvedValue(null) },
     });
     await expect(
-      deps.service.grantRole(
-        'nope',
-        RoleName.SALES_RELATIONSHIP_OFFICER,
-        actor.id,
-      ),
+      deps.service.grantRole('nope', SALES_ROLE.id, actor.id),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -376,18 +394,14 @@ describe('UserAdminService role assignment', () => {
       users: { revokeRole: vi.fn().mockResolvedValue(0) },
     });
     await expect(
-      deps.service.revokeRole(
-        'u-1',
-        RoleName.SALES_RELATIONSHIP_OFFICER,
-        actor.id,
-      ),
+      deps.service.revokeRole('u-1', SALES_ROLE.id, actor.id),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('refuses to revoke the LAST active administrator — nobody could grant it back', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         roleGrantsPermission: vi.fn().mockResolvedValue(true),
         // The only holder is the very assignment being revoked, so nothing
         // survives it.
@@ -397,11 +411,7 @@ describe('UserAdminService role assignment', () => {
       },
     });
     await expect(
-      deps.service.revokeRole(
-        'u-1',
-        RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
-        actor.id,
-      ),
+      deps.service.revokeRole('u-1', ADMIN_ROLE.id, actor.id),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.users.revokeRole).not.toHaveBeenCalled();
   });
@@ -409,20 +419,15 @@ describe('UserAdminService role assignment', () => {
   it('allows revoking an administrator while a second one remains', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         roleGrantsPermission: vi.fn().mockResolvedValue(true),
         findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
           { userId: 'u-1', roleId: 'role-admin' },
           { userId: 'u-other-admin', roleId: 'role-admin' },
         ]),
-        getRoleNames: vi.fn().mockResolvedValue([]),
       },
     });
-    await deps.service.revokeRole(
-      'u-1',
-      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
-      actor.id,
-    );
+    await deps.service.revokeRole('u-1', ADMIN_ROLE.id, actor.id);
     expect(deps.users.revokeRole).toHaveBeenCalledWith('u-1', 'role-admin');
   });
 
@@ -433,20 +438,15 @@ describe('UserAdminService role assignment', () => {
     // what survives THIS revoke, not how many holders there are.
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         roleGrantsPermission: vi.fn().mockResolvedValue(true),
         findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
           { userId: 'u-1', roleId: 'role-admin' },
           { userId: 'u-1', roleId: 'role-office-admin' },
         ]),
-        getRoleNames: vi.fn().mockResolvedValue([]),
       },
     });
-    await deps.service.revokeRole(
-      'u-1',
-      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
-      actor.id,
-    );
+    await deps.service.revokeRole('u-1', ADMIN_ROLE.id, actor.id);
     expect(deps.users.revokeRole).toHaveBeenCalledWith('u-1', 'role-admin');
   });
 
@@ -457,7 +457,7 @@ describe('UserAdminService role assignment', () => {
     // usable administrator revoke their own access.
     const deps = makeDeps({
       users: {
-        findRoleByName: vi
+        findRoleById: vi
           .fn()
           .mockResolvedValue({ id: 'role-custom', name: 'Office Admin' }),
         roleGrantsPermission: vi.fn().mockResolvedValue(true),
@@ -467,7 +467,7 @@ describe('UserAdminService role assignment', () => {
       },
     });
     await expect(
-      deps.service.revokeRole('u-1', 'Office Admin', actor.id),
+      deps.service.revokeRole('u-1', 'role-custom', actor.id),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.users.revokeRole).not.toHaveBeenCalled();
   });
@@ -477,13 +477,9 @@ describe('UserAdminService role assignment', () => {
     // an office's administration surface, and taking it for a Sales role would
     // make unrelated grants contend with each other.
     const deps = makeDeps({
-      users: { findRoleByName: vi.fn().mockResolvedValue(SALES_ROLE) },
+      users: { findRoleById: vi.fn().mockResolvedValue(SALES_ROLE) },
     });
-    await deps.service.revokeRole(
-      'u-1',
-      RoleName.SALES_RELATIONSHIP_OFFICER,
-      actor.id,
-    );
+    await deps.service.revokeRole('u-1', SALES_ROLE.id, actor.id);
     expect(deps.users.withCapabilityLocked).not.toHaveBeenCalled();
     expect(deps.users.revokeRole).toHaveBeenCalledWith('u-1', 'role-sales');
   });
@@ -530,18 +526,16 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
     // different rows and serialise against nothing.
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         roleGrantsPermission: vi.fn().mockResolvedValue(true),
       },
     });
-    return deps.service
-      .revokeRole('u-1', RoleName.SYSTEM_SECURITY_ADMINISTRATOR, actor.id)
-      .then(() => {
-        expect(deps.users.withCapabilityLocked).toHaveBeenCalledWith(
-          'user.manage',
-          expect.any(Function),
-        );
-      });
+    return deps.service.revokeRole('u-1', ADMIN_ROLE.id, actor.id).then(() => {
+      expect(deps.users.withCapabilityLocked).toHaveBeenCalledWith(
+        'user.manage',
+        expect.any(Function),
+      );
+    });
   });
 
   it('refuses to DEACTIVATE the last active administrator', async () => {
@@ -552,7 +546,7 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
     // effectively as revoking — AuthService.login refuses an inactive account.
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         // `u-other` is the only holder, so deactivating them leaves none.
         findActiveHoldersOfPermission: vi
           .fn()
@@ -568,7 +562,7 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
   it('allows deactivating an administrator while a second usable one remains', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
           { userId: 'u-other', roleId: 'role-admin' },
           { userId: 'u-survivor', roleId: 'role-admin' },
@@ -586,7 +580,7 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
     // reading them outside the lock is the race.
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE),
         findActiveHoldersOfPermission: vi
           .fn()
           .mockResolvedValue([{ userId: 'u-1', roleId: 'role-admin' }]),
@@ -598,7 +592,7 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
 
   it('never blocks REACTIVATION', async () => {
     const deps = makeDeps({
-      users: { findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE) },
+      users: { findRoleById: vi.fn().mockResolvedValue(ADMIN_ROLE) },
     });
     await deps.service.setActive('u-other', true, actor.id);
     expect(deps.users.setActive).toHaveBeenCalledWith('u-other', true);
@@ -622,16 +616,13 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   it('records a signal when a CHECKER role is granted', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue({
-          id: 'r-comp',
-          name: RoleName.COMPLIANCE_OFFICER,
-        }),
+        findRoleById: vi.fn().mockResolvedValue(COMPLIANCE_ROLE),
       },
       permissions: {
         getCodesForRoles: vi.fn().mockResolvedValue(new Set(['kyc.approve'])),
       },
     });
-    await deps.service.grantRole('u-1', RoleName.COMPLIANCE_OFFICER, actor.id);
+    await deps.service.grantRole('u-1', COMPLIANCE_ROLE.id, actor.id);
 
     const serialised = JSON.stringify(deps.audit.record.mock.calls);
     expect(serialised).toContain('SegregationOfDutiesSignal');
@@ -641,10 +632,7 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   it('marks a SELF-grant distinctly — no second account is even needed', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue({
-          id: 'r-fin',
-          name: RoleName.FINANCE_COLLECTIONS_OFFICER,
-        }),
+        findRoleById: vi.fn().mockResolvedValue(FINANCE_ROLE),
       },
       permissions: {
         getCodesForRoles: vi
@@ -653,11 +641,7 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
       },
     });
     // The administrator grants the checker role to their own account.
-    await deps.service.grantRole(
-      actor.id,
-      RoleName.FINANCE_COLLECTIONS_OFFICER,
-      actor.id,
-    );
+    await deps.service.grantRole(actor.id, FINANCE_ROLE.id, actor.id);
 
     const call = deps.audit.record.mock.calls.find(
       ([input]: [{ entityType: string }]) =>
@@ -670,17 +654,10 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   it('stays silent for a role that is NOT a checker', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue({
-          id: 'r-sales',
-          name: RoleName.SALES_RELATIONSHIP_OFFICER,
-        }),
+        findRoleById: vi.fn().mockResolvedValue(SALES_ROLE),
       },
     });
-    await deps.service.grantRole(
-      'u-1',
-      RoleName.SALES_RELATIONSHIP_OFFICER,
-      actor.id,
-    );
+    await deps.service.grantRole('u-1', SALES_ROLE.id, actor.id);
     expect(JSON.stringify(deps.audit.record.mock.calls)).not.toContain(
       'SegregationOfDutiesSignal',
     );
@@ -701,7 +678,7 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
         password: 'Str0ng!Passphrase-2026',
         departmentId: 'dept-1',
         branchId: 'branch-1',
-        roles: [RoleName.DATA_PROTECTION_OFFICER],
+        roleIds: [DPO_ROLE.id],
       },
       actor.id,
     );
@@ -713,15 +690,12 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   it('never fails the grant when the signal cannot be written', async () => {
     const deps = makeDeps({
       users: {
-        findRoleByName: vi.fn().mockResolvedValue({
-          id: 'r-comp',
-          name: RoleName.COMPLIANCE_OFFICER,
-        }),
+        findRoleById: vi.fn().mockResolvedValue(COMPLIANCE_ROLE),
       },
     });
     deps.audit.record.mockRejectedValue(new Error('audit down'));
     await expect(
-      deps.service.grantRole('u-1', RoleName.COMPLIANCE_OFFICER, actor.id),
+      deps.service.grantRole('u-1', COMPLIANCE_ROLE.id, actor.id),
     ).resolves.toBeDefined();
   });
 });

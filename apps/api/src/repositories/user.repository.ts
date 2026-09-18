@@ -274,7 +274,7 @@ export class UserRepository {
     });
   }
 
-  /** One page of users with their ACTIVE role names, for the admin console.
+  /** One page of users with their ACTIVE roles, for the admin console.
    * Never selects `passwordHash`. */
   async listWithRoles(
     take: number,
@@ -291,7 +291,10 @@ export class UserRepository {
       accessValidFrom: Date | null;
       accessValidUntil: Date | null;
       createdAt: Date;
-      roles: string[];
+      /** Id AND name: the id is what a revoke addresses, the name is what a
+       *  person reads. Returning only names forced the client to resolve one to
+       *  the other by matching text, which is the habit this phase removes. */
+      roles: { id: string; name: string }[];
       employee: { fullName: string } | null;
     }[]
   > {
@@ -316,13 +319,13 @@ export class UserRepository {
         createdAt: true,
         roles: {
           where: { revokedAt: null },
-          select: { role: { select: { name: true } } },
+          select: { role: { select: { id: true, name: true } } },
         },
       },
     });
     return rows.map(({ roles, ...rest }) => ({
       ...rest,
-      roles: roles.map((r) => r.role.name),
+      roles: roles.map((r) => r.role),
     }));
   }
 
@@ -340,6 +343,20 @@ export class UserRepository {
    * too. Spelling the compound key by hand would mean naming the organization
    * at the call site, which is the habit the extension exists to remove.
    */
+  /** One role of the caller's OWN office, by id. The tenant-scoped client is
+   *  what makes another office's id resolve to `null` rather than to their row —
+   *  so "unknown" and "not yours" are the same answer, which is the point. */
+  findRoleById(id: string): Promise<Role | null> {
+    return this.prisma.client.role.findFirst({ where: { id } });
+  }
+
+  /** The caller's own roles for a set of ids. A caller passing an id from
+   *  another office gets a SHORTER list back, which is how `provision` detects
+   *  it without ever saying which id was the problem. */
+  findRolesByIds(ids: string[]): Promise<Role[]> {
+    return this.prisma.client.role.findMany({ where: { id: { in: ids } } });
+  }
+
   findRoleByName(name: string): Promise<Role | null> {
     return this.prisma.client.role.findFirst({ where: { name } });
   }

@@ -115,6 +115,13 @@ async function provision(
   roles: RoleName[],
 ): Promise<{ email: string; id: string }> {
   const email = uniqueEmail(label);
+  // Named roles in, role IDS out: `POST /admin/users` addresses roles by id
+  // since the Phase 3 prep step, because a name is unique only within an office
+  // and an office can edit it. The helper keeps taking names so the tests that
+  // call it stay readable about WHICH role they mean.
+  const roleIds = await Promise.all(
+    roles.map(async (name) => (await ensureRole(name)).id),
+  );
   const res = await request(app!.getHttpServer())
     .post('/admin/users')
     .set(bearer(admin.accessToken))
@@ -124,7 +131,7 @@ async function provision(
       password: PASSWORD,
       departmentId,
       branchId,
-      roles,
+      roleIds,
     })
     .expect(201);
   return { email, id: (res.body as { id: string }).id };
@@ -169,7 +176,7 @@ describe('Part V auth — provisioning (item 1)', () => {
         email: uniqueEmail('no-dept'),
         password: PASSWORD,
         branchId,
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(400);
 
@@ -195,7 +202,7 @@ describe('Part V auth — provisioning (item 1)', () => {
         email: uniqueEmail('no-branch'),
         password: PASSWORD,
         departmentId,
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(400);
 
@@ -223,7 +230,7 @@ describe('Part V auth — provisioning (item 1)', () => {
         password: PASSWORD,
         departmentId: '00000000-0000-0000-0000-0000000000ff',
         branchId,
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(422);
     await prisma.department.deleteMany({
@@ -362,7 +369,7 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
         password: PASSWORD,
         departmentId,
         branchId,
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
         employeeId,
       })
       .expect(201);
@@ -423,7 +430,7 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
         password: PASSWORD,
         departmentId,
         branchId,
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
         employeeId: '00000000-0000-0000-0000-000000000000',
       })
       .expect(422);
@@ -445,7 +452,7 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       password: PASSWORD,
       departmentId,
       branchId,
-      roles: ['SALES_RELATIONSHIP_OFFICER'],
+      roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       employeeId,
     };
     await request(app!.getHttpServer())

@@ -83,7 +83,7 @@ export class UserAdminController {
     @Body() dto: RoleAssignmentDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.userAdmin.grantRole(id, dto.role, user.id);
+    return this.userAdmin.grantRole(id, dto.roleId, user.id);
   }
 
   /** A POST, not a DELETE — the grant row is never deleted, only stamped
@@ -95,7 +95,7 @@ export class UserAdminController {
     @Body() dto: RoleAssignmentDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.userAdmin.revokeRole(id, dto.role, user.id);
+    return this.userAdmin.revokeRole(id, dto.roleId, user.id);
   }
 
   @RequirePermissions('user.manage')
