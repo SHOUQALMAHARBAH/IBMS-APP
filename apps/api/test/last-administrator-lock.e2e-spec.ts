@@ -5,6 +5,7 @@ import type { App } from 'supertest/types';
 import { rawPrisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 import { UserAdminService } from '../src/modules/rbac/services/user-admin.service';
+import { RoleAdminService } from '../src/modules/rbac/services/role-admin.service';
 import { UserRepository } from '../src/repositories/user.repository';
 import { OrgContextService } from '../src/common/org-context/org-context.service';
 
@@ -16,6 +17,13 @@ import { OrgContextService } from '../src/common/org-context/org-context.service
  * `user.manage`, because that is the capability which grants roles back: lose it
  * and the office is locked out of its own administration surface with no way
  * back short of direct database access.
+ *
+ * Phase 3 added a THIRD route: retiring a role. All three ask one question —
+ * "what still holds `user.manage` after this write?" — and differ only in what
+ * they subtract: revoke takes one ASSIGNMENT, deactivation takes one USER,
+ * retirement takes one ROLE. Nothing about "retire a role we no longer use" looks
+ * like removing anybody's access, which is what makes it the least obvious of the
+ * three.
  *
  * Until Phase 2 the guard held `SELECT ... FOR UPDATE` on ONE Role row, which
  * served while exactly one role could hold `user.manage`. Keyed on the
@@ -62,6 +70,7 @@ const SUBDOMAIN = 'last-admin-lock-e2e';
 
 let app: INestApplication<App> | null = null;
 let service: UserAdminService;
+let roleAdmin: RoleAdminService;
 let users: UserRepository;
 let orgContext: OrgContextService;
 
@@ -123,6 +132,7 @@ beforeAll(async () => {
 
   app = await createTestApp();
   service = app.get(UserAdminService);
+  roleAdmin = app.get(RoleAdminService);
   users = app.get(UserRepository);
   orgContext = app.get(OrgContextService);
 
@@ -340,6 +350,111 @@ describe('the last-administrator guard survives two concurrent removals', () => 
         service.revokeRole(adminBId, roleBId, adminBId),
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  }, 120_000);
+
+  it('refuses to RETIRE the last role that grants user administration', async () => {
+    // The third route. Retiring role A leaves role B, which is fine; retiring B
+    // as well would leave the office with nobody able to grant the capability
+    // back, so the second one is refused.
+    await resetFixture();
+
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+    );
+    await expect(
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleBId, 'INACTIVE', adminBId),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    // And the invariant itself: somebody can still administer users.
+    const holders = await orgContext.runAs(ORG_ID, () =>
+      users.findActiveHoldersOfPermission('user.manage'),
+    );
+    expect(new Set(holders.map((h) => h.userId)).size).toBe(1);
+  }, 120_000);
+
+  it('lets exactly ONE of two simultaneous retirements through', async () => {
+    // Same race as the other two routes, on the same lock. Two roles, two
+    // requests, neither of which is the other's — a lock on the Role ROW would
+    // put these on separate keys and let both commit.
+    await resetFixture();
+
+    const results = await Promise.allSettled([
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+      ),
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleBId, 'INACTIVE', adminBId),
+      ),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toBeInstanceOf(UnprocessableEntityException);
+  }, 120_000);
+
+  it('serialises a RETIREMENT against a concurrent REVOKE on the other role', async () => {
+    // The case a per-route guard would miss entirely: two DIFFERENT operations,
+    // on two different rows, racing for the same invariant. They share the
+    // capability lock, so one of them loses.
+    await resetFixture();
+
+    const results = await Promise.allSettled([
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+      ),
+      orgContext.runAs(ORG_ID, () =>
+        service.revokeRole(adminBId, roleBId, adminBId),
+      ),
+    ]);
+
+    expect(
+      results.filter((r) => r.status === 'fulfilled'),
+      'one of the two must be refused',
+    ).toHaveLength(1);
+
+    const holders = await orgContext.runAs(ORG_ID, () =>
+      users.findActiveHoldersOfPermission('user.manage'),
+    );
+    expect(
+      new Set(holders.map((h) => h.userId)).size,
+      'the office keeps an administrator whichever one won',
+    ).toBe(1);
+  }, 120_000);
+
+  it('never refuses REACTIVATION — an office must be able to undo a retirement', async () => {
+    await resetFixture();
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+    );
+    const back = await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setStatus(roleAId, 'ACTIVE', adminAId),
+    );
+    expect(back.status).toBe('ACTIVE');
+  }, 120_000);
+
+  it('refuses to retire a PLATFORM role, and isSystem is the only reason', async () => {
+    // The protection flag, from the outside. `OFFICE_ADMINISTRATOR` and the
+    // eleven converted legacy roles carry it; an office's own role does not.
+    await resetFixture();
+    const protectedRole = await rawPrisma.role.update({
+      where: { id: roleAId },
+      data: { isSystem: true },
+    });
+    try {
+      await expect(
+        orgContext.runAs(ORG_ID, () =>
+          roleAdmin.setStatus(protectedRole.id, 'INACTIVE', adminAId),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    } finally {
+      await rawPrisma.role.update({
+        where: { id: roleAId },
+        data: { isSystem: false },
+      });
+    }
   }, 120_000);
 
   it('does NOT refuse revoking one administrator role from a holder of two', async () => {

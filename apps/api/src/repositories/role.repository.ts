@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Role } from '@ibms/db';
+import type { Role, RoleStatus } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -47,6 +47,13 @@ export class RoleRepository {
    * `tenant-isolation.e2e-spec.ts` covers it with two offices that each define a
    * role of the same name granting the same code.
    */
+  /** Retire or reactivate one role. `updateMany`-free because the caller has
+   *  already resolved the row on the scoped client, so the id is known to belong
+   *  to this office. */
+  setStatus(id: string, status: RoleStatus): Promise<Role> {
+    return this.prisma.client.role.update({ where: { id }, data: { status } });
+  }
+
   async findActiveUserIdsWithPermission(code: string): Promise<string[]> {
     const grants = await this.prisma.client.rolePermission.findMany({
       // ACTIVE only: a recertification reviewer pool or an administrator-subject
