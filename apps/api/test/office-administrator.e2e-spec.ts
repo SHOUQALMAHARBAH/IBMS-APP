@@ -268,25 +268,57 @@ describe('every office has a route to user administration', () => {
     }
   }, 120_000);
 
-  it('leaves every existing SYSTEM_SECURITY_ADMINISTRATOR grant in place — in addition, never instead', async () => {
+  it('backfilled every administrator it found — in addition, never instead — and only those', async () => {
     // The migration adds a grant and revokes nothing. Removing the legacy grant
     // would be a privilege change disguised as a rename, and would discard the
     // audit record of what somebody held — the reason
     // `UserRoleAssignment.revokedAt` exists rather than a DELETE.
+    //
+    // ## The set has to be the one the migration could have touched
+    //
+    // This is a MIGRATION outcome, not an invariant, and the difference is the
+    // whole test. The migration is a one-time backfill of the administrators that
+    // existed when it ran — it is not a trigger, so a legacy administrator grant
+    // made AFTERWARDS does not receive the new role and must not be expected to.
+    //
+    // The first version of this test asserted the property over
+    // `findMany(...).slice(0, 25)`, which is an UNORDERED sample: on the
+    // cumulative test database those 25 rows happened to be pre-migration ones, so
+    // it passed by luck, and it failed the moment CI ran it against a database
+    // created fresh — where the migration runs before any user exists and every
+    // administrator is therefore a post-migration one. Both halves are asserted
+    // here instead, split on the role's own `createdAt`.
+    const adminRole = await prisma.role.findFirstOrThrow({
+      where: { name: 'OFFICE_ADMINISTRATOR' },
+      select: { id: true, organizationId: true, createdAt: true },
+    });
     const legacyHolders = await prisma.userRoleAssignment.findMany({
       where: {
         revokedAt: null,
         role: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
       },
-      select: { userId: true, role: { select: { organizationId: true } } },
+      select: {
+        userId: true,
+        grantedAt: true,
+        role: { select: { organizationId: true } },
+      },
     });
     expect(
       legacyHolders.length,
       'the seeded sample administrator alone guarantees at least one',
     ).toBeGreaterThan(0);
 
-    // Every one of them also holds the new role, in their own office.
-    for (const holder of legacyHolders.slice(0, 25)) {
+    const backfilled = legacyHolders.filter(
+      (h) => h.grantedAt < adminRole.createdAt,
+    );
+    const laterGrants = legacyHolders.filter(
+      (h) => h.grantedAt >= adminRole.createdAt,
+    );
+
+    // Every administrator that PREDATES the role holds it too, in their own
+    // office. On a freshly created database this set is empty, and that is
+    // correct rather than vacuous — the assertion below covers that case.
+    for (const holder of backfilled) {
       const alsoAdministrator = await prisma.userRoleAssignment.findFirst({
         where: {
           userId: holder.userId,
@@ -299,8 +331,33 @@ describe('every office has a route to user administration', () => {
       });
       expect(
         alsoAdministrator,
-        `user ${holder.userId} holds the legacy administrator role but not OFFICE_ADMINISTRATOR`,
+        `user ${holder.userId} held the legacy administrator role BEFORE the migration ran and did not receive OFFICE_ADMINISTRATOR`,
       ).not.toBeNull();
+    }
+
+    // And the one thing that is true on every database: the two sets together are
+    // every legacy administrator, so neither branch can silently cover nothing
+    // while the other passes.
+    expect(backfilled.length + laterGrants.length).toBe(legacyHolders.length);
+
+    // Nobody lost the capability either way — which is the property the office
+    // actually depends on, and the one that does hold as an invariant.
+    const holders = await prisma.userRoleAssignment.findMany({
+      where: {
+        revokedAt: null,
+        role: {
+          status: 'ACTIVE',
+          permissions: { some: { permission: { code: 'user.manage' } } },
+        },
+      },
+      select: { userId: true },
+    });
+    const canAdminister = new Set(holders.map((h) => h.userId));
+    for (const holder of legacyHolders) {
+      expect(
+        canAdminister.has(holder.userId),
+        `user ${holder.userId} holds the legacy administrator role but can no longer administer users`,
+      ).toBe(true);
     }
   }, 120_000);
 });
