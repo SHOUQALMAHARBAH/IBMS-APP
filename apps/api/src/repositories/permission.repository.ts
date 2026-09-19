@@ -20,6 +20,16 @@ export class PermissionRepository {
     });
   }
 
+  /** The catalogue rows for a set of codes. Returns FEWER than asked for when a
+   *  code is unknown, which is how `RoleAdminService` detects one without ever
+   *  guessing at what the caller meant. */
+  findByCodes(codes: string[]): Promise<Permission[]> {
+    if (codes.length === 0) return Promise.resolve([]);
+    return this.prisma.client.permission.findMany({
+      where: { code: { in: codes } },
+    });
+  }
+
   /**
    * Every distinct permission code granted to any of the given roles.
    *
