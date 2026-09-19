@@ -286,6 +286,10 @@ const NAV_GROUPS: readonly NavGroup[] = [
         permissions: ['access-recertification.review'],
       },
       { href: '/settings/users', labelKey: 'navUserAdmin', permissions: ['user.manage'] },
+      // `role.read`, not `role.manage`: a caller who may look at the office's
+      // roles but not change them gets the screen read-only rather than no link
+      // at all. That is the whole reason the prep step split those two names.
+      { href: '/settings/roles', labelKey: 'navRoleAdmin', permissions: ['role.read'] },
     ],
   },
 ];
