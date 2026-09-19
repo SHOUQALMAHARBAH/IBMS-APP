@@ -345,6 +345,24 @@ describe('RBAC / access recertification (e2e)', () => {
         expect((provisioned.body as HeldRolesBody).roles).toEqual([
           { id: custom.id, name: `Client Liaison ${tag}` },
         ]);
+        // Phase 3 — the unified User/Employee screen joins the two halves on this
+        // field, and shows an account with no HR record as its own state. Null
+        // here because nothing was linked, and `null` rather than absent so the
+        // screen can tell "not linked" from "the API did not say".
+        expect(provisioned.body).toHaveProperty('employeeId', null);
+
+        const listed = await request(app.getHttpServer())
+          .get('/admin/users')
+          .set(bearer(admin.accessToken))
+          .expect(200);
+        const listedRow = (
+          listed.body as { users: { id: string; employeeId: string | null }[] }
+        ).users.find((u) => u.id === provisionedId);
+        expect(
+          listedRow,
+          'the provisioned account must appear in the list',
+        ).toBeDefined();
+        expect(listedRow).toHaveProperty('employeeId', null);
 
         const granted = await request(app.getHttpServer())
           .post(`/admin/users/${provisionedId}/roles`)

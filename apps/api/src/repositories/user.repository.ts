@@ -304,6 +304,10 @@ export class UserRepository {
        *  person reads. Returning only names forced the client to resolve one to
        *  the other by matching text, which is the habit this phase removes. */
       roles: { id: string; name: string }[];
+      /** The HR record this account is linked to, when there is one. The unified
+       *  User/Employee screen joins on it: one row per PERSON, with the state of
+       *  the link visible when only one half exists. */
+      employeeId: string | null;
       employee: { fullName: string } | null;
     }[]
   > {
@@ -316,6 +320,7 @@ export class UserRepository {
         // display name the person sees in their own navbar rather than the
         // free text typed at provisioning. See common/display-name.util.ts.
         employee: { select: { fullName: true } },
+        employeeId: true,
         id: true,
         fullName: true,
         email: true,

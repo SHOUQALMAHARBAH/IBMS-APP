@@ -40,6 +40,19 @@ const head: CSSProperties = {
   fontWeight: 600,
   borderBottom: '2px solid var(--border-default)',
 };
+const noRolesBadgeStyle: CSSProperties = {
+  display: 'inline-block',
+  padding: '0.1rem 0.4rem',
+  borderRadius: '0.25rem',
+  border: '1px solid var(--border-default)',
+  fontSize: '0.8rem',
+  fontWeight: 600,
+};
+const linkStateStyle: CSSProperties = {
+  display: 'block',
+  fontSize: '0.8rem',
+  color: 'var(--ink-secondary)',
+};
 
 /**
  * Backlog A.2 — the provisioning surface `user.manage` was seeded for. Without
@@ -388,6 +401,7 @@ export default function UserAdminPage() {
                   <tr>
                     <th style={head}>{t('usrName')}</th>
                     <th style={head}>{t('usrEmail2')}</th>
+                    <th style={head}>{t('usrHrRecordColumn')}</th>
                     <th style={head}>{t('usrRoles2')}</th>
                     <th style={head}>{t('usrActive')}</th>
                     <th style={head}>{t('usrAction')}</th>
@@ -398,10 +412,33 @@ export default function UserAdminPage() {
                     <tr key={u.id}>
                       <td style={cell}>{u.fullName}</td>
                       <td style={cell}>{u.email}</td>
+                      {/* The link is the organising idea, not a field on a form:
+                          `User.employeeId` is unique, and once linked the HR
+                          record's four-part official name becomes the display
+                          name everywhere. An account with no HR record is a real
+                          and visible state — somebody still owes this person an
+                          employee record. */}
+                      <td style={cell} data-hr-link={u.employeeId ? 'linked' : 'none'}>
+                        {u.employeeId ? (
+                          <a href={`/employees/${u.employeeId}`}>
+                            {t('usrHrRecordOpen')}
+                          </a>
+                        ) : (
+                          <span style={linkStateStyle}>
+                            {t('usrHrRecordNone')}
+                          </span>
+                        )}
+                      </td>
                       <td style={cell}>
                         {u.roles.length === 0 ? (
-                          <span style={{ color: 'var(--ink-secondary)' }}>
-                            {t('usrNone')}
+                          /* A badge, not the word "None". An account with no
+                             roles can sign in and reach NOTHING, which reads as a
+                             broken system rather than an unfinished setup — and
+                             after Phase 3 it is a common state, because a new
+                             office starts with one role and `POST /auth/signup`
+                             has always created accounts with zero. */
+                          <span style={noRolesBadgeStyle} data-no-roles="">
+                            {t('usrNoRolesBadge')}
                           </span>
                         ) : (
                           u.roles.map((held) => (
@@ -447,8 +484,14 @@ export default function UserAdminPage() {
                                 setGrantChoice(e.target.value as RoleName)
                               }
                             >
+                              {/* value is the ID, not the name. `grantRole`
+                                  posts this as `roleId`, and the API validates
+                                  it as a UUID — an option carrying the name made
+                                  every grant from this dropdown a 400, while the
+                                  default (set from `cat[0].id`) matched no option
+                                  at all. */}
                               {roleCatalogue.map((entry) => (
-                                <option key={entry.id} value={entry.name}>
+                                <option key={entry.id} value={entry.id}>
                                   {roleLabel(entry)}
                                 </option>
                               ))}

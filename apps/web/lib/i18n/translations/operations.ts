@@ -318,6 +318,12 @@ export const OPERATIONS = {
     usrActive: 'نشط',
     usrAction: 'إجراء',
     usrNone: '— بلا دور',
+    // The unified User/Employee screen (Phase 3). `usrNone` stays because it is
+    // still the right word in a sentence; a TABLE CELL needed a badge.
+    usrNoRolesBadge: 'بلا أدوار',
+    usrHrRecordColumn: 'سجل الموظف',
+    usrHrRecordOpen: 'فتح السجل',
+    usrHrRecordNone: 'لا يوجد سجل موظف مرتبط',
     usrRevoke: 'إلغاء',
     usrYes: 'نعم',
     usrNo: 'لا',
@@ -738,6 +744,10 @@ export const OPERATIONS = {
     usrActive: 'Active',
     usrAction: 'Action',
     usrNone: '— none',
+    usrNoRolesBadge: 'No roles assigned',
+    usrHrRecordColumn: 'HR record',
+    usrHrRecordOpen: 'Open record',
+    usrHrRecordNone: 'No linked employee record',
     usrRevoke: 'Revoke',
     usrYes: 'Yes',
     usrNo: 'No',
