@@ -395,6 +395,103 @@ function secretFromOtpAuthUri(uri: string): string {
   return match[1];
 }
 
+/**
+ * Install a role into a demo office by MIRRORING the default office's row of the
+ * same name — its display names, its security attributes, its `isSystem` flag,
+ * and its permission grants.
+ *
+ * ## Why mirroring rather than a bare upsert
+ *
+ * This used to be a bare `role.upsert` that created the row with the machine
+ * name in all three name fields and NO grants at all, relying on Phase 1's
+ * migration having copied the grants across. That left a real drift: `seed.ts`
+ * grants permissions to the DEFAULT organization's roles only, so every code
+ * added after the demo office was created never reached it. It was measured, not
+ * theorised — Office B's `SYSTEM_SECURITY_ADMINISTRATOR` was three codes behind
+ * the grid (`employee.create`, `employee.update`, `role.manage`), so the demo
+ * office's administrator silently could not do things the default office's could.
+ *
+ * The default office is the right source because `preflight()` already refuses to
+ * run without it, and because "the demo offices behave like the seeded one" is
+ * exactly the property the demo exists to show.
+ *
+ * Grants are added, never removed: a role in a demo office that somehow holds
+ * something extra keeps it rather than being silently narrowed mid-demo.
+ */
+async function ensureRoleMirroringDefaultOffice(
+  orgId: string,
+  roleName: string,
+): Promise<{ id: string }> {
+  const template = await rawPrisma.role.findUnique({
+    where: { organizationId_name: { organizationId: ORG_A_ID, name: roleName } },
+    include: { permissions: { select: { permissionId: true } } },
+  });
+  if (!template) {
+    throw new Error(
+      `Role "${roleName}" does not exist in the default organization, so there is nothing to mirror into ${orgId}. ` +
+        'Run `npm run db:seed` against the DEV .env first.',
+    );
+  }
+
+  // Office A IS the template, so mirroring it onto itself is a no-op by
+  // definition — but going through the same path keeps one code path for both
+  // offices rather than a branch that only one of them exercises.
+  const role = await rawPrisma.role.upsert({
+    where: { organizationId_name: { organizationId: orgId, name: roleName } },
+    update: {
+      nameAr: template.nameAr,
+      nameEn: template.nameEn,
+      description: template.description,
+      requiresMfaAlways: template.requiresMfaAlways,
+      requiresHardwareToken: template.requiresHardwareToken,
+      isSystem: template.isSystem,
+    },
+    create: {
+      organizationId: orgId,
+      name: roleName,
+      nameAr: template.nameAr,
+      nameEn: template.nameEn,
+      description: template.description,
+      requiresMfaAlways: template.requiresMfaAlways,
+      requiresHardwareToken: template.requiresHardwareToken,
+      isSystem: template.isSystem,
+    },
+  });
+
+  for (const { permissionId } of template.permissions) {
+    // `organizationId` named explicitly: on the raw client the column default
+    // is NULL, which the composite FK to `Role(id, organizationId)` rejects
+    // rather than accepting an unattributed grant.
+    await rawPrisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId } },
+      update: {},
+      create: { organizationId: orgId, roleId: role.id, permissionId },
+    });
+  }
+  return role;
+}
+
+/**
+ * The rule for a NEW office: it gets an `OFFICE_ADMINISTRATOR` and no business
+ * roles at all — its administrator defines whatever the office needs.
+ *
+ * This script and `packages/db/prisma/seed.ts` are the only two writers that
+ * create an Organization anywhere in the codebase (verified: no endpoint, no
+ * service, no screen). So the rule cannot live in a provisioning service that
+ * does not exist; it lives in both writers, and
+ * `office-administrator.e2e-spec.ts` asserts that an Organization without a role
+ * granting `user.manage` is a defect. Whenever real org provisioning lands, it
+ * therefore cannot ship without one.
+ *
+ * The demo office also gets its eight business roles, because the demo's whole
+ * point is two offices running the same pipelines. That is not a contradiction of
+ * the rule: the rule is about what a new office gets BY DEFAULT, and this script
+ * is explicitly building a populated demo.
+ */
+async function ensureOfficeAdministrator(orgId: string): Promise<void> {
+  await ensureRoleMirroringDefaultOffice(orgId, 'OFFICE_ADMINISTRATOR');
+}
+
 /** Direct-Prisma account creation, exactly like `packages/db/prisma/seed.ts`'s
  * `ensureSampleUsers` and every e2e spec's cross-org fixtures: there is no
  * HTTP endpoint to create the FIRST account in an Organization once a second
@@ -457,21 +554,7 @@ async function ensureActor(
     data: { mfaEnabled: false, mustChangePassword: false, lockedUntil: null, failedLoginAttempts: 0 },
   });
 
-  // Roles are office-scoped now, and this script uses the RAW client, so the
-  // Organization has to be named explicitly — the compound key rather than the
-  // old global-unique `{ name }`. Two demo offices can therefore both have a
-  // "SALES_RELATIONSHIP_OFFICER" without colliding, which is exactly the
-  // property the demo is meant to show off.
-  const role = await rawPrisma.role.upsert({
-    where: { organizationId_name: { organizationId: orgId, name: def.role } },
-    update: {},
-    create: {
-      organizationId: orgId,
-      name: def.role,
-      nameAr: def.role,
-      nameEn: def.role,
-    },
-  });
+  const role = await ensureRoleMirroringDefaultOffice(orgId, def.role);
   const existingGrant = await rawPrisma.userRoleAssignment.findFirst({
     where: { userId: user.id, roleId: role.id, revokedAt: null },
   });
@@ -1376,6 +1459,12 @@ it('seeds demo data for two Organizations through the real API', async () => {
           subdomain: ORG_B_SUBDOMAIN,
         },
       });
+    }
+    // The new-office rule. Runs on every pass, not just on creation, so an
+    // Office B created by an earlier version of this script also ends up with
+    // one — the same reason every other step here is idempotent.
+    for (const orgId of [ORG_A_ID, ORG_B_ID]) {
+      await ensureOfficeAdministrator(orgId);
     }
 
     const orgAName =

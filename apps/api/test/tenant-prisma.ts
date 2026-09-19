@@ -133,3 +133,68 @@ export async function ensureRole(name: string): Promise<{ id: string }> {
     create: { name, nameAr: name, nameEn: name },
   });
 }
+
+/**
+ * Give a fixture Organization the same `OFFICE_ADMINISTRATOR` a real office gets,
+ * by mirroring the default office's row — its attributes and its grants.
+ *
+ * ## Why a fixture office needs this
+ *
+ * `office-administrator.e2e-spec.ts` asserts that EVERY Organization has an
+ * active route to user administration: an office nobody can provision a user in
+ * cannot be set up at all, and the failure would surface as its administrator
+ * being unable to log in rather than as anything a test caught. That assertion is
+ * the durable form of the rule, and it has to hold for every row in the table —
+ * so a fixture that stands up an office and skips the administrator would break
+ * it, and would also be modelling an office that could not exist.
+ *
+ * Both callers create their Organization as the OWNER (`rawPrisma`): standing one
+ * up is a platform act, not something a tenant-scoped request can do. This helper
+ * does the same, and names `organizationId` on every write, because outside a
+ * scoped request the column default is NULL and the composite FK
+ * `(roleId, organizationId)` -> `Role(id, organizationId)` rejects an
+ * unattributed grant rather than accepting one.
+ */
+export async function ensureOfficeAdministratorFor(
+  organizationId: string,
+): Promise<{ id: string }> {
+  const template = await rawPrisma.role.findUnique({
+    where: {
+      organizationId_name: {
+        organizationId: TEST_ORGANIZATION_ID,
+        name: 'OFFICE_ADMINISTRATOR',
+      },
+    },
+    include: { permissions: { select: { permissionId: true } } },
+  });
+  if (!template) {
+    throw new Error(
+      'The default test organization has no OFFICE_ADMINISTRATOR role to mirror. Run `npm run db:test:migrate:dev` and the seed against .env.test.',
+    );
+  }
+
+  const role = await rawPrisma.role.upsert({
+    where: {
+      organizationId_name: { organizationId, name: 'OFFICE_ADMINISTRATOR' },
+    },
+    update: {},
+    create: {
+      organizationId,
+      name: 'OFFICE_ADMINISTRATOR',
+      nameAr: template.nameAr,
+      nameEn: template.nameEn,
+      description: template.description,
+      requiresMfaAlways: template.requiresMfaAlways,
+      requiresHardwareToken: template.requiresHardwareToken,
+      isSystem: template.isSystem,
+    },
+  });
+  for (const { permissionId } of template.permissions) {
+    await rawPrisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId } },
+      update: {},
+      create: { organizationId, roleId: role.id, permissionId },
+    });
+  }
+  return role;
+}

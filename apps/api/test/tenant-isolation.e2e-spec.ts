@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import { type RoleName } from '@ibms/db';
 import {
   TEST_ORGANIZATION_ID,
+  ensureOfficeAdministratorFor,
   ensureRole,
   prisma,
   rawPrisma,
@@ -302,6 +303,10 @@ beforeAll(async () => {
       subdomain: ORG_B_SUBDOMAIN,
     },
   });
+  // Every office needs a route to user administration — see
+  // `ensureOfficeAdministratorFor`. A fixture office that skipped it would be
+  // modelling an office nobody could provision a user in.
+  await ensureOfficeAdministratorFor(ORG_B_ID);
 
   // Office B's customer, with the SAME legal name, written as the owner —
   // there is no authenticated path into office B yet (subdomain resolution is

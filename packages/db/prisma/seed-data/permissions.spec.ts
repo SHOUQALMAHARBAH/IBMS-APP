@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { RoleName } from "@prisma/client";
 import { PERMISSIONS } from "./permissions";
-import { ROLES } from "./roles";
+import { OFFICE_ADMINISTRATOR_ROLE, ROLES } from "./roles";
 
-function codesGrantedTo(role: RoleName): string[] {
+function codesGrantedTo(role: string): string[] {
   return PERMISSIONS.filter((p) => p.roles.includes(role)).map((p) => p.code);
 }
 
@@ -29,8 +29,15 @@ describe("permission grid — every code is independent and traceable", () => {
     }
   });
 
-  it("only references the 11 seeded roles", () => {
-    const validRoles = new Set(ROLES.map((r) => r.name));
+  it("only references roles the seed actually installs", () => {
+    // `PermissionSeed.roles` is `string[]`, not `RoleName[]`, because the office
+    // administrator is a seeded role deliberately outside the legacy enum. This
+    // check — not the enum — is what catches a typo now, so it has to know about
+    // every role the seed installs, and only those.
+    const validRoles = new Set([
+      ...ROLES.map((r) => r.name),
+      OFFICE_ADMINISTRATOR_ROLE.name,
+    ]);
     for (const permission of PERMISSIONS) {
       for (const role of permission.roles) {
         expect(validRoles.has(role)).toBe(true);
@@ -224,6 +231,105 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
         readOnly.length,
         `every holder of ${readCode} also holds ${revealCode} — the split is nominal`,
       ).toBeGreaterThan(0);
+    }
+  });
+});
+
+// Office-scoped custom RBAC, PHASE 3 workstream D — the office administrator.
+describe("permission grid — the office administrator", () => {
+  const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
+
+  it("holds exactly 22 codes", () => {
+    // The count is asserted as well as the membership so that adding a code
+    // without deciding about it is impossible: both this number and the list in
+    // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
+    // to move together.
+    expect(codesGrantedTo(OFFICE_ADMIN).sort()).toEqual(
+      [
+        "access-recertification.cycle.start",
+        "audit-log.read",
+        "bcp-dr.manage",
+        "customer.bulk-import",
+        "deprovisioning.execute",
+        "email.integration.manage",
+        "email.integration.read",
+        "employee.create",
+        "employee.read",
+        "employee.update",
+        "encryption-key.read",
+        "incident.contain",
+        "incident.report",
+        "information-asset.manage",
+        "permission.read",
+        "role.manage",
+        "role.read",
+        "security-config.manage",
+        "security-config.read",
+        "training.record",
+        "user.manage",
+        "vendor.manage",
+      ].sort(),
+    );
+  });
+
+  it("is a STRICT SUBSET of what the legacy administrator already holds", () => {
+    // This is the property that makes migration 20261008100000 a zero-delta
+    // change: granting this role to every existing `user.manage` holder adds
+    // nothing to anybody's effective permissions, which was measured as a
+    // byte-identical per-user diff on both databases. If a later edit grants the
+    // office administrator something the legacy administrator lacks, that
+    // measurement silently stops being reproducible — so it fails here instead.
+    const legacy = new Set(codesGrantedTo(RoleName.SYSTEM_SECURITY_ADMINISTRATOR));
+    const officeAdmin = codesGrantedTo(OFFICE_ADMIN);
+    const exclusive = officeAdmin.filter((code) => !legacy.has(code));
+    expect(
+      exclusive,
+      "the office administrator holds codes the legacy administrator does not, so the migration is no longer zero-delta",
+    ).toEqual([]);
+    // Strict, not merely equal — the legacy role holds destructive and
+    // platform-level codes this one is deliberately denied.
+    expect(officeAdmin.length).toBeLessThan(legacy.size);
+  });
+
+  it("is denied the eight codes withheld from it on purpose", () => {
+    // Each of these is a decision with a reason, recorded in `roles.ts` and in
+    // the migration. Moving one onto the role has to break a test rather than
+    // arrive as a side effect of a grid edit.
+    const granted = codesGrantedTo(OFFICE_ADMIN);
+    for (const withheld of [
+      // destructive business actions
+      "claim.delete",
+      "document.delete-override",
+      // the global insurer catalogue is a platform concern
+      "insurer.form.map",
+      "insurer.master.manage",
+      // reviewing your own access is the control this system exists to enforce
+      "access-recertification.review",
+      "access-recertification.review.routine",
+      // Part 10.2 Highly Confidential
+      "employee.national-id.reveal",
+      "customer.national-id.reveal",
+    ]) {
+      expect(granted, `${withheld} must not be granted`).not.toContain(withheld);
+    }
+  });
+
+  it("never grants the administrator a business-transaction code", () => {
+    // A broader net than the eight above: an administrator provisions accounts
+    // and configures the office. It does not sell, underwrite, settle or pay.
+    const granted = codesGrantedTo(OFFICE_ADMIN);
+    for (const code of [
+      "lead.create",
+      "rfq.create",
+      "policy.check",
+      "kyc.approve",
+      "refund.approve",
+      "claim.settle.approve",
+      "customer.360-view.read",
+    ]) {
+      expect(granted, `${code} is business data, not administration`).not.toContain(
+        code,
+      );
     }
   });
 });

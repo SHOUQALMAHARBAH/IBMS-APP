@@ -8,10 +8,13 @@ import { RoleName } from "@prisma/client";
  * cross-referencing the brain doc.
  */
 export interface RoleSeed {
-  /** The stable machine name. Still typed to the legacy `RoleName` enum, which
-   *  survives this phase unreferenced by the schema — these eleven ARE that
-   *  catalogue, and typing them keeps a typo from seeding a twelfth role. */
-  name: RoleName;
+  /** The stable machine name. `ROLES` narrows this to the legacy `RoleName`
+   *  enum, which survives unreferenced by the schema — those eleven ARE that
+   *  catalogue, and typing them keeps a typo from seeding a twelfth. The
+   *  interface itself is a plain string because `OFFICE_ADMINISTRATOR` is a
+   *  seeded role that is deliberately NOT in the enum: the enum is the legacy
+   *  catalogue being retired, not the list of roles the platform installs. */
+  name: string;
   /** Display names. Office-scoped custom roles made these mandatory on `Role`:
    *  an office renames its own roles, and a name that exists only in Latin
    *  script shows up untranslated mid-sentence on an Arabic page. Kept
@@ -38,7 +41,7 @@ export interface RoleSeed {
  *  is false, and a per-row field would invite one. */
 export const SEEDED_ROLES_ARE_SYSTEM = true;
 
-export const ROLES: RoleSeed[] = [
+export const ROLES: (RoleSeed & { name: RoleName })[] = [
   {
     name: RoleName.SALES_RELATIONSHIP_OFFICER,
     nameEn: "Sales / Relationship Officer",
@@ -139,3 +142,53 @@ export const ROLES: RoleSeed[] = [
       "Time-boxed, read-only access to logs, documents, and workflow history for a defined engagement period (User.accessValidFrom/accessValidUntil). Cannot modify any record.",
   },
 ];
+
+/**
+ * The office administrator, and the only role a NEW office is given.
+ *
+ * ## Why this role exists
+ *
+ * Every office needs somebody who can provision a user and define a role, or
+ * the office cannot be set up at all — and until now that person had to be a
+ * `SYSTEM_SECURITY_ADMINISTRATOR`, a platform-catalogue role from the fixed
+ * eleven this rework is retiring. An office that defines its own roles needs its
+ * administrator to be an ordinary per-office row like any other.
+ *
+ * ## It is a strict subset, and that is load-bearing
+ *
+ * Its 22 codes are a verified strict subset of what
+ * `SYSTEM_SECURITY_ADMINISTRATOR` already holds. That is what lets the migration
+ * grant this role to every existing administrator with a provably EMPTY
+ * effective-permission diff: nobody gains anything, the role simply becomes the
+ * per-office name for what they could already do. `permissions.spec.ts` asserts
+ * the subset property so it cannot quietly stop holding.
+ *
+ * What it deliberately does NOT hold, all of it verified against the grid:
+ * `claim.delete` and `document.delete-override` (destructive business actions an
+ * administrator has no business performing), `insurer.form.map` and
+ * `insurer.master.manage` (the global insurer catalogue is a platform concern),
+ * `access-recertification.review` and `.review.routine` (an administrator
+ * reviewing their own access is the control this system exists to prevent), and
+ * `employee.national-id.reveal` / `customer.national-id.reveal` (Part 10.2
+ * Highly Confidential — provisioning an account does not require reading
+ * somebody's national identity number).
+ *
+ * ## isSystem, and what it does not mean
+ *
+ * `isSystem` protects the row from being renamed, retired or re-granted from the
+ * Role screen. It GRANTS NOTHING. There is no wildcard, no `ALL_PERMISSIONS`,
+ * no `if (isSystem) allow` — this role reaches exactly the 22 codes below, the
+ * same way every other role reaches its grants.
+ */
+export const OFFICE_ADMINISTRATOR_ROLE: RoleSeed = {
+  name: "OFFICE_ADMINISTRATOR",
+  nameEn: "Office Administrator",
+  nameAr: "مدير المكتب",
+  // Strict, like every administration role in the catalogue. Part II §4.4 —
+  // and this one can provision accounts, which is the capability an attacker
+  // wants most.
+  requiresMfaAlways: true,
+  requiresHardwareToken: true,
+  description:
+    "Provisions users, defines the office's own roles and their permissions, and manages office security configuration, email integration and the operational registers. Cannot delete business records, touch the global insurer catalogue, review its own access recertification, or reveal a national ID.",
+};
