@@ -13,9 +13,10 @@ import type { CustomerRepository } from '../../repositories/customer.repository'
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'plc-1',
     organizationId: 'org-1',
     email: 'placement@ibms.test',
@@ -23,7 +24,7 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
 const APPROVED_NA = {

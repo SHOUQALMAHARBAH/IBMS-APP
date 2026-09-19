@@ -115,7 +115,7 @@ describe('API contract (OpenAPI)', () => {
     ).accessToken;
     const userId = (login.body as { user: { id: string } }).user.id;
 
-    // MfaRequiredGuard and RolesGuard/PermissionsGuard both run before this
+    // MfaRequiredGuard and PermissionsGuard both run before this
     // route resolves — enroll MFA and grant the admin role first, same as
     // rbac.e2e-spec.ts.
     const enroll = await request(app.getHttpServer())

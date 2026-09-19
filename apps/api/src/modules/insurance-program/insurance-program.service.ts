@@ -21,7 +21,7 @@ import { RiskProfileRepository } from '../../repositories/risk-profile.repositor
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import { quantizeMoney } from '../../common/money.util';
 import {
   deriveSumInsured,
@@ -84,7 +84,7 @@ export interface InsuranceProgramView extends InsuranceProgramWithLines {
  *
  * Visibility: a program inherits its Risk Profile's Customer's visibility —
  * the Sales/Relationship Officer who owns that Customer sees it;
- * Placement/Manager/Executive (CUSTOMER_FILE_CROSS_OWNER_ROLES) work the
+ * Placement/Manager/Executive (`customer-file.all-owners.read`) work the
  * whole book. Same pattern as RiskProfileService / NeedsAssessmentService.
  */
 @Injectable()
@@ -101,9 +101,7 @@ export class InsuranceProgramService {
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed; an audit hiccup

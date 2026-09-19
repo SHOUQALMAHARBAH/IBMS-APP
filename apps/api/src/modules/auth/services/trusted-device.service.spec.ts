@@ -1,13 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import type { RoleName } from '@ibms/db';
 import { TrustedDeviceService } from './trusted-device.service';
 import { MfaService } from './mfa.service';
 import { authenticator } from 'otplib';
 import {
-  ALWAYS_MFA_ROLES,
-  PRIVILEGED_ROLES,
-  alwaysRequiresMfa,
+  roleSecurityAttributes,
+  type RoleSecurityAttributes,
 } from '../auth.types';
 import type { TrustedDeviceRepository } from '../../../repositories/trusted-device.repository';
 import type { AuditService } from '../../audit/audit.service';
@@ -41,7 +39,25 @@ function build(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const STANDARD: RoleName[] = ['SALES_RELATIONSHIP_OFFICER'];
+/** What a Sales Officer's roles resolve to: neither obligation. */
+const STANDARD: RoleSecurityAttributes = {
+  requiresMfaAlways: false,
+  requiresHardwareToken: false,
+};
+
+/** What an administrator's, Compliance Officer's or DPO's roles resolve to. */
+const ALWAYS_MFA: RoleSecurityAttributes = {
+  requiresMfaAlways: true,
+  requiresHardwareToken: true,
+};
+
+/** Executive Management and Branch/Department Manager — privileged for the
+ *  WebAuthn fast-follow, but §4.4 deliberately leaves them the trusted-device
+ *  convenience. The one combination that proves the two flags are independent. */
+const PRIVILEGED_ONLY: RoleSecurityAttributes = {
+  requiresMfaAlways: false,
+  requiresHardwareToken: true,
+};
 
 beforeAll(() => {
   // `MfaService` encrypts the TOTP secret with this key, same as the existing
@@ -49,32 +65,58 @@ beforeAll(() => {
   process.env.MFA_ENCRYPTION_KEY = randomBytes(32).toString('base64');
 });
 
-describe('the always-MFA role set (Part II §4.4)', () => {
-  it('is exactly the three roles the spec names', () => {
-    expect([...ALWAYS_MFA_ROLES].sort()).toEqual([
-      'COMPLIANCE_OFFICER',
-      'DATA_PROTECTION_OFFICER',
-      'SYSTEM_SECURITY_ADMINISTRATOR',
-    ]);
+describe('roleSecurityAttributes (Part II §4.4 / Part 10.1)', () => {
+  // These used to be two hard-coded lists of role NAMES, which is why this
+  // block used to assert their contents. The membership question now belongs to
+  // the data: `packages/db/prisma/seed-data/roles.spec.ts` asserts the seed
+  // agrees with the two specs, and
+  // `apps/api/test/role-security-attributes.e2e-spec.ts` asserts the migrated
+  // database does. What is left here is the resolution RULE.
+
+  it('imposes an obligation carried by ANY role held', () => {
+    // One strict role plus one relaxed role is strict. The alternative —
+    // requiring every role to agree — would let an administrator weaken a
+    // privileged account by granting it an extra ordinary role, which is
+    // backwards.
+    expect(roleSecurityAttributes([STANDARD, ALWAYS_MFA])).toEqual({
+      requiresMfaAlways: true,
+      requiresHardwareToken: true,
+    });
+    expect(roleSecurityAttributes([ALWAYS_MFA, STANDARD])).toEqual({
+      requiresMfaAlways: true,
+      requiresHardwareToken: true,
+    });
   });
 
-  it('is NOT the privileged-role set, and that difference is deliberate', () => {
-    // `PRIVILEGED_ROLES` drives step-up and the hardware-token fast-follow, and
-    // is wider. Reusing it here would look stricter while quietly taking the
-    // trusted-device convenience away from Executive Management and
-    // Branch/Department Managers, whom §4.4 leaves as standard roles.
-    expect(PRIVILEGED_ROLES).toContain('EXECUTIVE_MANAGEMENT');
-    expect(PRIVILEGED_ROLES).toContain('BRANCH_DEPARTMENT_MANAGER');
-    expect(ALWAYS_MFA_ROLES).not.toContain('EXECUTIVE_MANAGEMENT');
-    expect(ALWAYS_MFA_ROLES).not.toContain('BRANCH_DEPARTMENT_MANAGER');
+  it('keeps the two obligations independent', () => {
+    // The Executive / Manager case. If these two flags were ever collapsed into
+    // one, both roles would lose the trusted-device option and nothing else in
+    // the suite would fail.
+    expect(roleSecurityAttributes([PRIVILEGED_ONLY])).toEqual({
+      requiresMfaAlways: false,
+      requiresHardwareToken: true,
+    });
   });
 
-  it('flags a user holding any one of them, among other roles', () => {
-    expect(
-      alwaysRequiresMfa(['SALES_RELATIONSHIP_OFFICER', 'COMPLIANCE_OFFICER']),
-    ).toBe(true);
-    expect(alwaysRequiresMfa(STANDARD)).toBe(false);
-    expect(alwaysRequiresMfa([])).toBe(false);
+  it('imposes nothing when no role is held', () => {
+    // Unchanged from the name-list behaviour, and safe for the same reason: an
+    // account with no roles resolves no permissions either, so there is nothing
+    // for a skipped prompt to reach.
+    expect(roleSecurityAttributes([])).toEqual({
+      requiresMfaAlways: false,
+      requiresHardwareToken: false,
+    });
+  });
+
+  it('resolves a role the code has never heard of as STRICT, because the column does', () => {
+    // The fail-open bug, stated as a test. A role an office invents carries
+    // `requiresMfaAlways: true` out of the database (the column default), so it
+    // arrives here strict — where a name list would not have matched it at all.
+    const custom: RoleSecurityAttributes = {
+      requiresMfaAlways: true,
+      requiresHardwareToken: true,
+    };
+    expect(roleSecurityAttributes([custom]).requiresMfaAlways).toBe(true);
   });
 });
 
@@ -89,17 +131,36 @@ describe('TrustedDeviceService.maySkipMfa', () => {
     expect(mocks.touchLastUsed).toHaveBeenCalledWith('td-1');
   });
 
-  it('NEVER skips for an always-MFA role, even with a live trust', async () => {
+  it('NEVER skips for an always-MFA caller, even with a live trust', async () => {
     const { service, mocks } = build({
       findLiveForUser: vi.fn().mockResolvedValue({ id: 'td-1' }),
     });
-    for (const role of ALWAYS_MFA_ROLES) {
-      await expect(
-        service.maySkipMfa('u1', [role], { fingerprint: 'abc' }),
-      ).resolves.toBe(false);
-    }
-    // It does not even look: the role decides before the device does.
+    await expect(
+      service.maySkipMfa('u1', ALWAYS_MFA, { fingerprint: 'abc' }),
+    ).resolves.toBe(false);
+    // Only `requiresMfaAlways` decides — asserted separately so the two flags
+    // cannot quietly become one.
+    await expect(
+      service.maySkipMfa(
+        'u1',
+        { requiresMfaAlways: true, requiresHardwareToken: false },
+        { fingerprint: 'abc' },
+      ),
+    ).resolves.toBe(false);
+    // It does not even look: the obligation decides before the device does.
     expect(mocks.findLiveForUser).not.toHaveBeenCalled();
+  });
+
+  it('DOES skip for a privileged-but-not-always-MFA caller', async () => {
+    // Executive Management and Branch/Department Manager. This is the test that
+    // fails if the hardware-token flag is ever used to answer the §4.4
+    // question.
+    const { service } = build({
+      findLiveForUser: vi.fn().mockResolvedValue({ id: 'td-1' }),
+    });
+    await expect(
+      service.maySkipMfa('u1', PRIVILEGED_ONLY, { fingerprint: 'abc' }),
+    ).resolves.toBe(true);
   });
 
   it('does not skip when the request carried no fingerprint', async () => {
@@ -131,16 +192,29 @@ describe('TrustedDeviceService.trust', () => {
     expect(call.deviceFingerprintHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('refuses an always-MFA role server-side, whatever the client sent', async () => {
+  it('refuses an always-MFA caller server-side, whatever the client sent', async () => {
     // §4.4 says the checkbox must not render for them; a control that only
     // exists in the UI is not a control.
     const { service, mocks } = build();
-    for (const role of ALWAYS_MFA_ROLES) {
-      await expect(
-        service.trust('u1', [role], { fingerprint: 'abc' }),
-      ).resolves.toBeNull();
-    }
+    await expect(
+      service.trust('u1', ALWAYS_MFA, { fingerprint: 'abc' }),
+    ).resolves.toBeNull();
+    await expect(
+      service.trust(
+        'u1',
+        { requiresMfaAlways: true, requiresHardwareToken: false },
+        { fingerprint: 'abc' },
+      ),
+    ).resolves.toBeNull();
     expect(mocks.grant).not.toHaveBeenCalled();
+  });
+
+  it('grants to a privileged-but-not-always-MFA caller', async () => {
+    const { service, mocks } = build();
+    await expect(
+      service.trust('u1', PRIVILEGED_ONLY, { fingerprint: 'abc' }),
+    ).resolves.not.toBeNull();
+    expect(mocks.grant).toHaveBeenCalled();
   });
 
   it('refuses when no fingerprint was supplied', async () => {

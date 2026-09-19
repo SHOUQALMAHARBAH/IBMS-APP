@@ -77,7 +77,7 @@ export const CLAIM_LIST_LIMIT = 200;
 
 export interface ListClaimsFilter {
   /** `null` = this caller reaches the whole claims book (see
-   *  `CLAIM_CROSS_OWNER_ROLES`). Otherwise, only claims whose Customer is
+   *  `claim.all-owners.read`). Otherwise, only claims whose Customer is
    *  owned by this user id. */
   ownerUserId: string | null;
   status?: ClaimStatus;

@@ -99,6 +99,21 @@ async function makeUser(
   return { accessToken, userId: user.id };
 }
 
+/** Same onboarding, but granting a role by ID rather than by seeded name — the
+ *  one test below builds a CUSTOM role, which `ensureRole` would upsert by name
+ *  without its permissions. */
+async function makeUserWithRoleId(
+  app: INestApplication<App>,
+  label: string,
+  roleId: string,
+): Promise<{ accessToken: string; userId: string }> {
+  const created = await makeUser(app, label);
+  await prisma.userRoleAssignment.create({
+    data: { userId: created.userId, roleId },
+  });
+  return created;
+}
+
 describe('Incident Management (e2e) — backlog Part C #55', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
@@ -170,7 +185,10 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
       .set(bearer(responder.accessToken))
       .expect(201);
 
-    // Executive Management cannot classify — only DPO
+    // Executive Management cannot classify. Since Phase 2 that is a PERMISSION:
+    // `incident.classify` is the DPO's, `incident.classification.co-sign` is
+    // Executive Management's. It used to be one code for both routes with the
+    // service refusing by role NAME, which no custom role could satisfy.
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/classify`)
       .set(bearer(exec.accessToken))
@@ -209,7 +227,10 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
       .set(bearer(dpo.accessToken))
       .expect(422);
 
-    // the DPO who classified cannot also co-sign — wrong role AND same actor
+    // The DPO who classified cannot also co-sign. Two independent reasons now,
+    // and the 403 here is the first: they do not hold
+    // `incident.classification.co-sign`. The second — same actor — is what still
+    // holds for someone who DOES hold both codes, proved in its own test below.
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/co-sign`)
       .set(bearer(dpo.accessToken))
@@ -293,6 +314,110 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
     expect(actions).toContain('UPDATE');
   });
 
+  it('a caller holding BOTH halves still cannot co-sign its own classification', async () => {
+    // Phase 2 workstream G, the part that matters.
+    //
+    // Splitting `incident.classify` in two makes the classify/co-sign pair
+    // separately grantable — and an office CAN put both codes on one role. That
+    // is deliberate: a small office may want it, and Phase 3's matrix warns
+    // rather than refuses.
+    //
+    // What must NOT depend on how the roles were arranged is that nobody
+    // co-signs their own work. `assertDifferentActors` is that control, and this
+    // test is the proof it survives the split: one person, both permissions, and
+    // the co-sign of their own classification is still refused.
+    const app = await boot();
+    const bothName = `Incident Both Halves ${Date.now()}`;
+    const both = await prisma.role.create({
+      data: {
+        name: bothName,
+        nameEn: bothName,
+        nameAr: bothName,
+        requiresMfaAlways: false,
+        requiresHardwareToken: false,
+      },
+    });
+    const codes = [
+      'incident.report',
+      'incident.contain',
+      'incident.classify',
+      'incident.classification.co-sign',
+    ];
+    const permissions = await prisma.permission.findMany({
+      where: { code: { in: codes } },
+      select: { id: true, code: true },
+    });
+    expect(permissions.map((r) => r.code).sort()).toEqual([...codes].sort());
+    await prisma.rolePermission.createMany({
+      data: permissions.map((perm) => ({
+        roleId: both.id,
+        permissionId: perm.id,
+      })),
+    });
+
+    try {
+      const dualHatted = await makeUserWithRoleId(
+        app,
+        'incident-both',
+        both.id,
+      );
+
+      const reported = await request(app.getHttpServer())
+        .post('/incidents')
+        .set(bearer(dualHatted.accessToken))
+        .send({
+          title: 'Dual-hatted classification',
+          description: 'One person holding both halves of the pair.',
+          severity: 'critical',
+        })
+        .expect(201);
+      const incidentId = (reported.body as IncidentBody).id;
+
+      await request(app.getHttpServer())
+        .post(`/incidents/${incidentId}/contain`)
+        .set(bearer(dualHatted.accessToken))
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/incidents/${incidentId}/assess-impact`)
+        .set(bearer(dualHatted.accessToken))
+        .expect(201);
+
+      // Both halves are reachable for this caller — no 403 on either route.
+      await request(app.getHttpServer())
+        .post(`/incidents/${incidentId}/classify`)
+        .set(bearer(dualHatted.accessToken))
+        .send({ classification: 'MATERIAL' })
+        .expect(201);
+
+      // And yet the co-sign is refused, because it would be the same human on
+      // both sides of a control that exists to have two.
+      await request(app.getHttpServer())
+        .post(`/incidents/${incidentId}/co-sign`)
+        .set(bearer(dualHatted.accessToken))
+        .expect(403);
+
+      const stored = await prisma.incidentReport.findUniqueOrThrow({
+        where: { id: incidentId },
+        select: {
+          classifiedByDpoUserId: true,
+          seniorManagementCoSignUserId: true,
+        },
+      });
+      expect(stored.classifiedByDpoUserId).toBe(dualHatted.userId);
+      expect(
+        stored.seniorManagementCoSignUserId,
+        'no co-sign may have been recorded',
+      ).toBeNull();
+    } finally {
+      // db-test is cumulative.
+      await prisma.userRoleAssignment.deleteMany({
+        where: { roleId: both.id },
+      });
+      await prisma.rolePermission.deleteMany({ where: { roleId: both.id } });
+      await prisma.role.deleteMany({ where: { id: both.id } });
+    }
+  }, 300_000);
+
   it('a NON_MATERIAL classification skips the co-sign gate and blocks co-sign entirely', async () => {
     const app = await boot();
     const reporter = await makeUser(
@@ -310,6 +435,10 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
       'inc-nonmat-dpo',
       'DATA_PROTECTION_OFFICER',
     );
+    // Needed since the classify/co-sign split: only a holder of
+    // `incident.classification.co-sign` gets far enough to be refused by the
+    // Non-Material business rule rather than by the permission gate.
+    const exec = await makeUser(app, 'inc-nonmat-exec', 'EXECUTIVE_MANAGEMENT');
 
     const created = await request(app.getHttpServer())
       .post('/incidents')
@@ -357,11 +486,23 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
     });
     expect(seniorMgmtTimers).toHaveLength(0);
 
-    // co-sign is refused outright for a Non-Material incident
+    // Co-sign is refused outright for a Non-Material incident. Asked as the
+    // EXECUTIVE, not the DPO: since Phase 2 the two halves are separate
+    // permissions, so the DPO is now stopped at the guard with a 403 and never
+    // reaches the business rule this line is about. Authorization first, then
+    // the rule — which is the right order, and means the rule has to be probed
+    // by someone authorized to invoke it.
+    await request(app.getHttpServer())
+      .post(`/incidents/${incident.id}/co-sign`)
+      .set(bearer(exec.accessToken))
+      .expect(422);
+
+    // And the DPO, who does not hold `incident.classification.co-sign`, is
+    // refused by the gate regardless of the incident's classification.
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/co-sign`)
       .set(bearer(dpo.accessToken))
-      .expect(422);
+      .expect(403);
 
     // regulator notification proceeds with no co-sign required
     const notified = await request(app.getHttpServer())

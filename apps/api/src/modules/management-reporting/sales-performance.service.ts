@@ -20,7 +20,7 @@ import {
   type SalesTargetView,
 } from './sales-performance.config';
 import { parseCalendarDate } from '../../common/calendar-date.util';
-import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllLeadOwners } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateSalesTargetDto } from './dto/create-sales-target.dto';
 import type { UpdateSalesTargetDto } from './dto/update-sales-target.dto';
@@ -146,9 +146,7 @@ export class SalesPerformanceService {
     query: SalesPerformanceQueryDto,
     actor: AuthenticatedUser,
   ): Promise<SalesPerformanceView> {
-    const canViewAllOwners = actor.roles.some((role) =>
-      VIEW_ALL_OWNERS_ROLES.includes(role),
-    );
+    const canViewAllOwners = canReadAllLeadOwners(actor);
 
     let scope: { ownerUserId: string } | { branchId: string };
     if (!canViewAllOwners) {

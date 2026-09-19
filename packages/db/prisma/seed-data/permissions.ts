@@ -810,11 +810,43 @@ const complianceRisk: PermissionSeed[] = [
     description: "Execute incident containment actions",
     roles: [ADMIN, COMPLIANCE],
   },
+  // Classification and the Senior Management co-sign are two halves of one
+  // control, and until Phase 2 a single code gated BOTH — so the role NAME was
+  // the only thing telling them apart (`incident.service.ts` refused a
+  // non-DPO classify and a non-Executive co-sign by name). A custom role was in
+  // neither check and could reach neither action, and one code could not express
+  // "may classify but not co-sign" at all.
+  //
+  // Split into three. `incident.senior-management.notify` exists because the
+  // notification stamp had no role narrowing, so BOTH the DPO and Executive
+  // Management could make it; narrowing `incident.classify` to the DPO alone
+  // would have silently taken that from Executive Management.
+  //
+  // An office CAN grant both halves to one role. Instance-level independence
+  // does not depend on this split: `assertDifferentActors` still refuses a
+  // co-sign by whoever recorded the classification, so nobody co-signs their own
+  // work however the roles are arranged. Phase 3's permission matrix warns on
+  // the combination rather than refusing it — a small office may legitimately
+  // want it.
   {
     code: "incident.classify",
     module: "compliance-risk",
     description:
-      "Classify an incident as Material (requires DPO + Senior Management co-sign)",
+      "Classify an incident as Material or Non-Material (the DPO half of the pair; the co-sign is a separate permission)",
+    roles: [DPO],
+  },
+  {
+    code: "incident.classification.co-sign",
+    module: "compliance-risk",
+    description:
+      "Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it",
+    roles: [EXEC],
+  },
+  {
+    code: "incident.senior-management.notify",
+    module: "compliance-risk",
+    description:
+      "Record that Senior Management was notified of a Material incident (a manual stamp, not part of the classify/co-sign pair)",
     roles: [DPO, EXEC],
   },
   {
@@ -1185,12 +1217,98 @@ const admin: PermissionSeed[] = [
       "Review and decide an access-recertification item (never one's own)",
     roles: [MANAGER, COMPLIANCE, EXEC],
   },
+  // The reviewer pool has always been TWO TIERS: Compliance and line Managers
+  // are assigned routinely, and Executive Management is a genuine fallback used
+  // only when no routine reviewer other than the subject exists. That ordering
+  // lived in the shape of `startCycle`'s code, as two lists — which a single
+  // permission cannot express, because all three roles hold the same one.
+  //
+  // So the eligibility code above is UNCHANGED (it still gates `decide()`, and
+  // an Executive assigned as fallback must still be able to decide), and this
+  // second code marks the roles to prefer when ASSIGNING. An office grants it to
+  // whichever of its own roles should take routine reviews; granting nobody is
+  // legitimate and simply makes every eligible reviewer a fallback.
+  {
+    code: "access-recertification.review.routine",
+    module: "admin",
+    description:
+      "Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review)",
+    roles: [MANAGER, COMPLIANCE],
+  },
   {
     code: "encryption-key.read",
     module: "admin",
     description:
       "View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access)",
     roles: [ADMIN],
+  },
+];
+
+// ----------------------------------------------------------------------
+// Cross-owner visibility (office-scoped custom RBAC, Phase 2 workstream C)
+// ----------------------------------------------------------------------
+//
+// Each of these answers one question: "may this caller see a record they do not
+// own?" Until Phase 2 each was a hard-coded list of role NAMES in
+// `apps/api/src/common/rbac-visibility.util.ts`. A role an office defines
+// appeared in none of them, so it saw only what it owned however its
+// permissions had been granted — failing closed, but wrong, and silently.
+//
+// Every grant below is exactly the list that rule held before, so no existing
+// user's visibility changes. `.all-owners.read` rather than
+// `.view-all-owners`: the External Auditor holds cross-owner reach on customers
+// and `permissions.spec.ts` proves that role read-only BY CONSTRUCTION from the
+// `.read`/`.view` suffix — a name needing that check widened would have traded a
+// real safety property for a nicer-reading code.
+const crossOwnerVisibility: PermissionSeed[] = [
+  {
+    code: "lead.all-owners.read",
+    module: "commercial-front-office",
+    description:
+      "See leads and prospects owned by another Sales/Relationship Officer — the org-wide pipeline view, not one's own",
+    roles: [MANAGER, EXEC],
+  },
+  {
+    code: "customer.all-owners.read",
+    module: "customer",
+    description:
+      "See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)",
+    roles: [MANAGER, EXEC, COMPLIANCE, AUDITOR],
+  },
+  {
+    code: "customer-file.all-owners.read",
+    module: "commercial-front-office",
+    description:
+      "See any customer's COMMERCIAL file — risk profile, needs assessment, insurance program, opportunity, RFQ, quotation, comparison, client decision — regardless of owner",
+    roles: [PLACEMENT, MANAGER, EXEC],
+  },
+  {
+    code: "policy.all-owners.read",
+    module: "insurance-operations",
+    description:
+      "See any Policy regardless of who owns its Customer (the Policy Checking Officer's Process 20 quality control is a cross-book control function)",
+    roles: [PLACEMENT, MANAGER, EXEC, POLICY_CHECK],
+  },
+  {
+    code: "claim.all-owners.read",
+    module: "claims",
+    description:
+      "See any Claim regardless of who owns its Customer — the Claims Officer works the whole claims book",
+    roles: [CLAIMS, MANAGER, EXEC],
+  },
+  {
+    code: "endorsement.all-owners.read",
+    module: "insurance-operations",
+    description:
+      "See any Endorsement regardless of owner (Finance handles the premium adjustment an endorsement produces)",
+    roles: [PLACEMENT, MANAGER, EXEC, FINANCE],
+  },
+  {
+    code: "recommendation.all-owners.read",
+    module: "commercial-front-office",
+    description:
+      "See any broker Recommendation regardless of owner — Compliance must reach any of them to clear a conflict-of-interest disclosure the conflicted officer cannot self-clear",
+    roles: [PLACEMENT, MANAGER, EXEC, COMPLIANCE],
   },
 ];
 
@@ -1242,5 +1360,6 @@ export const PERMISSIONS: PermissionSeed[] = [
   ...supportingOperations,
   ...pdpl,
   ...admin,
+  ...crossOwnerVisibility,
   ...slaGovernance,
 ];

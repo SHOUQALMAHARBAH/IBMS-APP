@@ -40,7 +40,7 @@ import type { AcknowledgeReceiptDto } from './dto/acknowledge-receipt.dto';
  * `DeliveryRecord` is NOT a `WorkflowTransitionService` entity (no `status` —
  * its lifecycle is the parent `Policy`'s status). Visibility mirrors the rest
  * of the module — a policy inherits its Customer's visibility (`PolicyService.
- * loadVisible`, which trusts `POLICY_CROSS_OWNER_ROLES` + the Customer owner).
+ * loadVisible`, which trusts `policy.all-owners.read` + the Customer owner).
  */
 @Injectable()
 export class PolicyDeliveryService {

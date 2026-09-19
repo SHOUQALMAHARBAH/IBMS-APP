@@ -40,12 +40,21 @@ function makeDeps(over: Record<string, unknown> = {}) {
     grantRole: vi.fn().mockResolvedValue({ id: 'ura-1' }),
     revokeRole: vi.fn().mockResolvedValue(1),
     setActive: vi.fn().mockResolvedValue(1),
-    countActiveHoldersOfRole: vi.fn().mockResolvedValue(2),
-    // The real one wraps `work` in a transaction that first takes
-    // `SELECT ... FOR UPDATE` on the Role row, so the last-administrator count
-    // and the write it gates cannot interleave. Here it just runs the callback.
-    withRoleLocked: vi.fn(
-      async (_roleId: string, work: () => Promise<unknown>) => work(),
+    // Two administrators by default, each through their own role — so the
+    // lockout guard has a survivor and the ordinary paths are not blocked.
+    findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
+      { userId: 'u-1', roleId: 'role-admin' },
+      { userId: 'u-other-admin', roleId: 'role-admin' },
+    ]),
+    // The role being touched is NOT an administrator role unless a test says so,
+    // which keeps the guard out of the way of the unrelated cases.
+    roleGrantsPermission: vi.fn().mockResolvedValue(false),
+    // The real one wraps `work` in a transaction holding
+    // `pg_advisory_xact_lock` on (organizationId, capability), so the
+    // last-administrator read and the write it gates cannot interleave with
+    // another request asking the same question. Here it just runs the callback.
+    withCapabilityLocked: vi.fn(
+      async (_code: string, work: () => Promise<unknown>) => work(),
     ),
     listWithRoles: vi.fn().mockResolvedValue([]),
     countAll: vi.fn().mockResolvedValue(0),
@@ -67,7 +76,16 @@ function makeDeps(over: Record<string, unknown> = {}) {
     hash: vi.fn().mockResolvedValue('hashed'),
     ...(over.passwords as object),
   };
-  const permissions = { invalidateCache: vi.fn() };
+  const permissions = {
+    invalidateCache: vi.fn(),
+    // Phase 2 — the segregation signal now asks what a role actually GRANTS
+    // rather than what it is called, so provisioning and granting resolve each
+    // role's codes. An empty set means "this role carries no checker
+    // permission", which is the quiet path most of these tests want; the tests
+    // that are about the signal override it.
+    getCodesForRoles: vi.fn().mockResolvedValue(new Set<string>()),
+    ...(over.permissions as object),
+  };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   // Part II §4.2.2 — provisioning now resolves a Department, scoped to the
   // caller's own office.
@@ -370,7 +388,12 @@ describe('UserAdminService role assignment', () => {
     const deps = makeDeps({
       users: {
         findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
-        countActiveHoldersOfRole: vi.fn().mockResolvedValue(1),
+        roleGrantsPermission: vi.fn().mockResolvedValue(true),
+        // The only holder is the very assignment being revoked, so nothing
+        // survives it.
+        findActiveHoldersOfPermission: vi
+          .fn()
+          .mockResolvedValue([{ userId: 'u-1', roleId: 'role-admin' }]),
       },
     });
     await expect(
@@ -387,13 +410,11 @@ describe('UserAdminService role assignment', () => {
     const deps = makeDeps({
       users: {
         findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
-        countActiveHoldersOfRole: vi.fn().mockResolvedValue(2),
-        // The real one wraps `work` in a transaction that first takes
-        // `SELECT ... FOR UPDATE` on the Role row, so the last-administrator count
-        // and the write it gates cannot interleave. Here it just runs the callback.
-        withRoleLocked: vi.fn(
-          async (_roleId: string, work: () => Promise<unknown>) => work(),
-        ),
+        roleGrantsPermission: vi.fn().mockResolvedValue(true),
+        findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
+          { userId: 'u-1', roleId: 'role-admin' },
+          { userId: 'u-other-admin', roleId: 'role-admin' },
+        ]),
         getRoleNames: vi.fn().mockResolvedValue([]),
       },
     });
@@ -403,6 +424,68 @@ describe('UserAdminService role assignment', () => {
       actor.id,
     );
     expect(deps.users.revokeRole).toHaveBeenCalledWith('u-1', 'role-admin');
+  });
+
+  it('allows revoking ONE administrator role from a user who holds the capability through another', async () => {
+    // A count of holders cannot answer this: the sole holder is `u-1`, so a
+    // count would say "one administrator" and refuse — even though `u-1` keeps
+    // `user.manage` through a second role and nothing is lost. The guard asks
+    // what survives THIS revoke, not how many holders there are.
+    const deps = makeDeps({
+      users: {
+        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        roleGrantsPermission: vi.fn().mockResolvedValue(true),
+        findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
+          { userId: 'u-1', roleId: 'role-admin' },
+          { userId: 'u-1', roleId: 'role-office-admin' },
+        ]),
+        getRoleNames: vi.fn().mockResolvedValue([]),
+      },
+    });
+    await deps.service.revokeRole(
+      'u-1',
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+      actor.id,
+    );
+    expect(deps.users.revokeRole).toHaveBeenCalledWith('u-1', 'role-admin');
+  });
+
+  it('guards a CUSTOM administrator role, which a name check never could', async () => {
+    // The whole point of keying on the capability. This role is called something
+    // an office chose; the old guard compared against
+    // 'SYSTEM_SECURITY_ADMINISTRATOR' and so never fired for it, letting the last
+    // usable administrator revoke their own access.
+    const deps = makeDeps({
+      users: {
+        findRoleByName: vi
+          .fn()
+          .mockResolvedValue({ id: 'role-custom', name: 'Office Admin' }),
+        roleGrantsPermission: vi.fn().mockResolvedValue(true),
+        findActiveHoldersOfPermission: vi
+          .fn()
+          .mockResolvedValue([{ userId: 'u-1', roleId: 'role-custom' }]),
+      },
+    });
+    await expect(
+      deps.service.revokeRole('u-1', 'Office Admin', actor.id),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.users.revokeRole).not.toHaveBeenCalled();
+  });
+
+  it('does not take the capability lock when the role is not an administrator role', async () => {
+    // Every other revoke must stay on the unguarded path — the lock serialises
+    // an office's administration surface, and taking it for a Sales role would
+    // make unrelated grants contend with each other.
+    const deps = makeDeps({
+      users: { findRoleByName: vi.fn().mockResolvedValue(SALES_ROLE) },
+    });
+    await deps.service.revokeRole(
+      'u-1',
+      RoleName.SALES_RELATIONSHIP_OFFICER,
+      actor.id,
+    );
+    expect(deps.users.withCapabilityLocked).not.toHaveBeenCalled();
+    expect(deps.users.revokeRole).toHaveBeenCalledWith('u-1', 'role-sales');
   });
 });
 
@@ -434,21 +517,28 @@ describe('UserAdminService.setActive (de-provisioning)', () => {
 });
 
 describe('UserAdminService — the last-administrator lockout invariant', () => {
-  it('takes the Role LOCK around the count and the revoke, not just a bare count', () => {
-    // As a plain count-then-act, two concurrent revocations of the two
-    // remaining administrators both read holders === 2, both passed
-    // `holders <= 1`, and both committed — leaving nobody holding
-    // `user.manage` and no way to grant it back short of direct database
-    // access, the precise outcome the guard exists to prevent.
+  it('takes the CAPABILITY lock around the read and the revoke, not just a bare count', () => {
+    // As a plain count-then-act, two concurrent revocations of the two remaining
+    // administrators both observed a survivor and both committed — leaving
+    // nobody holding `user.manage` and no way to grant it back short of direct
+    // database access, the precise outcome the guard exists to prevent.
     // race-safe-invariants.md § What triggers this rule names this shape.
+    //
+    // The lock is on the CAPABILITY, not on the Role row it used to be. A row
+    // lock served while exactly one role could hold `user.manage`; now several
+    // can, and two revocations against different administrator roles would lock
+    // different rows and serialise against nothing.
     const deps = makeDeps({
-      users: { findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE) },
+      users: {
+        findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
+        roleGrantsPermission: vi.fn().mockResolvedValue(true),
+      },
     });
     return deps.service
       .revokeRole('u-1', RoleName.SYSTEM_SECURITY_ADMINISTRATOR, actor.id)
       .then(() => {
-        expect(deps.users.withRoleLocked).toHaveBeenCalledWith(
-          ADMIN_ROLE.id,
+        expect(deps.users.withCapabilityLocked).toHaveBeenCalledWith(
+          'user.manage',
           expect.any(Function),
         );
       });
@@ -463,10 +553,10 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
     const deps = makeDeps({
       users: {
         findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
-        getRoleNames: vi
+        // `u-other` is the only holder, so deactivating them leaves none.
+        findActiveHoldersOfPermission: vi
           .fn()
-          .mockResolvedValue([RoleName.SYSTEM_SECURITY_ADMINISTRATOR]),
-        countActiveHoldersOfRole: vi.fn().mockResolvedValue(1),
+          .mockResolvedValue([{ userId: 'u-other', roleId: 'role-admin' }]),
       },
     });
     await expect(
@@ -479,27 +569,30 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
     const deps = makeDeps({
       users: {
         findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
-        getRoleNames: vi
-          .fn()
-          .mockResolvedValue([RoleName.SYSTEM_SECURITY_ADMINISTRATOR]),
-        countActiveHoldersOfRole: vi.fn().mockResolvedValue(2),
+        findActiveHoldersOfPermission: vi.fn().mockResolvedValue([
+          { userId: 'u-other', roleId: 'role-admin' },
+          { userId: 'u-survivor', roleId: 'role-admin' },
+        ]),
       },
     });
     await deps.service.setActive('u-other', false, actor.id);
     expect(deps.users.setActive).toHaveBeenCalledWith('u-other', false);
   });
 
-  it('does not run the admin lockout check when deactivating a NON-administrator', async () => {
+  it('does not refuse when deactivating a NON-administrator', async () => {
+    // The holder list does not contain this user, so the guard has nothing to
+    // say. Unlike revoke, deactivation takes the lock either way: it cannot know
+    // whether the subject is an administrator without reading the holders, and
+    // reading them outside the lock is the race.
     const deps = makeDeps({
       users: {
         findRoleByName: vi.fn().mockResolvedValue(ADMIN_ROLE),
-        getRoleNames: vi
+        findActiveHoldersOfPermission: vi
           .fn()
-          .mockResolvedValue([RoleName.SALES_RELATIONSHIP_OFFICER]),
+          .mockResolvedValue([{ userId: 'u-1', roleId: 'role-admin' }]),
       },
     });
     await deps.service.setActive('u-sales', false, actor.id);
-    expect(deps.users.countActiveHoldersOfRole).not.toHaveBeenCalled();
     expect(deps.users.setActive).toHaveBeenCalledWith('u-sales', false);
   });
 
@@ -509,7 +602,7 @@ describe('UserAdminService — the last-administrator lockout invariant', () => 
     });
     await deps.service.setActive('u-other', true, actor.id);
     expect(deps.users.setActive).toHaveBeenCalledWith('u-other', true);
-    expect(deps.users.withRoleLocked).not.toHaveBeenCalled();
+    expect(deps.users.withCapabilityLocked).not.toHaveBeenCalled();
   });
 });
 
@@ -520,6 +613,11 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   // single-handed. maker-checker-segregation.md is explicit that admin
   // consoles are NOT exempt from that rule, so this is not a lex gap — it is a
   // gap in what the system can see. These pin the visibility half.
+  //
+  // Phase 2 re-keyed the signal from role NAMES to the checker PERMISSIONS a
+  // role grants, so these tests now say what the role grants rather than only
+  // what it is called. That is the whole change: a role an office defines,
+  // holding `policy.check`, used to be handed out with no signal at all.
 
   it('records a signal when a CHECKER role is granted', async () => {
     const deps = makeDeps({
@@ -528,6 +626,9 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
           id: 'r-comp',
           name: RoleName.COMPLIANCE_OFFICER,
         }),
+      },
+      permissions: {
+        getCodesForRoles: vi.fn().mockResolvedValue(new Set(['kyc.approve'])),
       },
     });
     await deps.service.grantRole('u-1', RoleName.COMPLIANCE_OFFICER, actor.id);
@@ -544,6 +645,11 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
           id: 'r-fin',
           name: RoleName.FINANCE_COLLECTIONS_OFFICER,
         }),
+      },
+      permissions: {
+        getCodesForRoles: vi
+          .fn()
+          .mockResolvedValue(new Set(['refund.approve'])),
       },
     });
     // The administrator grants the checker role to their own account.
@@ -583,7 +689,11 @@ describe('UserAdminService — segregation-of-duties visibility', () => {
   it('signals on PROVISION too, not only on a later grant', async () => {
     // Provisioning a fresh account that already carries a checker role is the
     // exact "second identity" shape, so it must be as visible as a grant.
-    const deps = makeDeps();
+    const deps = makeDeps({
+      permissions: {
+        getCodesForRoles: vi.fn().mockResolvedValue(new Set(['kyc.approve'])),
+      },
+    });
     await deps.service.provision(
       {
         fullName: 'Second Identity',

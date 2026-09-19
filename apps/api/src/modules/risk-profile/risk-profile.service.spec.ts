@@ -6,9 +6,10 @@ import type { RiskProfileRepository } from '../../repositories/risk-profile.repo
 import type { CustomerRepository } from '../../repositories/customer.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -16,7 +17,7 @@ function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
 function assetRow(overrides?: Record<string, unknown>) {

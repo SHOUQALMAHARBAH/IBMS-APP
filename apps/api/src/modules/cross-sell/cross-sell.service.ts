@@ -5,7 +5,7 @@ import { CrossSellOpportunityRepository } from '../../repositories/cross-sell-op
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllLeadOwners } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { BENCHMARK_LINES, findCoverageGaps } from './cross-sell.config';
 
@@ -55,7 +55,7 @@ export interface CrossSellDetectionView extends CrossSellDetectionOutcome {
  * Visibility mirrors lead.service.ts / prospect.service.ts (this is a
  * Sales-pipeline concern): a Sales/Relationship Officer sees only
  * opportunities on a Customer they own; Manager/Executive
- * (VIEW_ALL_OWNERS_ROLES) get the org-wide view.
+ * (`lead.all-owners.read`) get the org-wide view.
  */
 @Injectable()
 export class CrossSellService {
@@ -69,7 +69,7 @@ export class CrossSellService {
   ) {}
 
   private canViewAllOwners(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) => VIEW_ALL_OWNERS_ROLES.includes(role));
+    return canReadAllLeadOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed; an audit hiccup

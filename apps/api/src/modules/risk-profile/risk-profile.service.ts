@@ -3,7 +3,7 @@ import type { Asset, RiskProfile } from '@ibms/db';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import { quantizeMoney } from '../../common/money.util';
 import {
   consolidateSites,
@@ -31,7 +31,7 @@ export interface RiskProfileWithSurvey extends RiskProfile {
  *
  * A Risk Profile inherits its visibility from its Customer: the
  * Sales/Relationship Officer who owns that Customer sees it;
- * Placement/Manager/Executive (CUSTOMER_FILE_CROSS_OWNER_ROLES) work the
+ * Placement/Manager/Executive (`customer-file.all-owners.read`) work the
  * whole book. Assets carry no workflow state and no maker/checker — they are
  * survey data captured under `risk-profile.create` and read under
  * `risk-profile.read`. Every monetary roll-up goes through money.util.ts
@@ -47,9 +47,7 @@ export class RiskProfileService {
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed; an audit hiccup

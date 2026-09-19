@@ -13,17 +13,18 @@ import type { RecommendationRepository } from '../../repositories/recommendation
 import type { CommissionRepository } from '../../repositories/commission.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 const d = (s: string) => new Prisma.Decimal(s);
 
-const actor: AuthenticatedUser = {
+const actor: AuthenticatedUser = withCrossOwnerPermissions({
   id: 'fin-1',
   organizationId: 'org-1',
   email: 'finance@ibms.test',
   roles: ['FINANCE_COLLECTIONS_OFFICER'],
   roleIds: [],
   sessionId: 's-1',
-};
+});
 
 const POLICY = {
   id: 'pol-1',

@@ -17,7 +17,7 @@ import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllEndorsementOwners } from '../../common/rbac-visibility.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
 import {
   compareMoney,
@@ -47,11 +47,6 @@ import type {
   AdvanceEndorsementDto,
   CalculateAdjustmentDto,
 } from './dto/endorsement-step.dto';
-
-const CROSS_OWNER_ROLES: readonly string[] = [
-  ...CUSTOMER_FILE_CROSS_OWNER_ROLES,
-  'FINANCE_COLLECTIONS_OFFICER',
-];
 
 export interface EndorsementView {
   id: string;
@@ -122,7 +117,7 @@ export class EndorsementService {
   ) {}
 
   private canReachAnyPolicy(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((r) => CROSS_OWNER_ROLES.includes(r));
+    return canReadAllEndorsementOwners(actor);
   }
 
   private async safeAudit(

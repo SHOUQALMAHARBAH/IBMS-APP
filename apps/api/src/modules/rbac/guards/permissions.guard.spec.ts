@@ -4,6 +4,7 @@ import type { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import type { PermissionsService } from '../services/permissions.service';
 import type { AuthenticatedUser } from '../../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../../test/fixtures/authenticated-user';
 
 function makeContext(user: AuthenticatedUser | undefined): ExecutionContext {
   return {
@@ -25,14 +26,15 @@ function makePermissionsService(granted: string[]): PermissionsService {
   } as unknown as PermissionsService;
 }
 
-const user = (): AuthenticatedUser => ({
-  id: 'u1',
-  organizationId: 'org-1',
-  email: 'u1@ibms.test',
-  roles: ['CLAIMS_OFFICER'],
-  roleIds: [],
-  sessionId: 's1',
-});
+const user = (): AuthenticatedUser =>
+  withCrossOwnerPermissions({
+    id: 'u1',
+    organizationId: 'org-1',
+    email: 'u1@ibms.test',
+    roles: ['CLAIMS_OFFICER'],
+    roleIds: [],
+    sessionId: 's1',
+  });
 
 describe('PermissionsGuard', () => {
   it('allows the request through when no @RequirePermissions decorator is present', async () => {

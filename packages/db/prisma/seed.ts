@@ -536,6 +536,13 @@ async function main() {
         description: role.description,
         nameEn: role.nameEn,
         nameAr: role.nameAr,
+        // Written on BOTH paths. `Role.requiresMfaAlways`/
+        // `requiresHardwareToken` default to the strict value, so a create that
+        // omitted them would seed eleven roles that all demand MFA on every
+        // login — and an update that omitted them would leave a database
+        // migrated before this seed ran disagreeing with a freshly seeded one.
+        requiresMfaAlways: role.requiresMfaAlways,
+        requiresHardwareToken: role.requiresHardwareToken,
       },
       create: {
         organizationId: DEFAULT_ORGANIZATION_ID,
@@ -543,6 +550,8 @@ async function main() {
         nameEn: role.nameEn,
         nameAr: role.nameAr,
         description: role.description,
+        requiresMfaAlways: role.requiresMfaAlways,
+        requiresHardwareToken: role.requiresHardwareToken,
       },
     });
   }

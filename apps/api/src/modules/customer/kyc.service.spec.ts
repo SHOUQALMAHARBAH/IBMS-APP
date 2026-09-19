@@ -15,9 +15,10 @@ import type { ScreeningService } from './screening.service';
 import type { ScreeningHoldService } from './screening-hold.service';
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -25,7 +26,7 @@ function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
 function makeDeps() {

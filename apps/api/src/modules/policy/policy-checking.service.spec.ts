@@ -14,9 +14,10 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { PolicyService } from './policy.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 function checker(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return {
+  return withCrossOwnerPermissions({
     id: 'chk-1',
     organizationId: 'org-1',
     email: 'chk@ibms.test',
@@ -24,7 +25,7 @@ function checker(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     roleIds: [],
     sessionId: 'session-1',
     ...overrides,
-  };
+  });
 }
 
 const MATCHING_DTO = {

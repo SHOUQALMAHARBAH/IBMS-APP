@@ -7,7 +7,7 @@ import { RiskProfileRepository } from '../../repositories/risk-profile.repositor
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { VIEW_ALL_OWNERS_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllLeadOwners } from '../../common/rbac-visibility.util';
 import {
   addMoney,
   compareMoney,
@@ -91,7 +91,7 @@ export interface UpSellDetectionView extends UpSellDetectionOutcome {
  * Visibility mirrors cross-sell.service.ts / lead.service.ts (a
  * Sales-pipeline concern): a Sales/Relationship Officer sees only
  * recommendations on a Customer they own; Manager/Executive
- * (VIEW_ALL_OWNERS_ROLES) get the org-wide view.
+ * (`lead.all-owners.read`) get the org-wide view.
  */
 @Injectable()
 export class UpSellService {
@@ -107,7 +107,7 @@ export class UpSellService {
   ) {}
 
   private canViewAllOwners(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) => VIEW_ALL_OWNERS_ROLES.includes(role));
+    return canReadAllLeadOwners(actor);
   }
 
   private async safeAudit(

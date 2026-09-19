@@ -15,7 +15,7 @@ import { InsuranceProgramRepository } from '../../repositories/insurance-program
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import { quantizeMoney } from '../../common/money.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateOpportunityDto } from './dto/create-opportunity.dto';
@@ -56,7 +56,7 @@ export interface OpportunityView extends Opportunity {
  *
  * Visibility: an Opportunity inherits its Risk Profile's Customer's
  * visibility — the Sales/Relationship Officer who owns that Customer sees it;
- * Placement/Manager/Executive (CUSTOMER_FILE_CROSS_OWNER_ROLES) work the
+ * Placement/Manager/Executive (`customer-file.all-owners.read`) work the
  * whole book. Same pattern as InsuranceProgramService.
  */
 @Injectable()
@@ -72,9 +72,7 @@ export class OpportunityService {
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed; an audit hiccup

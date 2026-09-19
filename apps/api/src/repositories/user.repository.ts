@@ -9,6 +9,13 @@ import { OrgContextService } from '../common/org-context/org-context.service';
 export interface RoleRef {
   id: string;
   name: string;
+  /** Part II §4.4 — this role never skips the MFA prompt. A column on `Role`,
+   *  strict by default, because the list of role NAMES it replaced matched no
+   *  custom role and therefore failed OPEN. See `roleSecurityAttributes`. */
+  requiresMfaAlways: boolean;
+  /** Part 10.1 — this role is flagged for the WebAuthn hardware-token
+   *  requirement. Same shape, same reason. */
+  requiresHardwareToken: boolean;
 }
 
 @Injectable()
@@ -155,9 +162,20 @@ export class UserRepository {
   async getRoleRefs(userId: string): Promise<RoleRef[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { userId, revokedAt: null },
-      select: { role: { select: { id: true, name: true } } },
+      // The two security attributes ride along on a join that already existed,
+      // so resolving them costs no extra query.
+      select: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            requiresMfaAlways: true,
+            requiresHardwareToken: true,
+          },
+        },
+      },
     });
-    return assignments.map((a) => ({ id: a.role.id, name: a.role.name }));
+    return assignments.map((a) => a.role);
   }
 
   async getRoleNames(userId: string): Promise<string[]> {
@@ -402,23 +420,48 @@ export class UserRepository {
   }
 
   /**
-   * Holders of a role who can ACTUALLY SIGN IN RIGHT NOW — used to refuse the
-   * last-administrator revoke that would lock everyone out of the
-   * provisioning surface.
+   * Every active assignment through which somebody currently holds `code`, as
+   * (userId, roleId) pairs — the raw material for "would this change leave
+   * nobody able to administer users?"
    *
-   * The access-validity window is part of "can sign in", not decoration:
-   * `AuthService.login` and `SessionService` both refuse a user outside it.
-   * Counting only `revokedAt: null` + `user.isActive` therefore counted
-   * administrators who are provably unable to log in — an EXTERNAL_AUDITOR-
-   * style time-boxed account whose window has closed still satisfied the
-   * guard, so the one genuinely usable administrator could revoke their own
-   * role and reach exactly the unrecoverable state the guard exists to
+   * ## Why pairs rather than a count
+   *
+   * A count cannot answer the question once a user may hold the capability
+   * through more than one role. Revoking ONE administrator role from a user who
+   * holds two leaves them an administrator, so a count of holders would refuse a
+   * revoke that takes nothing away; and counting assignments instead of users
+   * would let two roles on one person look like two administrators. Returning
+   * the pairs lets the caller subtract exactly what the pending write removes —
+   * one assignment for a revoke, one whole user for a deactivation.
+   *
+   * ## "Active" means CAN SIGN IN RIGHT NOW
+   *
+   * The access-validity window is part of that, not decoration: `AuthService
+   * .login` and `SessionService` both refuse a user outside it. Filtering only
+   * on `revokedAt: null` + `user.isActive` once counted administrators provably
+   * unable to log in — a time-boxed account whose window had closed still
+   * satisfied the guard, so the one genuinely usable administrator could revoke
+   * their own role and reach exactly the unrecoverable state the guard exists to
    * prevent. One request, no race required.
+   *
+   * Scoped to the caller's own office: `RolePermission` and
+   * `UserRoleAssignment` both carry `organizationId`, so the extension filters
+   * the top-level query on each. The only nested filter is on `Permission`,
+   * which is a deliberately global catalogue.
    */
-  countActiveHoldersOfRole(roleId: string, now = new Date()): Promise<number> {
-    return this.prisma.client.userRoleAssignment.count({
+  async findActiveHoldersOfPermission(
+    code: string,
+    now = new Date(),
+  ): Promise<{ userId: string; roleId: string }[]> {
+    const grants = await this.prisma.client.rolePermission.findMany({
+      where: { permission: { code } },
+      select: { roleId: true },
+    });
+    if (grants.length === 0) return [];
+
+    return this.prisma.client.userRoleAssignment.findMany({
       where: {
-        roleId,
+        roleId: { in: [...new Set(grants.map((g) => g.roleId))] },
         revokedAt: null,
         user: {
           isActive: true,
@@ -438,32 +481,91 @@ export class UserRepository {
           ],
         },
       },
+      select: { userId: true, roleId: true },
     });
   }
 
+  /** Whether this role grants `code` — the question "is the role being revoked
+   *  an administrator role?", which a name comparison used to answer. */
+  async roleGrantsPermission(roleId: string, code: string): Promise<boolean> {
+    const grant = await this.prisma.client.rolePermission.findFirst({
+      where: { roleId, permission: { code } },
+      select: { roleId: true },
+    });
+    return grant !== null;
+  }
+
   /**
-   * Runs `work` with the Role row LOCKED, so a "is this the last holder?"
-   * count and the write that depends on it cannot interleave with another
-   * request doing the same thing.
+   * Runs `work` holding an exclusive lock on one CAPABILITY in one office, so a
+   * "would this leave nobody able to do X?" read and the write that depends on
+   * it cannot interleave with another request asking the same question.
+   *
+   * ## Why this replaced a row lock, which was correct until it wasn't
    *
    * The guard in `UserAdminService` was a plain count-then-act: two concurrent
-   * revocations of the two remaining SYSTEM_SECURITY_ADMINISTRATORs both read
-   * `holders === 2`, both passed `holders <= 1`, and both committed — leaving
-   * nobody holding `user.manage` and no way to grant it back short of direct
-   * database access, which is the precise outcome the guard's own comment
-   * says it exists to prevent. `race-safe-invariants.md` § What triggers this
-   * rule names this shape exactly.
+   * revocations of the two remaining administrators both read `holders === 2`,
+   * both passed the check, and both committed — leaving nobody holding
+   * `user.manage` and no way to grant it back short of direct database access.
+   * `race-safe-invariants.md` § What triggers this rule names that shape.
    *
-   * Locking the Role row (rather than the assignments) is what serialises
-   * revoke against deactivate: they touch different tables but share the same
-   * invariant, "at least one usable holder of this role".
+   * The fix was `SELECT ... FOR UPDATE` on the Role row, which serialised the
+   * two because there was exactly ONE role that could hold `user.manage`. Phase
+   * 2 keys the guard on the capability instead of that role's name, so several
+   * roles in an office can hold it — and two revocations against DIFFERENT
+   * administrator roles would lock different rows, serialise against nothing,
+   * both observe a surviving administrator, and both commit. The row lock did
+   * not become wrong; the thing it was protecting stopped being one row.
+   *
+   * ## Why an advisory lock rather than locking every candidate row
+   *
+   * Locking all roles that grant the code, in a deterministic order, also works
+   * and is deadlock-free — but it degrades as an office adds administrator roles,
+   * and it has to re-derive the candidate set inside the lock it is trying to
+   * take. An advisory lock keyed on the capability covers every present and
+   * future role granting it, needs no row to exist, and reads as what it is.
+   *
+   * Keyed on (organizationId, code) so two offices never contend, and
+   * transaction-scoped (`pg_advisory_xact_lock`) so it releases on commit AND on
+   * rollback — a session-scoped lock leaked on a thrown guard would wedge the
+   * surface for everyone.
    */
-  withRoleLocked<T>(roleId: string, work: () => Promise<T>): Promise<T> {
+  // `async`, so the guard below REJECTS rather than throwing synchronously out
+  // of a method whose signature promises a Promise. A caller using `.catch()`
+  // would otherwise get an uncaught exception instead — found by the test that
+  // asserts the refusal.
+  async withCapabilityLocked<T>(
+    code: string,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    const organizationId = this.orgContext.currentOrNull();
+    if (!organizationId) {
+      // Not defensive padding: an unkeyed lock would serialise every office
+      // against every other, and silently, which is worse than refusing.
+      throw new Error(
+        `withCapabilityLocked(${code}) requires an Organization context.`,
+      );
+    }
     return this.prisma.client.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "Role" WHERE id = ${roleId} FOR UPDATE`;
+      // `$executeRaw`, not `$queryRaw`: `pg_advisory_xact_lock` returns `void`,
+      // and Prisma cannot deserialize a void column — `$queryRaw` fails with
+      // "Failed to deserialize column of type 'void'", which would have made
+      // every administrator revoke a 500. There is no result to read here
+      // anyway; the lock is the effect.
+      //
+      // Two-argument form: `hashtext` of each part, so the key is derived from
+      // both and cannot collide with another capability in the same office.
+      // `$executeRaw`, not `$queryRaw`: `pg_advisory_xact_lock` returns `void`,
+      // and Prisma cannot deserialize a void column — `$queryRaw` fails with
+      // "Failed to deserialize column of type 'void'", which would have made
+      // every administrator revoke a 500. There is no result to read here
+      // anyway; the lock is the effect.
+      //
+      // Two-argument form: `hashtext` of each part, so the key is derived from
+      // both and cannot collide with another capability in the same office.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${organizationId}), hashtext(${code}))`;
       // `work()` deliberately issues its queries on the OUTER client, not on
-      // `tx` — this transaction exists only to hold the row lock, and has
-      // always been separate from the work it serialises.
+      // `tx` — this transaction exists only to hold the lock, and has always
+      // been separate from the work it serialises.
       //
       // Multi-tenancy Phase 2 step 8 makes that explicit. Left alone, the work
       // would inherit "a transaction is already open", skip opening its own RLS

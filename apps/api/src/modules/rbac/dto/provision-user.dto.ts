@@ -1,15 +1,14 @@
-import { RoleName } from '@ibms/db';
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
   IsDateString,
   IsEmail,
-  IsEnum,
   IsIn,
   IsOptional,
   IsString,
   Length,
+  Matches,
 } from 'class-validator';
 
 /**
@@ -70,13 +69,30 @@ export class ProvisionUserDto {
   @Length(1, 100)
   branchId!: string;
 
-  /** At least one role — provisioning a zero-role account is exactly the
-   * unusable state this endpoint exists to avoid. */
+  /**
+   * At least one role — provisioning a zero-role account is exactly the
+   * unusable state this endpoint exists to avoid.
+   *
+   * Names, validated as bounded strings rather than against the legacy
+   * `RoleName` enum: an office defines its own roles, and `@IsEnum` rejected
+   * every custom name with a 400 before the service could even look it up. The
+   * service resolves each name inside the caller's own office and answers 422
+   * for anything unknown, which is both the real check and what stops one
+   * office probing another's role names.
+   *
+   * `ArrayMaxSize` is a sanity bound on one request, no longer "the size of the
+   * catalogue" — an office may define more than eleven roles.
+   */
   @IsArray()
   @ArrayNotEmpty()
-  @ArrayMaxSize(11)
-  @IsEnum(RoleName, { each: true })
-  roles!: RoleName[];
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  @Length(1, 100, { each: true })
+  @Matches(/^[^\p{C}]+$/u, {
+    each: true,
+    message: 'each role must not contain control characters',
+  })
+  roles!: string[];
 
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window.
    * `AuthService.assertAccessWindowActive` enforces both bounds at login. */

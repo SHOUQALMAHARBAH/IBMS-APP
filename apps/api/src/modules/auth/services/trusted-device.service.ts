@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { TrustedDeviceRepository } from '../../../repositories/trusted-device.repository';
 import { AuditService } from '../../audit/audit.service';
-import { alwaysRequiresMfa } from '../auth.types';
+import type { RoleSecurityAttributes } from '../auth.types';
 
 /** Part II §4.1.4 — "default: trustedAt + 30 days, configurable". */
 export const TRUSTED_DEVICE_TTL_DAYS = Number(
@@ -53,16 +53,22 @@ export class TrustedDeviceService {
   /**
    * Whether this login may skip the MFA prompt.
    *
-   * Three conditions, all required: the role is not one of §4.4's always-MFA
-   * roles, the request actually carried a fingerprint, and that fingerprint
-   * matches a live trust for THIS user. Anything missing means prompt.
+   * Three conditions, all required: no role this caller holds carries §4.4's
+   * always-MFA obligation, the request actually carried a fingerprint, and that
+   * fingerprint matches a live trust for THIS user. Anything missing means
+   * prompt.
+   *
+   * Takes the RESOLVED obligation rather than a list of role names. The name
+   * list this replaced could not recognise a role an office invented, so a
+   * custom role skipped the prompt it should never have been offered; a column
+   * on `Role` that defaults to strict cannot.
    */
   async maySkipMfa(
     userId: string,
-    roles: readonly string[],
+    security: RoleSecurityAttributes,
     device: DeviceContext,
   ): Promise<boolean> {
-    if (alwaysRequiresMfa(roles)) return false;
+    if (security.requiresMfaAlways) return false;
     if (!device.fingerprint) return false;
 
     const trusted = await this.devices.findLiveForUser(
@@ -78,18 +84,18 @@ export class TrustedDeviceService {
   /**
    * Grants a 30-day trust after a successful MFA verification.
    *
-   * Refused outright for an always-MFA role, even though the UI is told not to
-   * render the option: a control that only exists in the client is not a
+   * Refused outright for an always-MFA caller, even though the UI is told not
+   * to render the option: a control that only exists in the client is not a
    * control. Returns `null` in that case rather than throwing, because a client
    * that asks is not misbehaving — it may simply be stale — and the login it
    * asked during has already succeeded.
    */
   async trust(
     userId: string,
-    roles: readonly string[],
+    security: RoleSecurityAttributes,
     device: DeviceContext,
   ): Promise<{ id: string; expiresAt: Date } | null> {
-    if (alwaysRequiresMfa(roles)) return null;
+    if (security.requiresMfaAlways) return null;
     if (!device.fingerprint) return null;
 
     const expiresAt = new Date(

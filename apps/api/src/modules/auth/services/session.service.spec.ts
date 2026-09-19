@@ -108,6 +108,12 @@ function buildService(
     get: vi.fn().mockResolvedValue(opts.config ?? makeConfig()),
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // Phase 2 — `validateAndTouch` resolves the caller's permission codes so the
+  // cross-owner visibility rules can stay synchronous. Cached and keyed on role
+  // ids, which is why an empty role list resolves to an empty set here.
+  const permissions = {
+    getCodesForRoles: vi.fn().mockResolvedValue(new Set()),
+  };
 
   // SessionService's constructor types expect the full repository/service
   // classes — the mocks above cover every method it actually calls.
@@ -122,8 +128,17 @@ function buildService(
     securityConfig as never,
     audit as never,
     orgContext,
+    permissions as never,
   );
-  return { service, sessions, users, securityConfig, audit, orgContext };
+  return {
+    service,
+    sessions,
+    users,
+    securityConfig,
+    audit,
+    orgContext,
+    permissions,
+  };
 }
 
 describe('SessionService.validateAndTouch', () => {
@@ -139,6 +154,10 @@ describe('SessionService.validateAndTouch', () => {
       email: 'test@ibms.test',
       roles: [],
       roleIds: [],
+      // Phase 2 — resolved here so `rbac-visibility.util.ts`'s cross-owner rules
+      // can stay synchronous predicates. Empty because this fixture holds no
+      // roles; the permission lookup is keyed on role ids.
+      permissions: new Set(),
       sessionId: 'session-1',
     });
     // Part II §4.1.5 — the idle ceiling moves forward with the activity, so the
@@ -268,20 +287,10 @@ describe('SessionService.isStepUpFresh', () => {
   });
 });
 
-describe('SessionService.requiresHardwareToken', () => {
-  it('is true for a privileged role', () => {
-    const { service } = buildService();
-    expect(
-      service.requiresHardwareToken(['SYSTEM_SECURITY_ADMINISTRATOR']),
-    ).toBe(true);
-    expect(service.requiresHardwareToken(['DATA_PROTECTION_OFFICER'])).toBe(
-      true,
-    );
-  });
-
-  it('is false for a non-privileged role and no roles', () => {
-    const { service } = buildService();
-    expect(service.requiresHardwareToken(['CLAIMS_OFFICER'])).toBe(false);
-    expect(service.requiresHardwareToken([])).toBe(false);
-  });
-});
+// `SessionService.requiresHardwareToken` is gone, and so are the two tests that
+// covered it. It was a one-line wrapper around a role-NAME list, typed to the
+// legacy `RoleName` enum, with no caller outside this file — so the tests were
+// the only thing keeping it alive. The obligation is now a column on `Role`
+// (`requiresHardwareToken`), resolved by `roleSecurityAttributes` and covered by
+// `trusted-device.service.spec.ts`, the role seed spec, and
+// `apps/api/test/role-security-attributes.e2e-spec.ts`.

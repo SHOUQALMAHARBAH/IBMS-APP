@@ -173,7 +173,7 @@ export class PolicyRepository {
    * `ownerUserId` is the visibility filter and it is applied HERE, in the
    * SQL `where`, never to the rows afterwards. A caller who reaches the whole
    * book (Placement/Manager/Executive/Policy Checking — see
-   * `POLICY_CROSS_OWNER_ROLES`) passes `null`; anyone else passes their own
+   * `policy.all-owners.read`) passes `null`; anyone else passes their own
    * id and sees only policies on Customers they own.
    *
    * Filtering before the window rather than after it is the standing rule

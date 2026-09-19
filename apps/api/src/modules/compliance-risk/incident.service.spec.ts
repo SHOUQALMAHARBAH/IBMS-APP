@@ -185,16 +185,38 @@ describe('IncidentService.assessImpact (Process 55)', () => {
   });
 });
 
-describe('IncidentService.classify (Process 55) — DPO only', () => {
-  it('403s a caller without the DATA_PROTECTION_OFFICER role', async () => {
-    const { service } = makeService({
+describe('IncidentService.classify (Process 55)', () => {
+  it('no longer refuses by ROLE NAME — the permission gate owns that decision', async () => {
+    // Until Phase 2 this method threw for a caller whose roles did not include
+    // DATA_PROTECTION_OFFICER, because `incident.classify` gated BOTH the
+    // classify and the co-sign route and the name was the only thing telling
+    // them apart. A role an office defined satisfied neither check.
+    //
+    // The code is now split, so `incident.classify` is granted to the DPO alone
+    // and `@RequirePermissions` refuses everyone else before the request ever
+    // reaches here. A second check in the service would be a name gate by
+    // another route — which is exactly what this phase removes — so the service
+    // must NOT re-check. `incident.e2e-spec.ts` proves the route itself refuses.
+    const { service, workflow } = makeService({
       repo: {
         findById: vi.fn().mockResolvedValue(row({ status: 'IMPACT_ASSESSED' })),
       },
     });
-    await expect(
-      service.classify('incident-1', { classification: 'MATERIAL' }, exec),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await service.classify(
+      'incident-1',
+      { classification: 'NON_MATERIAL' },
+      exec,
+    );
+    // Asserted on the transition rather than the returned view: the view is
+    // re-read through the same `findById` mock, which still answers with the
+    // pre-transition row. Reaching the transition at all is the point.
+    expect(workflow.transition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: 'IncidentReport',
+        toStatus: 'CLASSIFIED',
+        actorUserId: 'u-exec',
+      }),
+    );
   });
 
   it('stamps classification + classifiedByDpoUserId and starts the SLA timer for MATERIAL', async () => {
@@ -298,7 +320,7 @@ describe('IncidentService.coSign (Process 55) — Executive Management only, Mat
     );
   });
 
-  it('is idempotent if already co-signed (checked before the role check)', async () => {
+  it('is idempotent if already co-signed (checked before the segregation check)', async () => {
     const { service } = makeService({
       repo: {
         findById: vi.fn().mockResolvedValue(
@@ -314,19 +336,28 @@ describe('IncidentService.coSign (Process 55) — Executive Management only, Mat
     expect(v.seniorManagementCoSignUserId).toBe('u-exec-1');
   });
 
-  it('403s a caller without the EXECUTIVE_MANAGEMENT role', async () => {
-    const { service } = makeService({
+  it('no longer refuses by ROLE NAME — the permission gate owns that decision', async () => {
+    // Same reasoning as classify: the co-sign route now carries its own
+    // `incident.classification.co-sign`, so refusing a caller who does not hold
+    // it is the guard's job, not this method's. A second name check here would
+    // be the very thing this phase removes.
+    //
+    // The classifier here is a THIRD person, so the segregation check below has
+    // nothing to object to — that check is asserted separately, and it is the
+    // one that cannot be configured away.
+    const { service, repo } = makeService({
       repo: {
-        findById: vi
-          .fn()
-          .mockResolvedValue(
-            row({ status: 'CLASSIFIED', classification: 'MATERIAL' }),
-          ),
+        findById: vi.fn().mockResolvedValue(
+          row({
+            status: 'CLASSIFIED',
+            classification: 'MATERIAL',
+            classifiedByDpoUserId: 'u-someone-else',
+          }),
+        ),
       },
     });
-    await expect(service.coSign('incident-1', dpo)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await service.coSign('incident-1', dpo);
+    expect(repo.recordCoSign).toHaveBeenCalledWith('incident-1', 'u-dpo');
   });
 
   it('422s (fail closed) if classified but no recorded classifier', async () => {

@@ -2,7 +2,6 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RoleRepository } from '../../../repositories/role.repository';
 import { PermissionRepository } from '../../../repositories/permission.repository';
-import { RequireRoles } from '../../auth/decorators/require-roles.decorator';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
 
 const roleListSchema = {
@@ -33,9 +32,7 @@ const permissionListSchema = {
 };
 
 /** Part 5.1 / Process #40 — read-only views over the role/permission
- * catalogue. Gated by both @RequireRoles (belt-and-suspenders while
- * @RequirePermissions isn't yet the only gate anywhere in the app) and
- * @RequirePermissions, which is the pattern every future sensitive
+ * catalogue. Gated by @RequirePermissions alone — the pattern every sensitive
  * endpoint should follow once Part C's business modules land. */
 @ApiTags('rbac')
 @Controller('rbac')
@@ -45,7 +42,6 @@ export class RbacController {
     private readonly permissions: PermissionRepository,
   ) {}
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('role.manage')
   @Get('roles')
   @ApiOkResponse({
@@ -56,7 +52,6 @@ export class RbacController {
     return this.roles.findAll();
   }
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('permission.manage')
   @Get('permissions')
   @ApiOkResponse({

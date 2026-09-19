@@ -1,7 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { KeyRegistryService } from '../key-registry.service';
-import { RequireRoles } from '../../auth/decorators/require-roles.decorator';
 import { RequirePermissions } from '../../rbac/decorators/require-permissions.decorator';
 
 const keyMetadataListSchema = {
@@ -26,7 +25,6 @@ const keyMetadataListSchema = {
 export class EncryptionKeysController {
   constructor(private readonly keys: KeyRegistryService) {}
 
-  @RequireRoles('SYSTEM_SECURITY_ADMINISTRATOR')
   @RequirePermissions('encryption-key.read')
   @Get('encryption-keys')
   @ApiOkResponse({

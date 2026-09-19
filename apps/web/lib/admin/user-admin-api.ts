@@ -4,21 +4,30 @@ import { apiGet, apiPost } from '../auth/api-client';
 // creates an account with NO roles (and therefore no permissions); every real
 // account is provisioned here, by an administrator, with the roles it needs.
 
-export const ROLE_NAMES = [
-  'SALES_RELATIONSHIP_OFFICER',
-  'PLACEMENT_TECHNICAL_OFFICER',
-  'POLICY_CHECKING_OFFICER',
-  'CLAIMS_OFFICER',
-  'FINANCE_COLLECTIONS_OFFICER',
-  'COMPLIANCE_OFFICER',
-  'BRANCH_DEPARTMENT_MANAGER',
-  'DATA_PROTECTION_OFFICER',
-  'SYSTEM_SECURITY_ADMINISTRATOR',
-  'EXECUTIVE_MANAGEMENT',
-  'EXTERNAL_AUDITOR',
-] as const;
+/**
+ * A role name is FREE TEXT chosen by the office, not one of a fixed eleven.
+ *
+ * This used to be a hard-coded union of the legacy catalogue, which meant the
+ * provisioning screen could only ever offer those eleven — an office's own roles
+ * would have been invisible here however they were granted. The list now comes
+ * from `GET /rbac/roles`, and the alias is kept only so the call sites that
+ * describe their intent with it keep reading clearly.
+ */
+export type RoleName = string;
 
-export type RoleName = (typeof ROLE_NAMES)[number];
+/** One role as the catalogue returns it, with the display names an office edits.
+ *  `GET /rbac/roles` needs `role.manage`. */
+export interface RoleCatalogueEntry {
+  id: string;
+  name: string;
+  nameEn: string;
+  nameAr: string;
+  description: string | null;
+}
+
+export function listRoles(): Promise<RoleCatalogueEntry[]> {
+  return apiGet<RoleCatalogueEntry[]>('/rbac/roles');
+}
 
 export interface AdminUser {
   id: string;

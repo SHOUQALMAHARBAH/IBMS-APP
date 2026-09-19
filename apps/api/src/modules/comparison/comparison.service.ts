@@ -13,7 +13,7 @@ import { OpportunityRepository } from '../../repositories/opportunity.repository
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import { planComparison } from './comparison.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { BuildComparisonDto } from './dto/build-comparison.dto';
@@ -93,9 +93,7 @@ export class ComparisonService {
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed. */

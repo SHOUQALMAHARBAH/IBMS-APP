@@ -17,6 +17,7 @@ import { PermissionsService } from './permissions.service';
 import type { ProvisionUserDto } from '../dto/provision-user.dto';
 import {
   segregationSignal,
+  type GrantedRole,
   type SegregationSignal,
 } from '../checker-roles.config';
 import { DepartmentRepository } from '../../../repositories/department.repository';
@@ -27,22 +28,20 @@ import { BranchRepository } from '../../../repositories/branch.repository';
 export const USER_ADMIN_PAGE_SIZE = 200;
 
 /**
- * The name the pre-custom-roles catalogue gave the office administrator.
+ * What makes an account an administrator, for the purposes of the lockout guard
+ * below: it can administer users.
  *
- * Was `RoleName.SYSTEM_SECURITY_ADMINISTRATOR`. Office-scoped custom roles
- * removed the enum, and every migrated role kept its machine name — so the
- * lockout guard below still finds exactly the role it always did, in each
- * office, and existing administrators are unaffected.
+ * This was a hard-coded role NAME (`SYSTEM_SECURITY_ADMINISTRATOR`) — the
+ * assumption this whole project removes. An office that renamed that role, or
+ * built its own administrator role instead, lost the protection SILENTLY: the
+ * guard simply never fired, and the last usable administrator could revoke their
+ * own access with nothing to stop them.
  *
- * ⚠️ PHASE 3 CONVERSION TARGET. Keying the guard on one hard-coded NAME is the
- * assumption this whole project removes: an office that renames this role, or
- * builds its own administrator role instead, loses the protection silently.
- * The approved replacement is "the last active holder of any role holding
- * `user.manage`", plus `Role.isSystem` — both of which need Phase 3's schema
- * and CRUD. Widening it now would change behaviour in a phase whose gate is
- * that behaviour does NOT change.
+ * `user.manage` is the right anchor because it is the capability that makes the
+ * state unrecoverable: it is what grants roles back. An office may hold it on
+ * several roles at once, which is what the lock below had to be redesigned for.
  */
-const LEGACY_ADMIN_ROLE_NAME = 'SYSTEM_SECURITY_ADMINISTRATOR';
+const USER_ADMIN_PERMISSION = 'user.manage';
 
 export interface AdminUserView {
   id: string;
@@ -251,7 +250,7 @@ export class UserAdminService {
 
     await this.recordSegregationSignal(
       segregationSignal({
-        roles: requested,
+        roles: await this.grantedRoles(roles),
         subjectUserId: user.id,
         actorUserId,
       }),
@@ -304,7 +303,7 @@ export class UserAdminService {
 
     await this.recordSegregationSignal(
       segregationSignal({
-        roles: [roleName],
+        roles: await this.grantedRoles([role]),
         subjectUserId: userId,
         actorUserId,
       }),
@@ -330,29 +329,50 @@ export class UserAdminService {
       throw new UnprocessableEntityException(`Unknown role ${roleName}.`);
     }
 
-    // Lockout guard: SYSTEM_SECURITY_ADMINISTRATOR is the only role holding
-    // `user.manage`, so revoking the last usable one leaves nobody able to
-    // grant it back — an unrecoverable state short of direct DB access.
+    // Lockout guard: `user.manage` is what grants roles back, so removing the
+    // last usable holder of it leaves nobody able to — an unrecoverable state
+    // short of direct database access.
     //
-    // The count and the revoke run under a LOCK on the Role row. As a plain
+    // Keyed on the capability, not on a role NAME: an office that renames its
+    // administrator role, or builds its own, is protected too. Only roles that
+    // actually grant it are guarded, so revoking anything else is untouched.
+    //
+    // The read and the write run under a lock on the capability. As a plain
     // count-then-act, two concurrent revocations of the two remaining
-    // administrators both read `holders === 2`, both passed `holders <= 1`,
-    // and both committed — producing exactly the state this guard exists to
-    // prevent (`race-safe-invariants.md` § What triggers this rule: "any
-    // 'has this already happened?' guard before a state change that is not a
-    // status-conditional updateMany").
-    const revoked =
-      roleName === LEGACY_ADMIN_ROLE_NAME
-        ? await this.users.withRoleLocked(role.id, async () => {
-            const holders = await this.users.countActiveHoldersOfRole(role.id);
-            if (holders <= 1) {
+    // administrators both observe a survivor and both commit — exactly the state
+    // this guard exists to prevent (`race-safe-invariants.md` § What triggers
+    // this rule). A lock on the Role ROW is no longer enough for that, because
+    // several roles in one office may grant `user.manage` and two revocations
+    // against different ones would lock different rows.
+    const guarded = await this.users.roleGrantsPermission(
+      role.id,
+      USER_ADMIN_PERMISSION,
+    );
+    const revoked = guarded
+      ? await this.users.withCapabilityLocked(
+          USER_ADMIN_PERMISSION,
+          async () => {
+            // What would still hold `user.manage` after THIS revoke: every
+            // active holder except the one assignment being withdrawn. A count
+            // of holders would refuse a revoke that takes nothing away, because
+            // the same user may hold the capability through a second role.
+            const holders = await this.users.findActiveHoldersOfPermission(
+              USER_ADMIN_PERMISSION,
+            );
+            const remaining = new Set(
+              holders
+                .filter((h) => !(h.userId === userId && h.roleId === role.id))
+                .map((h) => h.userId),
+            );
+            if (remaining.size === 0) {
               throw new UnprocessableEntityException(
-                'Refusing to revoke the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to grant it back. Provision a second administrator first.',
+                'Refusing to revoke the last active grant of user administration — nobody would be able to grant it back. Provision a second administrator first.',
               );
             }
             return this.users.revokeRole(userId, role.id);
-          })
-        : await this.users.revokeRole(userId, role.id);
+          },
+        )
+      : await this.users.revokeRole(userId, role.id);
     if (revoked === 0) {
       throw new ConflictException(
         `User ${userId} does not hold an active ${roleName} grant.`,
@@ -392,30 +412,34 @@ export class UserAdminService {
     // a different route. The self-deactivation guard above is NOT sufficient:
     // two administrators deactivating EACH OTHER concurrently are neither of
     // them deactivating themselves, so both calls passed and the system was
-    // left with zero active administrators. Deactivating is as effective a
-    // way to remove the last usable holder as revoking is — `AuthService.login`
-    // refuses an inactive account outright — so it takes the same Role lock
-    // and the same count.
-    const adminRole = await this.users.findRoleByName(LEGACY_ADMIN_ROLE_NAME);
-    const changed =
-      !isActive && adminRole
-        ? await this.users.withRoleLocked(adminRole.id, async () => {
-            const holdsAdmin = (await this.users.getRoleNames(userId)).includes(
-              LEGACY_ADMIN_ROLE_NAME,
+    // left with zero active administrators. Deactivating is as effective a way
+    // to remove the last usable holder as revoking is — `AuthService.login`
+    // refuses an inactive account outright — so it takes the same lock and asks
+    // the same question.
+    //
+    // Deactivation removes a whole USER, so the survivors are every holder other
+    // than this one, whatever roles they hold it through.
+    const changed = !isActive
+      ? await this.users.withCapabilityLocked(
+          USER_ADMIN_PERMISSION,
+          async () => {
+            const holders = await this.users.findActiveHoldersOfPermission(
+              USER_ADMIN_PERMISSION,
             );
-            if (holdsAdmin) {
-              const holders = await this.users.countActiveHoldersOfRole(
-                adminRole.id,
+            if (holders.some((h) => h.userId === userId)) {
+              const remaining = new Set(
+                holders.filter((h) => h.userId !== userId).map((h) => h.userId),
               );
-              if (holders <= 1) {
+              if (remaining.size === 0) {
                 throw new UnprocessableEntityException(
-                  'Refusing to deactivate the last active SYSTEM_SECURITY_ADMINISTRATOR — nobody would be able to sign in and grant the role back. Provision a second administrator first.',
+                  'Refusing to deactivate the last active user administrator — nobody would be able to sign in and grant the access back. Provision a second administrator first.',
                 );
               }
             }
             return this.users.setActive(userId, isActive);
-          })
-        : await this.users.setActive(userId, isActive);
+          },
+        )
+      : await this.users.setActive(userId, isActive);
     if (changed === 0) {
       // Already in the requested state — idempotent, not an error.
       return { userId, isActive };
@@ -430,6 +454,25 @@ export class UserAdminService {
       afterValue: { isActive },
     });
     return { userId, isActive };
+  }
+
+  /**
+   * Resolves what each role being granted actually grants.
+   *
+   * One lookup per role rather than one for the union, so the signal can say
+   * WHICH role carried the checker permission — the union would flag the grant
+   * without naming the cause. Every lookup is keyed on a role ID and cached, and
+   * this runs once per provisioning call, so the cost is nil.
+   */
+  private async grantedRoles(
+    roles: readonly { id: string; name: string }[],
+  ): Promise<GrantedRole[]> {
+    return Promise.all(
+      roles.map(async (role) => ({
+        name: role.name,
+        permissions: await this.permissions.getCodesForRoles([role.id]),
+      })),
+    );
   }
 
   /**
@@ -461,9 +504,13 @@ export class UserAdminService {
     if (!signal) return;
 
     const roles = signal.checkerRoles.join(', ');
+    // The permissions, not only the role names. A name is no longer an identity:
+    // two offices may each define a "Reviewer" granting different things, so the
+    // name alone does not tell Compliance what was actually handed over.
+    const why = signal.checkerPermissions.join(', ');
     const message = signal.selfGrant
-      ? `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted THEMSELVES the checker role(s) ${roles} via ${context.via}. One identity now holds both halves of a maker/checker pair.`
-      : `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted checker role(s) ${roles} to user ${context.subjectUserId} via ${context.via}. Verify this is not a second identity for an existing maker.`;
+      ? `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted THEMSELVES the checker role(s) ${roles} (${why}) via ${context.via}. One identity now holds both halves of a maker/checker pair.`
+      : `SEGREGATION OF DUTIES: administrator ${context.actorUserId} granted checker role(s) ${roles} (${why}) to user ${context.subjectUserId} via ${context.via}. Verify this is not a second identity for an existing maker.`;
 
     // Self-grant is the shape that needs no second account at all, so it is
     // the stronger signal and is logged as an error rather than a warning.
@@ -477,6 +524,7 @@ export class UserAdminService {
       entityId: context.subjectUserId,
       afterValue: {
         checkerRoles: signal.checkerRoles,
+        checkerPermissions: signal.checkerPermissions,
         selfGrant: signal.selfGrant,
         grantedByUserId: context.actorUserId,
         grantedToUserId: context.subjectUserId,

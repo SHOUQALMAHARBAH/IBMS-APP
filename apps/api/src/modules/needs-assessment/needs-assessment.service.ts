@@ -15,7 +15,7 @@ import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { assertDifferentActors } from '../../common/maker-checker.util';
-import { CUSTOMER_FILE_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import {
   deriveRecommendedCoverageLines,
   parseQuestionnaireAnswers,
@@ -51,7 +51,7 @@ import type { ListNeedsAssessmentsQueryDto } from './dto/list-needs-assessments-
  * differ) — only the capturer is excluded from both.
  *
  * Visibility: the Sales Officer who captured an assessment sees it;
- * Placement/Manager/Executive (CUSTOMER_FILE_CROSS_OWNER_ROLES) see the
+ * Placement/Manager/Executive (`customer-file.all-owners.read`) see the
  * whole book. The manager decision actions are queue-style — any
  * `needs-assessment.approve` holder can act on any assessment, matching the
  * seeded grid's role-level (not instance-level) design, same as the KYC
@@ -70,9 +70,7 @@ export class NeedsAssessmentService {
   ) {}
 
   private canViewAll(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) =>
-      CUSTOMER_FILE_CROSS_OWNER_ROLES.includes(role),
-    );
+    return canReadAllCustomerFileOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed; an audit hiccup

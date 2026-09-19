@@ -10,6 +10,7 @@ import { SalesPerformanceService } from './sales-performance.service';
 import type { SalesPerformanceRepository } from '../../repositories/sales-performance.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
 
 const TARGET: SalesTarget = {
   id: 'target-1',
@@ -46,22 +47,22 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
   return { service, repo, audit };
 }
 
-const SALES_OFFICER: AuthenticatedUser = {
+const SALES_OFFICER: AuthenticatedUser = withCrossOwnerPermissions({
   id: 'sales-1',
   organizationId: 'org-1',
   email: 'sales@ibms.test',
   roles: ['SALES_RELATIONSHIP_OFFICER'],
   roleIds: [],
   sessionId: 's-1',
-};
-const MANAGER: AuthenticatedUser = {
+});
+const MANAGER: AuthenticatedUser = withCrossOwnerPermissions({
   id: 'manager-1',
   organizationId: 'org-1',
   email: 'manager@ibms.test',
   roles: ['BRANCH_DEPARTMENT_MANAGER'],
   roleIds: [],
   sessionId: 's-2',
-};
+});
 
 describe('SalesPerformanceService.createTarget', () => {
   it('rejects both ownerUserId and branchId set', async () => {

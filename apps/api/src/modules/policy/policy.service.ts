@@ -21,7 +21,7 @@ import { BrokerLicenseRepository } from '../../repositories/broker-license.repos
 import { isBrokerLicenseCurrentlyLapsed } from '../compliance-risk/broker-license.config';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { POLICY_CROSS_OWNER_ROLES } from '../../common/rbac-visibility.util';
+import { canReadAllPolicyOwners } from '../../common/rbac-visibility.util';
 import {
   compareMoney,
   formatMoney,
@@ -199,7 +199,7 @@ export class PolicyService {
    * cross-book control function, like Compliance for KYC). Sales sees only
    * policies on a Customer they own. */
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
-    return actor.roles.some((role) => POLICY_CROSS_OWNER_ROLES.includes(role));
+    return canReadAllPolicyOwners(actor);
   }
 
   /** Logged, not thrown — the real write already committed. */

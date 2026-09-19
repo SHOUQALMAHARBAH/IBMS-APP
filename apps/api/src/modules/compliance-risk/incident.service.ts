@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -181,7 +180,12 @@ export class IncidentService {
     return this.reloadAndAuditUpdate(id, actorUserId);
   }
 
-  // --- 4. classify (IMPACT_ASSESSED -> CLASSIFIED) — DPO only ----------
+  // --- 4. classify (IMPACT_ASSESSED -> CLASSIFIED) ---------------------
+  //
+  // Who may do this is the guard's job now: `incident.classify` is granted to
+  // the DPO alone. Until Phase 2 that code was ALSO the co-sign's gate, so this
+  // method had to refuse a non-DPO caller by role NAME — which no custom role
+  // could ever satisfy.
 
   async classify(
     id: string,
@@ -197,12 +201,6 @@ export class IncidentService {
         `Incident ${id} is already classified ${incident.classification}, not ${dto.classification}.`,
       );
     }
-    if (!actor.roles.includes('DATA_PROTECTION_OFFICER')) {
-      throw new ForbiddenException(
-        'Only a Data Protection Officer can classify an incident — Executive Management holds incident.classify too, but only for the separate co-sign step.',
-      );
-    }
-
     try {
       await this.workflow.transition({
         entityType: 'IncidentReport',
@@ -244,8 +242,14 @@ export class IncidentService {
     return this.reloadAndAuditUpdate(id, actor.id);
   }
 
-  // --- co-sign (Material only, Executive Management only) --------------
+  // --- co-sign (Material only) -----------------------------------------
   // NOT an engine transition — status stays CLASSIFIED.
+  //
+  // Gated by its own `incident.classification.co-sign`, so the role name no
+  // longer has to distinguish this from classification. `assertDifferentActors`
+  // below is the control that does NOT depend on how the permissions were
+  // granted: even a caller holding both halves cannot co-sign a classification
+  // they recorded themselves.
 
   async coSign(
     id: string,
@@ -259,11 +263,6 @@ export class IncidentService {
     }
     if (incident.seniorManagementCoSignUserId) {
       return deriveIncidentReportView(incident, new Date()); // idempotent
-    }
-    if (!actor.roles.includes('EXECUTIVE_MANAGEMENT')) {
-      throw new ForbiddenException(
-        'Only Executive Management can co-sign a Material incident classification — Data Protection Officer holds incident.classify too, but only for the classify step itself.',
-      );
     }
     // Fail CLOSED, not open — the same #42/M04 "processed but no recorded
     // processor" guard: if somehow classified without a recorded classifier,

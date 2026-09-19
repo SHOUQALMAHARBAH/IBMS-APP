@@ -669,10 +669,10 @@ build actually is today:
   matching beyond the curated transliteration table (§10.1) is deferred by
   decision. See CLAUDE.md § What's New for the per-phase record.
 
-- **Custom office-scoped RBAC — Phase 1 of 5 complete.** A second scope addition on
-  top of multi-tenancy, and the same kind of retrofit: the whole backlog was built
-  against a fixed catalogue of 11 roles shared by every office, and that is being
-  replaced with roles each office defines for itself. `MULTI-TENANCY-SPEC.md`'s
+- **Custom office-scoped RBAC — Phases 1 and 2 of 5 complete.** A second scope
+  addition on top of multi-tenancy, and the same kind of retrofit: the whole backlog
+  was built against a fixed catalogue of 11 roles shared by every office, and that is
+  being replaced with roles each office defines for itself. `MULTI-TENANCY-SPEC.md`'s
   reasoning applies here too — it changes an assumption a lot of files depend on, so
   it goes one phase at a time and each phase ships whole.
 
@@ -690,21 +690,38 @@ build actually is today:
   gate was a per-user effective-permission diff before vs after — empty across both
   organizations, so no access changed.
 
+  **What exists (Phase 2).** No authorization decision reads a role NAME any more.
+  The two controls that failed OPEN are gone: `ALWAYS_MFA_ROLES` and
+  `PRIVILEGED_ROLES` are now `Role.requiresMfaAlways` and
+  `Role.requiresHardwareToken`, columns defaulting to the STRICT value — a security
+  attribute rather than a permission, because a permission could be granted away from
+  the very Role screen Phase 3 adds. Cross-owner visibility is seven
+  `<family>.all-owners.read` permissions; `@RequireRoles` and `RolesGuard` are deleted
+  outright (all 19 routes already carried an equivalent `@RequirePermissions`); the
+  segregation-of-duties signal keys on 13 checker PERMISSIONS; the recertification
+  reviewer pool keys on `access-recertification.review`, with a second
+  `...review.routine` code preserving its two-tier ordering; the last-administrator
+  guard keys on `user.manage` under a transaction-scoped advisory lock (a Role-row
+  lock no longer serialises it, because several roles can now hold the capability);
+  `incident.classify` is split so classification and the Senior Management co-sign are
+  separately grantable; and role names are validated as bounded strings, so an office's
+  own role can actually be assigned. 167 permission codes became 177.
+
   **What does NOT exist yet, and is not a defect to chase.** No office can create a
   role: there is no Role CRUD API or screen, and `status`/`isSystem` are not on the
-  model, so `Role.name` being editable is theoretical until Phase 3. Twelve decision
-  points still branch on a role NAME rather than a permission. Ten of them fail CLOSED
-  (the five cross-owner visibility lists, the recertification reviewer pool, the
-  segregation-of-duties signal, SLA escalation routing, and 17 `@RequireRoles` sites);
-  **two fail OPEN** — `ALWAYS_MFA_ROLES` and `PRIVILEGED_ROLES`, where a custom role
-  would silently qualify for the trusted-device MFA skip and the hardware-token
-  exemption. Neither is reachable today because no custom role can exist, which is
-  exactly why **Phase 2 must land before Phase 3**. Maker/checker is unaffected and
-  needs no work: it compares user IDs at 62 call sites, backed by 17 database CHECK
-  constraints, so holding several roles cannot weaken separation of duties. The
-  `RoleName` enum type and the pre-migration global role rows are deliberately kept for
-  at least one release so rollback stays cheap. See CLAUDE.md § What's New for the
-  per-phase record, including the two cross-tenant leaks Phase 1 closed.
+  model, so `Role.name` being editable is theoretical until Phase 3. Four decision
+  points still branch on a role NAME, all deliberately: SLA escalation routing
+  (`sla-registry.config.ts`, `sla-policies.ts`), the bell-notification recipients that
+  follow it, and the Executive nav ORDER. Those answer "which business function owns
+  this", which is an organizational fact rather than an access decision — converting
+  them to permissions would replace a clear statement with a misleading one. The honest
+  fix is a business-function routing table, which belongs with Phase 4's org structure.
+  Maker/checker is unaffected and needed no work: it compares user IDs at 62 call sites,
+  backed by 17 database CHECK constraints, so holding several roles cannot weaken
+  separation of duties. The `RoleName` enum type and the pre-migration global role rows
+  are deliberately kept for at least one release so rollback stays cheap. See CLAUDE.md
+  § What's New for the per-phase record, including the two cross-tenant leaks Phase 1
+  closed and the seed defect Phase 2 found.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

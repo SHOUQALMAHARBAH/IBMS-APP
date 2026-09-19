@@ -9,6 +9,23 @@ import { createTestApp } from './utils/test-app';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
+/** The eleven roles `packages/db/prisma/seed.ts` seeds. Asserted as a subset of
+ *  what `GET /rbac/roles` returns, never as the whole of it — see the comment
+ *  at that assertion. */
+const SEEDED_ROLE_NAMES = [
+  'SALES_RELATIONSHIP_OFFICER',
+  'PLACEMENT_TECHNICAL_OFFICER',
+  'POLICY_CHECKING_OFFICER',
+  'CLAIMS_OFFICER',
+  'FINANCE_COLLECTIONS_OFFICER',
+  'COMPLIANCE_OFFICER',
+  'BRANCH_DEPARTMENT_MANAGER',
+  'DATA_PROTECTION_OFFICER',
+  'SYSTEM_SECURITY_ADMINISTRATOR',
+  'EXECUTIVE_MANAGEMENT',
+  'EXTERNAL_AUDITOR',
+];
+
 interface IssuedSessionBody {
   accessToken: string;
   user: { id: string };
@@ -109,6 +126,51 @@ async function makeUser(
   return { accessToken, userId, email };
 }
 
+/** A role with a name no list in this codebase knows, holding exactly the given
+ *  permission codes — what an office actually builds after Phase 3. */
+async function makeCustomRole(
+  name: string,
+  codes: string[],
+): Promise<{ id: string }> {
+  const role = await prisma.role.create({
+    data: {
+      name,
+      nameEn: name,
+      nameAr: name,
+      requiresMfaAlways: false,
+      requiresHardwareToken: false,
+    },
+  });
+  const permissions = await prisma.permission.findMany({
+    where: { code: { in: codes } },
+    select: { id: true, code: true },
+  });
+  // A mistyped code would otherwise grant nothing and make the test fail for a
+  // reason that looks like the behaviour under test.
+  expect(permissions.map((r) => r.code).sort()).toEqual([...codes].sort());
+  await prisma.rolePermission.createMany({
+    data: permissions.map((perm) => ({
+      roleId: role.id,
+      permissionId: perm.id,
+    })),
+  });
+  return role;
+}
+
+/** `makeUser`, but granting a role by ID — `grantRole` upserts by NAME, which
+ *  would resolve a custom role to a fresh one with no permissions. */
+async function makeUserWithRoleId(
+  app: INestApplication<App>,
+  label: string,
+  roleId: string,
+): Promise<{ accessToken: string; userId: string; email: string }> {
+  const created = await makeUser(app, label);
+  await prisma.userRoleAssignment.create({
+    data: { userId: created.userId, roleId },
+  });
+  return created;
+}
+
 /** AccessRecertificationService.startCycle always assigns the FIRST
  * eligible (!= subject) member of the reviewer pool — not "whoever started
  * the cycle". The test DB accumulates COMPLIANCE_OFFICER/
@@ -118,19 +180,52 @@ async function makeUser(
  * depends on knowing exactly who it'll be — scoped to these three roles
  * only, and only ever touches the (test-only) db-test database.
  */
+/** Provisioning requires a Department AND a Branch (Part II §4.2.2), created
+ *  through their own endpoints rather than inserted, so the only path an
+ *  administrator really has stays exercised. */
+async function orgUnitsFor(
+  app: INestApplication<App>,
+  accessToken: string,
+  tag: number,
+): Promise<{ departmentId: string; branchId: string }> {
+  const department = await request(app.getHttpServer())
+    .post('/admin/departments')
+    .set(bearer(accessToken))
+    .send({ name: `DTO Dept ${tag}`, nameAr: `قسم ${tag}` })
+    .expect(201);
+  const branch = await request(app.getHttpServer())
+    .post('/admin/branches')
+    .set(bearer(accessToken))
+    .send({ name: `DTO Branch ${tag}`, nameAr: `فرع ${tag}` })
+    .expect(201);
+  return {
+    departmentId: (department.body as { id: string }).id,
+    branchId: (branch.body as { id: string }).id,
+  };
+}
+
 async function resetReviewerPool(): Promise<void> {
-  await prisma.userRoleAssignment.updateMany({
+  // Keyed on the PERMISSION since Phase 2, not on the three legacy role names.
+  // A name-keyed reset would leave any custom reviewer role in the pool and make
+  // "who becomes the reviewer" nondeterministic again — including the roles the
+  // custom-role test below creates.
+  const grants = await prisma.rolePermission.findMany({
     where: {
-      revokedAt: null,
-      role: {
-        name: {
+      permission: {
+        code: {
           in: [
-            'COMPLIANCE_OFFICER',
-            'BRANCH_DEPARTMENT_MANAGER',
-            'EXECUTIVE_MANAGEMENT',
+            'access-recertification.review',
+            'access-recertification.review.routine',
           ],
         },
       },
+    },
+    select: { roleId: true },
+  });
+  await prisma.userRoleAssignment.updateMany({
+    where: {
+      revokedAt: null,
+      roleId: { in: [...new Set(grants.map((g) => g.roleId))] },
     },
     data: { revokedAt: new Date() },
   });
@@ -173,7 +268,20 @@ describe('RBAC / access recertification (e2e)', () => {
         .get('/rbac/roles')
         .set(bearer(admin.accessToken))
         .expect(200);
-      expect((roles.body as unknown[]).length).toBe(11);
+      // A SUPERSET check, not `length === 11`.
+      //
+      // Two reasons the exact count was the wrong assertion, and office-scoped
+      // custom roles made both of them real. This database is cumulative, so any
+      // spec that creates a role — several now do — moves a global count; and
+      // the whole point of this project is that an office defines roles beyond
+      // the legacy eleven, so a catalogue of exactly eleven stops being the
+      // expected state the moment Phase 3 ships. What must hold is that every
+      // seeded role is still there.
+      const names = (roles.body as { name: string }[]).map((r) => r.name);
+      expect(names).toEqual(expect.arrayContaining(SEEDED_ROLE_NAMES));
+      expect(new Set(names).size, 'no duplicate role names in one office').toBe(
+        names.length,
+      );
 
       const permissions = await request(app.getHttpServer())
         .get('/rbac/permissions')
@@ -183,6 +291,123 @@ describe('RBAC / access recertification (e2e)', () => {
         50,
       );
     });
+  });
+
+  describe('role names are free text, not the legacy enum', () => {
+    it('accepts a CUSTOM role name on provisioning and on a later grant', async () => {
+      // Phase 2 workstream H. `ProvisionUserDto` and `RoleAssignmentDto`
+      // validated `roles` against the legacy `RoleName` enum, so every custom
+      // name was rejected with a 400 before the service could look it up — Phase
+      // 3 could have created a role that no endpoint would assign.
+      const app = await boot();
+      const tag = Date.now();
+      const custom = await makeCustomRole(`Client Liaison ${tag}`, [
+        'lead.list.read',
+      ]);
+      const second = await makeCustomRole(`Renewals Desk ${tag}`, [
+        'renewal.read',
+      ]);
+      const admin = await makeUser(
+        app,
+        'dto-admin',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const orgUnits = await orgUnitsFor(app, admin.accessToken, tag);
+
+      try {
+        const provisioned = await request(app.getHttpServer())
+          .post('/admin/users')
+          .set(bearer(admin.accessToken))
+          .send({
+            fullName: 'Custom Role Holder',
+            email: uniqueEmail('custom-role-holder'),
+            password: PASSWORD,
+            departmentId: orgUnits.departmentId,
+            branchId: orgUnits.branchId,
+            roles: [`Client Liaison ${tag}`],
+          })
+          .expect(201);
+        const provisionedId = (provisioned.body as { id: string }).id;
+        expect((provisioned.body as { roles: string[] }).roles).toEqual([
+          `Client Liaison ${tag}`,
+        ]);
+
+        // And a second custom role granted afterwards, through the other DTO.
+        const granted = await request(app.getHttpServer())
+          .post(`/admin/users/${provisionedId}/roles`)
+          .set(bearer(admin.accessToken))
+          .send({ role: `Renewals Desk ${tag}` })
+          .expect(201);
+        expect((granted.body as { roles: string[] }).roles.sort()).toEqual(
+          [`Client Liaison ${tag}`, `Renewals Desk ${tag}`].sort(),
+        );
+      } finally {
+        const ids = [custom.id, second.id];
+        await prisma.userRoleAssignment.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.rolePermission.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.role.deleteMany({ where: { id: { in: ids } } });
+      }
+    }, 300_000);
+
+    it('rejects an UNKNOWN role with 422, not 400 — the lookup decides, not the validator', async () => {
+      // The distinction matters: 400 means "this could never be a role name",
+      // which is no longer something a validator can know. 422 means "no such
+      // role in THIS office", which is the scoped lookup answering — and that
+      // scoping is what stops one office probing another's role names.
+      const app = await boot();
+      const tag = Date.now();
+      const admin = await makeUser(
+        app,
+        'dto-admin-unknown',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const target = await makeUser(app, 'dto-target');
+
+      await request(app.getHttpServer())
+        .post(`/admin/users/${target.userId}/roles`)
+        .set(bearer(admin.accessToken))
+        .send({ role: `No Such Role ${tag}` })
+        .expect(422);
+
+      const orgUnits = await orgUnitsFor(app, admin.accessToken, tag);
+      await request(app.getHttpServer())
+        .post('/admin/users')
+        .set(bearer(admin.accessToken))
+        .send({
+          fullName: 'Unknown Role',
+          email: uniqueEmail('unknown-role'),
+          password: PASSWORD,
+          departmentId: orgUnits.departmentId,
+          branchId: orgUnits.branchId,
+          roles: [`No Such Role ${tag}`],
+        })
+        .expect(422);
+    }, 300_000);
+
+    it('still rejects a malformed name with 400 — the shape is bounded even though the vocabulary is not', async () => {
+      // Relaxing the vocabulary is not the same as accepting anything. These
+      // values reach audit rows and log lines, so an empty name, an
+      // over-long one, and one carrying a control character are all still 400.
+      const app = await boot();
+      const admin = await makeUser(
+        app,
+        'dto-admin-malformed',
+        'SYSTEM_SECURITY_ADMINISTRATOR',
+      );
+      const target = await makeUser(app, 'dto-target-malformed');
+
+      for (const role of ['', 'x'.repeat(101), 'Bad\nName']) {
+        await request(app.getHttpServer())
+          .post(`/admin/users/${target.userId}/roles`)
+          .set(bearer(admin.accessToken))
+          .send({ role })
+          .expect(400);
+      }
+    }, 300_000);
   });
 
   describe('access-recertification cycle lifecycle', () => {
@@ -199,6 +424,93 @@ describe('RBAC / access recertification (e2e)', () => {
         .set(bearer(plain.accessToken))
         .expect(403);
     });
+
+    it('runs a full cycle for an office whose reviewers are CUSTOM roles only', async () => {
+      // Phase 2 workstream E, and the case that is broken before it.
+      //
+      // The reviewer pool used to be three hard-coded role NAMES. An office that
+      // had built its own roles matched none of them, so `pickReviewer` threw for
+      // every subject, `startCycle` skipped every one with a warning, and the
+      // cycle completed having recertified NOBODY — a compliance control
+      // reporting success while doing nothing. Nothing failed; there was simply
+      // no work in the cycle.
+      const app = await boot();
+      await resetReviewerPool();
+
+      const tag = Date.now();
+      const reviewerRole = await makeCustomRole(`Access Reviewer ${tag}`, [
+        'access-recertification.cycle.start',
+        'access-recertification.review',
+        'access-recertification.review.routine',
+      ]);
+      const subjectRole = await makeCustomRole(`Ordinary Staff ${tag}`, [
+        'lead.list.read',
+      ]);
+
+      try {
+        const reviewer = await makeUserWithRoleId(
+          app,
+          'recert-custom-reviewer',
+          reviewerRole.id,
+        );
+        const subject = await makeUserWithRoleId(
+          app,
+          'recert-custom-subject',
+          subjectRole.id,
+        );
+
+        const cycleRes = await request(app.getHttpServer())
+          .post('/access-recertification/cycles')
+          .set(bearer(reviewer.accessToken))
+          .send({ cycleLabel: `custom-roles-${tag}` })
+          .expect(201);
+        const cycleId = (cycleRes.body as CycleBody).id;
+
+        const itemsRes = await request(app.getHttpServer())
+          .get('/access-recertification/items')
+          .query({ cycleId })
+          .set(bearer(reviewer.accessToken))
+          .expect(200);
+        const items = itemsRes.body as RecertificationItemBody[];
+
+        // The cycle did real work: the ordinary-staff subject has an item, and
+        // its reviewer is the custom role's holder. Before this phase there would
+        // have been no item at all.
+        const subjectItem = items.find(
+          (i) => i.subjectUserId === subject.userId,
+        );
+        expect(
+          subjectItem,
+          'a custom-role office must still recertify its staff',
+        ).toBeDefined();
+        expect(subjectItem!.reviewerUserId).toBe(reviewer.userId);
+
+        // And the reviewer is never their own reviewer: with one pool member they
+        // are skipped entirely rather than self-assigned, which is the same
+        // behaviour the seeded-role test below pins.
+        expect(
+          items.find((i) => i.subjectUserId === reviewer.userId),
+        ).toBeUndefined();
+
+        // The decision itself works for a custom role — eligibility to decide is
+        // `access-recertification.review`, which this role holds.
+        await request(app.getHttpServer())
+          .post(`/access-recertification/items/${subjectItem!.id}/decision`)
+          .set(bearer(reviewer.accessToken))
+          .send({ decision: 'confirmed' })
+          .expect(201);
+      } finally {
+        // db-test is cumulative.
+        const ids = [reviewerRole.id, subjectRole.id];
+        await prisma.userRoleAssignment.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.rolePermission.deleteMany({
+          where: { roleId: { in: ids } },
+        });
+        await prisma.role.deleteMany({ where: { id: { in: ids } } });
+      }
+    }, 300_000);
 
     it('a Compliance Officer starting a cycle never becomes the reviewer of their own item, and reviews the subject assigned to them', async () => {
       const app = await boot();

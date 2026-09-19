@@ -24,7 +24,7 @@ import {
   decryptEntityFields,
 } from '../security/encrypted-fields';
 import {
-  CUSTOMER_CROSS_OWNER_ROLES,
+  canReadAllCustomerOwners,
   isCustomerVisibleTo,
 } from '../../common/rbac-visibility.util';
 import { composeFullName } from '../../common/person-name.util';
@@ -281,9 +281,7 @@ export class CustomerService {
       >
     >
   > {
-    const canViewAllOwners = actor.roles.some((role) =>
-      CUSTOMER_CROSS_OWNER_ROLES.includes(role),
-    );
+    const canViewAllOwners = canReadAllCustomerOwners(actor);
     // Part F item #6 — resolve the search term to a set of ids first, then
     // filter the existing Prisma query by them, rather than duplicating
     // ownerUserId/status filtering logic in raw SQL.

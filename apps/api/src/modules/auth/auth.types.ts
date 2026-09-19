@@ -26,70 +26,83 @@ export interface AuthenticatedUser {
    * Still plain strings rather than an enum because an office names its own
    * roles. Code that reads this to make an authorization decision is a Phase 2
    * conversion target: it will not recognise any custom role, so it fails
-   * closed at best and open at worst (see `ALWAYS_MFA_ROLES`). New code must
-   * branch on a PERMISSION, never on a name.
+   * closed. (The two that failed OPEN were the MFA controls, and they are gone
+   * — see `RoleSecurityAttributes` below.) New code must branch on a
+   * PERMISSION, never on a name.
    */
   roles: string[];
+  /**
+   * The permission codes these roles grant, resolved once per request.
+   *
+   * Phase 2 added this so the cross-owner visibility rules in
+   * `common/rbac-visibility.util.ts` could become permission checks without
+   * making ~20 services async or giving each one a new dependency. Resolved by
+   * `PermissionsService.getCodesForRoles(roleIds)` — keyed on role IDS, never
+   * names, and cached, so this is the same call `PermissionsGuard` already makes
+   * on every permission-gated request rather than a second round trip.
+   *
+   * A `Set` rather than an array because every consumer asks "does it contain
+   * this code". Never serialised to a response: `/auth/me` builds its own sorted
+   * array for the client.
+   */
+  permissions: ReadonlySet<string>;
   sessionId: string;
 }
 
 /**
- * ⚠️ PHASE 2 CONVERSION TARGET — THIS LIST FAILS OPEN FOR A CUSTOM ROLE.
+ * The two MFA obligations a role can carry, resolved for one caller.
  *
- * Both this and `ALWAYS_MFA_ROLES` below match on role NAME. An office-defined
- * role appears in neither list, so it silently qualifies for the exemption the
- * list exists to deny — a security control weakened by a configuration screen.
+ * ## What this replaced, and why it is not a permission
  *
- * The approved fix is NOT a permission (an administrator could grant it away)
- * but a Role-level flag — `requiresMfaAlways` / `requiresHardwareToken` —
- * defaulting to the SAFE value for every new role, so a custom role fails
- * closed. Phase 2, proven by test #19.
+ * Until Phase 2 these were two hard-coded lists of role NAMES —
+ * `ALWAYS_MFA_ROLES` (Part II §4.4) and `PRIVILEGED_ROLES` (Part 10.1). Once an
+ * office can define its own role, a name-keyed list matches nothing it did not
+ * already know, so a custom role appeared in neither and silently qualified for
+ * the exemption the list existed to deny. These were the only two controls in
+ * this codebase that failed OPEN.
  *
- * Not yet exploitable: no custom role can exist until the Role CRUD screen
- * lands in Phase 3, and every role migrated in Phase 1 kept its legacy name,
- * so these lists still match exactly who they matched before. Phase 2 must
- * land before Phase 3 for that to stay true.
+ * The replacement is a column on `Role`, not a permission. A permission can be
+ * revoked from the Role screen, which would mean the control could be switched
+ * off from the very UI this project is adding. `Role.requiresMfaAlways` and
+ * `Role.requiresHardwareToken` default to the STRICT value, so a role nobody
+ * classified is strict until someone relaxes it deliberately — it fails closed.
+ *
+ * ## Why the two flags stay separate
+ *
+ * Part 10.1's set is WIDER than §4.4's, and the difference is load-bearing:
+ * Executive Management and Branch/Department Manager are flagged for the
+ * WebAuthn hardware-token requirement while keeping the trusted-device
+ * convenience §4.4 deliberately leaves them. Deriving one flag from the other
+ * would look stricter and would quietly take that convenience from both.
  */
-export const PRIVILEGED_ROLES: readonly string[] = [
-  'SYSTEM_SECURITY_ADMINISTRATOR',
-  'EXECUTIVE_MANAGEMENT',
-  'BRANCH_DEPARTMENT_MANAGER',
-  'COMPLIANCE_OFFICER',
-  'DATA_PROTECTION_OFFICER',
-];
-
-/** Part 10.1 — privileged roles + Compliance/DPO require a hardware-token
- * MFA factor once WebAuthn ships (fast-follow — see auth module README).
- * See the fail-open warning on `PRIVILEGED_ROLES`. */
-export function requiresHardwareToken(roles: readonly string[]): boolean {
-  return roles.some((role) => PRIVILEGED_ROLES.includes(role));
+export interface RoleSecurityAttributes {
+  /** §4.4 — this caller sees the MFA prompt on every login, trusted device or
+   *  not, and the "trust this device" option is neither offered nor honoured. */
+  requiresMfaAlways: boolean;
+  /** Part 10.1 — this caller must present a hardware-token factor once
+   *  WebAuthn ships (fast-follow — see the auth module README). Surfaced as
+   *  `mfaPolicySatisfied`; it has never blocked a login. */
+  requiresHardwareToken: boolean;
 }
 
 /**
- * Part II §4.4 — roles that ALWAYS see the MFA prompt, trusted device or not.
+ * Resolves one caller's obligations from the roles they hold.
  *
- * Deliberately NOT `PRIVILEGED_ROLES`, and the difference is the point.
- * `PRIVILEGED_ROLES` is a wider set used for step-up and the hardware-token
- * fast-follow; §4.4 names exactly three roles whose MFA guarantee must never be
- * softened by the trusted-device convenience. Reusing the wider list would look
- * harmless — stricter, even — but it would silently take the convenience away
- * from Executive Management and Branch/Department Managers, who the spec
- * deliberately leaves as standard roles for this purpose.
+ * ANY role carrying an obligation imposes it: holding one strict role and one
+ * relaxed role is strict. The alternative — requiring every role to agree —
+ * would let an administrator weaken a privileged account by granting it an
+ * extra, ordinary role, which is the opposite of what these controls are for.
  *
- * These users never see the "trust this device" option either: §4.4 says the
- * checkbox must not even render for them, and the server refuses the grant
- * regardless of what the client sends.
+ * Structurally typed rather than taking `RoleRef`, so this module keeps no
+ * dependency on the repository layer.
  */
-export const ALWAYS_MFA_ROLES: readonly string[] = [
-  'SYSTEM_SECURITY_ADMINISTRATOR',
-  'COMPLIANCE_OFFICER',
-  'DATA_PROTECTION_OFFICER',
-];
-
-/** Whether this caller must complete an MFA challenge on every single login.
- * ⚠️ Fails open for a custom role — see the warning on `PRIVILEGED_ROLES`. */
-export function alwaysRequiresMfa(roles: readonly string[]): boolean {
-  return roles.some((role) => ALWAYS_MFA_ROLES.includes(role));
+export function roleSecurityAttributes(
+  roles: readonly RoleSecurityAttributes[],
+): RoleSecurityAttributes {
+  return {
+    requiresMfaAlways: roles.some((role) => role.requiresMfaAlways),
+    requiresHardwareToken: roles.some((role) => role.requiresHardwareToken),
+  };
 }
 
 /**
