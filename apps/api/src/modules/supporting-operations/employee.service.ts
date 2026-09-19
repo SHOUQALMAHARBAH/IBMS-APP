@@ -29,6 +29,7 @@ import { composeFullName } from '../../common/person-name.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   CreateEmployeeDto,
+  UpdateEmployeeDto,
   RevealEmployeeFieldDto,
 } from './dto/create-employee.dto';
 import type { CreateTrainingDto } from './dto/create-training.dto';
@@ -197,6 +198,69 @@ export class EmployeeService {
     };
   }
 
+  /**
+   * Correct an existing employee record.
+   *
+   * New in Phase 3 — the module had no update path at all, so the unified
+   * User/Employee screen had nothing to submit a correction to.
+   *
+   * The two Part 8.2 dates go through `parseHistoricalInstant` for the same
+   * reason `create` does: they are always in the past, and accepting a future
+   * "background check completed" date would let a record assert a control that has
+   * not happened yet.
+   */
+  async update(
+    id: string,
+    dto: UpdateEmployeeDto,
+    actorUserId: string,
+  ): Promise<Employee> {
+    const existing = await this.employees.findById(id);
+    if (!existing) throw new NotFoundException('Employee not found');
+
+    const confidentialityAgreementSignedAt =
+      dto.confidentialityAgreementSignedAt
+        ? parseHistoricalInstant(
+            dto.confidentialityAgreementSignedAt,
+            'confidentialityAgreementSignedAt',
+          )
+        : undefined;
+    const backgroundCheckCompletedAt = dto.backgroundCheckCompletedAt
+      ? parseHistoricalInstant(
+          dto.backgroundCheckCompletedAt,
+          'backgroundCheckCompletedAt',
+        )
+      : undefined;
+
+    const updated = await this.employees.update(id, {
+      position: dto.position,
+      licensedRole: dto.licensedRole,
+      confidentialityAgreementSignedAt,
+      backgroundCheckCompletedAt,
+      departmentId: dto.departmentId,
+    });
+
+    await this.audit.record({
+      userId: actorUserId,
+      action: 'UPDATE',
+      entityType: 'Employee',
+      entityId: id,
+      // The national ID is never in either value — it is not updatable here, and
+      // an audit row is not the place to put a Highly Confidential field even
+      // when it has not changed.
+      beforeValue: {
+        position: existing.position,
+        licensedRole: existing.licensedRole,
+        departmentId: existing.departmentId,
+      },
+      afterValue: {
+        position: updated.position,
+        licensedRole: updated.licensedRole,
+        departmentId: updated.departmentId,
+      },
+    });
+    return updated;
+  }
+
   async revealField(
     id: string,
     dto: RevealEmployeeFieldDto,
@@ -290,7 +354,7 @@ export class EmployeeService {
   /** The "employment-status change" that triggers de-provisioning
    * (`AccessDeprovisioningChecklist`'s own schema doc comment). Gated by
    * `deprovisioning.execute` (System Security Administrator ONLY), not the
-   * broader `employee.manage` — terminating IS the trigger, so it sits
+   * broader record-management permissions — terminating IS the trigger, so it sits
    * behind the same narrow permission as executing the checklist itself. */
   async terminate(
     employeeId: string,

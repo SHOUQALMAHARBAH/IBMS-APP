@@ -66,15 +66,12 @@ test("a user without the permission sees a friendly message", async ({ page }) =
 
   await page.goto("/employees");
   await expect(
-    page.getByText("employee.manage permission", { exact: false }),
+    page.getByText("employee.read permission", { exact: false }),
   ).toBeVisible();
 });
 
-test("employee detail: reveals the national id and ticks a checklist item", async ({ page }) => {
+test("employee detail: ticks a checklist item, and hides the reveal from an administrator", async ({ page }) => {
   await mockAuth(page, ["SYSTEM_SECURITY_ADMINISTRATOR"]);
-  await page.route("http://localhost:4000/employees/emp-1/reveal-field", (route) =>
-    route.fulfill({ status: 201, json: { field: "nationalId", value: "9988774321" } }),
-  );
 
   interface Checklist {
     id: string;
@@ -113,12 +110,34 @@ test("employee detail: reveals the national id and ticks a checklist item", asyn
   await page.goto("/employees/emp-1");
   await expect(page.getByRole("heading", { name: "Jane Employee" })).toBeVisible();
 
-  await page.getByLabel(/Reason/).fill("KYC audit cross-check requested by Compliance");
-  await page.getByRole("button", { name: "Reveal" }).click();
-  await expect(page.getByText("Full value: 9988774321")).toBeVisible();
+  // Part 10.2 — the national-ID reveal is `employee.national-id.reveal`, which
+  // the administrator does not hold. The form must be ABSENT, not merely
+  // unusable: a control that 403s on submit is the dead control the UX directive
+  // rules out, and it is also how this gap looked before the split.
+  await expect(
+    page.getByRole("heading", { name: "Reveal national ID" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reveal" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Mark done" }).first().click();
   await expect(page.getByText("System access revoked: Yes")).toBeVisible();
+});
+
+test("employee detail: Compliance holds the reveal and gets the real value", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("http://localhost:4000/employees/emp-1/reveal-field", (route) =>
+    route.fulfill({ status: 201, json: { field: "nationalId", value: "9988774321" } }),
+  );
+  await page.route("http://localhost:4000/employees/emp-1", (route) =>
+    route.fulfill({ status: 200, json: EMPLOYEE_DETAIL }),
+  );
+
+  await page.goto("/employees/emp-1");
+  await expect(page.getByRole("heading", { name: "Jane Employee" })).toBeVisible();
+
+  await page.getByLabel(/Reason/).fill("KYC audit cross-check requested by Compliance");
+  await page.getByRole("button", { name: "Reveal" }).click();
+  await expect(page.getByText("Full value: 9988774321")).toBeVisible();
 });
 
 test("employees list has no serious/critical accessibility violations @a11y", async ({ page }) => {

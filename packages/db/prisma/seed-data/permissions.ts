@@ -220,6 +220,26 @@ const commercialFrontOffice: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER],
   },
   {
+    // The customer counterpart of `employee.national-id.reveal`, and the same
+    // gap: `POST /customers/:id/reveal-field` was gated on
+    // `customer.360-view.read` — the same code that gates reading the customer at
+    // all — so all five holders of that could reveal a national ID.
+    //
+    // This is enforced PER FIELD rather than per route, and the difference from
+    // the employee split is deliberate. The employee route can only ever reveal a
+    // national ID, so its route gate IS its field gate. The customer route also
+    // reveals contactPhone and contactEmail, which a Sales/Relationship Officer
+    // needs for ordinary work on their own customer — gating the whole route to
+    // Compliance would have stopped an officer seeing their own customer's phone
+    // number. So `customer.360-view.read` still governs the route and the contact
+    // fields, and this code is additionally required for the national ID alone.
+    code: "customer.national-id.reveal",
+    module: "customer",
+    description:
+      "Reveal a customer's unmasked national ID with a written justification (Part 10.2 Highly Confidential; the contact fields on the same endpoint stay under customer.360-view.read)",
+    roles: [COMPLIANCE],
+  },
+  {
     code: "customer.360-view.read",
     module: "commercial-front-office",
     description: "Read the aggregated 360° customer view",
@@ -983,12 +1003,52 @@ const management: PermissionSeed[] = [
 // Domain H — Supporting Operations (Processes 66-74)
 // ----------------------------------------------------------------------
 const supportingOperations: PermissionSeed[] = [
+  // `employee.manage` gated FOUR routes: create, list, get — and reveal an
+  // employee's national ID. One code for "manage an HR record" and "read a
+  // person's national identity number" is the gap this splits. Part 10.2
+  // classifies that field Highly Confidential; it is encrypted at rest and every
+  // reveal already needs a >=10-character justification and writes an audited
+  // READ flagged `isSensitiveDataAccess`. The GATE was the part that was too
+  // wide.
+  //
+  // Migration 20261007100000 renames `employee.manage` to `employee.read` IN
+  // PLACE, so both existing grants follow it and nobody loses the ability to
+  // read an employee. `create` and `update` are then granted explicitly to the
+  // same two roles, preserving their reach.
   {
-    code: "employee.manage",
+    code: "employee.read",
+    module: "supporting-operations",
+    description: "View employee records and their licensing/training history",
+    roles: [ADMIN, MANAGER],
+  },
+  {
+    code: "employee.create",
+    module: "supporting-operations",
+    description: "Create an employee (HR) record",
+    roles: [ADMIN, MANAGER],
+  },
+  {
+    code: "employee.update",
+    module: "supporting-operations",
+    description: "Correct an existing employee record",
+    roles: [ADMIN, MANAGER],
+  },
+  {
+    // COMPLIANCE ONLY, and that is the reduction this split exists for. The
+    // administrator and the Branch/Department Manager both hold
+    // `employee.manage` today and therefore this; neither keeps it. An
+    // administrator provisions accounts — they do not need to read an employee's
+    // national identity number, and the Office Administrator role Phase 3 seeds
+    // deliberately does not carry this code either.
+    //
+    // Compliance is the holder because it already has the equivalent reach on
+    // customers for KYC, so the capability sits with the function whose job
+    // requires verifying an identity document.
+    code: "employee.national-id.reveal",
     module: "supporting-operations",
     description:
-      "Manage an employee record and licensing/certification tracking",
-    roles: [ADMIN, MANAGER],
+      "Reveal an employee's unmasked national ID with a written justification (Part 10.2 Highly Confidential; every reveal is an audited sensitive read)",
+    roles: [COMPLIANCE],
   },
   {
     code: "training.record",

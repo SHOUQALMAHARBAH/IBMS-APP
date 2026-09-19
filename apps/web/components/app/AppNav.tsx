@@ -269,7 +269,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
   {
     labelKey: 'navGroupOperations',
     items: [
-      { href: '/employees', labelKey: 'navEmployees', permissions: ['employee.manage'] },
+      { href: '/employees', labelKey: 'navEmployees', permissions: ['employee.read'] },
       { href: '/vendors', labelKey: 'navVendors', permissions: ['vendor.manage'] },
       { href: '/information-assets', labelKey: 'navInformationAssets', permissions: ['information-asset.manage'] },
       { href: '/documents', labelKey: 'navDocuments', permissions: ['document.manage'] },

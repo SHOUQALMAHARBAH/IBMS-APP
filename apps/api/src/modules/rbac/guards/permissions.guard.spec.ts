@@ -4,7 +4,7 @@ import type { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 import type { PermissionsService } from '../services/permissions.service';
 import type { AuthenticatedUser } from '../../auth/auth.types';
-import { withCrossOwnerPermissions } from '../../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../../test/fixtures/authenticated-user';
 
 function makeContext(user: AuthenticatedUser | undefined): ExecutionContext {
   return {
@@ -27,7 +27,7 @@ function makePermissionsService(granted: string[]): PermissionsService {
 }
 
 const user = (): AuthenticatedUser =>
-  withCrossOwnerPermissions({
+  withDerivedPermissions({
     id: 'u1',
     organizationId: 'org-1',
     email: 'u1@ibms.test',

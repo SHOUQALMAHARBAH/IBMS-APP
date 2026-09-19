@@ -14,14 +14,14 @@ import type { CustomerRepository } from '../../repositories/customer.repository'
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 const DAY = 86_400_000;
 const INCEPTION = new Date('2026-01-01T00:00:00.000Z');
 const EXPIRY = new Date(INCEPTION.getTime() + 360 * DAY);
 
 function placement(over?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'placement-1',
     organizationId: 'org-1',
     email: 'placement@ibms.test',

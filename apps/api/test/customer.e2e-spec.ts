@@ -949,21 +949,44 @@ describe('Customer Acquisition / Onboarding (e2e) — backlog Part C #3-4', () =
         'Reveal Field Customer',
       );
 
+      // Phase 3 split `customer.national-id.reveal` out of
+      // `customer.360-view.read`, so the owning Sales Officer no longer reveals
+      // this field — Compliance does. The full gate matrix lives in
+      // `national-id-reveal-split.e2e-spec.ts`; what this test is about is the
+      // justification and the true decrypted value, so it uses a holder.
+      const compliance = await makeUser(
+        app,
+        'cust-reveal-compliance',
+        'COMPLIANCE_OFFICER',
+      );
+
       await request(app.getHttpServer())
         .post(`/customers/${customer.id}/reveal-field`)
-        .set(bearer(sales.accessToken))
+        .set(bearer(compliance.accessToken))
         .send({ field: 'nationalId', reason: 'short' })
         .expect(400);
 
       const res = await request(app.getHttpServer())
         .post(`/customers/${customer.id}/reveal-field`)
-        .set(bearer(sales.accessToken))
+        .set(bearer(compliance.accessToken))
         .send({
           field: 'nationalId',
           reason: 'Verifying against a photo ID during an onboarding call',
         })
         .expect(201);
       expect((res.body as { value: string }).value).toBe('9901012345');
+
+      // The owner keeps the contact fields on the same endpoint — the reason the
+      // customer split is per field rather than per route.
+      const phone = await request(app.getHttpServer())
+        .post(`/customers/${customer.id}/reveal-field`)
+        .set(bearer(sales.accessToken))
+        .send({
+          field: 'contactPhone',
+          reason: 'Returning the client a missed call about their quote',
+        })
+        .expect(201);
+      expect((phone.body as { value: string }).value.length).toBeGreaterThan(0);
     });
   });
 });

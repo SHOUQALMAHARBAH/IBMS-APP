@@ -152,3 +152,78 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     }
   });
 });
+
+// Office-scoped custom RBAC, PHASE 3 workstream E. `employee.manage` gated four
+// routes — create, list, get, and reveal an employee's unmasked national ID —
+// and `customer.360-view.read` gated both reading a customer and revealing
+// theirs. These are the grid-level invariants of splitting the reveals out.
+describe("permission grid — a national-ID reveal is its own permission", () => {
+  const REVEAL_CODES = [
+    "employee.national-id.reveal",
+    "customer.national-id.reveal",
+  ];
+
+  it("no longer has the employee.manage bridge, and employee.read replaced it", () => {
+    const codes = PERMISSIONS.map((p) => p.code);
+    expect(codes).not.toContain("employee.manage");
+    for (const code of [
+      "employee.read",
+      "employee.create",
+      "employee.update",
+    ]) {
+      expect(codes).toContain(code);
+    }
+  });
+
+  it("gives every former employee.manage holder employee.read — nobody lost the ability to read an employee", () => {
+    // Migration 20261007100000 renames the row IN PLACE so its grants follow it.
+    // The two holders were the administrator and the Branch/Department Manager;
+    // they must also hold create and update, or the rename would have narrowed
+    // access rather than split a sensitive field off it.
+    const formerHolders = [
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+      RoleName.BRANCH_DEPARTMENT_MANAGER,
+    ];
+    for (const role of formerHolders) {
+      const granted = codesGrantedTo(role);
+      expect(granted, `${role} must still read employees`).toContain(
+        "employee.read",
+      );
+      expect(granted).toContain("employee.create");
+      expect(granted).toContain("employee.update");
+    }
+  });
+
+  it("gives the reveal codes to the Compliance Officer and to nobody else", () => {
+    // THE reduction. Both former `employee.manage` holders held the reveal
+    // through it, and all five `customer.360-view.read` holders held the customer
+    // one; after the split only the function whose job is verifying an identity
+    // document does. A new holder here is a deliberate decision, so it must break
+    // this test and be argued for, not arrive as a side effect of a grid edit.
+    for (const code of REVEAL_CODES) {
+      const entry = PERMISSIONS.find((p) => p.code === code);
+      expect(entry, `${code} must exist in the grid`).toBeDefined();
+      expect(entry!.roles).toEqual([RoleName.COMPLIANCE_OFFICER]);
+    }
+  });
+
+  it("keeps the reveal separable from the read it was split out of", () => {
+    // The point of the split is that holding the reading permission never implies
+    // the reveal. Expressed as a grid property: at least one role holds the read
+    // WITHOUT the reveal, in both families. If that ever became false the codes
+    // would be distinct in name only.
+    const pairs: [string, string][] = [
+      ["employee.read", "employee.national-id.reveal"],
+      ["customer.360-view.read", "customer.national-id.reveal"],
+    ];
+    for (const [readCode, revealCode] of pairs) {
+      const readers = PERMISSIONS.find((p) => p.code === readCode)!.roles;
+      const revealers = PERMISSIONS.find((p) => p.code === revealCode)!.roles;
+      const readOnly = readers.filter((r) => !revealers.includes(r));
+      expect(
+        readOnly.length,
+        `every holder of ${readCode} also holds ${revealCode} — the split is nominal`,
+      ).toBeGreaterThan(0);
+    }
+  });
+});

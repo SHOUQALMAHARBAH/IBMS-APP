@@ -52,7 +52,7 @@ export default function UserAdminPage() {
   const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
-  const canLinkEmployee = hasPermission(user, 'employee.manage');
+  const canLinkEmployee = hasPermission(user, 'employee.read');
   const canReadRoles = hasPermission(user, 'role.read');
 
   /**
@@ -147,7 +147,7 @@ export default function UserAdminPage() {
           listDepartments(),
           listBranches(),
           // Only when the caller can read it — GET /employees needs
-          // employee.manage, and a 403 here would blank the other two.
+          // employee.read, and a 403 here would blank the other two.
           canLinkEmployee ? listEmployees() : Promise.resolve([]),
           // Same shape of guard: GET /rbac/roles needs `role.read`, which a
           // holder of `user.manage` does not necessarily have.
@@ -282,7 +282,7 @@ export default function UserAdminPage() {
           </label>
           {/*
             Optional, and rendered only for someone who can actually read the
-            employee list — `GET /employees` needs `employee.manage`, and a
+            employee list — `GET /employees` needs `employee.read`, and a
             select that 403s on load is worse than no select.
 
             Link-only by design: an Employee cannot be created from here

@@ -85,6 +85,21 @@ export class EmployeeRepository {
     return this.prisma.client.employee.create({ data: input });
   }
 
+  /** Correct an existing record. Deliberately narrow — see `UpdateEmployeeDto`
+   *  for what it refuses and why. */
+  update(
+    id: string,
+    data: {
+      position?: string;
+      licensedRole?: string;
+      confidentialityAgreementSignedAt?: Date;
+      backgroundCheckCompletedAt?: Date;
+      departmentId?: string;
+    },
+  ): Promise<Employee> {
+    return this.prisma.client.employee.update({ where: { id }, data });
+  }
+
   findById(id: string): Promise<Employee | null> {
     return this.prisma.client.employee.findUnique({ where: { id } });
   }

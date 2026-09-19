@@ -18,10 +18,10 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { PlacePolicyDto } from './dto/place-policy.dto';
 import type { RecordPolicyIssuanceDto } from './dto/record-policy-issuance.dto';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'plc-1',
     organizationId: 'org-1',
     email: 'plc@ibms.test',
@@ -36,7 +36,7 @@ function placement(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
  * is scoped to Customers they own — used to exercise the not-visible branch
  * (a Placement officer can reach the whole book). */
 function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'sales-2',
     organizationId: 'org-1',
     email: 'sales@ibms.test',

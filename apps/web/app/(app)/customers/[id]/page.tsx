@@ -48,15 +48,21 @@ function ProfileField({
   revealed,
   onReveal,
   revealLabel,
+  /** Untranslated hook for the three revealable fields, so a test can assert
+   *  which ROW offers a reveal. All three buttons carry the same translated
+   *  label, and `getByRole(name)` matches substrings, so without this an
+   *  assertion about the national-ID row can pass off the phone row's button. */
+  fieldKey,
 }: {
   label: string;
   value: string | null | undefined;
   revealed?: string;
   onReveal?: () => void;
   revealLabel: string;
+  fieldKey?: string;
 }) {
   return (
-    <div>
+    <div data-field={fieldKey}>
       <div style={profileFieldLabelStyle}>{label}</div>
       <div style={profileFieldValueStyle}>
         <bdi>{revealed ?? value ?? '—'}</bdi>
@@ -147,6 +153,11 @@ export default function CustomerProfilePage() {
   const canOpenCrossSell = hasPermission(user, 'cross-sell.read');
   const canOpenUpSell = canOpenCrossSell;
   const canOpenCrm = hasPermission(user, 'customer.360-view.read');
+  // Part 10.2. Revealing a national ID is its own permission as of the
+  // office-scoped RBAC work — held by Compliance, not by everyone who can open
+  // the file. Without this check the button renders for every reader and 403s on
+  // click, which is the dead control the UX directive rules out.
+  const canRevealNationalId = hasPermission(user, 'customer.national-id.reveal');
 
   return (
     <main style={pageStyle}>
@@ -187,15 +198,19 @@ export default function CustomerProfilePage() {
             <ProfileField
               label={t('customerFieldNationalId')}
               value={customer.nationalId}
+              fieldKey="nationalId"
               revealed={revealed.nationalId}
               onReveal={
-                customer.nationalId ? () => setRevealTarget('nationalId') : undefined
+                customer.nationalId && canRevealNationalId
+                  ? () => setRevealTarget('nationalId')
+                  : undefined
               }
               revealLabel={t('customerProfileFieldReveal')}
             />
             <ProfileField
               label={t('customerFieldContactPhone')}
               value={customer.contactPhone}
+              fieldKey="contactPhone"
               revealed={revealed.contactPhone}
               onReveal={() => setRevealTarget('contactPhone')}
               revealLabel={t('customerProfileFieldReveal')}
@@ -203,6 +218,7 @@ export default function CustomerProfilePage() {
             <ProfileField
               label={t('customerFieldContactEmail')}
               value={customer.contactEmail}
+              fieldKey="contactEmail"
               revealed={revealed.contactEmail}
               onReveal={() => setRevealTarget('contactEmail')}
               revealLabel={t('customerProfileFieldReveal')}

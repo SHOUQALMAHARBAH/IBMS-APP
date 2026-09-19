@@ -396,7 +396,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // plus an automated access de-provisioning checklist on termination —
     // the first real caller of the already-registered
     // termination_access_revocation SLA_REGISTRY entry. No new permission,
-    // no migration — employee.manage / training.record /
+    // no migration — employee.read / training.record /
     // deprovisioning.execute were all pre-seeded ahead of time.
     EmployeeModule,
     // Process 67 — Procurement. The source names no purchase-request

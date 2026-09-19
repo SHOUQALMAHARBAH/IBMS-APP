@@ -10,7 +10,7 @@ import { SalesPerformanceService } from './sales-performance.service';
 import type { SalesPerformanceRepository } from '../../repositories/sales-performance.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 const TARGET: SalesTarget = {
   id: 'target-1',
@@ -47,7 +47,7 @@ function makeService(over: { repo?: Record<string, unknown> } = {}) {
   return { service, repo, audit };
 }
 
-const SALES_OFFICER: AuthenticatedUser = withCrossOwnerPermissions({
+const SALES_OFFICER: AuthenticatedUser = withDerivedPermissions({
   id: 'sales-1',
   organizationId: 'org-1',
   email: 'sales@ibms.test',
@@ -55,7 +55,7 @@ const SALES_OFFICER: AuthenticatedUser = withCrossOwnerPermissions({
   roleIds: [],
   sessionId: 's-1',
 });
-const MANAGER: AuthenticatedUser = withCrossOwnerPermissions({
+const MANAGER: AuthenticatedUser = withDerivedPermissions({
   id: 'manager-1',
   organizationId: 'org-1',
   email: 'manager@ibms.test',

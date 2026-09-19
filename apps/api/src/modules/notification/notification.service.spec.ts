@@ -3,7 +3,7 @@ import { NotificationService } from './notification.service';
 import type { NotificationRepository } from '../../repositories/notification.repository';
 import type { PermissionsService } from '../rbac/services/permissions.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 /*
  * The gating is the thing worth testing. The counts are one-line Prisma calls;
@@ -44,7 +44,7 @@ function makeService(
 }
 
 const user = (roles: string[]): AuthenticatedUser =>
-  withCrossOwnerPermissions({
+  withDerivedPermissions({
     id: 'user-1',
     organizationId: 'org-1',
     email: 'a@b.test',
