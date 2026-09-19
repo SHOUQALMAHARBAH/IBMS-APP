@@ -15,7 +15,7 @@ import { authenticator } from 'otplib';
 // which is what `userRoleAssignment.create` below was doing. `Role` itself
 // is platform-level and unscoped, so it is unaffected either way; see the
 // header of ./tenant-prisma for why specs no longer reach for the raw client.
-import { prisma } from './tenant-prisma';
+import { ensureRole, prisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 interface MfaEnrollBody {
@@ -132,11 +132,7 @@ describe('API contract (OpenAPI)', () => {
         code: authenticator.generate(secret),
       })
       .expect(200);
-    const role = await prisma.role.upsert({
-      where: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
-      update: {},
-      create: { name: 'SYSTEM_SECURITY_ADMINISTRATOR' },
-    });
+    const role = await ensureRole('SYSTEM_SECURITY_ADMINISTRATOR');
     const activeGrant = await prisma.userRoleAssignment.findFirst({
       where: { userId, roleId: role.id, revokedAt: null },
     });

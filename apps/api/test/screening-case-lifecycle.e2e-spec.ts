@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from './tenant-prisma';
+import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
@@ -90,11 +90,7 @@ async function makeUser(
     })
     .expect(200);
 
-  const roleRow = await prisma.role.upsert({
-    where: { name: role },
-    update: {},
-    create: { name: role },
-  });
+  const roleRow = await ensureRole(role);
   const existing = await prisma.userRoleAssignment.findFirst({
     where: { userId: body.user.id, roleId: roleRow.id, revokedAt: null },
   });

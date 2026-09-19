@@ -1,4 +1,20 @@
-import type { RoleName } from '@ibms/db';
+/**
+ * ⚠️ PHASE 2 CONVERSION TARGET — every list in this file matches on role NAME.
+ *
+ * Office-scoped custom roles made a name meaningful only within one office, so
+ * an office-defined role appears in none of these lists and sees ONLY records
+ * it owns, however its permissions were granted. That fails CLOSED, which is
+ * the right direction to fail — but it is still wrong, and no error says so.
+ *
+ * The approved fix is a `*.view-all-owners` permission per resource family
+ * (customer, customer-file, policy, claim, lead), granted to the roles that
+ * hold the equivalent reach today. Phase 2.
+ *
+ * Phase 1 only widened the types from `RoleName[]` to `readonly string[]`: the
+ * roles migrated to per-office rows kept their legacy names, so every list
+ * still matches exactly who it matched before, and no custom role can exist
+ * until Phase 3's Role screen. Phase 2 must land before Phase 3.
+ */
 
 /** Roles the seeded permission grid trusts with cross-owner visibility on a
  * Sales/Relationship Officer's own records (leads, prospects, ...) — an
@@ -7,7 +23,7 @@ import type { RoleName } from '@ibms/db';
  * (ibms-brain/meta/context/roles-and-segregation-of-duties.md). Shared by
  * `lead.service.ts` and `prospect.service.ts`; more Domain A modules are
  * expected to need the identical rule as Processes 3-10 land. */
-export const VIEW_ALL_OWNERS_ROLES: RoleName[] = [
+export const VIEW_ALL_OWNERS_ROLES: readonly string[] = [
   'BRANCH_DEPARTMENT_MANAGER',
   'EXECUTIVE_MANAGEMENT',
 ];
@@ -19,7 +35,7 @@ export const VIEW_ALL_OWNERS_ROLES: RoleName[] = [
  * ibms-brain/meta/context/roles-and-segregation-of-duties.md). A superset of
  * VIEW_ALL_OWNERS_ROLES. Shared by `customer.service.ts` and the CRM module
  * (Part C #10) — both resolve "who may view this customer" the same way. */
-export const CUSTOMER_CROSS_OWNER_ROLES: RoleName[] = [
+export const CUSTOMER_CROSS_OWNER_ROLES: readonly string[] = [
   ...VIEW_ALL_OWNERS_ROLES,
   'COMPLIANCE_OFFICER',
   'EXTERNAL_AUDITOR',
@@ -37,9 +53,7 @@ export function isCustomerVisibleTo(
   actor: { id: string; roles: readonly string[] },
 ): boolean {
   if (customer.ownerUserId === actor.id) return true;
-  return actor.roles.some((role) =>
-    (CUSTOMER_CROSS_OWNER_ROLES as readonly string[]).includes(role),
-  );
+  return actor.roles.some((role) => CUSTOMER_CROSS_OWNER_ROLES.includes(role));
 }
 
 /** Roles that work a customer's commercial file across the whole book, not
@@ -51,7 +65,7 @@ export function isCustomerVisibleTo(
  * records tied to a Customer they own (or, for a Needs Assessment, that
  * they captured). Shared by the risk-profile and needs-assessment modules
  * (Part C #5). */
-export const CUSTOMER_FILE_CROSS_OWNER_ROLES: RoleName[] = [
+export const CUSTOMER_FILE_CROSS_OWNER_ROLES: readonly string[] = [
   'PLACEMENT_TECHNICAL_OFFICER',
   'BRANCH_DEPARTMENT_MANAGER',
   'EXECUTIVE_MANAGEMENT',
@@ -62,7 +76,7 @@ export const CUSTOMER_FILE_CROSS_OWNER_ROLES: RoleName[] = [
  * quality control is a cross-book control function, like Compliance for KYC).
  * Shared by `PolicyService` and `PolicyCheckingService` (backlog Part C
  * #18-20). */
-export const POLICY_CROSS_OWNER_ROLES: RoleName[] = [
+export const POLICY_CROSS_OWNER_ROLES: readonly string[] = [
   ...CUSTOMER_FILE_CROSS_OWNER_ROLES,
   'POLICY_CHECKING_OFFICER',
 ];
@@ -74,7 +88,7 @@ export const POLICY_CROSS_OWNER_ROLES: RoleName[] = [
  * A Sales/Relationship Officer holding `claim.notify` / `claim.read` still
  * sees only claims on a Customer they own. Shared by the claim module (backlog
  * Part C #23+). */
-export const CLAIM_CROSS_OWNER_ROLES: RoleName[] = [
+export const CLAIM_CROSS_OWNER_ROLES: readonly string[] = [
   'CLAIMS_OFFICER',
   'BRANCH_DEPARTMENT_MANAGER',
   'EXECUTIVE_MANAGEMENT',

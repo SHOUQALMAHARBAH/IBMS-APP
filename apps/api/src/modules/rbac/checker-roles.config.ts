@@ -1,5 +1,3 @@
-import { RoleName } from '@ibms/db';
-
 /**
  * The roles that hold the CHECKER half of a maker/checker pair.
  *
@@ -39,29 +37,29 @@ import { RoleName } from '@ibms/db';
  * distinct, queryable audit row plus a log line Compliance can alert on. A
  * detective control is a real control; a silent one is not.
  */
-export const CHECKER_ROLES: readonly RoleName[] = [
-  RoleName.POLICY_CHECKING_OFFICER,
-  RoleName.COMPLIANCE_OFFICER,
-  RoleName.FINANCE_COLLECTIONS_OFFICER,
-  RoleName.DATA_PROTECTION_OFFICER,
-  RoleName.EXECUTIVE_MANAGEMENT,
-  RoleName.BRANCH_DEPARTMENT_MANAGER,
+export const CHECKER_ROLES: readonly string[] = [
+  'POLICY_CHECKING_OFFICER',
+  'COMPLIANCE_OFFICER',
+  'FINANCE_COLLECTIONS_OFFICER',
+  'DATA_PROTECTION_OFFICER',
+  'EXECUTIVE_MANAGEMENT',
+  'BRANCH_DEPARTMENT_MANAGER',
 ];
 
-export function isCheckerRole(role: RoleName): boolean {
+export function isCheckerRole(role: string): boolean {
   return CHECKER_ROLES.includes(role);
 }
 
 /** Every checker role in `roles`, in the catalogue's order so the result is
  * stable regardless of the order they were requested in. */
-export function checkerRolesIn(roles: readonly RoleName[]): RoleName[] {
+export function checkerRolesIn(roles: readonly string[]): string[] {
   const requested = new Set(roles);
   return CHECKER_ROLES.filter((role) => requested.has(role));
 }
 
 /** What the segregation-relevant audit row and log line say happened. */
 export interface SegregationSignal {
-  checkerRoles: RoleName[];
+  checkerRoles: string[];
   /** The administrator granted a checker role to THEMSELVES. Distinguished
    * because it is the shape that needs no second account at all, and is the
    * strongest single indicator of privilege escalation on this surface. */
@@ -69,7 +67,7 @@ export interface SegregationSignal {
 }
 
 export function segregationSignal(input: {
-  roles: readonly RoleName[];
+  roles: readonly string[];
   subjectUserId: string;
   actorUserId: string;
 }): SegregationSignal | null {

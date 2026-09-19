@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
-import { prisma } from './tenant-prisma';
+import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
 
@@ -86,11 +86,7 @@ async function enrollMfa(
 }
 
 async function grantRole(userId: string, roleName: RoleName): Promise<void> {
-  const role = await prisma.role.upsert({
-    where: { name: roleName },
-    update: {},
-    create: { name: roleName },
-  });
+  const role = await ensureRole(roleName);
   const activeGrant = await prisma.userRoleAssignment.findFirst({
     where: { userId, roleId: role.id, revokedAt: null },
   });

@@ -102,6 +102,7 @@ function buildService(
       .fn()
       .mockResolvedValue('user' in opts ? opts.user : makeUser()),
     getRoleNames: vi.fn().mockResolvedValue([]),
+    getRoleRefs: vi.fn().mockResolvedValue([]),
   };
   const securityConfig = {
     get: vi.fn().mockResolvedValue(opts.config ?? makeConfig()),
@@ -137,6 +138,7 @@ describe('SessionService.validateAndTouch', () => {
       organizationId: 'org-1',
       email: 'test@ibms.test',
       roles: [],
+      roleIds: [],
       sessionId: 'session-1',
     });
     // Part II §4.1.5 — the idle ceiling moves forward with the activity, so the

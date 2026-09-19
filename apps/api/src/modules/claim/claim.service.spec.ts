@@ -29,6 +29,7 @@ function claims(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     organizationId: 'org-1',
     email: 'claims@ibms.test',
     roles: ['CLAIMS_OFFICER'],
+    roleIds: [],
     sessionId: 's-1',
     ...overrides,
   };
@@ -41,6 +42,7 @@ function sales(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
+    roleIds: [],
     sessionId: 's-9',
     ...overrides,
   };

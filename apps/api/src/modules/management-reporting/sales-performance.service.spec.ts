@@ -51,6 +51,7 @@ const SALES_OFFICER: AuthenticatedUser = {
   organizationId: 'org-1',
   email: 'sales@ibms.test',
   roles: ['SALES_RELATIONSHIP_OFFICER'],
+  roleIds: [],
   sessionId: 's-1',
 };
 const MANAGER: AuthenticatedUser = {
@@ -58,6 +59,7 @@ const MANAGER: AuthenticatedUser = {
   organizationId: 'org-1',
   email: 'manager@ibms.test',
   roles: ['BRANCH_DEPARTMENT_MANAGER'],
+  roleIds: [],
   sessionId: 's-2',
 };
 

@@ -5,7 +5,12 @@ import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { createHash } from 'node:crypto';
 import { type RoleName } from '@ibms/db';
-import { prisma, rawPrisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
+import {
+  TEST_ORGANIZATION_ID,
+  ensureRole,
+  prisma,
+  rawPrisma,
+} from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
@@ -87,11 +92,7 @@ async function makeUser(
     .expect(200);
 
   for (const roleName of roles) {
-    const role = await prisma.role.upsert({
-      where: { name: roleName },
-      update: {},
-      create: { name: roleName },
-    });
+    const role = await ensureRole(roleName);
     const active = await prisma.userRoleAssignment.findFirst({
       where: { userId: body.user!.id, roleId: role.id, revokedAt: null },
     });

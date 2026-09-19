@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import type { RoleName } from '@ibms/db';
 import { TrustedDeviceRepository } from '../../../repositories/trusted-device.repository';
 import { AuditService } from '../../audit/audit.service';
 import { alwaysRequiresMfa } from '../auth.types';
@@ -60,7 +59,7 @@ export class TrustedDeviceService {
    */
   async maySkipMfa(
     userId: string,
-    roles: RoleName[],
+    roles: readonly string[],
     device: DeviceContext,
   ): Promise<boolean> {
     if (alwaysRequiresMfa(roles)) return false;
@@ -87,7 +86,7 @@ export class TrustedDeviceService {
    */
   async trust(
     userId: string,
-    roles: RoleName[],
+    roles: readonly string[],
     device: DeviceContext,
   ): Promise<{ id: string; expiresAt: Date } | null> {
     if (alwaysRequiresMfa(roles)) return null;

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ForbiddenException, type ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
-import type { RoleName } from '@ibms/db';
 import { RolesGuard } from './roles.guard';
 import type { AuthenticatedUser } from '../auth.types';
 
@@ -15,14 +14,15 @@ function makeContext(user: AuthenticatedUser | undefined): ExecutionContext {
   } as unknown as ExecutionContext;
 }
 
-function makeReflector(required: RoleName[] | undefined): Reflector {
+function makeReflector(required: string[] | undefined): Reflector {
   return { getAllAndOverride: () => required } as unknown as Reflector;
 }
 
-const user = (roles: RoleName[]): AuthenticatedUser => ({
+const user = (roles: string[]): AuthenticatedUser => ({
   id: 'u1',
   organizationId: 'org-1',
   email: 'u1@ibms.test',
+  roleIds: roles.map((r) => `id-${r}`),
   roles,
   sessionId: 's1',
 });

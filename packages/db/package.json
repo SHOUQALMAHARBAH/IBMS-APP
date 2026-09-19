@@ -31,7 +31,7 @@
     "studio": "dotenv -e ../../.env -- prisma studio",
     "seed": "dotenv -e ../../.env -- prisma db seed",
     "seed:test": "dotenv -e ../../.env.test -- prisma db seed",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.seed.json",
     "test": "vitest run"
   },
   "dependencies": {

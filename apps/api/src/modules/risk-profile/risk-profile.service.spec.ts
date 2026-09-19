@@ -13,6 +13,7 @@ function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
     organizationId: 'org-1',
     email: 'sales@ibms.test',
     roles: ['SALES_RELATIONSHIP_OFFICER'],
+    roleIds: [],
     sessionId: 'session-1',
     ...overrides,
   };

@@ -509,17 +509,54 @@ async function main() {
   await ensureDocumentTemplates();
   await ensureSlaPolicies();
 
+  // Roles are OFFICE-SCOPED now, so every one of these belongs to the default
+  // organization and is keyed on `(organizationId, name)` rather than a name
+  // that used to be globally unique. This script runs on the RAW client, which
+  // nothing tenant-scopes, so the Organization is named explicitly.
+  //
+  // These eleven are still seeded because they are the DEFAULT office's own
+  // roles — the same rows a migrated database already has, so a fresh seed and a
+  // migrated database end up indistinguishable. That is deliberately NOT the
+  // rule for an office created later: the approved design seeds a brand-new
+  // Organization with no business roles at all, only the protected
+  // OFFICE_ADMINISTRATOR, and its administrator builds whatever it needs. That
+  // path arrives with Phase 3 (which is where `isSystem` and the Role screen
+  // land); revisit this block then rather than pre-empting it here, because
+  // seeding zero roles today would leave a fresh database with nothing any
+  // sample user or e2e fixture could be granted.
   for (const role of ROLES) {
     await prisma.role.upsert({
-      where: { name: role.name },
-      update: { description: role.description },
-      create: { name: role.name, description: role.description },
+      where: {
+        organizationId_name: {
+          organizationId: DEFAULT_ORGANIZATION_ID,
+          name: role.name,
+        },
+      },
+      update: {
+        description: role.description,
+        nameEn: role.nameEn,
+        nameAr: role.nameAr,
+      },
+      create: {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+        name: role.name,
+        nameEn: role.nameEn,
+        nameAr: role.nameAr,
+        description: role.description,
+      },
     });
   }
-  console.log(`Seeded ${ROLES.length} roles.`);
+  console.log(`Seeded ${ROLES.length} roles for the default organization.`);
 
+  // Scoped to the default organization for the same reason: on a database that
+  // already holds a second office, an unfiltered read would return two roles
+  // sharing a name and the Map would silently keep whichever came last.
   const roleIdByName = new Map(
-    (await prisma.role.findMany()).map((r) => [r.name, r.id]),
+    (
+      await prisma.role.findMany({
+        where: { organizationId: DEFAULT_ORGANIZATION_ID },
+      })
+    ).map((r) => [r.name, r.id]),
   );
 
   for (const permission of PERMISSIONS) {
@@ -543,10 +580,21 @@ async function main() {
           `Permission "${permission.code}" references role "${roleName}", which was not seeded — is it missing from seed-data/roles.ts?`,
         );
       }
+      // `organizationId` named explicitly: `RolePermission` is tenant-scoped
+      // now, and on the raw client the column's default
+      // (`current_setting('app.current_org_id', true)`) is NULL, which the
+      // composite FK to `Role(id, organizationId)` rejects rather than
+      // accepting an unattributed grant. Every `roleId` here came from
+      // `roleIdByName`, which is scoped to this same Organization, so the pair
+      // always agrees.
       await prisma.rolePermission.upsert({
         where: { roleId_permissionId: { roleId, permissionId: perm.id } },
         update: {},
-        create: { roleId, permissionId: perm.id },
+        create: {
+          organizationId: DEFAULT_ORGANIZATION_ID,
+          roleId,
+          permissionId: perm.id,
+        },
       });
     }
   }

@@ -39,7 +39,11 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
-    const granted = await this.permissions.getCodesForRoles(user.roles);
+    // `roleIds`, never `roles`: a role NAME is unique only within an office, so
+    // resolving grants by name would return the union of every same-named
+    // role's permissions across every tenant. See
+    // `PermissionRepository.findCodesForRoles`.
+    const granted = await this.permissions.getCodesForRoles(user.roleIds);
     const hasPermission = required.some((code) => granted.has(code));
     if (!hasPermission) {
       throw new ForbiddenException(

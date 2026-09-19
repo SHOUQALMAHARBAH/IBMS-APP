@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, RoleName, type User } from '@ibms/db';
+import { Prisma, type User } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
 import { PasswordService } from '../../auth/services/password.service';
 import { EmployeeRepository } from '../../../repositories/employee.repository';
@@ -26,6 +26,24 @@ import { BranchRepository } from '../../../repositories/branch.repository';
  * other unbounded read in this codebase (`ANALYTICS_POLICY_LIMIT` et al). */
 export const USER_ADMIN_PAGE_SIZE = 200;
 
+/**
+ * The name the pre-custom-roles catalogue gave the office administrator.
+ *
+ * Was `RoleName.SYSTEM_SECURITY_ADMINISTRATOR`. Office-scoped custom roles
+ * removed the enum, and every migrated role kept its machine name — so the
+ * lockout guard below still finds exactly the role it always did, in each
+ * office, and existing administrators are unaffected.
+ *
+ * ⚠️ PHASE 3 CONVERSION TARGET. Keying the guard on one hard-coded NAME is the
+ * assumption this whole project removes: an office that renames this role, or
+ * builds its own administrator role instead, loses the protection silently.
+ * The approved replacement is "the last active holder of any role holding
+ * `user.manage`", plus `Role.isSystem` — both of which need Phase 3's schema
+ * and CRUD. Widening it now would change behaviour in a phase whose gate is
+ * that behaviour does NOT change.
+ */
+const LEGACY_ADMIN_ROLE_NAME = 'SYSTEM_SECURITY_ADMINISTRATOR';
+
 export interface AdminUserView {
   id: string;
   fullName: string;
@@ -37,7 +55,7 @@ export interface AdminUserView {
   accessValidFrom: string | null;
   accessValidUntil: string | null;
   createdAt: string;
-  roles: RoleName[];
+  roles: string[];
 }
 
 /**
@@ -262,9 +280,9 @@ export class UserAdminService {
 
   async grantRole(
     userId: string,
-    roleName: RoleName,
+    roleName: string,
     actorUserId: string,
-  ): Promise<{ userId: string; roles: RoleName[] }> {
+  ): Promise<{ userId: string; roles: string[] }> {
     const user = await this.users.findById(userId);
     if (!user) throw new NotFoundException(`User ${userId} not found.`);
 
@@ -301,9 +319,9 @@ export class UserAdminService {
 
   async revokeRole(
     userId: string,
-    roleName: RoleName,
+    roleName: string,
     actorUserId: string,
-  ): Promise<{ userId: string; roles: RoleName[] }> {
+  ): Promise<{ userId: string; roles: string[] }> {
     const user = await this.users.findById(userId);
     if (!user) throw new NotFoundException(`User ${userId} not found.`);
 
@@ -324,7 +342,7 @@ export class UserAdminService {
     // 'has this already happened?' guard before a state change that is not a
     // status-conditional updateMany").
     const revoked =
-      roleName === RoleName.SYSTEM_SECURITY_ADMINISTRATOR
+      roleName === LEGACY_ADMIN_ROLE_NAME
         ? await this.users.withRoleLocked(role.id, async () => {
             const holders = await this.users.countActiveHoldersOfRole(role.id);
             if (holders <= 1) {
@@ -378,14 +396,12 @@ export class UserAdminService {
     // way to remove the last usable holder as revoking is — `AuthService.login`
     // refuses an inactive account outright — so it takes the same Role lock
     // and the same count.
-    const adminRole = await this.users.findRoleByName(
-      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
-    );
+    const adminRole = await this.users.findRoleByName(LEGACY_ADMIN_ROLE_NAME);
     const changed =
       !isActive && adminRole
         ? await this.users.withRoleLocked(adminRole.id, async () => {
             const holdsAdmin = (await this.users.getRoleNames(userId)).includes(
-              RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+              LEGACY_ADMIN_ROLE_NAME,
             );
             if (holdsAdmin) {
               const holders = await this.users.countActiveHoldersOfRole(
@@ -493,7 +509,7 @@ function toAdminUserView(row: {
   accessValidFrom: Date | null;
   accessValidUntil: Date | null;
   createdAt: Date;
-  roles: RoleName[];
+  roles: string[];
   employee?: { fullName: string } | null;
 }): AdminUserView {
   return {

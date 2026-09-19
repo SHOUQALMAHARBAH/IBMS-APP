@@ -1,0 +1,35 @@
+{
+  // Typecheck-only config for `prisma/` — the seed and its seed-data modules.
+  //
+  // WHY THIS EXISTS AS A SECOND CONFIG
+  // ----------------------------------
+  // `tsconfig.json` sets `"rootDir": "src"` because it BUILDS the package, so
+  // adding `prisma` to its `include` fails with TS6059 ("not under rootDir")
+  // rather than typechecking anything. Widening the build's rootDir to reach a
+  // script that is never compiled into `dist/` would change what the package
+  // emits, to fix a checking gap.
+  //
+  // WHAT THE GAP WAS
+  // ----------------
+  // `prisma/seed.ts` was typechecked by nothing. Office-scoped custom roles
+  // made `Role` require `organizationId`/`nameAr`/`nameEn` and moved its unique
+  // key to `(organizationId, name)`; the seed still wrote the old shape, and
+  // `npm run typecheck` passed 6/6 across the whole monorepo while the seed
+  // could not run at all. CI caught it — in the one step no local gate covers,
+  // on a database fresh enough to need a CREATE rather than an upsert-existing.
+  //
+  // The seed is the only thing CI runs that nothing typechecks, and every
+  // remaining phase of this rework touches both the schema and the seed. One
+  // extra `tsc` invocation turns that class of failure from a CI round-trip
+  // into a local error.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    // The seed and its spec run under tsx/vitest, which resolve ESM-style
+    // relative imports and JSON; the build's commonjs settings are irrelevant
+    // to a file that is never emitted.
+    "types": ["node"]
+  },
+  "include": ["prisma"]
+}

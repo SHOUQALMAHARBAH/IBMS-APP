@@ -8,7 +8,6 @@ import {
 import type {
   AccessRecertificationCycle,
   AccessRecertificationItem,
-  RoleName,
 } from '@ibms/db';
 import { assertDifferentActors } from '../../../common/maker-checker.util';
 import { AccessRecertificationRepository } from '../../../repositories/access-recertification.repository';
@@ -28,7 +27,7 @@ export interface RecertificationItemView {
   subjectUserId: string;
   subjectFullName: string;
   subjectEmail: string;
-  subjectRoles: RoleName[];
+  subjectRoles: string[];
   reviewerUserId: string;
   decision: string | null;
   reviewedAt: Date | null;
