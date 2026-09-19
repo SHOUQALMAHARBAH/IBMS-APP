@@ -347,16 +347,6 @@ export class UserRepository {
     return this.prisma.client.user.count();
   }
 
-  /**
-   * A role by name, WITHIN the caller's own office.
-   *
-   * `findFirst`, not `findUnique`: a role name is only unique per office now
-   * (`@@unique([organizationId, name])`), and `findFirst` is one of the
-   * operations `tenantScopeExtension` injects `organizationId` into — so this
-   * cannot return another office's role even though the name may exist there
-   * too. Spelling the compound key by hand would mean naming the organization
-   * at the call site, which is the habit the extension exists to remove.
-   */
   /** One role of the caller's OWN office, by id. The tenant-scoped client is
    *  what makes another office's id resolve to `null` rather than to their row —
    *  so "unknown" and "not yours" are the same answer, which is the point. */
@@ -371,13 +361,13 @@ export class UserRepository {
     return this.prisma.client.role.findMany({ where: { id: { in: ids } } });
   }
 
-  findRoleByName(name: string): Promise<Role | null> {
-    return this.prisma.client.role.findFirst({ where: { name } });
-  }
-
-  findRolesByNames(names: string[]): Promise<Role[]> {
-    return this.prisma.client.role.findMany({ where: { name: { in: names } } });
-  }
+  // DELETED: `findRoleByName` and `findRolesByNames`.
+  //
+  // Neither has had a caller since role assignment became id-addressed. A role
+  // NAME is unique only within an office and an office can rename its own roles,
+  // so it is not an identity — and a name-addressed role lookup sitting in the
+  // repository invites name-addressing back, which is the same argument that
+  // deleted `@RequireRoles`. Use `findRoleById` / `findRolesByIds`.
 
   /**
    * Grant a role by writing a NEW assignment row, never by resurrecting a

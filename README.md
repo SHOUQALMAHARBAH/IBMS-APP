@@ -669,7 +669,7 @@ build actually is today:
   matching beyond the curated transliteration table (§10.1) is deferred by
   decision. See CLAUDE.md § What's New for the per-phase record.
 
-- **Custom office-scoped RBAC — Phases 1 and 2 of 5 complete.** A second scope
+- **Custom office-scoped RBAC — Phases 1, 2 and 3 of 5 complete.** A second scope
   addition on top of multi-tenancy, and the same kind of retrofit: the whole backlog
   was built against a fixed catalogue of 11 roles shared by every office, and that is
   being replaced with roles each office defines for itself. `MULTI-TENANCY-SPEC.md`'s
@@ -717,9 +717,53 @@ build actually is today:
   addressed by a name an office can edit. Every response there now returns a user's
   roles the same way: `{ id, name }`.
 
-  **What does NOT exist yet, and is not a defect to chase.** No office can create a
-  role: there is no Role CRUD API or screen, and `status`/`isSystem` are not on the
-  model, so `Role.name` being editable is theoretical until Phase 3. Four decision
+  **What exists (Phase 3) — an office can now define its own roles.**
+  `/settings/roles` is the screen the whole rework exists for: the office's own
+  catalogue, a permission matrix over all 182 codes grouped by module, create,
+  rename, retire, reactivate. `Role` gained `status` (`ACTIVE`/`INACTIVE`) and
+  `isSystem`. There is deliberately **no `DELETE /rbac/roles/:id`** — retiring is
+  the only removal there is, because the `UserRoleAssignment` and `RolePermission`
+  rows pointing at a role ARE the record of who held what and when. `status` is
+  enforced in every query that DECIDES access, not just on the screen, and
+  there are now FOUR routes into the last-administrator lockout guard, all under the
+  same per-office advisory lock: revoking a grant, deactivating the user (both Phase 2),
+  retiring the role, and removing `user.manage` from a role via the matrix. The last one
+  is the quiet one — unchecking a box does not look like an access action, but it takes
+  the capability away exactly as a revoke does, and an office cannot grant it back. **`isSystem` GRANTS NOTHING**: it stops the Role
+  screen renaming, retiring or re-granting a row and is read nowhere else, with a
+  test whose only job is to prove a user holding an `isSystem` role with zero
+  grants reaches nothing.
+
+  Every office also gets an **`OFFICE_ADMINISTRATOR`** — 22 codes, `isSystem`,
+  strict MFA — granted to every user who could already administer users, asked as
+  a CAPABILITY rather than by role name, and **in addition to** their legacy role,
+  never instead. Its grants are a verified strict subset of what the legacy
+  administrator holds, which is what made the migration a provably empty per-user
+  effective-permission diff. A NEW office gets that role and **no business roles at
+  all**; since nothing in the application creates an Organization (the only two
+  writers are the seed and the demo script), the rule is encoded in both writers
+  plus a test asserting that an Organization with no active route to user
+  administration is a defect.
+
+  Two Highly Confidential reveals stopped riding on the permission that lets you
+  read the record. `employee.manage` became `employee.read` / `.create` / `.update`
+  plus **`employee.national-id.reveal`**, and **`customer.national-id.reveal`** split
+  out of `customer.360-view.read`. The employee split is per ROUTE (its DTO accepts
+  only that field); the customer one is per FIELD, because the same endpoint reveals
+  a phone number a Sales/Relationship Officer needs for their own customer. Both go
+  to the Compliance Officer alone — the administrator and the Manager both lose the
+  employee reveal, which is the point. The KYC path is proven intact end to end.
+  177 codes became 182.
+
+  Two decisions worth knowing about. The permission matrix **warns and saves**
+  when one role both classifies an incident and co-signs that classification: a
+  small office may legitimately want that, and `assertDifferentActors` still refuses
+  a co-sign by whoever recorded it. And the two MFA security attributes **are**
+  editable, behind a step-up challenge — the first consumer of `@RequireStepUp()`
+  anywhere — because not exposing them would leave every custom role demanding MFA
+  on every login forever.
+
+  **What does NOT exist yet, and is not a defect to chase.** Four decision
   points still branch on a role NAME, all deliberately: SLA escalation routing
   (`sla-registry.config.ts`, `sla-policies.ts`), the bell-notification recipients that
   follow it, and the Executive nav ORDER. Those answer "which business function owns
@@ -729,9 +773,25 @@ build actually is today:
   Maker/checker is unaffected and needed no work: it compares user IDs at 62 call sites,
   backed by 17 database CHECK constraints, so holding several roles cannot weaken
   separation of duties. The `RoleName` enum type and the pre-migration global role rows
-  are deliberately kept for at least one release so rollback stays cheap. See CLAUDE.md
-  § What's New for the per-phase record, including the two cross-tenant leaks Phase 1
-  closed and the seed defect Phase 2 found.
+  are deliberately kept for at least one release so rollback stays cheap. Insurer CRUD
+  and `insurer.relationship.manage` remain specification-only and are deliberately
+  deferred: including that code would have broken the strict-subset property the
+  administrator migration's empty diff depends on. Phase 4 (the unified screen's
+  org-structure half, subdomain resolution, and the business-function routing table
+  that finally retires those four role-name sites) and Phase 5 (migration rehearsal,
+  dropping the `RoleName` enum type and the pre-migration rows) are not built. See
+  CLAUDE.md § What's New for the per-phase record, including the two cross-tenant leaks
+  Phase 1 closed, the seed defect Phase 2 found, and the demo-office grant drift and
+  broken grant dropdown Phase 3 found. **Read `docs/office-scoped-rbac.md` before
+  touching anything role-related** — the four standing constraints, the things that
+  will bite (the seed grants to the default office only; it never REMOVES a grant; the
+  permission cache is per-process), and the Phase 4 hand-off. **One known gap the matrix
+  opens**: `insurer.form.map` is office-grantable but its effect crosses offices
+  (`InsurerFormTemplate` carries no `organizationId`, and the mapping becomes the form
+  every other office submits against). `OFFICE_ADMINISTRATOR` deliberately does not hold
+  it; closing it properly needs a "not office-grantable" marker the model does not have,
+  and an answer to who may grant it instead — there is no platform-admin surface. Logged
+  for Phase 4 alongside insurer CRUD, NOT fixed.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

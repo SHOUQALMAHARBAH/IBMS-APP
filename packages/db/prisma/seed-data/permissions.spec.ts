@@ -300,9 +300,12 @@ describe("permission grid — the office administrator", () => {
       // destructive business actions
       "claim.delete",
       "document.delete-override",
-      // the global insurer catalogue is a platform concern
+      // `insurer.form.map`'s effect CROSSES offices — the grid's own description
+      // says the mapping becomes the form every other office submits against.
+      // (`insurer.master.manage` is deliberately absent from this list: no such
+      // code exists in the catalogue, so asserting it is not granted asserts
+      // nothing. `insurer.master.read` is the only master-registry code today.)
       "insurer.form.map",
-      "insurer.master.manage",
       // reviewing your own access is the control this system exists to enforce
       "access-recertification.review",
       "access-recertification.review.routine",

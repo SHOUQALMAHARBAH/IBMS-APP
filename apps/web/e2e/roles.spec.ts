@@ -436,6 +436,38 @@ test("surfaces the last-administrator refusal verbatim instead of a generic erro
   await expect(page.getByText("last role that grants user administration")).toBeVisible();
 });
 
+test("surfaces the refusal when a permission save would remove the last administrator", async ({
+  page,
+}) => {
+  // The FOURTH route to the administrator lockout, and the one this screen opens:
+  // unchecking `user.manage` does not look like an access action, but it takes the
+  // capability away exactly as a revoke does. A different handler from the retire
+  // button above, so its own test — and the API's message, not a generic one,
+  // because it says what to do instead.
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  const refusal =
+    "Refusing to remove user administration from the last role whose holders have it — nobody would be able to grant it back. Give another role that permission, and somebody that role, first.";
+  await page.route(
+    `http://localhost:4000/rbac/roles/${CUSTOM_ROLE.id}/permissions`,
+    (route) =>
+      route.fulfill({ status: 422, json: { statusCode: 422, message: refusal } }),
+  );
+
+  await page.goto("/settings/roles");
+  await page
+    .locator('[data-role="CLAIMS_TRIAGE_DESK"]')
+    .getByRole("button", { name: "Permissions" })
+    .click();
+  await page.getByRole("button", { name: "Save permissions" }).click();
+
+  await expect(
+    page.getByText("last role whose holders have it"),
+  ).toBeVisible();
+  // And the save is NOT reported as having succeeded.
+  await expect(page.getByText("Permissions saved.")).toHaveCount(0);
+});
+
 test("creates a role the office named itself", async ({ page }) => {
   await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
   await mockRoles(page);

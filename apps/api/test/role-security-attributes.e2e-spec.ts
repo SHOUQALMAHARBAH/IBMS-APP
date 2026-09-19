@@ -60,6 +60,11 @@ const LEGACY_ROLE_NAMES = [
   'EXTERNAL_AUDITOR',
 ];
 
+/** Every role the PLATFORM defines, which is exactly the set `isSystem` marks.
+ *  The legacy eleven plus `OFFICE_ADMINISTRATOR`, which Phase 3 installs in every
+ *  office — a twelfth platform role, not an office's own. */
+const PLATFORM_ROLE_NAMES = [...LEGACY_ROLE_NAMES, 'OFFICE_ADMINISTRATOR'];
+
 const createdRoleIds: string[] = [];
 
 afterAll(async () => {
@@ -173,14 +178,21 @@ describe('Role lifecycle attributes — status and isSystem', () => {
     expect(rows[0].isSystem, 'column default for isSystem').toBe(false);
   });
 
-  it('marks all eleven legacy roles isSystem, in EVERY organization, and nothing else', async () => {
+  it('marks every PLATFORM-defined role isSystem, in EVERY organization, and nothing else', async () => {
     // `rawPrisma` on purpose: Phase 1 adopted or copied these rows per office, so
     // the property is "every office's copy is protected".
+    //
+    // The set is the eleven legacy names PLUS `OFFICE_ADMINISTRATOR`, which Phase 3
+    // installs in every office and which is equally platform-defined. Keyed off
+    // that list rather than off `isSystem` itself, so a role an office invents can
+    // never satisfy this by having the flag set — which is the direction that
+    // matters, since `isSystem` is what makes the Role screen refuse to touch a
+    // row.
     const all = await rawPrisma.role.findMany({
       select: { name: true, organizationId: true, isSystem: true },
     });
     for (const role of all) {
-      const shouldBeSystem = LEGACY_ROLE_NAMES.includes(role.name);
+      const shouldBeSystem = PLATFORM_ROLE_NAMES.includes(role.name);
       expect(
         role.isSystem,
         `${role.name} in org ${role.organizationId} isSystem`,
@@ -189,8 +201,8 @@ describe('Role lifecycle attributes — status and isSystem', () => {
     // Guard against the loop passing on an empty set.
     expect(
       all.filter((r) => r.isSystem).length,
-      'every office must have protected legacy roles',
-    ).toBeGreaterThanOrEqual(LEGACY_ROLE_NAMES.length);
+      'every office must have protected platform roles',
+    ).toBeGreaterThanOrEqual(PLATFORM_ROLE_NAMES.length);
   });
 
   it('starts every legacy role ACTIVE — the migration retires nothing', async () => {

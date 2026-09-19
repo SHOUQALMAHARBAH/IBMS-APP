@@ -71,7 +71,7 @@ ON CONFLICT ("organizationId", "name") DO NOTHING;
 --
 --    Deliberately EXCLUDED, all verified present in the grid and withheld:
 --      claim.delete, document.delete-override      destructive business actions
---      insurer.form.map, insurer.master.manage     the global insurer catalogue
+--      insurer.form.map                            its effect crosses offices
 --      access-recertification.review(.routine)     reviewing your own access
 --      employee.national-id.reveal                 Part 10.2 Highly Confidential
 --      customer.national-id.reveal                 Part 10.2 Highly Confidential

@@ -232,6 +232,72 @@ export class RoleAdminService {
     const before = new Set(role.permissionCodes);
     const after = new Set(requested);
 
+    // THE FOURTH ROUTE to the administrator lockout, and the one the matrix
+    // screen opens.
+    //
+    // The other three are revoking a user's grant and deactivating the user
+    // (both Phase 2) and retiring the role. This one is quieter: unchecking
+    // `user.manage` on the last role whose holders actually have it leaves the
+    // office with nobody who can administer users — and unlike a revoke, nothing
+    // about the action looks like it is about access at all.
+    //
+    // Reachable despite every office having an isSystem `OFFICE_ADMINISTRATOR`
+    // that `assertNotSystem` protects: an office with a second, CUSTOM
+    // administrator role can have every `OFFICE_ADMINISTRATOR` grant revoked
+    // one at a time (each allowed, because the custom role's holders survive
+    // each check), and then have the capability removed from that custom role
+    // here. The administrator role still GRANTS it; nobody HOLDS it, and nobody
+    // can be given it.
+    //
+    // Guarded exactly like `setStatus`: only when this write actually takes the
+    // capability away, under the same per-office advisory lock, asking what
+    // survives THIS change rather than what exists now.
+    const removesUserAdmin =
+      before.has(USER_ADMIN_PERMISSION) && !after.has(USER_ADMIN_PERMISSION);
+    if (!removesUserAdmin) {
+      return this.applyPermissions(
+        roleId,
+        organizationId,
+        permissionIds,
+        before,
+        after,
+        actorUserId,
+      );
+    }
+
+    return this.users.withCapabilityLocked(USER_ADMIN_PERMISSION, async () => {
+      const holders = await this.users.findActiveHoldersOfPermission(
+        USER_ADMIN_PERMISSION,
+      );
+      const remaining = new Set(
+        holders.filter((h) => h.roleId !== roleId).map((h) => h.userId),
+      );
+      if (remaining.size === 0) {
+        throw new UnprocessableEntityException(
+          'Refusing to remove user administration from the last role whose holders have it — nobody would be able to grant it back. Give another role that permission, and somebody that role, first.',
+        );
+      }
+      return this.applyPermissions(
+        roleId,
+        organizationId,
+        permissionIds,
+        before,
+        after,
+        actorUserId,
+      );
+    });
+  }
+
+  /** The write half of `setPermissions`, called from both sides of its lockout
+   *  guard so the guarded and unguarded paths cannot drift. */
+  private async applyPermissions(
+    roleId: string,
+    organizationId: string,
+    permissionIds: string[],
+    before: Set<string>,
+    after: Set<string>,
+    actorUserId: string,
+  ): Promise<{ permissionCodes: string[] }> {
     await this.roles.replacePermissions(roleId, organizationId, permissionIds);
 
     await this.safeAudit({

@@ -39,6 +39,33 @@ import { createTestApp } from './utils/test-app';
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 const tag = Math.random().toString(36).slice(2, 8);
 
+/**
+ * FIXED prefix, and cleaned up at BOTH ends.
+ *
+ * The `isSystem`-grants-nothing test has to create a role with `isSystem: true`,
+ * and `role-security-attributes.e2e-spec.ts` asserts that ONLY platform-defined
+ * roles carry that flag. A run killed mid-test therefore leaves a row that breaks
+ * a different file — which is what happened, so the name is a fixed prefix rather
+ * than a random one and the sweep runs in `beforeAll` too.
+ */
+const HOLLOW_ROLE_PREFIX = 'Hollow System Role';
+
+async function removeHollowRoles(): Promise<void> {
+  const roles = await prisma.role.findMany({
+    where: { name: { startsWith: HOLLOW_ROLE_PREFIX } },
+    select: { id: true },
+  });
+  if (roles.length === 0) return;
+  const roleIds = roles.map((r) => r.id);
+  await prisma.userRoleAssignment.deleteMany({
+    where: { roleId: { in: roleIds } },
+  });
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: { in: roleIds } },
+  });
+  await prisma.role.deleteMany({ where: { id: { in: roleIds } } });
+}
+
 /** The 22, from `seed-data/roles.ts`. Duplicated deliberately: a test that read
  *  the same list the seed writes would pass whatever that list said. */
 const OFFICE_ADMINISTRATOR_CODES = [
@@ -72,9 +99,10 @@ const WITHHELD_CODES = [
   // destructive business actions an administrator has no business performing
   'claim.delete',
   'document.delete-override',
-  // the global insurer catalogue is a platform concern, not an office's
+  // `insurer.form.map`'s effect crosses offices — the grid's own description says
+  // the mapping becomes the form every OTHER office submits against. There is no
+  // `insurer.master.manage` code in the catalogue to withhold.
   'insurer.form.map',
-  'insurer.master.manage',
   // an administrator reviewing their own access is the control this prevents
   'access-recertification.review',
   'access-recertification.review.routine',
@@ -131,9 +159,12 @@ async function makeUserWithRole(
 
 beforeAll(async () => {
   app = await createTestApp();
+  // Whatever a crashed run left behind, before anything asserts on it.
+  await removeHollowRoles();
 }, 240_000);
 
 afterAll(async () => {
+  await removeHollowRoles();
   await app?.close();
   app = null;
 });
@@ -357,11 +388,12 @@ describe('isSystem grants nothing', () => {
     // called "system" on a Role is exactly where an `if (isSystem) allow` would
     // be smuggled in, so this holds an isSystem role with ZERO grants and walks
     // the routes an administrator would use.
+    const hollowName = `${HOLLOW_ROLE_PREFIX} ${tag}`;
     const hollow = await prisma.role.create({
       data: {
-        name: `Hollow System Role ${tag}`,
-        nameAr: `Hollow System Role ${tag}`,
-        nameEn: `Hollow System Role ${tag}`,
+        name: hollowName,
+        nameAr: hollowName,
+        nameEn: hollowName,
         isSystem: true,
       },
     });

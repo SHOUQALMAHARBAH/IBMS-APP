@@ -165,13 +165,18 @@ export const ROLES: (RoleSeed & { name: RoleName })[] = [
  *
  * What it deliberately does NOT hold, all of it verified against the grid:
  * `claim.delete` and `document.delete-override` (destructive business actions an
- * administrator has no business performing), `insurer.form.map` and
- * `insurer.master.manage` (the global insurer catalogue is a platform concern),
- * `access-recertification.review` and `.review.routine` (an administrator
- * reviewing their own access is the control this system exists to prevent), and
- * `employee.national-id.reveal` / `customer.national-id.reveal` (Part 10.2
- * Highly Confidential — provisioning an account does not require reading
- * somebody's national identity number).
+ * administrator has no business performing), `insurer.form.map` (see below — its
+ * effect crosses offices), `access-recertification.review` and `.review.routine`
+ * (an administrator reviewing their own access is the control this system exists
+ * to prevent), and `employee.national-id.reveal` /
+ * `customer.national-id.reveal` (Part 10.2 Highly Confidential — provisioning an
+ * account does not require reading somebody's national identity number).
+ *
+ * There is NO `insurer.master.manage` code in the catalogue — only
+ * `insurer.master.read`. Nothing writes the global registry through a permission
+ * today, which is why the administrator cannot hold that write: it does not
+ * exist. Said here because "withheld" and "does not exist" are different facts
+ * and the second one changes the day insurer CRUD lands.
  *
  * ## isSystem, and what it does not mean
  *
