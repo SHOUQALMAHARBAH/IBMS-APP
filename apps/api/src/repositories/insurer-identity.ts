@@ -42,6 +42,25 @@ export const INSURER_IDENTITY_SELECT = {
   // and the coalesce below needs both halves present.
   legalName: true,
   legalNameAr: true,
+  // Whether the office still deals with this insurer.
+  //
+  // ## This reverses an earlier decision in this feature, deliberately
+  //
+  // The commit that enforced deactivation kept `isActive` OUT of here, arguing it
+  // is not part of an insurer's IDENTITY and that pushing a placement-time concern
+  // into eighteen consumers was wrong. That argument does not survive the decision
+  // to keep CAPTURING a quotation from a deactivated insurer legal: such a quote
+  // reaches the comparison matrix, and a broker could present it and a client could
+  // choose it, with nobody discovering the problem until placement refused. Silently
+  // comparable is a worse failure than not recorded.
+  //
+  // So the comparison and the recommendation genuinely need it, and the choice is
+  // between adding it here or adding a second insurer-reading definition. This file
+  // exists because five private copies of that join once drifted, so one definition
+  // wins. A consumer that has no use for the flag (a certificate of insurance, a
+  // policy schedule) simply does not render it — selecting a field is not the same
+  // as showing it.
+  isActive: true,
 } as const satisfies Prisma.InsurerSelect;
 
 /** The shape `INSURER_IDENTITY_SELECT` returns. */
@@ -52,6 +71,7 @@ export interface InsurerIdentity {
   insurerMaster: { legalName: string; legalNameAr: string | null } | null;
   legalName: string | null;
   legalNameAr: string | null;
+  isActive: boolean;
 }
 
 /** Just the two name sources, for the callers that only need a name. Kept as its
@@ -81,6 +101,9 @@ export function insurerIdentity(insurer: InsurerIdentity): {
   name: string;
   nameAr: string | null;
   financialStrengthRating: string | null;
+  /** FALSE when the office has stopped dealing with this insurer. Every surface
+   *  that lets someone CHOOSE an insurer has to show this — see the select. */
+  isActive: boolean;
 } {
   // The SOURCE is chosen once, then both names are read from it — not coalesced
   // field by field.
@@ -102,6 +125,7 @@ export function insurerIdentity(insurer: InsurerIdentity): {
     name: source.name,
     nameAr: source.nameAr,
     financialStrengthRating: insurer.financialStrengthRating,
+    isActive: insurer.isActive,
   };
 }
 

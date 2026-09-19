@@ -24,6 +24,7 @@ const MASTER_LINKED: InsurerIdentity = {
   // cannot know which kind of row it holds.
   legalName: null,
   legalNameAr: null,
+  isActive: true,
 };
 
 const OFFICE_LOCAL: InsurerIdentity = {
@@ -32,6 +33,7 @@ const OFFICE_LOCAL: InsurerIdentity = {
   insurerMaster: null,
   legalName: 'Wadi Rum Mutual',
   legalNameAr: 'وادي رم التعاونية',
+  isActive: true,
 };
 
 describe('insurerIdentity — the coalesce', () => {
@@ -41,6 +43,7 @@ describe('insurerIdentity — the coalesce', () => {
       name: 'AIG Jordan',
       nameAr: 'إي آي جي الأردن',
       financialStrengthRating: 'A-',
+      isActive: true,
     });
   });
 
@@ -50,6 +53,7 @@ describe('insurerIdentity — the coalesce', () => {
       name: 'Wadi Rum Mutual',
       nameAr: 'وادي رم التعاونية',
       financialStrengthRating: null,
+      isActive: true,
     });
   });
 
@@ -95,6 +99,32 @@ describe('insurerIdentity — the coalesce', () => {
   });
 });
 
+describe('insurerIdentity — the deactivated flag', () => {
+  it('carries isActive through, from either name source', () => {
+    // Every surface that lets someone CHOOSE an insurer has to be able to show
+    // this. It is here rather than in a second insurer-reading helper because
+    // capturing a quotation from a deactivated insurer stays legal, so such a quote
+    // reaches the comparison matrix — and a quote a broker can present while nobody
+    // can place it is a worse failure than a quote nobody recorded.
+    expect(
+      insurerIdentity({ ...MASTER_LINKED, isActive: false }).isActive,
+    ).toBe(false);
+    expect(insurerIdentity({ ...OFFICE_LOCAL, isActive: false }).isActive).toBe(
+      false,
+    );
+  });
+
+  it('does not let the flag ride on the name source — a deactivated MASTER-linked insurer still reads its name', () => {
+    // The flag and the name resolve independently. A regression that tied them
+    // together would blank the name of a deactivated insurer, which is exactly what
+    // a comparison row must not do: the whole point is to show WHO it is and that
+    // they are unavailable.
+    const retired = insurerIdentity({ ...MASTER_LINKED, isActive: false });
+    expect(retired.name).toBe('AIG Jordan');
+    expect(retired.isActive).toBe(false);
+  });
+});
+
 describe('insurerName — the name alone', () => {
   it('coalesces the same way as the full identity', () => {
     expect(insurerName(MASTER_LINKED)).toBe('AIG Jordan');
@@ -124,6 +154,7 @@ describe('INSURER_IDENTITY_SELECT', () => {
       financialStrengthRating: true,
       legalName: true,
       legalNameAr: true,
+      isActive: true,
       insurerMaster: { select: { legalName: true, legalNameAr: true } },
     });
   });

@@ -141,24 +141,12 @@ export class PolicyRepository {
   /** Just the id + status — for a bounded status-walk loop
    * (`PolicyCheckingService.driveCheckingOutcome`) that re-reads the live
    * status before every hop and does not need the full include. */
-  /**
-   * Whether the office still deals with this insurer.
-   *
-   * A narrow lookup rather than widening `INSURER_IDENTITY_SELECT`: `isActive` is
-   * not part of an insurer's IDENTITY, and adding it there would push a
-   * placement-time concern into all eighteen consumers of that select — a
-   * comparison matrix and a generated certificate have no business knowing it.
-   *
-   * `null` means the insurer does not exist, which a placement should treat as a
-   * different problem from a deactivated one.
-   */
-  async isInsurerActive(insurerId: string): Promise<boolean | null> {
-    const row = await this.prisma.client.insurer.findUnique({
-      where: { id: insurerId },
-      select: { isActive: true },
-    });
-    return row?.isActive ?? null;
-  }
+  // REMOVED: `isInsurerActive`.
+  //
+  // It existed for one commit, while `isActive` was deliberately kept out of
+  // `INSURER_IDENTITY_SELECT`. That changed when the comparison matrix needed the
+  // flag, so placement now reads it from the quote's own insurer — one definition
+  // of "is this insurer still ours", not two that could disagree.
 
   findStatus(id: string): Promise<{ id: string; status: PolicyStatus } | null> {
     return this.prisma.client.policy.findUnique({

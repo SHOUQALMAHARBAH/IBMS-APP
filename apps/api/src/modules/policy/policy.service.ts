@@ -462,8 +462,17 @@ export class PolicyService {
     // factual event, and refuses nothing for a late quote landing after the
     // business went elsewhere. A quote is a record of what was offered; a policy is
     // a commitment. Only the second one is blocked.
-    const insurerActive = await this.policies.isInsurerActive(quote.insurerId);
-    if (insurerActive === false) {
+    // Read from the quote's own insurer rather than a second lookup. The
+    // recommendation already loads it through `INSURER_IDENTITY_SELECT`, which
+    // carries `isActive` now that the comparison needs it — so the placement guard
+    // and the comparison marker resolve the same fact from the same definition
+    // instead of two queries that could disagree.
+    // `?.isActive === false`, not `!quote.insurer.isActive`: the first version read
+    // through `!== null` and threw on an `undefined` insurer, which a unit mock
+    // found immediately. Only an EXPLICIT false refuses — a missing insurer is a
+    // different problem and the FK is what reports it, exactly as the removed
+    // `isInsurerActive` returned `null` rather than `false` for that case.
+    if (quote.insurer?.isActive === false) {
       throw new UnprocessableEntityException(
         `Cannot place a policy with a deactivated insurer (${quote.insurerId}). Reactivate it from the insurer screen if this placement should go ahead — existing policies, claims and invoices with them are unaffected either way.`,
       );

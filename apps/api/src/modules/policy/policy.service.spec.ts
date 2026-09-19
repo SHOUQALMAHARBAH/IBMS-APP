@@ -140,10 +140,21 @@ function makeDeps(opts: Opts = {}) {
     .fn()
     .mockResolvedValue(opts.existingPolicy ?? null);
   const findManyByCustomerId = vi.fn().mockResolvedValue([policyRow()]);
-  // Insurer management — `place()` refuses an insurer the office has deactivated.
-  // Defaults to active, which is what every test that is not about that expects;
-  // `null` would mean the insurer does not exist.
-  const isInsurerActive = vi.fn().mockResolvedValue(opts.insurerActive ?? true);
+  // Insurer management — `place()` refuses an insurer the office has deactivated,
+  // reading the flag off the recommendation's own quote (the real
+  // `RECOMMENDATION_INCLUDE` loads it through `INSURER_IDENTITY_SELECT`). Defaults
+  // to active; `null` models an insurer the include did not resolve, which must NOT
+  // be treated as deactivated.
+  const quotedInsurer =
+    opts.insurerActive === null
+      ? null
+      : {
+          id: 'ins-1',
+          name: 'Sample Insurer',
+          nameAr: null,
+          financialStrengthRating: null,
+          isActive: opts.insurerActive ?? true,
+        };
   const findManyForActor = vi.fn().mockResolvedValue([policyRow()]);
   const countForActor = vi.fn().mockResolvedValue(1);
   const createIssuanceArtifacts = vi
@@ -198,7 +209,6 @@ function makeDeps(opts: Opts = {}) {
   const policies = {
     create,
     findById,
-    isInsurerActive,
     findByOpportunityId,
     findManyByCustomerId,
     findManyForActor,
@@ -222,6 +232,11 @@ function makeDeps(opts: Opts = {}) {
     recommendedQuotation: {
       id: 'q-1',
       insurerId: 'ins-1',
+      // The real `RECOMMENDATION_INCLUDE` loads the insurer through
+      // `INSURER_IDENTITY_SELECT`, which carries `isActive`. The mock has to as
+      // well, or the placement guard reads `undefined` and the test proves nothing
+      // about it either way.
+      insurer: quotedInsurer,
       premium: new Prisma.Decimal('120000'),
       currency: 'JOD',
       rfq: {

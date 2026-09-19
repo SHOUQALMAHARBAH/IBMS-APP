@@ -17,9 +17,34 @@ import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util'
 import { planComparison } from './comparison.config';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { BuildComparisonDto } from './dto/build-comparison.dto';
-import { insurerName } from '../../repositories/insurer-identity';
+import {
+  insurerIdentity,
+  insurerName,
+} from '../../repositories/insurer-identity';
 
-type MatrixRow = ComparisonWithRows['rows'][number];
+type StoredMatrixRow = ComparisonWithRows['rows'][number];
+
+/**
+ * One comparison row as the API returns it.
+ *
+ * The insurer is FLATTENED through `insurerIdentity()` rather than passed
+ * through raw, and that is a fix, not a preference. `rows` used to be
+ * `ComparisonWithRows['rows']` — the raw Prisma payload — so each row's insurer
+ * arrived as `{ insurerMaster: { legalName }, legalName, ... }` with no `name`
+ * at all, while the web read `row.quotation.insurer.name`. The quote-comparison
+ * table, whose whole purpose is comparing insurers on more than price, has been
+ * rendering blank insurer names since Part I §5 moved identity onto the master.
+ *
+ * Nothing caught it because the two sides never met: no API test read that
+ * field, and the web e2e mocks this endpoint with the flattened shape it wishes
+ * for. `comparison.e2e-spec.ts` now asserts the real wire shape, so the mock can
+ * no longer be the authority on it.
+ */
+export type MatrixRow = Omit<StoredMatrixRow, 'quotation'> & {
+  quotation: Omit<StoredMatrixRow['quotation'], 'insurer'> & {
+    insurer: ReturnType<typeof insurerIdentity>;
+  };
+};
 
 /** An insurer flagged in the comparison output — resolved to its identity
  * and current RFQ-response status. */
@@ -226,7 +251,17 @@ export class ComparisonService {
       insuranceLine: matrix.rfq.insuranceLine,
       builtAt: matrix.builtAt,
       builtByUserId: matrix.builtByUserId,
-      rows: matrix.rows,
+      // Every row's insurer goes through the one definition of "read an
+      // insurer's name", the same helper the flagged-insurer buckets above
+      // already use. Passing the raw join through is what made these rows
+      // nameless.
+      rows: matrix.rows.map((row) => ({
+        ...row,
+        quotation: {
+          ...row.quotation,
+          insurer: insurerIdentity(row.quotation.insurer),
+        },
+      })),
       missingInsurers,
       declinedInsurers,
     };
