@@ -4535,13 +4535,43 @@ enum InsurerFormFieldType {
 /// stays here is what genuinely differs per office and must never be visible
 /// to another one: the negotiated commercial terms and the named contacts.
 model Insurer {
-  id              String        @id @default(uuid())
+  id              String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId  String        @default(dbgenerated())
-  organization    Organization  @relation(fields: [organizationId], references: [id])
-  insurerMasterId String
-  insurerMaster   InsurerMaster @relation(fields: [insurerMasterId], references: [id])
+  organizationId  String         @default(dbgenerated())
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  /// The GLOBAL company this relationship is with — NULLABLE, and that is the
+  /// whole insurer-management feature.
+  ///
+  /// An office must be able to register an insurer that is in no catalogue, so
+  /// a global row cannot be a prerequisite. Auto-creating one behind the scenes
+  /// was rejected for a reason worth keeping written down:
+  /// `InsurerMaster.legalName` is unique PLATFORM-WIDE, so office A entering
+  /// "Acme Insurance" would collide with office B's entry — turning an error
+  /// message into an oracle for what other offices deal with, and giving an
+  /// office a way to probe by name. There is no wording that makes that error
+  /// safe, which is what makes it a data-model problem rather than a copy one.
+  ///
+  /// NULL means the identity below is authoritative. A row with neither is
+  /// nameless, which a CHECK constraint refuses — see the migration.
+  insurerMasterId String?
+  insurerMaster   InsurerMaster? @relation(fields: [insurerMasterId], references: [id])
+
+  /// Office-local identity, populated ONLY when `insurerMasterId` is NULL.
+  ///
+  /// Both scripts are required for a local row, for the same reason Phase 1 made
+  /// them required on `Role`: Arabic is this system's primary language, and a
+  /// name that exists only in Latin script shows up untranslated mid-sentence on
+  /// an Arabic page. `insurer-identity.ts` coalesces master name over local name
+  /// — the global catalogue is the authority whenever there is a link, so a
+  /// local override would be a second source of truth for one fact.
+  legalName    String?
+  legalNameAr  String?
+  /// What this company offers, for a company that has no global row to carry it
+  /// (`InsurerMaster.linesOffered` is the equivalent). Distinct from
+  /// `InsurerProduct`, which is what THIS office actually places with them.
+  /// Free text, like `insuranceLine` on the seven other models that carry it.
+  linesOffered String[]
 
   /// Part I §10.2 — three DIFFERENT people, not one generic contact: pricing
   /// and RFQ, claims, and underwriting.
@@ -4590,6 +4620,14 @@ model InsurerProduct {
   productName    String?
   isActive       Boolean      @default(true)
 
+  /// One row per line per insurer. A plain compound unique, not a partial one —
+  /// neither column is nullable, so there is no NULL-collision trap here.
+  ///
+  /// Added when this model got its first reader: the insurer screen replaces the
+  /// whole line set in one transaction, and "this insurer offers this line, once"
+  /// is a database invariant rather than something the writer remembers to check
+  /// (ibms-brain/meta/lex/race-safe-invariants.md).
+  @@unique([insurerId, insuranceLine])
   @@index([organizationId])
 }
 
