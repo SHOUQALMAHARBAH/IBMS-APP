@@ -6,7 +6,7 @@ import { authenticator } from 'otplib';
 import { ensureRole, prisma } from './tenant-prisma';
 import { type RoleName } from '@ibms/db';
 import { createTestApp } from './utils/test-app';
-import { makeInsurer } from './insurer-fixture';
+import { makeInsurer, makeLocalInsurer } from './insurer-fixture';
 
 const PASSWORD = 'Correct-Horse-Battery-Staple-9';
 
@@ -225,6 +225,11 @@ async function activePolicy(
   checkerToken: string,
   ownerUserId: string,
   tag: string,
+  /** Place the policy with a specific insurer instead of a fresh master-linked
+   *  one. Only the office-local payables test needs this — every other caller
+   *  wants the default, which is why it is an override rather than a required
+   *  argument. */
+  insurerOverride?: { id: string },
 ): Promise<{ policyId: string; customerId: string }> {
   const rand = Math.random().toString(36).slice(2, 8);
   const customer = await prisma.customer.create({
@@ -253,7 +258,8 @@ async function activePolicy(
       insuranceLine: 'Property All Risks',
     },
   });
-  const insurer = await makeInsurer(`Invoice E2E ${tag} ins ${rand}`);
+  const insurer =
+    insurerOverride ?? (await makeInsurer(`Invoice E2E ${tag} ins ${rand}`));
   await prisma.rFQInsurer.create({
     data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
   });
@@ -1081,6 +1087,110 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       .set(bearer(fin.accessToken))
       .expect(200);
     expect((unknownIns.body as InsurerPayablesReport).rows).toHaveLength(0);
+  });
+
+  it('Process 34 — an OFFICE-LOCAL insurer appears in the payables report, with its own name', async () => {
+    // The regression this test exists for, and the worst failure shape available.
+    //
+    // The report is raw SQL, and its join to `InsurerMaster` was INNER because
+    // every `Insurer` row had a master. Insurer management made that link
+    // nullable, so an INNER join now silently DROPS every invoice whose insurer is
+    // office-local: a financial report quietly missing rows, with no error and
+    // nothing to notice. The fix is a LEFT join with
+    // `COALESCE(im."legalName", ins."legalName")`.
+    //
+    // Both directions are asserted in one walk — a local insurer and a
+    // master-linked one, each with a collected invoice — so the COALESCE is proven
+    // to pick the right source rather than merely to compile.
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'inv34l-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(app, 'inv34l-chk', 'POLICY_CHECKING_OFFICER');
+    const fin = await makeUser(app, 'inv34l-fin', 'FINANCE_COLLECTIONS_OFFICER');
+
+    const rand = Math.random().toString(36).slice(2, 8);
+    const local = await makeLocalInsurer(`Wadi Rum Mutual ${rand}`, {
+      legalNameAr: `وادي رم التعاونية ${rand}`,
+    });
+    const linked = await makeInsurer(`Petra Insurance ${rand}`);
+
+    for (const insurer of [local, linked]) {
+      const { policyId } = await activePolicy(
+        app,
+        plc.accessToken,
+        chk.accessToken,
+        plc.userId,
+        'payables-local',
+        insurer,
+      );
+      const raised = await request(app.getHttpServer())
+        .post('/invoices')
+        .set(bearer(fin.accessToken))
+        .send({
+          policyId,
+          taxAmount: '9600.000',
+          feesAmount: '150.000',
+          dueDate: isoDaysAhead(30),
+        })
+        .expect(201);
+      // Collect the premium IN FULL — the report only shows an obligation once
+      // the client's money is whole.
+      await request(app.getHttpServer())
+        .post(`/invoices/${(raised.body as InvoiceBody).id}/receipt`)
+        .set(bearer(fin.accessToken))
+        .send({
+          amount: '115350.000',
+          method: 'bank_transfer',
+          reference: `E2E-LOCAL-${rand}`,
+        })
+        .expect(201);
+    }
+
+    // The local insurer: present, and named from its OWN row.
+    const localRow = await request(app.getHttpServer())
+      .get(`/insurer-accounting/payables?insurerId=${local.id}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const localBody = localRow.body as InsurerPayablesReport;
+    expect(
+      localBody.rows,
+      'an office-local insurer must not be dropped from a financial report',
+    ).toHaveLength(1);
+    expect(localBody.rows[0]).toMatchObject({
+      insurerId: local.id,
+      insurerName: local.name,
+      outstandingAmount: '105600.000',
+      outstandingCount: 1,
+    });
+
+    // The master-linked insurer: still present, still named from the GLOBAL
+    // catalogue. Proves the COALESCE picks the master when there is one.
+    const linkedRow = await request(app.getHttpServer())
+      .get(`/insurer-accounting/payables?insurerId=${linked.id}`)
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const linkedBody = linkedRow.body as InsurerPayablesReport;
+    expect(linkedBody.rows).toHaveLength(1);
+    expect(linkedBody.rows[0]).toMatchObject({
+      insurerId: linked.id,
+      insurerName: linked.name,
+    });
+
+    // And unscoped, both are in the same report with distinct names — the case an
+    // INNER join would silently halve.
+    const all = await request(app.getHttpServer())
+      .get('/insurer-accounting/payables')
+      .set(bearer(fin.accessToken))
+      .expect(200);
+    const names = (all.body as InsurerPayablesReport).rows
+      .filter((r) => r.insurerId === local.id || r.insurerId === linked.id)
+      .map((r) => r.insurerName)
+      .sort();
+    expect(names).toEqual([local.name, linked.name].sort());
   });
 
   it('Process 38 — records approved payment channels and threads them through the collection cycle', async () => {

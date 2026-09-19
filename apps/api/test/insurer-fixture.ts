@@ -45,3 +45,53 @@ export async function makeInsurer(
   // join to find out what it just named.
   return { id: insurer.id, insurerMasterId: insurerMaster.id, name: legalName };
 }
+
+/**
+ * Creates an OFFICE-LOCAL insurer — a company with no row in the global
+ * catalogue.
+ *
+ * The case insurer management exists for, and the one every consumer has to
+ * handle identically: the name lives on the office's own row, `insurerMasterId`
+ * is NULL, and `insurer-identity.ts` coalesces. A spec that needs to prove a
+ * report, document or screen renders a local insurer correctly uses this rather
+ * than hand-writing the insert, so there is one definition of "local insurer" in
+ * the fixtures just as there is one definition of the name join in the source.
+ *
+ * `legalNameAr` is supplied by default rather than left null: both scripts are
+ * required for a local row on the real create path, and a fixture that omitted
+ * the Arabic name would let a bidi rendering bug pass.
+ */
+export async function makeLocalInsurer(
+  legalName: string,
+  relationship: {
+    legalNameAr?: string | null;
+    linesOffered?: string[];
+    financialStrengthRating?: string | null;
+    creditTermsDays?: number | null;
+    rfqContactName?: string | null;
+    rfqContactEmail?: string | null;
+    claimsContactEmail?: string | null;
+    underwriterContact?: string | null;
+    isActive?: boolean;
+  } = {},
+): Promise<{ id: string; insurerMasterId: null; name: string }> {
+  const insurer = await prisma.insurer.create({
+    data: {
+      // Named explicitly rather than omitted: the column is nullable now, and a
+      // fixture that relied on the default would stop proving anything the day
+      // a default appeared.
+      insurerMasterId: null,
+      legalName,
+      legalNameAr: relationship.legalNameAr ?? `${legalName} (ع)`,
+      linesOffered: relationship.linesOffered ?? [],
+      financialStrengthRating: relationship.financialStrengthRating,
+      creditTermsDays: relationship.creditTermsDays,
+      rfqContactName: relationship.rfqContactName,
+      rfqContactEmail: relationship.rfqContactEmail,
+      claimsContactEmail: relationship.claimsContactEmail,
+      underwriterContact: relationship.underwriterContact,
+      isActive: relationship.isActive,
+    },
+  });
+  return { id: insurer.id, insurerMasterId: null, name: legalName };
+}
