@@ -299,6 +299,53 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, MANAGER, EXEC],
   },
   {
+    // The office's OWN insurer list — its relationships, contacts, credit terms
+    // and product lines. NOT the same read as the global catalogue below, and
+    // deliberately not folded into it: `insurer.master.read` describes companies
+    // and leaks nothing about any office, while this one exposes one office's
+    // commercial terms. One code for both would mean the auditor who may see the
+    // shared catalogue also sees every credit term.
+    //
+    // Held by the roles that actually PICK an insurer — an RFQ shortlist, a
+    // quotation, a comparison, a placement — AND by the office administrator,
+    // which needs it to render the screen its own management permission acts on.
+    // You cannot manage records you cannot list: an administrator holding
+    // `insurer.relationship.manage` without this would get the controls on a
+    // screen that renders nothing. The Phase 3 pair is the exact precedent —
+    // `OFFICE_ADMINISTRATOR` holds `role.read` alongside `role.manage` for the
+    // same reason, and the Role screen is built on that split.
+    //
+    // `GET /rfqs/selectable-insurers` moved onto this from `rfq.create` — it reads
+    // office insurers, and gating it on the create permission was a shortcut from
+    // when it was the only consumer.
+    code: "insurer.read",
+    module: "insurance-operations",
+    description:
+      "Read this office's own insurer relationships — contacts, credit terms, financial strength and the lines they offer",
+    roles: [SALES, PLACEMENT, MANAGER, EXEC, COMPLIANCE, AUDITOR, OFFICE_ADMIN],
+  },
+  {
+    // Register an insurer, maintain the relationship, retire it, set its lines.
+    //
+    // DEFERRED FROM PHASE 3 ON PURPOSE, and this is where it lands. Putting it on
+    // `OFFICE_ADMINISTRATOR` during Phase 3 would have broken the strict-subset
+    // property that made migration 20261008100000 a provably empty per-user diff:
+    // the legacy `SYSTEM_SECURITY_ADMINISTRATOR` does not hold this code, so the
+    // office administrator would have gained something the legacy one lacked. That
+    // migration has now run, so the subset is a historical fact rather than a
+    // standing constraint — `permissions.spec.ts` says so in those terms.
+    //
+    // Covers BOTH registration paths: linking to a company already in the global
+    // catalogue, and registering one that is in no catalogue at all. It does NOT
+    // cover writing the global catalogue — that is `insurer.master.manage`, which
+    // does not exist and which nobody would hold by default if it did.
+    code: "insurer.relationship.manage",
+    module: "insurance-operations",
+    description:
+      "Register and maintain this office's own insurer records, their lines of business, and their active status",
+    roles: [OFFICE_ADMIN],
+  },
+  {
     code: "insurer.master.read",
     module: "insurance-operations",
     description:

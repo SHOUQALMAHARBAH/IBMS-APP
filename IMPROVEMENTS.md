@@ -287,6 +287,46 @@ would remove the human judgement entirely.
 
 ---
 
+### 1.8 `P1` — Three assertions that pass whether or not the thing they check exists
+
+Found 2026-09-19 by auditing the whole suite for assertions that depend on an
+unordered sample, after CI caught one of exactly that shape in
+`office-administrator.e2e-spec.ts` (a migration outcome asserted over
+`findMany(...).slice(0, 25)` — it passed on the cumulative database because those
+25 rows happened to predate the migration, and failed on a from-zero one).
+
+The sweep covered every `findMany`/`groupBy` without an `orderBy` in
+`apps/api/test` and `apps/api/src/**/*.spec.ts`, following each assigned variable
+to an order-sensitive use (index, `.slice`, `.at`, `pop/shift`, order-sensitive
+`toEqual`). 17 sites; 14 are safe because they assert `toHaveLength(1)` before
+indexing, which makes `[0]` deterministic. Three are not:
+
+| Site | Problem |
+|---|---|
+| `incident.e2e-spec.ts:181` | `expect(containmentAfter[0]?.resolvedAt).not.toBeNull()` — no length check, and `?.` on an empty array yields `undefined`, which **passes** `.not.toBeNull()` |
+| `incident.e2e-spec.ts:262` | same shape, senior-management notification timer |
+| `sla-policy.e2e-spec.ts:217` | `expect(audits.length).toBeGreaterThan(0)` then asserts on `audits[0]` — tolerates many rows, then generalises from an arbitrary one |
+
+The two `incident` ones were **proved** vacuous rather than reasoned about: both
+queries were pointed at a nonexistent workflow name so they returned zero rows,
+and the file still passed 4/4. Those assertions would hold if the SLA timer were
+never created, never resolved, or deleted outright.
+
+- **Fix:** assert the count the test actually causes (`toHaveLength(1)`) and drop
+  the `?.`, so an empty result fails. The `sla-policy` one becomes
+  `toHaveLength(1)`, which also makes a second UPDATE on that policy a visible
+  failure rather than a coin flip.
+- **The pattern to ban is not "unordered query"** — it is `?.` on an indexed
+  result, and `length > 0` followed by `[0]`. Both make an assertion
+  unfalsifiable, and neither looks wrong on the page.
+- **Scheduled:** its own short branch, after the insurer feature ships and before
+  RBAC Phase 4. All three predate the RBAC rework and sit on `main`, so they are
+  independent of both. Not urgent — but a test that passes whether or not the
+  thing exists will eventually be cited as coverage by someone who did not read
+  it.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

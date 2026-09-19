@@ -1110,7 +1110,11 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
       'SALES_RELATIONSHIP_OFFICER',
     );
     const chk = await makeUser(app, 'inv34l-chk', 'POLICY_CHECKING_OFFICER');
-    const fin = await makeUser(app, 'inv34l-fin', 'FINANCE_COLLECTIONS_OFFICER');
+    const fin = await makeUser(
+      app,
+      'inv34l-fin',
+      'FINANCE_COLLECTIONS_OFFICER',
+    );
 
     const rand = Math.random().toString(36).slice(2, 8);
     const local = await makeLocalInsurer(`Wadi Rum Mutual ${rand}`, {
