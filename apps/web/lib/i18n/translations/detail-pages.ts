@@ -55,7 +55,7 @@ export const DETAIL_PAGES = {
     empdTerminateError: 'تعذّر إنهاء خدمة هذا الموظف.',
     empdChecklistUpdateError: 'تعذّر تحديث القائمة.',
     empdChecklistCompleteError: 'تعذّر إكمال القائمة.',
-    empdNoPermission: 'لا تملك صلاحية employee.manage اللازمة لعرض هذا الموظف.',
+    empdNoPermission: 'لا تملك صلاحية employee.read اللازمة لعرض هذا الموظف.',
     empdDeprovisioningTriggered: 'بوشر في {at} — مستحق في يوم العمل نفسه (تصعيد خلال ٢٤ ساعة إلى إدارة تقنية المعلومات إن بقي مفتوحاً).',
 
     // ---- Up-sell (list + detail) ---------------------------------------------
@@ -486,7 +486,7 @@ export const DETAIL_PAGES = {
     empdTerminateError: 'Could not terminate this employee.',
     empdChecklistUpdateError: 'Could not update the checklist.',
     empdChecklistCompleteError: 'Could not complete the checklist.',
-    empdNoPermission: "You don't hold the employee.manage permission.",
+    empdNoPermission: "You don't hold the employee.read permission.",
     empdDeprovisioningTriggered: 'Triggered {at} — due the same business day (24h escalation to IT management if still open).',
 
     upsHeading: 'Up-sell',

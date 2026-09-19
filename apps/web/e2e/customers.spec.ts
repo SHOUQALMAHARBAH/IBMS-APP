@@ -326,6 +326,84 @@ test("captures onboarding/KYC consent from the customer profile screen (Part D �
   await expect.poll(() => captured).toBe(true);
 });
 
+// Part 10.2 — `customer.national-id.reveal` split out of
+// `customer.360-view.read`. The customer split is enforced per FIELD, not per
+// route, because the same endpoint reveals a phone number a Sales/Relationship
+// Officer needs for ordinary work on a customer they own. These two tests are
+// the screen's half of that: the officer keeps the contact reveals and loses the
+// national-ID one, and Compliance holds all three.
+async function mockCustomerProfile(page: Page) {
+  await page.route("http://localhost:4000/customers/cust-1", (route) =>
+    route.fulfill({ status: 200, json: CUSTOMER }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/ubos", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/customers/cust-1/documents", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/consent-records**", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.route("http://localhost:4000/privacy-notices/current**", (route) =>
+    route.fulfill({ status: 200, json: { notice: null } }),
+  );
+}
+
+test("the owning Sales Officer can reveal the contact fields but not the national ID", async ({
+  page,
+}) => {
+  await mockAuth(page, ["SALES_RELATIONSHIP_OFFICER"]);
+  await mockCustomerProfile(page);
+
+  await page.goto("/customers/cust-1");
+  await expect(page.getByRole("heading", { name: "Ahmad Al-Fulani" })).toBeVisible();
+
+  // Three fields are revealable in the markup; the national ID's own row must
+  // offer no control. Scoped by the row's own `data-field` hook: all three
+  // buttons carry the same translated label, and an ancestor-based locator
+  // resolves to the grid container and therefore finds the other two.
+  const nationalIdRow = page.locator('[data-field="nationalId"]');
+  await expect(nationalIdRow).toHaveCount(1);
+  await expect(page.getByText("******2345")).toBeVisible();
+  await expect(
+    nationalIdRow.getByRole("button", { name: "Reveal", exact: true }),
+  ).toHaveCount(0);
+
+  // Two remain — phone and email — so the officer is not locked out of their own
+  // customer's contact details.
+  await expect(
+    page.getByRole("button", { name: "Reveal", exact: true }),
+  ).toHaveCount(2);
+});
+
+test("Compliance holds the national-ID reveal and gets the real value", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockCustomerProfile(page);
+  await page.route("http://localhost:4000/customers/cust-1/reveal-field", (route) =>
+    route.fulfill({ status: 201, json: { field: "nationalId", value: "9901012345" } }),
+  );
+
+  await page.goto("/customers/cust-1");
+  await expect(page.getByRole("heading", { name: "Ahmad Al-Fulani" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reveal", exact: true }),
+  ).toHaveCount(3);
+  await expect(
+    page.locator('[data-field="nationalId"]').getByRole("button", {
+      name: "Reveal",
+      exact: true,
+    }),
+  ).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Reveal", exact: true }).first().click();
+  await page
+    .getByLabel(/Justification for revealing nationalId/)
+    .fill("KYC identity verification against the passport on file");
+  await page.getByRole("button", { name: "Confirm reveal" }).click();
+  await expect(page.getByText("9901012345")).toBeVisible();
+});
+
 test("customer list and profile screens have no serious/critical accessibility violations @a11y", async ({
   page,
 }) => {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { RoleName } from "@prisma/client";
 import { PERMISSIONS } from "./permissions";
-import { ROLES } from "./roles";
+import { OFFICE_ADMINISTRATOR_ROLE, ROLES } from "./roles";
 
-function codesGrantedTo(role: RoleName): string[] {
+function codesGrantedTo(role: string): string[] {
   return PERMISSIONS.filter((p) => p.roles.includes(role)).map((p) => p.code);
 }
 
@@ -29,8 +29,15 @@ describe("permission grid — every code is independent and traceable", () => {
     }
   });
 
-  it("only references the 11 seeded roles", () => {
-    const validRoles = new Set(ROLES.map((r) => r.name));
+  it("only references roles the seed actually installs", () => {
+    // `PermissionSeed.roles` is `string[]`, not `RoleName[]`, because the office
+    // administrator is a seeded role deliberately outside the legacy enum. This
+    // check — not the enum — is what catches a typo now, so it has to know about
+    // every role the seed installs, and only those.
+    const validRoles = new Set([
+      ...ROLES.map((r) => r.name),
+      OFFICE_ADMINISTRATOR_ROLE.name,
+    ]);
     for (const permission of PERMISSIONS) {
       for (const role of permission.roles) {
         expect(validRoles.has(role)).toBe(true);
@@ -149,6 +156,183 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
         code.endsWith(".read") || code.endsWith(".view"),
         `${code} was granted to EXTERNAL_AUDITOR but is not a read-only code`,
       ).toBe(true);
+    }
+  });
+});
+
+// Office-scoped custom RBAC, PHASE 3 workstream E. `employee.manage` gated four
+// routes — create, list, get, and reveal an employee's unmasked national ID —
+// and `customer.360-view.read` gated both reading a customer and revealing
+// theirs. These are the grid-level invariants of splitting the reveals out.
+describe("permission grid — a national-ID reveal is its own permission", () => {
+  const REVEAL_CODES = [
+    "employee.national-id.reveal",
+    "customer.national-id.reveal",
+  ];
+
+  it("no longer has the employee.manage bridge, and employee.read replaced it", () => {
+    const codes = PERMISSIONS.map((p) => p.code);
+    expect(codes).not.toContain("employee.manage");
+    for (const code of [
+      "employee.read",
+      "employee.create",
+      "employee.update",
+    ]) {
+      expect(codes).toContain(code);
+    }
+  });
+
+  it("gives every former employee.manage holder employee.read — nobody lost the ability to read an employee", () => {
+    // Migration 20261007100000 renames the row IN PLACE so its grants follow it.
+    // The two holders were the administrator and the Branch/Department Manager;
+    // they must also hold create and update, or the rename would have narrowed
+    // access rather than split a sensitive field off it.
+    const formerHolders = [
+      RoleName.SYSTEM_SECURITY_ADMINISTRATOR,
+      RoleName.BRANCH_DEPARTMENT_MANAGER,
+    ];
+    for (const role of formerHolders) {
+      const granted = codesGrantedTo(role);
+      expect(granted, `${role} must still read employees`).toContain(
+        "employee.read",
+      );
+      expect(granted).toContain("employee.create");
+      expect(granted).toContain("employee.update");
+    }
+  });
+
+  it("gives the reveal codes to the Compliance Officer and to nobody else", () => {
+    // THE reduction. Both former `employee.manage` holders held the reveal
+    // through it, and all five `customer.360-view.read` holders held the customer
+    // one; after the split only the function whose job is verifying an identity
+    // document does. A new holder here is a deliberate decision, so it must break
+    // this test and be argued for, not arrive as a side effect of a grid edit.
+    for (const code of REVEAL_CODES) {
+      const entry = PERMISSIONS.find((p) => p.code === code);
+      expect(entry, `${code} must exist in the grid`).toBeDefined();
+      expect(entry!.roles).toEqual([RoleName.COMPLIANCE_OFFICER]);
+    }
+  });
+
+  it("keeps the reveal separable from the read it was split out of", () => {
+    // The point of the split is that holding the reading permission never implies
+    // the reveal. Expressed as a grid property: at least one role holds the read
+    // WITHOUT the reveal, in both families. If that ever became false the codes
+    // would be distinct in name only.
+    const pairs: [string, string][] = [
+      ["employee.read", "employee.national-id.reveal"],
+      ["customer.360-view.read", "customer.national-id.reveal"],
+    ];
+    for (const [readCode, revealCode] of pairs) {
+      const readers = PERMISSIONS.find((p) => p.code === readCode)!.roles;
+      const revealers = PERMISSIONS.find((p) => p.code === revealCode)!.roles;
+      const readOnly = readers.filter((r) => !revealers.includes(r));
+      expect(
+        readOnly.length,
+        `every holder of ${readCode} also holds ${revealCode} — the split is nominal`,
+      ).toBeGreaterThan(0);
+    }
+  });
+});
+
+// Office-scoped custom RBAC, PHASE 3 workstream D — the office administrator.
+describe("permission grid — the office administrator", () => {
+  const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
+
+  it("holds exactly 22 codes", () => {
+    // The count is asserted as well as the membership so that adding a code
+    // without deciding about it is impossible: both this number and the list in
+    // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
+    // to move together.
+    expect(codesGrantedTo(OFFICE_ADMIN).sort()).toEqual(
+      [
+        "access-recertification.cycle.start",
+        "audit-log.read",
+        "bcp-dr.manage",
+        "customer.bulk-import",
+        "deprovisioning.execute",
+        "email.integration.manage",
+        "email.integration.read",
+        "employee.create",
+        "employee.read",
+        "employee.update",
+        "encryption-key.read",
+        "incident.contain",
+        "incident.report",
+        "information-asset.manage",
+        "permission.read",
+        "role.manage",
+        "role.read",
+        "security-config.manage",
+        "security-config.read",
+        "training.record",
+        "user.manage",
+        "vendor.manage",
+      ].sort(),
+    );
+  });
+
+  it("is a STRICT SUBSET of what the legacy administrator already holds", () => {
+    // This is the property that makes migration 20261008100000 a zero-delta
+    // change: granting this role to every existing `user.manage` holder adds
+    // nothing to anybody's effective permissions, which was measured as a
+    // byte-identical per-user diff on both databases. If a later edit grants the
+    // office administrator something the legacy administrator lacks, that
+    // measurement silently stops being reproducible — so it fails here instead.
+    const legacy = new Set(codesGrantedTo(RoleName.SYSTEM_SECURITY_ADMINISTRATOR));
+    const officeAdmin = codesGrantedTo(OFFICE_ADMIN);
+    const exclusive = officeAdmin.filter((code) => !legacy.has(code));
+    expect(
+      exclusive,
+      "the office administrator holds codes the legacy administrator does not, so the migration is no longer zero-delta",
+    ).toEqual([]);
+    // Strict, not merely equal — the legacy role holds destructive and
+    // platform-level codes this one is deliberately denied.
+    expect(officeAdmin.length).toBeLessThan(legacy.size);
+  });
+
+  it("is denied the eight codes withheld from it on purpose", () => {
+    // Each of these is a decision with a reason, recorded in `roles.ts` and in
+    // the migration. Moving one onto the role has to break a test rather than
+    // arrive as a side effect of a grid edit.
+    const granted = codesGrantedTo(OFFICE_ADMIN);
+    for (const withheld of [
+      // destructive business actions
+      "claim.delete",
+      "document.delete-override",
+      // `insurer.form.map`'s effect CROSSES offices — the grid's own description
+      // says the mapping becomes the form every other office submits against.
+      // (`insurer.master.manage` is deliberately absent from this list: no such
+      // code exists in the catalogue, so asserting it is not granted asserts
+      // nothing. `insurer.master.read` is the only master-registry code today.)
+      "insurer.form.map",
+      // reviewing your own access is the control this system exists to enforce
+      "access-recertification.review",
+      "access-recertification.review.routine",
+      // Part 10.2 Highly Confidential
+      "employee.national-id.reveal",
+      "customer.national-id.reveal",
+    ]) {
+      expect(granted, `${withheld} must not be granted`).not.toContain(withheld);
+    }
+  });
+
+  it("never grants the administrator a business-transaction code", () => {
+    // A broader net than the eight above: an administrator provisions accounts
+    // and configures the office. It does not sell, underwrite, settle or pay.
+    const granted = codesGrantedTo(OFFICE_ADMIN);
+    for (const code of [
+      "lead.create",
+      "rfq.create",
+      "policy.check",
+      "kyc.approve",
+      "refund.approve",
+      "claim.settle.approve",
+      "customer.360-view.read",
+    ]) {
+      expect(granted, `${code} is business data, not administration`).not.toContain(
+        code,
+      );
     }
   });
 });

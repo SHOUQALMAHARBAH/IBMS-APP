@@ -372,6 +372,92 @@ describe('UserAdminService.provision (backlog A.2)', () => {
   });
 });
 
+describe('UserAdminService.list — the row shape the unified screen needs', () => {
+  it('carries the linked HR record id, so the two halves can be joined', async () => {
+    // The unified User/Employee screen is one row per PERSON, and the link is the
+    // organising idea rather than a field on a form. The response already carried
+    // the linked record's NAME (as the resolved `fullName`); without its ID the
+    // screen could show that a record exists but offer no way into it.
+    const deps = makeDeps({
+      users: {
+        listWithRoles: vi.fn().mockResolvedValue([
+          {
+            id: 'u-linked',
+            fullName: 'typed at provisioning',
+            email: 'linked@ibms.internal',
+            isActive: true,
+            mfaEnabled: true,
+            languagePreference: 'AR',
+            lastLoginAt: null,
+            accessValidFrom: null,
+            accessValidUntil: null,
+            createdAt: new Date('2026-09-09T00:00:00.000Z'),
+            roles: [SALES_ROLE],
+            employeeId: 'emp-1',
+            employee: { fullName: 'Nadia Ahmad Khalil Haddad' },
+          },
+          {
+            id: 'u-unlinked',
+            fullName: 'Layla Mansour',
+            email: 'unlinked@ibms.internal',
+            isActive: true,
+            mfaEnabled: false,
+            languagePreference: 'EN',
+            lastLoginAt: null,
+            accessValidFrom: null,
+            accessValidUntil: null,
+            createdAt: new Date('2026-09-09T00:00:00.000Z'),
+            roles: [],
+            employeeId: null,
+            employee: null,
+          },
+        ]),
+        countAll: vi.fn().mockResolvedValue(2),
+      },
+    });
+
+    const { users } = await deps.service.list();
+    expect(users.map((u) => u.employeeId)).toEqual(['emp-1', null]);
+    // And the linked record's four-part official name still wins over the free
+    // text typed at provisioning — the behaviour this field did not disturb.
+    expect(users[0].fullName).toBe('Nadia Ahmad Khalil Haddad');
+    expect(users[1].fullName).toBe('Layla Mansour');
+  });
+
+  it('reports employeeId on the account it has just provisioned', async () => {
+    // Link-only at provisioning — an Employee is never CREATED there, because that
+    // needs a national ID. The row the administrator sees immediately after
+    // creating an account has to agree with what the next list load will show.
+    // The link is validated against the office's OWN employee records, so the
+    // record has to exist for this path to be reachable at all.
+    const deps = makeDeps({
+      employees: {
+        findById: vi.fn().mockResolvedValue({
+          id: 'emp-7',
+          fullName: 'Nadia Ahmad Khalil Haddad',
+          departmentId: 'dept-1',
+        }),
+      },
+      // `User.employeeId` is unique — one HR record, one account — so the service
+      // checks the record is not already claimed before linking.
+      users: { findByEmployeeId: vi.fn().mockResolvedValue(null) },
+    });
+    const view = await deps.service.provision(
+      {
+        fullName: 'New User',
+        email: 'new@ibms.internal',
+        password: 'Sup3rSecret!Pass',
+        departmentId: 'dept-1',
+        branchId: 'branch-1',
+        employeeId: 'emp-7',
+        roleIds: [SALES_ROLE.id],
+      },
+      actor.id,
+    );
+    expect(view.employeeId).toBe('emp-7');
+  });
+});
+
 describe('UserAdminService role assignment', () => {
   it('grants a role and invalidates the permission cache so it takes effect at once', async () => {
     const deps = makeDeps();

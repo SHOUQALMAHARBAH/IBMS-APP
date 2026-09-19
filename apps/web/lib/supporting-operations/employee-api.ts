@@ -1,5 +1,5 @@
 // Process 66 — Human Resources (backlog Part C #66, Domain H). Calls
-// apps/api's /employees routes. employee.manage / training.record /
+// apps/api's /employees routes. employee.read / training.record /
 // deprovisioning.execute (all already pre-seeded).
 
 import { apiGet, apiPatch, apiPost } from '../auth/api-client';

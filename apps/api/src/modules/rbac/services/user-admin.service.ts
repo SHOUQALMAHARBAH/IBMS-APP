@@ -58,6 +58,14 @@ export interface AdminUserView {
    *  person reads. Returning names alone forced the client to match text back to
    *  an id, which is the habit this phase removes. */
   roles: { id: string; name: string }[];
+  /** The HR record this account is linked to, when there is one.
+   *
+   * The unified User/Employee screen is one row per PERSON, so it has to know
+   * which half of the pair each row already has: an account with no HR record
+   * still needs onboarding, and an HR record with no account cannot sign in.
+   * Before this the response carried the linked record's NAME (it still does,
+   * as `fullName`) but not its id, so the two lists could not be joined. */
+  employeeId: string | null;
 }
 
 /**
@@ -281,6 +289,9 @@ export class UserAdminService {
       accessValidUntil: user.accessValidUntil?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
       roles: roles.map((role) => ({ id: role.id, name: role.name })),
+      // Link-only at provisioning — an Employee is never CREATED here, because
+      // that needs a national ID. `dto.employeeId` is what was linked, or null.
+      employeeId: dto.employeeId ?? null,
     };
   }
 
@@ -583,6 +594,7 @@ function toAdminUserView(row: {
   accessValidUntil: Date | null;
   createdAt: Date;
   roles: { id: string; name: string }[];
+  employeeId?: string | null;
   employee?: { fullName: string } | null;
 }): AdminUserView {
   return {
@@ -597,5 +609,6 @@ function toAdminUserView(row: {
     accessValidUntil: row.accessValidUntil?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     roles: row.roles,
+    employeeId: row.employeeId ?? null,
   };
 }

@@ -5,8 +5,23 @@ import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { prisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
-import { crossOwnerPermissionsFor } from './fixtures/authenticated-user';
+import { seededPermissionsFor } from './fixtures/authenticated-user';
 import { ALL_OWNERS_READ_CODES } from '../src/common/rbac-visibility.util';
+import { CUSTOMER_NATIONAL_ID_REVEAL } from '../src/modules/customer/customer.service';
+
+/**
+ * Every code the unit-test fixture claims to model, which is what this guard can
+ * compare against the database as an exact set.
+ *
+ * Phase 3 added the second entry. `CustomerService.revealField` reads
+ * `actor.permissions` for it — the only other place a service does, rather than
+ * the route guard — so the fixture has to derive it, and this list has to widen
+ * with the fixture or the comparison stops being an equality.
+ */
+const FIXTURE_MODELLED_CODES: readonly string[] = [
+  ...ALL_OWNERS_READ_CODES,
+  CUSTOMER_NATIONAL_ID_REVEAL,
+];
 
 /**
  * Office-scoped custom RBAC, PHASE 2 workstream C.
@@ -254,7 +269,7 @@ describe('cross-owner visibility is a permission, not a role name', () => {
 });
 
 describe('the unit-test fixture table agrees with the seeded grants', () => {
-  it('derives the same cross-owner codes the database actually grants, for all 11 legacy roles', async () => {
+  it('derives the same codes the database actually grants, for all 11 legacy roles', async () => {
     // `fixtures/authenticated-user.ts` is a second copy of these grants, used by
     // around sixty unit-test actors. This is the check that keeps it honest.
     const roles = await prisma.role.findMany({
@@ -269,10 +284,12 @@ describe('the unit-test fixture table agrees with the seeded grants', () => {
     for (const role of roles) {
       const seeded = role.permissions
         .map((p) => p.permission.code)
-        .filter((code) => ALL_OWNERS_READ_CODES.includes(code))
+        .filter((code) => FIXTURE_MODELLED_CODES.includes(code))
         .sort();
-      const fixture = [...crossOwnerPermissionsFor([role.name])].sort();
-      expect(fixture, `cross-owner codes for ${role.name}`).toEqual(seeded);
+      const fixture = [...seededPermissionsFor([role.name])].sort();
+      expect(fixture, `fixture-modelled codes for ${role.name}`).toEqual(
+        seeded,
+      );
     }
   }, 120_000);
 

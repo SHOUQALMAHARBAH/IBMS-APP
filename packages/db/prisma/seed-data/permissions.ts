@@ -27,7 +27,12 @@ export interface PermissionSeed {
   code: string;
   module: string;
   description: string;
-  roles: RoleName[];
+  /** Role machine names. Typed as `string`, not `RoleName`, because
+   *  `OFFICE_ADMINISTRATOR` is a seeded role deliberately outside the legacy
+   *  enum — see `roles.ts`. `permissions.spec.ts` still checks every entry
+   *  against the roles actually seeded, so a typo cannot create a phantom role;
+   *  that check, not the enum, is what catches it now. */
+  roles: string[];
 }
 
 const SALES = RoleName.SALES_RELATIONSHIP_OFFICER;
@@ -41,6 +46,11 @@ const DPO = RoleName.DATA_PROTECTION_OFFICER;
 const ADMIN = RoleName.SYSTEM_SECURITY_ADMINISTRATOR;
 const EXEC = RoleName.EXECUTIVE_MANAGEMENT;
 const AUDITOR = RoleName.EXTERNAL_AUDITOR;
+/** Not a `RoleName`: the office administrator is a seeded role outside the legacy
+ *  enum. Its 22 grants are a strict subset of `ADMIN`'s, which is what makes the
+ *  migration that hands it to every existing administrator a zero-delta change —
+ *  `permissions.spec.ts` asserts that subset property. */
+const OFFICE_ADMIN = "OFFICE_ADMINISTRATOR";
 
 // ----------------------------------------------------------------------
 // Domain A — Commercial / Front Office (Processes 1-10)
@@ -87,7 +97,7 @@ const commercialFrontOffice: PermissionSeed[] = [
     // transaction and marks every one of them as never having passed KYC.
     // It is a platform-onboarding action, so it sits with the administrator
     // who onboards the office, not with the officers who work the book.
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "customer.create",
@@ -220,6 +230,26 @@ const commercialFrontOffice: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER],
   },
   {
+    // The customer counterpart of `employee.national-id.reveal`, and the same
+    // gap: `POST /customers/:id/reveal-field` was gated on
+    // `customer.360-view.read` — the same code that gates reading the customer at
+    // all — so all five holders of that could reveal a national ID.
+    //
+    // This is enforced PER FIELD rather than per route, and the difference from
+    // the employee split is deliberate. The employee route can only ever reveal a
+    // national ID, so its route gate IS its field gate. The customer route also
+    // reveals contactPhone and contactEmail, which a Sales/Relationship Officer
+    // needs for ordinary work on their own customer — gating the whole route to
+    // Compliance would have stopped an officer seeing their own customer's phone
+    // number. So `customer.360-view.read` still governs the route and the contact
+    // fields, and this code is additionally required for the national ID alone.
+    code: "customer.national-id.reveal",
+    module: "customer",
+    description:
+      "Reveal a customer's unmasked national ID with a written justification (Part 10.2 Highly Confidential; the contact fields on the same endpoint stay under customer.360-view.read)",
+    roles: [COMPLIANCE],
+  },
+  {
     code: "customer.360-view.read",
     module: "commercial-front-office",
     description: "Read the aggregated 360° customer view",
@@ -280,14 +310,14 @@ const insuranceOperations: PermissionSeed[] = [
     module: "insurance-operations",
     description:
       "See which mailbox this office sends from and whether it is working (Part I §6). Never exposes the stored credential.",
-    roles: [ADMIN, MANAGER, EXEC],
+    roles: [ADMIN, MANAGER, EXEC, OFFICE_ADMIN],
   },
   {
     code: "email.integration.manage",
     module: "insurance-operations",
     description:
       "Connect, test or disconnect this office's own outbound mailbox (Part I §6). Holds the OAuth consent that lets the platform send as a real company address, so it is administrator-only.",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "insurer.form.map",
@@ -802,13 +832,13 @@ const complianceRisk: PermissionSeed[] = [
     code: "incident.report",
     module: "compliance-risk",
     description: "Report a security/privacy incident",
-    roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER, ADMIN, DPO],
+    roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER, ADMIN, DPO, OFFICE_ADMIN],
   },
   {
     code: "incident.contain",
     module: "compliance-risk",
     description: "Execute incident containment actions",
-    roles: [ADMIN, COMPLIANCE],
+    roles: [ADMIN, COMPLIANCE, OFFICE_ADMIN],
   },
   // Classification and the Senior Management co-sign are two halves of one
   // control, and until Phase 2 a single code gated BOTH — so the role NAME was
@@ -878,7 +908,7 @@ const complianceRisk: PermissionSeed[] = [
     code: "audit-log.read",
     module: "compliance-risk",
     description: "Read the immutable audit log",
-    roles: [COMPLIANCE, ADMIN, AUDITOR],
+    roles: [COMPLIANCE, ADMIN, AUDITOR, OFFICE_ADMIN],
   },
   {
     code: "document-history.read",
@@ -983,37 +1013,77 @@ const management: PermissionSeed[] = [
 // Domain H — Supporting Operations (Processes 66-74)
 // ----------------------------------------------------------------------
 const supportingOperations: PermissionSeed[] = [
+  // `employee.manage` gated FOUR routes: create, list, get — and reveal an
+  // employee's national ID. One code for "manage an HR record" and "read a
+  // person's national identity number" is the gap this splits. Part 10.2
+  // classifies that field Highly Confidential; it is encrypted at rest and every
+  // reveal already needs a >=10-character justification and writes an audited
+  // READ flagged `isSensitiveDataAccess`. The GATE was the part that was too
+  // wide.
+  //
+  // Migration 20261007100000 renames `employee.manage` to `employee.read` IN
+  // PLACE, so both existing grants follow it and nobody loses the ability to
+  // read an employee. `create` and `update` are then granted explicitly to the
+  // same two roles, preserving their reach.
   {
-    code: "employee.manage",
+    code: "employee.read",
+    module: "supporting-operations",
+    description: "View employee records and their licensing/training history",
+    roles: [ADMIN, MANAGER, OFFICE_ADMIN],
+  },
+  {
+    code: "employee.create",
+    module: "supporting-operations",
+    description: "Create an employee (HR) record",
+    roles: [ADMIN, MANAGER, OFFICE_ADMIN],
+  },
+  {
+    code: "employee.update",
+    module: "supporting-operations",
+    description: "Correct an existing employee record",
+    roles: [ADMIN, MANAGER, OFFICE_ADMIN],
+  },
+  {
+    // COMPLIANCE ONLY, and that is the reduction this split exists for. The
+    // administrator and the Branch/Department Manager both hold
+    // `employee.manage` today and therefore this; neither keeps it. An
+    // administrator provisions accounts — they do not need to read an employee's
+    // national identity number, and the Office Administrator role Phase 3 seeds
+    // deliberately does not carry this code either.
+    //
+    // Compliance is the holder because it already has the equivalent reach on
+    // customers for KYC, so the capability sits with the function whose job
+    // requires verifying an identity document.
+    code: "employee.national-id.reveal",
     module: "supporting-operations",
     description:
-      "Manage an employee record and licensing/certification tracking",
-    roles: [ADMIN, MANAGER],
+      "Reveal an employee's unmasked national ID with a written justification (Part 10.2 Highly Confidential; every reveal is an audited sensitive read)",
+    roles: [COMPLIANCE],
   },
   {
     code: "training.record",
     module: "supporting-operations",
     description: "Record security-awareness training completion",
-    roles: [ADMIN, MANAGER],
+    roles: [ADMIN, MANAGER, OFFICE_ADMIN],
   },
   {
     code: "deprovisioning.execute",
     module: "supporting-operations",
     description:
       "Execute the access de-provisioning checklist on an employment-status change",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "vendor.manage",
     module: "supporting-operations",
     description: "Manage a vendor record and its risk tier",
-    roles: [COMPLIANCE, MANAGER, ADMIN],
+    roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN],
   },
   {
     code: "information-asset.manage",
     module: "supporting-operations",
     description: "Manage the ISO 27001 information asset inventory",
-    roles: [ADMIN, COMPLIANCE],
+    roles: [ADMIN, COMPLIANCE, OFFICE_ADMIN],
   },
   {
     code: "dpa.approve",
@@ -1025,7 +1095,7 @@ const supportingOperations: PermissionSeed[] = [
     code: "bcp-dr.manage",
     module: "supporting-operations",
     description: "Manage Business Continuity / Disaster Recovery plans",
-    roles: [ADMIN, COMPLIANCE],
+    roles: [ADMIN, COMPLIANCE, OFFICE_ADMIN],
   },
   {
     code: "kb.publish",
@@ -1186,7 +1256,7 @@ const admin: PermissionSeed[] = [
     code: "role.read",
     module: "admin",
     description: "View the office's role catalogue",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     // Nothing gates on this yet. Phase 3's Role CRUD is what will, and it exists
@@ -1195,7 +1265,7 @@ const admin: PermissionSeed[] = [
     module: "admin",
     description:
       "Create, edit, activate and deactivate the office's own roles, and set what they grant (Phase 3)",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     // There is deliberately no `permission.manage`. `Permission` is a single
@@ -1206,32 +1276,32 @@ const admin: PermissionSeed[] = [
     module: "admin",
     description:
       "View the global permission catalogue (the codes a role can be granted)",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "user.manage",
     module: "admin",
     description: "Provision/deprovision user accounts and role assignments",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "security-config.read",
     module: "admin",
     description:
       "Read the security configuration (idle timeout, lockout policy, ...)",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "security-config.manage",
     module: "admin",
     description: "Update the security configuration",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
   {
     code: "access-recertification.cycle.start",
     module: "admin",
     description: "Start an access-recertification cycle",
-    roles: [ADMIN, COMPLIANCE],
+    roles: [ADMIN, COMPLIANCE, OFFICE_ADMIN],
   },
   {
     code: "access-recertification.review",
@@ -1263,7 +1333,7 @@ const admin: PermissionSeed[] = [
     module: "admin",
     description:
       "View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access)",
-    roles: [ADMIN],
+    roles: [ADMIN, OFFICE_ADMIN],
   },
 ];
 

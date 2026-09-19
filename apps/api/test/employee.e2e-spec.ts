@@ -263,10 +263,21 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
     expect(linkedDbUser?.employeeId).toBe(created.id);
 
     // Reveal — a real justification returns the true plaintext.
+    //
+    // Phase 3 moved this off the record-management permission onto
+    // `employee.national-id.reveal`, held by Compliance alone, so the reveal is
+    // performed by the function this step's own justification already names. The
+    // administrator creating the record no longer reads the number; the gate
+    // matrix for that is `national-id-reveal-split.e2e-spec.ts`.
+    const complianceOfficer = await makeUser(
+      app,
+      'hr-compliance',
+      'COMPLIANCE_OFFICER',
+    );
     const revealed = (
       await request(app.getHttpServer())
         .post(`/employees/${created.id}/reveal-field`)
-        .set(bearer(admin.accessToken))
+        .set(bearer(complianceOfficer.accessToken))
         .send({
           field: 'nationalId',
           reason: 'KYC audit cross-check requested by Compliance',

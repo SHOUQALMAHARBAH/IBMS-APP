@@ -60,6 +60,11 @@ const LEGACY_ROLE_NAMES = [
   'EXTERNAL_AUDITOR',
 ];
 
+/** Every role the PLATFORM defines, which is exactly the set `isSystem` marks.
+ *  The legacy eleven plus `OFFICE_ADMINISTRATOR`, which Phase 3 installs in every
+ *  office — a twelfth platform role, not an office's own. */
+const PLATFORM_ROLE_NAMES = [...LEGACY_ROLE_NAMES, 'OFFICE_ADMINISTRATOR'];
+
 const createdRoleIds: string[] = [];
 
 afterAll(async () => {
@@ -135,6 +140,77 @@ describe('Role security attributes — the default is the strict value', () => {
     createdRoleIds.push(role.id);
     expect(role.requiresMfaAlways).toBe(false);
     expect(role.requiresHardwareToken).toBe(false);
+  });
+});
+
+describe('Role lifecycle attributes — status and isSystem', () => {
+  it('gives a new role ACTIVE and NOT isSystem, through Prisma and through raw SQL', async () => {
+    // Both defaults, separately, for the reason Phase 2 established the hard
+    // way: Prisma fills in a STATIC scalar default client-side and never lets the
+    // column default apply, so a test that only goes through Prisma keeps passing
+    // against a table whose own default is wrong — and any raw INSERT (a
+    // migration, a data-fix script) would then produce a row nobody intended.
+    //
+    // The direction matters in opposite ways here. `status` defaults ACTIVE
+    // because a role an office just built should work; `isSystem` defaults FALSE
+    // because an office's own role must be editable BY the office. A row that
+    // arrived `isSystem: true` by accident would be permanently uneditable with
+    // no way to fix it from the screen.
+    const name = `phase3-defaults-${Math.random().toString(36).slice(2, 8)}`;
+    const role = await prisma.role.create({
+      data: { name, nameAr: name, nameEn: name },
+    });
+    createdRoleIds.push(role.id);
+    expect(role.status).toBe('ACTIVE');
+    expect(role.isSystem).toBe(false);
+
+    const rawName = `phase3-raw-defaults-${Math.random().toString(36).slice(2, 8)}`;
+    const rows = await rawPrisma.$queryRaw<
+      { status: string; isSystem: boolean }[]
+    >`
+      INSERT INTO "Role" ("id", "organizationId", "name", "nameAr", "nameEn")
+      VALUES (gen_random_uuid(), ${TEST_ORGANIZATION_ID}::uuid, ${rawName}, ${rawName}, ${rawName})
+      RETURNING "status"::text, "isSystem"
+    `;
+    await rawPrisma.role.deleteMany({ where: { name: rawName } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status, 'column default for status').toBe('ACTIVE');
+    expect(rows[0].isSystem, 'column default for isSystem').toBe(false);
+  });
+
+  it('marks every PLATFORM-defined role isSystem, in EVERY organization, and nothing else', async () => {
+    // `rawPrisma` on purpose: Phase 1 adopted or copied these rows per office, so
+    // the property is "every office's copy is protected".
+    //
+    // The set is the eleven legacy names PLUS `OFFICE_ADMINISTRATOR`, which Phase 3
+    // installs in every office and which is equally platform-defined. Keyed off
+    // that list rather than off `isSystem` itself, so a role an office invents can
+    // never satisfy this by having the flag set — which is the direction that
+    // matters, since `isSystem` is what makes the Role screen refuse to touch a
+    // row.
+    const all = await rawPrisma.role.findMany({
+      select: { name: true, organizationId: true, isSystem: true },
+    });
+    for (const role of all) {
+      const shouldBeSystem = PLATFORM_ROLE_NAMES.includes(role.name);
+      expect(
+        role.isSystem,
+        `${role.name} in org ${role.organizationId} isSystem`,
+      ).toBe(shouldBeSystem);
+    }
+    // Guard against the loop passing on an empty set.
+    expect(
+      all.filter((r) => r.isSystem).length,
+      'every office must have protected platform roles',
+    ).toBeGreaterThanOrEqual(PLATFORM_ROLE_NAMES.length);
+  });
+
+  it('starts every legacy role ACTIVE — the migration retires nothing', async () => {
+    const retired = await rawPrisma.role.findMany({
+      where: { name: { in: LEGACY_ROLE_NAMES }, status: 'INACTIVE' },
+      select: { name: true, organizationId: true },
+    });
+    expect(retired).toEqual([]);
   });
 });
 

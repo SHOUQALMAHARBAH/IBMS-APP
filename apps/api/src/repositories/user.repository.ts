@@ -161,7 +161,16 @@ export class UserRepository {
    */
   async getRoleRefs(userId: string): Promise<RoleRef[]> {
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
-      where: { userId, revokedAt: null },
+      // ACTIVE roles only. A retired role is filtered out of the SESSION
+      // entirely, not just out of `findCodesForRoles` — so it contributes no
+      // permissions (defence in depth, since the id never reaches the permission
+      // lookup) and does not appear in `/auth/me`'s `roles` either.
+      //
+      // The alternative — leaving it visible for honesty — was considered and
+      // rejected: a role listed on the caller's own profile that grants nothing is
+      // more confusing than absent, and the unified User/Employee screen is where
+      // a retired grant is shown, with its status, to whoever administers it.
+      where: { userId, revokedAt: null, role: { status: 'ACTIVE' } },
       // The two security attributes ride along on a join that already existed,
       // so resolving them costs no extra query.
       select: {
@@ -295,6 +304,10 @@ export class UserRepository {
        *  person reads. Returning only names forced the client to resolve one to
        *  the other by matching text, which is the habit this phase removes. */
       roles: { id: string; name: string }[];
+      /** The HR record this account is linked to, when there is one. The unified
+       *  User/Employee screen joins on it: one row per PERSON, with the state of
+       *  the link visible when only one half exists. */
+      employeeId: string | null;
       employee: { fullName: string } | null;
     }[]
   > {
@@ -307,6 +320,7 @@ export class UserRepository {
         // display name the person sees in their own navbar rather than the
         // free text typed at provisioning. See common/display-name.util.ts.
         employee: { select: { fullName: true } },
+        employeeId: true,
         id: true,
         fullName: true,
         email: true,
@@ -333,16 +347,6 @@ export class UserRepository {
     return this.prisma.client.user.count();
   }
 
-  /**
-   * A role by name, WITHIN the caller's own office.
-   *
-   * `findFirst`, not `findUnique`: a role name is only unique per office now
-   * (`@@unique([organizationId, name])`), and `findFirst` is one of the
-   * operations `tenantScopeExtension` injects `organizationId` into — so this
-   * cannot return another office's role even though the name may exist there
-   * too. Spelling the compound key by hand would mean naming the organization
-   * at the call site, which is the habit the extension exists to remove.
-   */
   /** One role of the caller's OWN office, by id. The tenant-scoped client is
    *  what makes another office's id resolve to `null` rather than to their row —
    *  so "unknown" and "not yours" are the same answer, which is the point. */
@@ -357,13 +361,13 @@ export class UserRepository {
     return this.prisma.client.role.findMany({ where: { id: { in: ids } } });
   }
 
-  findRoleByName(name: string): Promise<Role | null> {
-    return this.prisma.client.role.findFirst({ where: { name } });
-  }
-
-  findRolesByNames(names: string[]): Promise<Role[]> {
-    return this.prisma.client.role.findMany({ where: { name: { in: names } } });
-  }
+  // DELETED: `findRoleByName` and `findRolesByNames`.
+  //
+  // Neither has had a caller since role assignment became id-addressed. A role
+  // NAME is unique only within an office and an office can rename its own roles,
+  // so it is not an identity — and a name-addressed role lookup sitting in the
+  // repository invites name-addressing back, which is the same argument that
+  // deleted `@RequireRoles`. Use `findRoleById` / `findRolesByIds`.
 
   /**
    * Grant a role by writing a NEW assignment row, never by resurrecting a
@@ -471,7 +475,13 @@ export class UserRepository {
     now = new Date(),
   ): Promise<{ userId: string; roleId: string }[]> {
     const grants = await this.prisma.client.rolePermission.findMany({
-      where: { permission: { code } },
+      // A RETIRED role is not a holder. Without this the last-administrator guard
+      // would count a role the office has already retired as a survivor — so an
+      // office could retire its only administrator role and then revoke the
+      // grant, and the guard would wave both through because it still saw
+      // somebody holding `user.manage`. That is the lockout the guard exists to
+      // prevent, reached by two steps that each look safe.
+      where: { permission: { code }, role: { status: 'ACTIVE' } },
       select: { roleId: true },
     });
     if (grants.length === 0) return [];
@@ -506,7 +516,9 @@ export class UserRepository {
    *  an administrator role?", which a name comparison used to answer. */
   async roleGrantsPermission(roleId: string, code: string): Promise<boolean> {
     const grant = await this.prisma.client.rolePermission.findFirst({
-      where: { roleId, permission: { code } },
+      // ACTIVE only, for the same reason as the holder read above: this decides
+      // whether the lockout guard runs at all, and a retired role grants nothing.
+      where: { roleId, permission: { code }, role: { status: 'ACTIVE' } },
       select: { roleId: true },
     });
     return grant !== null;

@@ -5,6 +5,7 @@ import type { App } from 'supertest/types';
 import { rawPrisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 import { UserAdminService } from '../src/modules/rbac/services/user-admin.service';
+import { RoleAdminService } from '../src/modules/rbac/services/role-admin.service';
 import { UserRepository } from '../src/repositories/user.repository';
 import { OrgContextService } from '../src/common/org-context/org-context.service';
 
@@ -16,6 +17,13 @@ import { OrgContextService } from '../src/common/org-context/org-context.service
  * `user.manage`, because that is the capability which grants roles back: lose it
  * and the office is locked out of its own administration surface with no way
  * back short of direct database access.
+ *
+ * Phase 3 added a THIRD route: retiring a role. All three ask one question —
+ * "what still holds `user.manage` after this write?" — and differ only in what
+ * they subtract: revoke takes one ASSIGNMENT, deactivation takes one USER,
+ * retirement takes one ROLE. Nothing about "retire a role we no longer use" looks
+ * like removing anybody's access, which is what makes it the least obvious of the
+ * three.
  *
  * Until Phase 2 the guard held `SELECT ... FOR UPDATE` on ONE Role row, which
  * served while exactly one role could hold `user.manage`. Keyed on the
@@ -62,6 +70,7 @@ const SUBDOMAIN = 'last-admin-lock-e2e';
 
 let app: INestApplication<App> | null = null;
 let service: UserAdminService;
+let roleAdmin: RoleAdminService;
 let users: UserRepository;
 let orgContext: OrgContextService;
 
@@ -100,6 +109,23 @@ async function removeFixtureOrg(): Promise<void> {
   await rawPrisma.organization.deleteMany({ where: { id: ORG_ID } });
 }
 
+/** Put both fixture roles back to granting exactly `user.manage`.
+ *
+ *  `resetFixture` resets ASSIGNMENTS only; the permission-set tests are the first
+ *  in this file to change a role's GRANTS, and leaving one emptied would make
+ *  every later test in the file run against a different fixture than it reads. */
+async function restoreGrants(): Promise<void> {
+  const userManage = await rawPrisma.permission.findUniqueOrThrow({
+    where: { code: 'user.manage' },
+  });
+  for (const roleId of [roleAId, roleBId]) {
+    await rawPrisma.rolePermission.deleteMany({ where: { roleId } });
+    await rawPrisma.rolePermission.create({
+      data: { organizationId: ORG_ID, roleId, permissionId: userManage.id },
+    });
+  }
+}
+
 async function resetFixture(): Promise<void> {
   await rawPrisma.userRoleAssignment.deleteMany({
     where: { organizationId: ORG_ID },
@@ -123,6 +149,7 @@ beforeAll(async () => {
 
   app = await createTestApp();
   service = app.get(UserAdminService);
+  roleAdmin = app.get(RoleAdminService);
   users = app.get(UserRepository);
   orgContext = app.get(OrgContextService);
 
@@ -340,6 +367,193 @@ describe('the last-administrator guard survives two concurrent removals', () => 
         service.revokeRole(adminBId, roleBId, adminBId),
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  }, 120_000);
+
+  it('refuses to RETIRE the last role that grants user administration', async () => {
+    // The third route. Retiring role A leaves role B, which is fine; retiring B
+    // as well would leave the office with nobody able to grant the capability
+    // back, so the second one is refused.
+    await resetFixture();
+
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+    );
+    await expect(
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleBId, 'INACTIVE', adminBId),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    // And the invariant itself: somebody can still administer users.
+    const holders = await orgContext.runAs(ORG_ID, () =>
+      users.findActiveHoldersOfPermission('user.manage'),
+    );
+    expect(new Set(holders.map((h) => h.userId)).size).toBe(1);
+  }, 120_000);
+
+  it('lets exactly ONE of two simultaneous retirements through', async () => {
+    // Same race as the other two routes, on the same lock. Two roles, two
+    // requests, neither of which is the other's — a lock on the Role ROW would
+    // put these on separate keys and let both commit.
+    await resetFixture();
+
+    const results = await Promise.allSettled([
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+      ),
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleBId, 'INACTIVE', adminBId),
+      ),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toBeInstanceOf(UnprocessableEntityException);
+  }, 120_000);
+
+  it('serialises a RETIREMENT against a concurrent REVOKE on the other role', async () => {
+    // The case a per-route guard would miss entirely: two DIFFERENT operations,
+    // on two different rows, racing for the same invariant. They share the
+    // capability lock, so one of them loses.
+    await resetFixture();
+
+    const results = await Promise.allSettled([
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+      ),
+      orgContext.runAs(ORG_ID, () =>
+        service.revokeRole(adminBId, roleBId, adminBId),
+      ),
+    ]);
+
+    expect(
+      results.filter((r) => r.status === 'fulfilled'),
+      'one of the two must be refused',
+    ).toHaveLength(1);
+
+    const holders = await orgContext.runAs(ORG_ID, () =>
+      users.findActiveHoldersOfPermission('user.manage'),
+    );
+    expect(
+      new Set(holders.map((h) => h.userId)).size,
+      'the office keeps an administrator whichever one won',
+    ).toBe(1);
+  }, 120_000);
+
+  it('never refuses REACTIVATION — an office must be able to undo a retirement', async () => {
+    await resetFixture();
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setStatus(roleAId, 'INACTIVE', adminAId),
+    );
+    const back = await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setStatus(roleAId, 'ACTIVE', adminAId),
+    );
+    expect(back.status).toBe('ACTIVE');
+  }, 120_000);
+
+  it('refuses to retire a PLATFORM role, and isSystem is the only reason', async () => {
+    // The protection flag, from the outside. `OFFICE_ADMINISTRATOR` and the
+    // eleven converted legacy roles carry it; an office's own role does not.
+    await resetFixture();
+    const protectedRole = await rawPrisma.role.update({
+      where: { id: roleAId },
+      data: { isSystem: true },
+    });
+    try {
+      await expect(
+        orgContext.runAs(ORG_ID, () =>
+          roleAdmin.setStatus(protectedRole.id, 'INACTIVE', adminAId),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    } finally {
+      await rawPrisma.role.update({
+        where: { id: roleAId },
+        data: { isSystem: false },
+      });
+    }
+  }, 120_000);
+
+  it('refuses to REMOVE user administration from the last role whose holders have it', async () => {
+    // THE FOURTH ROUTE, and the one the permission-matrix screen opens. Unchecking
+    // `user.manage` on a role is not obviously an access action at all — it looks
+    // like editing a checkbox — but it takes the capability away exactly as a
+    // revoke does, and the office ends up with nobody who can grant it back.
+    //
+    // Note this is reachable even though every office has an isSystem
+    // `OFFICE_ADMINISTRATOR` the CRUD guards protect: a second, CUSTOM
+    // administrator role can absorb the capability one revoke at a time, and then
+    // have it removed here.
+    await resetFixture();
+    await restoreGrants();
+
+    // Emptying role A is allowed — role B's holder still has it.
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setPermissions(roleAId, [], adminAId),
+    );
+    // Emptying role B as well is not.
+    await expect(
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setPermissions(roleBId, [], adminBId),
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    // The invariant itself: somebody can still administer users.
+    const holders = await orgContext.runAs(ORG_ID, () =>
+      users.findActiveHoldersOfPermission('user.manage'),
+    );
+    expect(new Set(holders.map((h) => h.userId)).size).toBe(1);
+    await restoreGrants();
+  }, 120_000);
+
+  it('lets exactly ONE of two simultaneous permission-set writes through', async () => {
+    // The same race as the other three routes, on the same per-office lock. Two
+    // different roles, so a lock on the Role ROW would put these on separate keys
+    // and let both commit — leaving nobody with the capability.
+    await resetFixture();
+    await restoreGrants();
+
+    const results = await Promise.allSettled([
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setPermissions(roleAId, [], adminAId),
+      ),
+      orgContext.runAs(ORG_ID, () =>
+        roleAdmin.setPermissions(roleBId, [], adminBId),
+      ),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toBeInstanceOf(UnprocessableEntityException);
+    await restoreGrants();
+  }, 120_000);
+
+  it('does not guard — or refuse — a permission-set write that KEEPS user administration', async () => {
+    // The guard only fires when the write actually takes the capability away.
+    // Adding a permission alongside it, or resubmitting the same set, must stay on
+    // the unguarded path: an office editing an administrator role for any other
+    // reason should not be refused, and should not contend for the office's
+    // administration lock either.
+    await resetFixture();
+    await restoreGrants();
+
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setPermissions(
+        roleAId,
+        ['user.manage', 'audit-log.read'],
+        adminAId,
+      ),
+    );
+    await orgContext.runAs(ORG_ID, () =>
+      roleAdmin.setPermissions(roleBId, ['user.manage'], adminBId),
+    );
+
+    const holders = await orgContext.runAs(ORG_ID, () =>
+      users.findActiveHoldersOfPermission('user.manage'),
+    );
+    expect(new Set(holders.map((h) => h.userId)).size).toBe(2);
+    await restoreGrants();
   }, 120_000);
 
   it('does NOT refuse revoking one administrator role from a holder of two', async () => {

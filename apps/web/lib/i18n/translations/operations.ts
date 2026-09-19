@@ -43,7 +43,7 @@ export const OPERATIONS = {
     empLoading: 'جارٍ التحميل…',
     empLoadError: 'تعذّر تحميل الموظفين — حاول مرة أخرى.',
     empCreateError: 'تعذّر إنشاء سجل الموظف.',
-    empNoPermission: 'لا تملك صلاحية employee.manage اللازمة لعرض الموظفين.',
+    empNoPermission: 'لا تملك صلاحية employee.read اللازمة لعرض الموظفين.',
     empSubmitButton: 'تسجيل الموظف',
     empLicensedRole: 'الدور المرخَّص (اختياري)',
     empHireDate: 'تاريخ التعيين',
@@ -318,6 +318,12 @@ export const OPERATIONS = {
     usrActive: 'نشط',
     usrAction: 'إجراء',
     usrNone: '— بلا دور',
+    // The unified User/Employee screen (Phase 3). `usrNone` stays because it is
+    // still the right word in a sentence; a TABLE CELL needed a badge.
+    usrNoRolesBadge: 'بلا أدوار',
+    usrHrRecordColumn: 'سجل الموظف',
+    usrHrRecordOpen: 'فتح السجل',
+    usrHrRecordNone: 'لا يوجد سجل موظف مرتبط',
     usrRevoke: 'إلغاء',
     usrYes: 'نعم',
     usrNo: 'لا',
@@ -382,6 +388,64 @@ export const OPERATIONS = {
     rpNoCustomerSelected:
       'لم يتم اختيار عميل — افتح عميلاً من {link} ثم ابدأ مسح المخاطر من ' +
       'هناك.',
+
+    // ---- Roles & permission matrix (office-scoped custom RBAC, Phase 3) ----
+    roleHeading: 'الأدوار والصلاحيات',
+    roleIntro:
+      'كل دور هنا يخصّ مكتبك وحده. تُحدَّد الصلاحيات لكل دور، ولا يمنح أي دور شيئاً لم يُعطَ له صراحةً.',
+    roleNoPermission:
+      'يتطلّب عرض الأدوار صلاحية role.read. راجع مدير مكتبك.',
+    roleCouldNotLoad: 'تعذّر تحميل الأدوار — حاول مرة أخرى.',
+    roleTableName: 'الدور',
+    roleTableStatus: 'الحالة',
+    roleTableHolders: 'من يحمله',
+    roleTablePermissions: 'الصلاحيات',
+    roleTableMfa: 'المصادقة',
+    roleTableActions: 'إجراءات',
+    roleStatusActive: 'نشط',
+    roleStatusInactive: 'متقاعد',
+    roleSystemBadge: 'دور نظامي',
+    roleSystemExplain:
+      'دور يحدّده النظام لا يحدّده المكتب: لا يمكن تغيير اسمه ولا تقاعده ولا تعديل صلاحياته. هذه العلامة لا تمنح أي صلاحية بحد ذاتها.',
+    roleNoRoles: 'لا توجد أدوار بعد.',
+    roleCreateHeading: 'إنشاء دور',
+    roleFieldName: 'الاسم البرمجي',
+    roleFieldNameHint: 'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
+    roleFieldNameEn: 'الاسم بالإنجليزية',
+    roleFieldNameAr: 'الاسم بالعربية',
+    roleFieldDescription: 'الوصف',
+    roleCreateButton: 'إنشاء الدور',
+    roleCreating: 'جارٍ الإنشاء…',
+    roleRetireButton: 'تقاعد الدور',
+    roleReactivateButton: 'إعادة التنشيط',
+    roleEditButton: 'الصلاحيات',
+    roleSaveNamesButton: 'حفظ الأسماء',
+    roleMatrixHeading: 'صلاحيات {role}',
+    roleMatrixIntro:
+      'اختر ما يستطيع حاملو هذا الدور فعله. يُحفظ الاختيار بالكامل مرة واحدة.',
+    roleMatrixReadOnly:
+      'هذا دور نظامي، لذلك تُعرض صلاحياته للقراءة فقط.',
+    roleMatrixSave: 'حفظ الصلاحيات',
+    roleMatrixSaving: 'جارٍ الحفظ…',
+    roleMatrixSaved: 'تم حفظ الصلاحيات.',
+    roleMatrixSelectedCount: 'المحدَّد: {count} من {total}',
+    roleMatrixClose: 'إغلاق',
+    roleSegregationWarning:
+      'تنبيه: هذا الدور يجمع تصنيف الحوادث والتوقيع المزدوج عليه. سيُحفظ كما هو — وما زال النظام يمنع الشخص نفسه من التوقيع على تصنيفه — لكن استقلال الدورين يصبح خياراً اتخذته أنت.',
+    roleMfaAlwaysLabel: 'تتطلّب المصادقة في كل مرة',
+    roleMfaHardwareLabel: 'تتطلّب مفتاح أمان',
+    roleMfaHeading: 'خصائص الأمان',
+    roleMfaIntro:
+      'كلتا الخصّيتين مشدّدتان تلقائياً. تخفيف أيّ منهما يُضعف ضابطاً أمنياً، لذلك يُطلب منك تأكيد هويتك أولاً ويُسجَّل التغيير.',
+    roleMfaSave: 'حفظ خصائص الأمان',
+    roleStepUpHeading: 'تأكيد الهوية',
+    roleStepUpIntro:
+      'أدخل كلمة مرورك (ورمز المصادقة إن كان مطلوباً) لتأكيد هذا التغيير.',
+    roleStepUpPassword: 'كلمة المرور',
+    roleStepUpCode: 'رمز المصادقة (اختياري)',
+    roleStepUpConfirm: 'تأكيد ومتابعة',
+    roleStepUpCancel: 'إلغاء',
+    roleStepUpFailed: 'تعذّر تأكيد الهوية — تحقّق من كلمة المرور والرمز.',
   },
   EN: {
     secHeading: 'Security',
@@ -415,7 +479,7 @@ export const OPERATIONS = {
     empLoading: 'Loading…',
     empLoadError: 'Could not load employees — try again.',
     empCreateError: 'Could not create the employee record.',
-    empNoPermission: "You don't hold the employee.manage permission.",
+    empNoPermission: "You don't hold the employee.read permission.",
     empSubmitButton: 'Record employee',
     empLicensedRole: 'Licensed role (optional)',
     empHireDate: 'Hire date',
@@ -680,6 +744,10 @@ export const OPERATIONS = {
     usrActive: 'Active',
     usrAction: 'Action',
     usrNone: '— none',
+    usrNoRolesBadge: 'No roles assigned',
+    usrHrRecordColumn: 'HR record',
+    usrHrRecordOpen: 'Open record',
+    usrHrRecordNone: 'No linked employee record',
     usrRevoke: 'Revoke',
     usrYes: 'Yes',
     usrNo: 'No',
@@ -747,5 +815,66 @@ export const OPERATIONS = {
     rpNoCustomerSelected:
       'No customer selected — open a customer from {link} and start the risk ' +
       'survey from there.',
+
+    // ---- Roles & permission matrix (office-scoped custom RBAC, Phase 3) ----
+    roleHeading: 'Roles and permissions',
+    roleIntro:
+      'Every role here belongs to your office alone. Permissions are set per role, and a role grants nothing it has not explicitly been given.',
+    roleNoPermission:
+      'Viewing roles needs the role.read permission. Ask your office administrator.',
+    roleCouldNotLoad: 'Could not load roles — try again.',
+    roleTableName: 'Role',
+    roleTableStatus: 'Status',
+    roleTableHolders: 'Held by',
+    roleTablePermissions: 'Permissions',
+    roleTableMfa: 'MFA',
+    roleTableActions: 'Actions',
+    roleStatusActive: 'Active',
+    roleStatusInactive: 'Retired',
+    roleSystemBadge: 'System role',
+    roleSystemExplain:
+      'A role the platform defines rather than your office: it cannot be renamed, retired, or re-granted. The flag itself grants nothing.',
+    roleNoRoles: 'No roles yet.',
+    roleCreateHeading: 'Create a role',
+    roleFieldName: 'Machine name',
+    roleFieldNameHint:
+      'Stable, and written into the audit log. It cannot be changed after creation.',
+    roleFieldNameEn: 'Name (English)',
+    roleFieldNameAr: 'Name (Arabic)',
+    roleFieldDescription: 'Description',
+    roleCreateButton: 'Create role',
+    roleCreating: 'Creating…',
+    roleRetireButton: 'Retire role',
+    roleReactivateButton: 'Reactivate',
+    roleEditButton: 'Permissions',
+    roleSaveNamesButton: 'Save names',
+    roleMatrixHeading: 'Permissions for {role}',
+    roleMatrixIntro:
+      'Choose what holders of this role can do. The whole selection is saved at once.',
+    roleMatrixReadOnly:
+      'This is a system role, so its permissions are shown read-only.',
+    roleMatrixSave: 'Save permissions',
+    roleMatrixSaving: 'Saving…',
+    roleMatrixSaved: 'Permissions saved.',
+    roleMatrixSelectedCount: 'Selected: {count} of {total}',
+    roleMatrixClose: 'Close',
+    roleSegregationWarning:
+      'Heads up: this role both classifies an incident and co-signs that classification. It will save as-is — and the system still refuses a co-sign by whoever recorded the classification — but keeping the two on one role is now a choice you have made.',
+    roleMfaAlwaysLabel: 'Always require MFA',
+    roleMfaHardwareLabel: 'Require a hardware security key',
+    roleMfaHeading: 'Security attributes',
+    roleMfaIntro:
+      'Both are strict by default. Relaxing either weakens a security control, so you are asked to confirm your identity first and the change is recorded.',
+    roleMfaSave: 'Save security attributes',
+    roleStepUpHeading: 'Confirm your identity',
+    roleStepUpIntro:
+      'Enter your password (and an authentication code if one is required) to confirm this change.',
+    roleStepUpPassword: 'Password',
+    roleStepUpCode: 'Authentication code (optional)',
+    roleStepUpConfirm: 'Confirm and continue',
+    roleStepUpCancel: 'Cancel',
+    roleStepUpFailed:
+      'Could not confirm your identity — check your password and code.',
+
   },
 } as const;

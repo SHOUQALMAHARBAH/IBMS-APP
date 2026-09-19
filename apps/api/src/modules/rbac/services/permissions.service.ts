@@ -33,6 +33,17 @@ interface CacheEntry {
  * in a multi-instance deployment `invalidateCache()` clears only the instance
  * that handled the write and the others catch up within the TTL. Bounded
  * staleness, never a wrong tenant.
+ *
+ * Phase 3 changed how often that limitation can be reached, without changing the
+ * limitation itself. Editing a role used to mean editing the seed and
+ * redeploying; it is now a button on `/settings/roles`, so an administrator can
+ * grant a permission and watch a colleague on another instance still be refused
+ * for up to `CACHE_TTL_MS`. Correct today — the API runs as a single instance —
+ * and written down here rather than discovered during the deployment that adds
+ * the second one. The fix when that day comes is a shared invalidation channel
+ * (Redis pub/sub or a `Role.updatedAt` the cache compares against), not a shorter
+ * TTL: a shorter TTL narrows the window without closing it and costs a join on
+ * every guarded request.
  */
 @Injectable()
 export class PermissionsService {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -16,6 +17,7 @@ import {
   type CustomerFilter,
 } from '../../repositories/customer.repository';
 import { ProspectRepository } from '../../repositories/prospect.repository';
+
 import { AuditService } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
 import { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
@@ -35,6 +37,13 @@ import type { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import type { CreateUboDto } from './dto/create-ubo.dto';
 import type { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
 import type { RevealFieldDto } from './dto/reveal-field.dto';
+
+/** Part 10.2 — revealing a national ID is a separate decision from being able to
+ *  open the customer's file, and only this field is behind it. See
+ *  `revealField` for why the customer split is per-field where the employee one
+ *  is per-route. Exported for the unit-test fixture that derives an actor's
+ *  permissions from their roles. */
+export const CUSTOMER_NATIONAL_ID_REVEAL = 'customer.national-id.reveal';
 
 /** Masked view of a Customer's own `-- ENCRYPT` fields for the profile
  * screen (Part 10.6 — masked-by-default, full reveal only via
@@ -357,14 +366,41 @@ export class CustomerService {
     return this.toMasked(customer, actor.id);
   }
 
-  /** Full, unmasked drill-down on one field — requires a written reason,
-   * gated the same as get() for visibility, additionally logged by
-   * SensitiveFieldRevealService.reveal() with that reason attached. */
+  /**
+   * Full, unmasked drill-down on one field — requires a written reason, gated the
+   * same as get() for visibility, additionally logged by
+   * SensitiveFieldRevealService.reveal() with that reason attached.
+   *
+   * ## The national ID needs its own permission, and only the national ID
+   *
+   * This endpoint was gated on `customer.360-view.read` alone — the same code that
+   * gates reading the customer at all — so all five holders of that could reveal a
+   * national identity number. Part 10.2 classifies that field Highly
+   * Confidential, and "can open this customer's file" is not the same decision as
+   * "may read their national ID".
+   *
+   * Enforced PER FIELD rather than at the route, which is where this differs from
+   * the employee split. `RevealEmployeeFieldDto` accepts only `nationalId`, so
+   * there the route gate is the field gate. Here the same endpoint also reveals
+   * `contactPhone` and `contactEmail`, which a Sales/Relationship Officer needs
+   * for ordinary work on a customer they own — moving the whole route to Compliance
+   * would have stopped an officer phoning their own client. So visibility and the
+   * contact fields stay under `customer.360-view.read`, and the national ID
+   * additionally requires `customer.national-id.reveal`.
+   */
   async revealField(
     id: string,
     dto: RevealFieldDto,
     actor: AuthenticatedUser,
   ): Promise<{ field: string; value: string }> {
+    if (
+      dto.field === 'nationalId' &&
+      !actor.permissions.has(CUSTOMER_NATIONAL_ID_REVEAL)
+    ) {
+      throw new ForbiddenException(
+        'Revealing a national ID requires the customer.national-id.reveal permission.',
+      );
+    }
     const customer = await this.findOwnedOrVisible(id, actor);
     const fieldMap: Record<typeof dto.field, string | null> = {
       nationalId: customer.nationalIdEnc,

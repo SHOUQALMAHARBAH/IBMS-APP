@@ -6,6 +6,7 @@ import { UserAdminController } from './controllers/user-admin.controller';
 import { OrgStructureController } from './controllers/org-structure.controller';
 import { PermissionsModule } from './permissions.module';
 import { UserAdminService } from './services/user-admin.service';
+import { RoleAdminService } from './services/role-admin.service';
 import { OrgStructureService } from './services/org-structure.service';
 import { AccessRecertificationService } from './services/access-recertification.service';
 import { AccessRecertificationScheduler } from './services/access-recertification.scheduler';
@@ -37,6 +38,7 @@ import { EmployeeRepository } from '../../repositories/employee.repository';
     BranchRepository,
     EmployeeRepository,
     UserAdminService,
+    RoleAdminService,
     OrgStructureService,
     AccessRecertificationService,
     AccessRecertificationScheduler,

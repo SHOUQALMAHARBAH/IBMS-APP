@@ -1,6 +1,25 @@
-import { Controller, Get } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RoleRepository } from '../../../repositories/role.repository';
+import { RoleAdminService } from '../services/role-admin.service';
+import { RequireStepUp } from '../../auth/decorators/require-step-up.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../auth/auth.types';
+import {
+  CreateRoleDto,
+  RoleSecurityAttributesDto,
+  SetRolePermissionsDto,
+  UpdateRoleDto,
+} from '../dto/role-crud.dto';
 import { PermissionRepository } from '../../../repositories/permission.repository';
 import { RequirePermissions } from '../decorators/require-permissions.decorator';
 
@@ -40,6 +59,7 @@ export class RbacController {
   constructor(
     private readonly roles: RoleRepository,
     private readonly permissions: PermissionRepository,
+    private readonly roleAdmin: RoleAdminService,
   ) {}
 
   // `role.read`, not `role.manage`: this reads the catalogue. `role.manage` now
@@ -51,7 +71,94 @@ export class RbacController {
     schema: roleListSchema,
   })
   listRoles() {
-    return this.roles.findAll();
+    // The admin shape: every role the office has, RETIRED ONES INCLUDED, with the
+    // holder count that makes retiring one an informed decision. A screen that
+    // hid retired roles would leave an office unable to reactivate one, which is
+    // the only way back.
+    return this.roleAdmin.list();
+  }
+
+  @RequirePermissions('role.read')
+  @Get('roles/:id')
+  @ApiOkResponse({
+    description: 'One role and the permission codes it grants.',
+  })
+  getRole(@Param('id') id: string) {
+    return this.roleAdmin.get(id);
+  }
+
+  @RequirePermissions('role.manage')
+  @Post('roles')
+  createRole(
+    @Body() dto: CreateRoleDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.roleAdmin.create(dto, user.id);
+  }
+
+  @RequirePermissions('role.manage')
+  @Patch('roles/:id')
+  updateRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateRoleDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.roleAdmin.update(id, dto, user.id);
+  }
+
+  /** The whole grant set at once, not one code per request: a partial save would
+   *  leave a role half-built, and the matrix submits the state it believes. */
+  @RequirePermissions('role.manage')
+  @Put('roles/:id/permissions')
+  setRolePermissions(
+    @Param('id') id: string,
+    @Body() dto: SetRolePermissionsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.roleAdmin.setPermissions(id, dto.permissionCodes, user.id);
+  }
+
+  /**
+   * The two Part II §4.4 / Part 10.1 security attributes, behind a FRESH step-up
+   * challenge.
+   *
+   * These decide whether a trusted device can shorten the second factor and
+   * whether the role is flagged for WebAuthn. Both default to the strict value,
+   * so relaxing one weakens a control — and a control an administrator can weaken
+   * from a screen with no re-authentication is weaker than it looks.
+   *
+   * This is the FIRST consumer of `@RequireStepUp`. The gate has existed since
+   * backlog A.1 with no business endpoint to attach to; its own comment said so.
+   */
+  @RequirePermissions('role.manage')
+  @RequireStepUp()
+  @Patch('roles/:id/security-attributes')
+  setRoleSecurityAttributes(
+    @Param('id') id: string,
+    @Body() dto: RoleSecurityAttributesDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.roleAdmin.setSecurityAttributes(id, dto, user.id);
+  }
+
+  /** A POST, not a DELETE — there is no delete. `Role.status` is the only removal
+   *  there is, because the grant rows pointing here are the record of who held
+   *  what and when. */
+  @RequirePermissions('role.manage')
+  @Post('roles/:id/retire')
+  @HttpCode(200)
+  retireRole(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.roleAdmin.setStatus(id, 'INACTIVE', user.id);
+  }
+
+  @RequirePermissions('role.manage')
+  @Post('roles/:id/reactivate')
+  @HttpCode(200)
+  reactivateRole(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.roleAdmin.setStatus(id, 'ACTIVE', user.id);
   }
 
   @RequirePermissions('permission.read')

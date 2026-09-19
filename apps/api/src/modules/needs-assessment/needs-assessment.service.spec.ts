@@ -13,7 +13,7 @@ import type { CustomerRepository } from '../../repositories/customer.repository'
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 function answers(overrides: Record<string, boolean | number> = {}) {
   const base: Record<string, boolean | number> = {};
@@ -24,7 +24,7 @@ function answers(overrides: Record<string, boolean | number> = {}) {
 }
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',

@@ -44,6 +44,10 @@ export interface AdminUser {
    *  shows. Matching a displayed name back to an id in the browser is exactly
    *  the habit the id-addressed API removes. */
   roles: { id: string; name: RoleName }[];
+  /** The HR record this account is linked to, when there is one. What lets the
+   *  unified screen show one row per PERSON — and show which half of the pair a
+   *  row is still missing. */
+  employeeId: string | null;
 }
 
 /** Part II §4.2.2 — a Branch or a Department, as the provisioning form's two

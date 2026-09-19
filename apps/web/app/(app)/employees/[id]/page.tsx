@@ -14,6 +14,7 @@ import {
   type EmployeeDetail,
 } from '../../../../lib/supporting-operations/employee-api';
 import { ApiError } from '../../../../lib/auth/api-client';
+import { hasPermission } from '../../../../lib/auth/permissions';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
@@ -41,6 +42,11 @@ export default function EmployeeDetailPage() {
 
   const [revealReason, setRevealReason] = useState('');
   const [revealedValue, setRevealedValue] = useState<string | null>(null);
+  // Part 10.2. The national-ID reveal stopped riding on the permission that lets
+  // you read an employee record: it is `employee.national-id.reveal`, held by
+  // Compliance alone. Rendering the form to every reader would offer a control
+  // that 403s on submit.
+  const canRevealNationalId = hasPermission(user, 'employee.national-id.reveal');
 
   const [trainingName, setTrainingName] = useState('');
   const [trainingDueAt, setTrainingDueAt] = useState('');
@@ -193,19 +199,21 @@ export default function EmployeeDetailPage() {
                 : t('empdActive')}
             </p>
 
-            <form onSubmit={onReveal} style={formStyle}>
-              <h3>{t('empdRevealNationalId')}</h3>
-              <label style={labelStyle}>
-                {t('empdRevealReason')}
-                <input
-                  value={revealReason}
-                  onChange={(e) => setRevealReason(e.target.value)}
-                  required
-                />
-              </label>
-              <button type="submit">{t('empdReveal')}</button>
-              {revealedValue ? <p>{t('empdFullValue')} {revealedValue}</p> : null}
-            </form>
+            {canRevealNationalId ? (
+              <form onSubmit={onReveal} style={formStyle}>
+                <h3>{t('empdRevealNationalId')}</h3>
+                <label style={labelStyle}>
+                  {t('empdRevealReason')}
+                  <input
+                    value={revealReason}
+                    onChange={(e) => setRevealReason(e.target.value)}
+                    required
+                  />
+                </label>
+                <button type="submit">{t('empdReveal')}</button>
+                {revealedValue ? <p>{t('empdFullValue')} {revealedValue}</p> : null}
+              </form>
+            ) : null}
 
             {!employee.terminationDate ? (
               <button type="button" onClick={onTerminate}>

@@ -28,7 +28,7 @@ import { AuthModule } from '../auth/auth.module';
  *     `User.employeeId`) + SessionService (killing live sessions the
  *     moment `systemAccessRevoked` is actually ticked).
  *
- * No new permission, no migration — `employee.manage` / `training.record` /
+ * No new permission, no migration — `employee.read` / `training.record` /
  * `deprovisioning.execute` were all pre-seeded ahead of time, the Domain G
  * "seed before code" precedent extended to Domain H.
  */

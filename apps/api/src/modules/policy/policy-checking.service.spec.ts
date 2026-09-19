@@ -14,10 +14,10 @@ import type { WorkflowTransitionService } from '../workflow/workflow-transition.
 import type { PolicyService } from './policy.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 function checker(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'chk-1',
     organizationId: 'org-1',
     email: 'chk@ibms.test',

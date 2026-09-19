@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -12,10 +13,10 @@ import type { EncryptionService } from '../security/encryption.service';
 import type { SensitiveFieldRevealService } from '../security/sensitive-field-reveal.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateCustomerDto } from './dto/create-customer.dto';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
@@ -285,6 +286,10 @@ describe('CustomerService', () => {
   });
 
   describe('revealField', () => {
+    // Phase 3 split `customer.national-id.reveal` out of `customer.360-view.read`.
+    // These first two exercise delegation and the missing-value path, so their
+    // actor is Compliance — the role that holds the reveal. The gate itself is
+    // the two tests after them.
     it('requires a written reason via SensitiveFieldRevealService.reveal (delegated, not re-implemented)', async () => {
       const { service, mocks } = makeDeps();
       mocks.findById.mockResolvedValue({
@@ -299,7 +304,7 @@ describe('CustomerService', () => {
           field: 'nationalId',
           reason: 'verifying against a photo ID on a call',
         },
-        makeUser({ id: 'sales-1' }),
+        makeUser({ id: 'compliance-1', roles: ['COMPLIANCE_OFFICER'] }),
       );
 
       expect(mocks.revealFn).toHaveBeenCalledWith(
@@ -324,9 +329,55 @@ describe('CustomerService', () => {
         service.revealField(
           'cust-1',
           { field: 'nationalId', reason: 'verifying against a photo ID' },
-          makeUser({ id: 'sales-1' }),
+          makeUser({ id: 'compliance-1', roles: ['COMPLIANCE_OFFICER'] }),
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('refuses the national ID without customer.national-id.reveal, even to the owner', async () => {
+      // Part 10.2. `customer.360-view.read` gated both reading the customer and
+      // revealing their national identity number; five roles held it. The owner
+      // reaching their own customer is the strongest case for the old behaviour
+      // and it is still refused — the permission, not the ownership, is what
+      // this field turns on.
+      const { service, mocks } = makeDeps();
+      mocks.findById.mockResolvedValue({
+        id: 'cust-1',
+        ownerUserId: 'sales-1',
+        nationalIdEnc: 'enc:9901012345',
+      });
+
+      await expect(
+        service.revealField(
+          'cust-1',
+          { field: 'nationalId', reason: 'curious about the ID number' },
+          makeUser({ id: 'sales-1' }),
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(
+        mocks.revealFn,
+        'a refused reveal must never reach the decryption service',
+      ).not.toHaveBeenCalled();
+    });
+
+    it('still reveals the contact fields to the owner without that permission', async () => {
+      // Why this split is per FIELD and not per route. The same endpoint reveals
+      // a phone number, which a Sales/Relationship Officer needs for ordinary
+      // work on a customer they own; gating the route to Compliance would have
+      // stopped an officer phoning their own client.
+      const { service, mocks } = makeDeps();
+      mocks.findById.mockResolvedValue({
+        id: 'cust-1',
+        ownerUserId: 'sales-1',
+        contactPhoneEnc: 'enc:+962-7-9111-2222',
+      });
+
+      const result = await service.revealField(
+        'cust-1',
+        { field: 'contactPhone', reason: 'returning the client a missed call' },
+        makeUser({ id: 'sales-1' }),
+      );
+      expect(result.value).toBe('plaintext-value');
     });
   });
 

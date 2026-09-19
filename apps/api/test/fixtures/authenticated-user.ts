@@ -1,4 +1,5 @@
 import type { AuthenticatedUser } from '../../src/modules/auth/auth.types';
+import { CUSTOMER_NATIONAL_ID_REVEAL } from '../../src/modules/customer/customer.service';
 import {
   CLAIM_ALL_OWNERS_READ,
   CUSTOMER_ALL_OWNERS_READ,
@@ -29,9 +30,9 @@ import {
  *
  * ## This is a copy of the seed's grants, and it is checked
  *
- * The table below must agree with `packages/db/prisma/seed-data/permissions.ts`.
- * `cross-owner-permissions.spec.ts` asserts exactly that, so the two cannot
- * drift.
+ * The tables below must agree with `packages/db/prisma/seed-data/permissions.ts`.
+ * `cross-owner-visibility.e2e-spec.ts` asserts exactly that against the real
+ * seeded database, so the two cannot drift.
  */
 const ALL_OWNERS_BY_ROLE: Readonly<Record<string, readonly string[]>> = {
   SALES_RELATIONSHIP_OFFICER: [],
@@ -71,16 +72,31 @@ const ALL_OWNERS_BY_ROLE: Readonly<Record<string, readonly string[]>> = {
   EXTERNAL_AUDITOR: [CUSTOMER_ALL_OWNERS_READ],
 };
 
+/**
+ * Phase 3 workstream E. The national-ID reveals stopped riding on the
+ * permission that lets you read the record, and `CustomerService.revealField`
+ * checks `actor.permissions` for its own code — so a unit-level actor needs this
+ * derived too, for exactly the reason the cross-owner table exists.
+ *
+ * Only the CUSTOMER code is here. Its employee counterpart is enforced at the
+ * route by `PermissionsGuard`, never read from `actor.permissions` inside a
+ * service, so no unit-level fixture needs it.
+ */
+const SENSITIVE_REVEAL_BY_ROLE: Readonly<Record<string, readonly string[]>> = {
+  COMPLIANCE_OFFICER: [CUSTOMER_NATIONAL_ID_REVEAL],
+};
+
 /** The cross-owner codes the seed grants to these roles. A role name this table
  *  does not know contributes nothing — which is the fail-closed direction, and
  *  matches what a genuinely custom role gets until an office grants it
  *  something. */
-export function crossOwnerPermissionsFor(
+export function seededPermissionsFor(
   roles: readonly string[],
 ): ReadonlySet<string> {
   const codes = new Set<string>();
   for (const role of roles) {
     for (const code of ALL_OWNERS_BY_ROLE[role] ?? []) codes.add(code);
+    for (const code of SENSITIVE_REVEAL_BY_ROLE[role] ?? []) codes.add(code);
   }
   return codes;
 }
@@ -92,18 +108,18 @@ export function crossOwnerPermissionsFor(
  * applied BEFORE the derivation — an override that changes the roles therefore
  * changes the permissions with them.
  */
-export function withCrossOwnerPermissions(
+export function withDerivedPermissions(
   user: Omit<AuthenticatedUser, 'permissions'> & {
     permissions?: ReadonlySet<string>;
   },
 ): AuthenticatedUser {
   return {
     ...user,
-    permissions: user.permissions ?? crossOwnerPermissionsFor(user.roles),
+    permissions: user.permissions ?? seededPermissionsFor(user.roles),
   };
 }
 
 /** Everything a cross-owner test needs, when the point is "this actor reaches
  *  the whole book" rather than which role does so. */
 export const ALL_CROSS_OWNER_PERMISSIONS: ReadonlySet<string> =
-  crossOwnerPermissionsFor(['BRANCH_DEPARTMENT_MANAGER']);
+  seededPermissionsFor(['BRANCH_DEPARTMENT_MANAGER']);

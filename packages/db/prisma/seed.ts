@@ -1,6 +1,10 @@
 import { PrismaClient, RoleName } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { ROLES } from "./seed-data/roles";
+import {
+  OFFICE_ADMINISTRATOR_ROLE,
+  ROLES,
+  SEEDED_ROLES_ARE_SYSTEM,
+} from "./seed-data/roles";
 import { PERMISSIONS } from "./seed-data/permissions";
 import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
@@ -514,17 +518,21 @@ async function main() {
   // that used to be globally unique. This script runs on the RAW client, which
   // nothing tenant-scopes, so the Organization is named explicitly.
   //
-  // These eleven are still seeded because they are the DEFAULT office's own
+  // The legacy eleven are still seeded because they are the DEFAULT office's own
   // roles — the same rows a migrated database already has, so a fresh seed and a
-  // migrated database end up indistinguishable. That is deliberately NOT the
-  // rule for an office created later: the approved design seeds a brand-new
-  // Organization with no business roles at all, only the protected
-  // OFFICE_ADMINISTRATOR, and its administrator builds whatever it needs. That
-  // path arrives with Phase 3 (which is where `isSystem` and the Role screen
-  // land); revisit this block then rather than pre-empting it here, because
-  // seeding zero roles today would leave a fresh database with nothing any
-  // sample user or e2e fixture could be granted.
-  for (const role of ROLES) {
+  // migrated database end up indistinguishable. The seed must not start removing
+  // them, for the same reason it must not prune grants: people hold them.
+  //
+  // `OFFICE_ADMINISTRATOR` joins them here, and this is where the rule for a NEW
+  // office differs. The approved design gives a brand-new Organization the
+  // administrator role and NOTHING ELSE — no business roles at all, its
+  // administrator builds whatever the office needs. There is no application path
+  // that creates an Organization (verified: the only two writers are this file
+  // and `apps/api/scripts/seed-demo.script.ts`), so the rule is encoded as
+  // `ensureOfficeAdministrator()` below, called by both writers, plus a test
+  // asserting that any Organization without an administrator role is a defect.
+  // When org provisioning does land it therefore cannot ship without one.
+  for (const role of [...ROLES, OFFICE_ADMINISTRATOR_ROLE]) {
     await prisma.role.upsert({
       where: {
         organizationId_name: {
@@ -543,6 +551,12 @@ async function main() {
         // migrated before this seed ran disagreeing with a freshly seeded one.
         requiresMfaAlways: role.requiresMfaAlways,
         requiresHardwareToken: role.requiresHardwareToken,
+        // Written on the update path too: a database migrated before this seed
+        // ran must end up agreeing with a freshly seeded one, and `isSystem`
+        // defaults to FALSE on the column (an office's own roles are the common
+        // case), so omitting it here would leave the legacy eleven editable on a
+        // seeded-from-empty database.
+        isSystem: SEEDED_ROLES_ARE_SYSTEM,
       },
       create: {
         organizationId: DEFAULT_ORGANIZATION_ID,
@@ -552,10 +566,13 @@ async function main() {
         description: role.description,
         requiresMfaAlways: role.requiresMfaAlways,
         requiresHardwareToken: role.requiresHardwareToken,
+        isSystem: SEEDED_ROLES_ARE_SYSTEM,
       },
     });
   }
-  console.log(`Seeded ${ROLES.length} roles for the default organization.`);
+  console.log(
+    `Seeded ${ROLES.length + 1} roles for the default organization (the legacy ${ROLES.length} plus ${OFFICE_ADMINISTRATOR_ROLE.name}).`,
+  );
 
   // Scoped to the default organization for the same reason: on a database that
   // already holds a second office, an unfiltered read would return two roles

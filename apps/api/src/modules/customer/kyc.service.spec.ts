@@ -15,10 +15,10 @@ import type { ScreeningService } from './screening.service';
 import type { ScreeningHoldService } from './screening-hold.service';
 import type { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { withCrossOwnerPermissions } from '../../../test/fixtures/authenticated-user';
+import { withDerivedPermissions } from '../../../test/fixtures/authenticated-user';
 
 function makeUser(overrides?: Partial<AuthenticatedUser>): AuthenticatedUser {
-  return withCrossOwnerPermissions({
+  return withDerivedPermissions({
     id: 'sales-1',
     organizationId: 'org-1',
     email: 'sales@ibms.test',
