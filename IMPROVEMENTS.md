@@ -327,6 +327,51 @@ never created, never resolved, or deleted outright.
 
 ---
 
+### 1.9 `P2` — A test FILE can be red with every test in it green
+
+Seen 2026-09-19 building `insurer-deactivation.e2e-spec.ts`: all six tests passed
+and the file failed, because `afterAll` threw on
+`Quotation_insurerId_fkey` while tearing fixtures down. Vitest reports
+`Test Files 1 failed | Tests 6 passed`.
+
+- **Why it matters:** the per-test count is what a person reads, and it said
+  6/6. Only the file line disagreed. A CI log skimmed for "failed tests" shows
+  nothing wrong.
+- **How to apply:** read the `Test Files` line, not just `Tests`. A green test
+  count with a red file means a hook failed — `beforeAll`, `afterAll`, or module
+  setup — and the cause is usually teardown hitting a constraint the tests
+  themselves never touch.
+- **Related:** `Insurer`'s FKs are all RESTRICT, so a fixture sweep has to delete
+  children in order. `Quotation` additionally has an immutability TRIGGER
+  ("a negotiation round is a new version, not a replacement"), so its rows need
+  the `SET LOCAL session_replication_role = replica` bypass on the owner
+  connection — the same pattern `last-administrator-lock.e2e-spec.ts` uses for
+  the immutable audit trail, scoped to the file's own fixture rows.
+
+---
+
+### 1.10 `P3` — Two office-local insurer fixtures are left in `db-test` on purpose
+
+`invoice.e2e-spec.ts`'s office-local payables test creates an insurer that ends up
+under a policy, an invoice and a receipt. It is **not** torn down, and that is a
+decision rather than an oversight:
+
+- `Policy_insurerId_fkey` is RESTRICT, so the insurer cannot be deleted alone.
+- That file deliberately leaves its whole fixture chain behind — customers,
+  programmes, policies — like every other test in it. Tearing down the chain for
+  this one insurer would be inconsistent with the file, and changing that file's
+  teardown behaviour as a side effect of the insurer feature is the kind of
+  unrelated change every phase has kept out.
+- **Consequence to know:** `db-test` can no longer be rolled back past migration
+  `20261009100000` (the one that made the master link nullable), because
+  restoring `NOT NULL` would require destroying those chains. Build a fresh
+  database instead — the `.env`-copy recipe in § api e2e run mechanics.
+- Insurers created purely to be LISTED are swept, in
+  `insurer-permissions.e2e-spec.ts` and `insurer-deactivation.e2e-spec.ts`. Only
+  the ones under a retained policy chain persist.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

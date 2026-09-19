@@ -10,6 +10,14 @@ export interface RecommendationInsurer {
   name: string;
   nameAr: string | null;
   financialStrengthRating: string | null;
+  /** FALSE when the office has stopped dealing with this insurer.
+   *
+   *  Every surface that lets someone CHOOSE an insurer has to show this, because
+   *  capturing a quotation from a deactivated insurer stays deliberately legal — a
+   *  recorded premium is a factual event. So such a quote reaches the comparison
+   *  and can be recommended, and without a marker a broker could present it and a
+   *  client choose it, with nobody finding out until placement refused. */
+  isActive: boolean;
 }
 
 export interface RationaleFactors {

@@ -20,6 +20,7 @@ import {
   comparisonScoreGridStyle,
   comparisonScrollStyle,
 } from './comparison.styles';
+import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
 
 interface Props {
   rfqId: string;
@@ -195,6 +196,7 @@ export function ComparisonSection({ rfqId, isPlacement }: Props) {
                     <tr key={row.id}>
                       <td style={rfqCellStyle}>
                         {q.insurer.name}
+                        <DeactivatedInsurerBadge isActive={q.insurer.isActive} />
                         {q.isCurrentVersion ? null : (
                           <span
                             style={{ color: 'var(--ink-secondary)', fontSize: '0.78rem' }}

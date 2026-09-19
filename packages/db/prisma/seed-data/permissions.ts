@@ -22,6 +22,27 @@ import { RoleName } from "@prisma/client";
  * Part C business modules (Lead, Policy, Claim, ...) have no application
  * code yet — these codes exist now so each module adopts an existing code
  * instead of inventing one when it lands.
+ *
+ * ## No code in this grid may have an effect outside the granting office
+ *
+ * Every permission here is granted BY an office TO its own roles, so its effect
+ * must stop at that office. A code that seems to need a wider effect is a sign
+ * that the MODEL it acts on is scoped wrongly — the cure belongs at the table, not
+ * in a special case on the permission.
+ *
+ * `insurer.form.map` is the case that proved it, and it is worth knowing because
+ * the wrong fix was nearly built. `InsurerFormTemplate` hung off the GLOBAL
+ * `InsurerMaster`, so mapping a submission form changed what every other office
+ * would submit against — and the Phase 3 permission matrix let any office grant
+ * itself that code. The proposed fix was a `Permission.scope` column with a
+ * server-side refusal and a matrix filter: real machinery to make one permission
+ * special.
+ *
+ * What actually fixed it was scoping the TEMPLATE to the office, after which the
+ * code's effect no longer crossed anything and the scope column had zero cases —
+ * leaving only a guard testable against a fabricated violation invented so it had
+ * something to refuse. If a genuinely platform-wide capability is ever needed, the
+ * column is the same work then, with a real case to test against.
  */
 export interface PermissionSeed {
   code: string;

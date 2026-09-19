@@ -28,6 +28,7 @@ import {
   quoteTermLabelStyle,
   quoteTermValueStyle,
 } from './quotation.styles';
+import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
 
 interface Props {
   rfqId: string;
@@ -227,6 +228,7 @@ export function QuotationsSection({ rfqId, isPlacement, submissions }: Props) {
                 }}
               >
                 <strong>{chain.insurer.name}</strong>
+                <DeactivatedInsurerBadge isActive={chain.insurer.isActive} />
                 <span style={rfqBadgeStyle}>
                   {t(
                     chain.versions.length === 1 ? 'quoteVersionCountOne' : 'quoteVersionCountOther',
