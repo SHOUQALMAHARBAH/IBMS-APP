@@ -448,6 +448,27 @@ export class PolicyService {
     }
     const quote = recommendation.recommendedQuotation;
 
+    // The office must still deal with this insurer.
+    //
+    // Placement is where the decision bites: it is the moment the office commits
+    // money and obligation. The shortlist guard stops a deactivated insurer being
+    // taken to market at all, but an insurer can be deactivated AFTER it quoted and
+    // after the client accepted — and placing business with a company the office
+    // has decided to stop dealing with is exactly what deactivation exists to
+    // prevent.
+    //
+    // Deliberately NOT applied to capturing the quotation itself: `quotation.
+    // service.ts` documents that recording a premium an insurer actually sent is a
+    // factual event, and refuses nothing for a late quote landing after the
+    // business went elsewhere. A quote is a record of what was offered; a policy is
+    // a commitment. Only the second one is blocked.
+    const insurerActive = await this.policies.isInsurerActive(quote.insurerId);
+    if (insurerActive === false) {
+      throw new UnprocessableEntityException(
+        `Cannot place a policy with a deactivated insurer (${quote.insurerId}). Reactivate it from the insurer screen if this placement should go ahead — existing policies, claims and invoices with them are unaffected either way.`,
+      );
+    }
+
     const existing = await this.policies.findByOpportunityId(dto.opportunityId);
     if (existing) {
       throw new ConflictException(

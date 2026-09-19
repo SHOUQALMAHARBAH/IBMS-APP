@@ -230,16 +230,36 @@ export class RfqService {
     return rfq;
   }
 
-  private async assertInsurersExist(insurerIds: string[]): Promise<void> {
+  /**
+   * Every shortlisted insurer must be one this office still deals with.
+   *
+   * Two refusals, not one, because they mean different things to whoever hits
+   * them. An unknown id is a client bug. A DEACTIVATED insurer is a decision the
+   * office made deliberately and can undo, so the message names the insurers and
+   * says what to do — refusing with "does not exist" for a company sitting in the
+   * office's own list would send someone hunting for a bug that is not there.
+   *
+   * This is the chokepoint for starting new business with an insurer: a quotation
+   * must be on an RFQ's shortlist, and a policy is placed from a quotation. So
+   * guarding the shortlist is what stops a deactivated insurer being taken to
+   * market at all.
+   */
+  private async assertInsurersSelectable(insurerIds: string[]): Promise<void> {
     if (insurerIds.length === 0) {
       throw new UnprocessableEntityException(
         'Select at least one insurer for the shortlist.',
       );
     }
-    const known = await this.rfqs.countInsurersByIds(insurerIds);
-    if (known !== insurerIds.length) {
+    const { inactiveIds, unknownIds } =
+      await this.rfqs.classifyInsurersByIds(insurerIds);
+    if (unknownIds.length > 0) {
       throw new UnprocessableEntityException(
         'One or more shortlisted insurers do not exist.',
+      );
+    }
+    if (inactiveIds.length > 0) {
+      throw new UnprocessableEntityException(
+        `Cannot shortlist a deactivated insurer (${inactiveIds.join(', ')}). Reactivate it from the insurer screen, or choose another — its existing policies, claims and invoices are unaffected either way.`,
       );
     }
   }
@@ -347,7 +367,7 @@ export class RfqService {
     );
 
     const insurerIds = [...new Set(dto.insurerIds)];
-    await this.assertInsurersExist(insurerIds);
+    await this.assertInsurersSelectable(insurerIds);
 
     // The `@@unique([opportunityId, insuranceLine])` is the real enforcement
     // — insertRfqRow() maps its violation to 409. This pre-check is the fast
@@ -406,7 +426,7 @@ export class RfqService {
     this.assertOpportunityInMarketPhase(opportunityStatus);
 
     const insurerIds = [...new Set(dto.insurerIds)];
-    await this.assertInsurersExist(insurerIds);
+    await this.assertInsurersSelectable(insurerIds);
 
     const alreadyOn = new Set(
       await this.rfqs.findExistingShortlistInsurerIds(rfqId, insurerIds),

@@ -1117,6 +1117,17 @@ describe('Premium Billing / Invoice (e2e) — backlog Part C #31', () => {
     );
 
     const rand = Math.random().toString(36).slice(2, 8);
+    // NOT torn down, and deliberately so: this insurer ends up under a policy,
+    // an invoice and a receipt, and this file leaves its whole fixture chain
+    // behind like every other test in it (customers, programmes, policies).
+    // Deleting just the insurer is impossible — `Policy_insurerId_fkey` is
+    // RESTRICT — and deleting the chain would be inconsistent with the file.
+    //
+    // Harmless: it is master-linked-shaped in every way that matters to other
+    // specs, stays ACTIVE, and the only assertions about picker contents elsewhere
+    // are `toContain` / `not.toContain` on their own fixtures rather than exact
+    // lists. The insurers created purely to be LISTED are swept, in
+    // `insurer-permissions.e2e-spec.ts` and `insurer-deactivation.e2e-spec.ts`.
     const local = await makeLocalInsurer(`Wadi Rum Mutual ${rand}`, {
       legalNameAr: `وادي رم التعاونية ${rand}`,
     });

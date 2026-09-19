@@ -45,6 +45,22 @@ const tag = Math.random().toString(36).slice(2, 8);
  */
 const FIXTURE_ROLE_PREFIX = 'RFQ Creator Only';
 
+/** Insurers this file creates. They exist only to be listed by the picker, so they
+ *  have no policies or quotations and can be removed outright — unlike the invoice
+ *  spec's, which sit under a deliberately-retained policy chain. */
+const FIXTURE_INSURER_PREFIX = 'Perms ';
+
+async function removeFixtureInsurers(): Promise<void> {
+  const insurers = await prisma.insurer.findMany({
+    where: { legalName: { startsWith: FIXTURE_INSURER_PREFIX } },
+    select: { id: true },
+  });
+  if (insurers.length === 0) return;
+  const ids = insurers.map((i) => i.id);
+  await prisma.insurerProduct.deleteMany({ where: { insurerId: { in: ids } } });
+  await prisma.insurer.deleteMany({ where: { id: { in: ids } } });
+}
+
 async function removeFixtureRoles(): Promise<void> {
   const roles = await prisma.role.findMany({
     where: { name: { startsWith: FIXTURE_ROLE_PREFIX } },
@@ -125,10 +141,12 @@ beforeAll(async () => {
   app = await createTestApp();
   // Whatever a failed or killed run left behind, before anything asserts on it.
   await removeFixtureRoles();
+  await removeFixtureInsurers();
 }, 240_000);
 
 afterAll(async () => {
   await removeFixtureRoles();
+  await removeFixtureInsurers();
   await app?.close();
   app = null;
 });
@@ -138,8 +156,10 @@ describe('insurer.read gates the shortlist picker', () => {
     // The five roles that gained access, plus Placement which already had it
     // through `rfq.create`. Each must get a 200 and a real list, because the point
     // of the move is that they can now ask the question at all.
-    const linked = await makeInsurer(`Perms Linked ${tag}`);
-    const local = await makeLocalInsurer(`Perms Local ${tag}`);
+    const linked = await makeInsurer(`${FIXTURE_INSURER_PREFIX}Linked ${tag}`);
+    const local = await makeLocalInsurer(
+      `${FIXTURE_INSURER_PREFIX}Local ${tag}`,
+    );
 
     for (const roleName of [
       'SALES_RELATIONSHIP_OFFICER',

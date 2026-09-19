@@ -1026,6 +1026,95 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
   // call in every e2e spec file that runs afterward (`fileParallelism:
   // false` in vitest-e2e.config.ts means files run sequentially, so this
   // restore-before-finish is sufficient, not just best-effort).
+  it('refuses to place a policy with an insurer the office has deactivated, and the existing policy with them is untouched', async () => {
+    // Insurer management — `Insurer.isActive` had never been read by anything, so a
+    // deactivate button would have been decorative. Placement is where the decision
+    // bites: it is the moment the office commits money and obligation.
+    //
+    // The insurer is deactivated AFTER quoting and after the client accepted, which
+    // is the case the shortlist guard cannot cover — that guard stops a deactivated
+    // insurer being taken to market, not one deactivated mid-flight.
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'pol-insdeact-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const chk = await makeUser(
+      app,
+      'pol-insdeact-chk',
+      'POLICY_CHECKING_OFFICER',
+    );
+
+    // First: a policy placed while the insurer was active, so the "existing
+    // obligations continue" half can be asserted on a real row rather than argued.
+    const before = await acceptedOpportunity(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'insdeact-before',
+    );
+    const placed = await request(app.getHttpServer())
+      .post('/policies')
+      .set(bearer(plc.accessToken))
+      .send({
+        opportunityId: before.opportunityId,
+        inceptionDate: '2026-03-01',
+      })
+      .expect(201);
+    const placedId = (placed.body as PolicyBody).id;
+
+    // Now a second opportunity, accepted, with the SAME insurer — then deactivate.
+    const after = await acceptedOpportunity(
+      app,
+      plc.accessToken,
+      plc.userId,
+      'insdeact-after',
+    );
+    await prisma.insurer.update({
+      where: { id: after.insurerId },
+      data: { isActive: false },
+    });
+
+    try {
+      const refused = await request(app.getHttpServer())
+        .post('/policies')
+        .set(bearer(plc.accessToken))
+        .send({
+          opportunityId: after.opportunityId,
+          inceptionDate: '2026-03-01',
+        })
+        .expect(422);
+      // The message names the insurer and says what to do. "Existing policies,
+      // claims and invoices are unaffected" is in it deliberately: whoever hits
+      // this needs to know deactivation did not break anything already placed.
+      expect((refused.body as { message: string }).message).toContain(
+        'deactivated insurer',
+      );
+
+      // EXISTING OBLIGATIONS CONTINUE. The policy placed a moment ago is still
+      // readable, still carries its insurer, and the insurer's name still renders —
+      // deactivation is not a delete, and nothing about the in-force book changes.
+      const still = await request(app.getHttpServer())
+        .get(`/policies/${placedId}`)
+        .set(bearer(chk.accessToken))
+        .expect(200);
+      const body = still.body as PolicyBody & {
+        insurer: { id: string; name: string } | null;
+      };
+      expect(body.id).toBe(placedId);
+      expect(body.insurer?.name.length ?? 0).toBeGreaterThan(0);
+    } finally {
+      // Restore, because db-test is cumulative and a deactivated insurer would
+      // change what a later spec's picker returns.
+      await prisma.insurer.update({
+        where: { id: after.insurerId },
+        data: { isActive: true },
+      });
+    }
+  });
+
   it('blocks new business (place) once the broker license has lapsed, and restores it before finishing (backlog Part C #51)', async () => {
     const app = await boot();
     const compliance = await makeUser(

@@ -101,9 +101,16 @@ function makeDeps() {
   const findOpenSubmissionsForFollowUp = vi.fn().mockResolvedValue([]);
   const findCurrentQuotationKeys = vi.fn().mockResolvedValue([]);
   const findSelectableInsurers = vi.fn().mockResolvedValue([]);
-  const countInsurersByIds = vi
+  // `countInsurersByIds` became `classifyInsurersByIds` when deactivation started
+  // being enforced: the guard has to tell an UNKNOWN id from a DEACTIVATED one,
+  // because they mean different things to whoever hits them. Default here is "every
+  // id is a live insurer", which is what every test that is not about insurer
+  // status expects.
+  const classifyInsurersByIds = vi
     .fn()
-    .mockImplementation((ids: string[]) => Promise.resolve(ids.length));
+    .mockImplementation((ids: string[]) =>
+      Promise.resolve({ activeIds: [...ids], inactiveIds: [], unknownIds: [] }),
+    );
   // Mirrors Prisma's default-fill: an undefined `sentAt` in `data` becomes
   // now() on the persisted row.
   const createCommunication = vi
@@ -130,7 +137,7 @@ function makeDeps() {
     findOpenSubmissionsForFollowUp,
     findCurrentQuotationKeys,
     findSelectableInsurers,
-    countInsurersByIds,
+    classifyInsurersByIds,
     createCommunication,
     findCommunicationsByRfqId,
   } as unknown as RfqRepository;
@@ -193,7 +200,7 @@ function makeDeps() {
       findOpenSubmissionsForFollowUp,
       findCurrentQuotationKeys,
       findSelectableInsurers,
-      countInsurersByIds,
+      classifyInsurersByIds,
       createCommunication,
       findCommunicationsByRfqId,
       findOpportunityById,
@@ -282,9 +289,30 @@ describe('RfqService', () => {
 
     it('rejects an unknown insurer with a 422', async () => {
       const { service, mocks } = makeDeps();
-      mocks.countInsurersByIds.mockResolvedValue(1); // only 1 of 2 exist
+      mocks.classifyInsurersByIds.mockResolvedValue({
+        activeIds: ['ins-1'],
+        inactiveIds: [],
+        unknownIds: ['ins-2'],
+      });
       await expect(service.createRfq(CREATE_DTO, placement())).rejects.toThrow(
         UnprocessableEntityException,
+      );
+      expect(mocks.createRfq).not.toHaveBeenCalled();
+    });
+
+    it('rejects a DEACTIVATED insurer with a 422 that says so, not "does not exist"', async () => {
+      // The reason the repository method changed shape. An unknown id is a client
+      // bug; a deactivated insurer is a decision the office made and can undo, and
+      // reporting the second as the first sends someone hunting a bug that is not
+      // there. Asserted on the MESSAGE, because the status code is the same.
+      const { service, mocks } = makeDeps();
+      mocks.classifyInsurersByIds.mockResolvedValue({
+        activeIds: ['ins-1'],
+        inactiveIds: ['ins-2'],
+        unknownIds: [],
+      });
+      await expect(service.createRfq(CREATE_DTO, placement())).rejects.toThrow(
+        /deactivated insurer \(ins-2\)/,
       );
       expect(mocks.createRfq).not.toHaveBeenCalled();
     });
