@@ -53,7 +53,7 @@ export default function UserAdminPage() {
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
   const canLinkEmployee = hasPermission(user, 'employee.manage');
-  const canReadRoles = hasPermission(user, 'role.manage');
+  const canReadRoles = hasPermission(user, 'role.read');
 
   /**
    * How a role is named on screen.
@@ -75,14 +75,15 @@ export default function UserAdminPage() {
     return (isArabic ? entry.nameAr : entry.nameEn) || entry.name;
   };
 
-  /** The same question for a bare name: a role a user holds when the caller
-   *  cannot read the catalogue (`GET /rbac/roles` needs `role.manage`), or one
-   *  removed since the grant was made. */
-  const roleLabelForName = (name: string): string => {
-    const entry = roleCatalogue.find((e) => e.name === name);
+  /** A role a user holds, matched by ID when the catalogue is readable
+   *  (`GET /rbac/roles` needs `role.read`) and falling back to the name the API
+   *  returned alongside it when it is not. Matched on the id rather than the
+   *  name so a rename between the two requests cannot mislabel a row. */
+  const roleLabelForHeld = (held: { id: string; name: string }): string => {
+    const entry = roleCatalogue.find((e) => e.id === held.id);
     if (entry) return roleLabel(entry);
-    const key = ENUM_LABEL.RoleName[name as LegacyRoleName];
-    return key ? t(key) : name;
+    const key = ENUM_LABEL.RoleName[held.name as LegacyRoleName];
+    return key ? t(key) : held.name;
   };
 
   const [rows, setRows] = useState<AdminUser[] | null>(null);
@@ -94,8 +95,9 @@ export default function UserAdminPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [roles, setRoles] = useState<RoleName[]>([]);
-  const [grantChoice, setGrantChoice] = useState<RoleName>('');
+  // Role IDS, not names — what the API now addresses.
+  const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [grantChoice, setGrantChoice] = useState<string>('');
   // The office's OWN catalogue, fetched rather than hard-coded — a custom role
   // has to be offerable here or Phase 3 could create one this screen cannot
   // grant.
@@ -147,7 +149,7 @@ export default function UserAdminPage() {
           // Only when the caller can read it — GET /employees needs
           // employee.manage, and a 403 here would blank the other two.
           canLinkEmployee ? listEmployees() : Promise.resolve([]),
-          // Same shape of guard: GET /rbac/roles needs `role.manage`, which a
+          // Same shape of guard: GET /rbac/roles needs `role.read`, which a
           // holder of `user.manage` does not necessarily have.
           canReadRoles ? listRoles() : Promise.resolve([]),
         ]);
@@ -156,7 +158,7 @@ export default function UserAdminPage() {
         setEmployees(emps);
         setRoleCatalogue(cat);
         // The grant dropdown's default is whatever the office actually has.
-        setGrantChoice((current) => current || (cat[0]?.name ?? ''));
+        setGrantChoice((current) => current || (cat[0]?.id ?? ''));
       } catch {
         // The form's own error line covers a failed submit; an empty dropdown
         // is self-explanatory and must not blank the user list beside it.
@@ -190,7 +192,7 @@ export default function UserAdminPage() {
         password,
         departmentId,
         branchId,
-        roles,
+        roleIds,
         // Omitted rather than sent empty: the DTO treats absence as "no link",
         // and an empty string would fail validation as a malformed id.
         employeeId: employeeId || undefined,
@@ -198,18 +200,18 @@ export default function UserAdminPage() {
       setFullName('');
       setEmail('');
       setPassword('');
-      setRoles([]);
+      setRoleIds([]);
       setDepartmentId('');
       setBranchId('');
       setEmployeeId('');
     });
   }
 
-  function toggleRole(role: RoleName) {
-    setRoles((current) =>
-      current.includes(role)
-        ? current.filter((r) => r !== role)
-        : [...current, role],
+  function toggleRole(roleId: string) {
+    setRoleIds((current) =>
+      current.includes(roleId)
+        ? current.filter((id) => id !== roleId)
+        : [...current, roleId],
     );
   }
 
@@ -333,8 +335,8 @@ export default function UserAdminPage() {
               >
                 <input
                   type="checkbox"
-                  checked={roles.includes(entry.name)}
-                  onChange={() => toggleRole(entry.name)}
+                  checked={roleIds.includes(entry.id)}
+                  onChange={() => toggleRole(entry.id)}
                 />{' '}
                 {roleLabel(entry)}
               </label>
@@ -342,14 +344,14 @@ export default function UserAdminPage() {
           </fieldset>
           <button
             type="submit"
-            disabled={busy || roles.length === 0 || !departmentId || !branchId}
+            disabled={busy || roleIds.length === 0 || !departmentId || !branchId}
             style={{ marginTop: '0.3rem' }}
           >
             {busy
               ? t('usrSaving')
               : t('usrProvisionUser')}
           </button>
-          {roles.length === 0 ? (
+          {roleIds.length === 0 ? (
             <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
               {t('usrPickAtLeastOneRole')}
             </p>
@@ -402,19 +404,19 @@ export default function UserAdminPage() {
                             {t('usrNone')}
                           </span>
                         ) : (
-                          u.roles.map((role) => (
+                          u.roles.map((held) => (
                             <span
-                              key={role}
+                              key={held.id}
                               style={{ display: 'block', fontSize: '0.85rem' }}
                             >
-                              {roleLabelForName(role)}
+                              {roleLabelForHeld(held)}
                               {isAdmin ? (
                                 <button
                                   type="button"
                                   disabled={busy}
                                   style={{ marginInlineStart: '0.4rem' }}
                                   onClick={() =>
-                                    void run(() => revokeRole(u.id, role))
+                                    void run(() => revokeRole(u.id, held.id))
                                   }
                                 >
                                   {t('usrRevoke')}

@@ -49,6 +49,12 @@ interface CycleBody {
   id: string;
 }
 
+/** Every response on the user-admin surface returns a user's roles the same
+ *  way: id AND name. */
+interface HeldRolesBody {
+  roles: { id: string; name: string }[];
+}
+
 function uniqueEmail(label: string): string {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@ibms.test`;
 }
@@ -293,12 +299,18 @@ describe('RBAC / access recertification (e2e)', () => {
     });
   });
 
-  describe('role names are free text, not the legacy enum', () => {
-    it('accepts a CUSTOM role name on provisioning and on a later grant', async () => {
-      // Phase 2 workstream H. `ProvisionUserDto` and `RoleAssignmentDto`
-      // validated `roles` against the legacy `RoleName` enum, so every custom
-      // name was rejected with a 400 before the service could look it up — Phase
-      // 3 could have created a role that no endpoint would assign.
+  describe('roles are addressed by ID, not by name', () => {
+    it('accepts a CUSTOM role on provisioning and on a later grant', async () => {
+      // Phase 3 prep. Two things changed here and both matter.
+      //
+      // `@IsEnum(RoleName)` used to reject every custom role with a 400 before
+      // the service could look it up — Phase 3 would have created roles no
+      // endpoint could assign. And the DTOs addressed roles by NAME, which was
+      // office-scoped and so never a leak, but left a rename-mid-request race:
+      // an administrator renaming a role between the client rendering the list
+      // and submitting the grant got a 422 for a role that exists, or — once an
+      // office reuses a freed name — a grant of the wrong role. A uuid cannot
+      // drift.
       const app = await boot();
       const tag = Date.now();
       const custom = await makeCustomRole(`Client Liaison ${tag}`, [
@@ -324,23 +336,34 @@ describe('RBAC / access recertification (e2e)', () => {
             password: PASSWORD,
             departmentId: orgUnits.departmentId,
             branchId: orgUnits.branchId,
-            roles: [`Client Liaison ${tag}`],
+            roleIds: [custom.id],
           })
           .expect(201);
         const provisionedId = (provisioned.body as { id: string }).id;
-        expect((provisioned.body as { roles: string[] }).roles).toEqual([
-          `Client Liaison ${tag}`,
+        // The response carries id AND name: the id is what a revoke addresses,
+        // the name is what the screen shows.
+        expect((provisioned.body as HeldRolesBody).roles).toEqual([
+          { id: custom.id, name: `Client Liaison ${tag}` },
         ]);
 
-        // And a second custom role granted afterwards, through the other DTO.
         const granted = await request(app.getHttpServer())
           .post(`/admin/users/${provisionedId}/roles`)
           .set(bearer(admin.accessToken))
-          .send({ role: `Renewals Desk ${tag}` })
+          .send({ roleId: second.id })
           .expect(201);
-        expect((granted.body as { roles: string[] }).roles.sort()).toEqual(
-          [`Client Liaison ${tag}`, `Renewals Desk ${tag}`].sort(),
-        );
+        expect(
+          (granted.body as HeldRolesBody).roles.map((r) => r.id).sort(),
+        ).toEqual([custom.id, second.id].sort());
+
+        // And revoking addresses the same id.
+        const revoked = await request(app.getHttpServer())
+          .post(`/admin/users/${provisionedId}/roles/revoke`)
+          .set(bearer(admin.accessToken))
+          .send({ roleId: second.id })
+          .expect(201);
+        expect((revoked.body as HeldRolesBody).roles.map((r) => r.id)).toEqual([
+          custom.id,
+        ]);
       } finally {
         const ids = [custom.id, second.id];
         await prisma.userRoleAssignment.deleteMany({
@@ -353,11 +376,12 @@ describe('RBAC / access recertification (e2e)', () => {
       }
     }, 300_000);
 
-    it('rejects an UNKNOWN role with 422, not 400 — the lookup decides, not the validator', async () => {
-      // The distinction matters: 400 means "this could never be a role name",
-      // which is no longer something a validator can know. 422 means "no such
-      // role in THIS office", which is the scoped lookup answering — and that
-      // scoping is what stops one office probing another's role names.
+    it('answers 422 for an unknown role id — the lookup decides, not the validator', async () => {
+      // A well-formed uuid that is not a role of this office. 422, not 400: the
+      // shape was fine, the office simply has no such role. And because the
+      // lookup runs on the tenant-scoped client, an id belonging to ANOTHER
+      // office gets this same answer — indistinguishable from one that never
+      // existed, which is what stops this endpoint being a probe.
       const app = await boot();
       const tag = Date.now();
       const admin = await makeUser(
@@ -366,11 +390,12 @@ describe('RBAC / access recertification (e2e)', () => {
         'SYSTEM_SECURITY_ADMINISTRATOR',
       );
       const target = await makeUser(app, 'dto-target');
+      const absent = '00000000-0000-4000-8000-00000000dead';
 
       await request(app.getHttpServer())
         .post(`/admin/users/${target.userId}/roles`)
         .set(bearer(admin.accessToken))
-        .send({ role: `No Such Role ${tag}` })
+        .send({ roleId: absent })
         .expect(422);
 
       const orgUnits = await orgUnitsFor(app, admin.accessToken, tag);
@@ -383,15 +408,15 @@ describe('RBAC / access recertification (e2e)', () => {
           password: PASSWORD,
           departmentId: orgUnits.departmentId,
           branchId: orgUnits.branchId,
-          roles: [`No Such Role ${tag}`],
+          roleIds: [absent],
         })
         .expect(422);
     }, 300_000);
 
-    it('still rejects a malformed name with 400 — the shape is bounded even though the vocabulary is not', async () => {
-      // Relaxing the vocabulary is not the same as accepting anything. These
-      // values reach audit rows and log lines, so an empty name, an
-      // over-long one, and one carrying a control character are all still 400.
+    it('answers 400 for something that is not a role id at all', async () => {
+      // The validator's remaining job is the SHAPE. A role NAME sent where an id
+      // belongs is the most likely mistake a stale client makes, and it must be
+      // an obvious 400 rather than a confusing 422.
       const app = await boot();
       const admin = await makeUser(
         app,
@@ -400,11 +425,11 @@ describe('RBAC / access recertification (e2e)', () => {
       );
       const target = await makeUser(app, 'dto-target-malformed');
 
-      for (const role of ['', 'x'.repeat(101), 'Bad\nName']) {
+      for (const roleId of ['', 'SALES_RELATIONSHIP_OFFICER', 'not-a-uuid']) {
         await request(app.getHttpServer())
           .post(`/admin/users/${target.userId}/roles`)
           .set(bearer(admin.accessToken))
-          .send({ role })
+          .send({ roleId })
           .expect(400);
       }
     }, 300_000);

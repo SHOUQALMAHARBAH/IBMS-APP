@@ -604,7 +604,7 @@ describe('Part V — a write that reports success actually wrote (item 6)', () =
         email,
         password: PASSWORD,
         ...(await orgUnitsForProvisioning(app!, admin.accessToken)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(201);
     const userId = (created.body as { id: string }).id;

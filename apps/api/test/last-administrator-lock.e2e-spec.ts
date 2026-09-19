@@ -66,7 +66,9 @@ let users: UserRepository;
 let orgContext: OrgContextService;
 
 /** Two DIFFERENT roles, both granting `user.manage` — the shape a single row
- *  lock cannot serialise. */
+ *  lock cannot serialise. Addressed by ID: `revokeRole` takes a role id since
+ *  the Phase 3 prep step, and this file calls the service directly, so no DTO
+ *  would have caught a name here. */
 let roleAId: string;
 let roleBId: string;
 let adminAId: string;
@@ -272,10 +274,10 @@ describe('the last-administrator guard survives two concurrent removals', () => 
     // both through.
     const results = await Promise.allSettled([
       orgContext.runAs(ORG_ID, () =>
-        service.revokeRole(adminAId, 'Office Admin A', adminAId),
+        service.revokeRole(adminAId, roleAId, adminAId),
       ),
       orgContext.runAs(ORG_ID, () =>
-        service.revokeRole(adminBId, 'Office Admin B', adminBId),
+        service.revokeRole(adminBId, roleBId, adminBId),
       ),
     ]);
 
@@ -331,11 +333,11 @@ describe('the last-administrator guard survives two concurrent removals', () => 
     await resetFixture();
 
     await orgContext.runAs(ORG_ID, () =>
-      service.revokeRole(adminAId, 'Office Admin A', adminAId),
+      service.revokeRole(adminAId, roleAId, adminAId),
     );
     await expect(
       orgContext.runAs(ORG_ID, () =>
-        service.revokeRole(adminBId, 'Office Admin B', adminBId),
+        service.revokeRole(adminBId, roleBId, adminBId),
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   }, 120_000);
@@ -356,7 +358,7 @@ describe('the last-administrator guard survives two concurrent removals', () => 
     });
 
     await orgContext.runAs(ORG_ID, () =>
-      service.revokeRole(adminAId, 'Office Admin A', adminAId),
+      service.revokeRole(adminAId, roleAId, adminAId),
     );
 
     const holders = await orgContext.runAs(ORG_ID, () =>

@@ -41,8 +41,12 @@ const ADMIN_ROUTE_PERMISSIONS = [
   'security-config.manage',
   'email.integration.manage',
   'user.manage',
-  'role.manage',
-  'permission.manage',
+  // `role.read` / `permission.read`, not `.manage`. Those two codes gated
+  // read-only GETs while being named "manage"; the Phase 3 prep step renamed
+  // them in place before the permission-matrix screen is built against them, and
+  // the new `role.manage` means CHANGING a role (nothing gates on it yet).
+  'role.read',
+  'permission.read',
   'encryption-key.read',
 ];
 
@@ -91,8 +95,8 @@ const ROUTES: Route[] = [
   { method: 'post', path: '/admin/departments', permission: 'user.manage' },
   { method: 'get', path: '/admin/branches', permission: 'user.manage' },
   { method: 'post', path: '/admin/branches', permission: 'user.manage' },
-  { method: 'get', path: '/rbac/roles', permission: 'role.manage' },
-  { method: 'get', path: '/rbac/permissions', permission: 'permission.manage' },
+  { method: 'get', path: '/rbac/roles', permission: 'role.read' },
+  { method: 'get', path: '/rbac/permissions', permission: 'permission.read' },
   { method: 'get', path: '/admin/users', permission: 'user.manage' },
   { method: 'post', path: '/admin/users', permission: 'user.manage' },
   {

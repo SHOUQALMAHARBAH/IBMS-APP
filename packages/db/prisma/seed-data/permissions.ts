@@ -1173,16 +1173,39 @@ const pdpl: PermissionSeed[] = [
 // Admin / RBAC surface (this task)
 // ----------------------------------------------------------------------
 const admin: PermissionSeed[] = [
+  // READING a catalogue and CHANGING one are different decisions, and until
+  // Phase 3 both codes here gated read-only GETs while being named `.manage`.
+  // A permission matrix built against a row labelled "manage" that only permits
+  // reading is the kind of thing an auditor asks about, so the names are settled
+  // BEFORE that screen exists rather than after.
+  //
+  // Migration 20261005100000 RENAMES the existing rows in place rather than
+  // deleting and recreating them, so every grant follows the rename and there is
+  // no window in which nobody can read the catalogue.
   {
-    code: "role.manage",
+    code: "role.read",
     module: "admin",
-    description: "View the role catalogue",
+    description: "View the office's role catalogue",
     roles: [ADMIN],
   },
   {
-    code: "permission.manage",
+    // Nothing gates on this yet. Phase 3's Role CRUD is what will, and it exists
+    // now so the matrix screen is built against the final name.
+    code: "role.manage",
     module: "admin",
-    description: "View the permission grid",
+    description:
+      "Create, edit, activate and deactivate the office's own roles, and set what they grant (Phase 3)",
+    roles: [ADMIN],
+  },
+  {
+    // There is deliberately no `permission.manage`. `Permission` is a single
+    // GLOBAL catalogue describing what the software can do — an office grants
+    // permissions, it never invents one — so a write capability here would name
+    // an action that cannot exist. This is a rename, not a split.
+    code: "permission.read",
+    module: "admin",
+    description:
+      "View the global permission catalogue (the codes a role can be granted)",
     roles: [ADMIN],
   },
   {

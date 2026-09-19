@@ -64,14 +64,21 @@ interface MfaEnrollBody {
   credentialId: string;
   otpAuthUri: string;
 }
+/** Every response on this surface returns a user's roles the same way since the
+ *  Phase 3 prep step: id AND name. The id is what a grant or revoke addresses,
+ *  the name is what a person reads. */
+interface HeldRole {
+  id: string;
+  name: string;
+}
 interface AdminUserBody {
   id: string;
   email: string;
-  roles: string[];
+  roles: HeldRole[];
 }
 interface RolesBody {
   userId: string;
-  roles: string[];
+  roles: HeldRole[];
 }
 interface OrgUnitBody {
   id: string;
@@ -192,12 +199,14 @@ describe('User admin / provisioning (e2e)', () => {
         email,
         password: PROVISIONED_PASSWORD,
         ...(await orgUnitsForProvisioning(app)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(201);
 
     const body = created.body as AdminUserBody;
-    expect(body.roles).toEqual(['SALES_RELATIONSHIP_OFFICER']);
+    expect(body.roles.map((r) => r.name)).toEqual([
+      'SALES_RELATIONSHIP_OFFICER',
+    ]);
 
     // Part II §4.3.1 changed what "usable straight away" means. A provisioned
     // account's FIRST login resolves to the mandatory password change, not to a
@@ -259,7 +268,7 @@ describe('User admin / provisioning (e2e)', () => {
         email: uniqueEmail('ua-nope'),
         password: PROVISIONED_PASSWORD,
         ...(await orgUnitsForProvisioning(app)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(403);
 
@@ -285,7 +294,7 @@ describe('User admin / provisioning (e2e)', () => {
         email: uniqueEmail('ua-weak'),
         password: 'shortpass123',
         ...(await orgUnitsForProvisioning(app)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(400);
 
@@ -298,7 +307,7 @@ describe('User admin / provisioning (e2e)', () => {
         email,
         password: PROVISIONED_PASSWORD,
         ...(await orgUnitsForProvisioning(app)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(201);
     // A second create on the same email is a clean 409, not an unhandled 500.
@@ -310,7 +319,7 @@ describe('User admin / provisioning (e2e)', () => {
         email,
         password: PROVISIONED_PASSWORD,
         ...(await orgUnitsForProvisioning(app)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(409);
   });
@@ -327,16 +336,20 @@ describe('User admin / provisioning (e2e)', () => {
     const granted = await request(app.getHttpServer())
       .post(`/admin/users/${subject.userId}/roles`)
       .set(bearer(admin.accessToken))
-      .send({ role: 'CLAIMS_OFFICER' })
+      .send({ roleId: (await ensureRole('CLAIMS_OFFICER')).id })
       .expect(201);
-    expect((granted.body as RolesBody).roles).toContain('CLAIMS_OFFICER');
+    expect((granted.body as RolesBody).roles.map((r) => r.name)).toContain(
+      'CLAIMS_OFFICER',
+    );
 
     const revoked = await request(app.getHttpServer())
       .post(`/admin/users/${subject.userId}/roles/revoke`)
       .set(bearer(admin.accessToken))
-      .send({ role: 'CLAIMS_OFFICER' })
+      .send({ roleId: (await ensureRole('CLAIMS_OFFICER')).id })
       .expect(201);
-    expect((revoked.body as RolesBody).roles).not.toContain('CLAIMS_OFFICER');
+    expect((revoked.body as RolesBody).roles.map((r) => r.name)).not.toContain(
+      'CLAIMS_OFFICER',
+    );
 
     // The audit record of WHEN access was withdrawn must survive.
     // `name` is unique per office now, not globally — and the scoped client
@@ -355,7 +368,7 @@ describe('User admin / provisioning (e2e)', () => {
     await request(app.getHttpServer())
       .post(`/admin/users/${subject.userId}/roles/revoke`)
       .set(bearer(admin.accessToken))
-      .send({ role: 'CLAIMS_OFFICER' })
+      .send({ roleId: (await ensureRole('CLAIMS_OFFICER')).id })
       .expect(409);
   });
 
@@ -375,7 +388,7 @@ describe('User admin / provisioning (e2e)', () => {
         email,
         password: PROVISIONED_PASSWORD,
         ...(await orgUnitsForProvisioning(app)),
-        roles: ['SALES_RELATIONSHIP_OFFICER'],
+        roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
       })
       .expect(201);
     const created2 = created.body as AdminUserBody;
@@ -525,7 +538,7 @@ describe('User admin / provisioning (e2e)', () => {
           password: PROVISIONED_PASSWORD,
           departmentId: deptBody.id,
           branchId: branchBody.id,
-          roles: ['SALES_RELATIONSHIP_OFFICER'],
+          roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
         })
         .expect(201);
 
@@ -552,7 +565,7 @@ describe('User admin / provisioning (e2e)', () => {
           password: PROVISIONED_PASSWORD,
           departmentId: units.departmentId,
           branchId: '00000000-0000-0000-0000-0000000000ff',
-          roles: ['SALES_RELATIONSHIP_OFFICER'],
+          roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
         })
         .expect(422);
 
@@ -564,7 +577,7 @@ describe('User admin / provisioning (e2e)', () => {
           email: uniqueEmail('ua-missing-branch'),
           password: PROVISIONED_PASSWORD,
           departmentId: units.departmentId,
-          roles: ['SALES_RELATIONSHIP_OFFICER'],
+          roleIds: [(await ensureRole('SALES_RELATIONSHIP_OFFICER')).id],
         })
         .expect(400);
     });
