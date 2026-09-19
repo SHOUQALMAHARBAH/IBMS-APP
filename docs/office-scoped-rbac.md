@@ -213,12 +213,29 @@ that changes and this gap needs closing with it.
 (`apps/web/e2e/fixtures/role-permissions.ts`). Its header says regenerate, not
 hand-edit. Regenerate it from the seeded database whenever a grant moves.
 
-**Maker/checker is unaffected and needs no work.** It compares user IDs at 62 call
-sites, backed by 17 database CHECK constraints, so holding several roles cannot
-weaken separation of duties. The permission matrix warns when one role both
+**Maker/checker is unaffected and needs no work.** It compares user IDs at 19 call
+sites, backed by 15 database `*_maker_checker_distinct` CHECK constraints, so holding
+several roles cannot weaken separation of duties. The permission matrix warns when one role both
 classifies an incident and co-signs that classification, but it saves: a small
 office may legitimately want that, and `assertDifferentActors` still refuses a
 co-sign by whoever recorded the classification.
+
+Both figures above are corrected from what this repo's notes have repeated since
+Phase 1 ("62 call sites, 17 CHECK constraints"); both were measured here rather than
+carried forward.
+
+The call sites are **19**, not 62. 63 is how many LINES in non-spec source mention
+`assertDifferentActors` at all — imports and comments included — which is what the
+older figure appears to have counted. Measured by grepping for the call with its
+opening parenthesis, excluding specs and the utility's own file.
+
+The constraints are **15**, not 17. 17 is how many CHECK constraints mention a user
+column; two of those —
+`SalesTarget_owner_xor_branch` and `ScreeningMatch_assigned_has_assignee` — are not
+maker/checker constraints at all. Measured with
+`SELECT conname FROM pg_constraint WHERE contype='c' AND conname LIKE '%maker_checker_distinct'`.
+Phase 3 added and removed none of them; the correction is to the count, not to the
+control.
 
 ---
 

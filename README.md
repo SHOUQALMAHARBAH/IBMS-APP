@@ -770,8 +770,9 @@ build actually is today:
   this", which is an organizational fact rather than an access decision — converting
   them to permissions would replace a clear statement with a misleading one. The honest
   fix is a business-function routing table, which belongs with Phase 4's org structure.
-  Maker/checker is unaffected and needed no work: it compares user IDs at 62 call sites,
-  backed by 17 database CHECK constraints, so holding several roles cannot weaken
+  Maker/checker is unaffected and needed no work: it compares user IDs at 19 call sites,
+  backed by 15 database `*_maker_checker_distinct` CHECK constraints, so holding
+  several roles cannot weaken
   separation of duties. The `RoleName` enum type and the pre-migration global role rows
   are deliberately kept for at least one release so rollback stays cheap. Insurer CRUD
   and `insurer.relationship.manage` remain specification-only and are deliberately
