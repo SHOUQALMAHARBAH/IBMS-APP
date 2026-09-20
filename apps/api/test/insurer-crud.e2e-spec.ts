@@ -84,6 +84,8 @@ interface InsurerView {
   companyEmail: string | null;
   companyWebsite: string | null;
   companyCorrespondenceAddress: string | null;
+  structure: string | null;
+  linesOffered: { code: string | null; isStandard: boolean }[];
   creditTermsDays: number | null;
   rfqContactEmail: string | null;
   financialStrengthRating: string | null;
@@ -166,16 +168,17 @@ async function catalogueCompany(label: string): Promise<{
 /**
  * Registers an insurer through the real endpoint.
  *
- * `companyPhone` and `companyEmail` are REQUIRED on both paths, so the helper
- * supplies them and every earlier test keeps testing what it was written to test: a
- * body missing them is a 400 from the DTO, which would mask the 422s and 409s below.
- * A test specifically about the contact fields passes its own values, or `null` to
+ * `companyPhone`, `companyEmail` and `structure` are REQUIRED on both paths, so the
+ * helper supplies them and every earlier test keeps testing what it was written to
+ * test: a body missing one is a 400 from the DTO, which would mask the 422s and 409s
+ * below. A test specifically about those fields passes its own values, or `null` to
  * omit one.
  */
 function register(body: Record<string, unknown>, token = admin.accessToken) {
   const withContacts: Record<string, unknown> = {
     companyPhone: '+962 6 400 0000',
     companyEmail: `switchboard-${Math.random().toString(36).slice(2, 8)}@example.test`,
+    structure: 'CONVENTIONAL',
     ...body,
   };
   for (const key of Object.keys(withContacts)) {
@@ -353,6 +356,34 @@ describe('the company-level contact details', () => {
       companyPhone: '+962 6 555 1234',
       companyEmail: 'info@contactable.test',
     });
+  }, 300_000);
+
+  it('requires the company structure, and refuses a value outside the three', async () => {
+    // Required because whether a company writes conventional or takaful business
+    // decides whether a client needing Sharia-compliant cover can be placed there at
+    // all — "we did not ask" is not a useful state for a record whose purpose is to be
+    // searched. Three options is no friction.
+    await register({
+      legalName: `${FIXTURE_PREFIX} No Structure`,
+      legalNameAr: `${FIXTURE_PREFIX} بلا هيكل`,
+      structure: null,
+    }).expect(400);
+    await register({
+      legalName: `${FIXTURE_PREFIX} Bad Structure`,
+      legalNameAr: `${FIXTURE_PREFIX} هيكل خطأ`,
+      structure: 'MUTUAL',
+    }).expect(400);
+
+    // All three values are accepted, including the window case a boolean could not
+    // have carried.
+    for (const structure of ['CONVENTIONAL', 'TAKAFUL', 'TAKAFUL_WINDOW']) {
+      const created = await register({
+        legalName: `${FIXTURE_PREFIX} ${structure}`,
+        legalNameAr: `${FIXTURE_PREFIX} ${structure}`,
+        structure,
+      }).expect(201);
+      expect((created.body as InsurerView).structure).toBe(structure);
+    }
   }, 300_000);
 
   it('requires a phone and an email on BOTH registration paths', async () => {

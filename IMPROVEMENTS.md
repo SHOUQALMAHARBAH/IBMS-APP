@@ -505,6 +505,67 @@ worth a pass of its own.
 
 ---
 
+### 1.15 `P1` — SIX models still name an insurance line in FREE TEXT
+
+The managed vocabulary (`InsuranceLine` + `OfficeInsuranceLine`) governs exactly one
+thing today: what a company OFFERS, via `InsurerOfferedLine`. Everything else that
+names an insurance type still stores a string:
+
+`InsuranceProgramLine`, `RFQ`, `Policy`, `InsurerProduct`, `InsurerFormTemplate` and
+`CommissionAgreement` — each with its own `insuranceLine String`. Counted from the
+schema, not from memory: an earlier draft of this entry said seven and named
+`Quotation` and `InsurerSlaAgreement`, neither of which carries the field, and missed
+`InsuranceProgramLine`, which does. `Quotation` inherits its line from the RFQ it
+answers, which is why it has none of its own.
+
+So the fragmentation the vocabulary exists to remove is only removed at the insurer
+end. A policy whose line reads `"مركبات"` still cannot be matched against an insurer
+that offers `MOTOR_COMPREHENSIVE`, which means:
+
+- portfolio/profitability reports that group by line still fragment along spellings;
+- "which of our insurers writes this policy's line" is still unanswerable;
+- the directory can search companies by line, but nothing can search POLICIES by the
+  same vocabulary.
+
+**Why it was not done here.** Converting those six means a data migration per model
+over rows that already exist, with no mapping for a value nobody standardised —
+`"MOTOR"`, `"Motor"`, `"motor comprehensive"` and `"تأمين شامل"` all have to become an
+id or be parked somewhere reviewable. That is its own piece of work with its own
+backfill and its own decision about what to do with a string that matches nothing. It
+is not a side effect of adding the vocabulary.
+
+**What makes it safe to defer:** the new tables add a referent rather than changing a
+meaning, so nothing regressed. What it costs to defer: every additional row written
+into those seven columns is another row a future migration has to classify.
+
+---
+
+### 1.16 `P2` — The vocabulary has no synonym detection, and additions cannot be retired
+
+Two bounded gaps in the managed-list design, both deliberate, both recorded so nobody
+mistakes them for oversights.
+
+**Synonyms are not caught.** An addition is refused if its canonical name key matches a
+standard line or an existing addition — which folds orthography (alef forms,
+diacritics, tatweel, ة/ه, ى/ي), the definite article and word order. It cannot fold
+MEANING: `"سيارات شامل"` and `"تأمين المركبات الشامل"` are the same cover and share no
+word, so an office can still add the second while the first exists. Closing that needs
+the similarity layer the insurer directory's matching commit brings (trigram /
+`pg_trgm`), applied to BOTH vocabularies — as a non-blocking "did you mean …?" on top
+of the exact guarantee, never instead of it. The exact key is what can be a unique
+index; a similarity score never can.
+
+**An addition can be renamed but not removed.** `PATCH /insurance-lines/:id` fixes a
+typo — which is why it exists, since without it a mistake is permanent in a vocabulary
+the whole office picks from. There is no retire/delete: an addition that turns out to
+be a duplicate of a standard line under a different name stays in the picker forever.
+The shape it wants is `status` (the `Role` precedent — retire, never delete, because
+the `InsurerOfferedLine` rows pointing at it ARE the record of which companies were
+said to offer it), plus a decision about what happens to insurers already offering a
+retired line. Not built because nothing can retire a line yet either way.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

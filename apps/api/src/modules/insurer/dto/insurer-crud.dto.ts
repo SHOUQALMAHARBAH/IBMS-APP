@@ -1,6 +1,9 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -41,6 +44,10 @@ function printable(field: string) {
   return { message: `${field} must not contain control characters` };
 }
 
+/** Conventional, takaful, or a takaful window inside a conventional company. Three
+ *  values and not a boolean: the Jordanian market has windows, which is neither. */
+const STRUCTURES = ['CONVENTIONAL', 'TAKAFUL', 'TAKAFUL_WINDOW'] as const;
+
 export class RegisterInsurerDto {
   /** The company's row in the shared catalogue. Mutually exclusive with the two
    *  local name fields below. */
@@ -64,6 +71,34 @@ export class RegisterInsurerDto {
   @Length(2, 200)
   @Matches(NO_CONTROL_CHARACTERS, printable('legalNameAr'))
   legalNameAr?: string;
+
+  /**
+   * REQUIRED. Whether a company writes conventional or takaful business decides
+   * whether a client who needs Sharia-compliant cover can be placed there at all, so
+   * "we did not ask" is not a useful state for a record whose purpose is to be
+   * searched. It is a three-option choice, which is no friction.
+   *
+   * Nullable in the column, because every insurer registered before the column
+   * existed has no answer and a DEFAULT would state a fact nobody checked.
+   */
+  @IsEnum(STRUCTURES)
+  structure!: 'CONVENTIONAL' | 'TAKAFUL' | 'TAKAFUL_WINDOW';
+
+  /**
+   * What the company offers, as ids from `GET /insurance-lines` — standard lines and
+   * this office's own additions in one array, because a person picking a line should
+   * not have to know which half of the vocabulary it came from.
+   *
+   * OPTIONAL, and an empty set is legitimate: an office often registers a company
+   * before it knows the full product list, and forcing a pick would produce a chosen-
+   * to-get-past-the-form value that is worse than an absent one. On `PATCH` the array
+   * REPLACES the set — an explicit `[]` clears it, an absent key leaves it alone.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('4', { each: true })
+  lineIds?: string[];
 
   /**
    * COMPANY-level contact details — the four the directory shows, kept apart from
@@ -182,6 +217,17 @@ export class UpdateInsurerDto {
   @Length(2, 200)
   @Matches(NO_CONTROL_CHARACTERS, printable('legalNameAr'))
   legalNameAr?: string;
+
+  @IsOptional()
+  @IsEnum(STRUCTURES)
+  structure?: 'CONVENTIONAL' | 'TAKAFUL' | 'TAKAFUL_WINDOW';
+
+  /** Replaces the whole set. `[]` clears it; an absent key leaves it alone. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('4', { each: true })
+  lineIds?: string[];
 
   /** The four COMPANY-level fields, all optional here. Correcting a switchboard
    *  number is exactly what a PATCH is for, and these belong to the office's own row

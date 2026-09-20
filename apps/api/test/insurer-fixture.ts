@@ -65,7 +65,6 @@ export async function makeLocalInsurer(
   legalName: string,
   relationship: {
     legalNameAr?: string | null;
-    linesOffered?: string[];
     financialStrengthRating?: string | null;
     creditTermsDays?: number | null;
     rfqContactName?: string | null;
@@ -83,7 +82,6 @@ export async function makeLocalInsurer(
       insurerMasterId: null,
       legalName,
       legalNameAr: relationship.legalNameAr ?? `${legalName} (ع)`,
-      linesOffered: relationship.linesOffered ?? [],
       financialStrengthRating: relationship.financialStrengthRating,
       creditTermsDays: relationship.creditTermsDays,
       rfqContactName: relationship.rfqContactName,

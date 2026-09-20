@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import { InsurerMasterRepository } from '../../repositories/insurer-master.repository';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import {
   InsurerRepository,
   type InsurerCompanyFields,
@@ -63,6 +64,7 @@ export class InsurerService {
   constructor(
     private readonly insurers: InsurerRepository,
     private readonly masters: InsurerMasterRepository,
+    private readonly lines: InsuranceLineRepository,
     private readonly audit: AuditService,
   ) {}
 
@@ -110,6 +112,10 @@ export class InsurerService {
 
     const company = this.companyFrom(dto);
     const relationship = this.relationshipFrom(dto);
+    // Resolved BEFORE the insurer is written: an unknown line id is a 422 about the
+    // body, and discovering it after the insert would leave a registered company with
+    // a half-applied product list and no way for the caller to tell.
+    const resolvedLines = await this.resolveLineIds(dto.lineIds);
     let created: InsurerRecord;
     try {
       created = await this.insurers.create({
@@ -128,7 +134,17 @@ export class InsurerService {
       );
     }
 
-    const view = deriveInsurerView(created);
+    if (resolvedLines) {
+      await this.insurers.replaceOfferedLines(created.id, resolvedLines);
+    }
+    // Re-read, because the row returned by the insert predates the line rows. The
+    // alternative — assembling the view from the ids just written — would mean two
+    // code paths producing one shape, which is how they drift.
+    const withLines = resolvedLines
+      ? ((await this.insurers.findById(created.id)) ?? created)
+      : created;
+
+    const view = deriveInsurerView(withLines);
     await this.audit.record({
       userId: actorUserId,
       action: 'CREATE',
@@ -142,6 +158,9 @@ export class InsurerService {
         legalName: created.legalName,
         legalNameAr: created.legalNameAr,
         name: view.name,
+        // The line CODES, not their ids: an id means nothing in another database, and
+        // the audit trail is read by people reconstructing what an office decided.
+        linesOffered: view.linesOffered.map((l) => l.code ?? l.nameEn),
         ...company,
         ...relationship,
       },
@@ -180,16 +199,19 @@ export class InsurerService {
         : { legalNameAr: dto.legalNameAr }),
     };
 
+    const resolvedLines = await this.resolveLineIds(dto.lineIds);
     const delta = auditDelta(row, patch);
-    if (delta.changed.length === 0) {
+    if (delta.changed.length === 0 && !resolvedLines) {
       // An empty or wholly redundant body is a no-op — not an error, and not an
       // audit row. The trail records changes; "somebody pressed save" is not one.
       return deriveInsurerView(row);
     }
 
-    let updated: InsurerRecord;
+    let updated: InsurerRecord = row;
     try {
-      updated = await this.insurers.update(id, patch);
+      if (delta.changed.length > 0) {
+        updated = await this.insurers.update(id, patch);
+      }
     } catch (err) {
       throw this.asCollision(
         err,
@@ -198,15 +220,32 @@ export class InsurerService {
       );
     }
 
+    if (resolvedLines) {
+      await this.insurers.replaceOfferedLines(id, resolvedLines);
+      updated = (await this.insurers.findById(id)) ?? updated;
+    }
+
+    const before = deriveInsurerView(row);
+    const after = deriveInsurerView(updated);
     await this.audit.record({
       userId: actorUserId,
       action: 'UPDATE',
       entityType: 'Insurer',
       entityId: id,
-      beforeValue: delta.before,
-      afterValue: delta.after,
+      beforeValue: {
+        ...delta.before,
+        ...(resolvedLines
+          ? { linesOffered: before.linesOffered.map((l) => l.code ?? l.nameEn) }
+          : {}),
+      },
+      afterValue: {
+        ...delta.after,
+        ...(resolvedLines
+          ? { linesOffered: after.linesOffered.map((l) => l.code ?? l.nameEn) }
+          : {}),
+      },
     });
-    return deriveInsurerView(updated);
+    return after;
   }
 
   /** One of this office's insurers, or absent. See the header for why absent is a
@@ -215,6 +254,54 @@ export class InsurerService {
     const row = await this.insurers.findById(id);
     if (!row) throw new NotFoundException(`Insurer ${id} not found.`);
     return row;
+  }
+
+  /**
+   * Splits a mixed array of line ids into the two tables they belong to, refusing any
+   * it cannot place.
+   *
+   * ONE array on the wire, because whether a line came from the standard 32 or from
+   * this office's own additions is our data model, not a distinction the person
+   * picking should have to make. Resolving it costs two bounded reads.
+   *
+   * `undefined` means "leave the set alone" and returns null; an EMPTY array means
+   * "clear it" and returns empty lists — the distinction a PATCH needs, and the
+   * reason this cannot collapse into a falsiness check.
+   *
+   * An unknown id is a 422 naming the ids, not a silent drop. Another office's
+   * addition lands here too: its id is invisible through the tenant-scoped read, so it
+   * is reported unknown rather than refused — which tells the caller nothing about
+   * whether it exists elsewhere.
+   */
+  private async resolveLineIds(
+    lineIds: string[] | undefined,
+  ): Promise<{ standardIds: string[]; officeIds: string[] } | null> {
+    if (lineIds === undefined) return null;
+    const unique = [...new Set(lineIds)];
+    if (unique.length === 0) return { standardIds: [], officeIds: [] };
+
+    const [standard, office] = await Promise.all([
+      this.lines.findStandardByIds(unique),
+      this.lines.findOfficeByIds(unique),
+    ]);
+    const standardIds = new Set(standard.map((l) => l.id));
+    const officeIds = new Set(office.map((l) => l.id));
+    const unknown = unique.filter(
+      (id) => !standardIds.has(id) && !officeIds.has(id),
+    );
+    if (unknown.length > 0) {
+      throw new UnprocessableEntityException(
+        `These insurance line ids do not exist: ${unknown.join(', ')}. Pick from GET /insurance-lines, or add the type first.`,
+      );
+    }
+    return {
+      // Filtered from the ORIGINAL list so the two sets partition it: a uuid present
+      // in both tables would otherwise be written twice and hit the CHECK.
+      standardIds: unique.filter((id) => standardIds.has(id)),
+      officeIds: unique.filter(
+        (id) => officeIds.has(id) && !standardIds.has(id),
+      ),
+    };
   }
 
   /**
@@ -236,6 +323,7 @@ export class InsurerService {
       fields.companyWebsite = dto.companyWebsite;
     if (dto.companyCorrespondenceAddress !== undefined)
       fields.companyCorrespondenceAddress = dto.companyCorrespondenceAddress;
+    if (dto.structure !== undefined) fields.structure = dto.structure;
     return fields;
   }
 

@@ -32,7 +32,45 @@ const LINKED: InsurerRecord = {
   legalName: null,
   legalNameAr: null,
   isActive: true,
-  linesOffered: ['Motor'],
+  structure: 'TAKAFUL',
+  // The shape `INSURER_RECORD_SELECT` returns: each row points at a standard line or
+  // at one of the office's own additions, never both.
+  offeredLines: [
+    {
+      insuranceLine: {
+        id: 'line-motor-comp',
+        code: 'MOTOR_COMPREHENSIVE',
+        nameEn: 'Motor Comprehensive',
+        nameAr: 'تأمين المركبات الشامل',
+        category: 'GENERAL' as const,
+        displayOrder: 1,
+      },
+      officeInsuranceLine: null,
+    },
+    {
+      insuranceLine: {
+        id: 'line-motor-tpl',
+        code: 'MOTOR_TPL_COMPULSORY',
+        nameEn: 'Motor Third-Party Liability (Compulsory)',
+        nameAr: 'تأمين المركبات الإلزامي (ضد الغير)',
+        category: 'GENERAL' as const,
+        displayOrder: 0,
+      },
+      officeInsuranceLine: null,
+    },
+    {
+      insuranceLine: null,
+      officeInsuranceLine: {
+        id: 'office-pet',
+        nameEn: 'Pet',
+        nameAr: 'تأمين الحيوانات الأليفة',
+        category: 'GENERAL' as const,
+        canonicalEn: 'pet',
+        canonicalAr: 'اليفه الحيوانات تامين',
+        createdAt: new Date('2026-09-15T00:00:00.000Z'),
+      },
+    },
+  ],
   companyPhone: '+962 6 500 0000',
   companyEmail: 'info@aigjordan.test',
   companyWebsite: 'aigjordan.test',
@@ -148,6 +186,66 @@ describe('deriveInsurerView', () => {
   });
 });
 
+describe('the lines an insurer offers', () => {
+  it('puts standard lines in MARKET order, before the additions this office made', () => {
+    // Market order, not alphabetical and not insertion order: compulsory motor comes
+    // before comprehensive because that is how the products are named, which is the
+    // one thing `displayOrder` exists to carry. The fixture lists comprehensive first
+    // precisely so an unsorted implementation fails here.
+    const view = deriveInsurerView(LINKED);
+    expect(view.linesOffered.map((l) => l.code)).toEqual([
+      'MOTOR_TPL_COMPULSORY',
+      'MOTOR_COMPREHENSIVE',
+      // An office addition has no code — a code is a platform-wide identifier and an
+      // office cannot mint one.
+      null,
+    ]);
+  });
+
+  it('marks which half of the vocabulary each line came from', () => {
+    const view = deriveInsurerView(LINKED);
+    expect(view.linesOffered.map((l) => l.isStandard)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    expect(view.linesOffered.at(-1)).toMatchObject({
+      nameEn: 'Pet',
+      nameAr: 'تأمين الحيوانات الأليفة',
+      isStandard: false,
+    });
+  });
+
+  it('never leaks the canonical dedupe keys of an addition into the view', () => {
+    // They are an internal dedupe key, not something a client should render or match
+    // on — and a client that started matching on them would be reimplementing the
+    // uniqueness rule against a value it cannot recompute.
+    const line = deriveInsurerView(LINKED).linesOffered.at(-1)!;
+    expect(Object.keys(line).sort()).toEqual(
+      ['category', 'code', 'id', 'isStandard', 'nameAr', 'nameEn'].sort(),
+    );
+  });
+
+  it('is empty for an insurer that offers nothing yet', () => {
+    // Legitimate: an office often registers a company before it knows the product
+    // list, so the DTO leaves the set optional.
+    expect(
+      deriveInsurerView({ ...LINKED, offeredLines: [] }).linesOffered,
+    ).toEqual([]);
+  });
+
+  it('carries the company structure, including the window case a boolean could not', () => {
+    expect(deriveInsurerView(LINKED).structure).toBe('TAKAFUL');
+    expect(
+      deriveInsurerView({ ...LINKED, structure: 'TAKAFUL_WINDOW' }).structure,
+    ).toBe('TAKAFUL_WINDOW');
+    // NULL on an insurer registered before the column existed.
+    expect(
+      deriveInsurerView({ ...LINKED, structure: null }).structure,
+    ).toBeNull();
+  });
+});
+
 describe('the view keeps company-level and relationship data distinguishable', () => {
   it('carries all four company-level contact fields', () => {
     const view = deriveInsurerView(LINKED);
@@ -198,6 +296,7 @@ describe('the view keeps company-level and relationship data distinguishable', (
       'insurerMasterId',
       'isActive',
       'linesOffered',
+      'structure',
       'companyPhone',
       'companyEmail',
       'companyWebsite',

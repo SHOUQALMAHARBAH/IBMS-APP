@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { INSURER_IDENTITY_SELECT } from './insurer-identity';
+import {
+  INSURANCE_LINE_SELECT,
+  OFFICE_INSURANCE_LINE_SELECT,
+} from './insurance-line.repository';
 
 /**
  * Insurer management — the office's OWN insurer records.
@@ -31,7 +35,24 @@ export const INSURER_RECORD_SELECT = {
   // Selected as well as the joined master, so the view can say WHICH registration
   // path this row took without inferring it from whether a join came back.
   insurerMasterId: true,
-  linesOffered: true,
+  // Conventional / takaful / takaful window — a COMPANY fact, so directory-visible.
+  structure: true,
+  /**
+   * What the company OFFERS, pointing at the managed vocabulary rather than at free
+   * text. Replaced a `linesOffered String[]` that nothing ever wrote.
+   *
+   * Not ordered here: a row points at either a standard line or an office addition,
+   * and Postgres cannot order one result set by a column from whichever of two
+   * joined tables happens to be present. The view sorts them — standard lines in
+   * market order first, then the office's own — which is the same order the picker
+   * uses.
+   */
+  offeredLines: {
+    select: {
+      insuranceLine: { select: INSURANCE_LINE_SELECT },
+      officeInsuranceLine: { select: OFFICE_INSURANCE_LINE_SELECT },
+    },
+  },
   // COMPANY-level — the switchboard, the general mailbox, the site, the address
   // formal paperwork goes to. Safe to show across offices; see the schema.
   companyPhone: true,
@@ -70,6 +91,9 @@ export interface InsurerListFilter {
  * by being appended to the wrong list.
  */
 export interface InsurerCompanyFields {
+  /** Conventional / takaful / takaful window — a company fact, so it belongs in this
+   *  group and not beside the credit terms. */
+  structure?: 'CONVENTIONAL' | 'TAKAFUL' | 'TAKAFUL_WINDOW';
   companyPhone?: string;
   companyEmail?: string;
   companyWebsite?: string;
@@ -154,6 +178,42 @@ export class InsurerRepository {
         ...input.relationship,
       },
       select: INSURER_RECORD_SELECT,
+    });
+  }
+
+  /**
+   * Replaces the whole set of lines an insurer offers.
+   *
+   * Replace, not merge, and in ONE transaction: the screen submits the set it wants,
+   * so a partial apply would leave a company advertising a line the office just
+   * unticked. The same reasoning `InsurerProduct`'s unique carries — "this insurer
+   * offers this line, once" is a database invariant, and the delete-then-insert runs
+   * inside a transaction so a concurrent read never sees an insurer with no lines at
+   * all.
+   *
+   * Both id lists are already resolved against their tables by the service, so a row
+   * here cannot point at a line that does not exist; the CHECK constraint is what
+   * guarantees it points at exactly one.
+   */
+  async replaceOfferedLines(
+    insurerId: string,
+    lines: { standardIds: readonly string[]; officeIds: readonly string[] },
+  ): Promise<void> {
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.insurerOfferedLine.deleteMany({ where: { insurerId } });
+      const rows = [
+        ...lines.standardIds.map((id) => ({
+          insurerId,
+          insuranceLineId: id,
+        })),
+        ...lines.officeIds.map((id) => ({
+          insurerId,
+          officeInsuranceLineId: id,
+        })),
+      ];
+      if (rows.length > 0) {
+        await tx.insurerOfferedLine.createMany({ data: rows });
+      }
     });
   }
 

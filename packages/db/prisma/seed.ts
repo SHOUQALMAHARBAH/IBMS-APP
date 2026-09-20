@@ -6,6 +6,7 @@ import {
   SEEDED_ROLES_ARE_SYSTEM,
 } from "./seed-data/roles";
 import { PERMISSIONS } from "./seed-data/permissions";
+import { INSURANCE_LINES } from "./seed-data/insurance-lines";
 import { RETENTION_SCHEDULE } from "./seed-data/retention-schedule";
 import { SAMPLE_USERS, SAMPLE_USER_PASSWORD } from "./seed-data/sample-users";
 import { validatePasswordPolicy } from "../src/password-policy";
@@ -625,6 +626,35 @@ async function main() {
     }
   }
   console.log(`Seeded ${PERMISSIONS.length} permissions.`);
+
+  // The standard insurance-line vocabulary. GLOBAL — no Organization column, and
+  // this is the ONLY writer of the table anywhere: no service, endpoint or
+  // repository writes it, which is what keeps "no code has an effect outside the
+  // granting office" true without copying 32 rows into every office.
+  //
+  // Upserted on `code`, never on the uuid: each database generates its own ids, so a
+  // re-seed has to recognise a line by the one value that is stable across all of
+  // them. `displayOrder` comes from the array index, so reordering the seed file
+  // reorders every picker and nothing else.
+  for (const [index, line] of INSURANCE_LINES.entries()) {
+    await prisma.insuranceLine.upsert({
+      where: { code: line.code },
+      update: {
+        nameEn: line.nameEn,
+        nameAr: line.nameAr,
+        category: line.category,
+        displayOrder: index,
+      },
+      create: {
+        code: line.code,
+        nameEn: line.nameEn,
+        nameAr: line.nameAr,
+        category: line.category,
+        displayOrder: index,
+      },
+    });
+  }
+  console.log(`Seeded ${INSURANCE_LINES.length} standard insurance lines.`);
 
   if (SEED_SAMPLE_DATA) {
     await ensureSampleInsurers();

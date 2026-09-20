@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { InsurerController } from './insurer.controller';
 import { InsurerService } from './insurer.service';
+import { InsuranceLineController } from './insurance-line.controller';
+import { InsuranceLineService } from './insurance-line.service';
 import { InsurerRepository } from '../../repositories/insurer.repository';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import { InsurerMasterModule } from './insurer-master.module';
 import { AuditModule } from '../audit/audit.module';
 
@@ -22,10 +25,24 @@ import { AuditModule } from '../audit/audit.module';
  */
 @Module({
   imports: [AuditModule, InsurerMasterModule],
-  controllers: [InsurerController],
-  providers: [InsurerService, InsurerRepository],
+  // The vocabulary lives here rather than in a module of its own: an insurance line
+  // exists so an insurer can be described by one, its only writer is the same
+  // administrator, and both halves are gated on the same two permission codes. A
+  // separate module would be a boundary with nothing on either side of it.
+  controllers: [InsurerController, InsuranceLineController],
+  providers: [
+    InsurerService,
+    InsurerRepository,
+    InsuranceLineService,
+    InsuranceLineRepository,
+  ],
   // Exported: the screens and any later insurer work (the directory, deactivation)
   // read through this service rather than reaching for the repository.
-  exports: [InsurerService, InsurerRepository],
+  exports: [
+    InsurerService,
+    InsurerRepository,
+    InsuranceLineService,
+    InsuranceLineRepository,
+  ],
 })
 export class InsurerModule {}

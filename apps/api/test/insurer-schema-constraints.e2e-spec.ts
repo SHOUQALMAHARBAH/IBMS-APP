@@ -96,9 +96,15 @@ describe('Insurer_has_identity — a nameless insurer cannot exist', () => {
     const row = await prisma.insurer.findFirst({ where: { legalName: name } });
     expect(row, 'a local insurer must be insertable').not.toBeNull();
     expect(row!.insurerMasterId).toBeNull();
-    // The array column defaults to empty rather than NULL, so every consumer can
-    // read it without a null check.
-    expect(row!.linesOffered).toEqual([]);
+    // What the company offers is now rows in `InsurerOfferedLine` pointing at the
+    // managed vocabulary, not a free-text array on this row: three spellings of one
+    // line were three unrelated values to every search that read them. A newly
+    // inserted insurer offers nothing yet, and that is an empty relation rather than
+    // an empty column.
+    expect(
+      await prisma.insurerOfferedLine.count({ where: { insurerId: row!.id } }),
+    ).toBe(0);
+    expect(row!.structure).toBeNull();
   }, 120_000);
 
   it('allows a row with a master link and no local name — every existing row', async () => {
@@ -257,7 +263,7 @@ describe('the migration changed no existing insurer', () => {
   }, 120_000);
 });
 
-describe('the unique constraints on Insurer are exactly these three', () => {
+describe('the unique constraints on Insurer are exactly these four', () => {
   it('is the inventory the 409 messages depend on', async () => {
     // Insurer CRUD turns a P2002 into a 409 whose wording names WHICH uniqueness
     // was hit — "this office already registers an insurer called X" versus "this
@@ -275,6 +281,12 @@ describe('the unique constraints on Insurer are exactly these three', () => {
     //     NULL`, so only a local registration or a rename can trip it;
     //   - `Insurer_organizationId_insurerMasterId_key` — NULLs are distinct in
     //     Postgres, so only a catalogue-linked registration can trip it.
+    //   - `Insurer_id_organizationId_key` — the composite-FK target added by the
+    //     managed-insurance-lines migration, so `InsurerOfferedLine` cannot claim an
+    //     office its insurer does not belong to. It can only collide if `id` does,
+    //     which the primary key refuses first, so it cannot reach a caller as a 409
+    //     either. THIS TEST IS WHY THAT WAS CHECKED: adding the index broke it, which
+    //     forced the question rather than letting the assumption rot.
     //
     // A FOURTH unique index would break that reasoning silently, producing a
     // confident 409 about the wrong constraint. This test is what makes adding one
@@ -287,6 +299,7 @@ describe('the unique constraints on Insurer are exactly these three', () => {
         ORDER BY indexname`,
     );
     expect(indexes.map((i) => i.indexname)).toEqual([
+      'Insurer_id_organizationId_key',
       'Insurer_one_local_name_per_org',
       'Insurer_organizationId_insurerMasterId_key',
       'Insurer_pkey',

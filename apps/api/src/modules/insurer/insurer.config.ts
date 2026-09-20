@@ -1,5 +1,10 @@
 import { insurerIdentity } from '../../repositories/insurer-identity';
 import type { InsurerRecord } from '../../repositories/insurer.repository';
+import {
+  officeLineView,
+  standardLineView,
+  type InsuranceLineView,
+} from './insurance-line.config';
 
 /**
  * Insurer management — the pure half: what a registration body means, and what an
@@ -27,7 +32,14 @@ export interface InsurerView {
    *  a PUBLIC company record, not a fact about any office. */
   insurerMasterId: string | null;
   isActive: boolean;
-  linesOffered: string[];
+  /** What the COMPANY offers, from the managed vocabulary — standard lines in market
+   *  order first, then this office's own additions. Was a free-text `string[]`; three
+   *  spellings of one line were three unrelated values to every search that read
+   *  them. */
+  linesOffered: InsuranceLineView[];
+  /** Conventional, takaful, or a takaful window. NULL on an insurer registered before
+   *  the column existed — required by the registration DTO, so only for those. */
+  structure: 'CONVENTIONAL' | 'TAKAFUL' | 'TAKAFUL_WINDOW' | null;
   /** COMPANY-level, and the group the cross-office directory is allowed to show:
    *  the switchboard, the general mailbox, the website, and the address formal
    *  paperwork goes to. Phone and email are required at registration; the other two
@@ -50,6 +62,38 @@ export interface InsurerView {
   createdAt: Date;
 }
 
+/**
+ * The lines an insurer offers, in picker order.
+ *
+ * Standard lines first, by the market order `displayOrder` carries, then the office's
+ * own additions by name. Sorted HERE rather than in SQL because each row points at
+ * either a standard line or an office addition, and there is no single joined column
+ * to order by — the same reason `INSURER_RECORD_SELECT` does not try.
+ *
+ * A row pointing at neither is impossible (`InsurerOfferedLine_exactly_one_line`), so
+ * the filter at the end is unreachable and exists only because TypeScript cannot see
+ * the CHECK.
+ */
+function offeredLineViews(row: InsurerRecord): InsuranceLineView[] {
+  const standard = row.offeredLines
+    .filter((l) => l.insuranceLine !== null)
+    .sort(
+      (a, b) =>
+        a.insuranceLine!.category.localeCompare(b.insuranceLine!.category) ||
+        a.insuranceLine!.displayOrder - b.insuranceLine!.displayOrder,
+    )
+    .map((l) => standardLineView(l.insuranceLine!));
+  const office = row.offeredLines
+    .filter((l) => l.officeInsuranceLine !== null)
+    .sort((a, b) =>
+      a.officeInsuranceLine!.nameEn.localeCompare(
+        b.officeInsuranceLine!.nameEn,
+      ),
+    )
+    .map((l) => officeLineView(l.officeInsuranceLine!));
+  return [...standard, ...office];
+}
+
 export function deriveInsurerView(row: InsurerRecord): InsurerView {
   const identity = insurerIdentity(row);
   return {
@@ -62,7 +106,8 @@ export function deriveInsurerView(row: InsurerRecord): InsurerView {
     isOfficeLocal: row.insurerMasterId === null,
     insurerMasterId: row.insurerMasterId,
     isActive: identity.isActive,
-    linesOffered: row.linesOffered,
+    linesOffered: offeredLineViews(row),
+    structure: row.structure,
     companyPhone: row.companyPhone,
     companyEmail: row.companyEmail,
     companyWebsite: row.companyWebsite,

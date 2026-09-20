@@ -212,7 +212,16 @@ async function removeOfficeB(): Promise<void> {
   await rawPrisma.commissionAgreement.deleteMany({
     where: { organizationId: ORG_B_ID },
   });
+  // Before both the insurer and the office line it points at: every foreign key on
+  // `InsurerOfferedLine` is RESTRICT, so one of these rows pins two parents and, via
+  // them, the Organization itself.
+  await rawPrisma.insurerOfferedLine.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
   await rawPrisma.insurer.deleteMany({ where: { organizationId: ORG_B_ID } });
+  await rawPrisma.officeInsuranceLine.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
   // `InsurerMaster.legalName` is globally unique, so a master left behind by a
   // crashed run would collide with the next run's fixture rather than simply
   // taking up space. Masters are global and shared, so only the ones this
@@ -931,6 +940,65 @@ describe("Part V — one office's insurer RECORD is absent, not forbidden (item 
     expect(body.total).toBe(0);
     // No cleanup here on purpose: `removeOfficeB` owns every ORG_B row and runs
     // whether or not this test passes.
+  }, 60_000);
+});
+
+describe('Part V — an office insurance-line addition does not cross offices (item 9c)', () => {
+  it("office A cannot see or reference office B's added line, but shares the standard 32", async () => {
+    // The vocabulary is deliberately TWO tables, and this is the test that the split
+    // does what it is for. The standard list is global and shared — that is the whole
+    // reason it is not copied per office. An office's own ADDITION is tenant-scoped
+    // like any other row, so it must be invisible next door.
+    const addition = await rawPrisma.officeInsuranceLine.create({
+      data: {
+        organizationId: ORG_B_ID,
+        nameEn: 'Office B Only Line',
+        nameAr: 'خط مكتب ب فقط',
+        category: 'GENERAL',
+        canonicalEn: 'b line office only',
+        canonicalAr: 'ب خط فقط مكتب',
+        createdByUserId: officeA.id,
+      },
+    });
+
+    const listed = await request(app!.getHttpServer())
+      .get('/insurance-lines')
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const lines = listed.body as {
+      id: string;
+      code: string | null;
+      isStandard: boolean;
+    }[];
+    expect(lines.map((l) => l.id)).not.toContain(addition.id);
+    // And the shared half genuinely is shared: office A sees the standard list in
+    // full, which is what makes copying it per office unnecessary.
+    expect(lines.filter((l) => l.isStandard)).toHaveLength(32);
+
+    // Naming it directly is reported UNKNOWN rather than forbidden — a 403 would
+    // confirm that some other office has a line by that id.
+    const refused = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(isolationAdmin.accessToken))
+      .send({
+        legalName: `Cross Office Line Probe ${Date.now()}`,
+        legalNameAr: 'فحص خط عبر المكاتب',
+        companyPhone: '+962 6 400 0000',
+        companyEmail: `probe-${Date.now()}@example.test`,
+        structure: 'CONVENTIONAL',
+        lineIds: [addition.id],
+      });
+    // `isolationAdmin` holds SYSTEM_SECURITY_ADMINISTRATOR, which does not hold
+    // `insurer.relationship.manage` — so the permission gate answers first. Either
+    // answer proves the point (the row is never written), and asserting the actual one
+    // keeps this test honest about what it measured.
+    expect([403, 422]).toContain(refused.status);
+    expect(
+      await rawPrisma.insurerOfferedLine.count({
+        where: { officeInsuranceLineId: addition.id },
+      }),
+    ).toBe(0);
+    // No cleanup here: `removeOfficeB` owns every ORG_B row and runs either way.
   }, 60_000);
 });
 
