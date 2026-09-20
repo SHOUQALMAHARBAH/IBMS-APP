@@ -137,6 +137,18 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close();
   app = null;
+  // GUARDED, and this is not defensive padding — it is a real defect that fired.
+  //
+  // `masterId` is only assigned at the end of `beforeAll`. When `beforeAll` failed
+  // for an unrelated reason (a leaked Organization elsewhere in the suite made
+  // `signup` return 500), it stayed undefined — and Prisma treats
+  // `where: { insurerMasterId: undefined }` as NO FILTER, so this teardown
+  // attempted to delete EVERY insurer in the office. It only failed instead of
+  // succeeding because `RFQInsurer_insurerId_fkey` is RESTRICT and some other
+  // fixture happened to hold a reference. On a database where nothing did, this
+  // would have deleted the office's entire insurer book while reporting a
+  // teardown error about something else.
+  if (!masterId) return;
   await prisma.insurerFormTemplate.deleteMany({
     where: { insurerMasterId: masterId },
   });

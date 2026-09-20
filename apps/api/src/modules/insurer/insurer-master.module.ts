@@ -15,5 +15,9 @@ import { AuditModule } from '../audit/audit.module';
   imports: [AuditModule],
   controllers: [InsurerMasterController],
   providers: [InsurerMasterService, InsurerMasterRepository],
+  // Exported for `InsurerModule`: registering an office insurer against the
+  // shared catalogue has to check the company is in it, and a cross-module read
+  // goes through the repository rather than this module's service.
+  exports: [InsurerMasterRepository],
 })
 export class InsurerMasterModule {}

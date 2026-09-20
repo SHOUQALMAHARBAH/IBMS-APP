@@ -350,6 +350,34 @@ and the file failed, because `afterAll` threw on
 
 ---
 
+**Seen twice more on 2026-09-20, and the second one is the reason this entry is
+`P2` rather than a note.** Both were hook failures with every test green, and both
+poisoned OTHER files:
+
+1. `last-administrator-lock.e2e-spec.ts` reported `Hook timed out in 10000ms` —
+   vitest's DEFAULT hook budget, which its `afterAll` had never been given an
+   explicit replacement for. Its fixture Organization therefore survived, and
+   `signup` then failed in two later files with a bare 500 (see § 1.11). A hook
+   that retries needs an explicit timeout; the default is 10s no matter how long
+   the work legitimately takes.
+2. `insurer-master.e2e-spec.ts`'s teardown ran
+   `deleteMany({ where: { insurerMasterId: masterId } })` with `masterId` still
+   `undefined`, because `beforeAll` had failed (from cause 1) before assigning it.
+   **Prisma treats an `undefined` where-value as NO FILTER**, so that teardown
+   attempted to delete every insurer in the office; it failed only because an
+   unrelated fixture held a RESTRICT reference. On a database where nothing did, it
+   would have quietly deleted the entire insurer book and reported a teardown error
+   about a foreign key.
+
+- **How to apply:** never feed a destructive `where` from a variable that is
+  assigned inside `beforeAll` without guarding it (`if (!id) return;`). The whole
+  suite was scanned for this shape — an uninitialised module-level `let` reaching a
+  `delete`/`deleteMany`/`update`/`updateMany` where-clause — and this was the only
+  instance with a widening filter; the two others found are singular `update`s,
+  which throw rather than widen.
+
+---
+
 ### 1.10 `P3` — Two office-local insurer fixtures are left in `db-test` on purpose
 
 `invoice.e2e-spec.ts`'s office-local payables test creates an insurer that ends up
@@ -369,6 +397,62 @@ decision rather than an oversight:
 - Insurers created purely to be LISTED are swept, in
   `insurer-permissions.e2e-spec.ts` and `insurer-deactivation.e2e-spec.ts`. Only
   the ones under a retained policy chain persist.
+
+---
+
+### 1.11 `P1` — `POST /auth/signup` answers a known, expected state with a 500
+
+Once more than one `Organization` exists, signup throws a bare `Error` — so the
+HTTP answer is a 500 with a generic body, and the real message ("more than one
+Organization exists, provision through `POST /admin/users`") only appears in the
+server log.
+
+This is not theoretical noise: it is the single most expensive diagnostic in this
+suite. Every time a spec leaks a fixture Organization, unrelated files report
+`expected 201 "Created", got 500` from whatever they were doing, and nothing in the
+test output says why. Two separate debugging sessions have started from that
+symptom.
+
+It is a `ConflictException` (or 422) with the message it already writes to the log.
+Deliberately **not** changed as a side effect of insurer management, because the
+status code is part of the auth contract and several specs assert on it — it wants
+its own commit and a check of every `signup` assertion in the suite.
+
+---
+
+### 1.12 `P2` — `GET /insurers` cannot order alphabetically
+
+The list is paged (`{items,total,page,pageSize}`) and ordered `createdAt desc`, like
+every other paged list here. Alphabetical would be the useful default for a
+management list of companies, and it is not available:
+
+- an insurer's name lives EITHER on the joined `InsurerMaster` or on the office's
+  own row, so a single SQL ordering over "the name" needs a raw
+  `COALESCE(im."legalName", i."legalName")` query — there is currently exactly one
+  raw-SQL site touching `Insurer` (`invoice.repository.ts`), and adding a second
+  for ordering was not worth it in the CRUD commit;
+- Arabic-aware ordering needs either an in-memory sort of the whole set (what the
+  two unpaginated pickers do, via `localeCompare(name, 'ar')`) or a DB-level ICU
+  collation, which is its own migration.
+
+`?search=` is what makes finding a company work meanwhile, and it is a query filter
+so the page bounds matching rows. Worth revisiting when the directory lands, since
+name normalisation across both scripts is that commit's problem anyway — and note
+that under the amendment every NEW registration is office-local, so the two-source
+split shrinks over time rather than growing.
+
+---
+
+### 1.13 `P3` — An insurer contact field cannot be cleared
+
+`PATCH /insurers/:id` keys on PRESENCE, so an absent field is left alone — which is
+what a one-field PATCH has to mean. There is consequently no way to say "this
+insurer no longer has a claims contact": the DTOs refuse an empty string and JSON
+null.
+
+Left open deliberately rather than inventing a per-field convention (`""` means
+clear? a `clearFields: []` array?) in the CRUD commit. It wants ONE answer for the
+whole contact set, and the contact-fields commit is where that set is decided.
 
 ---
 

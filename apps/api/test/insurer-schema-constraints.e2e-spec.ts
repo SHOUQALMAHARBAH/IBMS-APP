@@ -256,3 +256,40 @@ describe('the migration changed no existing insurer', () => {
     }
   }, 120_000);
 });
+
+describe('the unique constraints on Insurer are exactly these three', () => {
+  it('is the inventory the 409 messages depend on', async () => {
+    // Insurer CRUD turns a P2002 into a 409 whose wording names WHICH uniqueness
+    // was hit — "this office already registers an insurer called X" versus "this
+    // office already has a relationship with that company". It cannot read that
+    // from the error: Prisma 6.19.3 returns
+    // `meta: { modelName: 'Insurer', target: null }` for both of them, which is why
+    // the first attempt turned every collision into a 500.
+    //
+    // So `InsurerService.asCollision` decides from the WRITE PATH instead, which is
+    // exhaustive only while these three are the only unique constraints on the
+    // table:
+    //
+    //   - `Insurer_pkey` — a generated uuid, cannot collide;
+    //   - `Insurer_one_local_name_per_org` — partial, `WHERE insurerMasterId IS
+    //     NULL`, so only a local registration or a rename can trip it;
+    //   - `Insurer_organizationId_insurerMasterId_key` — NULLs are distinct in
+    //     Postgres, so only a catalogue-linked registration can trip it.
+    //
+    // A FOURTH unique index would break that reasoning silently, producing a
+    // confident 409 about the wrong constraint. This test is what makes adding one
+    // a decision rather than an accident: if it fails, revisit `asCollision`, then
+    // update this list.
+    const indexes = await rawPrisma.$queryRawUnsafe<{ indexname: string }[]>(
+      `SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'Insurer'
+          AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+        ORDER BY indexname`,
+    );
+    expect(indexes.map((i) => i.indexname)).toEqual([
+      'Insurer_one_local_name_per_org',
+      'Insurer_organizationId_insurerMasterId_key',
+      'Insurer_pkey',
+    ]);
+  }, 120_000);
+});

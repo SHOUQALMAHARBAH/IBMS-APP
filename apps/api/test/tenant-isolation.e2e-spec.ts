@@ -895,6 +895,45 @@ describe("Part V — two offices' commercial terms with the same insurer (item 9
   });
 });
 
+describe("Part V — one office's insurer RECORD is absent, not forbidden (item 9b)", () => {
+  it("office A gets a 404 for office B's insurer and never sees it listed", async () => {
+    // The management endpoints insurer CRUD added are the first WRITE path onto
+    // `Insurer`, and the first read of it addressed by id. Both have to behave the
+    // way every other tenant-scoped read here does: another office's row is
+    // ABSENT, not forbidden. A 403 would confirm the row exists, which is the same
+    // disclosure by a different status code — and for an insurer that disclosure is
+    // precisely what the Part I §5 boundary forbids, because whether a competing
+    // brokerage deals with a given company is not public.
+    //
+    // Registered as an office-LOCAL insurer on purpose: that is the row shape with
+    // no global counterpart, so nothing about it is legitimately shared.
+    const insurerB = await rawPrisma.insurer.create({
+      data: {
+        organizationId: ORG_B_ID,
+        legalName: `Office B Only Insurer ${Date.now()}`,
+        legalNameAr: 'شركة مكتب ب فقط',
+      },
+    });
+
+    await request(app!.getHttpServer())
+      .get(`/insurers/${insurerB.id}`)
+      .set(bearer(officeA.accessToken))
+      .expect(404);
+
+    // And not merely hidden from the page: the TOTAL is zero, so it is the filter
+    // and not the page window doing the work.
+    const list = await request(app!.getHttpServer())
+      .get(`/insurers?search=${encodeURIComponent('Office B Only Insurer')}`)
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const body = list.body as { items: { id: string }[]; total: number };
+    expect(body.items.map((i) => i.id)).not.toContain(insurerB.id);
+    expect(body.total).toBe(0);
+    // No cleanup here on purpose: `removeOfficeB` owns every ORG_B row and runs
+    // whether or not this test passes.
+  }, 60_000);
+});
+
 /**
  * Part V multi-tenancy item 7 — Phase 6.
  *
