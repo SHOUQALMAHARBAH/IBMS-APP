@@ -513,7 +513,13 @@ names an insurance type still stores a string:
 
 `InsuranceProgramLine`, `RFQ`, `Policy`, `InsurerProduct`, `InsurerFormTemplate` and
 `CommissionAgreement` — each with its own `insuranceLine String`. Counted from the
-schema, not from memory: an earlier draft of this entry said seven and named
+schema rather than from memory, with:
+
+```bash
+grep -nE '^\s+insuranceLine\s+String' packages/db/prisma/schema.prisma   # 6 matches
+```
+
+ an earlier draft of this entry said seven and named
 `Quotation` and `InsurerSlaAgreement`, neither of which carries the field, and missed
 `InsuranceProgramLine`, which does. `Quotation` inherits its line from the RFQ it
 answers, which is why it has none of its own.
@@ -549,7 +555,17 @@ mistakes them for oversights.
 standard line or an existing addition — which folds orthography (alef forms,
 diacritics, tatweel, ة/ه, ى/ي), the definite article and word order. It cannot fold
 MEANING: `"سيارات شامل"` and `"تأمين المركبات الشامل"` are the same cover and share no
-word, so an office can still add the second while the first exists. Closing that needs
+word, so an office can still add the second while the first exists.
+
+**This is an open WINDOW, not a permanent design limit, and it exists because of the
+commit order.** The vocabulary shipped before the similarity layer, so between those
+two commits an office can create a synonym pair that the directory will later have to
+reconcile. Accepted deliberately: the 32 standard lines cover nearly everything, which
+makes additions rare; and nobody is using the system yet, so the population of rows
+created inside the window is expected to be zero. Recorded here so that if the
+directory lands and finds a synonym pair, it is a known consequence of sequencing
+rather than a surprise — and so that whoever builds the matching layer knows to check
+for existing pairs rather than assuming a clean start. Closing that needs
 the similarity layer the insurer directory's matching commit brings (trigram /
 `pg_trgm`), applied to BOTH vocabularies — as a non-blocking "did you mean …?" on top
 of the exact guarantee, never instead of it. The exact key is what can be a unique
@@ -565,6 +581,67 @@ said to offer it), plus a decision about what happens to insurers already offeri
 retired line. Not built because nothing can retire a line yet either way.
 
 ---
+
+### 1.17 `P1` — A number that arrived by being repeated is not a measurement
+
+Three figures on this project have been carried from document to document, used in
+reasoning, and turned out to be wrong the first time somebody counted. The third one
+is the useful one, because it was produced by trying to write this entry.
+
+**1. Six models name an insurance line in free text, not seven.** § 1.15 originally
+said seven and named `Quotation` and `InsurerSlaAgreement`, neither of which carries the
+field, while missing `InsuranceProgramLine`, which does. Measured with a script over
+`schema.prisma` that prints every model with an `insuranceLine String` field — the
+command is in that entry.
+
+**2 and 3. The maker/checker figures are still unresolved, and that is the finding.**
+`maker-checker.util.ts` was documented as having "62 call sites ... backed by 17 DB
+CHECK constraints". A later pass corrected that to 19 and 15. Measuring again while
+writing this entry:
+
+```bash
+# references to the segregation helper, excluding its own definition and its specs
+grep -rn 'assertDifferentActors' apps/api/src --include='*.ts' | grep -vE '\.spec\.ts|export function' | wc -l   # 63
+# and the files they sit in
+grep -rl 'assertDifferentActors' apps/api/src --include='*.ts' | grep -v '\.spec\.ts' | wc -l                    # 29
+```
+
+```sql
+-- CHECK constraints whose NAME suggests a maker/checker rule (a name match, not an audit)
+SELECT count(*) FROM pg_constraint WHERE contype = 'c'
+  AND (conname ILIKE '%different%' OR conname ILIKE '%_ne_%'
+    OR conname ILIKE '%not_self%' OR conname ILIKE '%self_approval%'
+    OR conname ILIKE '%maker%' OR conname ILIKE '%checker%');   -- 27
+```
+
+**63 / 27 agrees with neither 62 / 17 nor 19 / 15.** Almost certainly because the three
+counts count different things — references versus routes versus files, and a
+name-pattern match versus a hand-audited list of constraints that genuinely enforce
+segregation. Which is the point: nobody can tell, because no version of the figure
+recorded what it counted or how. The claim "19 call sites" is not recoverable, so it is
+not checkable, so it is not a measurement either — a correction repeated is still a
+rumour.
+
+**How to apply.**
+
+- Either measure a count at the moment you state it, or do not state it.
+- State the COMMAND beside the number. A figure whose derivation is reproducible can be
+  re-measured by the next reader instead of re-copied; one that cannot is a rumour with
+  a digit in it.
+- Say what you counted. "63 references across 29 files" and "19 routes" can both be true
+  of the same helper and mean entirely different things.
+- A number that is load-bearing — in a test name, an assertion, a security argument —
+  needs a test that fails when the real count moves, not a reader trust. `office-administrator.e2e-spec.ts`
+  asserting the 24 codes and `insurance-lines.e2e-spec.ts` asserting all 32 lines are
+  the right shape; a comment saying "all 32" is not.
+
+**Not fixed here:** the maker/checker figures still need a real audit — what the 63
+references actually are, and which CHECK constraints genuinely back segregation as
+opposed to merely having a suggestive name. Until then no number for them should be
+repeated, including the ones above, which are a name-pattern match and nothing more.
+
+---
+
 
 ## 2. Bugs found & fixed this session (regression-watch)
 

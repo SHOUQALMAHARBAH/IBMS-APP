@@ -43,6 +43,26 @@ import { RoleName } from "@prisma/client";
  * leaving only a guard testable against a fabricated violation invented so it had
  * something to refuse. If a genuinely platform-wide capability is ever needed, the
  * column is the same work then, with a real case to test against.
+ *
+ * ## The constructive form of the same rule: ABSENCE beats a guard
+ *
+ * A table the application cannot write cannot be a channel between offices.
+ *
+ * That is the stronger statement, and it is available more often than it looks.
+ * Permission-based protection asks a guard to be right on every path, for every
+ * caller, forever; absence asks nothing of anyone, and there is no code to review
+ * because there is no code. So when a shared resource has to be readable by every
+ * office, prefer making it UNWRITABLE by the application over making it writable
+ * behind a strict code.
+ *
+ * `InsuranceLine` — the 32 standard insurance lines — is built that way and is the
+ * reference case. It is global, every office reads it, and it has no write route at
+ * all: no endpoint, no service method, no repository method. Rows arrive from
+ * `seed.ts` and change in a release. An office that needs a line the list lacks adds
+ * an `OfficeInsuranceLine`, which is tenant-scoped like everything else. Note what
+ * did NOT have to be invented: no `insurance-line.manage` code, no platform-admin
+ * surface, and no test proving a guard refuses the wrong office — because nothing
+ * can reach the table to be refused.
  */
 export interface PermissionSeed {
   code: string;
@@ -900,7 +920,17 @@ const complianceRisk: PermissionSeed[] = [
     code: "incident.report",
     module: "compliance-risk",
     description: "Report a security/privacy incident",
-    roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER, ADMIN, DPO, OFFICE_ADMIN],
+    roles: [
+      SALES,
+      PLACEMENT,
+      CLAIMS,
+      FINANCE,
+      COMPLIANCE,
+      MANAGER,
+      ADMIN,
+      DPO,
+      OFFICE_ADMIN,
+    ],
   },
   {
     code: "incident.contain",
