@@ -286,6 +286,17 @@ describe('the view exposes exactly the allow-list', () => {
     // An aggregating view is not auto-updatable in Postgres. Asserted because the default
     // privileges in this database grant INSERT/UPDATE/DELETE on new relations, so "the
     // grant says SELECT only" is not by itself the whole reason.
+    //
+    // ## THIS TEST PASSES FOR AN INCIDENTAL REASON, AND THAT IS WHY IT MUST NOT BE DELETED
+    //
+    // Read-only here is a property of the view's SHAPE, not something anybody designed. A
+    // materialized view would keep it by accident again; a real `Company` table — the
+    // successor IMPROVEMENTS.md § 1.21 contemplates — would lose it SILENTLY, on the exact
+    // day somebody is thinking about query plans rather than tenancy.
+    //
+    // So this assertion follows the directory to whatever replaces it, and the replacement
+    // re-establishes the guarantee EXPLICITLY. A test that passes for an incidental reason
+    // keeps passing right up until the moment it should have failed.
     await expect(
       asAppRole(null, `DELETE FROM "InsurerDirectory"`),
     ).rejects.toThrow(/cannot delete from view|not automatically updatable/i);
@@ -315,10 +326,19 @@ describe('nothing office-scoped reaches a caller', () => {
     // DISTINCTIVE planted values, each from a column that must not cross, searched in the
     // WHOLE serialised body so a leak through an unexpected key is caught too.
     //
-    // Deliberately NOT the numeric ones: `creditTermsDays` is 45 and 90, and "45" turns up
-    // in phone numbers and page totals — scanning for it would fail for reasons that are
-    // not leaks, and a test that cries wolf gets deleted. Numbers are covered by the
-    // field-name check below, which is precise where a substring scan cannot be.
+    // ## Why there are no numeric sentinels here, so nobody re-adds them
+    //
+    // `creditTermsDays` is 45 and 90, and "45" turns up in phone numbers and page totals —
+    // scanning a serialised body for it fails for reasons that are not leaks, and a test
+    // that cries wolf is a test somebody deletes.
+    //
+    // It is also not the load-bearing check for a numeric column, and never was. A number
+    // can only reach this response by being ON THE VIEW, and the `information_schema`
+    // allow-list above catches it there under ANY name — including aliased to something
+    // innocent, because that list is POSITIVE: an unexpected column fails as an unknown
+    // name, so the rename case needs no line written for it. This body scan earns its place
+    // for string values only, where an unmistakable sentinel cannot collide with real
+    // content.
     for (const planted of [
       'A-(office-A-only)',
       'BBB(office-B-only)',

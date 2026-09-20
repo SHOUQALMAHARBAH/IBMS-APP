@@ -776,9 +776,107 @@ insurer is written; or the honest end state, a real `Company` table that registr
 write to, with the per-office `Insurer` row pointing at it — which is roughly the
 `InsurerMaster` idea done properly, and a much larger decision than a performance fix.
 
-Not acted on, deliberately: 144 ms against a database holding more insurer rows than any
-real deployment will have for a long time is not a problem, and the shape of the fix
-depends on whether the `Company` question gets reopened.
+**A CONDITION ON WHICHEVER SUCCESSOR IS CHOSEN, recorded now while the reasoning is
+here.** The directory is read-only by ACCIDENT, not by design: an aggregating view is not
+auto-updatable in Postgres, and this database's default privileges grant
+INSERT/UPDATE/DELETE on new relations — so the `GRANT SELECT` is not what protects it. A
+materialized view would keep the property by accident again. **A real table would lose it
+silently**, on the exact day somebody is thinking about query plans rather than about
+tenancy. So:
+
+- whichever successor is built, the read-only guarantee is re-established EXPLICITLY —
+  revoked writes, or a trigger, or an RLS policy with no permissive WITH CHECK — and the
+  choice is stated in the migration;
+- the measured `DELETE FROM "InsurerDirectory"` test STAYS, pointed at whatever replaces
+  the view. A test that currently passes for an incidental reason is a test that will keep
+  passing right up until it should have failed.
+
+**And the sideways question, checked rather than assumed:** something DOES already assert
+that a new tenant-scoped table arrives governed. `tenant-isolation.e2e-spec.ts` enumerates
+every `relkind = 'r'` table carrying `organizationId` and fails if any has
+`relrowsecurity = false` or no policy — the whole-set pattern (§ 1.19), and the two tables
+this feature added passed it. What that guard does NOT cover is a non-table relation, which
+is exactly where the incidental property above lives: `relkind = 'r'` excludes views. That
+gap is the reason the condition above is written down rather than left to be noticed.
+
+Not acted on otherwise, deliberately: 144 ms against a database holding more insurer rows
+than any real deployment will have for a long time is not a problem, and the shape of the
+fix depends on whether the `Company` question gets reopened.
+
+---
+
+### 1.22 — RESOLVED (2026-09-20): eleven tests failing together was not a flake
+
+`kyc-screening-hold.e2e-spec.ts` failed all eleven of its tests in one batch run and passed
+70/70 on the next. The shape was wrong for a flake — a flake is one test, or a scattering,
+not a whole file in lockstep — so it was not closed as one.
+
+**The mechanism.** Four spec files create a second `Organization` in `beforeAll` and remove
+it in `afterAll`: `tenant-isolation`, `insurer-schema-constraints`, `insurer-directory`,
+`last-administrator-lock`. A run KILLED mid-flight never reaches `afterAll`. The batch
+immediately before the failing one had been killed at a ten-minute tool timeout (exit 143)
+— so the office survived into the next run, `POST /auth/signup` refuses once more than one
+Organization exists, and every test in the first file that provisions a user died together.
+Not a property of the suite; a property of how the suite was being RUN.
+
+**Candidates eliminated, with the evidence, because an eliminated hypothesis is worth more
+to the next person than an unexplained pass:**
+
+1. **`app.current_org_id` leaking across a pooled connection — eliminated by reading the
+   code, not by reasoning about it.** There are exactly three writers, all in
+   `tenant-scope.extension.ts`, and all three are
+   `set_config('app.current_org_id', $1, true)` — `is_local = true`, inside a transaction,
+   so Postgres reverts it at commit. Had this been the shape it would not have been a test
+   problem at all but the cross-office read the whole architecture exists to prevent, which
+   is why it was checked first.
+2. **Advisory-lock contention — eliminated.** `pg_advisory_xact_lock` is transaction-scoped
+   (`_xact_`), so it cannot be held across a batch boundary, and the KYC path takes no
+   capability lock.
+3. **A time-dependent fixture — not the cause.** Re-running batch 5 then batch 6 cleanly
+   reproduced neither the failure nor any leftover office; the failing run's distinguishing
+   feature was the killed predecessor, not the clock.
+
+**Fixed so the next occurrence diagnoses itself.** `createTestApp()` — which every spec
+calls — now refuses to boot when more than one Organization exists, naming the leftover
+office by legal name, subdomain and id, and saying to re-run the spec that owns that id
+(each sweeps in `beforeAll`). Proven by planting the exact row a killed run leaves behind:
+eleven `expected 201, got 500` became one sentence that names the cause. Safe for the four
+legitimate creators, all of which call `createTestApp()` before standing their second
+office up — verified by running all four plus the victim together, 46/46.
+
+**Still the underlying defect: § 1.11.** If `signup` refused with a 409 and its real
+message instead of a bare `Error`, none of this investigation would have been needed. The
+guard makes the symptom legible; it does not make the endpoint honest.
+
+---
+
+### 1.23 `P1` — A comment that states an invariant is a test that does not run
+
+Met twice, and the difference between the two meetings is the point.
+
+**Late (F4, and the `IN_FORCE_POLICY_STATUSES` header).** A comment asserted a property,
+the property changed, and the comment became a confident lie that outlived it — "ANALYZE
+makes this exact" when `ANALYZE` samples; "the Policy module is not built, so the table is
+empty" years after Domain B shipped. Each was found by someone who happened to be editing
+nearby, which is the only way a comment ever gets corrected.
+
+**Early (2026-09-20).** `tenant-isolation.e2e-spec.ts` said the insurer-form-mapping case
+was "the one Part V item where the correct answer is that a row IS visible across offices".
+The insurer directory made that false, and the comment was corrected in the SAME commit
+that falsified it — now naming the directory as the second case and pointing at the file
+that proves it, rather than duplicating those tests into a tenancy matrix.
+
+**How to apply.** When a change makes a comment's claim false, the comment is part of the
+change. Two habits carry it:
+
+- Grep for the claim, not just the code. A commit that makes "the only", "always", "never"
+  or a count false somewhere else has to fix that sentence too — `grep -rn "the one\|the
+  only\|always\|never" ` over the touched area costs seconds.
+- Prefer a claim that CANNOT rot: an assertion instead of a sentence. "Exactly these nine
+  columns" as a test beats "this view exposes only public data" as a comment, and § 1.19 is
+  the pattern for turning one into the other. Where a comment is genuinely the right home —
+  reasoning, history, a rejected alternative — it should state WHY rather than WHAT IS, and
+  a why does not go stale when a count moves.
 
 ---
 
