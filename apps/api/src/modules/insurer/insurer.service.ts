@@ -258,6 +258,23 @@ export class InsurerService {
   }
 
   /**
+   * What is outstanding with this insurer RIGHT NOW, without changing anything.
+   *
+   * The confirmation an administrator sees before pressing deactivate. Same method, same
+   * two named status sets, same four other counts as the audit row the act writes — one
+   * meaning read from two call sites, rather than a screen figure and a record figure
+   * that can drift apart. If the preview and the trail ever disagreed, nobody could tell
+   * which was right.
+   *
+   * Gated on `insurer.relationship.manage` rather than `insurer.read`: this exists to
+   * inform a decision, and only somebody who can take that decision needs it.
+   */
+  async statusImpact(id: string): Promise<InsurerStatusImpact> {
+    await this.load(id);
+    return this.insurers.countStatusImpact(id);
+  }
+
+  /**
    * Stops the office dealing with this insurer — ALLOW AND RECORD.
    *
    * Nothing about an existing obligation changes, and nothing here refuses on account

@@ -642,36 +642,38 @@ repeated, including the ones above, which are a name-pattern match and nothing m
 
 ---
 
-### 1.18 `P2` — "In force" is `ACTIVE` alone, so a deactivation impact count understates
+### 1.18 ~~`P2` — "In force" is `ACTIVE` alone, so a deactivation impact count understates~~ — RESOLVED (2026-09-20)
 
-`IN_FORCE_POLICY_STATUSES` (`cross-sell-opportunity.repository.ts`) is `['ACTIVE']`, and
-the insurer-deactivation impact count reuses it — deliberately, because one definition of
-"in force" in the codebase beats a second one invented at a new call site.
-
-The consequence is that the recorded impact UNDERSTATES what is outstanding. A policy at
+The impact count reported one policy figure using `IN_FORCE_POLICY_STATUSES` (`ACTIVE`
+alone), so an audit row could read `policiesInForce: 0` while six policies sat at
 `PLACEMENT_CONFIRMED`, `ISSUED`, `CHECKING_IN_PROGRESS`, `DISCREPANCY`, `VERIFIED` or
-`DELIVERED` is live business with that insurer — the office is mid-issuance and has
-already committed — and none of those are counted. So the audit row for a deactivation
-can read `policiesInForce: 0` while six policies are being issued with that company.
+`DELIVERED`. A confident wrong answer, in the one record whose purpose is to stop an
+administrator believing they have made a clean break.
 
-Two ways to fix it, and the choice is a domain call rather than a coding one:
+**Fixed by a second NAME, not a wider one** — option (2) of the two this entry laid out.
+`policy.repository.ts` now owns three sets side by side: `IN_FORCE_POLICY_STATUSES`
+(cover running, `ACTIVE`), `OPEN_OBLIGATION_POLICY_STATUSES` (the insurer still owes an
+action — the six above), and `CLOSED_POLICY_STATUSES` (`CANCELLED`, `EXPIRED`). Widening
+the shared constant would have changed the cross-sell gap scan's meaning without anyone
+deciding to; its comment argues for the narrow reading there, and that argument still
+holds.
 
-1. **Widen the shared constant** to every status except `CANCELLED` and `EXPIRED`. That
-   changes the cross-sell gap scan too, which is what the constant was written for — and
-   its own comment argues for the narrow reading there ("a `DELIVERED` policy is days
-   from `ACTIVE` and the nightly sweep catches it then").
-2. **Add a second, explicitly named set** for obligation counting and leave "in force"
-   meaning what it means. Two names for two questions, which is honest, at the cost of a
-   reader having to know which is which.
+The impact reports **two numbers**, not one, because they are different questions: cover
+that runs to its own expiry needs nothing from the insurer, while a policy at
+`DISCREPANCY` is an open matter with that specific company. Collapsing them hides the
+half that should give somebody pause. Both figures go into the audit `afterValue` and
+both are readable before the act via `GET /insurers/:id/status-impact`, from the same
+count method — one meaning, two call sites.
 
-(2) is probably right, but it deserves a decision rather than a quiet widening. Until
-then the count is the shared definition, and this entry is what stops somebody reading
-`policiesInForce: 0` as "nothing outstanding".
+`policy-status-sets.spec.ts` asserts the three sets partition `PolicyStatus` exactly, so
+a tenth status cannot be added without somebody classifying it. Without that, a new
+status would be in none of the sets and would vanish from both figures with nothing
+failing.
 
-**While in there:** that constant's doc comment still says "the Policy module (Domain B,
-Processes 18-22) is not built, so the `Policy` table is empty in every environment
-today". Domain B has since been built. The comment is stale in a way that could talk a
-reader out of trusting the constant.
+**Still open from this entry:** `IN_FORCE_POLICY_STATUSES`' doc comment claimed "the
+Policy module (Domain B, Processes 18-22) is not built, so the `Policy` table is empty in
+every environment today". Domain B has since been built; the comment was rewritten during
+the promotion.
 
 ---
 

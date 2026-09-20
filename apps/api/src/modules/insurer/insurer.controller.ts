@@ -88,6 +88,20 @@ export class InsurerController {
   }
 
   /**
+   * The confirmation figures, before anything is committed: policies in force, policies
+   * the insurer still owes an action on, open renewal cases, unanswered submissions and
+   * unsettled invoices.
+   *
+   * A GET that changes nothing, and the same count the deactivation writes to the audit
+   * trail — so the screen and the record cannot drift apart.
+   */
+  @RequirePermissions('insurer.relationship.manage')
+  @Get(':id/status-impact')
+  statusImpact(@Param('id', ParseUUIDPipe) id: string) {
+    return this.insurers.statusImpact(id);
+  }
+
+  /**
    * Stops the office dealing with this insurer. ALLOW AND RECORD: it never refuses on
    * account of an existing obligation, because refusing would not settle one.
    *

@@ -202,7 +202,7 @@ async function marketReadyOpportunity(ownerUserId: string): Promise<string> {
 async function outstandingObligations(
   insurerId: string,
   ownerUserId: string,
-): Promise<{ policyId: string }> {
+): Promise<{ policyId: string; inIssuancePolicyId: string }> {
   const suffix = Math.random().toString(36).slice(2, 6);
   const customer = await prisma.customer.create({
     data: {
@@ -224,8 +224,8 @@ async function outstandingObligations(
       status: 'NEEDS_CONFIRMED',
     },
   });
-  // ACTIVE, because `IN_FORCE_POLICY_STATUSES` is `ACTIVE` alone — the shared constant
-  // the count reuses rather than coining a second definition of "in force".
+  // ACTIVE — `IN_FORCE_POLICY_STATUSES`. Cover that is running and will expire on its
+  // own, needing nothing further from the insurer.
   const policy = await prisma.policy.create({
     data: {
       opportunityId: opportunity.id,
@@ -251,7 +251,39 @@ async function outstandingObligations(
       status: 'INVOICED',
     },
   });
-  return { policyId: policy.id };
+  // And one the INSURER still owes an action on. DISCREPANCY deliberately: it is the
+  // clearest case of an open matter with that specific company — somebody there has to
+  // resolve it — and an impact count that reported only the ACTIVE policy would tell an
+  // administrator they were making a clean break while this sat unresolved.
+  // A WHOLE second chain, because the path from a risk profile to an opportunity is
+  // one-to-one at every step: `InsuranceProgram.riskProfileId` is unique and so is
+  // `Opportunity.insuranceProgramId`. Two policies with the same insurer therefore mean
+  // two risk profiles, which is also what the domain says — a second policy covers a
+  // second risk.
+  const secondRiskProfile = await prisma.riskProfile.create({
+    data: { customerId: customer.id, siteLabel: 'Warehouse' },
+  });
+  const secondProgram = await prisma.insuranceProgram.create({
+    data: { riskProfileId: secondRiskProfile.id, status: 'FINALIZED' },
+  });
+  const secondOpportunity = await prisma.opportunity.create({
+    data: {
+      customerId: customer.id,
+      insuranceProgramId: secondProgram.id,
+      status: 'NEEDS_CONFIRMED',
+    },
+  });
+  const inIssuance = await prisma.policy.create({
+    data: {
+      opportunityId: secondOpportunity.id,
+      customerId: customer.id,
+      insurerId,
+      insuranceLine: 'Property All Risks',
+      requestedPremium: '8000.000',
+      status: 'DISCREPANCY',
+    },
+  });
+  return { policyId: policy.id, inIssuancePolicyId: inIssuance.id };
 }
 
 beforeAll(async () => {
@@ -524,15 +556,20 @@ describe('deactivating is an ACT, with a reason and a record of what was outstan
       insurer: { id: string; isActive: boolean };
       impact: {
         policiesInForce: number;
+        policiesInIssuance: number;
         openRenewalCases: number;
         pendingRfqSubmissions: number;
         unsettledInvoices: number;
       };
     };
     expect(body.insurer.isActive).toBe(false);
-    // Every one of the four moved off zero, so each is reading something real.
+    // Every one of the five moved off zero, so each is reading something real — and the
+    // two policy figures are SEPARATE. One number covering both would hide the half that
+    // should give an administrator pause: cover that runs to its own expiry asks nothing
+    // of the insurer, while a policy at DISCREPANCY is an open matter with that company.
     expect(body.impact).toEqual({
       policiesInForce: 1,
+      policiesInIssuance: 1,
       openRenewalCases: 1,
       pendingRfqSubmissions: 1,
       unsettledInvoices: 1,
@@ -553,6 +590,7 @@ describe('deactivating is an ACT, with a reason and a record of what was outstan
       isActive: false,
       reason: 'Relationship ended after the 2026 renewal season review.',
       policiesInForce: 1,
+      policiesInIssuance: 1,
       openRenewalCases: 1,
       pendingRfqSubmissions: 1,
       unsettledInvoices: 1,
@@ -573,6 +611,102 @@ describe('deactivating is an ACT, with a reason and a record of what was outstan
         where: { policyId, status: { not: 'REMITTED' } },
       }),
     ).toBe(1);
+  }, 300_000);
+
+  it('shows the same figures BEFORE the button commits, and changes nothing', async () => {
+    // The confirmation an administrator reads before deciding. Same count method as the
+    // act that follows it, so the screen and the audit row cannot drift apart — if they
+    // disagreed, nobody could tell which was right.
+    const insurer = await makeLocalInsurer(
+      `${FIXTURE_PREFIX} Previewed ${tag}`,
+    );
+    const admin = await makeUser(
+      `deact-preview-${tag}`,
+      'OFFICE_ADMINISTRATOR',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    await outstandingObligations(insurer.id, admin.userId);
+
+    const preview = await request(app!.getHttpServer())
+      .get(`/insurers/${insurer.id}/status-impact`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    expect(preview.body).toMatchObject({
+      policiesInForce: 1,
+      policiesInIssuance: 1,
+      unsettledInvoices: 1,
+    });
+
+    // A GET that changes nothing: still active, and no audit row written by reading.
+    const row = await prisma.insurer.findUniqueOrThrow({
+      where: { id: insurer.id },
+      select: { isActive: true },
+    });
+    expect(row.isActive).toBe(true);
+    expect(
+      await prisma.auditLogEntry.count({
+        where: { entityType: 'Insurer', entityId: insurer.id },
+      }),
+    ).toBe(0);
+
+    // And the act reports the same figures the preview did.
+    const acted = await request(app!.getHttpServer())
+      .post(`/insurers/${insurer.id}/deactivate`)
+      .set(bearer(admin.accessToken))
+      .send({ reason: 'Confirmed against the figures shown on the dialog.' })
+      .expect(200);
+    expect((acted.body as { impact: unknown }).impact).toEqual(preview.body);
+  }, 300_000);
+
+  it('counts a policy in ISSUANCE even when nothing is in force', async () => {
+    // The case the single-figure version got wrong: an administrator would have been
+    // told `policiesInForce: 0` and read it as a clean break, while the insurer still
+    // owed them an issuance.
+    const insurer = await makeLocalInsurer(`${FIXTURE_PREFIX} Issuing ${tag}`);
+    const admin = await makeUser(
+      `deact-issuing-${tag}`,
+      'OFFICE_ADMINISTRATOR',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const customer = await prisma.customer.create({
+      data: {
+        customerType: 'CORPORATE',
+        legalName: `${FIXTURE_PREFIX} Issuing Client ${tag}`,
+        ownerUserId: admin.userId,
+      },
+    });
+    const riskProfile = await prisma.riskProfile.create({
+      data: { customerId: customer.id, siteLabel: 'HQ' },
+    });
+    const program = await prisma.insuranceProgram.create({
+      data: { riskProfileId: riskProfile.id, status: 'FINALIZED' },
+    });
+    const opportunity = await prisma.opportunity.create({
+      data: {
+        customerId: customer.id,
+        insuranceProgramId: program.id,
+        status: 'NEEDS_CONFIRMED',
+      },
+    });
+    await prisma.policy.create({
+      data: {
+        opportunityId: opportunity.id,
+        customerId: customer.id,
+        insurerId: insurer.id,
+        insuranceLine: 'Property All Risks',
+        requestedPremium: '5000.000',
+        status: 'CHECKING_IN_PROGRESS',
+      },
+    });
+
+    const preview = await request(app!.getHttpServer())
+      .get(`/insurers/${insurer.id}/status-impact`)
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    expect(preview.body).toMatchObject({
+      policiesInForce: 0,
+      policiesInIssuance: 1,
+    });
   }, 300_000);
 
   it('requires a reason, and refuses a token one', async () => {

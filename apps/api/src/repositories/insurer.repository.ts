@@ -6,7 +6,10 @@ import {
   INSURANCE_LINE_SELECT,
   OFFICE_INSURANCE_LINE_SELECT,
 } from './insurance-line.repository';
-import { IN_FORCE_POLICY_STATUSES } from './cross-sell-opportunity.repository';
+import {
+  IN_FORCE_POLICY_STATUSES,
+  OPEN_OBLIGATION_POLICY_STATUSES,
+} from './policy.repository';
 
 /**
  * Insurer management — the office's OWN insurer records.
@@ -127,10 +130,19 @@ export interface InsurerRelationshipFields {
  * might look.
  */
 export interface InsurerStatusImpact {
-  /** Policies in force, by this codebase's own definition: `IN_FORCE_POLICY_STATUSES`,
-   *  which is `ACTIVE` alone. Deliberately the shared constant — see the note in the
-   *  repository method about what it therefore excludes. */
+  /** Cover that is RUNNING — `IN_FORCE_POLICY_STATUSES`, i.e. `ACTIVE`. It expires on
+   *  its own and needs nothing further from the insurer. */
   policiesInForce: number;
+  /**
+   * Policies where the INSURER STILL OWES AN ACTION — issue it, resolve a discrepancy,
+   * deliver it (`OPEN_OBLIGATION_POLICY_STATUSES`).
+   *
+   * Reported separately rather than added to the figure above, because the two are
+   * different questions and this is the one that should give an administrator pause: it
+   * is the list of things still outstanding FROM that company. One number covering both
+   * would hide exactly the half that matters for the decision.
+   */
+  policiesInIssuance: number;
   /** Renewal cases still moving — anything not RENEWED, LAPSED or CANCELLED. Reached
    *  through the policy, which is the only link `RenewalCase` has to an insurer. */
   openRenewalCases: number;
@@ -233,13 +245,14 @@ export class InsurerRepository {
    * The counts exist so the record says what was outstanding at the moment of the
    * decision.
    *
-   * `policiesInForce` uses the shared `IN_FORCE_POLICY_STATUSES` (`ACTIVE` alone).
-   * That is narrower than "every obligation": a policy at PLACEMENT_CONFIRMED,
-   * ISSUED, CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED or DELIVERED is live business
-   * with this insurer and is NOT counted here. Reusing the constant is deliberate —
-   * one definition of "in force" in the codebase beats a second one invented at this
-   * call site — but the gap is real and is recorded in IMPROVEMENTS.md rather than
-   * papered over.
+   * The policy figure is TWO figures, from two named sets in `policy.repository.ts`:
+   * cover that is running, and cover the insurer still owes an action on. An earlier
+   * version reported only the first, reusing `IN_FORCE_POLICY_STATUSES` — which meant
+   * an audit row could read `policiesInForce: 0` while six policies sat at
+   * PLACEMENT_CONFIRMED, ISSUED, CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED or
+   * DELIVERED. A confident wrong answer is worse than no count, and the fix was a
+   * second NAME rather than a wider one: the cross-sell gap scan still wants the narrow
+   * reading it was written for.
    *
    * Renewals and invoices reach the insurer through `Policy`, which is the only link
    * either model has to one. Both are tenant-scoped, so both counts are already
@@ -248,12 +261,19 @@ export class InsurerRepository {
   async countStatusImpact(insurerId: string): Promise<InsurerStatusImpact> {
     const [
       policiesInForce,
+      policiesInIssuance,
       openRenewalCases,
       pendingRfqSubmissions,
       unsettledInvoices,
     ] = await Promise.all([
       this.prisma.client.policy.count({
         where: { insurerId, status: { in: [...IN_FORCE_POLICY_STATUSES] } },
+      }),
+      this.prisma.client.policy.count({
+        where: {
+          insurerId,
+          status: { in: [...OPEN_OBLIGATION_POLICY_STATUSES] },
+        },
       }),
       this.prisma.client.renewalCase.count({
         where: {
@@ -270,6 +290,7 @@ export class InsurerRepository {
     ]);
     return {
       policiesInForce,
+      policiesInIssuance,
       openRenewalCases,
       pendingRfqSubmissions,
       unsettledInvoices,
