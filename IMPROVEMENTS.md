@@ -677,6 +677,82 @@ the promotion.
 
 ---
 
+### 1.19 — HOUSE PATTERN: assert the whole SET, not the members you thought of
+
+Three guards on this project are the same move, and it is worth having one name for it.
+
+| Guard | Asserts | Breaks when |
+|---|---|---|
+| `insurer-schema-constraints.e2e-spec.ts` | the complete list of UNIQUE indexes on `Insurer` | a fourth index appears — which it did, and the test caught its own author's migration days later |
+| `insurer.config.spec.ts` | the complete key set of `InsurerView`, split into a company half and a relationship half | a field is added to the view without anybody saying which half it is in |
+| `policy-status-sets.spec.ts` | that three status sets partition `PolicyStatus`, read from the generated client | a tenth status is added and lands in none of them |
+
+**What it defends against is invisible by construction.** In each case the failure is a
+NEW member falling through a gap while every existing test stays green: a fifth unique
+index producing a 409 about the wrong constraint, a relationship column appearing in a
+view the directory reads, a policy status vanishing from both halves of an impact count.
+Nothing is broken — something is merely absent, and absence is what per-member tests
+cannot see. A test per member only ever covers the members somebody thought of.
+
+**How to write one.**
+
+- Enumerate from the AUTHORITY, not from a hand-written list: `Object.values(SomeEnum)`
+  from the generated client, `pg_indexes` from the live database, `Object.keys()` of the
+  object actually returned. A test that restates the list it is checking passes whatever
+  that list says.
+- Assert the whole thing with `toEqual`, not membership with `toContain`. Containment is
+  satisfied by a set that has grown.
+- Make the failure NAME the new member. `expect(unclassified).toEqual([])` prints
+  `[ 'DISCREPANCY' ]`; `expect(isPartition).toBe(true)` prints `false`. The first tells
+  the next person what to do.
+- Say in the message what goes wrong if the set is incomplete, because whoever hits it
+  will be adding a legitimate member and wondering why a test cares.
+
+Deliberately annoying is the design: adding a member should not be possible without a
+decision, and the test is where that decision gets recorded.
+
+**Where this should eventually live:** `ibms-brain/meta/context/verification-contract.md`,
+the canonical home for verification practice across the workspace. That is a submodule
+commit plus a pointer bump in this repo, so it is flagged here rather than done unasked.
+
+---
+
+### 1.20 `P1` — A check that LOOKS like verification but is not
+
+A family of mistakes worth recognising as one shape: a step that produces a confident
+answer without actually checking the thing.
+
+**A grep of the schema is not a read of the schema.** Building a two-policy fixture, a
+grep for a unique on `riskProfileId` came back empty, so the fixture reused one risk
+profile — and the database refused it, because `InsuranceProgram.riskProfileId` IS unique.
+The correction then reused one programme across two opportunities, and the database
+refused that too (`Opportunity.insuranceProgramId` is unique as well). Two wrong answers
+from a search that felt like verification. That path is one-to-one at every step; reading
+the model block would have said so, and the grep's scope quietly decided the answer.
+
+**Its relatives, all already documented here:**
+
+- **§ 1.14** — an `undefined` in a Prisma `where` widens the filter. The query runs, it
+  returns rows, nothing errors; it simply answered a different question.
+- **§ 1.17** — a count carried between documents. It looks like a measurement because it
+  is a number.
+- **Untyped fixture payloads.** A supertest `.send({...})` object is not typechecked
+  against the DTO, so a fixture can keep sending a field that no longer exists, or omit
+  one that became required, with the compiler silent. This is exactly why a response- or
+  request-shape change needs the full e2e sweep and not a typecheck plus a targeted run.
+- **A test whose assertions cannot fail** — the `isSystem` bypass, the reviewer tiering,
+  the concurrent-revoke race. Planting is the answer, and a plant that does not fire (the
+  ordering plant that left the real comparator in place) is the same mistake one level up.
+
+**How to apply.** When a step's output would change a decision, ask what it would look
+like if the step were wrong — and whether you would notice. A grep that finds nothing and
+a grep scoped wrongly are indistinguishable from the output. So prefer the authority (read
+the model, query the database, run the code) over a search ABOUT the authority; and when a
+search is the practical option, confirm the negative a second way. A database refusing an
+insert is verification. A grep finding nothing is a hint.
+
+---
+
 
 ## 2. Bugs found & fixed this session (regression-watch)
 
