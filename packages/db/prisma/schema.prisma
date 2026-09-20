@@ -4741,8 +4741,22 @@ model Insurer {
   /// an Arabic page. `insurer-identity.ts` coalesces master name over local name
   /// — the global catalogue is the authority whenever there is a link, so a
   /// local override would be a second source of truth for one fact.
-  legalName   String?
-  legalNameAr String?
+  legalName     String?
+  legalNameAr   String?
+  /// `canonicalNameKey()` of this company's resolved name, STORED so the directory can
+  /// group across offices in SQL.
+  ///
+  /// The normaliser folds alef forms, diacritics, tatweel, ة/ه, ى/ي, the definite
+  /// article and word order — none of which SQL can do without a second
+  /// implementation of the same rules, which is the thing to avoid. So the application
+  /// computes it on every write and the view groups by it.
+  ///
+  /// NULLABLE, and rows registered before this column existed have none. The directory
+  /// gives such a row its own entry rather than guessing — an unkeyed row merges with
+  /// nothing. No backfill: doing one in SQL would mean writing those folding rules a
+  /// second time, and getting them slightly different is worse than an unmerged entry.
+  canonicalName String?
+
   /// Conventional, takaful, or a takaful window inside a conventional company.
   /// A COMPANY-level fact, so the directory may show it; nullable because every
   /// insurer registered before this column existed has no answer and inventing one
@@ -4752,7 +4766,7 @@ model Insurer {
   /// what the company offers is now `InsurerOfferedLine`, pointing at the managed
   /// vocabulary, because three spellings of one line are three unrelated values to
   /// every search and report that reads them.
-  structure   InsurerStructure?
+  structure InsurerStructure?
 
   /// COMPANY-level contact details — the switchboard and the general mailbox, not
   /// a person this office deals with.

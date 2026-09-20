@@ -10,10 +10,9 @@
  * is added to or removed from a role there, regenerate rather than hand-edit,
  * or this becomes the second copy of the grid that §10.4 exists to prevent.
  *
- * Last regenerated for office-scoped custom RBAC Phase 2, which added the seven
- * `*.all-owners.read` cross-owner codes, split `incident.classify` into
- * classify / co-sign / senior-management-notify, and added
- * `access-recertification.review.routine`.
+ * Last regenerated for insurer management, which added `insurer.read` and
+ * `insurer.relationship.manage` to OFFICE_ADMINISTRATOR and introduced
+ * `insurer.directory.read` for the five roles that quote, place or register.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   BRANCH_DEPARTMENT_MANAGER: [
@@ -54,6 +53,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.report',
     'insurer-accounting.read',
     'insurer-performance.view',
+    'insurer.directory.read',
     'insurer.master.read',
     'insurer.read',
     'interaction.log',
@@ -224,6 +224,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.senior-management.notify',
     'insurer-accounting.read',
     'insurer-performance.view',
+    'insurer.directory.read',
     'insurer.master.read',
     'insurer.read',
     'internal-controls.view',
@@ -313,6 +314,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.contain',
     'incident.report',
     'information-asset.manage',
+    'insurer.directory.read',
     'insurer.read',
     'insurer.relationship.manage',
     'permission.read',
@@ -342,6 +344,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'endorsement.create',
     'endorsement.read',
     'incident.report',
+    'insurer.directory.read',
     'insurer.form.map',
     'insurer.master.read',
     'insurer.read',
@@ -402,6 +405,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'endorsement.read',
     'feedback.log',
     'incident.report',
+    'insurer.directory.read',
     'insurer.master.read',
     'insurer.read',
     'interaction.log',

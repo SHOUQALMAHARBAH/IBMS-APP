@@ -239,15 +239,15 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 24 codes", () => {
+  it("holds exactly 25 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
     // to move together.
     //
-    // 22 at the Phase 3 migration, 24 with insurer management. The two codes that
-    // moved the number are declared in ADDED_AFTER_THE_MIGRATION below, so the
-    // facts cannot drift apart.
+    // 22 at the Phase 3 migration, 24 with insurer management, 25 with the
+    // cross-office directory. Every code that moved the number is declared in
+    // ADDED_AFTER_THE_MIGRATION below, so the facts cannot drift apart.
     expect(codesGrantedTo(OFFICE_ADMIN).sort()).toEqual(
       [
         "access-recertification.cycle.start",
@@ -264,6 +264,7 @@ describe("permission grid — the office administrator", () => {
         "incident.contain",
         "incident.report",
         "information-asset.manage",
+        "insurer.directory.read",
         "insurer.read",
         "insurer.relationship.manage",
         "permission.read",
@@ -309,6 +310,17 @@ describe("permission grid — the office administrator", () => {
       // that renders nothing, because you cannot manage records you cannot list.
       "insurer.read",
       "insurer.relationship.manage",
+      // The cross-office directory. The administrator is the one who REGISTERS an
+      // insurer, and registration is where a duplicate has to be caught — the
+      // match-at-registration suggestion reads this same list to ask "did you mean
+      // one of these?". An administrator who could register a company but not see
+      // which companies already exist is the one person guaranteed to create the
+      // duplicate.
+      //
+      // It exposes no office's data: the route reads a security-definer view whose
+      // columns are an allow-list of public company facts, asserted against
+      // `information_schema` by `insurer-directory.e2e-spec.ts`.
+      "insurer.directory.read",
     ];
 
     const legacy = new Set(
@@ -360,7 +372,9 @@ describe("permission grid — the office administrator", () => {
       "employee.national-id.reveal",
       "customer.national-id.reveal",
     ]) {
-      expect(granted, `${withheld} must not be granted`).not.toContain(withheld);
+      expect(granted, `${withheld} must not be granted`).not.toContain(
+        withheld,
+      );
     }
   });
 
@@ -377,9 +391,10 @@ describe("permission grid — the office administrator", () => {
       "claim.settle.approve",
       "customer.360-view.read",
     ]) {
-      expect(granted, `${code} is business data, not administration`).not.toContain(
-        code,
-      );
+      expect(
+        granted,
+        `${code} is business data, not administration`,
+      ).not.toContain(code);
     }
   });
 });

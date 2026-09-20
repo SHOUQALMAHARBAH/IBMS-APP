@@ -5,6 +5,9 @@ import { InsuranceLineController } from './insurance-line.controller';
 import { InsuranceLineService } from './insurance-line.service';
 import { InsurerRepository } from '../../repositories/insurer.repository';
 import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
+import { InsurerDirectoryController } from './insurer-directory.controller';
+import { InsurerDirectoryService } from './insurer-directory.service';
+import { InsurerDirectoryRepository } from '../../repositories/insurer-directory.repository';
 import { InsurerMasterModule } from './insurer-master.module';
 import { AuditModule } from '../audit/audit.module';
 
@@ -29,12 +32,18 @@ import { AuditModule } from '../audit/audit.module';
   // exists so an insurer can be described by one, its only writer is the same
   // administrator, and both halves are gated on the same two permission codes. A
   // separate module would be a boundary with nothing on either side of it.
-  controllers: [InsurerController, InsuranceLineController],
+  controllers: [
+    InsurerController,
+    InsuranceLineController,
+    InsurerDirectoryController,
+  ],
   providers: [
     InsurerService,
     InsurerRepository,
     InsuranceLineService,
     InsuranceLineRepository,
+    InsurerDirectoryService,
+    InsurerDirectoryRepository,
   ],
   // Exported: the screens and any later insurer work (the directory, deactivation)
   // read through this service rather than reaching for the repository.

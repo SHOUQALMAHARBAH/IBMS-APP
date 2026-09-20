@@ -29,7 +29,7 @@ import { createTestApp } from './utils/test-app';
  *     rule that outlives the mechanism — there is no org-provisioning endpoint
  *     anywhere yet, so whenever one lands it cannot ship without giving its new
  *     office an administrator.
- *  2. The role reaches exactly its 24 codes and none of the eight withheld ones,
+ *  2. The role reaches exactly its 25 codes and none of the eight withheld ones,
  *     end to end through HTTP, on a real user.
  *  3. `isSystem` GRANTS NOTHING. A flag called "system" on a Role is exactly
  *     where an `if (isSystem) allow` bypass gets smuggled in, so a user holding
@@ -66,7 +66,7 @@ async function removeHollowRoles(): Promise<void> {
   await prisma.role.deleteMany({ where: { id: { in: roleIds } } });
 }
 
-/** The 24, from `seed-data/roles.ts`. Duplicated deliberately: a test that read
+/** The 25, from `seed-data/roles.ts`. Duplicated deliberately: a test that read
  *  the same list the seed writes would pass whatever that list said.
  *
  *  22 at the Phase 3 migration; `insurer.read` and `insurer.relationship.manage`
@@ -103,6 +103,12 @@ const OFFICE_ADMINISTRATOR_CODES = [
   // global catalogue.
   'insurer.read',
   'insurer.relationship.manage',
+  // The cross-office directory, added with it. The administrator registers
+  // insurers, and registration is where a duplicate has to be caught — the
+  // match-at-registration suggestion reads this same list. Somebody who can
+  // register a company but cannot see which already exist is the one person
+  // guaranteed to create the duplicate.
+  'insurer.directory.read',
 ] as const;
 
 /** Withheld on purpose, each for a stated reason. A code moving from this list to
@@ -225,7 +231,7 @@ describe('every office has a route to user administration', () => {
     ).toEqual([]);
   }, 120_000);
 
-  it('gives every Organization an isSystem OFFICE_ADMINISTRATOR with all 24 codes', async () => {
+  it('gives every Organization an isSystem OFFICE_ADMINISTRATOR with all 25 codes', async () => {
     // The first test would also pass on an office whose only administrator is a
     // legacy `SYSTEM_SECURITY_ADMINISTRATOR`. This one is about the role the
     // migration and both seed writers install.
@@ -248,7 +254,7 @@ describe('every office has a route to user administration', () => {
     // leak for the previous test to report, not a reason for this one to fail
     // about grants. What this asserts instead: the seeded default office has the
     // role, and EVERY administrator row that exists anywhere holds exactly the
-    // 24 codes, so a drifted copy in any office fails here.
+    // 25 codes, so a drifted copy in any office fails here.
     expect(
       roles.some((r) => r.organizationId === DEFAULT_ORGANIZATION_ID),
       'the seeded default office must have an OFFICE_ADMINISTRATOR',
@@ -374,7 +380,7 @@ describe('every office has a route to user administration', () => {
   }, 120_000);
 });
 
-describe('the office administrator reaches exactly its 24 codes', () => {
+describe('the office administrator reaches exactly its 25 codes', () => {
   it('provisions a user and reads the role catalogue, holding no legacy role', async () => {
     const role = await prisma.role.findFirstOrThrow({
       where: { name: 'OFFICE_ADMINISTRATOR' },

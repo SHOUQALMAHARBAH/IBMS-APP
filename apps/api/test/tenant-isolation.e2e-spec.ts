@@ -775,11 +775,17 @@ describe('Part V — an insurer form mapped once serves every office (item 8)', 
   it("office B reads office A's mapping unmodified, without re-mapping it", async () => {
     // §5's actual promise: the company's IDENTITY and its mapped submission
     // form are GLOBAL, so the second office to deal with an insurer inherits
-    // the first office's work. This is the one Part V item where the correct
-    // answer is that a row IS visible across offices — every other item here
-    // asserts the opposite, which is exactly why it is worth pinning: a
-    // well-meaning `organizationId` added to `InsurerFormTemplate` would pass
-    // every other test in this file and silently break this promise.
+    // the first office's work. Worth pinning because every other item in this
+    // file asserts the opposite: a well-meaning `organizationId` added to
+    // `InsurerFormTemplate` would pass all of them and silently break this.
+    //
+    // No longer the ONLY such item, which is why this comment changed. The
+    // cross-office insurer DIRECTORY is the second deliberate cross-office read,
+    // and it is proven in `insurer-directory.e2e-spec.ts` — the file with the
+    // second Organization and the boundary tests that belong beside it — rather
+    // than duplicated here. Two files, because the directory's boundary needs a
+    // security-definer view, planted leaks and an allow-list, none of which is a
+    // tenancy-matrix question.
     const master = await rawPrisma.insurerMaster.create({
       data: {
         legalName: `Cross-Office Mapped Insurer ${Date.now()}`,

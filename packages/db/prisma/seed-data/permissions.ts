@@ -387,6 +387,27 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [OFFICE_ADMIN],
   },
   {
+    // The cross-office DIRECTORY — every company any office has registered, as a lead
+    // list. Its own code and not folded into `insurer.read`, because they answer
+    // opposite questions: `insurer.read` is "who does MY office deal with, on what
+    // terms", and this is "which companies exist at all". One code for both would mean
+    // an office could not be given the market without also being given its own panel,
+    // or vice versa.
+    //
+    // Audience: everyone who works on quoting and placement, plus the administrator who
+    // registers insurers — the match-at-registration suggestion reads the same list.
+    // Deliberately NOT Compliance or the External Auditor: neither has a reason to
+    // browse the market, and a code nobody needs is a code somebody eventually holds.
+    //
+    // What it grants access to is a SECURITY DEFINER view with no office-scoped column
+    // in it. The permission gates the route; the schema is what makes the boundary real.
+    code: "insurer.directory.read",
+    module: "insurance-operations",
+    description:
+      "Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms.",
+    roles: [SALES, PLACEMENT, MANAGER, EXEC, OFFICE_ADMIN],
+  },
+  {
     code: "insurer.master.read",
     module: "insurance-operations",
     description:

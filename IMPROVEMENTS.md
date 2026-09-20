@@ -753,6 +753,35 @@ insert is verification. A grep finding nothing is a hint.
 
 ---
 
+### 1.21 `P3` — The directory view re-aggregates every insurer on every query
+
+`InsurerDirectory` groups every office's `Insurer` rows on each read. Measured on db-test,
+which holds 6,059 directory entries over ~5,400 insurer rows:
+
+```sql
+EXPLAIN (ANALYZE, TIMING OFF) SELECT * FROM "InsurerDirectory"
+  WHERE "name" ILIKE '%Yarmouk%' ORDER BY "name" LIMIT 50;
+-- Planning 54.8 ms, Execution 144.1 ms
+```
+
+Fine now, and the number is here so a future decision has data rather than a hunch: the
+cost scales with the PLATFORM-wide insurer count, not with one office's, because the whole
+point of the view is that it spans offices. A `LIMIT 50` does not save it — the aggregate
+is computed before the filter can apply.
+
+At an order of magnitude more rows this becomes a visible page load. The fixes, in
+increasing order of commitment: an index supporting the group key (the `canonicalName`
+index exists; `insurerMasterId` is already indexed); a MATERIALIZED view refreshed when an
+insurer is written; or the honest end state, a real `Company` table that registrations
+write to, with the per-office `Insurer` row pointing at it — which is roughly the
+`InsurerMaster` idea done properly, and a much larger decision than a performance fix.
+
+Not acted on, deliberately: 144 ms against a database holding more insurer rows than any
+real deployment will have for a long time is not a problem, and the shape of the fix
+depends on whether the `Company` question gets reopened.
+
+---
+
 
 ## 2. Bugs found & fixed this session (regression-watch)
 
