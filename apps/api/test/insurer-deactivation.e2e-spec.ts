@@ -89,6 +89,25 @@ async function removeFixtureInsurers(): Promise<void> {
   });
   await prisma.rFQInsurer.deleteMany({ where: { insurerId: { in: ids } } });
   await prisma.insurerProduct.deleteMany({ where: { insurerId: { in: ids } } });
+  // The obligation chain the impact-count test builds, deepest first. `Policy` is the
+  // one that pins the insurer (RESTRICT again), and an invoice and a renewal case pin
+  // the policy — so all three have to go before the insurer can, and in this order.
+  //
+  // This is the THIRD time this sweep has grown to follow a new FK, and each time the
+  // symptom was identical: every test green, the file red. Adding a fixture row with a
+  // RESTRICT parent means extending this function in the same commit.
+  const policies = await prisma.policy.findMany({
+    where: { insurerId: { in: ids } },
+    select: { id: true },
+  });
+  const policyIds = policies.map((p) => p.id);
+  if (policyIds.length > 0) {
+    await prisma.invoice.deleteMany({ where: { policyId: { in: policyIds } } });
+    await prisma.renewalCase.deleteMany({
+      where: { policyId: { in: policyIds } },
+    });
+    await prisma.policy.deleteMany({ where: { id: { in: policyIds } } });
+  }
   await prisma.insurer.deleteMany({ where: { id: { in: ids } } });
 }
 
@@ -169,6 +188,70 @@ async function marketReadyOpportunity(ownerUserId: string): Promise<string> {
     },
   });
   return opportunity.id;
+}
+
+/**
+ * One of each obligation the impact counts report, as fixture rows.
+ *
+ * Direct inserts rather than the real workflow, deliberately: reaching an ACTIVE policy
+ * through the API means placement, issuance, checking, delivery and an invoice cycle,
+ * and what is under test here is whether four COUNT queries read the right rows — not
+ * the lifecycle that produces them. The RFQ submission is the exception and goes through
+ * the real endpoint, because that one is cheap.
+ */
+async function outstandingObligations(
+  insurerId: string,
+  ownerUserId: string,
+): Promise<{ policyId: string }> {
+  const suffix = Math.random().toString(36).slice(2, 6);
+  const customer = await prisma.customer.create({
+    data: {
+      customerType: 'CORPORATE',
+      legalName: `${FIXTURE_PREFIX} Obligor ${tag}-${suffix}`,
+      ownerUserId,
+    },
+  });
+  const riskProfile = await prisma.riskProfile.create({
+    data: { customerId: customer.id, siteLabel: 'HQ' },
+  });
+  const program = await prisma.insuranceProgram.create({
+    data: { riskProfileId: riskProfile.id, status: 'FINALIZED' },
+  });
+  const opportunity = await prisma.opportunity.create({
+    data: {
+      customerId: customer.id,
+      insuranceProgramId: program.id,
+      status: 'NEEDS_CONFIRMED',
+    },
+  });
+  // ACTIVE, because `IN_FORCE_POLICY_STATUSES` is `ACTIVE` alone — the shared constant
+  // the count reuses rather than coining a second definition of "in force".
+  const policy = await prisma.policy.create({
+    data: {
+      opportunityId: opportunity.id,
+      customerId: customer.id,
+      insurerId,
+      insuranceLine: 'Property All Risks',
+      requestedPremium: '12000.000',
+      status: 'ACTIVE',
+    },
+  });
+  // Open: anything that is not RENEWED, LAPSED or CANCELLED.
+  await prisma.renewalCase.create({
+    data: { policyId: policy.id, status: 'IN_PROGRESS' },
+  });
+  // Unsettled: not yet REMITTED, the hop that discharges the obligation to the insurer.
+  await prisma.invoice.create({
+    data: {
+      customerId: customer.id,
+      policyId: policy.id,
+      premiumAmount: '12000.000',
+      totalAmount: '12000.000',
+      dueDate: new Date('2026-12-31T00:00:00.000Z'),
+      status: 'INVOICED',
+    },
+  });
+  return { policyId: policy.id };
 }
 
 beforeAll(async () => {
@@ -398,5 +481,213 @@ describe('capturing a quotation is NOT blocked — and that is deliberate', () =
         commissionRatePercent: '12.50',
       })
       .expect(201);
+  }, 300_000);
+});
+
+describe('deactivating is an ACT, with a reason and a record of what was outstanding', () => {
+  it('flips the flag, answers with live counts, and writes ONE audited UPDATE carrying them', async () => {
+    const insurer = await makeLocalInsurer(`${FIXTURE_PREFIX} Acted On ${tag}`);
+    const admin = await makeUser(
+      `deact-admin-${tag}`,
+      'OFFICE_ADMINISTRATOR',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+
+    // Something genuinely outstanding, through the real API: an RFQ sent to this
+    // insurer and not yet answered. A test whose four counts are all zero would pass
+    // against a service that returned four hard-coded zeros.
+    const opportunityId = await marketReadyOpportunity(admin.userId);
+    await request(app!.getHttpServer())
+      .post('/rfqs')
+      .set(bearer(admin.accessToken))
+      .send({
+        opportunityId,
+        insuranceLine: 'Property All Risks',
+        insurerIds: [insurer.id],
+      })
+      .expect(201);
+
+    // And the three obligations that live further down the chain, as fixture rows:
+    // what is under test is the COUNT, not the policy lifecycle that produces one.
+    const { policyId } = await outstandingObligations(insurer.id, admin.userId);
+
+    const response = await request(app!.getHttpServer())
+      .post(`/insurers/${insurer.id}/deactivate`)
+      .set(bearer(admin.accessToken))
+      .send({
+        reason: 'Relationship ended after the 2026 renewal season review.',
+      })
+      .expect(200);
+
+    const body = response.body as {
+      insurer: { id: string; isActive: boolean };
+      impact: {
+        policiesInForce: number;
+        openRenewalCases: number;
+        pendingRfqSubmissions: number;
+        unsettledInvoices: number;
+      };
+    };
+    expect(body.insurer.isActive).toBe(false);
+    // Every one of the four moved off zero, so each is reading something real.
+    expect(body.impact).toEqual({
+      policiesInForce: 1,
+      openRenewalCases: 1,
+      pendingRfqSubmissions: 1,
+      unsettledInvoices: 1,
+    });
+
+    // The audit row carries the reason and the same counts, flat, so a reader scanning
+    // the trail sees what was outstanding without knowing this shape.
+    const entries = await prisma.auditLogEntry.findMany({
+      where: {
+        entityType: 'Insurer',
+        entityId: insurer.id,
+        action: 'UPDATE',
+      },
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].beforeValue).toEqual({ isActive: true });
+    expect(entries[0].afterValue).toMatchObject({
+      isActive: false,
+      reason: 'Relationship ended after the 2026 renewal season review.',
+      policiesInForce: 1,
+      openRenewalCases: 1,
+      pendingRfqSubmissions: 1,
+      unsettledInvoices: 1,
+    });
+    expect(entries[0].userId).toBe(admin.userId);
+
+    // ALLOW AND RECORD: not one of those obligations changed. Refusing the
+    // deactivation would not have settled an invoice, and stopping an in-force policy
+    // would be a breach rather than a tidy-up.
+    const policy = await prisma.policy.findUniqueOrThrow({
+      where: { id: policyId },
+      select: { status: true, insurerId: true },
+    });
+    expect(policy.status).toBe('ACTIVE');
+    expect(policy.insurerId).toBe(insurer.id);
+    expect(
+      await prisma.invoice.count({
+        where: { policyId, status: { not: 'REMITTED' } },
+      }),
+    ).toBe(1);
+  }, 300_000);
+
+  it('requires a reason, and refuses a token one', async () => {
+    const insurer = await makeLocalInsurer(
+      `${FIXTURE_PREFIX} Needs Reason ${tag}`,
+    );
+    const admin = await makeUser(`deact-reason-${tag}`, 'OFFICE_ADMINISTRATOR');
+
+    await request(app!.getHttpServer())
+      .post(`/insurers/${insurer.id}/deactivate`)
+      .set(bearer(admin.accessToken))
+      .send({})
+      .expect(400);
+    // Ten characters, the same floor the national-id reveal uses: long enough that "x"
+    // is not a reason, short enough not to be theatre.
+    await request(app!.getHttpServer())
+      .post(`/insurers/${insurer.id}/deactivate`)
+      .set(bearer(admin.accessToken))
+      .send({ reason: 'no' })
+      .expect(400);
+
+    // And the record is untouched by a refused attempt.
+    const row = await prisma.insurer.findUniqueOrThrow({
+      where: { id: insurer.id },
+      select: { isActive: true },
+    });
+    expect(row.isActive).toBe(true);
+  }, 300_000);
+
+  it('is idempotent, and a second press does not write a second reason', async () => {
+    const insurer = await makeLocalInsurer(`${FIXTURE_PREFIX} Twice ${tag}`);
+    const admin = await makeUser(`deact-twice-${tag}`, 'OFFICE_ADMINISTRATOR');
+
+    for (const reason of [
+      'First decision, recorded with its own wording.',
+      'Second press of the same button, minutes later.',
+    ]) {
+      await request(app!.getHttpServer())
+        .post(`/insurers/${insurer.id}/deactivate`)
+        .set(bearer(admin.accessToken))
+        .send({ reason })
+        .expect(200);
+    }
+
+    // One decision, one row. A second entry would claim a change that did not happen —
+    // the same rule the no-op PATCH follows.
+    const entries = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'Insurer', entityId: insurer.id, action: 'UPDATE' },
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].afterValue).toMatchObject({
+      reason: 'First decision, recorded with its own wording.',
+    });
+  }, 300_000);
+
+  it('reactivates without demanding a reason, and records that too', async () => {
+    const insurer = await makeLocalInsurer(`${FIXTURE_PREFIX} Back ${tag}`, {
+      isActive: false,
+    });
+    const admin = await makeUser(
+      `deact-back-${tag}`,
+      'OFFICE_ADMINISTRATOR',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+
+    // No reason: refusing to let an office undo a deactivation for want of a sentence
+    // would be worse than an unexplained reactivation.
+    const response = await request(app!.getHttpServer())
+      .post(`/insurers/${insurer.id}/reactivate`)
+      .set(bearer(admin.accessToken))
+      .send({})
+      .expect(200);
+    expect(
+      (response.body as { insurer: { isActive: boolean } }).insurer.isActive,
+    ).toBe(true);
+
+    const entries = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'Insurer', entityId: insurer.id, action: 'UPDATE' },
+    });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].afterValue).toMatchObject({
+      isActive: true,
+      reason: null,
+    });
+
+    // And the picker offers them again — the effect the flag exists for.
+    const picker = await request(app!.getHttpServer())
+      .get('/rfqs/selectable-insurers')
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    expect((picker.body as { id: string }[]).map((i) => i.id)).toContain(
+      insurer.id,
+    );
+  }, 300_000);
+
+  it('is administrative, and an unknown insurer is absent rather than forbidden', async () => {
+    const insurer = await makeLocalInsurer(`${FIXTURE_PREFIX} Gated ${tag}`);
+    const reader = await makeUser(
+      `deact-reader-${tag}`,
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const admin = await makeUser(`deact-404-${tag}`, 'OFFICE_ADMINISTRATOR');
+
+    // `insurer.read` renders the record; changing whether the office deals with the
+    // company is `insurer.relationship.manage`.
+    await request(app!.getHttpServer())
+      .post(`/insurers/${insurer.id}/deactivate`)
+      .set(bearer(reader.accessToken))
+      .send({ reason: 'A reader should not be able to do this at all.' })
+      .expect(403);
+
+    await request(app!.getHttpServer())
+      .post('/insurers/00000000-0000-4000-8000-000000000000/deactivate')
+      .set(bearer(admin.accessToken))
+      .send({ reason: 'An id that belongs to nobody in this office.' })
+      .expect(404);
   }, 300_000);
 });

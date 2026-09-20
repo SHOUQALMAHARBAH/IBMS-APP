@@ -6,6 +6,7 @@ import {
   INSURANCE_LINE_SELECT,
   OFFICE_INSURANCE_LINE_SELECT,
 } from './insurance-line.repository';
+import { IN_FORCE_POLICY_STATUSES } from './cross-sell-opportunity.repository';
 
 /**
  * Insurer management — the office's OWN insurer records.
@@ -114,6 +115,33 @@ export interface InsurerRelationshipFields {
   financialStrengthRating?: string | null;
 }
 
+/**
+ * What was still outstanding with an insurer at the moment its status changed.
+ *
+ * Every figure is a LIVE count taken at that moment, not a stored total: the record
+ * has to say what was true when the decision was made, and a number recomputed later
+ * answers a different question.
+ *
+ * Each definition below reuses the one this codebase already has, rather than coining
+ * a second meaning for the same word — which is why two of them are narrower than they
+ * might look.
+ */
+export interface InsurerStatusImpact {
+  /** Policies in force, by this codebase's own definition: `IN_FORCE_POLICY_STATUSES`,
+   *  which is `ACTIVE` alone. Deliberately the shared constant — see the note in the
+   *  repository method about what it therefore excludes. */
+  policiesInForce: number;
+  /** Renewal cases still moving — anything not RENEWED, LAPSED or CANCELLED. Reached
+   *  through the policy, which is the only link `RenewalCase` has to an insurer. */
+  openRenewalCases: number;
+  /** Submissions this insurer has not answered: SENT or VIEWED. QUOTED, DECLINED and
+   *  NO_RESPONSE are all resolved outcomes, whatever the answer was. */
+  pendingRfqSubmissions: number;
+  /** Invoices not yet REMITTED — the hop that discharges the broker's obligation to
+   *  the insurer (`finance.config.ts`, Process 34). */
+  unsettledInvoices: number;
+}
+
 @Injectable()
 export class InsurerRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -179,6 +207,73 @@ export class InsurerRepository {
       },
       select: INSURER_RECORD_SELECT,
     });
+  }
+
+  /**
+   * Flips whether the office still deals with this insurer.
+   *
+   * A narrow write of one column, not part of `update()`: deactivating is an act with
+   * consequences somebody should see, and the edit DTO refuses `isActive` precisely so
+   * it cannot ride along with a phone-number correction.
+   */
+  setActive(id: string, isActive: boolean): Promise<InsurerRecord> {
+    return this.prisma.client.insurer.update({
+      where: { id },
+      data: { isActive },
+      select: INSURER_RECORD_SELECT,
+    });
+  }
+
+  /**
+   * What is still outstanding with this insurer, right now.
+   *
+   * Four counts, run together. Nothing here BLOCKS anything — deactivation is
+   * allow-and-record, because an office that has stopped dealing with a company still
+   * owes what it already owes, and refusing the deactivation would not change that.
+   * The counts exist so the record says what was outstanding at the moment of the
+   * decision.
+   *
+   * `policiesInForce` uses the shared `IN_FORCE_POLICY_STATUSES` (`ACTIVE` alone).
+   * That is narrower than "every obligation": a policy at PLACEMENT_CONFIRMED,
+   * ISSUED, CHECKING_IN_PROGRESS, DISCREPANCY, VERIFIED or DELIVERED is live business
+   * with this insurer and is NOT counted here. Reusing the constant is deliberate —
+   * one definition of "in force" in the codebase beats a second one invented at this
+   * call site — but the gap is real and is recorded in IMPROVEMENTS.md rather than
+   * papered over.
+   *
+   * Renewals and invoices reach the insurer through `Policy`, which is the only link
+   * either model has to one. Both are tenant-scoped, so both counts are already
+   * confined to this office.
+   */
+  async countStatusImpact(insurerId: string): Promise<InsurerStatusImpact> {
+    const [
+      policiesInForce,
+      openRenewalCases,
+      pendingRfqSubmissions,
+      unsettledInvoices,
+    ] = await Promise.all([
+      this.prisma.client.policy.count({
+        where: { insurerId, status: { in: [...IN_FORCE_POLICY_STATUSES] } },
+      }),
+      this.prisma.client.renewalCase.count({
+        where: {
+          policy: { insurerId },
+          status: { notIn: ['RENEWED', 'LAPSED', 'CANCELLED'] },
+        },
+      }),
+      this.prisma.client.rFQInsurer.count({
+        where: { insurerId, status: { in: ['SENT', 'VIEWED'] } },
+      }),
+      this.prisma.client.invoice.count({
+        where: { policy: { insurerId }, status: { not: 'REMITTED' } },
+      }),
+    ]);
+    return {
+      policiesInForce,
+      openRenewalCases,
+      pendingRfqSubmissions,
+      unsettledInvoices,
+    };
   }
 
   /**

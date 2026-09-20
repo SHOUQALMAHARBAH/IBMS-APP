@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -11,7 +12,9 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { InsurerService } from './insurer.service';
 import {
+  DeactivateInsurerDto,
   ListInsurersQueryDto,
+  ReactivateInsurerDto,
   RegisterInsurerDto,
   UpdateInsurerDto,
 } from './dto/insurer-crud.dto';
@@ -35,9 +38,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  * records you cannot list — which is the same pairing the Role screen is built on
  * (`role.read` alongside `role.manage`).
  *
- * `isActive` is not writable through either route. Deactivating an insurer has
- * consequences an administrator should see before committing to them, so it is its
- * own act rather than a field in an edit form.
+ * `isActive` is not writable through the edit route. Deactivating an insurer is its
+ * own act — `POST :id/deactivate`, with a reason, answering with what was outstanding
+ * at the moment it happened — rather than a field that rides along with a
+ * phone-number correction.
  */
 @ApiTags('insurer')
 @Controller('insurers')
@@ -81,5 +85,39 @@ export class InsurerController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.insurers.update(id, dto, user.id);
+  }
+
+  /**
+   * Stops the office dealing with this insurer. ALLOW AND RECORD: it never refuses on
+   * account of an existing obligation, because refusing would not settle one.
+   *
+   * POST and not PATCH: this is an act with a reason and a recorded consequence, not a
+   * field assignment. The response carries the impact counts as at the moment of the
+   * change — in-force policies, open renewal cases, unanswered RFQ submissions and
+   * unsettled invoices — which are also written to the audit trail.
+   */
+  @RequirePermissions('insurer.relationship.manage')
+  @Post(':id/deactivate')
+  @HttpCode(200)
+  deactivate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeactivateInsurerDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.insurers.deactivate(id, dto.reason, user.id);
+  }
+
+  /** Puts them back in play. A reason is optional here — refusing to let an office undo
+   *  a deactivation for want of a sentence would be worse than an unexplained
+   *  reactivation. */
+  @RequirePermissions('insurer.relationship.manage')
+  @Post(':id/reactivate')
+  @HttpCode(200)
+  reactivate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReactivateInsurerDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.insurers.reactivate(id, dto.reason, user.id);
   }
 }

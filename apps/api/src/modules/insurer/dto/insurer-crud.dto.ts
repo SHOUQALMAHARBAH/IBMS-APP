@@ -335,3 +335,30 @@ export class ListInsurersQueryDto {
   @Min(1)
   pageSize?: number;
 }
+
+/**
+ * Deactivating or reactivating an insurer.
+ *
+ * A REASON is required to deactivate and optional to reactivate, and the asymmetry is
+ * the point: deactivation is the consequential direction — it stops the office
+ * soliciting anything new from that company — so the record needs a why. Refusing a
+ * REACTIVATION for want of a sentence would leave an office unable to undo something it
+ * regrets, which is the same reasoning that leaves role reactivation unguarded.
+ *
+ * Ten characters minimum, matching the justification floor the national-id reveal
+ * already uses: long enough that "x" is not a reason, short enough not to be theatre.
+ */
+export class DeactivateInsurerDto {
+  @IsString()
+  @Length(10, 500)
+  @Matches(NO_CONTROL_CHARACTERS, printable('reason'))
+  reason!: string;
+}
+
+export class ReactivateInsurerDto {
+  @IsOptional()
+  @IsString()
+  @Length(10, 500)
+  @Matches(NO_CONTROL_CHARACTERS, printable('reason'))
+  reason?: string;
+}

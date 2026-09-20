@@ -642,6 +642,39 @@ repeated, including the ones above, which are a name-pattern match and nothing m
 
 ---
 
+### 1.18 `P2` — "In force" is `ACTIVE` alone, so a deactivation impact count understates
+
+`IN_FORCE_POLICY_STATUSES` (`cross-sell-opportunity.repository.ts`) is `['ACTIVE']`, and
+the insurer-deactivation impact count reuses it — deliberately, because one definition of
+"in force" in the codebase beats a second one invented at a new call site.
+
+The consequence is that the recorded impact UNDERSTATES what is outstanding. A policy at
+`PLACEMENT_CONFIRMED`, `ISSUED`, `CHECKING_IN_PROGRESS`, `DISCREPANCY`, `VERIFIED` or
+`DELIVERED` is live business with that insurer — the office is mid-issuance and has
+already committed — and none of those are counted. So the audit row for a deactivation
+can read `policiesInForce: 0` while six policies are being issued with that company.
+
+Two ways to fix it, and the choice is a domain call rather than a coding one:
+
+1. **Widen the shared constant** to every status except `CANCELLED` and `EXPIRED`. That
+   changes the cross-sell gap scan too, which is what the constant was written for — and
+   its own comment argues for the narrow reading there ("a `DELIVERED` policy is days
+   from `ACTIVE` and the nightly sweep catches it then").
+2. **Add a second, explicitly named set** for obligation counting and leave "in force"
+   meaning what it means. Two names for two questions, which is honest, at the cost of a
+   reader having to know which is which.
+
+(2) is probably right, but it deserves a decision rather than a quiet widening. Until
+then the count is the shared definition, and this entry is what stops somebody reading
+`policiesInForce: 0` as "nothing outstanding".
+
+**While in there:** that constant's doc comment still says "the Policy module (Domain B,
+Processes 18-22) is not built, so the `Policy` table is empty in every environment
+today". Domain B has since been built. The comment is stale in a way that could talk a
+reader out of trusting the constant.
+
+---
+
 
 ## 2. Bugs found & fixed this session (regression-watch)
 

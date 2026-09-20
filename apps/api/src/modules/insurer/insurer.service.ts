@@ -13,6 +13,7 @@ import {
   type InsurerCompanyFields,
   type InsurerRecord,
   type InsurerRelationshipFields,
+  type InsurerStatusImpact,
 } from '../../repositories/insurer.repository';
 import { pageWindow, type Paginated } from '../../common/pagination';
 import {
@@ -28,6 +29,14 @@ import type {
   RegisterInsurerDto,
   UpdateInsurerDto,
 } from './dto/insurer-crud.dto';
+
+/** What the two status endpoints answer with: the record as it now stands, and what was
+ *  outstanding at the moment it changed. Two named halves rather than extra keys on the
+ *  view, so the view's shape stays one thing — the property its key-set test pins. */
+export interface InsurerStatusChange {
+  insurer: InsurerView;
+  impact: InsurerStatusImpact;
+}
 
 /**
  * Insurer management — an office's own insurer records.
@@ -246,6 +255,83 @@ export class InsurerService {
       },
     });
     return after;
+  }
+
+  /**
+   * Stops the office dealing with this insurer — ALLOW AND RECORD.
+   *
+   * Nothing about an existing obligation changes, and nothing here refuses on account
+   * of one. An office that has stopped dealing with a company still owes what it owes:
+   * in-force policies stay in force, claims keep running, invoices keep their schedule,
+   * and a quotation that arrives late can still be captured. What stops is NEW use —
+   * the RFQ picker will not offer them, an existing RFQ will not take them, and a
+   * placement against their quotation is refused. Those three guards were built with
+   * the column; this is the act that sets it.
+   *
+   * So the impact counts are a RECORD, not a gate. Refusing the deactivation would not
+   * settle a single invoice; what an administrator needs is for the decision to be
+   * attributable, reasoned, and accompanied by what was outstanding when it was made.
+   *
+   * Counted BEFORE the write and with no transaction around the pair, deliberately. A
+   * count taken after the flip would answer a question nobody asked, and wrapping both
+   * in one transaction would buy nothing: these figures are about other aggregates that
+   * go on moving regardless, so the honest claim is "as at the moment of the change",
+   * which is what a pre-write read gives.
+   */
+  async deactivate(
+    id: string,
+    reason: string,
+    actorUserId: string,
+  ): Promise<InsurerStatusChange> {
+    return this.setStatus(id, false, reason, actorUserId);
+  }
+
+  /** Puts the insurer back in play. The impact counts come back here too — after a
+   *  spell of being deactivated, what is still open with this company is exactly what
+   *  somebody reactivating them wants to see. */
+  async reactivate(
+    id: string,
+    reason: string | undefined,
+    actorUserId: string,
+  ): Promise<InsurerStatusChange> {
+    return this.setStatus(id, true, reason, actorUserId);
+  }
+
+  private async setStatus(
+    id: string,
+    isActive: boolean,
+    reason: string | undefined,
+    actorUserId: string,
+  ): Promise<InsurerStatusChange> {
+    const row = await this.load(id);
+    const impact = await this.insurers.countStatusImpact(id);
+
+    if (row.isActive === isActive) {
+      // Already in this state: the current record and the live counts, and NO audit
+      // row. The trail records changes — pressing deactivate twice is one decision,
+      // and a second entry claiming otherwise would be false.
+      return { insurer: deriveInsurerView(row), impact };
+    }
+
+    const updated = await this.insurers.setActive(id, isActive);
+    await this.audit.record({
+      userId: actorUserId,
+      // UPDATE, not a new action value. Deactivation is a field on this record
+      // changing; inventing `DEACTIVATE` would make every existing audit reader
+      // choose between two vocabularies for one idea.
+      action: 'UPDATE',
+      entityType: 'Insurer',
+      entityId: id,
+      beforeValue: { isActive: row.isActive },
+      afterValue: {
+        isActive,
+        reason: reason ?? null,
+        // The counts, inline rather than nested, so a reader scanning the trail sees
+        // what was outstanding without having to know this shape.
+        ...impact,
+      },
+    });
+    return { insurer: deriveInsurerView(updated), impact };
   }
 
   /** One of this office's insurers, or absent. See the header for why absent is a
