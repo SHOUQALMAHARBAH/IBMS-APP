@@ -456,6 +456,55 @@ whole contact set, and the contact-fields commit is where that set is decided.
 
 ---
 
+### 1.14 `P1` — An `undefined` value in a Prisma `where` WIDENS the filter
+
+The trap, stated on its own because it generalises far past the case that found it:
+
+```ts
+// `id` is undefined — this does NOT match nothing. It matches EVERYTHING.
+await prisma.insurer.deleteMany({ where: { insurerMasterId: id } });
+```
+
+Prisma omits an `undefined` value from the generated SQL rather than comparing against
+it. A filter assembled from a variable therefore **loses a condition** when that
+variable is unset, and the operation applies to every row the caller can see. On a
+`findMany` that is a confusing result; on a `deleteMany` or `updateMany` it is data
+loss, and it **succeeds silently** — there is no error, no empty result, nothing to
+notice. `null` behaves correctly (it compares against NULL); only `undefined` widens.
+
+**The case that found it (2026-09-20).** `insurer-master.e2e-spec.ts`'s teardown ran
+`deleteMany({ where: { insurerMasterId: masterId } })` where `masterId` is assigned at
+the END of `beforeAll`. An unrelated leaked fixture Organization made `signup` return
+500, `beforeAll` failed before the assignment, and the teardown then attempted to
+delete **every insurer in the office** — 5,354 rows on `db-test`. It failed only
+because `RFQInsurer_insurerId_fkey` is RESTRICT and some other fixture happened to
+hold a reference. Nothing about the resulting error mentioned a missing filter; it
+named a foreign key.
+
+**How to apply.**
+
+- Never build a destructive `where` from a variable that is assigned conditionally, or
+  inside a hook that can fail, without guarding it first: `if (!id) return;`.
+- Prefer a filter that cannot widen. `{ id: { in: ids } }` with an empty array matches
+  nothing, which is the safe direction; `{ id: undefined }` matches everything.
+- Treat a fixed name PREFIX as the filter of choice in test teardown
+  (`{ legalName: { startsWith: FIXTURE_PREFIX } }`) — it is a literal, so it cannot
+  become undefined, and it sweeps what a crashed run left behind as a side effect.
+- The same applies in application code, where the blast radius is a real office's
+  data rather than a test database. A repository method taking an optional filter
+  should spread it conditionally (`...(x === undefined ? {} : { field: x })`) — the
+  pattern `insurer.repository.ts#whereFor` uses — rather than passing the value
+  straight through.
+
+**Scan result.** The whole `apps/api/test` tree was scanned for the shape (a
+module-level `let` with no initialiser reaching a `delete`/`deleteMany`/`update`/
+`updateMany` where-clause). One instance with a widening filter — the one above, now
+guarded. Two others are singular `update`s, which throw on an undefined unique
+where rather than widening. Application code was not scanned exhaustively; that is
+worth a pass of its own.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

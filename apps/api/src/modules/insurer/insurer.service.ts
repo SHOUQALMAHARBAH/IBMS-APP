@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { InsurerMasterRepository } from '../../repositories/insurer-master.repository';
 import {
   InsurerRepository,
+  type InsurerCompanyFields,
   type InsurerRecord,
   type InsurerRelationshipFields,
 } from '../../repositories/insurer.repository';
@@ -107,6 +108,7 @@ export class InsurerService {
       }
     }
 
+    const company = this.companyFrom(dto);
     const relationship = this.relationshipFrom(dto);
     let created: InsurerRecord;
     try {
@@ -115,6 +117,7 @@ export class InsurerService {
           identity.path === 'MASTER' ? identity.insurerMasterId : null,
         legalName: identity.path === 'LOCAL' ? identity.legalName : null,
         legalNameAr: identity.path === 'LOCAL' ? identity.legalNameAr : null,
+        company,
         relationship,
       });
     } catch (err) {
@@ -139,6 +142,7 @@ export class InsurerService {
         legalName: created.legalName,
         legalNameAr: created.legalNameAr,
         name: view.name,
+        ...company,
         ...relationship,
       },
     });
@@ -163,10 +167,12 @@ export class InsurerService {
       );
     }
 
-    const patch: InsurerRelationshipFields & {
-      legalName?: string;
-      legalNameAr?: string;
-    } = {
+    const patch: InsurerCompanyFields &
+      InsurerRelationshipFields & {
+        legalName?: string;
+        legalNameAr?: string;
+      } = {
+      ...this.companyFrom(dto),
       ...this.relationshipFrom(dto),
       ...(dto.legalName === undefined ? {} : { legalName: dto.legalName }),
       ...(dto.legalNameAr === undefined
@@ -209,6 +215,28 @@ export class InsurerService {
     const row = await this.insurers.findById(id);
     if (!row) throw new NotFoundException(`Insurer ${id} not found.`);
     return row;
+  }
+
+  /**
+   * The COMPANY-level fields the caller actually sent.
+   *
+   * A separate method from `relationshipFrom` rather than one that returns
+   * everything, for the same reason the two interfaces are separate: these four
+   * cross an office boundary in the directory and the others must not, so a field
+   * added to the wrong extractor is a disclosure rather than a typo. Two functions
+   * means the mistake has to be made twice.
+   */
+  private companyFrom(
+    dto: RegisterInsurerDto | UpdateInsurerDto,
+  ): InsurerCompanyFields {
+    const fields: InsurerCompanyFields = {};
+    if (dto.companyPhone !== undefined) fields.companyPhone = dto.companyPhone;
+    if (dto.companyEmail !== undefined) fields.companyEmail = dto.companyEmail;
+    if (dto.companyWebsite !== undefined)
+      fields.companyWebsite = dto.companyWebsite;
+    if (dto.companyCorrespondenceAddress !== undefined)
+      fields.companyCorrespondenceAddress = dto.companyCorrespondenceAddress;
+    return fields;
   }
 
   /**

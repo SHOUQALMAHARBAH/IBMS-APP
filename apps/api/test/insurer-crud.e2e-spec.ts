@@ -80,6 +80,10 @@ interface InsurerView {
   isOfficeLocal: boolean;
   insurerMasterId: string | null;
   isActive: boolean;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  companyWebsite: string | null;
+  companyCorrespondenceAddress: string | null;
   creditTermsDays: number | null;
   rfqContactEmail: string | null;
   financialStrengthRating: string | null;
@@ -159,12 +163,28 @@ async function catalogueCompany(label: string): Promise<{
   return { id: master.id, legalName, legalNameAr };
 }
 
-/** Registers an office-local insurer through the real endpoint. */
+/**
+ * Registers an insurer through the real endpoint.
+ *
+ * `companyPhone` and `companyEmail` are REQUIRED on both paths, so the helper
+ * supplies them and every earlier test keeps testing what it was written to test: a
+ * body missing them is a 400 from the DTO, which would mask the 422s and 409s below.
+ * A test specifically about the contact fields passes its own values, or `null` to
+ * omit one.
+ */
 function register(body: Record<string, unknown>, token = admin.accessToken) {
+  const withContacts: Record<string, unknown> = {
+    companyPhone: '+962 6 400 0000',
+    companyEmail: `switchboard-${Math.random().toString(36).slice(2, 8)}@example.test`,
+    ...body,
+  };
+  for (const key of Object.keys(withContacts)) {
+    if (withContacts[key] === null) delete withContacts[key];
+  }
   return request(app!.getHttpServer())
     .post('/insurers')
     .set(bearer(token))
-    .send(body);
+    .send(withContacts);
 }
 
 beforeAll(async () => {
@@ -301,6 +321,142 @@ describe('registering an insurer — both paths through one endpoint', () => {
       'not in the shared catalogue',
     );
   }, 120_000);
+});
+
+describe('the company-level contact details', () => {
+  it('records all four, and returns them as company data', async () => {
+    const created = await register({
+      legalName: `${FIXTURE_PREFIX} Contactable Mutual`,
+      legalNameAr: `${FIXTURE_PREFIX} التعاونية للاتصال`,
+      companyPhone: '+962 6 555 1234',
+      companyEmail: 'info@contactable.test',
+      companyWebsite: 'contactable.test',
+      companyCorrespondenceAddress: 'PO Box 140, Amman 11118, Jordan',
+    }).expect(201);
+
+    const view = created.body as InsurerView;
+    expect(view.companyPhone).toBe('+962 6 555 1234');
+    expect(view.companyEmail).toBe('info@contactable.test');
+    // Stored as entered, with a scheme or without one. A renderer prepends a scheme;
+    // the API does not rewrite what somebody typed.
+    expect(view.companyWebsite).toBe('contactable.test');
+    expect(view.companyCorrespondenceAddress).toBe(
+      'PO Box 140, Amman 11118, Jordan',
+    );
+
+    // In the audit trail as part of the registration, like every other field the
+    // caller supplied.
+    const entries = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'Insurer', entityId: view.id, action: 'CREATE' },
+    });
+    expect(entries[0].afterValue).toMatchObject({
+      companyPhone: '+962 6 555 1234',
+      companyEmail: 'info@contactable.test',
+    });
+  }, 300_000);
+
+  it('requires a phone and an email on BOTH registration paths', async () => {
+    // Required because they are what make a company findable by an office that has
+    // never dealt with it: a brokerage agreement has to be sent somewhere, and a
+    // directory entry nobody can act on is not a lead.
+    await register({
+      legalName: `${FIXTURE_PREFIX} No Phone`,
+      legalNameAr: `${FIXTURE_PREFIX} بلا هاتف`,
+      companyPhone: null,
+    }).expect(400);
+    await register({
+      legalName: `${FIXTURE_PREFIX} No Email`,
+      legalNameAr: `${FIXTURE_PREFIX} بلا بريد`,
+      companyEmail: null,
+    }).expect(400);
+
+    // The catalogue path is not exempt. A company whose NAME we already know still
+    // needs a way to be contacted.
+    const company = await catalogueCompany('NeedsContacts');
+    await register({ insurerMasterId: company.id, companyPhone: null }).expect(
+      400,
+    );
+    await register({ insurerMasterId: company.id }).expect(201);
+  }, 300_000);
+
+  it('leaves website and correspondence address optional, and validates them when given', async () => {
+    // Optional on purpose: neither should add friction at registration.
+    const minimal = await register({
+      legalName: `${FIXTURE_PREFIX} Minimal Contacts`,
+      legalNameAr: `${FIXTURE_PREFIX} اتصال أدنى`,
+    }).expect(201);
+    expect((minimal.body as InsurerView).companyWebsite).toBeNull();
+    expect(
+      (minimal.body as InsurerView).companyCorrespondenceAddress,
+    ).toBeNull();
+
+    // Optional does not mean unchecked.
+    await register({
+      legalName: `${FIXTURE_PREFIX} Bad Site`,
+      legalNameAr: `${FIXTURE_PREFIX} موقع خطأ`,
+      companyWebsite: 'not a url at all',
+    }).expect(400);
+    await register({
+      legalName: `${FIXTURE_PREFIX} Bad Email`,
+      legalNameAr: `${FIXTURE_PREFIX} بريد خطأ`,
+      companyEmail: 'not-an-email',
+    }).expect(400);
+  }, 300_000);
+
+  it('accepts a MULTI-LINE correspondence address, unlike every other free-text field', async () => {
+    // A postal address genuinely spans lines, so this one field deliberately has no
+    // control-character guard — the `Customer.registeredAddress` precedent.
+    const created = await register({
+      legalName: `${FIXTURE_PREFIX} Multiline Address`,
+      legalNameAr: `${FIXTURE_PREFIX} عنوان متعدد`,
+      companyCorrespondenceAddress: 'Flat 3, Building 12\nAl Shmeisani\nAmman',
+    }).expect(201);
+    expect(
+      (created.body as InsurerView).companyCorrespondenceAddress,
+    ).toContain('\n');
+
+    // Whereas a relationship contact NAME still refuses one.
+    await register({
+      legalName: `${FIXTURE_PREFIX} Multiline Name`,
+      legalNameAr: `${FIXTURE_PREFIX} اسم متعدد`,
+      rfqContactName: 'Dana\nQasem',
+    }).expect(400);
+  }, 300_000);
+
+  it('lets a company field be corrected on a CATALOGUE-linked insurer, where the name cannot be', async () => {
+    // The asymmetry is the point. The catalogue owns the company's NAME; it does not
+    // own this office's record of how to reach them, which lives on the office's own
+    // row and is the office's to fix.
+    const company = await catalogueCompany('Correctable');
+    const linked = await register({
+      insurerMasterId: company.id,
+      companyPhone: '+962 6 111 0000',
+    }).expect(201);
+    const id = (linked.body as InsurerView).id;
+
+    const patched = await request(app!.getHttpServer())
+      .patch(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .send({ companyPhone: '+962 6 222 9999' })
+      .expect(200);
+    expect((patched.body as InsurerView).companyPhone).toBe('+962 6 222 9999');
+
+    // Recorded as a change, with what it changed from.
+    const updates = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'Insurer', entityId: id, action: 'UPDATE' },
+    });
+    expect(updates[0].beforeValue).toEqual({
+      companyPhone: '+962 6 111 0000',
+    });
+    expect(updates[0].afterValue).toEqual({ companyPhone: '+962 6 222 9999' });
+
+    // The name is still not ours to change.
+    await request(app!.getHttpServer())
+      .patch(`/insurers/${id}`)
+      .set(bearer(admin.accessToken))
+      .send({ legalName: `${FIXTURE_PREFIX} Renamed` })
+      .expect(422);
+  }, 300_000);
 });
 
 describe('one record per company per office', () => {

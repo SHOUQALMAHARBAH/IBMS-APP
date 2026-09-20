@@ -28,6 +28,17 @@ export interface InsurerView {
   insurerMasterId: string | null;
   isActive: boolean;
   linesOffered: string[];
+  /** COMPANY-level, and the group the cross-office directory is allowed to show:
+   *  the switchboard, the general mailbox, the website, and the address formal
+   *  paperwork goes to. Phone and email are required at registration; the other two
+   *  are optional, so all four are nullable on a row registered before this
+   *  existed. */
+  companyPhone: string | null;
+  companyEmail: string | null;
+  companyWebsite: string | null;
+  companyCorrespondenceAddress: string | null;
+  /** RELATIONSHIP-level from here down — this office's own commercial terms and the
+   *  named people who answer it. None of this may cross an office boundary. */
   financialStrengthRating: string | null;
   creditTermsDays: number | null;
   rfqContactName: string | null;
@@ -52,6 +63,10 @@ export function deriveInsurerView(row: InsurerRecord): InsurerView {
     insurerMasterId: row.insurerMasterId,
     isActive: identity.isActive,
     linesOffered: row.linesOffered,
+    companyPhone: row.companyPhone,
+    companyEmail: row.companyEmail,
+    companyWebsite: row.companyWebsite,
+    companyCorrespondenceAddress: row.companyCorrespondenceAddress,
     financialStrengthRating: identity.financialStrengthRating,
     creditTermsDays: row.creditTermsDays,
     rfqContactName: row.rfqContactName,

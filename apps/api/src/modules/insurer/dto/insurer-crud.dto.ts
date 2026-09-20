@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Length,
   Matches,
@@ -63,6 +64,43 @@ export class RegisterInsurerDto {
   @Length(2, 200)
   @Matches(NO_CONTROL_CHARACTERS, printable('legalNameAr'))
   legalNameAr?: string;
+
+  /**
+   * COMPANY-level contact details — the four the directory shows, kept apart from
+   * the relationship contacts below because that separation IS the boundary.
+   *
+   * Phone and email are REQUIRED on both registration paths. They are what make a
+   * company findable by anyone who has not dealt with it: a brokerage agreement has
+   * to be sent somewhere, and a search result nobody can act on is not a lead. The
+   * columns are nullable because insurers registered before this existed have
+   * neither and there is nothing honest to backfill — so the requirement lives here,
+   * where it applies to new registrations only.
+   */
+  @IsString()
+  @Length(3, 40)
+  @Matches(NO_CONTROL_CHARACTERS, printable('companyPhone'))
+  companyPhone!: string;
+
+  @IsEmail()
+  @Length(3, 320)
+  companyEmail!: string;
+
+  /** Optional: it lets somebody check what a company offers before making the call,
+   *  and demanding it would add friction for no gain. `require_protocol: false`
+   *  because "petra.jo" is what a person types — a renderer has to prepend a scheme
+   *  rather than emit that as a relative href. */
+  @IsOptional()
+  @IsUrl({ require_protocol: false })
+  @Length(4, 300)
+  companyWebsite?: string;
+
+  /** Optional, and specifically where FORMAL PAPERWORK goes. No control-character
+   *  guard, unlike every other free-text field here: a postal address is genuinely
+   *  multi-line, and `Customer.registeredAddress` sets that precedent. */
+  @IsOptional()
+  @IsString()
+  @Length(2, 300)
+  companyCorrespondenceAddress?: string;
 
   @IsOptional()
   @IsString()
@@ -144,6 +182,31 @@ export class UpdateInsurerDto {
   @Length(2, 200)
   @Matches(NO_CONTROL_CHARACTERS, printable('legalNameAr'))
   legalNameAr?: string;
+
+  /** The four COMPANY-level fields, all optional here. Correcting a switchboard
+   *  number is exactly what a PATCH is for, and these belong to the office's own row
+   *  even when the NAME comes from the shared catalogue — so unlike `legalName`,
+   *  they are editable on a catalogue-linked insurer too. */
+  @IsOptional()
+  @IsString()
+  @Length(3, 40)
+  @Matches(NO_CONTROL_CHARACTERS, printable('companyPhone'))
+  companyPhone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @Length(3, 320)
+  companyEmail?: string;
+
+  @IsOptional()
+  @IsUrl({ require_protocol: false })
+  @Length(4, 300)
+  companyWebsite?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 300)
+  companyCorrespondenceAddress?: string;
 
   @IsOptional()
   @IsString()

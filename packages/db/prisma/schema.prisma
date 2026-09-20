@@ -4573,6 +4573,32 @@ model Insurer {
   /// Free text, like `insuranceLine` on the seven other models that carry it.
   linesOffered String[]
 
+  /// COMPANY-level contact details — the switchboard and the general mailbox, not
+  /// a person this office deals with.
+  ///
+  /// The distinction is the directory boundary, not tidiness. These four describe
+  /// the company and are therefore safe to show across offices; the
+  /// `rfqContact*` / `claimsContact*` / `underwriterContact` fields below are
+  /// RELATIONSHIP contacts — the named people who answer THIS office — and must
+  /// never leave it. A field added to the wrong group is a disclosure, so the two
+  /// groups are kept apart here and named so the difference survives a skim.
+  ///
+  /// Phone and email are REQUIRED at registration and nullable in the column, and
+  /// that is not a contradiction: every insurer registered before this existed has
+  /// neither, and backfilling a phone number nobody knows would be inventing data.
+  /// The DTO is what requires them, so the rule applies to new registrations only.
+  companyPhone                 String?
+  companyEmail                 String?
+  /// Optional: it lets somebody check what a company offers before making the
+  /// call, but demanding it would add friction to registration for no gain. Stored
+  /// as entered, which may be scheme-less ("petra.jo") — a renderer has to prepend
+  /// a scheme rather than emit it as a relative href.
+  companyWebsite               String?
+  /// Optional, and specifically the address that FORMAL PAPERWORK goes to — a
+  /// brokerage agreement has to be sent somewhere. Not a head-office location and
+  /// not a branch list.
+  companyCorrespondenceAddress String?
+
   /// Part I §10.2 — three DIFFERENT people, not one generic contact: pricing
   /// and RFQ, claims, and underwriting.
   rfqContactName          String?

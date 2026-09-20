@@ -33,6 +33,10 @@ const LINKED: InsurerRecord = {
   legalNameAr: null,
   isActive: true,
   linesOffered: ['Motor'],
+  companyPhone: '+962 6 500 0000',
+  companyEmail: 'info@aigjordan.test',
+  companyWebsite: 'aigjordan.test',
+  companyCorrespondenceAddress: 'PO Box 9000, Amman 11190, Jordan',
   financialStrengthRating: 'A-',
   creditTermsDays: 30,
   rfqContactName: 'Dana Qasem',
@@ -141,6 +145,82 @@ describe('deriveInsurerView', () => {
     expect(view.rfqContactEmail).toBe('dana@example.test');
     expect(view.financialStrengthRating).toBe('A-');
     expect(view.isActive).toBe(true);
+  });
+});
+
+describe('the view keeps company-level and relationship data distinguishable', () => {
+  it('carries all four company-level contact fields', () => {
+    const view = deriveInsurerView(LINKED);
+    expect(view.companyPhone).toBe('+962 6 500 0000');
+    expect(view.companyEmail).toBe('info@aigjordan.test');
+    expect(view.companyWebsite).toBe('aigjordan.test');
+    expect(view.companyCorrespondenceAddress).toBe(
+      'PO Box 9000, Amman 11190, Jordan',
+    );
+  });
+
+  it('leaves them null on an insurer registered before they existed', () => {
+    // Every pre-existing row has none of the four, and phone/email being required
+    // at REGISTRATION does not retroactively make them present. A consumer that
+    // assumed non-null would break on the office's whole existing book.
+    const legacy = {
+      ...LINKED,
+      companyPhone: null,
+      companyEmail: null,
+      companyWebsite: null,
+      companyCorrespondenceAddress: null,
+    };
+    const view = deriveInsurerView(legacy);
+    expect(view.companyPhone).toBeNull();
+    expect(view.companyEmail).toBeNull();
+  });
+
+  /**
+   * The key set, asserted whole — the precursor to the directory's allow-list test.
+   *
+   * The directory will show the COMPANY half of this view across offices and must
+   * never show the RELATIONSHIP half: these are competing brokerages, and a credit
+   * term or a named contact leaking is the one thing the boundary exists to prevent.
+   * Which half a field belongs to is therefore a disclosure decision, and the way
+   * such a decision gets skipped is by appending a field to a view and moving on.
+   *
+   * So this list is exhaustive and deliberately annoying: adding anything to
+   * `InsurerView` fails this test until somebody states which group it is in. When
+   * the directory lands it reads the first group by name, and this test is what
+   * stops the second group growing into it unnoticed.
+   */
+  it('exposes exactly these fields, split into a company half and a relationship half', () => {
+    const COMPANY_HALF = [
+      'id',
+      'name',
+      'nameAr',
+      'isOfficeLocal',
+      'insurerMasterId',
+      'isActive',
+      'linesOffered',
+      'companyPhone',
+      'companyEmail',
+      'companyWebsite',
+      'companyCorrespondenceAddress',
+      'createdAt',
+    ];
+    const RELATIONSHIP_HALF = [
+      'financialStrengthRating',
+      'creditTermsDays',
+      'rfqContactName',
+      'rfqContactEmail',
+      'rfqContactPhone',
+      'claimsContactName',
+      'claimsContactEmail',
+      'underwriterContact',
+    ];
+    expect(Object.keys(deriveInsurerView(LINKED)).sort()).toEqual(
+      [...COMPANY_HALF, ...RELATIONSHIP_HALF].sort(),
+    );
+    // And the two halves genuinely do not overlap — a field cannot be in both.
+    expect(COMPANY_HALF.filter((k) => RELATIONSHIP_HALF.includes(k))).toEqual(
+      [],
+    );
   });
 });
 

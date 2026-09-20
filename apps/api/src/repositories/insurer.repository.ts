@@ -32,6 +32,13 @@ export const INSURER_RECORD_SELECT = {
   // path this row took without inferring it from whether a join came back.
   insurerMasterId: true,
   linesOffered: true,
+  // COMPANY-level — the switchboard, the general mailbox, the site, the address
+  // formal paperwork goes to. Safe to show across offices; see the schema.
+  companyPhone: true,
+  companyEmail: true,
+  companyWebsite: true,
+  companyCorrespondenceAddress: true,
+  // RELATIONSHIP-level — the named people who answer THIS office. Never leaves it.
   rfqContactName: true,
   rfqContactEmail: true,
   rfqContactPhone: true,
@@ -51,6 +58,22 @@ export interface InsurerListFilter {
    *  deactivated, or it cannot offer to reactivate it. */
   isActive?: boolean;
   search?: string;
+}
+
+/**
+ * COMPANY-level fields a caller may set.
+ *
+ * Separate from `InsurerRelationshipFields` below for a reason that is not stylistic:
+ * the directory shows this group across offices and must never show the other, so
+ * "which interface does this field belong to" is the same question as "may a
+ * competing brokerage see it". Two types means a field cannot drift across that line
+ * by being appended to the wrong list.
+ */
+export interface InsurerCompanyFields {
+  companyPhone?: string;
+  companyEmail?: string;
+  companyWebsite?: string;
+  companyCorrespondenceAddress?: string;
 }
 
 /** The relationship fields a caller may set. Deliberately not `Prisma.InsurerUpdateInput`:
@@ -119,6 +142,7 @@ export class InsurerRepository {
     insurerMasterId: string | null;
     legalName: string | null;
     legalNameAr: string | null;
+    company: InsurerCompanyFields;
     relationship: InsurerRelationshipFields;
   }): Promise<InsurerRecord> {
     return this.prisma.client.insurer.create({
@@ -126,6 +150,7 @@ export class InsurerRepository {
         insurerMasterId: input.insurerMasterId,
         legalName: input.legalName,
         legalNameAr: input.legalNameAr,
+        ...input.company,
         ...input.relationship,
       },
       select: INSURER_RECORD_SELECT,
@@ -142,10 +167,11 @@ export class InsurerRepository {
    */
   update(
     id: string,
-    patch: InsurerRelationshipFields & {
-      legalName?: string;
-      legalNameAr?: string;
-    },
+    patch: InsurerCompanyFields &
+      InsurerRelationshipFields & {
+        legalName?: string;
+        legalNameAr?: string;
+      },
   ): Promise<InsurerRecord> {
     return this.prisma.client.insurer.update({
       where: { id },
