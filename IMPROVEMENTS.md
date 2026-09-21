@@ -1409,6 +1409,33 @@ repo declares a single `chromium` project and CI installs only chromium, so dema
 webkit would fail a correct install and invite someone to download 500 MB to silence it. Planted
 an orphaned `chromium-1243` and watched it fire with the exact `rm -rf` to run.
 
+**A rule that requires vigilance is not a fix — amended after it failed on its own author.**
+This section's first version also reported `effective_cache_size = 5 GB` and claimed "something
+set it". Both wrong: `SELECT setting || unit` concatenates `"524288"` with `"8kB"` into
+`"5242888kB"`, which reads as 5 GB. It is 524288 x 8kB = **4 GB**, `source = default`.
+
+The lesson taken at the time was "name the units and source beside a number". That rule was
+written down and then broken **one day later, by the person who wrote it**, because the
+concatenation produces a string that READS CORRECTLY. Remembering is not the fix when the wrong
+output is indistinguishable from the right one.
+
+**So the rule is a method, not a discipline: read a Postgres setting through a call that formats
+it, because a call cannot produce the wrong string.**
+
+```sql
+-- NO:  the output is plausible and wrong
+SELECT name, setting || unit FROM pg_settings WHERE name = 'effective_cache_size';
+--            -> "5242888kB"
+
+-- YES: either of these
+SHOW effective_cache_size;                                    -- -> "4GB"
+SELECT name, setting, unit, source FROM pg_settings ...;       -- separate columns, no concatenation
+SELECT pg_size_pretty(setting::bigint * 8192) FROM pg_settings ...;
+```
+
+The same shape applies beyond Postgres: prefer the form of a query that cannot express the
+mistake over the form that requires you to notice it.
+
 **And the thing this measurement DISPROVED, which is the point of taking it.** The sweep's failures
 were attributed to "the machine being full" — and the disk was indeed nearly full, which made that
 story fit. It was the wrong story. Disk was never the binding constraint: the suite failed on
@@ -1517,12 +1544,64 @@ suite can touch pool saturation, the concurrent case deserves its own measuremen
 assumption. With `maxWait: 30_000`, saturation there looks like thirty-second requests, not an
 error.
 
-**Verdict: scheduled, not urgent.** Nothing in normal operation approaches the ceiling. The two
-things worth fixing are legibility, not correctness, and they belong on their own branch after
-the insurer feature alongside the § 1.8 assertions: (a) split the envelope so ordinary operations
-carry an ordinary deadline, and (b) put `maxWait` back near its default so pool exhaustion says
-so. Both are safe to do without touching the RLS mechanism, and neither should be bundled into
-feature work.
+#### The tail, chased rather than cited (2026-10-15)
+
+The first version of this section filed the 84.7 s write under "which is exactly what the comment
+beside `RLS_SESSION_TRANSACTION_OPTIONS` says motivated raising the ceiling". That comment explains
+why somebody raised the ceiling. It does not establish that an 85-second audit write is acceptable —
+**it is § 1.23 again, the justification beside the workaround accepted as the finding.** So:
+
+**How many rows?** `AccessRecertificationService.startCycle` emits one audit row per ACTIVE USER.
+On db-test that is **45,649** in a single batch. 84,661 ms / 45,649 rows = **1.86 ms per row**.
+
+**Is the return value used?** Yes — `recordMany` loops the persisted rows through
+`anomalyDetection.evaluate(entry)`, which keys off the persisted `id`/`occurredAt`. So
+`createManyAndReturn` is not gratuitous and the "delete six characters" fix does not apply.
+
+**What makes each insert expensive?** `AuditLogEntry` on db-test holds **5,934,528 rows in
+3,529 MB** with FOUR secondary indexes plus the primary key, against `shared_buffers = 128 MB`.
+Every insert updates five B-trees whose pages cannot be cached. Its two triggers are
+`no_update`/`no_delete` (immutability), so they never fire on INSERT and are ruled out.
+
+**And the comparison that reframes it.** Dev has **30 active users and a 3,680 kB audit table**;
+db-test has 45,649 and 3.5 GB. db-test is CUMULATIVE — that user count is test accumulation, not
+an office. So the 85 seconds is substantially an artifact of the test database's size.
+
+**A correction to the risk statement, mine and the reviewer's.** "Audit entries are written by real
+user actions" is true of `record()` — ONE row, 134 call sites, covered by the p50 of 15 ms. It is
+NOT true of the slow path: `recordMany` has exactly **two** callers, `access-recertification` and
+`internal-controls`, both periodic administrative operations. The 85-second write is a quarterly
+batch, not something a user waits on.
+
+**What survives as a real characteristic**, and is the reason this is recorded rather than closed:
+`startCycle` writes one audit row per active user **inside one transaction**, so its duration is
+O(office size) by construction. A genuinely large office still produces a multi-second-to-minute
+transaction holding one pooled connection. That is bounded and known rather than alarming — but it
+is a property of the design, not of db-test.
+
+#### Verdict, revised
+
+**The pool was the urgent part, and it is now fixed.** Nothing set `connection_limit`, so the pool
+was `num_physical_cpus * 2 + 1`, evaluated wherever the process happens to run: 9 on a 4-core
+laptop, **3 or 5 in an API container limited to one or two cores** — a property the whole
+application depends on, decided silently by the environment. And there are TWO pools per API
+process (`APP_DATABASE_URL` for ordinary work, the owner connection for identity/bootstrap), each
+inheriting that default independently. Now set explicitly — 15 app + 5 owner = 20 per process,
+against 97 usable connections, i.e. four instances — in every env template, the local env files and
+`docker-compose.yml`, with the arithmetic and the "raise `max_connections` or lower these" note
+beside it.
+
+Note what the measurement could NOT establish: observed concurrency peaked at **9, which was the
+pool size**, so demand is at least 9 and otherwise unknown. The new figure has headroom for that
+reason, not because 15 was measured.
+
+**Still scheduled, on their own branch with the § 1.8 assertions:** (a) split the timeout envelope
+so an ordinary operation carries an ordinary deadline instead of one sized for a 45,000-row insert,
+and (b) return `maxWait` near its 2 s default so pool exhaustion says "Unable to start a
+transaction in the given time" instead of a request that waits half a minute and fails as something
+else. Two masks stacked: the slow write hides behind a raised ceiling, and the exhaustion it causes
+hides behind a raised wait. Neither weakens RLS — the TRANSACTION protects RLS, the budget protects
+nothing.
 
 **A caveat on the sample, since it decides how much the numbers are worth.** 11 of 91 spec files,
 chosen for read-heavy and RBAC paths (`rbac`, `tenant-isolation`, `insurer-directory`, `policy`,

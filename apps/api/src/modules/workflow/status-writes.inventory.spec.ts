@@ -118,16 +118,12 @@ describe('no status write bypasses the workflow engine', () => {
   // its sibling came to fail as a timeout and report nothing about the property it guards.
   // If this figure grows, find out where the time goes before raising it again — that is the
   // rule § 1.28 exists for.
-  it(
-    'no Prisma write sets `status` in its data payload on a governed entity',
-    () => {
-      // A status move belongs in `WorkflowTransitionService.transition()`, which
-      // validates the edge against the allowed-transitions map and writes the
-      // TRANSITION audit row. A direct write skips both.
-      expect(directStatusWrites()).toEqual([]);
-    },
-    20_000,
-  );
+  it('no Prisma write sets `status` in its data payload on a governed entity', () => {
+    // A status move belongs in `WorkflowTransitionService.transition()`, which
+    // validates the edge against the allowed-transitions map and writes the
+    // TRANSITION audit row. A direct write skips both.
+    expect(directStatusWrites()).toEqual([]);
+  }, 20_000);
 
   it('no raw SQL updates a status column', () => {
     // `$executeRaw` is outside the reach of the scan above, and is how a
