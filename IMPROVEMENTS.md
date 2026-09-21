@@ -881,7 +881,7 @@ fraction of the budget is a prediction of failure, not bad luck.
 
 ### 1.23 `P1` — A comment that states an invariant is a test that does not run
 
-Met twice, and the difference between the two meetings is the point.
+Met three times, and each meeting was later than the last.
 
 **Late (F4, and the `IN_FORCE_POLICY_STATUSES` header).** A comment asserted a property,
 the property changed, and the comment became a confident lie that outlived it — "ANALYZE
@@ -895,12 +895,37 @@ The insurer directory made that false, and the comment was corrected in the SAME
 that falsified it — now naming the directory as the second case and pointing at the file
 that proves it, rather than duplicating those tests into a tenancy matrix.
 
+**Later still, and not in a comment at all (2026-09-21).** `turbo.json` declared
+`outputs: ["dist/**", ".next/**", "!.next/cache/**"]`. That exclusion was CORRECT when it was
+written: it kept Next's incremental cache out of the build artifact. Next then moved the dev
+server's cache to `.next/dev/cache`, which `.next/**` matches and `!.next/cache/**` does not —
+and the config went on looking correct while sweeping **826 MB of stale dev-server artifacts into
+every cache entry**, four days out of date at the point of measuring. Nothing failed. It was found
+only because the cache reached 36 GB and filled the disk (§ 1.32).
+
+So the class is wider than comments: **a config exclusion encodes an assumption about another
+tool's directory layout, and when that tool moves, the config becomes a lie that fails silently.**
+A comment at least sits beside the code it describes, where someone editing nearby may notice. A
+path glob describes a directory tree the repo does not own and no reviewer inspects, so it has no
+reader at all — which makes it the worst-case version of this failure and the reason the first two
+meetings were found in years and this one in gigabytes.
+
+Not worth a hunt, but worth knowing: **other exclusions in this repo make the same kind of
+assumption** — the remaining globs in `turbo.json`, `.gitignore`, `.dockerignore`, the
+`include`/`exclude` sets in the `tsconfig.json` files, and Playwright's `testIgnore`. Each is a
+bet on where another tool puts its files. A dependency major-version bump is the moment to
+re-check the ones belonging to that dependency.
+
 **How to apply.** When a change makes a comment's claim false, the comment is part of the
-change. Two habits carry it:
+change. Three habits carry it:
 
 - Grep for the claim, not just the code. A commit that makes "the only", "always", "never"
   or a count false somewhere else has to fix that sentence too — `grep -rn "the one\|the
   only\|always\|never" ` over the touched area costs seconds.
+- Treat a path glob as an assertion about someone else's layout, and give it a witness where
+  one is cheap. The `!.next/dev/**` fix is still just a glob; what makes it noticeable next time
+  is `prune-turbo-cache.mjs` printing the largest cache entry and flagging it when it exceeds
+  what a build output should be. The glob can still go stale — the size check is what says so.
 - Prefer a claim that CANNOT rot: an assertion instead of a sentence. "Exactly these nine
   columns" as a test beats "this view exposes only public data" as a comment, and § 1.19 is
   the pattern for turning one into the other. Where a comment is genuinely the right home —
@@ -1431,12 +1456,80 @@ is the heaviest thing in the suite and the first thing pressure reaches. That fi
 exactly why the kernel log was checked instead of the fit.
 
 **Still open, deliberately.** It passes in isolation 10/10 (670s) and passed in-sweep on other
-runs; one green run does not retire a flake, so it stays named. The question worth asking next is
-not about the machine: **is a 120-second interactive transaction the right envelope for a READ
-path?** Every tenant-scoped read in the application carries it. A read that can legitimately take
-two minutes is a performance defect, and a budget that generous means the failure surfaces as an
-empty engine response rather than as a slow query anyone would investigate. Not changed here —
-that envelope protects the RLS mechanism and touching it needs its own measurement.
+runs; one green run does not retire a flake, so it stays named.
+
+---
+
+#### The three numbers, measured 2026-09-21 — and they correct the premise
+
+Taken by instrumenting the extension's two transaction call sites to append
+`label,duration_ms,in_flight_at_entry`, running 11 spec files (130 tests, 1491s), then reverting
+the probe. **n = 11,006 tenant-scoped transactions.**
+
+**1 — Connection pool: 9.** Nothing sets `connection_limit` in any `DATABASE_URL` or in code, so
+Prisma's default applies: `num_physical_cpus * 2 + 1`, and this machine has 4 physical cores.
+Postgres `max_connections` is 100 on both databases, so the pool is the binding limit, not the
+server.
+
+**2 — `maxWait: 30_000`, and this is the bad branch.** Set alongside the timeout in
+`tenant-scope.extension.ts`, raised from Prisma's 2 s default. So pool exhaustion does NOT
+surface as "Unable to start a transaction in the given time" within two seconds; a request waits
+up to **thirty** seconds for a connection first. The legible signal is gone, and what replaces it
+is a request that simply takes half a minute.
+
+**3 — The duration distribution, which is the surprise:**
+
+| | |
+|---|---|
+| p50 | **15 ms** |
+| p90 | 26 ms |
+| p95 | 36 ms |
+| p99 | **127 ms** |
+| p99.9 | **34,984 ms** |
+| max | **84,661 ms** — 71% of the 120 s ceiling |
+
+≥5 s: 15 transactions (0.14%). ≥30 s: 12.
+
+**The tail is not reads. Every one of the slowest eight is a bulk WRITE** —
+`AuditLogEntry.createManyAndReturn` (84.7 s, 78.7 s, 77.6 s, 77.5 s) and
+`AccessRecertificationItem.createManyAndReturn` (49.1 s, 46.1 s, 43.0 s, 40.8 s) — all with
+`in_flight = 1`, so not contention. That is exactly what the code comment beside
+`RLS_SESSION_TRANSACTION_OPTIONS` says motivated raising the ceiling in the first place: a bulk
+`createManyAndReturn` that took 5837 ms and died under the 5 s default.
+
+**So "is 120 s the right envelope for a read?" was the wrong question, and it was mine.** Reads
+are three orders of magnitude clear of the ceiling — a p99 of 127 ms against 120,000 ms is a
+**945× margin**. The ceiling is not masking slow reads because there are none.
+
+**The real defect is that ONE envelope covers both.** The extension wraps every tenant-scoped
+operation identically, so a 15 ms read inherits a bound sized for a 40-second bulk insert. That
+is what makes a genuinely stuck read illegible: it has no deadline anyone would notice until
+120 s, by which point Prisma reports an empty engine response rather than a slow query. A
+differentiated envelope — a few seconds for the ordinary case, the long one for bulk writes that
+have earned it — costs nothing in tenant isolation, because **the transaction is what protects
+RLS; the budget protects nothing.** `set_config(..., true)` stays transaction-local at any
+timeout.
+
+**And concurrency reached the pool.** In-flight at entry was 1 for 98.1% of transactions, but the
+observed maximum was **9 — exactly the pool size**, twice, in a suite whose files run serially.
+Nothing in this measurement is a production load test, and that is the point: if a serial test
+suite can touch pool saturation, the concurrent case deserves its own measurement rather than an
+assumption. With `maxWait: 30_000`, saturation there looks like thirty-second requests, not an
+error.
+
+**Verdict: scheduled, not urgent.** Nothing in normal operation approaches the ceiling. The two
+things worth fixing are legibility, not correctness, and they belong on their own branch after
+the insurer feature alongside the § 1.8 assertions: (a) split the envelope so ordinary operations
+carry an ordinary deadline, and (b) put `maxWait` back near its default so pool exhaustion says
+so. Both are safe to do without touching the RLS mechanism, and neither should be bundled into
+feature work.
+
+**A caveat on the sample, since it decides how much the numbers are worth.** 11 of 91 spec files,
+chosen for read-heavy and RBAC paths (`rbac`, `tenant-isolation`, `insurer-directory`, `policy`,
+`claim`, `commission`, `access-recertification`, `customer`, `kyc`). It is a sample, not the
+suite, and it was taken on a machine under load — which biases durations UP, so the healthy-case
+percentiles are if anything better than shown. The tail is the part to trust least and it is
+still the part that matters.
 
 ---
 
