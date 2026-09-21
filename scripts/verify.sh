@@ -57,7 +57,15 @@ gate "Unit Tests"          npm run test
 gate "Security"            npm run test:security
 gate "Database Schema"     npm run db:validate
 gate "Database Migrations" npm run db:test:migrate:deploy
-gate "Database Migrations (drift check)" npm run db:test:migrate:status
+# `migrate status` reports whether every migration has been APPLIED. It does NOT compare an
+# applied migration's stored checksum against its file — measured: with a drifted migration
+# present it still printed "Database schema is up to date!". This gate used to be labelled
+# "drift check", which claimed a guarantee it did not provide.
+gate "Database Migrations (all applied)" npm run db:test:migrate:status
+gate "Database Migrations (checksum drift)" npm run db:test:checksums
+# And the third distinct property, which nothing checked either: whether schema.prisma still
+# describes what the database enforces. `migrate status` never reads schema.prisma at all.
+gate "Database Schema (divergence from the database)" npm run db:test:divergence
 gate "Database Seed"       npm run db:test:seed
 gate "Integration Tests"   npm run test:e2e
 gate "Contract Tests"      npm run test:contract

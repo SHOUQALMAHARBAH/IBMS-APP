@@ -401,17 +401,31 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run test:smoke` | `bash scripts/smoke.sh api` — dispatches to the api service's smoke test (see below) |
 | `npm run e2e` | Playwright functional e2e (web) — **excludes** `@a11y`-tagged specs (`--grep-invert @a11y`) |
 | `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — **only** `@a11y`-tagged specs. A separate gate: a green `npm run e2e` says nothing about accessibility, so run both and report both counts |
-| `npm run db:validate` | `prisma validate` — schema is internally valid (not a drift check; that's `db:migrate:status`) |
+| `npm run db:validate` | `prisma validate` — schema is internally valid. **Not** a drift check, and `db:migrate:status` is not one either — see the two rows below, which are |
 | `npm run db:migrate:dev` | Create/apply a migration against the dev DB (`packages/db`) |
 | `npm run db:migrate:deploy` | Apply existing migrations to the dev DB, no schema drift (also used for CI/prod) |
-| `npm run db:migrate:status` | Check dev DB migration history against `schema.prisma` for drift |
+| `npm run db:migrate:status` | Whether every migration has been APPLIED to the dev DB. It does **not** read `schema.prisma` and does **not** compare checksums — measured: with a drifted migration present it prints "Database schema is up to date!" and exits 0 |
+| `npm run db:checksums` | Every applied migration's stored checksum vs its file, WHOLE SET. Catches a migration edited after being applied — which `migrate resolve` makes easy, since it stamps the hash of the file as it is at resolve time |
+| `npm run db:divergence` | Whether `schema.prisma` still describes what the database enforces. Asserts the diff is exactly 12 NAMED statements (generated columns, GIN-on-tsvector, composite tenant FKs, one identifier-truncation rename) and fails in **both** directions. This is what caught a `SetNull` declared over an enforced `RESTRICT`, and six real indexes the schema never declared |
 | `npm run db:test:migrate:dev` | Create/apply a migration against `db-test` — where schema iteration happens |
 | `npm run db:test:migrate:deploy` | Apply existing migrations to `db-test`, no schema drift |
-| `npm run db:test:migrate:status` | Check `db-test` migration history against `schema.prisma` for drift |
+| `npm run db:test:migrate:status` | As above, against `db-test` |
+| `npm run db:test:checksums` / `db:test:divergence` | The two real checks above, against `db-test`. `scripts/verify.sh` runs the `db-test` variants; CI runs the dev ones against its own service container |
 | `npm run db:studio` | Prisma Studio (dev DB) |
 | `npm run db:seed` | Seed the dev DB — the default office's roles + the global permission catalogue (`packages/db/prisma/seed.ts`), idempotent. Roles are OFFICE-SCOPED as of 2026-09-18; a role name is unique per `Organization`, not globally |
 | `npm run db:test:seed` | Same seed, against `db-test` |
 | `npm run seed:demo -w api` | Demo data for two Organizations — employees, leads, ~500 customers and full sales-to-policy pipelines — created through the real HTTP API, **dev DB only** (never `.env.test`). Scale is env-configurable; accounts come back with MFA off, so sign in with the password and pair an authenticator at Settings → Security — the run now **fails, naming accounts**, if any is left enrolled with a secret nobody holds. See `apps/api/scripts/README-SEED-DEMO.md` |
+
+**`migrate dev` is still not the way to add a migration here, and the reason has changed.**
+It used to be blocked by checksum drift (five drifted migrations, now normalised — IMPROVEMENTS.md
+§ 1.29), so "the drift is fixed" reads like an invitation to go back to it. It is not:
+`schema.prisma` deliberately describes LESS than this database enforces, because Prisma's schema
+language cannot express a STORED generated column, a GIN index on an `Unsupported("tsvector")`
+field, or a composite tenant foreign key. `migrate dev` would generate a migration containing
+exactly the 12 statements `db:divergence` enumerates — dropping four GIN indexes and un-generating
+five columns, `Insurer.canonicalName` among them. Hand-write the migration, apply it, then
+`prisma migrate resolve --applied`; run `db:checksums` afterwards, because resolve stamps the
+file's hash at that moment and any later edit to it drifts.
 
 ## `scripts/`
 

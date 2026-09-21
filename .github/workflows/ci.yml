@@ -155,8 +155,19 @@ jobs:
       - name: Run Prisma migrations
         run: npm run db:migrate:deploy
 
-      - name: Verify schema — migration history matches schema.prisma (no drift)
+      # This step was called "migration history matches schema.prisma (no drift)". It did neither:
+      # `migrate status` compares the migration history against the DATABASE and never reads
+      # schema.prisma, and it does not compare checksums — measured, with a drifted migration
+      # present it printed "Database schema is up to date!" and exited 0. The three properties are
+      # now three steps, each named for what it actually checks.
+      - name: Verify migrations — every migration is applied
         run: npm run db:migrate:status
+
+      - name: Verify migrations — no applied migration's file has been edited
+        run: npm run db:checksums
+
+      - name: Verify schema — schema.prisma still describes what the database enforces
+        run: npm run db:divergence
 
       - name: Seed database (roles + permission grid)
         run: npm run db:seed

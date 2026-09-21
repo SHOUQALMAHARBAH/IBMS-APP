@@ -740,6 +740,17 @@ the model block would have said so, and the grep's scope quietly decided the ans
   against the DTO, so a fixture can keep sending a field that no longer exists, or omit
   one that became required, with the compiler silent. This is exactly why a response- or
   request-shape change needs the full e2e sweep and not a typecheck plus a targeted run.
+- **A write that quietly rewrote every line it was not asked to touch.** Inserting two sections
+  into this file with a Python text-mode write converted the whole file from LF to CRLF: 137 new
+  lines arrived as a **1917-line diff**, and `package.json` as a 50-line one. Nothing errored, the
+  content was correct, and the change would have reached review as a whole-file rewrite with the
+  real edit buried inside it — and `git blame` for the file reset to one commit. Caught by reading
+  `git diff --stat` and disbelieving the number, then hexdumping both versions; the first check
+  (`grep -c` for a CR) gave a confidently WRONG answer, which is this section's own shape one level
+  down. On Windows, text-mode `open(p,'w')` translates `
+` to `os.linesep` on the way out, so a
+  read-modify-write round trip is not a round trip. Use binary mode, or `newline=''`, and check the
+  diffstat against the size of the edit you meant to make.
 - **A test whose assertions cannot fail** — the `isSystem` bypass, the reviewer tiering,
   the concurrent-revoke race. Planting is the answer, and a plant that does not fire (the
   ordering plant that left the real comparator in place) is the same mistake one level up.
@@ -1101,6 +1112,143 @@ once, and then it stops being an open question.
 
 ---
 
+
+### 1.29 — RESOLVED (2026-09-21): the gate named "drift check" checked no drift, and there were five
+
+`scripts/verify.sh` carried a gate labelled **"Database Migrations (drift check)"** whose
+command was `prisma migrate status`. That command reports whether every migration has been
+APPLIED. It does not compare an applied migration's stored checksum against its file.
+
+Measured, not assumed — with a drifted file deliberately planted:
+
+```
+$ npm run db:test:migrate:status
+92 migrations found in prisma/migrations
+Database schema is up to date!          # exit 0
+```
+
+`migrate dev` is the command that complains, and this project cannot use it at all (it wants
+to reset the dev database over a pre-existing drift, which is why the migrations README
+records the non-destructive apply-then-`migrate resolve` route). So for the life of this
+repo, nothing checked.
+
+**The whole-set check (§ 1.19) is what made the scale visible.** `packages/db/scripts/check-migration-checksums.mjs`
+compares EVERY applied migration's stored hash against its file, on whatever database
+`DATABASE_URL` names — `npm run db:checksums` / `db:test:checksums`, both wired into
+`verify.sh` beside the now-honestly-named "all applied" gate. First run: **one drift on
+db-test, FIVE on dev.** Only one was known about. A check written for the instance we knew
+would have found exactly that instance.
+
+**Establishing what drifted, before normalising it.** Re-aligning a hash erases the evidence
+of what changed, so each was settled first by hashing every committed version of the file:
+
+| Migration | Stored hash is… | Verdict |
+|---|---|---|
+| `20261008100000_office_administrator_role` | exactly the file at `31ba45e` | `8c300b8` changed **one comment line**, no SQL |
+| the other four | **no committed version of the file** | applied to dev mid-authoring, file edited before commit |
+
+The four are the interesting ones: their stored hashes match nothing in git, because the
+content that produced them was a draft that only ever existed on one machine. Two independent
+measurements closed them:
+
+1. **db-test carries the COMMITTED hashes for all four.** It was created later, from the
+   committed files, and every migration ran. The committed SQL provably builds a working
+   database.
+2. **`prisma migrate diff --from-migrations ./prisma/migrations --to-url <dev>` is EMPTY** —
+   dev's live schema is identical to what the committed set produces from empty.
+
+And measurement 2 is COMPLETE coverage here rather than partial, which had to be checked
+rather than hoped: `migrate diff` introspects tables, columns, indexes, constraints and
+enums, and is blind to functions, triggers, views, policies, grants and data migrations.
+Every statement in those four is of a kind it does see — `ALTER TABLE`, `CREATE INDEX`,
+`CREATE UNIQUE INDEX`, `CREATE TYPE`, `DROP INDEX`, and one CHECK constraint added inside a
+`DO` block. Had any of them created a function or a policy, the empty diff would have proven
+much less.
+
+All five then normalised, on both databases, each named explicitly.
+
+**`migrate resolve` is itself a drift source.** That migration's db-test row carries
+`applied_steps_count = 0` — the signature of `migrate resolve --applied`, which records the
+hash of the file AS IT IS AT RESOLVE TIME. The documented non-destructive route therefore
+stamps a hash mid-session, and any later edit to that file — a comment, a clearer error
+message — drifts it. Expect this to recur; the check is what makes it cheap.
+
+**There is deliberately no `--fix` flag.** Re-aligning a hash is a one-keystroke way to
+destroy the evidence of what drifted, and the two cases need opposite responses:
+
+- **comments only** → the SQL that ran IS the SQL written down; re-align the stored hash;
+- **SQL changed** → the databases were built from something the file no longer says.
+  Re-aligning makes that permanent and invisible. Write a NEW migration bringing the schema
+  to what the edited file describes, and leave the original alone.
+
+So the script prints the `git log -p` to run and refuses to decide. Guard proven by planting
+all three branches and watching each fire: a comment-only edit to an applied migration, an
+applied migration whose file is gone, and the `migrate status` non-detection above.
+
+**A filter that ate the evidence, worth its own line (§ 1.20's family).** Reading that
+comment-only diff, `git diff … | grep -vE '^[-+][-+]'` — "strip the `---`/`+++` headers" —
+printed NOTHING, which reads as "the file did not change". A SQL comment begins with `--`,
+so `+-- a new comment` matches that pattern and was stripped. The filter silently removed
+exactly the class of line being investigated. Same shape as an `undefined` in a `where`
+(§ 1.14): the command succeeded and answered a different question.
+
+---
+
+### 1.30 — RESOLVED (2026-09-21): `schema.prisma` described a weaker database than the one we run
+
+Found while establishing § 1.29's drift. To prove the dev database still agreed with its
+migrations I ran `prisma migrate diff`, and then ran it in the other direction — migrations
+versus `schema.prisma` — because a CI step had been *claiming* that comparison for months:
+
+```yaml
+- name: Verify schema — migration history matches schema.prisma (no drift)
+  run: npm run db:migrate:status          # reads neither schema.prisma nor any checksum
+```
+
+**Six real divergences, none of them theoretical.** Every one of them was the database being
+STRICTER than the declaration — which is why nothing had broken, and why it would have broken
+on the next `prisma migrate dev`, whose generated migration is exactly this diff:
+
+| Divergence | What the next generated migration would have done |
+|---|---|
+| `Insurer.insurerMaster` — DB enforces `ON DELETE RESTRICT`; an **optional** Prisma relation defaults to `SetNull` | dropped the FK and recreated it as `SET NULL` |
+| `ScreeningMatch(listType, status)` | `DROP INDEX` |
+| `ScreeningMatch(screeningRequestId)` | `DROP INDEX` |
+| `ScreeningRequest(subjectFingerprint)` | `DROP INDEX` |
+| `WatchlistSyncRun(status, completedAt DESC)` | `DROP INDEX` |
+| `Insurer(canonicalName)` + GIN `WatchlistEntry(canonicalTokens)` | `DROP INDEX` |
+
+All six were closed by **declaring** them — `onDelete: Restrict`, six `@@index` lines — with no
+migration, because the database already had exactly those objects. `relationMode` is unset
+(`foreignKeys`), so Prisma emulates no referential action and the `onDelete` declaration changes
+DDL generation only, never runtime behaviour.
+
+**Why the obvious gate cannot exist, and what replaced it.** "The diff is empty" is not a
+property this repo can assert: the schema deliberately holds LESS than the migrations do, because
+Prisma's language cannot express a STORED generated column, a GIN index on an
+`Unsupported("tsvector")` field, or a composite tenant FK. Asserting emptiness would be red
+forever, which is presumably why nobody ever tried.
+
+So the gate is the whole-set shape (§ 1.19): `packages/db/scripts/check-schema-divergence.mjs`
+asserts the diff is EXACTLY 12 named statements, each carrying the reason it is allowed —
+5 generated columns, 3 GIN-on-tsvector, 3 composite tenant FKs, 1 identifier-truncation rename.
+**Both directions fail**: a new divergence, and an entry that no longer diverges, so the table
+cannot rot into a list of things that used to be true. Both branches planted and observed.
+Measured identical on dev and db-test, and measured equivalent to the `--from-migrations` form,
+so it compares the live database and needs no shadow database or CREATEDB in CI.
+
+**The residual, stated rather than implied.** The three composite FKs *are* expressible — their
+targets carry the `@@unique([id, organizationId])` a composite reference needs. They stay raw
+SQL because declaring them pulls `organizationId` into the relation and changes the generated
+client's relation shape across models the whole codebase reads. That is a deliberate deferral,
+not an impossibility, and it is the one entry in the table that could be retired by a decision
+rather than by a Prisma feature.
+
+**The rule.** A divergence is closed by making the schema tell the truth, never by adding an
+entry to the allow-list. An entry means every future `migrate dev` generates that statement and
+someone eventually commits it.
+
+---
 
 ## 2. Bugs found & fixed this session (regression-watch)
 

@@ -1392,6 +1392,10 @@ model ScreeningRequest {
   @@index([outcome])
   @@index([correlationId])
   @@index([organizationId])
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([subjectFingerprint])
 }
 
 enum RiskLevel {
@@ -3444,6 +3448,11 @@ model WatchlistEntry {
   /// published generation and in the one being downloaded beside it.
   @@unique([source, sourceRecordId, datasetVersionId])
   @@index([normalizedName])
+  /// Declared, not added — the database has had this index since
+  /// `20260911120000_screening_provider_and_matching`, and no migration accompanies the
+  /// declaration. It showed as a DROP in `migrate diff`, so the next generated migration
+  /// would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([canonicalTokens], type: Gin)
   @@index([source])
   @@index([datasetVersionId])
 }
@@ -3598,6 +3607,14 @@ model ScreeningMatch {
   @@index([assignedToUserId, caseStatus])
   @@index([caseStatus])
   @@index([organizationId])
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([listType, status])
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([screeningRequestId])
 }
 
 /// Part B §16 — a note on a screening case.
@@ -3651,6 +3668,11 @@ model WatchlistSyncRun {
   /// that has since grown, which the screening hold reports.
   addedCount   Int?
   errorMessage String?
+
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([status, completedAt(sort: Desc)])
 }
 
 /// Process 51 — configurable compliance calendar for CBJ regulatory
@@ -4731,7 +4753,20 @@ model Insurer {
   /// NULL means the identity below is authoritative. A row with neither is
   /// nameless, which a CHECK constraint refuses — see the migration.
   insurerMasterId String?
-  insurerMaster   InsurerMaster? @relation(fields: [insurerMasterId], references: [id])
+  /// `onDelete: Restrict` is DECLARED rather than defaulted, and the declaration is the fix
+  /// for a real divergence. The database has enforced `ON DELETE RESTRICT` since
+  /// `20260929100000_insurer_master_split` created this FK; Prisma's default for an OPTIONAL
+  /// relation is `SetNull`, so the schema silently described a weaker rule than the database
+  /// enforces. Measured with `migrate diff --from-migrations --to-schema-datamodel`: the one
+  /// statement pair in that diff that was NOT a Prisma-inexpressible object was this FK being
+  /// dropped and recreated as `SET NULL` — meaning the next auto-generated migration would
+  /// have quietly weakened it.
+  ///
+  /// RESTRICT is the right rule: nulling `insurerMasterId` would convert a catalogue-linked
+  /// insurer into a locally registered one carrying no `legalName`, which `Insurer_has_identity`
+  /// forbids — so the delete fails either way, and this way it fails as the foreign-key
+  /// violation it is rather than as a confusing CHECK violation on an unrelated column.
+  insurerMaster   InsurerMaster? @relation(fields: [insurerMasterId], references: [id], onDelete: Restrict)
 
   /// Office-local identity, populated ONLY when `insurerMasterId` is NULL.
   ///
@@ -4837,6 +4872,10 @@ model Insurer {
   @@unique([id, organizationId])
   @@index([organizationId])
   @@index([insurerMasterId])
+  /// Declared, not added — the database has had this index since `20261013100000_one_canonical_name_key`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([canonicalName])
 }
 
 /// Narrative process 31 — "Products / Classes" per insurer, the lines of
