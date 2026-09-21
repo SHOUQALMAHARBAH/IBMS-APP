@@ -1394,6 +1394,52 @@ visible one would have let the next red run be blamed on something already fixed
 
 ---
 
+### 1.33 `P2` — "Response from the Engine was empty" was NOT an OOM, and the mechanism is a 120s transaction
+
+The one failure in the full 91-file sweep (2026-09-21): `rbac.e2e-spec.ts` -> "closes the
+double-decide race" reported
+`PrismaClientUnknownRequestError: Response from the Engine was empty`, then timed out at 180s.
+On a memory-starved machine, in the longest batch (1167s), an OOM kill of the query engine was
+the obvious candidate. **It is not what happened**, and checking beat assuming:
+
+| Check | Result |
+|---|---|
+| WSL kernel log (`dmesg`, 494 lines readable) | **no OOM kill of anything** |
+| db-test container | `RestartCount=0`, `OOMKilled=false`, up since Sep 18 |
+| Postgres log, 19:10-19:25 window | no crash, no recovery, no fatal |
+| Prisma engine type | default `library` — **in-process**, so there is no separate engine process to kill |
+
+That last row invalidates the hypothesis by construction: the thing presumed killed does not
+exist as a process.
+
+**The actual mechanism, from the stack.** `LibraryEngine.transaction` ->
+`_transactionWithCallback` (an INTERACTIVE transaction) -> `Promise.all (index 0)` ->
+`AccessRecertificationService.listItemsForReviewer:198`. That method opens no transaction of its
+own; the transaction comes from `apps/api/src/prisma/tenant-scope.extension.ts:493`, which wraps
+**every tenant-scoped query** in an interactive transaction — necessary, because RLS needs
+`set_config('app.current_org_id', ..., true)` to be transaction-local — and gives it
+`timeout: 120_000`.
+
+So: under load the 120s budget expires, the engine's response channel closes, `transaction()`
+parses an empty response, Nest maps it to a 500, and the test awaiting that HTTP call hits its
+own 180s vitest budget. Corroborated by a separate sighting in the abandoned sweep, same service
+and same model, where Prisma said it outright: *"Transaction already closed: A query cannot be
+executed on an expired transaction. The timeout for this transaction was 120000 ms."*
+
+The failing test is the concurrency test — it runs two decisions simultaneously by design, so it
+is the heaviest thing in the suite and the first thing pressure reaches. That fits, which is
+exactly why the kernel log was checked instead of the fit.
+
+**Still open, deliberately.** It passes in isolation 10/10 (670s) and passed in-sweep on other
+runs; one green run does not retire a flake, so it stays named. The question worth asking next is
+not about the machine: **is a 120-second interactive transaction the right envelope for a READ
+path?** Every tenant-scoped read in the application carries it. A read that can legitimately take
+two minutes is a performance defect, and a budget that generous means the failure surfaces as an
+empty engine response rather than as a slow query anyone would investigate. Not changed here —
+that envelope protects the RLS mechanism and touching it needs its own measurement.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently
