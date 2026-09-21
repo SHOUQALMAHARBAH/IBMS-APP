@@ -40,10 +40,9 @@ import { canonicalNameKey } from '../src/common/company-name.util';
  * So the clause is asserted STRUCTURALLY below, since the behaviour it protects cannot be
  * exercised on this image.
  *
- * **Word characters, and TWO more locale-dependent operations the first audit missed.** The
- * function is declared IMMUTABLE and a STORED generated column plus a unique index are built
- * on that declaration being true, so every operation inside it was enumerated. Three are
- * locale-dependent, not one:
+ * **Word characters, and the two more locale dependencies that are now GONE.** The function is
+ * declared IMMUTABLE and a STORED generated column plus a unique index are built on that being
+ * true, so every operation inside it was enumerated. Three were locale-dependent:
  *
  *  1. the token `ORDER BY` — fixed with `COLLATE "C"`, and structurally asserted below;
  *  2. `lower()` — Postgres marks it IMMUTABLE even though it is CTYPE-sensitive, a wart in
@@ -63,15 +62,21 @@ import { canonicalNameKey } from '../src/common/company-name.util';
  * key, the unique index would refuse the second, and the directory would merge them all into
  * a single entry.
  *
- * The rest of the folding is CTYPE-FREE by construction, which is what makes the IMMUTABLE
- * declaration otherwise honest: the diacritic and tatweel strip, the alef/teh-marbuta
- * translate, and the definite-article rule are all over ENUMERATED character sets and literal
- * Unicode ranges, so no CTYPE is consulted.
+ * **Both CTYPE dependencies were then REMOVED rather than documented** (migration
+ * `20261014100000`). `lower()` became an enumerated `translate()` over ASCII and the Latin-1
+ * capitals; the POSIX class became an explicit allowed set — Arabic U+0600..U+06FF, Latin
+ * (ASCII + Latin-1), digits — with everything else, including `\s`, treated as a separator.
+ * The TypeScript mirror was changed to the identical rule in the same commit, which is why
+ * `foldCase` exists there instead of `toLowerCase()`.
  *
- * The 39-name table below DOES catch a `C`-CTYPE database, because that changes the VALUES —
- * SQL would return '' where TypeScript returns a key. It cannot catch a collation difference,
- * because on this image the default collation already IS byte order. Two different blind
- * spots, and only one of them is blind.
+ * The SCOPE that buys: a name in Cyrillic, Greek or CJK folds to its digits and ASCII content
+ * only. Deliberate for a system whose registration form demands a Latin AND an Arabic name,
+ * and a limit that has to be widened on BOTH sides together — so do not add a name in a new
+ * script to the table below expecting it to pass.
+ *
+ * What remains untestable here is ONE thing: the `COLLATE "C"` on the token sort, which is
+ * about the STORED column's stability across library upgrades rather than about CTYPE. It is
+ * still asserted structurally, and the reason is in the migration beside the clause.
  */
 
 /** Every rule the folding applies, plus the cases that break naive implementations. */
@@ -181,29 +186,34 @@ describe('canonical_name_key: SQL and TypeScript agree', () => {
     expect(row.different_names_must_differ).toBe(false);
   }, 120_000);
 
-  it('runs on a database whose CTYPE folds non-ASCII, which the function REQUIRES', async () => {
-    // Named separately from the parity table so the failure says WHY. The table would also
-    // fail on a `C`-CTYPE database, but it would fail as twenty mismatched keys rather than
-    // as one sentence about the database's locale.
+  it('is CTYPE-FREE — the same key under a C collation, which is now provable HERE', async () => {
+    // This REPLACED a test asserting the database's CTYPE folds non-ASCII, and the replacement
+    // matters twice over.
     //
-    // Both properties are measured rather than inferred from the locale NAME, because names
-    // vary between builds and behaviour is what the function depends on.
-    const [row] = await rawPrisma.$queryRaw<
-      { arabic_is_alnum: boolean; folds_non_ascii: boolean }[]
-    >`
+    // The old version asserted a PRECONDITION the function no longer has. Worse, keeping it
+    // would have made the suite refuse a `C`-locale database that the function now handles
+    // perfectly well — a test blocking a deployment for a reason that had been fixed.
+    //
+    // And this property could not be tested at all before. The old function used `lower()` and
+    // `[^[:alnum:][:space:]]`, so collating the input changed the ANSWER: an Arabic name came
+    // back with every letter replaced. Now every fold is over an enumerated character set or a
+    // literal Unicode range, so the collation of the argument cannot reach any of them — and
+    // that is checkable on this image rather than being a claim about production.
+    const [row] = await rawPrisma.$queryRaw<Record<string, boolean>[]>`
       SELECT
-        regexp_replace('تأمين', '[^[:alnum:][:space:]]', '*', 'g') = 'تأمين'
-          AS arabic_is_alnum,
-        lower('ÉTOILE') = 'étoile' AS folds_non_ascii
+        canonical_name_key('تأمين المركبات الشامل' COLLATE "C")
+          = canonical_name_key('تأمين المركبات الشامل')  AS arabic_unaffected,
+        canonical_name_key('Zurich Étoile' COLLATE "C")
+          = canonical_name_key('Zurich Étoile')          AS latin_unaffected,
+        canonical_name_key('MOTOR (Comprehensive)' COLLATE "C")
+          = canonical_name_key('MOTOR (Comprehensive)')  AS punctuation_unaffected
     `;
     expect(
-      row.arabic_is_alnum,
-      'this database treats Arabic letters as punctuation, so canonical_name_key() returns an EMPTY key for every Arabic name — every Arabic-named local insurer in an office would collide on one key and the directory would merge them into one entry. The database needs a UTF-8 CTYPE, not C',
+      row.arabic_unaffected,
+      'the collation of the argument changed the key for an Arabic name — some step inside the function is still consulting a CTYPE, and under a C locale it would key every Arabic name to the empty string',
     ).toBe(true);
-    expect(
-      row.folds_non_ascii,
-      'lower() here folds ASCII only, so an accented company name keys differently in SQL than in the TypeScript mirror',
-    ).toBe(true);
+    expect(row.latin_unaffected).toBe(true);
+    expect(row.punctuation_unaffected).toBe(true);
   }, 120_000);
 
   it('sorts tokens with an EXPLICIT collation, which this image cannot prove behaviourally', async () => {

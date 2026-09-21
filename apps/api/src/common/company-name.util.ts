@@ -52,13 +52,56 @@ const ALEF_VARIANTS = /[آأإٱ]/g;
 const ALEF_MAQSURA = /ى/g;
 /** ة -> ه */
 const TEH_MARBUTA = /ة/g;
-/** Anything that is not a letter, a digit or a space becomes a separator, so
- *  "Motor (Comprehensive)" and "Motor — Comprehensive" fold together. */
-const NON_WORD = /[^\p{L}\p{N}\s]/gu;
+
+/**
+ * The case fold, ENUMERATED rather than `toLowerCase()`.
+ *
+ * `toLowerCase()` folds every uppercase letter in Unicode; the SQL function cannot, because
+ * doing so there means `lower()`, which is CTYPE-dependent — and under a `C` ctype it folds
+ * ASCII only. Rather than leave the two implementations agreeing by luck on one image, BOTH
+ * now fold the same enumerated set: ASCII plus the Latin-1 capitals.
+ */
+const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞ';
+const LOWER = 'abcdefghijklmnopqrstuvwxyzàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþ';
+const FOLD = new Map(
+  [...UPPER].map((char, index) => [char, LOWER[index]] as const),
+);
+
+/**
+ * Anything outside the ENUMERATED sets becomes a separator, so "Motor (Comprehensive)" and
+ * "Motor — Comprehensive" fold together.
+ *
+ * This was `[^\p{L}\p{N}\s]`, which has no equivalent in Postgres regex — the SQL side used
+ * `[^[:alnum:][:space:]]`, a POSIX class whose meaning is the database's locale. Under a `C`
+ * ctype it matches ASCII only, which would have turned every Arabic letter into punctuation
+ * and keyed every Arabic name to the empty string. Both sides now enumerate instead, so
+ * neither consults a locale:
+ *
+ *  - Arabic, the whole U+0600..U+06FF block;
+ *  - Latin: ASCII letters plus the Latin-1 letters (ß, à-ö, ø-þ) that a European reinsurer's
+ *    name plausibly carries — Zürich, Münchener, Société;
+ *  - digits.
+ *
+ * Every other script — Cyrillic, Greek, CJK — is a separator, exactly as punctuation is. A
+ * deliberate limit for a system whose registration form demands a Latin AND an Arabic name,
+ * and one that has to be widened on BOTH sides together if it is ever widened.
+ *
+ * Whitespace is deliberately NOT in the allowed set: a tab or a newline is outside it and
+ * therefore already becomes a space, which is why the split below is on a literal space run
+ * rather than `\s+` — `\s` is another CTYPE-dependent class in Postgres.
+ */
+const NON_WORD = /[^a-z0-9ß-öø-þ؀-ۿ]/g;
 /** The Arabic definite article at the head of a token. Three letters minimum
  *  after it, so a short word that merely begins with those letters is left
  *  alone. */
 const DEFINITE_ARTICLE = /^ال(?=[؀-ۿ]{3,})/;
+
+/** The enumerated case fold, character by character — the mirror of the SQL `translate()`. */
+function foldCase(value: string): string {
+  let out = '';
+  for (const char of value) out += FOLD.get(char) ?? char;
+  return out;
+}
 
 /**
  * The canonical key for `value`. Two names with the same key are the same name.
@@ -66,27 +109,33 @@ const DEFINITE_ARTICLE = /^ال(?=[؀-ۿ]{3,})/;
  * Idempotent: keying an already-keyed string returns it unchanged, so a stored key
  * and a freshly computed one compare directly.
  *
- * `toLowerCase()` and not `toLocaleLowerCase()`, deliberately: the latter is
- * locale-sensitive, and the Turkish dotless-i rule would make the same name key
- * differently depending on the server's locale — which, for a value that carries a
- * unique index, would mean a duplicate that inserts on one machine and refuses on
- * another.
+ * NEITHER `toLowerCase()` NOR `toLocaleLowerCase()` — both are wrong here, for different
+ * reasons. The locale variant is locale-sensitive outright: the Turkish dotless-i rule would
+ * key the same name differently on two machines, which for a value carrying a unique index
+ * means a duplicate that inserts on one and is refused on the other. The plain one folds all
+ * of Unicode, which the SQL side cannot do without `lower()` — CTYPE-dependent, and under a
+ * `C` ctype it folds ASCII only. So the fold is ENUMERATED on both sides (`foldCase` here,
+ * `translate()` there) and the two agree by construction rather than by coincidence on one
+ * image.
  */
 export function canonicalNameKey(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(DIACRITICS, '')
-    .replace(TATWEEL, '')
-    .replace(ALEF_VARIANTS, 'ا')
-    .replace(ALEF_MAQSURA, 'ي')
-    .replace(TEH_MARBUTA, 'ه')
-    .replace(NON_WORD, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => token.replace(DEFINITE_ARTICLE, ''))
-    .filter(Boolean)
-    .sort()
-    .join(' ');
+  return (
+    foldCase(value)
+      .replace(DIACRITICS, '')
+      .replace(TATWEEL, '')
+      .replace(ALEF_VARIANTS, 'ا')
+      .replace(ALEF_MAQSURA, 'ي')
+      .replace(TEH_MARBUTA, 'ه')
+      .replace(NON_WORD, ' ')
+      // A literal space run, matching the SQL split: everything else has already become a
+      // space, and `\s` is CTYPE-dependent on the other side.
+      .split(' ')
+      .filter(Boolean)
+      .map((token) => token.replace(DEFINITE_ARTICLE, ''))
+      .filter(Boolean)
+      .sort()
+      .join(' ')
+  );
 }
 
 /** True when two names are the same name. A convenience over two `canonicalNameKey`

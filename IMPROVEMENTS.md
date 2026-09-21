@@ -1024,12 +1024,37 @@ SELECT array_to_string(ARRAY(SELECT t FROM unnest(ARRAY['f','é']) t ORDER BY t)
 | `ILIKE` / pattern matching on non-ASCII | case-folding is CTYPE-dependent; Arabic is caseless so unaffected, Latin accents are not | the directory's `ILIKE` search behaves differently on accented names |
 | ICU collations (`COLLATE "…-x-icu"`) | none used anywhere | — |
 
-The two CTYPE rows are not hypothetical for `canonical_name_key`, whose whole job is folding
-Arabic: under a `C` CTYPE the key of every Arabic name is the EMPTY STRING, so every
-Arabic-named local insurer in one office collides on one key, the unique index refuses the
-second, and the directory merges them into a single entry. `canonical-name-key-parity.e2e-spec.ts`
-now asserts both properties by BEHAVIOUR rather than by locale name, so such a database fails
-one named test instead of twenty mismatched keys.
+The two CTYPE rows were not hypothetical for `canonical_name_key`, whose whole job is folding
+Arabic: under a `C` CTYPE the key of every Arabic name was the EMPTY STRING, so every
+Arabic-named local insurer in one office collided on one key, the unique index refused the
+second, and the directory merged them into a single entry.
+
+**RESOLVED for that function (2026-09-21) by REMOVING the dependency, not by asserting it.**
+Recording a precondition leaves the hazard in place and trusts a future reader to honour it —
+and the hazard here is one a reasonable person would walk into while tidying up, since adding
+`COLLATE "C"` or creating the database with `LC_CTYPE=C` both look like reproducibility wins.
+Migration `20261014100000_canonical_key_ctype_free` makes every step fold over an ENUMERATED
+character set or a literal Unicode range: `lower()` became a `translate()` over A–Z and the
+Latin-1 capitals (Arabic is caseless, so nothing is lost), and `[^[:alnum:][:space:]]` became
+`[^a-z0-9ß-öø-þ؀-ۿ]`. `IMMUTABLE` is now true by construction rather than by declaration, and
+the TypeScript mirror was brought to the identical rule in the same commit.
+
+Measured before and after, on the same database:
+`canonical_name_key('تأمين المركبات الشامل' COLLATE "C")` returned the EMPTY STRING under the
+old definition and now returns the identical key to the un-collated call. So the parity spec's
+CTYPE assertion inverted: it used to assert the database HAS a UTF-8 ctype (a precondition), and
+now asserts the function does not care (a property). Keeping the old test would have blocked a
+C-locale deploy the function handles correctly.
+
+**And the assertion moved to where the property matters.** No test of ours can run on the
+production database, so the check lives in the migration itself — a `DO` block that refuses to
+deploy if the Arabic key comes back empty, if the Latin-1 fold is not applied, or if the token
+sort is not byte-ordered. It earned itself immediately: its first version expected `'etoile'`,
+the function returned `'étoile'`, and the deploy failed — I had decided the accent rule two
+different ways inside one commit. Accents are preserved and only case is folded, deliberately:
+"Zürich" and "Zurich" are plausibly two different companies to a broker.
+
+The remaining rows of the table above still stand for `ORDER BY` and `ILIKE` elsewhere.
 
 **The alignment status, which is better than feared.** Dev, test, UAT and CI all run the same
 image, so they agree with each other, and **there is no production build to disagree with** —
@@ -1045,8 +1070,8 @@ must name the Postgres build, and then one of:
 2. **Re-measure the class on the chosen build** — every row of the table above — and keep the
    structural assertions only where the behavioural one still cannot run.
 
-Either way the database must be created with a **UTF-8 CTYPE**, which is now a tested
-precondition rather than an assumption.
+The **UTF-8 CTYPE** requirement no longer applies to the canonical key, which is CTYPE-free by
+construction; it remains the safe choice for everything else in the table.
 
 **Why this matters beyond one function.** An unmeasured difference between test and production
 is the same shape as a mock asserting a hand-written API shape: a second description of reality
