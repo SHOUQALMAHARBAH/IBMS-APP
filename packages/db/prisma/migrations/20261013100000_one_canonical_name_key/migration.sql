@@ -49,13 +49,39 @@
 -- STRICT so a NULL name yields a NULL key (a catalogue-linked row has no local name).
 -- PARALLEL SAFE because it touches nothing outside its argument.
 --
--- `COLLATE "C"` on the token sort is load-bearing and CANNOT be proven behaviourally on
--- this test image: `postgres:18-alpine` is musl, which ships no locale data, so the
--- database's `en_US.utf8` already falls back to byte order. On a glibc or ICU deployment
--- `en_US.utf8` is dictionary order — 'étoile' would sort beside 'etoile' instead of after
--- 'zurich' — and the key would silently differ from the suggestion for any name carrying a
--- Latin accent. The parity spec therefore asserts the clause's presence in the source, and
--- says why it cannot assert the behaviour.
+-- ## `COLLATE "C"` IS LOAD-BEARING. DO NOT SIMPLIFY IT AWAY.
+--
+-- It provably does nothing on a developer's machine, which makes it exactly the clause a
+-- future reader deletes as noise. The reason it stays is not tidiness:
+--
+-- `canonicalName` is STORED. A value computed under one collation and a value computed under
+-- another are DIFFERENT VALUES IN THE SAME COLUMN, and the unique index over it would then be
+-- inconsistent with itself — the classic shape of index corruption after a glibc upgrade,
+-- where existing entries were built under the old ordering and new ones under the new.
+-- `COLLATE "C"` is byte order, which no library upgrade changes. That is what the clause buys,
+-- and it buys it on the production database, where no test can see it.
+--
+-- It also cannot be proven behaviourally here: `postgres:18-alpine` is musl, which ships no
+-- locale data, so this database's `en_US.utf8` already falls back to byte order and removing
+-- the clause changes nothing measurable. Planted and observed: parity stayed green. So the
+-- parity spec asserts the clause's PRESENCE in the function source and says why it cannot
+-- assert the behaviour.
+--
+-- ## Two further locale dependencies, enumerated because IMMUTABLE has to be honest
+--
+-- `lower()` is CTYPE-sensitive and Postgres marks it IMMUTABLE anyway — a wart this function
+-- inherits. `[^[:alnum:][:space:]]` is CTYPE-dependent too. Measured here:
+--
+--     regexp_replace('تأمين' COLLATE "C", '[^[:alnum:][:space:]]', '*', 'g')  ->  '*****'
+--
+-- Under a `C` CTYPE every Arabic letter is punctuation, so the key of every Arabic name is
+-- EMPTY — and in an Arabic-primary system that means every Arabic-named local insurer in an
+-- office collides on one key. The database therefore REQUIRES a UTF-8 CTYPE, which
+-- `canonical-name-key-parity.e2e-spec.ts` asserts by behaviour rather than by locale name.
+--
+-- Everything else folds over enumerated character sets and literal Unicode ranges — the
+-- diacritic strip, the alef/teh-marbuta translate, the definite-article rule — so no CTYPE is
+-- consulted by any of them.
 CREATE OR REPLACE FUNCTION canonical_name_key(value text)
 RETURNS text
 LANGUAGE sql

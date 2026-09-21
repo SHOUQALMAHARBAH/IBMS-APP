@@ -40,10 +40,38 @@ import { canonicalNameKey } from '../src/common/company-name.util';
  * So the clause is asserted STRUCTURALLY below, since the behaviour it protects cannot be
  * exercised on this image.
  *
- * **Word characters.** `[^\p{L}\p{N}\s]` in JavaScript against `[^[:alnum:][:space:]]` in
- * Postgres. Those are different notations for the same intent, and whether the POSIX class
- * covers Arabic depends on the database's collation — which is exactly why this is measured
- * against a live database rather than reasoned about from the documentation.
+ * **Word characters, and TWO more locale-dependent operations the first audit missed.** The
+ * function is declared IMMUTABLE and a STORED generated column plus a unique index are built
+ * on that declaration being true, so every operation inside it was enumerated. Three are
+ * locale-dependent, not one:
+ *
+ *  1. the token `ORDER BY` — fixed with `COLLATE "C"`, and structurally asserted below;
+ *  2. `lower()` — Postgres marks it IMMUTABLE even though it is CTYPE-sensitive, a wart in
+ *     Postgres itself that this function inherits;
+ *  3. `[^[:alnum:][:space:]]` — POSIX classes are CTYPE-dependent.
+ *
+ * Measured on this database, which is the only honest way to describe it:
+ *
+ *     regexp_replace('تأمين', '[^[:alnum:][:space:]]', '*', 'g')                -> 'تأمين'
+ *     regexp_replace('تأمين' COLLATE "C", '[^[:alnum:][:space:]]', '*', 'g')    -> '*****'
+ *     lower('ÉTOILE')              -> 'étoile'
+ *     lower('ÉTOILE' COLLATE "C")  -> 'Étoile'
+ *
+ * So under a `C` CTYPE every Arabic letter is treated as punctuation and replaced — which
+ * makes the key of EVERY Arabic name the empty string. In an Arabic-primary system that is
+ * not a rounding error: every Arabic-named local insurer in one office would collide on one
+ * key, the unique index would refuse the second, and the directory would merge them all into
+ * a single entry.
+ *
+ * The rest of the folding is CTYPE-FREE by construction, which is what makes the IMMUTABLE
+ * declaration otherwise honest: the diacritic and tatweel strip, the alef/teh-marbuta
+ * translate, and the definite-article rule are all over ENUMERATED character sets and literal
+ * Unicode ranges, so no CTYPE is consulted.
+ *
+ * The 39-name table below DOES catch a `C`-CTYPE database, because that changes the VALUES —
+ * SQL would return '' where TypeScript returns a key. It cannot catch a collation difference,
+ * because on this image the default collation already IS byte order. Two different blind
+ * spots, and only one of them is blind.
  */
 
 /** Every rule the folding applies, plus the cases that break naive implementations. */
@@ -151,6 +179,31 @@ describe('canonical_name_key: SQL and TypeScript agree', () => {
     // The article rule requires three more Arabic letters, so a short word survives whole.
     expect(row.short_word_kept).toBe('الف');
     expect(row.different_names_must_differ).toBe(false);
+  }, 120_000);
+
+  it('runs on a database whose CTYPE folds non-ASCII, which the function REQUIRES', async () => {
+    // Named separately from the parity table so the failure says WHY. The table would also
+    // fail on a `C`-CTYPE database, but it would fail as twenty mismatched keys rather than
+    // as one sentence about the database's locale.
+    //
+    // Both properties are measured rather than inferred from the locale NAME, because names
+    // vary between builds and behaviour is what the function depends on.
+    const [row] = await rawPrisma.$queryRaw<
+      { arabic_is_alnum: boolean; folds_non_ascii: boolean }[]
+    >`
+      SELECT
+        regexp_replace('تأمين', '[^[:alnum:][:space:]]', '*', 'g') = 'تأمين'
+          AS arabic_is_alnum,
+        lower('ÉTOILE') = 'étoile' AS folds_non_ascii
+    `;
+    expect(
+      row.arabic_is_alnum,
+      'this database treats Arabic letters as punctuation, so canonical_name_key() returns an EMPTY key for every Arabic name — every Arabic-named local insurer in an office would collide on one key and the directory would merge them into one entry. The database needs a UTF-8 CTYPE, not C',
+    ).toBe(true);
+    expect(
+      row.folds_non_ascii,
+      'lower() here folds ASCII only, so an accented company name keys differently in SQL than in the TypeScript mirror',
+    ).toBe(true);
   }, 120_000);
 
   it('sorts tokens with an EXPLICIT collation, which this image cannot prove behaviourally', async () => {

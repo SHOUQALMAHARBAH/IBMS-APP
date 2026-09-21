@@ -997,6 +997,85 @@ measured gate, rather than a mapping table plus confidence.
 
 ---
 
+### 1.27 `P1` — The test database cannot exercise a class of TEXT behaviour, and this system is Arabic-primary
+
+Found by planting a missing `COLLATE "C"` and watching parity stay green. The test was correct;
+**the database it ran against could not disagree with it** — the §1.8 class in its most
+dangerous form, because nothing is wrong with the assertion.
+
+**Cause, measured.** Every Postgres in this project is `postgres:18-alpine` — dev, test, uat
+and CI (`docker-compose.yml` ×3, `.github/workflows/ci.yml`). Alpine is musl, which ships no
+locale data, so a database created as `en_US.utf8` silently behaves as `C` for collation.
+
+```sql
+-- on this database, right now
+SELECT array_to_string(ARRAY(SELECT t FROM unnest(ARRAY['f','é']) t ORDER BY t), ',')              -- f,é
+     , array_to_string(ARRAY(SELECT t FROM unnest(ARRAY['f','é']) t ORDER BY t COLLATE "C"), ','); -- f,é
+-- identical. On glibc/ICU the first is 'é,f'.
+```
+
+**What that makes untestable here — the class:**
+
+| Behaviour | Status on this image | Consequence if production differs |
+|---|---|---|
+| `ORDER BY text` without explicit `COLLATE` | indistinguishable from byte order | a sort the tests certify is not the sort users see |
+| `lower()` / `upper()` on non-ASCII | works (folds `É`→`é`) | breaks only on a `C` **CTYPE** build, not on glibc |
+| POSIX classes (`[[:alnum:]]`, `[[:space:]]`, `\w`) on non-ASCII | works (Arabic is alnum) | on a `C` CTYPE, **every Arabic letter is punctuation** |
+| `ILIKE` / pattern matching on non-ASCII | case-folding is CTYPE-dependent; Arabic is caseless so unaffected, Latin accents are not | the directory's `ILIKE` search behaves differently on accented names |
+| ICU collations (`COLLATE "…-x-icu"`) | none used anywhere | — |
+
+The two CTYPE rows are not hypothetical for `canonical_name_key`, whose whole job is folding
+Arabic: under a `C` CTYPE the key of every Arabic name is the EMPTY STRING, so every
+Arabic-named local insurer in one office collides on one key, the unique index refuses the
+second, and the directory merges them into a single entry. `canonical-name-key-parity.e2e-spec.ts`
+now asserts both properties by BEHAVIOUR rather than by locale name, so such a database fails
+one named test instead of twenty mismatched keys.
+
+**The alignment status, which is better than feared.** Dev, test, UAT and CI all run the same
+image, so they agree with each other, and **there is no production build to disagree with** —
+no deploy target exists (README § Known gaps: the remaining infrastructure items "mostly wait
+on a deployment-target decision"). So this is not a live test-versus-production gap; it is a
+condition on a decision not yet made.
+
+**THE CONDITION, to be met before the first real deployment.** The deployment-target decision
+must name the Postgres build, and then one of:
+
+1. **Match it** — run the same build in test and CI as in production, which is the outcome to
+   prefer: it retires the whole class rather than documenting it; or
+2. **Re-measure the class on the chosen build** — every row of the table above — and keep the
+   structural assertions only where the behavioural one still cannot run.
+
+Either way the database must be created with a **UTF-8 CTYPE**, which is now a tested
+precondition rather than an assumption.
+
+**Why this matters beyond one function.** An unmeasured difference between test and production
+is the same shape as a mock asserting a hand-written API shape: a second description of reality
+that cannot disagree with the first. It was found by accident here. The rest of the class has
+not been probed.
+
+---
+
+### 1.28 `P2` — A 99-second e2e test that nobody has looked inside
+
+`audit.e2e-spec.ts` runs one test in **99.5 seconds** measured in isolation (2026-09-21), and
+its budget was raised from the suite's 180 s default to 600 s after it failed under batch load.
+Raising the budget was right; it is not the whole answer.
+
+Nobody has asked WHERE the hundred seconds goes. It boots the Nest app, signs a user up, logs
+them in (two bcrypt hashes at the configured cost) and then attacks a row at the database
+layer — which could legitimately account for it, or could be hiding something quadratic in
+fixtures: a loop that re-queries, an N+1 in a seeding helper, or a wait implemented as a sleep.
+
+**The rule this exists to prevent:** raising a timeout without asking is how a 100-second test
+becomes a 400-second test and then becomes "the suite takes an hour, run it less often".
+
+So the measured duration is recorded beside the raised budget in the spec itself, making growth
+visible rather than absorbed. **Next time that file is touched, spend ten minutes finding out
+where the time goes.** If the answer is "it covers a lot", that is a fine answer — recorded
+once, and then it stops being an open question.
+
+---
+
 
 ## 2. Bugs found & fixed this session (regression-watch)
 
