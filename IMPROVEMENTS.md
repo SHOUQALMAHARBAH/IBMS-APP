@@ -1285,6 +1285,45 @@ someone eventually commits it.
 
 ---
 
+### 1.31 — RESOLVED (2026-09-21): a teardown that ran out of budget corrupted every spec after it
+
+`tenant-isolation.e2e-spec.ts` stands up a second Organization and removes it in `afterAll`.
+That teardown issues 16 sequential `deleteMany` calls plus a trigger-suspending transaction
+against `db-test`, which is CUMULATIVE — 6,291 `Insurer` rows at the time of writing. Measured
+across three runs on this host: **15180ms, 21669ms, 50517ms**, against vitest's **10s default
+hook budget**.
+
+So the hook was aborted PARTWAY, every run, and office B survived. And a surviving office B is
+not a local failure: `AuthService.signup` refuses while two Organizations exist, so every spec
+file that runs afterwards fails at `makeUser` with no visible reason. Measured: **36 failures
+across three unrelated spec files**, every one of them the two-Organization guard refusing to
+boot, from a single teardown that went 5 seconds over.
+
+**A timeout is usually a nuisance. This one had a persistent side effect**, which is the
+distinction worth carrying: when a hook's job is to clean up shared state, its budget is a
+correctness parameter, not a performance one. Fixed with an explicit **120s** budget — generous
+on purpose, given a 15s-to-50s measured spread — plus a `console.log` of the actual duration on
+every run, so growth is visible before it becomes another cliff.
+
+**Two more things fell out of it.**
+
+**The self-heal was ordered so it could never heal.** The suite calls `removeOfficeB()` in
+`beforeAll` specifically to recover from a leftover, and its comment says so — but the call sat
+AFTER `createTestApp()`, which is where the two-Organization guard lives. The guard therefore
+fired before the recovery could run, so the one spec able to clean up after itself was the one
+spec blocked from doing it. The sweep now runs first. Proven by planting a leftover office B
+directly in the database and watching the suite boot through it.
+
+**The guard's diagnosis was confidently wrong, and I repeated it.** Its message read "almost
+certainly a run killed before its afterAll" — a plausible hypothesis written when the guard was
+built, stated as near-fact. The first time it fired for real the cause was the budget, not a
+kill, and I reported the kill to the user because the message said so. A diagnostic that names
+one cause gets believed over the evidence; it now names both routes and tells the reader to
+check the owning spec's teardown budget first. **The § 1.20 shape again**: the message produced a
+confident answer without checking the thing, and it was mine.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

@@ -71,10 +71,13 @@ async function assertOneOrganization(): Promise<void> {
   throw new Error(
     `${orgs.length} Organizations exist in the test database, so POST /auth/signup ` +
       `will refuse with a bare 500 and every spec that provisions a user will fail for ` +
-      `no visible reason. A previous spec leaked one — almost certainly a run killed ` +
-      `before its afterAll. Leftover: ${extra}. Re-run the spec that owns that id ` +
-      `(each sweeps in beforeAll), or remove it, then run again. See IMPROVEMENTS.md ` +
-      `§ 1.11 and § 1.22.`,
+      `no visible reason. A previous spec leaked one, by one of TWO routes: its afterAll ` +
+      `never ran (a killed run), or its afterAll ran and EXCEEDED ITS BUDGET — vitest ` +
+      `aborts a hook at 10s by default and the sweep is then half-done, which is what ` +
+      `actually happened the first time this message fired. Check the owning spec's ` +
+      `teardown budget before assuming a crash. Leftover: ${extra}. Re-run the spec that ` +
+      `owns that id — it sweeps on entry, BEFORE createTestApp, so it heals itself — or ` +
+      `remove the row, then run again. See IMPROVEMENTS.md § 1.11, § 1.22 and § 1.31.`,
   );
 }
 

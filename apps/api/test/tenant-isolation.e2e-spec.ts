@@ -267,10 +267,16 @@ async function removeOfficeB(): Promise<void> {
 }
 
 beforeAll(async () => {
-  app = await createTestApp();
-
-  // Clear any office B a crashed run left behind, BEFORE signing anyone up.
+  // Clear any office B a previous run left behind FIRST — before `createTestApp`, not
+  // after it. `createTestApp` refuses to boot while two Organizations exist (the whole
+  // point of that guard: a leaked office B breaks `makeUser` in every later spec for no
+  // visible reason). With the order the other way round, the guard fired before this
+  // self-heal could run, so the suite could not recover from its own leftover and the
+  // guard's own advice — "re-run the spec that owns that id, each sweeps in beforeAll" —
+  // was not true of this spec. It is now.
   await removeOfficeB();
+
+  app = await createTestApp();
 
   // EVERY account this suite needs is created while exactly one Organization
   // exists, because signup refuses to guess once there are two. Office B is
@@ -345,14 +351,32 @@ beforeAll(async () => {
   customerBId = customerB.id;
 }, 120_000);
 
+// 120s, not vitest's 10s default for a hook, and the number is a measurement rather than
+// a guess. This teardown issues 16 sequential `deleteMany` calls plus a trigger-suspending
+// transaction against `db-test`, which is CUMULATIVE — 6,291 Insurer rows at the time of
+// writing — so its cost grows with the database. Measured across three runs on this host:
+// **15180ms, 21669ms, 50517ms** — already past the default it had quietly crossed, and with
+// enough variance under load that a tight budget would fail intermittently.
+//
+// A timeout here is not a cosmetic failure, which is why the budget is generous rather
+// than tight: the hook is aborted PARTWAY, office B survives, and then every spec file
+// that runs afterwards fails on the two-Organization guard. Measured once: one killed
+// sweep produced 36 failures across three unrelated spec files, all with the same
+// mystifying signature. See IMPROVEMENTS.md § 1.28 — if this figure ever grows again,
+// find out where the time goes rather than raising it a second time.
 afterAll(async () => {
   await app?.close();
   app = null;
   // Owner connection: RLS would otherwise stop the cleanup seeing the very
   // rows it needs to remove. Leaving office B behind would break signup for
   // every spec file that runs after this one.
+  const startedAt = Date.now();
   await removeOfficeB();
-});
+  const elapsed = Date.now() - startedAt;
+  // Surfaced rather than silent: growth in this number is the early warning that the
+  // budget above is heading for the same cliff again.
+  console.log(`[tenant-isolation] removeOfficeB() took ${elapsed}ms`);
+}, 120_000);
 
 describe('Part V — two Organizations cannot reach each other (item 1)', () => {
   it('both offices hold a customer of the identical legal name', async () => {
