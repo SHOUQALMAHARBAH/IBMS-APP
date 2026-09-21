@@ -134,6 +134,30 @@ const NAMES = [
   "Contractors' All Risks",
   'Erection All Risks',
   'سيارات شامل',
+
+  // ---- Arabic NON-LETTERS inside the Arabic block (added 2026-10-15) ----------------------
+  // The block U+0600..U+06FF is not a letter range, and allowing all of it meant ASCII
+  // punctuation was stripped while Arabic punctuation was kept. Each pair below must key
+  // IDENTICALLY; before `20261015100000` every one of them keyed differently.
+  'شركة، التأمين', //          U+060C arabic comma
+  'شركة؛ التأمين', //          U+061B arabic semicolon
+  'شركة؟ التأمين', //          U+061F arabic question mark
+  'شركة۔ التأمين', //          U+06D4 arabic full stop
+  'شركة٬ التأمين', //          U+066C thousands separator
+  'شركة التأمين', //           ... all five fold to this
+
+  // Arabic-Indic digits, both ranges, fold to ASCII — same number, same key.
+  'شركة ١٢٣', //               U+0660..U+0669
+  'شركة ۱۲۳', //               U+06F0..U+06F9
+  'شركة 123',
+
+  // Presentation forms normalise to base letters rather than being stripped to fragments,
+  // which is how a name pasted from an older PDF arrives.
+  'ﺷﺮﻛﺔ',
+  'شركة',
+
+  // A combining mark is ERASED, not turned into a word-splitting separator.
+  'شَركة التأمين',
 ];
 
 describe('canonical_name_key: SQL and TypeScript agree', () => {

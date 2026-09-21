@@ -42,10 +42,49 @@
  * other the same rule.
  */
 
-/** Arabic combining marks (fathatan..sukun) plus the superscript alef. */
-const DIACRITICS = /[ً-ْٰ]/g;
-/** Tatweel — a justification glyph, never part of a word. */
-const TATWEEL = /ـ/g;
+/**
+ * ARABIC LETTERS, as enumerated subranges — NOT the Arabic block.
+ *
+ * U+0600..U+06FF is not a letter range. It carries punctuation (U+060C comma, U+061B
+ * semicolon, U+061F question mark, U+066A..U+066D percent and separators, U+06D4 full stop),
+ * digits (U+0660..U+0669, U+06F0..U+06F9) and format controls alongside its letters. Allowing
+ * the whole block meant ASCII punctuation was stripped while Arabic punctuation was KEPT, so
+ * "شركة، التأمين" and "شركة التأمين" were two different companies — in the script this product
+ * is mostly used in.
+ */
+const ARABIC_LETTERS =
+  '\u0620-\u063F' + // kashmiri yeh, hamza .. farsi yeh with three dots
+  '\u0641-\u064A' + // feh .. yeh          (U+0640 tatweel is not a letter)
+  '\u066E-\u066F' + // dotless beh, dotless qaf
+  '\u0671-\u06D3' + // (U+0670 is a mark, U+06D4 a full stop)
+  '\u06D5' + //           ae
+  '\u06EE-\u06EF' + // dal / reh with inverted v
+  '\u06FA-\u06FF';
+
+/** The Latin-1 letters a European reinsurer's name plausibly carries: ss-sharp, a-o, o-thorn. */
+const LATIN1_LETTERS = '\u00DF-\u00F6\u00F8-\u00FE';
+
+/**
+ * Every Arabic combining mark, plus tatweel — DELETED, not left to become a separator.
+ *
+ * Wider than the old `fathatan..sukun` pair, and that widening is a CONSEQUENCE of enumerating
+ * letters above rather than an independent fix: a mark outside the allowed set now falls to
+ * `NON_WORD` and becomes a SPACE, which splits a word in half — worse than keeping it. So
+ * every mark is removed first. U+064B-U+065F, U+0670, U+06D6-U+06ED, plus U+0640 tatweel.
+ */
+const COMBINING_MARKS = /[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g;
+
+/**
+ * Arabic-Indic digits fold to ASCII, BOTH ranges (U+0660-U+0669 and U+06F0-U+06F9). The same
+ * number written in two scripts is the same number: "شركة ١٢٣" and "شركة 123" are one company.
+ */
+const ARABIC_INDIC_DIGITS = /[\u0660-\u0669\u06F0-\u06F9]/g;
+function foldDigit(char: string): string {
+  const code = char.charCodeAt(0);
+  return String.fromCharCode(
+    0x30 + (code - (code >= 0x06f0 ? 0x06f0 : 0x0660)),
+  );
+}
 /** آ أ إ ٱ -> ا */
 const ALEF_VARIANTS = /[آأإٱ]/g;
 /** ى -> ي */
@@ -77,10 +116,12 @@ const FOLD = new Map(
  * and keyed every Arabic name to the empty string. Both sides now enumerate instead, so
  * neither consults a locale:
  *
- *  - Arabic, the whole U+0600..U+06FF block;
- *  - Latin: ASCII letters plus the Latin-1 letters (ß, à-ö, ø-þ) that a European reinsurer's
- *    name plausibly carries — Zürich, Münchener, Société;
- *  - digits.
+ *  - Arabic LETTERS, enumerated above — NOT the whole U+0600..U+06FF block, which also holds
+ *    punctuation and digits. Allowing the block kept Arabic punctuation while stripping ASCII
+ *    punctuation, so a name with an Arabic comma was a different company;
+ *  - Latin: ASCII letters plus the Latin-1 letters that a European reinsurer's name plausibly
+ *    carries — Zürich, Münchener, Société;
+ *  - digits, with the Arabic-Indic ranges already folded to ASCII above.
  *
  * Every other script — Cyrillic, Greek, CJK — is a separator, exactly as punctuation is. A
  * deliberate limit for a system whose registration form demands a Latin AND an Arabic name,
@@ -90,11 +131,11 @@ const FOLD = new Map(
  * therefore already becomes a space, which is why the split below is on a literal space run
  * rather than `\s+` — `\s` is another CTYPE-dependent class in Postgres.
  */
-const NON_WORD = /[^a-z0-9ß-öø-þ؀-ۿ]/g;
-/** The Arabic definite article at the head of a token. Three letters minimum
- *  after it, so a short word that merely begins with those letters is left
- *  alone. */
-const DEFINITE_ARTICLE = /^ال(?=[؀-ۿ]{3,})/;
+const NON_WORD = new RegExp(`[^a-z0-9${LATIN1_LETTERS}${ARABIC_LETTERS}]`, 'g');
+/** The Arabic definite article at the head of a token. Three LETTERS minimum after it, so a
+ *  short word that merely begins with those letters is left alone — and so that "ال" followed
+ *  by a comma is not mistaken for an article. */
+const DEFINITE_ARTICLE = new RegExp(`^ال(?=[${ARABIC_LETTERS}]{3,})`);
 
 /** The enumerated case fold, character by character — the mirror of the SQL `translate()`. */
 function foldCase(value: string): string {
@@ -120,9 +161,9 @@ function foldCase(value: string): string {
  */
 export function canonicalNameKey(value: string): string {
   return (
-    foldCase(value)
-      .replace(DIACRITICS, '')
-      .replace(TATWEEL, '')
+    foldCase(value.normalize('NFKC'))
+      .replace(COMBINING_MARKS, '')
+      .replace(ARABIC_INDIC_DIGITS, foldDigit)
       .replace(ALEF_VARIANTS, 'ا')
       .replace(ALEF_MAQSURA, 'ي')
       .replace(TEH_MARBUTA, 'ه')
