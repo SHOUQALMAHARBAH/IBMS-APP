@@ -1324,6 +1324,47 @@ confident answer without checking the thing, and it was mine.
 
 ---
 
+### 1.32 `P2` — The Turborepo cache is unbounded, and it had eaten 35 GB
+
+Measured 2026-09-21 while establishing why the api e2e sweep could not complete. `.turbo/cache`
+held **36 GB in 2742 entries** spanning ten days — verified twice (PowerShell recursive sum and
+`du -sh`) before anything was deleted, because a number that large is exactly the kind worth
+disbelieving once.
+
+| | |
+|---|---|
+| repo total | 37.46 GB |
+| `.turbo/cache` | **35.3 GB** |
+| `apps/web/.next` | 1.03 GB |
+| everything else (all `node_modules`, `dist`, …) | ~1.1 GB |
+
+**One `web#build` cache entry is 1.2 GB** (four of the five largest entries were, at ~50-170s
+recorded duration each), and `npm run build` writes a new one on every distinct input hash. Turbo
+does not prune its local cache — there is no TTL and no size cap — so the growth rate here was
+about **3.6 GB/day** of active work. C: went 20.51 GB free -> 55.82 GB on `rm -rf .turbo/cache`,
+matching the measurement exactly.
+
+Also removed: four orphaned Playwright browser revisions (1.21 GB). The installed
+`playwright-core` 1.62.1 wants chromium **1234**, firefox **1538**, webkit **2336**; on disk were
+chromium 1234 AND 1243, firefox 1543, webkit 2359. Playwright resolves a browser by revision
+directory, so 1243/1543/2359 could never be used by this install. The config declares a single
+`chromium` project, so firefox and webkit were never used at all — worth knowing before someone
+re-downloads 500 MB of them.
+
+**This will recur, so treat a green build as a disk cost.** The honest options are a periodic
+`rm -rf .turbo/cache` in whatever housekeeping this repo grows, or accepting the growth knowingly.
+`.turbo/` is already gitignored (`.gitignore:13`), so nothing here was ever committed.
+
+**And the thing this measurement DISPROVED, which is the point of taking it.** The sweep's failures
+were attributed to "the machine being full" — and the disk was indeed nearly full, which made that
+story fit. It was the wrong story. Disk was never the binding constraint: the suite failed on
+COMMIT exhaustion (30.89 GB committed against a 31.66 GB limit, 98%) and CPU saturation (100%
+across 8 cores), and freeing 36.49 GB changed neither. A small 6-test spec file still took 210s
+afterwards. Two constraints that both look like "full" are not one constraint, and fixing the
+visible one would have let the next red run be blamed on something already fixed.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently
