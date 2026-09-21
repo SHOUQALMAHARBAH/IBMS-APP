@@ -41,6 +41,24 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
+/**
+ * Every source file's path AND contents, read ONCE.
+ *
+ * Both scans below want every file, and each used to walk the tree and read all of it
+ * again — two full passes over ~800 files. The second scan then failed as a TIMEOUT
+ * (7.0s against vitest's 5s default), which is the worst way for a guard to fail: it
+ * reports nothing about the property it guards, and the obvious response is to raise
+ * the budget and leave the cost in place (IMPROVEMENTS.md § 1.28).
+ */
+let cachedSources: { file: string; text: string }[] | null = null;
+function allSources(): { file: string; text: string }[] {
+  cachedSources ??= sourceFiles(SRC).map((file) => ({
+    file,
+    text: fs.readFileSync(file, 'utf8'),
+  }));
+  return cachedSources;
+}
+
 /** The text inside the `{ … }` that `opener` matches, brace-balanced. */
 function braceBody(text: string, opener: RegExp): string {
   const m = opener.exec(text);
@@ -67,8 +85,7 @@ function braceBody(text: string, opener: RegExp): string {
 function directStatusWrites(): string[] {
   const governed = new Set(governedAccessors());
   const found: string[] = [];
-  for (const file of sourceFiles(SRC)) {
-    const text = fs.readFileSync(file, 'utf8');
+  for (const { file, text } of allSources()) {
     const write =
       /\.(\w+)\.(create|update|updateMany|upsert)\(\s*\{([\s\S]{0,900}?)\n\s*\}\s*\)/g;
     let m: RegExpExecArray | null;
@@ -95,21 +112,42 @@ describe('no status write bypasses the workflow engine', () => {
     expect(governedAccessors().length).toBeGreaterThan(10);
   });
 
-  it('no Prisma write sets `status` in its data payload on a governed entity', () => {
-    // A status move belongs in `WorkflowTransitionService.transition()`, which
-    // validates the edge against the allowed-transitions map and writes the
-    // TRANSITION audit row. A direct write skips both.
-    expect(directStatusWrites()).toEqual([]);
-  });
+  // 20s, not the 5s default, and the number is measured rather than picked: this test runs
+  // the tree walk and the whole-tree read that BOTH scans share, at 2810ms in isolation on
+  // this host. Under a full-suite batch the same work has been observed at 3x, which is how
+  // its sibling came to fail as a timeout and report nothing about the property it guards.
+  // If this figure grows, find out where the time goes before raising it again — that is the
+  // rule § 1.28 exists for.
+  it(
+    'no Prisma write sets `status` in its data payload on a governed entity',
+    () => {
+      // A status move belongs in `WorkflowTransitionService.transition()`, which
+      // validates the edge against the allowed-transitions map and writes the
+      // TRANSITION audit row. A direct write skips both.
+      expect(directStatusWrites()).toEqual([]);
+    },
+    20_000,
+  );
 
   it('no raw SQL updates a status column', () => {
     // `$executeRaw` is outside the reach of the scan above, and is how a
     // status write would most plausibly hide.
-    const offenders = sourceFiles(SRC).filter((f) =>
-      /\$executeRaw[\s\S]{0,200}?UPDATE[\s\S]{0,200}?status/i.test(
-        fs.readFileSync(f, 'utf8'),
-      ),
-    );
+    //
+    // The cheap `includes` is not an optimisation to be tidied away — it is what keeps
+    // this test inside its budget. The regex nests two bounded lazy quantifiers, which
+    // backtracks hard on a long file. A file with no `$executeRaw` anywhere cannot match
+    // a pattern requiring one, so the filter changes no outcome.
+    //
+    // Measured on this host, this test alone: 7056ms, which TIMED OUT against vitest's
+    // 5s default -> 1837ms with the filter -> 5.9ms once the read is shared. The
+    // remaining cost moved to the scan below, which now populates the cache.
+    const offenders = allSources()
+      .filter(
+        ({ text }) =>
+          text.includes('$executeRaw') &&
+          /\$executeRaw[\s\S]{0,200}?UPDATE[\s\S]{0,200}?status/i.test(text),
+      )
+      .map(({ file }) => file);
     expect(offenders).toEqual([]);
   });
 });

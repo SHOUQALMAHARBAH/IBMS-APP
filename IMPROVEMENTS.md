@@ -1110,6 +1110,41 @@ visible rather than absorbed. **Next time that file is touched, spend ten minute
 where the time goes.** If the answer is "it covers a lot", that is a fine answer — recorded
 once, and then it stops being an open question.
 
+**A second instance, 2026-09-21 — and this one was FAILING, not merely slow.**
+`status-writes.inventory.spec.ts` guards a real rule (Part G item 3: no status write bypasses
+`transition()`). Its raw-SQL scan took **7056ms against vitest's 5s default**, so it failed as a
+TIMEOUT — which is the worst way for a guard to fail, because the report then says nothing about
+the property. It surfaced in a full-suite run as 2 failures in 1 file, alongside 2 more that
+varied run to run under this host's memory pressure; the timeout was the reproducible one, and it
+is not caused by the branch it was found on — the scan covers `apps/api/src/**/*.ts` and its
+duration varied 7s to 18s purely with load.
+
+Ten minutes found the cost exactly where this section says to look, and none of it was the
+property:
+
+| Change | This test, measured in isolation |
+|---|---|
+| as found | **7056ms — timed out** |
+| skip the regex on files with no `$executeRaw` at all | 1837ms |
+| read the tree ONCE and share it with the sibling scan | **5.9ms** |
+
+Both scans had been walking `apps/api/src` and reading every one of ~800 files separately — two
+full passes — and the regex nests two bounded lazy quantifiers
+(`[\s\S]{0,200}?UPDATE[\s\S]{0,200}?status`), which backtracks hard on a long file. Neither fix
+can change an outcome: a file containing no `$executeRaw` cannot match a pattern that requires
+one. Verified by planting a `$executeRaw ... UPDATE "Policy" SET status` and watching the faster
+scan catch it in 37ms.
+
+The remaining cost (2810ms, the shared read) moved to the sibling test, which now carries an
+explicit **20s** budget with that measurement written beside it — because the same work has been
+observed at roughly 3x under a full-suite batch, which is how the timeout happened at all.
+
+**And a note on my own numbers, which is § 1.17 arriving again.** The first two versions of that
+comment claimed "7.0s -> 0.2s", then "-> 97ms". Both were invented — plausible figures written
+before measuring, inside a comment whose entire purpose is to make a cost visible. The real
+number was 5.9ms, from `--reporter=json`. A number in a comment is a measurement or it is
+decoration; there is no third thing.
+
 ---
 
 
