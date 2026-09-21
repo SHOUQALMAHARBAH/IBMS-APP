@@ -1808,6 +1808,54 @@ specs.
 
 ---
 
+### 1.36 — RESOLVED (2026-10-16): the status-write guard was blind to the most compact form of the violation
+
+`status-writes.inventory.spec.ts` enforces a MANDATORY rule
+(`ibms-brain/meta/lex/workflow-state-transitions.md`: never assign a workflow `status` directly).
+Its scan matched a Prisma write with:
+
+```
+/\.(\w+)\.(create|update|updateMany|upsert)\(\s*\{([\s\S]{0,900}?)
+\s*\}\s*\)/g
+```
+
+That `
+\s*\}` requires a NEWLINE before the closing brace, and the body was capped at 900
+characters. So **a one-line write was invisible to the guard entirely**:
+
+```ts
+await p.policy.update({ where: { id: 1 }, data: { status: 'CANCELLED' } });   // NOT CAUGHT
+await p.policy.update({                                                       // caught
+  where: { id: 1 },
+  data: { status: 'CANCELLED' },
+});
+```
+
+Proven by planting both shapes: multi-line failed the test, single-line passed green.
+
+**The part worth reading is how it got there.** The spec's own comment says the `braceBody` helper
+was added *because* a single-line `data: { … }` defeated the payload extraction, and that "a
+deliberately planted bypass went undetected until it was tested for". That fix was real — but it
+addressed the INNER payload parse and left the OUTER match still demanding a newline. Half the
+hole was closed, and the comment recorded the whole thing as solved. **A comment describing a fix
+is not a test of the fix's completeness**, which is § 1.23 arriving in the one place that should
+have been immune: inside a guard, next to the guard's own history.
+
+Fixed by brace-matching the argument object too, so neither line breaks nor length matter. Three
+plants now hold it: a single-line status write is CAUGHT; `status` in a `where` clause is NOT
+flagged (that is the race-safe pattern `race-safe-invariants.md` requires); an ungoverned model's
+`status` is NOT flagged.
+
+**And a second defect in the same file, caught by typecheck rather than by the test.** Widening the
+scan's roots left a stale `SRC` reference inside the branch that only executes when a violation is
+FOUND. The test passed green while its FAILURE PATH was broken: a real bypass would have thrown
+`ReferenceError: SRC is not defined` instead of naming the offender. **Exercise a guard's failure
+path, not only its success path** — planting is what does that, and the plant I ran first
+(single-line) did not reach this branch because it was not being matched at all. Two defects
+hiding each other.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

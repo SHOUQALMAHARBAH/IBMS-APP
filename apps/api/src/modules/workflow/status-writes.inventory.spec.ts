@@ -80,6 +80,19 @@ function allSources(): { file: string; text: string }[] {
   return cachedSources;
 }
 
+/** The text inside a `{ … }` whose opening brace is at `openBraceAt`, brace-balanced. */
+function braceBodyAt(text: string, openBraceAt: number): string {
+  let depth = 1;
+  let i = openBraceAt + 1;
+  const start = i;
+  while (depth > 0 && i < text.length) {
+    if (text[i] === '{') depth += 1;
+    else if (text[i] === '}') depth -= 1;
+    i += 1;
+  }
+  return text.slice(start, i - 1);
+}
+
 /** The text inside the `{ … }` that `opener` matches, brace-balanced. */
 function braceBody(text: string, opener: RegExp): string {
   const m = opener.exec(text);
@@ -107,12 +120,24 @@ function directStatusWrites(): string[] {
   const governed = new Set(governedAccessors());
   const found: string[] = [];
   for (const { file, text } of allSources()) {
-    const write =
-      /\.(\w+)\.(create|update|updateMany|upsert)\(\s*\{([\s\S]{0,900}?)\n\s*\}\s*\)/g;
+    // Matches only the OPENER, then brace-matches the argument object.
+    //
+    // It used to match the whole call and require a NEWLINE before the closing brace, with the
+    // body capped at 900 characters. Both were silent blind spots: a one-line
+    // `p.policy.update({ where: { id: 1 }, data: { status: 'X' } })` was invisible to this
+    // guard entirely, and so was any call longer than 900 characters.
+    //
+    // This spec's own history is why that is worth spelling out. `braceBody` below was added
+    // precisely because a single-line `data: { … }` defeated the PAYLOAD extraction — and the
+    // fix stopped there, leaving the OUTER match still demanding a newline. Half the hole was
+    // closed and the comment recorded the whole thing as solved. Proven by planting both
+    // shapes on 2026-10-16: multi-line was caught, single-line passed green.
+    const write = /\.(\w+)\.(create|update|updateMany|upsert)\(\s*\{/g;
     let m: RegExpExecArray | null;
     while ((m = write.exec(text)) !== null) {
-      const [, model, , body] = m;
+      const [, model] = m;
       if (!governed.has(model)) continue;
+      const body = braceBodyAt(text, m.index + m[0].length - 1);
       // Isolate the `data:` object by MATCHING BRACES, not by a regex that
       // hoped for a newline before the closing one. The first version here
       // required `\n\s*\}`, so a single-line `data: { status: 'CLOSED' }`
@@ -121,7 +146,9 @@ function directStatusWrites(): string[] {
       const payload = braceBody(body, /\bdata:\s*\{/);
       if (/\bstatus\s*:/.test(payload)) {
         const line = text.slice(0, m.index).split('\n').length;
-        found.push(`${path.relative(SRC, file).replace(/\\/g, '/')}:${line}`);
+        found.push(
+          `${path.relative(ROOTS[0], file).replace(/\\/g, '/')}:${line}`,
+        );
       }
     }
   }
@@ -138,7 +165,8 @@ describe('no status write bypasses the workflow engine', () => {
   // must stay in the hundreds, so moving or renaming a source tree fails here rather than
   // silently narrowing the guard.
   it('sanity: every root exists and the scan still covers the codebase', () => {
-    for (const root of ROOTS) expect(fs.existsSync(root), `missing root: ${root}`).toBe(true);
+    for (const root of ROOTS)
+      expect(fs.existsSync(root), `missing root: ${root}`).toBe(true);
     expect(allSources().length).toBeGreaterThan(500);
   });
 
