@@ -37,6 +37,26 @@ import { securityHeaders } from '../../src/common/security-headers.middleware';
  *
  * Safe to run before the four legitimate creators: every one of them calls
  * `createTestApp()` BEFORE standing its second office up.
+ *
+ * ## It REFUSES. It does not clean up. Do not make it clean up.
+ *
+ * The convenience version of this function deletes the extra Organization and carries on —
+ * "it is only a test database". Do not write it.
+ *
+ * A cleanup that runs automatically runs against the wrong database exactly once: a
+ * mistyped `DATABASE_URL`, a `.env` copied from the wrong template, a CI job pointed at a
+ * shared instance, a developer who ran the e2e suite with the dev env-file loaded. What it
+ * deletes there is not a fixture — it is a real brokerage office, and every user, policy,
+ * claim and invoice hanging off it. There is no version of that trade that is worth the
+ * keystrokes it saves.
+ *
+ * Refusing costs one person one minute and tells them exactly which spec to re-run.
+ * Deleting costs somebody an office. The guard is allowed to be inconvenient; that is the
+ * feature, not a rough edge to be filed off.
+ *
+ * (`apps/api/test/tenant-prisma.ts` is pointed at `.env.test` by the e2e config, so the
+ * accident is not likely here today. It does not need to be likely. It needs to be
+ * impossible, and the way to make it impossible is to not write the delete.)
  */
 async function assertOneOrganization(): Promise<void> {
   const orgs = await rawPrisma.organization.findMany({
