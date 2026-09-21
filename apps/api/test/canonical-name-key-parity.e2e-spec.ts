@@ -158,6 +158,20 @@ const NAMES = [
 
   // A combining mark is ERASED, not turned into a word-splitting separator.
   'شَركة التأمين',
+
+  // ---- What NFKC EMITS must still be handled by the steps after it ------------------------
+  // These two go through the WHOLE pipeline, not just the normalize step, because the risk is
+  // one of ORDER: NFKC decomposition emits characters the later steps remove, so normalize
+  // has to run FIRST. It does — it is the innermost call.
+  //
+  // U+FE71 ARABIC TATWEEL WITH FATHATAN decomposes to U+0640 + U+064B — a tatweel and a
+  // combining mark, both produced BY the normalisation. The mark strip runs after it and
+  // erases them; a strip placed before would never have seen them.
+  'شركةﹱ التأمين',
+  // U+FEFB ARABIC LIGATURE LAM WITH ALEF decomposes to two LETTERS, U+0644 + U+0627, and must
+  // key identically to those two letters typed separately.
+  'ﻻ',
+  'لا',
 ];
 
 describe('canonical_name_key: SQL and TypeScript agree', () => {

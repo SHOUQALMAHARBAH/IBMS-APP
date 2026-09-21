@@ -21,7 +21,28 @@ import { WORKFLOW_TRANSITIONS } from './workflow-transitions.config';
  * transition validation in one line.
  */
 
-const SRC = path.join(__dirname, '../..');
+/**
+ * Every root the rule applies to — application code that runs at RUNTIME and could therefore
+ * bypass the engine.
+ *
+ * This was `apps/api/src` alone, which is narrower than the tests' own claim: a raw status
+ * write in `packages/db` or in an operational script would never have been seen. Found while
+ * asking what had slipped during the window when the raw-SQL scan was silently timing out —
+ * the one-off check that answered that question reached further than the guard did, which is
+ * fixing the instance and leaving the blind spot.
+ *
+ * DELIBERATELY NOT COVERED: `packages/db/prisma/migrations/*.sql`. A migration that sets a
+ * status column is a reviewed, one-off data change, not a runtime path around `transition()` —
+ * and a legitimate backfill (adding a status column and populating it) would be a false
+ * positive that teaches people to weaken the guard. The exclusion is stated in the test names
+ * below rather than left implicit. Checked once by hand on 2026-10-15: no migration sets a
+ * status column today.
+ */
+const ROOTS = [
+  path.join(__dirname, '../..'), //                        apps/api/src
+  path.join(__dirname, '../../../../../packages/db/src'), // packages/db/src
+  path.join(__dirname, '../../../scripts'), //              apps/api/scripts
+];
 
 /** Every entity whose status the engine governs, as Prisma client accessors
  *  (`Policy` -> `policy`, `RFQInsurer` -> `rFQInsurer`). */
@@ -52,7 +73,7 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
  */
 let cachedSources: { file: string; text: string }[] | null = null;
 function allSources(): { file: string; text: string }[] {
-  cachedSources ??= sourceFiles(SRC).map((file) => ({
+  cachedSources ??= ROOTS.flatMap((root) => sourceFiles(root)).map((file) => ({
     file,
     text: fs.readFileSync(file, 'utf8'),
   }));
@@ -112,6 +133,15 @@ describe('no status write bypasses the workflow engine', () => {
     expect(governedAccessors().length).toBeGreaterThan(10);
   });
 
+  // A scan that quietly covers less than it used to is the same failure as a scan that times
+  // out: it reports success about files it never opened. Both roots must exist and the total
+  // must stay in the hundreds, so moving or renaming a source tree fails here rather than
+  // silently narrowing the guard.
+  it('sanity: every root exists and the scan still covers the codebase', () => {
+    for (const root of ROOTS) expect(fs.existsSync(root), `missing root: ${root}`).toBe(true);
+    expect(allSources().length).toBeGreaterThan(500);
+  });
+
   // 20s, not the 5s default, and the number is measured rather than picked: this test runs
   // the tree walk and the whole-tree read that BOTH scans share, at 2810ms in isolation on
   // this host. Under a full-suite batch the same work has been observed at 3x, which is how
@@ -125,7 +155,7 @@ describe('no status write bypasses the workflow engine', () => {
     expect(directStatusWrites()).toEqual([]);
   }, 20_000);
 
-  it('no raw SQL updates a status column', () => {
+  it('no raw SQL in application code updates a status column (migrations excluded — see ROOTS)', () => {
     // `$executeRaw` is outside the reach of the scan above, and is how a
     // status write would most plausibly hide.
     //

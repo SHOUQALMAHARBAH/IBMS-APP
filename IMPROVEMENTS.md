@@ -1,5 +1,32 @@
 # IMPROVEMENTS.md
 
+## The principle these entries are instances of
+
+> **Prefer the form that cannot express the mistake over the form that requires you to notice
+> it.**
+
+Nearly every fix in this file is that one move, applied somewhere new. It is worth absorbing as
+a sentence, because a reader who has it will make the right call in a situation none of the
+numbered entries covers — which is the only kind of documentation that scales.
+
+| The form that requires noticing | The form that cannot express the mistake |
+|---|---|
+| A comment asserting an invariant (§ 1.23) | A test asserting it |
+| "These are the only columns this view exposes" | A key allow-list asserted as a whole set (§ 1.19) |
+| Remembering that a child row must agree with its parent's office | A composite FK making a disagreeing row fail to INSERT |
+| Remembering to write `canonicalName` correctly | A `GENERATED ALWAYS … STORED` column the application cannot write |
+| Remembering not to select a relationship column | A `SECURITY DEFINER` view where it is unreachable |
+| Remembering that a migration changed a stored key | A `DO` block that refuses to deploy if it did not recompute |
+| Reading `setting \|\| unit` and spotting `"5242888kB"` (§ 1.32) | `SHOW`, or separate columns, which cannot concatenate |
+| Reading a character class to check its ranges (§ 1.34) | Decoding it and diffing against the intended set |
+| Remembering that a guard covers only one directory (§ 1.34) | A sanity test that fails when a root moves |
+
+The tell that you are on the wrong side of the table: the correct and incorrect versions LOOK
+THE SAME, and only care separates them. Care is not a control — it is the thing that was
+already being applied when the defect got in.
+
+---
+
 Consolidated backlog of **things to fix** — bugs, CI/test failures, missing
 wiring, unsourced values, security & compliance gaps, and tech debt — gathered
 while building Part C (Domains A–D). This is the **cross-cutting action list**;
@@ -1573,11 +1600,69 @@ NOT true of the slow path: `recordMany` has exactly **two** callers, `access-rec
 `internal-controls`, both periodic administrative operations. The 85-second write is a quarterly
 batch, not something a user waits on.
 
-**What survives as a real characteristic**, and is the reason this is recorded rather than closed:
-`startCycle` writes one audit row per active user **inside one transaction**, so its duration is
-O(office size) by construction. A genuinely large office still produces a multi-second-to-minute
-transaction holding one pooled connection. That is bounded and known rather than alarming — but it
-is a property of the design, not of db-test.
+**What survives as a real characteristic — now with a number, so it is a closed question rather
+than a worry.** `startCycle` writes one audit row per active user **inside one transaction**, so
+its duration is O(office size) by construction. At the measured **1.86 ms/row** (which is the
+PESSIMISTIC figure — it came from a 3.5 GB table on a starved machine):
+
+| Office size (active users) | One `startCycle` batch | Against the 120 s ceiling |
+|---|---|---|
+| 50 — a small brokerage | 0.09 s | 0.1% |
+| 200 — a large Jordanian brokerage | 0.37 s | 0.3% |
+| 1,000 | 1.9 s | 1.6% |
+| 5,000 | 9.3 s | 8% |
+| **64,500** | **120 s** | **the ceiling** |
+| 45,649 — db-test's fixture accumulation | 85 s | 71% |
+
+**So the ceiling is reached at roughly 64,500 users in one office.** The target market is
+Jordanian insurance brokerages; the largest plausibly has low hundreds of staff. The margin is
+therefore about **300×** on the realistic upper bound, and the only observation near the ceiling
+came from cumulative test fixtures, not an office.
+
+**The condition, so this does not have to be rediscovered:** if a single Organization ever passes
+about **5,000 active users** — a tenth of the ceiling, and the point where a quarterly admin
+action starts taking ten seconds — `startCycle` should batch its audit writes instead of holding
+one transaction. Below that it is correct as written, and the arithmetic above is why. Note the
+figure degrades as `AuditLogEntry` grows, which is the retention gap recorded immediately
+below — the two interact, and the retention decision is the one that moves 1.86 ms/row.
+
+#### AND THE QUESTION NOBODY HAD ASKED: `AuditLogEntry` has no retention plan
+
+**Awaiting a business decision. Recorded here so it is a named gap rather than a discovery.**
+
+`AuditLogEntry` on db-test is **5,934,528 rows / 3,529 MB with four secondary indexes** — on a
+TEST database. In production it only grows: every one of the 134 `record()` call sites appends,
+nothing removes, and there is no partitioning, no archival and no stated period.
+
+Two consequences, and the second matters more:
+
+**Performance, which is not static.** The measured 1.86 ms/row is a function of that table's size
+against `shared_buffers`. It does not stay 1.86 — every month of real use makes every audit write
+slower, and an audit write sits INSIDE the transaction of the action that caused it. So this
+silently taxes every user action, and the `startCycle` arithmetic above degrades with it.
+
+**Compliance, which is the real problem.** This is a PDPL system with a privacy module, a RoPA
+register and retention schedules for other entities (`seed-data/retention-schedule.ts` seeds a
+row for `AuditLogEntry`, and `AuditService.getRetentionCutoffDate()` reads it — but nothing
+DELETES, deliberately: the table is immutable by trigger and disposal is the dual-control M06
+workflow). Data protection law does not permit indefinite retention without a stated basis and
+period. **An audit log with no retention decision is not just a growing table — it is a
+processing activity the system cannot describe, in a product whose selling point is that it
+can.**
+
+**What the owner has to decide**, and it is far cheaper at zero production rows than retrofitted
+onto the largest table in the database:
+
+1. **The period**, with its basis — CBJ record-keeping obligations and PDPL minimisation pull in
+   opposite directions and the answer is a sourced number, not a guess. The seeded figure in
+   `retention-schedule.ts` is explicitly a draft, per its own header.
+2. **The mechanism** — monthly `PARTITION BY RANGE (occurredAt)` so old partitions detach in O(1)
+   and never need the immutability trigger bypassed, versus archive-then-dispose through the
+   existing M06 dual-control path. Partitioning is a schema decision that is nearly free now and
+   a migration of millions of rows later.
+
+Belongs in the register of things awaiting a business decision, alongside the four commercial
+surfaces.
 
 #### Verdict, revised
 
@@ -1609,6 +1694,117 @@ chosen for read-heavy and RBAC paths (`rbac`, `tenant-isolation`, `insurer-direc
 suite, and it was taken on a machine under load — which biases durations UP, so the healthy-case
 percentiles are if anything better than shown. The tail is the part to trust least and it is
 still the part that matters.
+
+---
+
+### 1.34 `P1` — When correctness depends on the IDENTITY of characters, do not read them — decode them
+
+Visual identity is not identity. Two strings can render indistinguishably and denote different
+sets, and **reading is exactly the operation that fails** — no amount of reviewer care helps,
+because the reviewer's eyes are the broken instrument.
+
+**How it was found (2026-10-15).** `canonical_name_key` and its TypeScript mirror both got a new
+Arabic combining-mark class, written as literal characters in each file. They looked the same. The
+`canonical-name-key-parity` spec disagreed, on `شركة ١٢٣`. Decoded:
+
+| | decoded ranges |
+|---|---|
+| SQL literal | U+064B..U+065F, U+0670, U+06D6..U+06ED, U+0640 — **correct** |
+| TypeScript literal | **U+064B..U+0670**, U+065F, U+06D6..U+06ED, U+0640 |
+
+The TypeScript range ran to U+0670 instead of U+065F, which swallows **U+0660..U+0669, the
+Arabic-Indic digits** — so the digit fold never saw them and they were deleted instead of folded.
+Every Arabic company name containing a number would have keyed wrongly, in the suggestion layer
+only, and nothing but the parity table could have said so.
+
+**The fix, in two parts, and the second matters more than the first:**
+
+1. **Escapes, not literals**, wherever a class or set is authored — `ً-ٟ` is ASCII
+   source and cannot carry the mistake. (Postgres regex could not be authored that way through
+   this toolchain — the escapes arrived as literal characters — so the SQL side keeps literals
+   and asserts its boundaries at deploy time instead. Where you cannot remove the hazard, assert
+   against it.)
+2. **DECODE BOTH SIDES PROGRAMMATICALLY AND DIFF AGAINST THE INTENDED SET.** Not "read it
+   carefully" — parse the class, expand its ranges, and compare to an explicit list of code
+   points with their Unicode names. That is what caught the off-by-one above and what verified
+   the seven Arabic letter subranges and the mark strip afterwards:
+
+   ```
+   kept but NOT intended: none
+   intended but NOT kept: none
+   ```
+
+**The same failure from the human side, twice in one commit.** The deploy-time assertions in
+`20261015100000` caught me classing U+066E/U+066F as punctuation when they are dotless beh and
+dotless qaf — **letters** — and using U+FEF3 as a presentation form when it is a yeh. Both were
+me misreading a Unicode chart, caught by something that cannot misread. A person reading a code
+chart and a person reading a glyph fail the same way.
+
+**Where else this repo makes the bet.** Any literal that encodes a **SET rather than a word** —
+these are the places a reviewer is structurally unable to help:
+
+- **Regex character classes** over non-ASCII: `company-name.util.ts` (now escapes),
+  `canonical_name_key` (literals + deploy assertions), `apps/web/lib/i18n/fold.ts` (folds Arabic
+  for the sidebar filter — same orthography rules, a second copy by design).
+- **The Arabic halves of bilingual data** compared across files: `seed-data/insurance-lines.ts`'s
+  32 `nameAr` values, the `DocumentTemplate` rows, `translations/ar.ts` keys, and the
+  `role-permissions.ts` fixture the web e2e keeps as a third copy of the permission grid. An
+  invisible difference there is a lookup that silently misses.
+- **Anything compared for equality across two files at all**, which is the general form: a
+  constant duplicated between api and web, a fixture mirroring a seed.
+
+**The rule.** If a literal defines a SET, or is compared across a boundary, it needs a mechanism
+that decodes rather than a reader who squints: escapes where the language allows them, a
+programmatic diff against the intended members, or an assertion at the boundary. Not a hunt —
+but when one of those files is next edited, decode it rather than reading it.
+
+**And a second blind spot, found by the same question.** The `status-writes.inventory` guard read
+only `apps/api/src`, while its test names claimed "no raw SQL updates a status column"
+unqualified — so a status write in `packages/db` or an operational script was outside it forever.
+Widened to all three application roots, with migrations named as a DELIBERATE exclusion (a
+reviewed one-off backfill is not a runtime bypass, and treating it as one would teach people to
+weaken the guard) and a new sanity test that fails if a root moves or the scan shrinks below 500
+files — because a scan that quietly covers less is the same failure as one that times out: it
+reports success about files it never opened. That test caught an off-by-one in the very paths it
+was added to protect, on its first run.
+
+---
+
+### 1.35 `P2` — MEASUREMENT PATTERN: a measurement taken at a limit is a lower bound, not a value
+
+**A limit that binds makes the demand behind it unobservable.** The queue is invisible because the
+limit *is* the queue.
+
+Found 2026-09-21 while sizing the connection pool. The instrumented run reported "maximum
+concurrency observed: **9**" — and the pool was **9**. That number does not say demand was 9; it
+says demand was *at least* 9 and the measurement could not see past the ceiling. Every request
+beyond the ninth was waiting, and waiting leaves no mark in a counter of things in flight.
+
+The same shape, elsewhere in this file:
+
+- **§ 1.28** — a test's duration measured against a timeout it was hitting tells you the timeout,
+  not the duration. `status-writes.inventory` "took 5 s" because 5 s was the budget; the real
+  figure was 7056 ms, and only visible once the budget moved.
+- **§ 1.33** — the p99.9 of 35 s and max of 84.7 s were measured under a 120 s ceiling. Had the
+  ceiling been 30 s, the same workload would have reported a max of 30 s and a crop of errors.
+- **The backup drill (2026-09-17)** — `n_live_tup` after `ANALYZE` reported 4,142,466 rows because
+  sampling is what it does. The true count was 4,141,630. An estimator asked for a value returns
+  the estimator's answer.
+
+**How to apply.** Before recording a measurement, ask: *is there a limit near this number, and is
+it the same number?* If so, say "≥ n" and name the limit — then raise it and measure again if the
+value matters. Two honest forms:
+
+- "max concurrency **9**, which WAS the pool size — a lower bound"
+- "max concurrency **11** against a pool of 15 — a value"
+
+The first justifies headroom; the second justifies a size. Reporting the first as though it were
+the second is how a ceiling becomes a specification by accident.
+
+**Outstanding for this instance:** the pool ceiling moved to 15, so the run should be repeated. If
+concurrency peaks at 15, demand is still censored and 15 is also a guess; if it peaks at 11, the
+headroom is measured rather than assumed. Rides along with the next instrumented run of those
+specs.
 
 ---
 
