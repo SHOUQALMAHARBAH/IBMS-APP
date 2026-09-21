@@ -1,0 +1,80 @@
+# PROPOSED ~/.wslconfig  —  copy to %USERPROFILE%\.wslconfig, then `wsl --shutdown`
+#
+# Nothing takes effect until both of those steps happen, so this file changes nothing where it
+# sits. Docker Desktop restarts its distro on demand afterwards; the named volumes
+# (ibms-app_db-data, ibms-app_db-test-data) live in the VHDX and are not affected.
+#
+# =============================================================================================
+# THE MEASUREMENTS THIS IS DERIVED FROM  (this machine, 2026-09-21)
+# =============================================================================================
+#
+#   TotalVisibleMemorySize ........ 8030 MB installed          <- physical RAM, not configurable
+#   FreePhysicalMemory ............ 21 MB at worst, 1133 MB after closing one app
+#   Memory\Commit Limit ........... 31.84 GB   (8 GB RAM + a 23.76 GB pagefile)
+#   Memory\Committed Bytes ........ 30.89 GB at worst = 98% of the limit
+#   Processor(_Total) ............. 100% of 8 logical cores at worst
+#   vmmemWSL PrivateMemorySize .... 3941 MB committed        <- with NO .wslconfig, i.e. uncapped
+#   WSL distros ................... docker-desktop only (WSL 2.1.5.0)
+#   postgres shared_buffers ....... 160 MB per instance, two instances
+#   postgres effective_cache_size .. 5 GB per instance        <- see the note at the bottom
+#   db-test volume ................ 6.09 GB
+#
+# What went wrong: at 98% commit, vitest could not fork worker processes at all
+# ("Failed to start forks worker"), a 6-test spec file took 210s, and a teardown hook that
+# normally finishes in 15s took 50s and was aborted, corrupting shared state for 36 later tests.
+# The WSL VM holding half the machine's RAM is a large part of that, and today nothing bounds it.
+
+[wsl2]
+
+# --- memory ----------------------------------------------------------------------------------
+# 3 GB, not the uncapped default (Windows 11 gives WSL2 ~50% of RAM, so ~4 GB here — and
+# vmmemWSL was measured at 3941 MB, consistent with having grown into it).
+#
+# Why 3 GB is enough for what actually runs in here: the only workload is two Postgres
+# containers, whose shared_buffers total 320 MB. The rest is OS page cache for the data files.
+# db-test is 6.09 GB, so it was never going to fit in page cache at 3 GB OR at 4 GB — the
+# marginal cache loss is real but small.
+#
+# THE TRADE, in one line: a lower cap means Postgres keeps less of db-test's 6.09 GB in page
+# cache and does more disk I/O, so the e2e suite runs slower; a higher cap means Windows swaps,
+# which is what drove FreePhysicalMemory to 21 MB and stopped the test runner from starting at
+# all. The second failure is much worse than the first, which is why this errs low.
+#
+# If the suite is measurably slower after this and the machine still has headroom, 4GB is the
+# next step up — change one thing and re-measure, rather than both.
+memory=3GB
+
+# --- processors ------------------------------------------------------------------------------
+# 4 of 8 logical cores. WSL only needs to run Postgres, and the api e2e suite is SERIAL
+# (`fileParallelism: false` in test/vitest-e2e.config.ts), so there is one active connection at
+# a time — 4 cores is generous for that. The test runner, Next.js and VS Code all run on the
+# WINDOWS side, and today WSL is free to contend for all 8 with them. This reserves half.
+processors=4
+
+# --- swap ------------------------------------------------------------------------------------
+# Left at the default deliberately. Setting swap=0 would make Postgres inside the VM OOM-kill
+# under the new, tighter memory cap instead of degrading; that trades a slow suite for a broken
+# one.
+
+[experimental]
+
+# Returns freed memory to Windows instead of holding the high-water mark, which is the specific
+# behaviour that left vmmemWSL sitting at 3941 MB committed long after the work finished.
+# Requires WSL 2.0+; this machine is 2.1.5.0. "gradual" over "dropcache" because dropcache
+# discards the page cache outright and this workload is exactly the one that wants it.
+autoMemoryReclaim=gradual
+
+# =============================================================================================
+# ONE RELATED THING, NOT PART OF THIS FILE
+# =============================================================================================
+#
+# Both Postgres instances run with effective_cache_size = 5 GB. That is a HINT to the query
+# planner about how much OS page cache it can expect, and it is already wrong today (WSL's
+# default cap is ~4 GB); under a 3 GB cap it would overstate by more. An overstated value makes
+# the planner prefer index scans over sequential ones, which on a 6 GB test database can be the
+# wrong choice.
+#
+# It is a docker-compose / postgresql.conf change rather than a WSL one, so it is deliberately
+# NOT bundled here — but if this file is applied, effective_cache_size should come down to
+# roughly 2GB to match, and that is worth doing in the same sitting so the two are not left
+# disagreeing.

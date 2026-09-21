@@ -1351,9 +1351,38 @@ directory, so 1243/1543/2359 could never be used by this install. The config dec
 `chromium` project, so firefox and webkit were never used at all — worth knowing before someone
 re-downloads 500 MB of them.
 
-**This will recur, so treat a green build as a disk cost.** The honest options are a periodic
-`rm -rf .turbo/cache` in whatever housekeeping this repo grows, or accepting the growth knowingly.
-`.turbo/` is already gitignored (`.gitignore:13`), so nothing here was ever committed.
+**CLOSED WITH A CAP, not a cleanup** — deleting it fixes one day and at 3.6 GB/day the space
+returns in ten.
+
+**First, most of the entry should never have been cached.** `turbo.json` declared
+`outputs: ["dist/**", ".next/**", "!.next/cache/**"]`. The exclusion was written for Next's old
+layout; Next now writes the DEV server's incremental cache to `.next/dev/cache`, which `.next/**`
+matches happily. Measured: `apps/web/.next/dev` was **826 MB of the 1.2 GB entry**, with an mtime
+four days stale — written by `next dev`, untouched by the build that cached it, while the actual
+build outputs (`server`, `static`, `standalone`) totalled ~70 MB. Fixed by adding
+`!.next/dev/**`, which should take a `web#build` entry from ~1.2 GB to ~370 MB and the growth
+rate to roughly a third.
+
+**Then a cap, because nothing bounded the total.** `scripts/prune-turbo-cache.mjs` enforces
+`TURBO_CACHE_MAX_GB` (default **5 GB**), removing oldest entries by mtime, deleting the three
+files Turbo writes per hash together so a half-entry can never be served. It runs as
+HOUSEKEEPING at the end of `scripts/verify.sh` — never a gate, because a full cache must not fail
+a verification run — and the measured growth rate is printed beside the cap so whoever changes
+the number sees the trade: a smaller cap costs one cold rebuild, never a wrong result, since a
+cache miss is indistinguishable from a first run. Proven against a synthetic five-entry cache:
+oldest-first, cap respected, `--report` changes nothing.
+
+`.turbo/` is gitignored (`.gitignore:13`), so nothing here was ever committed.
+
+**The Playwright orphans got the witness they never had.** Four revisions (1.21 GB) were
+unusable by the installed playwright-core, and the only reason anyone noticed was a full disk.
+`scripts/check-playwright-browsers.mjs` is now a GATE in `verify.sh`: every browser ON DISK must
+be a revision the installed `playwright-core` resolves, since that is the failure a version bump
+creates silently — it downloads the new revision, the tests pass, and the old directory becomes
+unreachable weight. It deliberately does NOT require every default browser to be present: this
+repo declares a single `chromium` project and CI installs only chromium, so demanding firefox and
+webkit would fail a correct install and invite someone to download 500 MB to silence it. Planted
+an orphaned `chromium-1243` and watched it fire with the exact `rm -rf` to run.
 
 **And the thing this measurement DISPROVED, which is the point of taking it.** The sweep's failures
 were attributed to "the machine being full" — and the disk was indeed nearly full, which made that

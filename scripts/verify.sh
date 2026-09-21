@@ -73,6 +73,17 @@ gate "Smoke Tests"         bash scripts/smoke.sh api
 gate "Accessibility"       npm run test:a11y
 gate "E2E"                 npm run e2e
 gate "Build"               npm run build
+# A Playwright version bump downloads a new browser revision and leaves the old one on disk
+# forever; Playwright resolves by revision directory, so the old one is unreachable weight.
+# 1.21 GB of it was found by accident on 2026-09-21. This is the witness that was missing.
+gate "Playwright browsers"  npm run browsers:check
+
+# Housekeeping, deliberately NOT a gate — it must never fail a verification run. Turborepo has
+# no size cap on its local cache and this one reached 36 GB in ten days (~3.6 GB/day), filling
+# the disk to 5.4% free. Runs last, after the gates above have had their cache hits.
+echo ""
+echo "--- housekeeping: turbo cache ---"
+node scripts/prune-turbo-cache.mjs || true
 
 echo ""
 echo "===================== verification summary ====================="
