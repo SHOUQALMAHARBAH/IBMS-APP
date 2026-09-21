@@ -277,8 +277,13 @@ describe('the unique constraints on Insurer are exactly these four', () => {
     // table:
     //
     //   - `Insurer_pkey` — a generated uuid, cannot collide;
-    //   - `Insurer_one_local_name_per_org` — partial, `WHERE insurerMasterId IS
-    //     NULL`, so only a local registration or a rename can trip it;
+    //   - `Insurer_one_local_company_per_org` — partial, `WHERE insurerMasterId IS NULL`,
+    //     so only a local registration or a rename can trip it. RENAMED and rebuilt when the
+    //     canonical key was unified: it was `(organizationId, lower(legalName))` and is now
+    //     `(organizationId, canonicalName)` over the GENERATED column, which is why the name
+    //     says COMPANY rather than NAME. The per-write-path reasoning below was re-derived
+    //     against it rather than the expectation being edited: a local write still trips only
+    //     this index, because a catalogue-linked row is outside its WHERE clause;
     //   - `Insurer_organizationId_insurerMasterId_key` — NULLs are distinct in
     //     Postgres, so only a catalogue-linked registration can trip it.
     //   - `Insurer_id_organizationId_key` — the composite-FK target added by the
@@ -300,9 +305,78 @@ describe('the unique constraints on Insurer are exactly these four', () => {
     );
     expect(indexes.map((i) => i.indexname)).toEqual([
       'Insurer_id_organizationId_key',
-      'Insurer_one_local_name_per_org',
+      'Insurer_one_local_company_per_org',
       'Insurer_organizationId_insurerMasterId_key',
       'Insurer_pkey',
     ]);
+  }, 120_000);
+});
+
+describe('the canonical key belongs to the database', () => {
+  it('REFUSES a write to canonicalName, which is why it is generated', async () => {
+    // The whole argument for a GENERATED column rather than an application-written one. Before
+    // this, the service computed the key and the database trusted it; a second writer, a
+    // migration, or a service that forgot would have produced a row the directory groups
+    // wrongly — silently, because nothing compares the stored key to the name beside it.
+    //
+    // Attempted as the OWNER, so this is not a privilege check: Postgres refuses the column
+    // to everybody.
+    await expect(
+      rawPrisma.$executeRawUnsafe(
+        `UPDATE "Insurer" SET "canonicalName" = 'whatever i like'
+          WHERE "insurerMasterId" IS NULL`,
+      ),
+    ).rejects.toThrow(/generated|cannot be used|GENERATED/i);
+  }, 120_000);
+
+  it('derives it from the name, and re-derives it on a rename', async () => {
+    const name = `Constraint Fixture Generated ${tag}`;
+    const inserted = await rawPrisma.insurer.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        legalName: name,
+        legalNameAr: `${name} (ع)`,
+      },
+      select: { id: true, canonicalName: true },
+    });
+    // Sorted tokens, lower-cased — computed by the database, not supplied.
+    expect(inserted.canonicalName).toBe(
+      `${tag} constraint fixture generated`.split(' ').sort().join(' '),
+    );
+
+    // A rename moves it in the same statement, with nothing in the application involved.
+    const renamed = await rawPrisma.insurer.update({
+      where: { id: inserted.id },
+      data: { legalName: `Constraint Fixture Renamed ${tag}` },
+      select: { canonicalName: true },
+    });
+    expect(renamed.canonicalName).toBe(
+      `${tag} constraint fixture renamed`.split(' ').sort().join(' '),
+    );
+  }, 120_000);
+
+  it('refuses a second local registration that differs only in spelling', async () => {
+    // The defect this closed, from the write side. `Insurer_one_local_company_per_org` is on
+    // the canonical key now, so a respelling is the same company — where the old
+    // `lower(legalName)` index accepted it and left the directory showing one entry for two
+    // rows.
+    const base = `Constraint Fixture Spelling ${tag}`;
+    await rawPrisma.insurer.create({
+      data: {
+        organizationId: TEST_ORGANIZATION_ID,
+        legalName: base,
+        legalNameAr: `${base} (ع)`,
+      },
+    });
+    await expect(
+      rawPrisma.insurer.create({
+        data: {
+          organizationId: TEST_ORGANIZATION_ID,
+          // Reordered, punctuated, extra spaces — one company under the key.
+          legalName: `spelling   fixture-constraint   ${tag}`,
+          legalNameAr: `${base} (ع2)`,
+        },
+      }),
+    ).rejects.toThrow();
   }, 120_000);
 });

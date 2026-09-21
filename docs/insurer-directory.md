@@ -90,12 +90,24 @@ exactly the disclosure the boundary forbids — **the disappearance is itself a 
 other offices' behaviour**. The cost is accepted: there is no cleanup path, and a company
 registered once is listed forever.
 
-### `Insurer.canonicalName`
+### `Insurer.canonicalName` — the database owns it
 
-Written by the application on every identity write, because SQL cannot call
-`canonicalNameKey()` and a second implementation of those folding rules in SQL is the thing
-to avoid. Nullable, and **not backfilled** for the same reason — an unmerged entry is better
-than two nearly-identical normalisers.
+A **STORED GENERATED** column over `canonical_name_key("legalName")`, an `IMMUTABLE` SQL
+function. The application cannot write it; Postgres refuses, and a test proves the refusal.
+
+That is not tidiness. Before migration `20261013100000` the application computed this key and
+the database trusted it, **while registration enforced uniqueness on `lower(legalName)`
+instead** — so the directory merged two spellings that registration had accepted as two rows.
+Measured: two insurer records, two sets of credit terms, one line on the screen, no error
+anywhere. One definition now serves both the view's `GROUP BY` and
+`Insurer_one_local_company_per_org`, so **registration refuses exactly what the directory
+merges.**
+
+The TypeScript `canonicalNameKey()` survives for one job — suggesting "did you mean…?" before
+a row exists — and is pinned to the SQL function by `canonical-name-key-parity.e2e-spec.ts`, a
+table of 39 names asserted against both.
+
+NULL for a catalogue-linked row, which groups by `insurerMasterId` instead.
 
 ## What the directory deliberately does NOT do
 
@@ -144,6 +156,27 @@ condition that attaches to each.
 | Route + permission | `apps/api/src/modules/insurer/insurer-directory.controller.ts` |
 | Boundary tests, planted leaks | `apps/api/test/insurer-directory.e2e-spec.ts` |
 | Name normaliser | `apps/api/src/common/company-name.util.ts` |
+
+## A STATED LIMIT: the directory cannot answer "who writes FLEET motor?"
+
+Variants — fleet vs individual, group vs individual medical, a named sub-peril like
+"(Fire)" — will live on `Policy` and `CommissionAgreement`, **not** on an insurer's offered
+lines. An insurer offers `MOTOR_COMPREHENSIVE`; nothing records that it writes only fleet
+motor.
+
+So the directory answers **"who writes Motor Comprehensive?"** and cannot answer **"who writes
+FLEET motor comprehensive?"**. An office searching for fleet cover gets every motor writer and
+has to ask them.
+
+That is acceptable and deliberate — the directory is a reference, not an authority, and the
+office telephones the company either way (§ "What the directory deliberately does NOT do").
+It is written down here because a known limit is cheap and a surprise is not: a broker who
+expects the narrower answer and gets the broader one should find it documented rather than
+discover it.
+
+The reason it is not a defect: promoting a segment to its own line WOULD let the directory
+answer the narrow question, and would stop a fleet-only writer appearing under Motor at all —
+which is the opposite of what a discovery surface is for.
 
 ## Still open
 

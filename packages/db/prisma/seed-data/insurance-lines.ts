@@ -33,6 +33,20 @@
  * would break vocabulary search for no gain: a client needing Sharia-compliant motor
  * cover wants Motor Comprehensive from a takaful company, not a different line.
  *
+ * ## One inconsistency inside the list, SEEN and left alone
+ *
+ * The 32 split life into `LIFE_INDIVIDUAL` and `LIFE_GROUP` but give medical a single
+ * `MEDICAL_HEALTH` — so the group/individual distinction exists on one side of the
+ * general/life split and not the other. That is an inconsistency in the classification, and it
+ * is recorded here so the next reader knows it was noticed rather than missed.
+ *
+ * Deliberately not fixed. Once a variant axis exists on the models that need the distinction
+ * (a policy, a commission agreement), splitting the line adds nothing behavioural — and it
+ * would cost the owner a decision already made about a settled list. A segment promoted to its
+ * own line also stops appearing under its parent in the directory, which is the opposite of
+ * what the directory is for: a company writing only group medical should still answer "who
+ * writes medical?".
+ *
  * ## The `code` is the identity
  *
  * `id` is a uuid generated per database, so it means something different in dev,

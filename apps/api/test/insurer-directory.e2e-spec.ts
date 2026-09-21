@@ -197,7 +197,6 @@ beforeAll(async () => {
   noDirectory = await makeUser(`dir-none-${tag}`, 'COMPLIANCE_OFFICER');
 
   // Office A registers the company, with office-scoped values that must never surface.
-  const aCanonical = canonicalOf(SHARED_EN);
   const motor = await rawPrisma.insuranceLine.findFirstOrThrow({
     where: { code: 'MOTOR_COMPREHENSIVE' },
   });
@@ -208,7 +207,6 @@ beforeAll(async () => {
     data: {
       legalName: SHARED_EN,
       legalNameAr: SHARED_AR,
-      canonicalName: aCanonical,
       structure: 'TAKAFUL',
       companyPhone: '+962 6 500 7000',
       companyEmail: 'contact@yarmouk.test',
@@ -239,8 +237,9 @@ beforeAll(async () => {
       organizationId: ORG_B_ID,
       legalName: SHARED_EN_B,
       legalNameAr: SHARED_AR,
-      // The same key from a different spelling — extra spaces, a hyphen, lower case.
-      canonicalName: canonicalOf(SHARED_EN_B),
+      // The same key from a different spelling — extra spaces, a hyphen, lower case. Not
+      // written: the generated column derives it from `legalName`, which is the property
+      // under test. The office-B row existing at all is what proves the two spellings merge.
       structure: 'TAKAFUL',
       // No phone: office A's fills the gap. A website office A lacks: B's fills that one.
       companyEmail: 'b-side@yarmouk.test',
@@ -449,7 +448,6 @@ describe('presence depends on registration, not on anyone still dealing with the
       data: {
         legalName: name,
         legalNameAr: `${FIXTURE_PREFIX} متروك تماما ${tag}`,
-        canonicalName: canonicalOf(name),
         structure: 'CONVENTIONAL',
         companyPhone: '+962 6 500 8000',
         companyEmail: 'still-listed@example.test',
@@ -474,7 +472,6 @@ describe('presence depends on registration, not on anyone still dealing with the
       data: {
         legalName: name,
         legalNameAr: `${FIXTURE_PREFIX} بلا خطوط ${tag}`,
-        canonicalName: canonicalOf(name),
         structure: 'CONVENTIONAL',
         companyPhone: '+962 6 500 9000',
         companyEmail: 'no-lines@example.test',

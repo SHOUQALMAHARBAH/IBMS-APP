@@ -206,7 +206,6 @@ export class InsurerRepository {
     insurerMasterId: string | null;
     legalName: string | null;
     legalNameAr: string | null;
-    canonicalName: string;
     company: InsurerCompanyFields;
     relationship: InsurerRelationshipFields;
   }): Promise<InsurerRecord> {
@@ -215,7 +214,6 @@ export class InsurerRepository {
         insurerMasterId: input.insurerMasterId,
         legalName: input.legalName,
         legalNameAr: input.legalNameAr,
-        canonicalName: input.canonicalName,
         ...input.company,
         ...input.relationship,
       },
@@ -349,7 +347,6 @@ export class InsurerRepository {
       InsurerRelationshipFields & {
         legalName?: string;
         legalNameAr?: string;
-        canonicalName?: string;
       },
   ): Promise<InsurerRecord> {
     return this.prisma.client.insurer.update({

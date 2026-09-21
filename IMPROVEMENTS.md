@@ -848,6 +848,24 @@ office up — verified by running all four plus the victim together, 46/46.
 message instead of a bare `Error`, none of this investigation would have been needed. The
 guard makes the symptom legible; it does not make the endpoint honest.
 
+**A SECOND mechanism with the same symptom, found the next day.** `audit.e2e-spec.ts`'s single
+test failed inside a batch and passed alone and on re-run. Measured: it needs **99.5 seconds in
+isolation** against the suite's 180 s default — 55% of its budget before any other file has
+touched the database — because it boots the app, signs a user up, logs them in (two bcrypt
+hashes) and then attacks a row. Eight preceding files are enough to push it over. Fixed with an
+explicit 600 s and the measurement in a comment.
+
+So &ldquo;fails in a batch, passes alone&rdquo; has at least two causes worth separating before
+either is called a flake:
+
+| Symptom | Mechanism | How to tell |
+|---|---|---|
+| MANY tests in one file fail together | shared state — a leaked Organization, a truncated cache | they fail at the same call (`signup`, a fixture helper), and the file passes once the state is cleaned |
+| ONE slow test fails | no timeout headroom under load | time it in isolation; if it uses a large fraction of its budget alone, it has none in company |
+
+The general rule: **time a test alone before believing it is flaky.** A runtime that is a large
+fraction of the budget is a prediction of failure, not bad luck.
+
 ---
 
 ### 1.23 `P1` — A comment that states an invariant is a test that does not run
@@ -877,6 +895,105 @@ change. Two habits carry it:
   the pattern for turning one into the other. Where a comment is genuinely the right home —
   reasoning, history, a rejected alternative — it should state WHY rather than WHAT IS, and
   a why does not go stale when a count moves.
+
+---
+
+### 1.24 — ACCEPTANCE PATTERN: a read surface must be checked against its WRITERS, not only against what it reveals
+
+The insurer directory was accepted on conditions that were all satisfied: a security-definer
+view, an `information_schema` allow-list, planted leaks, a proven-refused write, measured
+cross-office invisibility. Every one of those asks **what does this surface expose**.
+
+None of them asked **does this surface agree with the write path that feeds it** — and it did
+not. The directory grouped two spellings as one company; registration's unique index accepted
+them as two rows. Two insurer records, two sets of credit terms, one line on the screen, no
+error anywhere. Live inside an accepted commit for two days (F13, fixed by migration
+`20261013100000`).
+
+**The general form, for every read surface from here:** a derived read — a view, a
+materialised projection, a cached aggregate, a report — has at least two properties to check,
+and exposure is only the first.
+
+| Ask | Catches |
+|---|---|
+| What does it expose? | leakage — the allow-list, the planted sentinel |
+| **Does it agree with its writers?** | **a surface whose grouping, filtering or dedupe rule differs from the constraint the write path enforces** |
+| What does it do when its inputs are absent? | an unkeyed row, a NULL join, an empty aggregate silently reading as "none" |
+
+The second failure has no symptom. Nothing errors, nothing is missing, and the screen is
+confidently wrong — which is why it needs an explicit question rather than a reviewer's
+instinct.
+
+**How to apply.** For any derived surface, name the rule it applies (group by X, dedupe on Y,
+filter on Z) and then find the WRITE-side constraint that is supposed to make that rule
+correct. If the two are different expressions, they are two definitions and they will diverge;
+if you cannot find a write-side constraint at all, the surface is asserting something nothing
+enforces. The fix in both cases is one definition — and § 1.19's whole-set pattern is how you
+keep it one: `canonical_name_key()` is a single database function, used by the view's
+`GROUP BY` and by the unique index, with the TypeScript mirror pinned to it by a table of
+names asserted against both.
+
+---
+
+### 1.25 `P1` — TO BUILD: the commission variant, and the NULL-uniqueness defect in the obvious key
+
+Decided (and NOT yet built — the line conversion commits carry it):
+
+- A `variant` beside the managed line id on the models that sit on a crossing, because the 32
+  cannot express fleet-vs-individual, group-vs-individual medical, or a named sub-peril, and
+  `Property All Risks (Fire)` carries its own commission rate today.
+- **Stored for display, matched on a CANONICAL KEY** — the same generated-column treatment as
+  the company name. Free text on a matching path is the defect being removed, one level down.
+- **Not** a managed catalogue. A second vocabulary and a second add-flow, invented before the
+  shape is known, is the closed-list mistake again.
+- The entry control offers the variants already used for that line **in this office**, so
+  consistency is the default path rather than a discipline somebody maintains.
+
+**Why that is sufficient here and insufficient for lines — the load-bearing reason.** Variant
+matching happens WITHIN ONE OFFICE on both sides (a policy and a commission agreement belong
+to the same office). A LINE crosses offices, through the directory. A key only has to be shared
+as widely as the comparison it serves.
+
+**The graduation condition, as a trigger rather than a judgement call:** the moment a variant
+must be compared ACROSS offices, or appear on the directory, it becomes a managed list.
+
+**A defect in the obvious key, which touches money.** `UNIQUE (insurerId, insuranceLineId,
+variant)` does **not** constrain two agreements that both have a NULL variant — Postgres treats
+NULLs as distinct in a unique index, so the plain-line case, which is the common case, is
+exactly the one the constraint misses. A unique that does not unique, on the commission table.
+Use `NULLS NOT DISTINCT`, or index over `COALESCE(variant_key, '')`. **Settle it in the same
+commit and prove it by planting two NULL-variant agreements and watching the insert be
+refused — not by reading the DDL.**
+
+**Two axes, not three things** (recorded while the evidence is in front of us): fleet and group
+are the SAME axis — one contract covering many insureds, expressed in two lines of business. A
+named sub-peril is a different axis. Whoever eventually builds a managed variant list should
+start from two axes rather than an enumeration of the cases we happened to observe.
+
+---
+
+### 1.26 `P1` — TO BUILD: the line migration is TOTAL, and the old column drops on a MEASUREMENT
+
+The rule for converting the six free-text `insuranceLine` columns, decided before any of it is
+written, because it is the part that goes wrong quietly:
+
+- **Every row either maps to a line id, or is explicitly PARKED** — its original string
+  retained and reported. Nothing is silently dropped.
+- **Nothing is funnelled into an "Unclassified" line.** An unclassified line is a line nobody
+  writes, and it would poison the directory that the whole conversion exists to serve.
+- **The old string column is dropped only when a test MEASURES zero unmapped rows** — not when
+  we believe there are none. The drop becomes conditional on a measurement, the same move as
+  the unique-index inventory and the status partition.
+
+Two values need a human decision and get one in the seed rather than a mapping table, since
+every row in every database is synthetic: `General/Product Liability` (spans two of the 32) and
+`Fire & Property` (ambiguous between Fire & Allied Perils and Property All Risks). Building
+machinery to interpret fiction is the tidiness being avoided.
+
+The general case is not those two. `db-test` holds **178 distinct Policy values and 4,213 RFQ
+rows** — fixture noise, but it is what an unconstrained column attracts, and the conversion has
+to tolerate values no mapping table anticipates. That is why the rule is totality plus a
+measured gate, rather than a mapping table plus confidence.
 
 ---
 

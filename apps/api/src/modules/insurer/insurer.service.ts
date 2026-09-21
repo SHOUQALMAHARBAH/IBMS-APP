@@ -16,7 +16,6 @@ import {
   type InsurerStatusImpact,
 } from '../../repositories/insurer.repository';
 import { pageWindow, type Paginated } from '../../common/pagination';
-import { canonicalNameKey } from '../../common/company-name.util';
 import {
   auditDelta,
   collisionMessage,
@@ -108,7 +107,6 @@ export class InsurerService {
       throw new UnprocessableEntityException(identity.error);
     }
 
-    let masterName = '';
     if (identity.path === 'MASTER') {
       // Checked here rather than left to the foreign key, which would surface as a
       // P2003 and a 500. The catalogue is global, so its ids are nobody's secret
@@ -119,7 +117,6 @@ export class InsurerService {
           'That company is not in the shared catalogue. Register it with legalName and legalNameAr instead.',
         );
       }
-      masterName = master.legalName;
     }
 
     const company = this.companyFrom(dto);
@@ -135,17 +132,10 @@ export class InsurerService {
           identity.path === 'MASTER' ? identity.insurerMasterId : null,
         legalName: identity.path === 'LOCAL' ? identity.legalName : null,
         legalNameAr: identity.path === 'LOCAL' ? identity.legalNameAr : null,
-        // The directory groups by this, so it is written on the way in rather than
-        // derived on the way out: SQL cannot call the normaliser, and a second
-        // implementation of those folding rules in SQL is the thing to avoid.
-        //
-        // Written for BOTH paths. A catalogue-linked row groups by its master id, so it
-        // does not strictly need one — but the registration matcher will, and a column
-        // that is populated only sometimes is a column every later reader has to
-        // special-case.
-        canonicalName: canonicalNameKey(
-          identity.path === 'LOCAL' ? identity.legalName : masterName,
-        ),
+        // `canonicalName` is NOT written here, and cannot be: it is a STORED GENERATED
+        // column over `canonical_name_key("legalName")`. The directory groups by it and
+        // `Insurer_one_local_company_per_org` enforces uniqueness on it, so one definition
+        // decides both — rather than this service computing a key the database then trusts.
         company,
         relationship,
       });
@@ -216,14 +206,10 @@ export class InsurerService {
       } = {
       ...this.companyFrom(dto),
       ...this.relationshipFrom(dto),
-      ...(dto.legalName === undefined
-        ? {}
-        : {
-            legalName: dto.legalName,
-            // Recomputed on a rename, or the directory would keep grouping this company
-            // under the name it no longer has.
-            canonicalName: canonicalNameKey(dto.legalName),
-          }),
+      // A rename needs no recomputation: the generated column follows `legalName` in the
+      // same statement, so the directory regroups and the uniqueness re-applies without
+      // this service knowing the rule.
+      ...(dto.legalName === undefined ? {} : { legalName: dto.legalName }),
       ...(dto.legalNameAr === undefined
         ? {}
         : { legalNameAr: dto.legalNameAr }),
