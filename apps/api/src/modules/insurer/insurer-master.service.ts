@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { InsurerMasterRepository } from '../../repositories/insurer-master.repository';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import {
   deriveMasterView,
   deriveTemplateView,
@@ -32,6 +33,7 @@ export class InsurerMasterService {
   constructor(
     private readonly masters: InsurerMasterRepository,
     private readonly audit: AuditService,
+    private readonly lines: InsuranceLineRepository,
   ) {}
 
   async list(): Promise<InsurerMasterView[]> {
@@ -54,12 +56,18 @@ export class InsurerMasterService {
    */
   async listForms(
     insurerMasterId: string,
-    insuranceLine?: string,
+    insuranceLineId?: string,
   ): Promise<InsurerFormTemplateView[]> {
     await this.get(insurerMasterId);
+    // Validated even on a READ. A filter on an id that does not exist returns an empty list,
+    // which reads as "nobody has mapped this line" when the truth is "that is not a line" —
+    // two different answers the caller cannot tell apart.
+    if (insuranceLineId !== undefined) {
+      await this.assertGlobalLine(insuranceLineId);
+    }
     const templates = await this.masters.listTemplates(
       insurerMasterId,
-      insuranceLine,
+      insuranceLineId,
     );
     return templates.map(deriveTemplateView);
   }
@@ -75,9 +83,9 @@ export class InsurerMasterService {
    */
   async currentForm(
     insurerMasterId: string,
-    insuranceLine: string,
+    insuranceLineId: string,
   ): Promise<InsurerFormTemplateView | null> {
-    const forms = await this.listForms(insurerMasterId, insuranceLine);
+    const forms = await this.listForms(insurerMasterId, insuranceLineId);
     return forms[0] ?? null;
   }
 
@@ -92,6 +100,7 @@ export class InsurerMasterService {
     actorUserId: string,
   ): Promise<InsurerFormTemplateView> {
     await this.get(insurerMasterId);
+    await this.assertGlobalLine(dto.insuranceLineId);
 
     const duplicates = duplicateFieldKeys(dto.fields);
     if (duplicates.length > 0) {
@@ -108,7 +117,7 @@ export class InsurerMasterService {
 
     const template = await this.masters.createNextVersion({
       insurerMasterId,
-      insuranceLine: dto.insuranceLine,
+      insuranceLineId: dto.insuranceLineId,
       sourceDocumentRef: dto.sourceDocumentRef ?? null,
       fields: dto.fields.map((f) => ({
         fieldKey: f.fieldKey,
@@ -138,5 +147,33 @@ export class InsurerMasterService {
     });
 
     return deriveTemplateView(template);
+  }
+
+  /**
+   * The line must exist AND be one of the 32 global ones.
+   *
+   * An office's own addition is refused with its own message rather than a generic "unknown
+   * id", because the two are different problems and the second one is not the caller's fault:
+   * the id IS real, they can see it in their own picker, and the reason it cannot be used here
+   * is a tenancy property of this model that nothing on their screen explains.
+   *
+   * `InsurerFormTemplate` carries no `organizationId` — it hangs off `InsurerMaster`, so one
+   * mapping is read by EVERY office. A row pointing at an `OfficeInsuranceLine` would put one
+   * office's private vocabulary on a row the others read. The FK already makes that impossible;
+   * this turns "impossible" into a sentence.
+   */
+  private async assertGlobalLine(insuranceLineId: string): Promise<void> {
+    const [standard] = await this.lines.findStandardByIds([insuranceLineId]);
+    if (standard !== undefined) return;
+
+    const office = await this.lines.findOfficeLineById(insuranceLineId);
+    if (office !== null) {
+      throw new UnprocessableEntityException(
+        `Insurance line "${office.nameEn}" is your office's own addition, and an insurer form mapping is read by every office on the platform — so it can only be mapped to a line from the shared catalogue. Pick one from GET /insurance-lines, or ask for this type to be added to the standard list.`,
+      );
+    }
+    throw new UnprocessableEntityException(
+      `Insurance line id does not exist: ${insuranceLineId}. Pick one from GET /insurance-lines.`,
+    );
   }
 }

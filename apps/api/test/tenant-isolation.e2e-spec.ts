@@ -834,7 +834,13 @@ describe('Part V — an insurer form mapped once serves every office (item 8)', 
       .post(`/insurer-masters/${master.id}/form-templates`)
       .set(bearer(isolationAdmin.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        // By CODE, not a literal uuid: each database seeds its own ids.
+        insuranceLineId: (
+          await rawPrisma.insuranceLine.findUniqueOrThrow({
+            where: { code: 'MOTOR_COMPREHENSIVE' },
+            select: { id: true },
+          })
+        ).id,
         sourceDocumentRef: 'shared-motor-form.pdf',
         fields: [
           {
@@ -855,16 +861,21 @@ describe('Part V — an insurer form mapped once serves every office (item 8)', 
     // template were tenant-scoped in either layer, this returns nothing.
     const visible = await asAppRole<{
       id: string;
-      insuranceLine: string;
+      code: string;
       version: number;
       sourceDocumentRef: string | null;
     }>(
       ORG_B_ID,
-      `SELECT id, "insuranceLine", version, "sourceDocumentRef"
-         FROM "InsurerFormTemplate" WHERE id = '${templateId}'`,
+      // Joined to `InsuranceLine` deliberately: office B must be able to reach the LINE as well
+      // as the template, or it has a mapping it cannot name. The line catalogue is global and
+      // unscoped, and this is the read that proves it stayed that way.
+      `SELECT t.id, l.code, t.version, t."sourceDocumentRef"
+         FROM "InsurerFormTemplate" t
+         JOIN "InsuranceLine" l ON l.id = t."insuranceLineId"
+        WHERE t.id = '${templateId}'`,
     );
     expect(visible).toHaveLength(1);
-    expect(visible[0].insuranceLine).toBe('MOTOR');
+    expect(visible[0].code).toBe('MOTOR_COMPREHENSIVE');
     expect(visible[0].version).toBe(1);
     expect(visible[0].sourceDocumentRef).toBe('shared-motor-form.pdf');
 

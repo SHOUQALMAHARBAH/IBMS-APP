@@ -4512,7 +4512,23 @@ model InsurerFormTemplate {
   id                String        @id @default(uuid())
   insurerMasterId   String
   insurerMaster     InsurerMaster @relation(fields: [insurerMasterId], references: [id])
-  insuranceLine     String
+  /// The managed line this form is FOR — the GLOBAL catalogue only, never an office's own
+  /// addition, and that restriction is structural rather than stylistic.
+  ///
+  /// `InsurerFormTemplate` carries no `organizationId`: it hangs off `InsurerMaster`, so one
+  /// mapping is read by EVERY office (that is the whole point of § 5 — an office that has never
+  /// touched an insurer still gets the mapping someone else made). An `OfficeInsuranceLine`
+  /// belongs to exactly one office, so referencing one from a globally-readable row would put
+  /// office A's private vocabulary on a row office B reads — a cross-office disclosure of the
+  /// kind the insurer directory exists to prevent. And there is no composite-FK guard available
+  /// here, because a global child has no `organizationId` to agree with its parent.
+  ///
+  /// Keyed by uuid rather than `code` deliberately, despite `InsuranceLine.code`'s own warning
+  /// that uuids differ between databases: that warning applies to anything SEEDED, which must
+  /// mean the same line in two databases. A form template is runtime data created in one
+  /// database, so the FK is the right reference and the uuid is the right key.
+  insuranceLineId   String
+  insuranceLine     InsuranceLine @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
   version           Int           @default(1)
   /// The originally uploaded PDF/Word this mapping was derived from.
   sourceDocumentRef String?
@@ -4523,7 +4539,7 @@ model InsurerFormTemplate {
   /// One version of a given line's form per insurer. A re-map is a NEW
   /// version, never an edit of the one other offices are already submitting
   /// against.
-  @@unique([insurerMasterId, insuranceLine, version])
+  @@unique([insurerMasterId, insuranceLineId, version])
   @@index([insurerMasterId])
 }
 
@@ -4626,7 +4642,8 @@ model InsuranceLine {
   displayOrder Int
   createdAt    DateTime              @default(now())
 
-  offeredBy InsurerOfferedLine[]
+  offeredBy     InsurerOfferedLine[]
+  formTemplates InsurerFormTemplate[]
 
   @@index([category, displayOrder])
 }

@@ -8,6 +8,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Min,
   ValidateNested,
@@ -58,9 +59,12 @@ export class MapInsurerFormFieldDto {
  * against.
  */
 export class MapInsurerFormDto {
-  @IsString()
-  @Length(1, 100)
-  insuranceLine!: string;
+  /** The GLOBAL `InsuranceLine.id` this form is for. A uuid, not a name — and the lookup, not
+   *  the validator, decides whether it exists: an unknown id is a 422 naming it, and an
+   *  OFFICE's own line id is a 422 explaining that a globally-readable mapping cannot point at
+   *  one office's private vocabulary. `@IsUUID()` only rejects things that are not ids at all. */
+  @IsUUID()
+  insuranceLineId!: string;
 
   /** The uploaded PDF/Word this mapping was derived from, so the mapping can
    * always be checked back against its source. */

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 import { InsurerMasterService } from './insurer-master.service';
 import { MapInsurerFormDto } from './dto/map-insurer-form.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
@@ -8,16 +8,17 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 class ListFormsQueryDto {
+  /** A GLOBAL `InsuranceLine.id`. Omit it for every line this insurer has a mapping for. */
   @IsOptional()
-  @IsString()
-  @Length(1, 100)
-  insuranceLine?: string;
+  @IsUUID()
+  insuranceLineId?: string;
 }
 
 class CurrentFormQueryDto {
-  @IsString()
-  @Length(1, 100)
-  insuranceLine!: string;
+  /** A GLOBAL `InsuranceLine.id` — required here, because "the version to submit against"
+   *  is a question about one line. */
+  @IsUUID()
+  insuranceLineId!: string;
 }
 
 /**
@@ -54,7 +55,7 @@ export class InsurerMasterController {
   @RequirePermissions('insurer.master.read')
   @Get(':id/form-templates')
   listForms(@Param('id') id: string, @Query() query: ListFormsQueryDto) {
-    return this.masters.listForms(id, query.insuranceLine);
+    return this.masters.listForms(id, query.insuranceLineId);
   }
 
   /**
@@ -69,7 +70,7 @@ export class InsurerMasterController {
   @RequirePermissions('insurer.master.read')
   @Get(':id/form-templates/current')
   currentForm(@Param('id') id: string, @Query() query: CurrentFormQueryDto) {
-    return this.masters.currentForm(id, query.insuranceLine);
+    return this.masters.currentForm(id, query.insuranceLineId);
   }
 
   @RequirePermissions('insurer.form.map')

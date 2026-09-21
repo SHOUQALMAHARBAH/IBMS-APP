@@ -1058,6 +1058,43 @@ rows** — fixture noise, but it is what an unconstrained column attracts, and t
 to tolerate values no mapping table anticipates. That is why the rule is totality plus a
 measured gate, rather than a mapping table plus confidence.
 
+#### One of the six is DONE (2026-10-16): `InsurerFormTemplate.insuranceLine`
+
+The easy one, and worth recording precisely because its ease does not transfer. It held **zero
+rows on both databases**, so the migration needs no mapping at all — and rather than assume that
+stays true, it **REFUSES on any database that has rows**, naming the distinct strings it found:
+
+```
+ERROR:  2 InsurerFormTemplate row(s) exist, carrying these free-text lines:
+  'Motor Comprehensive', 'vehicle'
+... There is no automatic mapping from free text to the managed vocabulary — "Motor",
+"motor comprehensive" and "Vehicle" are all plausible strings for one line, and choosing for you
+would attach a form to the wrong line that every office then submits against.
+```
+
+Planted two rows on dev and watched it refuse before applying for real. That refusal IS the
+totality rule for the zero-row case: nothing silently dropped, nothing invented.
+
+**The design decision the other five do not share.** This model references the GLOBAL
+`InsuranceLine` **only**, never `OfficeInsuranceLine` — the opposite of `InsurerOfferedLine`,
+which carries both. The reason is tenancy, not taste: `InsurerFormTemplate` has no
+`organizationId`, it hangs off `InsurerMaster`, so one mapping is read by EVERY office. A row
+pointing at an office's own line would put office A's private vocabulary on a row office B reads.
+The composite-FK guard used elsewhere is unavailable, because a global child has no
+`organizationId` to agree with — so the constraint is the FK pointing at one table, plus a 422
+that explains it, plus a deploy-time assertion that no FK to `OfficeInsuranceLine` exists (a
+future migration adding one "for symmetry with InsurerOfferedLine" is the plausible mistake).
+
+**Each remaining column needs that question asked separately:** is this row read by one office or
+by all of them? Global-only for the shared ones, both FKs for the office-scoped ones. Getting it
+backwards on an office-scoped model merely over-restricts; getting it backwards on a global one is
+a disclosure.
+
+**Also retired with it:** a `mode: 'insensitive'` filter on the old string column, which existed
+only so `"motor"` would find `"MOTOR"`. Leniency was a symptom of free text; with a managed
+vocabulary the question has one answer, and the e2e test that asserted case-insensitivity was
+replaced by tests for what the id is NOT — unknown id 422, office line 422, non-uuid 400.
+
 ---
 
 ### 1.27 `P1` — The test database cannot exercise a class of TEXT behaviour, and this system is Arabic-primary

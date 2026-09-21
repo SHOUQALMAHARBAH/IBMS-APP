@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { InsurerMasterController } from './insurer-master.controller';
 import { InsurerMasterService } from './insurer-master.service';
 import { InsurerMasterRepository } from '../../repositories/insurer-master.repository';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import { AuditModule } from '../audit/audit.module';
 
 /**
@@ -14,7 +15,13 @@ import { AuditModule } from '../audit/audit.module';
 @Module({
   imports: [AuditModule],
   controllers: [InsurerMasterController],
-  providers: [InsurerMasterService, InsurerMasterRepository],
+  providers: [
+    InsurerMasterService,
+    InsurerMasterRepository,
+    // The service validates that a form's line is one of the 32 GLOBAL lines, and refuses an
+    // office's own addition — see `assertGlobalLine`.
+    InsuranceLineRepository,
+  ],
   // Exported for `InsurerModule`: registering an office insurer against the
   // shared catalogue has to check the company is in it, and a cross-module read
   // goes through the repository rather than this module's service.

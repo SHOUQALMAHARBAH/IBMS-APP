@@ -114,7 +114,13 @@ describe('deriveTemplateView', () => {
     const view = deriveTemplateView({
       id: 't1',
       insurerMasterId: 'm1',
-      insuranceLine: 'MOTOR',
+      insuranceLineId: 'line-motor',
+      insuranceLine: {
+        id: 'line-motor',
+        code: 'MOTOR_COMPREHENSIVE',
+        nameEn: 'Motor — Comprehensive',
+        nameAr: 'تأمين المركبات الشامل',
+      },
       version: 2,
       sourceDocumentRef: 'aig-motor-2026.pdf',
       createdAt: new Date('2026-09-12T00:00:00.000Z'),
@@ -136,7 +142,12 @@ describe('deriveTemplateView', () => {
     expect(view).toEqual({
       id: 't1',
       insurerMasterId: 'm1',
-      insuranceLine: 'MOTOR',
+      insuranceLine: {
+        id: 'line-motor',
+        code: 'MOTOR_COMPREHENSIVE',
+        nameEn: 'Motor — Comprehensive',
+        nameAr: 'تأمين المركبات الشامل',
+      },
       version: 2,
       sourceDocumentRef: 'aig-motor-2026.pdf',
       fields: [
@@ -159,7 +170,13 @@ describe('deriveTemplateView', () => {
     const view = deriveTemplateView({
       id: 't1',
       insurerMasterId: 'm1',
-      insuranceLine: 'MOTOR',
+      insuranceLineId: 'line-motor',
+      insuranceLine: {
+        id: 'line-motor',
+        code: 'MOTOR_COMPREHENSIVE',
+        nameEn: 'Motor — Comprehensive',
+        nameAr: 'تأمين المركبات الشامل',
+      },
       version: 1,
       sourceDocumentRef: null,
       createdAt: new Date(),
