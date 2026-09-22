@@ -10,7 +10,7 @@ import { RollbackDatasetDto } from './dto/rollback-dataset.dto';
  * Process 49 (backlog Part C #49, Domain F) — the sanctions/PEP list sync
  * job's on-demand trigger + status view. `sanctions-pep.screen`
  * (`[COMPLIANCE_OFFICER]`) gates both — the seeded permission's own
- * description, "Run recurring sanctions/PEP screening batches."
+ * description, "Run recurring sanctions screening batches."
  */
 @ApiTags('compliance-risk')
 @Controller('watchlist-sync')

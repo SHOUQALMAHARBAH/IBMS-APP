@@ -143,6 +143,14 @@ export class SessionService {
     // the role-name checks still awaiting Phase 2 read the names.
     const roleRefs = await this.users.getRoleRefs(userId);
     const roleIds = roleRefs.map((r) => r.id);
+    // The one place per request where an authenticated actor's roles are known, so it is the one
+    // place that records them for the audit log. `AuditService` reads this and STORES the role on
+    // every entry rather than leaving a reader to resolve it from present state later — a
+    // promotion or a rename would otherwise rewrite what history appears to say about someone.
+    this.orgContext.adoptActorRoles(
+      roleIds,
+      roleRefs.map((r) => r.name),
+    );
     return {
       id: user.id,
       organizationId: user.organizationId,

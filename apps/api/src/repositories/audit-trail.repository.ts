@@ -25,6 +25,8 @@ const AUDIT_LOG_ENTRY_SELECT = {
   beforeValue: true,
   afterValue: true,
   isSensitiveDataAccess: true,
+  actorRoleIds: true,
+  actorRoleNames: true,
   occurredAt: true,
 } satisfies Prisma.AuditLogEntrySelect;
 

@@ -78,15 +78,32 @@ export class DisposalBatchService {
     dto: CreateDisposalBatchDto,
     actorUserId: string,
   ): Promise<DisposalBatchView> {
-    if (
-      dto.retentionScheduleItemId &&
-      !(await this.repo.retentionScheduleItemExists(
+    if (dto.retentionScheduleItemId) {
+      const item = await this.repo.findRetentionScheduleItemForNomination(
         dto.retentionScheduleItemId,
-      ))
-    ) {
-      throw new NotFoundException(
-        `Retention schedule item ${dto.retentionScheduleItemId} not found.`,
       );
+      if (!item) {
+        throw new NotFoundException(
+          `Retention schedule item ${dto.retentionScheduleItemId} not found.`,
+        );
+      }
+      // A period nobody has legally confirmed cannot authorise a destruction.
+      //
+      // Every period in this schedule is a DRAFT until a lawyer signs it off — the owner's own
+      // documents leave them blank pending advice, and `retentionPeriodMonths` is a number
+      // somebody typed until `confirmedByLegalCounselAt` says otherwise. Nominating against an
+      // unconfirmed period means destroying records on an unsourced figure, which is the one
+      // mistake in this workflow that cannot be undone: the dual control below governs WHO
+      // approves, not whether the period is real.
+      //
+      // The editing guard already keys on this field the other way round — once confirmed, the
+      // period may no longer be edited (`retention-schedule.service.ts`). That existed; this,
+      // the half that blocks acting on an UNconfirmed one, did not.
+      if (item.confirmedByLegalCounselAt === null) {
+        throw new UnprocessableEntityException(
+          `The retention period for "${item.recordCategory}" has not been confirmed by legal counsel, so records in it cannot be nominated for disposal. Confirm the period first — it is a draft until then, and destroying records against a draft cannot be undone.`,
+        );
+      }
     }
     await this.assertNoActiveLegalHold(dto.retentionScheduleItemId ?? null);
 

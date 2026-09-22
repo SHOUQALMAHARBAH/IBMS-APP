@@ -139,7 +139,7 @@ export const CUSTOMERS = {
     customerWizardReviewUbosLine: "عدد المستفيدين الحقيقيين المسجلين: {count}",
     customerWizardReviewDocumentsLine: "عدد المستندات المرفقة: {count}",
     customerWizardReviewSubmitIntro:
-      "الإرسال يحيل ملف اعرف عميلك إلى الالتزام لفحص العقوبات/الأشخاص السياسيين/غسل الأموال " +
+      "الإرسال يحيل ملف اعرف عميلك إلى الالتزام لفحص العقوبات/غسل الأموال " +
       'والاعتماد — يبقى العميل بحالة "بانتظار اعرف عميلك" حتى يُعتمد.',
     customerWizardSubmittingButton: "جارٍ الإرسال…",
     customerWizardSubmitButton: "إرسال للمراجعة من الالتزام",
@@ -155,7 +155,7 @@ export const CUSTOMERS = {
     // KycQueue.tsx + customers/kyc-queue/page.tsx
     kycQueuePageHeading: "قائمة فحص اعرف عميلك",
     kycQueuePageIntro:
-      "العملية 3-4 — تشغيل فحص العقوبات/الأشخاص السياسيين/غسل الأموال، وتوجيه النتائج " +
+      "العملية 3-4 — تشغيل فحص العقوبات/غسل الأموال، وتوجيه النتائج " +
       "عالية المخاطر عبر العناية الواجبة المعززة، واعتماد أو رفض كل ملف اعرف عميلك. " +
       "الاعتماد يُفعّل العميل؛ ومبدأ الفصل بين المُعِد والمدقق يمنع موظف الالتزام الذي " +
       "سجّل الملف من اعتماده أيضاً.",
@@ -341,7 +341,7 @@ export const CUSTOMERS = {
     customerWizardReviewUbosLine: "Beneficial owners recorded: {count}",
     customerWizardReviewDocumentsLine: "Documents attached: {count}",
     customerWizardReviewSubmitIntro:
-      "Submitting hands this KYC file to Compliance for sanctions/PEP/AML screening and " +
+      "Submitting hands this KYC file to Compliance for sanctions/AML screening and " +
       "approval — the Customer stays PENDING_KYC until it's approved.",
     customerWizardSubmittingButton: "Submitting…",
     customerWizardSubmitButton: "Submit for compliance review",
@@ -358,7 +358,7 @@ export const CUSTOMERS = {
     // KycQueue.tsx + customers/kyc-queue/page.tsx
     kycQueuePageHeading: "KYC compliance queue",
     kycQueuePageIntro:
-      "Process 3-4 — run sanctions/PEP/AML screening, route high-risk results through " +
+      "Process 3-4 — run sanctions/AML screening, route high-risk results through " +
       "enhanced due diligence, and approve or reject each KYC file. Approving activates " +
       "the Customer; maker/checker prevents the capturing officer from also being the approver.",
     kycQueueNoApprovePermission:

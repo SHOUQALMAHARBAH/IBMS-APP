@@ -60,7 +60,7 @@ test("lists sync runs with the sync/batch buttons", async ({ page }) => {
 
   await page.goto("/watchlist-sync");
   await expect(
-    page.getByRole("heading", { name: "Sanctions & PEP watchlist sync" }),
+    page.getByRole("heading", { name: "Sanctions watchlist sync" }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: "OFAC SDN" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "UN consolidated list" })).toBeVisible();

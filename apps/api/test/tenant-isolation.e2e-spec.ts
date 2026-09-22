@@ -540,9 +540,16 @@ describe('Part V — raw SQL is protected by RLS alone (item 3)', () => {
 });
 
 describe('Part V — the runtime role cannot sidestep the policies (item 4)', () => {
-  it('has no SUPERUSER, no BYPASSRLS, and owns no tables', async () => {
-    const role = await ownerQuery<{ rolsuper: boolean; rolbypassrls: boolean }>(
-      `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'ibms_app'`,
+  it('holds no attribute and no MEMBERSHIP that could sidestep RLS, and owns no tables', async () => {
+    const role = await ownerQuery<{
+      rolsuper: boolean;
+      rolbypassrls: boolean;
+      rolreplication: boolean;
+      rolcreaterole: boolean;
+      rolcreatedb: boolean;
+    }>(
+      `SELECT rolsuper, rolbypassrls, rolreplication, rolcreaterole, rolcreatedb
+         FROM pg_roles WHERE rolname = 'ibms_app'`,
     );
 
     expect(role).toHaveLength(1);
@@ -554,6 +561,35 @@ describe('Part V — the runtime role cannot sidestep the policies (item 4)', ()
         WHERE schemaname = 'public' AND tableowner = 'ibms_app'`,
     );
     expect(Number(owned[0].n)).toBe(0);
+
+    // The three attributes above are not the whole surface. `rolsuper` is what a reader checks
+    // and it is not the only way to get superuser privileges:
+    //
+    //  * REPLICATION can read the WAL, which is every row in the database regardless of RLS.
+    //  * CREATEROLE can grant itself membership in anything, including the owner.
+    //  * CREATEDB is not a data bypass but has no business on a runtime role.
+    expect(role[0].rolreplication).toBe(false);
+    expect(role[0].rolcreaterole).toBe(false);
+    expect(role[0].rolcreatedb).toBe(false);
+
+    // AND MEMBERSHIP, which is the hole the attribute checks leave open: `GRANT ibms TO
+    // ibms_app` or `GRANT pg_read_all_data TO ibms_app` gives the runtime role the owner's
+    // privileges — and Postgres exempts a table's OWNER from its own RLS policies — while
+    // `rolsuper` stays false and every assertion above keeps passing.
+    //
+    // Asserted as the whole set rather than as named exclusions: `ibms_app` belongs to NO role.
+    // A membership that is genuinely needed can then be argued for here, which is the point.
+    const memberships = await ownerQuery<{ granted: string }>(
+      `SELECT g.rolname AS granted
+         FROM pg_auth_members m
+         JOIN pg_roles r ON r.oid = m.member
+         JOIN pg_roles g ON g.oid = m.roleid
+        WHERE r.rolname = 'ibms_app'`,
+    );
+    expect(
+      memberships.map((m) => m.granted),
+      'the runtime role has been granted membership in another role, so it now inherits that role’s privileges — and if that role owns the tables it is exempt from their RLS policies, with rolsuper still false',
+    ).toEqual([]);
   });
 
   it('every tenant-scoped table has RLS enabled and a policy on it', async () => {

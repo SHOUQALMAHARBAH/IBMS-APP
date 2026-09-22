@@ -44,7 +44,7 @@ export const COMPLIANCE_RISK = {
     tmNoPermission: 'لا تملك صلاحية aml.monitor اللازمة لعرض تنبيهات مراقبة المعاملات.',
 
     // ---- Watchlist sync (#49) --------------------------------------------
-    wsHeading: 'مزامنة قوائم العقوبات والأشخاص السياسيين',
+    wsHeading: 'مزامنة قوائم العقوبات',
     wsIntro:
       'تُزامَن قائمتان عامّتان مجانيتان للعقوبات (OFAC SDN وقائمة الأمم المتحدة الموحّدة) محلياً كل اثنتَي عشرة ساعة — وهي وتيرة التحديث الفعلية للقائمتين — ويُعاد فحص كل عميل نشط عليهما كل أربع ساعات. ويمكن تشغيل كليهما يدوياً من هنا.',
     wsSyncButton: 'مزامنة القوائم الآن',
@@ -304,7 +304,7 @@ export const COMPLIANCE_RISK = {
     tmActionError: 'That action failed — try again.',
     tmNoPermission: "You don't hold the aml.monitor permission.",
 
-    wsHeading: 'Sanctions & PEP watchlist sync',
+    wsHeading: 'Sanctions watchlist sync',
     wsIntro:
       "Two free public sanctions lists (OFAC SDN, UN Consolidated) are synced locally every 12 hours — the lists' own real-world refresh cadence — and every ACTIVE customer is re-screened against them every 4 hours. Both can also be run on demand here.",
     wsSyncButton: 'Sync watchlists now',

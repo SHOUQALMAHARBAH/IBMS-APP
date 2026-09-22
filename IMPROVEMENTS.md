@@ -2025,6 +2025,128 @@ no guard at all.
 
 ---
 
+### 1.38 — RESOLVED (2026-09-22): the four audit findings that could not wait, and two corrections to the audit itself
+
+The compliance audit (§ 2 of this file's companion report) found 12 requirements' worth of gaps.
+Four were actioned; the rest are version two by decision. These four, and what measuring them
+corrected about the audit's own claims.
+
+#### 1. The actor's role, which is the ONLY unrecoverable one
+
+`AuditLogEntry` stored `userId` and nothing about that user's authority, so "what role were they
+acting under" had to be answered from their CURRENT assignments. A promotion, a revocation, a
+retirement or a **rename** therefore rewrote what every historical entry appears to say about that
+person — silently, on an append-only table.
+
+Every other gap the audit found (source IP, device, evidence ids, SLA context, hash-chaining) can
+be added later and will simply be empty for older rows. **This one cannot: a role held in the past
+that was never written down is not recoverable from anything.** Each day it stayed unstored was a
+day of history that can never be reconstructed.
+
+Now `actorRoleIds` + `actorRoleNames` on every entry. **Both**, because neither substitutes: ids
+survive a rename and thread back to the grant history; names capture the label as it stood, since
+an office can rename its own roles and "approved by Claims Triage Desk" must not silently become
+something else.
+
+**Where the values come from, and why not the call sites.** There are 134 `audit.record()` call
+sites; threading an actor through all of them is 134 chances to omit it, each omission silent.
+Instead the request-scoped `OrgContextService` store — which already carries per-request identity
+for exactly this reason — gained `actorRoles`, set once from
+`SessionService.validateAndTouch`, which **already fetches ids and names in one query** for the
+`AuthenticatedUser` it returns. Zero extra queries, zero call-site changes. `runUnscoped` carries
+it through rather than resetting it, because several bypass blocks write audit rows and those are
+the privileged ones.
+
+**Empty is an answer, not a hole:** a scheduled sweep, a seed, or a session-rejection path that
+audits its own refusal genuinely held no role.
+
+**And the guard, because there are THREE writers and a fourth is plausible.** `record`,
+`recordMany` and `recordInTransaction` — the last added later for
+`WorkflowTransitionService.transition()`, so every workflow status change goes through it. A
+writer that forgets the actor produces entries that look complete and are not, and nothing would
+notice: the column defaults to `{}`. So a test reads the service's own source and asserts EVERY
+`auditLogEntry.create`/`createManyAndReturn` spreads the actor. Planted a fourth forgetful writer;
+it named `audit.service.ts:160` and the consequence. The bulk-path test earned itself immediately —
+the first implementation put the spread on the outer object instead of inside the per-row map, so
+45,000 rows would have carried the default.
+
+**Was anything else resolved from present state?** Measured: **no.** The read path performs no
+joins at all (`select: AUDIT_LOG_ENTRY_SELECT`, flat columns), so every view field is stored. Worth
+knowing for next time: the actor's display name is not resolved live either — the screen shows the
+raw `userId` — which is a readability gap, but anyone who "fixes" it by joining `User` reintroduces
+exactly this class of bug, because `fullName` is mutable.
+
+#### 2. PEP — the naming claimed a capability that does not exist
+
+`WatchlistSource` is `{ OFAC_SDN, UN_CONSOLIDATED }`. No PEP list is synced, while "Sanctions &
+PEP" appeared throughout. **Three different kinds of occurrence, and only one of them was a
+false claim:**
+
+| Kind | Example | Action |
+|---|---|---|
+| Declared attribute | `Customer.isPep`, the wizard checkbox "Politically exposed person (PEP)" | **Kept.** Collecting a self-declaration works and is not a screening claim |
+| Capability claim | "Sanctions & PEP watchlist sync", "Run sanctions/PEP/AML screening", the role description | **Renamed** to drop PEP |
+| Existing disclaimer | "PEP screening is NOT operational. No customer may be represented as clear of PEP status." | **Kept** — the system already says this, in both languages |
+
+**The answer to "is PEP visible to a compliance officer or regulator": YES** — a screen heading, a
+permission description read in the roles matrix, a role description, and the customer wizard.
+**And also yes to the honest half:** the screening-health screen already carried an explicit
+"NOT operational" disclaimer in both languages. So the gap was *partly* disclosed already, which
+the audit did not say.
+
+The permission CODE `sanctions-pep.screen` is deliberately **not** renamed: it is an identifier,
+renaming it is a data migration touching `RolePermission` grants across every office plus the web
+e2e's third copy of the grid, and that is disproportionate to a naming fix. Recorded rather than
+done.
+
+#### 3. Retention — one half was missing, and the other half I mis-reported
+
+**Added:** a period whose `confirmedByLegalCounselAt` is null may no longer be nominated for
+disposal. Every period in this schedule is a draft until a lawyer signs it — `retentionPeriodMonths`
+is a number somebody typed until then — and destroying records against a draft is the one step in
+this workflow that cannot be undone. The dual control governs WHO approves, not whether the period
+is real. The refusal names the category.
+
+The editing guard already keyed on this field the *other* way round (once confirmed, no longer
+editable). The half that blocked acting on an UNconfirmed one did not exist.
+
+**A CORRECTION to the audit.** It said "defaults ARE shipped — contradicting 'no placeholder values
+in production'". Measured: the seeded `AuditLogEntry` row already has
+`confirmedByLegalCounselAt = NULL` on both databases, and its `legalBasis` reads "DRAFT,
+UNCONFIRMED — no specific figure is cited anywhere…". So a period *number* is shipped, explicitly
+labelled a draft, with the confirmation field null. The audit's framing was harsher than the facts.
+What was true is that the null **did nothing** — which is what the block above fixes.
+
+**Two existing tests had to change, and that is the finding.** Both nominated against an
+unconfirmed period and expected success. They were asserting the defect.
+
+#### 4. NOSUPERUSER — already asserted, and a REAL gap next to it
+
+**Correction:** the audit cited "`ibms_app` is NOSUPERUSER and cannot" as reasoning and implied it
+was unverified. It was already asserted — `tenant-isolation.e2e-spec.ts`, "has no SUPERUSER, no
+BYPASSRLS, and owns no tables". I did not find it when writing the audit and reported an assertion
+as an assumption.
+
+**But the attribute checks leave a hole that matters more than the one asked about.** `rolsuper`
+is what a reader checks, and it is not the only route:
+
+```sql
+GRANT ibms TO ibms_app;   -- rolsuper stays FALSE
+```
+
+The runtime role then inherits the owner's privileges — and **Postgres exempts a table's owner from
+its own RLS policies.** Planted exactly that: `rolsuper` remained `false`, and the unfiltered
+cross-office read returned **13,774 rows where 1 was expected**, across two offices instead of one.
+Every attribute assertion kept passing.
+
+So the test now also asserts REPLICATION (reads the WAL — every row, regardless of RLS), CREATEROLE
+(can grant itself membership in anything), CREATEDB, and **membership in NO role at all** — the
+whole set, so a genuinely needed grant has to be argued for in that assertion. And the test was
+renamed, because "has no SUPERUSER, no BYPASSRLS, and owns no tables" no longer described what it
+checks.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

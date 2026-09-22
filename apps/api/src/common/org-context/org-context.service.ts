@@ -63,6 +63,21 @@ interface OrgStore {
    * inner query, which Prisma does not support.
    */
   scopedTransactionOrg: string | null;
+  /**
+   * The roles the authenticated caller holds, captured ONCE per request when the session
+   * resolves — so `AuditService` can store the role held AT THE ACTION rather than leave a
+   * reader to resolve it from present state later.
+   *
+   * Carried here rather than passed through `RecordAuditEntryInput` because there are 134
+   * `audit.record()` call sites; threading an actor through all of them would be a large,
+   * mechanical change with 134 chances to omit it, and an omission would be silent. The store
+   * already carries per-request identity for exactly this reason.
+   *
+   * `null` means no authenticated actor on this async path — a scheduled sweep, a seed, or the
+   * session-rejection paths that audit their own refusal before the roles are known. That is a
+   * real answer (the write held no role), not a missing one, and it is written as an empty array.
+   */
+  actorRoles: { ids: readonly string[]; names: readonly string[] } | null;
 }
 
 @Injectable()
@@ -77,6 +92,7 @@ export class OrgContextService {
         organizationId: null,
         unscopedReason: null,
         scopedTransactionOrg: null,
+        actorRoles: null,
       },
       work,
     );
@@ -87,7 +103,12 @@ export class OrgContextService {
    * Organizations, and by anything else that legitimately knows its own org. */
   runAs<T>(organizationId: string, work: () => T): T {
     return this.storage.run(
-      { organizationId, unscopedReason: null, scopedTransactionOrg: null },
+      {
+        organizationId,
+        unscopedReason: null,
+        scopedTransactionOrg: null,
+        actorRoles: null,
+      },
       work,
     );
   }
@@ -114,9 +135,40 @@ export class OrgContextService {
         organizationId: store?.organizationId ?? null,
         unscopedReason: reason,
         scopedTransactionOrg: null,
+        // Carried through, not reset. A bypass block still has the same actor, and several of
+        // them write audit rows — dropping the roles here would blank exactly the entries that
+        // record a privileged operation.
+        actorRoles: store?.actorRoles ?? null,
       },
       async () => await work(),
     );
+  }
+
+  /**
+   * Records the roles the authenticated caller holds, for `AuditService` to STORE on each entry.
+   *
+   * Called once per request from `SessionService.validateAndTouch`, which already fetches ids and
+   * names in one query for the `AuthenticatedUser` it returns — so this costs nothing extra.
+   *
+   * Mutates the open store rather than opening a new one, the same way `adopt()` does, so the
+   * value is visible to everything downstream on this async path. No store (a scheduler, a seed,
+   * a unit test) is a no-op: those writes genuinely have no actor, and `AuditService` writes an
+   * empty array for them.
+   */
+  adoptActorRoles(ids: readonly string[], names: readonly string[]): void {
+    const store = this.storage.getStore();
+    if (!store) return;
+    store.actorRoles = { ids: [...ids], names: [...names] };
+  }
+
+  /** The roles captured by {@link adoptActorRoles}, or null when there is no authenticated actor
+   *  on this path. Read only by `AuditService` — never by an authorization decision, which must
+   *  go through `PermissionsService` on role IDS (Phase 2). */
+  actorRolesOrNull(): {
+    ids: readonly string[];
+    names: readonly string[];
+  } | null {
+    return this.storage.getStore()?.actorRoles ?? null;
   }
 
   /** Fills in the Organization for a request whose store is already open.

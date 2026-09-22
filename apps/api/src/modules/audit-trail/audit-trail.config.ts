@@ -50,6 +50,8 @@ export interface AuditLogEntryRow {
   beforeValue: Prisma.JsonValue | null;
   afterValue: Prisma.JsonValue | null;
   isSensitiveDataAccess: boolean;
+  actorRoleIds: string[];
+  actorRoleNames: string[];
   occurredAt: Date;
 }
 
@@ -62,6 +64,11 @@ export interface AuditLogEntryView {
   beforeValue: Prisma.JsonValue | null;
   afterValue: Prisma.JsonValue | null;
   isSensitiveDataAccess: boolean;
+  /** The roles the actor HELD at the moment of the action, as stored on the entry — not resolved
+   *  from their present assignments. Empty means the write had no authenticated actor (a
+   *  scheduled sweep, a seed), or predates migration `20261017100000`. */
+  actorRoleIds: string[];
+  actorRoleNames: string[];
   occurredAt: string;
 }
 
@@ -77,6 +84,8 @@ export function deriveAuditLogEntryView(
     beforeValue: row.beforeValue,
     afterValue: row.afterValue,
     isSensitiveDataAccess: row.isSensitiveDataAccess,
+    actorRoleIds: row.actorRoleIds,
+    actorRoleNames: row.actorRoleNames,
     occurredAt: row.occurredAt.toISOString(),
   };
 }

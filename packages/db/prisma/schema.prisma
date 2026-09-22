@@ -5033,6 +5033,33 @@ model AuditLogEntry {
   beforeValue           Json?
   afterValue            Json?
   isSensitiveDataAccess Boolean      @default(false) // Part 10.3: reads of Sensitive Personal Data specifically flagged
+  /// The roles this actor HELD AT THE MOMENT OF THE ACTION — stored, never resolved later.
+  ///
+  /// Both halves are needed and neither substitutes for the other:
+  ///
+  ///  * `actorRoleIds` identifies WHICH `Role` rows, which survives a rename and is what a
+  ///    reviewer follows to the grant history.
+  ///  * `actorRoleNames` captures the LABEL as it stood. An office can rename its own roles
+  ///    (`/settings/roles`), and a rename must not retroactively relabel every historical entry
+  ///    — "approved by Claims Triage Desk" cannot silently become "approved by Legacy Desk".
+  ///
+  /// Why stored rather than joined: roles are mutable. A promotion, a revocation, or a role
+  /// retirement would otherwise rewrite what every past entry appears to say about that person —
+  /// silently, with no trace, on an append-only table. This is the one audit field that cannot be
+  /// backfilled later, because a role held in the past that was never written down is not
+  /// recoverable from anything.
+  ///
+  /// EMPTY IS MEANINGFUL, not missing: a write with no authenticated actor in context — a
+  /// scheduled sweep, a seed, or the session-rejection paths that audit their own refusal — held
+  /// no role. Rows predating migration `20261017100000` are also empty, which honestly says "not
+  /// recorded" rather than inventing a role for them.
+  /// `@default([])` is DECLARED because the database has it: migration `20261017100000` added both
+  /// columns `NOT NULL DEFAULT '{}'`, which is what gave 5,934,528 existing rows a value without
+  /// rewriting the largest table in the database. Undeclared, `db:divergence` caught it
+  /// immediately — the next generated migration would have DROPPED those defaults, and then an
+  /// insert omitting the field would fail against a NOT NULL column.
+  actorRoleIds          String[]     @default([])
+  actorRoleNames        String[]     @default([])
   occurredAt            DateTime     @default(now())
 
   @@index([entityType, entityId])

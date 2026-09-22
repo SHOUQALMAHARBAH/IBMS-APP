@@ -44,6 +44,13 @@ function makeService(
 ) {
   const repo = {
     retentionScheduleItemExists: vi.fn().mockResolvedValue(true),
+    // Confirmed by default: nomination now refuses a draft period, and the tests below are
+    // about ownership, 404s and legal holds rather than about that gate. The gate has its own
+    // case at the end of this describe.
+    findRetentionScheduleItemForNomination: vi.fn().mockResolvedValue({
+      recordCategory: 'AuditLogEntry',
+      confirmedByLegalCounselAt: new Date('2026-01-01T00:00:00.000Z'),
+    }),
     create: vi.fn().mockResolvedValue(row()),
     findById: vi.fn().mockResolvedValue(row()),
     findMany: vi.fn().mockResolvedValue([row()]),
@@ -99,9 +106,33 @@ describe('DisposalBatchService.nominate', () => {
     );
   });
 
+  it('422s a period no lawyer has confirmed — a draft cannot authorise a destruction', async () => {
+    // `retentionPeriodMonths` is a number somebody typed until `confirmedByLegalCounselAt` says
+    // otherwise. The dual control below governs WHO approves, not whether the period is real,
+    // and destroying records is the one step here that cannot be undone.
+    const { service } = makeService({
+      repo: {
+        findRetentionScheduleItemForNomination: vi.fn().mockResolvedValue({
+          recordCategory: 'ClaimFile',
+          confirmedByLegalCounselAt: null,
+        }),
+      },
+    });
+
+    await expect(
+      service.nominate({ retentionScheduleItemId: 'item-1' }, 'u-manager'),
+    ).rejects.toThrow(/has not been confirmed by legal counsel/);
+    // Named, so the officer can see WHICH category is blocking.
+    await expect(
+      service.nominate({ retentionScheduleItemId: 'item-1' }, 'u-manager'),
+    ).rejects.toThrow(/ClaimFile/);
+  });
+
   it('404s an unknown retentionScheduleItemId', async () => {
     const { service } = makeService({
-      repo: { retentionScheduleItemExists: vi.fn().mockResolvedValue(false) },
+      repo: {
+        findRetentionScheduleItemForNomination: vi.fn().mockResolvedValue(null),
+      },
     });
     await expect(
       service.nominate({ retentionScheduleItemId: 'nope' }, 'u-manager'),

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuditAction, AuditLogEntry, Prisma } from '@ibms/db';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OrgContextService } from '../../common/org-context/org-context.service';
 import type { TenantTransactionClient } from '../../prisma/tenant-scope.extension';
 import { AuditAnomalyDetectionService } from './audit-anomaly-detection.service';
 
@@ -29,7 +30,22 @@ export class AuditService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly anomalyDetection: AuditAnomalyDetectionService,
+    private readonly orgContext: OrgContextService,
   ) {}
+
+  /**
+   * The roles the actor held AT THIS MOMENT, from the request context — never resolved later.
+   *
+   * An empty pair is a real answer, not a gap: a scheduled sweep, a seed, or a session-rejection
+   * path that audits its own refusal before the roles are known all legitimately have no actor.
+   */
+  private actorRoles(): { actorRoleIds: string[]; actorRoleNames: string[] } {
+    const roles = this.orgContext.actorRolesOrNull();
+    return {
+      actorRoleIds: roles ? [...roles.ids] : [],
+      actorRoleNames: roles ? [...roles.names] : [],
+    };
+  }
 
   async record(input: RecordAuditEntryInput): Promise<void> {
     const entry = await this.prisma.client.auditLogEntry.create({
@@ -41,6 +57,7 @@ export class AuditService {
         beforeValue: input.beforeValue,
         afterValue: input.afterValue,
         isSensitiveDataAccess: input.isSensitiveDataAccess ?? false,
+        ...this.actorRoles(),
       },
     });
     await this.anomalyDetection.evaluate(entry);
@@ -70,6 +87,7 @@ export class AuditService {
         beforeValue: input.beforeValue,
         afterValue: input.afterValue,
         isSensitiveDataAccess: input.isSensitiveDataAccess ?? false,
+        ...this.actorRoles(),
       },
     });
   }
@@ -93,6 +111,10 @@ export class AuditService {
    */
   async recordMany(inputs: RecordAuditEntryInput[]): Promise<void> {
     if (inputs.length === 0) return;
+    // Read ONCE, outside the map: every row in a batch is the same actor on the same async path,
+    // and reading per row would re-enter AsyncLocalStorage 45,000 times for one office's
+    // access-recertification cycle.
+    const actorRoles = this.actorRoles();
     const entries = await this.prisma.client.auditLogEntry.createManyAndReturn({
       data: inputs.map((input) => ({
         userId: input.userId,
@@ -102,6 +124,7 @@ export class AuditService {
         beforeValue: input.beforeValue,
         afterValue: input.afterValue,
         isSensitiveDataAccess: input.isSensitiveDataAccess ?? false,
+        ...actorRoles,
       })),
     });
     for (const entry of entries) {

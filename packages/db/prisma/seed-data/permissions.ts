@@ -161,7 +161,7 @@ const commercialFrontOffice: PermissionSeed[] = [
   {
     code: "screening.run",
     module: "commercial-front-office",
-    description: "Run sanctions/PEP/AML screening",
+    description: "Run sanctions/AML screening",
     roles: [COMPLIANCE],
   },
   {
@@ -909,7 +909,7 @@ const complianceRisk: PermissionSeed[] = [
   {
     code: "sanctions-pep.screen",
     module: "compliance-risk",
-    description: "Run recurring sanctions/PEP screening batches",
+    description: "Run recurring sanctions screening batches",
     roles: [COMPLIANCE],
   },
   {
