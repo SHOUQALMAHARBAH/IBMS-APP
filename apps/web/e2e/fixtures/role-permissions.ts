@@ -6,13 +6,16 @@
  * sidebar and every §10.4 control render from that field, and a mock without
  * it silently renders an empty nav (the helpers fail CLOSED by design).
  *
- * GENERATED from packages/db/prisma/seed-data/permissions.ts. If a permission
- * is added to or removed from a role there, regenerate rather than hand-edit,
- * or this becomes the second copy of the grid that §10.4 exists to prevent.
+ * DO NOT HAND-EDIT. Regenerate with:
  *
- * Last regenerated for insurer management, which added `insurer.read` and
- * `insurer.relationship.manage` to OFFICE_ADMINISTRATOR and introduced
- * `insurer.directory.read` for the five roles that quote, place or register.
+ *     npm run db:fixture:permissions
+ *
+ * which reads the SEEDED DATABASE — what `/auth/me` actually answers from —
+ * rather than `permissions.ts`, which is the seed's input and would reproduce
+ * the grid as declared instead of as granted. `--check` fails without writing,
+ * so a stale copy is a red gate rather than four confusing Playwright failures.
+ *
+ * 12 roles, 427 grants, from the default office.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   BRANCH_DEPARTMENT_MANAGER: [
@@ -315,6 +318,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.report',
     'information-asset.manage',
     'insurer.directory.read',
+    'insurer.office-form.map',
     'insurer.read',
     'insurer.relationship.manage',
     'permission.read',
@@ -347,6 +351,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'insurer.directory.read',
     'insurer.form.map',
     'insurer.master.read',
+    'insurer.office-form.map',
     'insurer.read',
     'interaction.log',
     'kb.publish',
@@ -454,6 +459,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.report',
     'information-asset.manage',
     'insurer.form.map',
+    'insurer.office-form.map',
     'permission.read',
     'role.manage',
     'role.read',

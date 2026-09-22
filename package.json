@@ -47,7 +47,10 @@
     "db:provision-app-role": "node scripts/provision-app-role.mjs",
     "db:seed": "npm run seed --workspace=@ibms/db",
     "db:test:seed": "npm run seed:test --workspace=@ibms/db",
-    "db:backup:drill": "bash scripts/backup-restore-drill.sh"
+    "db:backup:drill": "bash scripts/backup-restore-drill.sh",
+    "db:fixture:permissions": "dotenv -e .env -- node scripts/generate-role-permissions-fixture.mjs",
+    "db:fixture:permissions:check": "dotenv -e .env -- node scripts/generate-role-permissions-fixture.mjs --check",
+    "db:test:fixture:permissions:check": "dotenv -e .env.test -- node scripts/generate-role-permissions-fixture.mjs --check"
   },
   "devDependencies": {
     "turbo": "2.10.11"

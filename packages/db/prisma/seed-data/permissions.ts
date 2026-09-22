@@ -436,6 +436,18 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [PLACEMENT, ADMIN],
   },
   {
+    // The office-scoped twin of the code above, and the split is the reason both exist. That
+    // one is withheld from the office administrator BECAUSE its effect crosses offices; this
+    // one's does not — the row is readable by one office and no other office's submissions
+    // change. Folding them together would force a choice between denying an administrator
+    // their own office's forms and handing them a platform-wide write.
+    code: "insurer.office-form.map",
+    module: "insurance-operations",
+    description:
+      "Map THIS OFFICE's own copy of an insurer's submission form, for a company it deals with directly (Q9). Office-scoped in effect: the mapping is readable only by this office, takes precedence over the shared mapping for this office's own submissions, and never alters the shared one. Unlike insurer.form.map it may point at a line this office added itself.",
+    roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
+  },
+  {
     code: "rfq.insurer.update",
     module: "insurance-operations",
     description: "Update an insurer's RFQ response status",

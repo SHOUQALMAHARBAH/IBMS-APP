@@ -339,6 +339,8 @@ model Organization {
   userSessions                    UserSession[]
   vendors                         Vendor[]
   officeInsuranceLines            OfficeInsuranceLine[]
+  officeInsurerFormTemplates      OfficeInsurerFormTemplate[]
+  officeInsurerFormFields         OfficeInsurerFormField[]
   insurerOfferedLines             InsurerOfferedLine[]
 }
 
@@ -498,19 +500,20 @@ model User {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  roles                UserRoleAssignment[]
-  auditLogEntries      AuditLogEntry[]             @relation("AuditLogUser")
-  accessAnomalyAlerts  AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
-  recertifications     AccessRecertificationItem[] @relation("RecertificationReviewer")
-  mfaCredentials       MfaCredential[]
-  refreshTokens        RefreshToken[]
-  sessions             UserSession[]
-  passwordResetTokens  PasswordResetToken[]
+  roles                      UserRoleAssignment[]
+  auditLogEntries            AuditLogEntry[]             @relation("AuditLogUser")
+  accessAnomalyAlerts        AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
+  recertifications           AccessRecertificationItem[] @relation("RecertificationReviewer")
+  mfaCredentials             MfaCredential[]
+  refreshTokens              RefreshToken[]
+  sessions                   UserSession[]
+  passwordResetTokens        PasswordResetToken[]
   /// Spec §4.1.4 / §4.1.3 — populated by the Phase 4 auth rebuild. Declared
   /// here now because Phase 1 creates the tables they point at.
-  trustedDevices       TrustedDevice[]
-  passwordHistory      PasswordHistoryEntry[]
-  officeInsuranceLines OfficeInsuranceLine[]
+  trustedDevices             TrustedDevice[]
+  passwordHistory            PasswordHistoryEntry[]
+  officeInsuranceLines       OfficeInsuranceLine[]
+  officeInsurerFormTemplates OfficeInsurerFormTemplate[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -4618,19 +4621,24 @@ model InsurerFormTemplate {
   /// kind the insurer directory exists to prevent. And there is no composite-FK guard available
   /// here, because a global child has no `organizationId` to agree with its parent.
   ///
-  /// WHAT WOULD LEGITIMATELY END THIS RESTRICTION, so nobody has to work around it: this model
-  /// becoming OFFICE-SCOPED. Q9 (approved, not yet built) does exactly that — an office contracts
-  /// with a company outside the system, that company sends THAT OFFICE its forms, and the
-  /// administrator uploads and field-maps them; the forms are never shared with another office.
-  /// The gap making it necessary is visible right here: `insurerMasterId` is NOT NULL, so for a
-  /// LOCALLY registered company a form template is not merely unmapped, it is unrepresentable.
+  /// WHAT WOULD LEGITIMATELY END THIS RESTRICTION was stated here as "this model becoming
+  /// OFFICE-SCOPED, which Q9 will do". **Q9 has now landed and did NOT do that**, so the
+  /// restriction stands and this note records why rather than leaving a prediction that was
+  /// overtaken.
   ///
-  /// The moment this model carries an `organizationId`, the reasoning above INVERTS and an
-  /// office-scoped template may legitimately reference that office's own added line — an office
-  /// that added "Pet" and uploaded a form for it is precisely the case Q9 exists to serve. At
-  /// that point re-derive the FK rather than patching around it, and the composite-FK guard
-  /// `(insuranceLineId, organizationId)` becomes available because the child finally has an
-  /// `organizationId` to agree with.
+  /// Q9 is `OfficeInsurerFormTemplate`, a SECOND model hanging off the office-scoped `Insurer`.
+  /// Adding `organizationId` here would have withdrawn Part I §5's promise silently:
+  /// `applyTenantScope` filters every query on any model that carries the column, and the scoped
+  /// set is derived from the DMMF, so a row readable by every office and a table the extension
+  /// scopes are mutually exclusive. The inversion the old note predicted DID happen — but on the
+  /// new model, where an office's own added line is a legitimate referent because the row is
+  /// readable by one office, and where the composite-FK guard `(officeInsuranceLineId,
+  /// organizationId)` is available because that child carries an `organizationId` to agree with.
+  ///
+  /// So `insurerMasterId` stays NOT NULL here, correctly: a globally shared mapping is a fact
+  /// about a catalogue company. The gap the old note named — "for a LOCALLY registered company a
+  /// form template is unrepresentable" — is closed by the new model, which hangs off `Insurer`
+  /// and therefore needs no `insurerMasterId` at all.
   ///
   /// Keyed by uuid rather than `code` deliberately, despite `InsuranceLine.code`'s own warning
   /// that uuids differ between databases: that warning applies to anything SEEDED, which must
@@ -4682,6 +4690,105 @@ enum InsurerFormFieldType {
   DATE
   ENUM
   BOOLEAN
+}
+
+/// Q9 — an office's OWN mapped submission form for a company only it deals with.
+///
+/// A SECOND model rather than an `organizationId` on `InsurerFormTemplate`, and the
+/// reasoning is the whole point of the pair. `InsurerFormTemplate` hangs off the global
+/// `InsurerMaster`, so one mapping is readable by EVERY office — Part I §5's promise that
+/// two offices never re-map the same objectively-identical PDF. `applyTenantScope` adds
+/// `where: { organizationId }` to every query on any model that carries the column, and the
+/// scoped set is derived from the DMMF, so a shared row and a scoped table are mutually
+/// exclusive. Adding the column there would have withdrawn §5 silently.
+///
+/// This one hangs off the office-scoped `Insurer`, whose `insurerMasterId` is already
+/// nullable — so it serves a locally registered company and a catalogue-linked one with the
+/// same shape, and needs no `insurerMasterId` of its own. That is how the gap Q9 exists to
+/// close ("for a locally registered company a form template is unrepresentable") disappears
+/// instead of being patched.
+///
+/// It is NOT a private edit of a shared mapping. Nothing here writes, versions or supersedes
+/// an `InsurerFormTemplate` row; an office's own form takes precedence FOR THAT OFFICE and
+/// the shared row is untouched and unaware.
+model OfficeInsurerFormTemplate {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  /// This office's own insurer row. Not `insurerMasterId`: the office relationship is the
+  /// thing a private form belongs to, and it exists for locally registered companies too.
+  insurerId String
+  insurer   Insurer @relation(fields: [insurerId], references: [id])
+
+  /// The line this form is FOR — catalogue OR this office's own addition, exactly one.
+  ///
+  /// This is where the restriction on `InsurerFormTemplate.insuranceLineId` INVERTS, as
+  /// IMPROVEMENTS.md §1.26 predicted it would. There, a row is readable by every office, so
+  /// pointing at one office's private vocabulary would be a cross-office disclosure. Here the
+  /// row is readable by ONE office, so its own added line is a legitimate referent — an office
+  /// that added "Pet" and holds that insurer's Pet form is precisely the case Q9 serves.
+  ///
+  /// The composite-FK guard that was unavailable on the global model is available here,
+  /// because the child finally has an `organizationId` to agree with: see the migration's
+  /// `_office_line_same_org_fkey`, which Prisma cannot express.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  version           Int      @default(1)
+  sourceDocumentRef String?
+  createdAt         DateTime @default(now())
+  /// Stored, unlike the global table which records its author only in the audit log: "who
+  /// mapped this" is the first question asked when a submission is rejected.
+  createdByUser     User     @relation(fields: [createdByUserId], references: [id])
+  createdByUserId   String
+
+  fields OfficeInsurerFormField[]
+
+  /// One version per line per insurer, expressed as TWO uniques over the nullable columns
+  /// rather than one over a derived key. Safe because the database's
+  /// `OfficeInsurerFormTemplate_exactly_one_line` CHECK (not expressible here) guarantees
+  /// exactly one is non-null, so every row is constrained by the index whose column is NOT
+  /// null. A `GENERATED` COALESCE key was written first and removed after measuring that this
+  /// shape already refuses the duplicate — it bought nothing and cost a divergence entry.
+  @@unique([insurerId, insuranceLineId, version], map: "OfficeInsurerFormTemplate_insurerId_insuranceLineId_version_key")
+  @@unique([insurerId, officeInsuranceLineId, version], map: "OfficeInsurerFormTemplate_insurerId_officeLineId_version_key")
+  /// The target of `OfficeInsurerFormField`'s composite foreign key.
+  @@unique([id, organizationId])
+  @@index([organizationId, insurerId, insuranceLineId, version(sort: Desc)], map: "OfficeInsurerFormTemplate_resolve_standard_idx")
+  @@index([organizationId, insurerId, officeInsuranceLineId, version(sort: Desc)], map: "OfficeInsurerFormTemplate_resolve_office_idx")
+  @@index([organizationId])
+}
+
+/// A field on an office's own form mapping.
+///
+/// Carries `organizationId` even though its parent already does, because of the Phase 1 RBAC
+/// outage: an RLS policy scoped through a JOIN to a parent can never be satisfied, since
+/// `tenantScopeExtension` sets `app.current_org_id` only for models that CARRY the column. The
+/// drift that denormalizing invites is answered structurally by the composite FK
+/// `(templateId, organizationId)`, which Prisma cannot express — see the migration.
+model OfficeInsurerFormField {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  templateId String
+  template   OfficeInsurerFormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fieldKey     String
+  labelEn      String
+  labelAr      String?
+  dataType     InsurerFormFieldType
+  isRequired   Boolean              @default(false)
+  options      String[]
+  displayOrder Int
+
+  @@unique([templateId, fieldKey])
+  @@index([templateId])
+  @@index([organizationId])
 }
 
 /// The two halves of the market classification. Not a regulatory taxonomy: the
@@ -4753,6 +4860,7 @@ model InsuranceLine {
 
   offeredBy             InsurerOfferedLine[]
   formTemplates         InsurerFormTemplate[]
+  officeFormTemplates   OfficeInsurerFormTemplate[]
   insuranceProgramLines InsuranceProgramLine[]
   rfqs                  RFQ[]
   policies              Policy[]
@@ -4800,6 +4908,7 @@ model OfficeInsuranceLine {
   rfqs                  RFQ[]
   policies              Policy[]
   commissionAgreements  CommissionAgreement[]
+  officeFormTemplates   OfficeInsurerFormTemplate[]
 
   /// Once per office, per script.
   @@unique([organizationId, canonicalEn])
@@ -4988,6 +5097,11 @@ model Insurer {
   /// What THIS office places with them — a relationship fact that never leaves the
   /// office. The two are deliberately different tables; see `InsurerOfferedLine`.
   products             InsurerProduct[]
+  /// This office's OWN mapped submission forms for this company (Q9). Distinct from
+  /// `InsurerMaster.formTemplates`, which is the GLOBAL mapping every office shares —
+  /// see `OfficeInsurerFormTemplate` for why the two are separate models rather than
+  /// one table with an `organizationId`.
+  officeFormTemplates  OfficeInsurerFormTemplate[]
   slaAgreements        InsurerSlaAgreement[]
   rfqSubmissions       RFQInsurer[]
   quotations           Quotation[]

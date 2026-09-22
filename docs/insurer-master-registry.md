@@ -42,12 +42,16 @@ insurer+line maps that insurer's PDF/Word form once, and every submission
 afterwards — from any office — reuses the mapping.
 
 ```
-GET  /insurer-masters                                  insurer.master.read
+GET  /insurer-masters                                    insurer.master.read
 GET  /insurer-masters/:id
-GET  /insurer-masters/:id/form-templates?insuranceLine=
-GET  /insurer-masters/:id/form-templates/current?insuranceLine=
-POST /insurer-masters/:id/form-templates               insurer.form.map
+GET  /insurer-masters/:id/form-templates?insuranceLineId=
+GET  /insurer-masters/:id/form-templates/current?insuranceLineId=
+POST /insurer-masters/:id/form-templates                 insurer.form.map
 ```
+
+The query parameter is `insuranceLineId` — a uuid from the GLOBAL catalogue, not a
+name. It was `insuranceLine`, a free-text string, until the managed-vocabulary
+conversion; this line said so for longer than it was true.
 
 `insurer.master.read` goes to Sales, Placement, Manager, Executive and the
 external auditor. `insurer.form.map` goes only to Placement and the system
@@ -66,6 +70,67 @@ actually allocates them: the repository reads the current maximum, attempts the
 insert, and retries against the new maximum if it loses the race. Reading the
 maximum and trusting it would be a check-then-act
 (`ibms-brain/meta/lex/race-safe-invariants.md`).
+
+## An office's OWN form — Q9, and why it is a second table
+
+An office that contracts with a company outside the platform receives ITS OWN forms
+from that company. Those are not §5's shared mapping and must never become one, so
+they live on a separate, tenant-scoped model:
+
+```
+GET  /insurers/:insurerId/form-templates?lineId=            insurer.read
+GET  /insurers/:insurerId/form-templates/resolved?lineId=   insurer.read
+POST /insurers/:insurerId/form-templates                    insurer.office-form.map
+```
+
+Note the path: nested under `/insurers/:id`, because these forms belong to an
+office's RELATIONSHIP with a company, not to the company.
+
+**Why not an `organizationId` on `InsurerFormTemplate`?** Because that would have
+withdrawn §5 silently. `applyTenantScope` adds `where: { organizationId }` to every
+query on any model carrying the column, and the scoped set is derived from the DMMF
+— so a row readable by every office and a table the extension scopes are mutually
+exclusive. There is no third state, and creating one would mean special-casing the
+single mechanism that protects every other table. `IMPROVEMENTS.md` §1.26 predicted
+the one-table shape; re-deriving it produced this one instead.
+
+The split mirrors the one directly above it, for the same reason:
+
+| Global | Office |
+|---|---|
+| `InsurerMaster` → `InsurerFormTemplate` | `Insurer` → `OfficeInsurerFormTemplate` |
+| Readable by every office | Readable by one |
+| Catalogue lines only | Catalogue **or** the office's own added line |
+| `insurerMasterId` NOT NULL | No `insurerMasterId` — it hangs off `Insurer`, whose master link is already nullable |
+| `insurer.form.map` | `insurer.office-form.map` |
+
+**The two permissions are deliberately different codes.** The grid withholds
+`insurer.form.map` from the office administrator because "the mapping becomes the
+form every other office submits against" — a reason that does not apply to a row one
+office can read. Collapsing them would force a choice between denying an
+administrator their own office's forms and handing them a platform-wide write.
+`permissions.spec.ts` asserts both halves: the administrator holds the office code
+and not the global one.
+
+**An office's own line is legitimate here and refused there.** That inversion is the
+whole point of the pair, and `office-insurer-forms.e2e-spec.ts` asserts both halves
+in ONE test — either alone would pass against a system that had simply stopped
+checking.
+
+**Which form do I submit against?** `/resolved` answers it, naming its `source`:
+
+1. `OFFICE` — this office's own mapping, newest version, if it has one.
+2. `SHARED` — otherwise the global mapping off the insurer's `InsurerMaster`.
+3. `null` — otherwise. Still a real answer, for the same §5 reason as `/current`.
+
+Step 2 is reachable only for a catalogue-linked insurer on a catalogue line, because
+the shared table holds nothing else. For a locally registered company, or an office's
+own added line, step 1 is the only source there is.
+
+An office's own mapping WINS, and that is safe in the direction that matters: it
+changes only what this office submits. Nothing on the office side writes, versions or
+supersedes a shared row — an override is not an edit, and a test asserts the shared
+row is still version 1 afterwards.
 
 There is no mapping **screen** yet — API and tests only, deliberately. Screens
 belong with the Phase 4 UI work, and every new screen needs Arabic alongside

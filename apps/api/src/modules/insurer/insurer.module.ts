@@ -8,6 +8,9 @@ import { InsuranceLineRepository } from '../../repositories/insurance-line.repos
 import { InsurerDirectoryController } from './insurer-directory.controller';
 import { InsurerDirectoryService } from './insurer-directory.service';
 import { InsurerDirectoryRepository } from '../../repositories/insurer-directory.repository';
+import { OfficeInsurerFormController } from './office-insurer-form.controller';
+import { OfficeInsurerFormService } from './office-insurer-form.service';
+import { OfficeInsurerFormRepository } from '../../repositories/office-insurer-form.repository';
 import { InsurerMasterModule } from './insurer-master.module';
 import { AuditModule } from '../audit/audit.module';
 
@@ -36,6 +39,10 @@ import { AuditModule } from '../audit/audit.module';
     InsurerController,
     InsuranceLineController,
     InsurerDirectoryController,
+    // Q9's office-scoped form mappings. In THIS module, not `InsurerMasterModule`, because the
+    // rows are tenant-scoped — which is the one property that decides which half a thing
+    // belongs to, and the reason the two modules exist.
+    OfficeInsurerFormController,
   ],
   providers: [
     InsurerService,
@@ -44,6 +51,8 @@ import { AuditModule } from '../audit/audit.module';
     InsuranceLineRepository,
     InsurerDirectoryService,
     InsurerDirectoryRepository,
+    OfficeInsurerFormService,
+    OfficeInsurerFormRepository,
   ],
   // Exported: the screens and any later insurer work (the directory, deactivation)
   // read through this service rather than reaching for the repository.

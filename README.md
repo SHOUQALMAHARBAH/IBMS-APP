@@ -808,7 +808,12 @@ build actually is today:
   every other office submits against). `OFFICE_ADMINISTRATOR` deliberately does not hold
   it; closing it properly needs a "not office-grantable" marker the model does not have,
   and an answer to who may grant it instead — there is no platform-admin surface. Logged
-  for Phase 4 alongside insurer CRUD, NOT fixed.
+  for Phase 4 alongside insurer CRUD, NOT fixed. **Q9 narrowed it without closing it**:
+  `insurer.office-form.map` now lets an office map its OWN copy of an insurer's form
+  (`OfficeInsurerFormTemplate`, tenant-scoped, RLS, either line catalogue), so an office
+  that needs a form mapped no longer has any reason to want the platform-wide code. The
+  hole is still a hole — an office administrator who grants themselves `insurer.form.map`
+  through the matrix still writes a row every office reads — but nobody now needs to.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

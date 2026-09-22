@@ -70,6 +70,15 @@ gate "Database Schema (divergence from the database)" npm run db:test:divergence
 # membership leaves rolsuper FALSE and lets the runtime role read past every RLS policy.
 gate "Database Privileges (runtime role)" npm run db:test:privileges
 gate "Database Seed"       npm run db:test:seed
+# The THIRD copy of the role -> permission grid: Playwright mocks `/auth/me` from a checked-in
+# fixture, and a mock missing a code renders an empty nav because the sidebar helpers fail
+# CLOSED. A stale copy has already broken four Playwright tests across three files, in files
+# that had nothing to do with the change. Placed AFTER the seed gate, because it compares the
+# fixture against the freshly seeded grid rather than against the declaration.
+# Reads .env.test, like every gate around it: this runs immediately after the db-test seed, so
+# it compares the fixture against the grid that was just written rather than against dev's.
+# The two are asserted byte-identical elsewhere; this gate should still read the one it seeded.
+gate "Permission Fixture (web e2e mirror)" npm run db:test:fixture:permissions:check
 gate "Integration Tests"   npm run test:e2e
 gate "Contract Tests"      npm run test:contract
 gate "Smoke Tests"         bash scripts/smoke.sh api

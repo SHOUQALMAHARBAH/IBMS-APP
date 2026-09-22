@@ -94,6 +94,19 @@ const EXPECTED = {
   'ALTER TABLE "CommissionAgreement" DROP CONSTRAINT "CommissionAgreement_office_line_same_org_fkey";':
     'composite tenant FK, raw SQL by design',
 
+  // Q9's office-scoped form templates (`20261021100000`). The insurer one is what makes an
+  // office's private form belong to the office that holds it; the office-line one is the guard
+  // that was UNAVAILABLE on the global `InsurerFormTemplate` and became available here, because
+  // the child finally carries an `organizationId` to agree with. The field one is the Phase 1
+  // RBAC lesson: the child denormalizes `organizationId` so its RLS policy is satisfiable at
+  // all, and this constraint is what stops the denormalized copy drifting from its template.
+  'ALTER TABLE "OfficeInsurerFormTemplate" DROP CONSTRAINT "OfficeInsurerFormTemplate_insurer_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "OfficeInsurerFormTemplate" DROP CONSTRAINT "OfficeInsurerFormTemplate_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "OfficeInsurerFormField" DROP CONSTRAINT "OfficeInsurerFormField_template_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.

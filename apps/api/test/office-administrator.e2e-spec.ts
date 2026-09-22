@@ -74,7 +74,7 @@ async function removeHollowRoles(): Promise<void> {
  *  precisely so they would land after that migration rather than invalidate its
  *  empty-diff property. They arrive as a PAIR for the same reason `role.read` and
  *  `role.manage` did: the write permission is useless on a screen the holder
- *  cannot render. */
+ *  cannot render. `insurer.office-form.map` is the 25th, from Q9. */
 const OFFICE_ADMINISTRATOR_CODES = [
   'user.manage',
   'employee.read',
@@ -109,6 +109,12 @@ const OFFICE_ADMINISTRATOR_CODES = [
   // register a company but cannot see which already exist is the one person
   // guaranteed to create the duplicate.
   'insurer.directory.read',
+  // Q9's office-scoped form mappings — the 25th. Granted here while `insurer.form.map` stays in
+  // WITHHELD_CODES below, and that contrast is the reason both codes exist: the withheld one
+  // becomes the form every OTHER office submits against, and this one is readable by one office.
+  // Asserted from both sides so a future edit that decided "these are the same thing really"
+  // has to break one of the two.
+  'insurer.office-form.map',
 ] as const;
 
 /** Withheld on purpose, each for a stated reason. A code moving from this list to

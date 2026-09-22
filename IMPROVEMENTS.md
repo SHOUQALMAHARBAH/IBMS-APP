@@ -229,6 +229,50 @@ single remaining failure is the §1.2 TOTP flake, not a timeout — `rbac`
 passes 6/6 in isolation. So the suite's health was almost entirely a function
 of accumulated fixture data, which is exactly what §1.1 predicts.
 
+**2026-09-22 update — the accumulation has now passed the point where a test
+timeout is the binding limit, and `testTimeout` can no longer mitigate it.**
+
+Measured on db-test today: **46,153 users, 45,939 of them ACTIVE, and 5,938,213
+`AuditLogEntry` rows** — more users than the 36,470 that produced the 12
+failures above. `rbac.e2e-spec.ts` alone (not concurrent, one command,
+`fileParallelism: false`): **4 failed, 6 passed**, and the four failures are no
+longer vitest timeouts:
+
+```
+PrismaClientKnownRequestError:
+Invalid `prisma.auditLogEntry.createManyAndReturn()` invocation:
+Transaction API error: Transaction already closed: A query cannot be executed
+on an expired transaction. The timeout for this transaction was 120000 ms,
+however 128300 ms passed since the start of the transaction.
+```
+
+**That is a 500 from the application, not a red test.** `startCycle` opens one
+interactive transaction and writes an item plus an audit row per active subject;
+at 45,939 active subjects it exceeds Prisma's 120 s interactive-transaction cap.
+Three consequences worth separating:
+
+1. **Raising `testTimeout` is now useless.** The cap is inside the application's
+   own transaction, so the request fails at 120 s regardless of how long the test
+   is willing to wait. The mitigation this entry chose in September has been
+   exhausted.
+2. **It is still not a product defect.** No real brokerage office has 45,939
+   active users; the transaction is O(active subjects) by design and that design
+   is fine at real scale. The data volume is the defect, exactly as this entry
+   has said since it was written.
+3. **CI is unaffected and is therefore the authority for this file.** CI creates
+   its database from nothing, so one run's users are a few hundred. `rbac`
+   passed in CI on this branch today (run on `3b7a844`, 20m52s green, full
+   unfiltered `turbo run test:e2e`). This is the concrete case the
+   verification-contract rule was written for: *keep CI for being the only
+   environment that starts from NOTHING.*
+
+**What to do, in order.** Reset db-test again (`prisma migrate reset` + seed) —
+it is operational hygiene, it needs explicit consent because the command refuses
+without it, and the table above shows it is worth far more than any timeout
+change. Then do fix option 1, per-file isolation, because a reset buys months
+and not more: the accumulation restarts on the next run, and this is now the
+SECOND time it has crossed a hard limit, each time at a higher one.
+
 The root cause is unchanged and option 1 above is still the answer: per-file
 DB isolation. Until then, **reset db-test before relying on a full-suite
 number** — otherwise the suite measures months of accumulated fixtures rather
@@ -1253,37 +1297,66 @@ only so `"motor"` would find `"MOTOR"`. Leniency was a symptom of free text; wit
 vocabulary the question has one answer, and the e2e test that asserted case-insensitivity was
 replaced by tests for what the id is NOT — unknown id 422, office line 422, non-uuid 400.
 
-#### AND THE INTERACTION THAT INVERTS IT: Q9 — MUST BE RE-DERIVED IN THE Q9 COMMIT
+#### AND THE INTERACTION THAT INVERTS IT: Q9 — RE-DERIVED (2026-09-22), AND THE PREDICTION WAS WRONG
 
-**Q9 (approved, NOT built — measured 2026-09-22) makes `InsurerFormTemplate` OFFICE-SCOPED.** An
-office contracts with a company outside the system; that company sends THAT OFFICE its forms; the
-administrator uploads and field-maps them; they are never shared with another office. The gap
-making it urgent is visible in the schema today: **`insurerMasterId` is `NOT NULL`**, so for a
-locally registered company a form template is not unmapped — it is *unrepresentable*.
+This entry said: **Q9 makes `InsurerFormTemplate` OFFICE-SCOPED** — add `organizationId`, make
+`insurerMasterId` nullable, take both line FKs, delete `assertGlobalLine` — and it said the commit
+must **re-derive** rather than patch around. Re-deriving is exactly what produced a different
+answer, which is the best argument for that instruction surviving.
 
-Evidence Q9 has not landed: `InsurerFormTemplate` has no `organizationId` column, and
-`pg_class.relrowsecurity` is **false** for both `InsurerFormTemplate` and `InsurerFormField` while
-`Insurer` and `OfficeInsuranceLine` are **true**.
+**What was wrong.** `InsurerFormTemplate` is global ON PURPOSE. It hangs off `InsurerMaster`, so a
+mapping made once is readable by every office — Part I §5's promise and a Part V multi-tenancy
+checklist item. Adding `organizationId` would have withdrawn that **silently**: `applyTenantScope`
+adds `where: { organizationId }` to every query on any model carrying the column, the scoped set is
+DERIVED from the DMMF, and there is no third state. A row visible to every office and a table the
+extension scopes are mutually exclusive, and the only way to have both is to special-case the one
+mechanism protecting ~100 other tables.
 
-**When Q9 lands, the restriction above INVERTS.** An office-scoped template MAY legitimately
-reference that office's own added line — an office that added "Pet" and uploaded that insurer's
-form for it is precisely the case Q9 serves. So the Q9 commit must **re-derive**, not patch around:
+So the prediction would have traded a stated requirement for a table shape, and the trade would not
+have shown up as a failing test — it would have shown up as a new office inheriting no mappings,
+months later.
 
-1. The FK choice — office-scoped means BOTH nullable FKs, as `InsurerOfferedLine` has.
-2. `InsurerMasterService.assertGlobalLine` — deleted, replaced by the composite-FK guard
-   `(insuranceLineId, organizationId)`, which only becomes possible once the child carries an
-   `organizationId` to agree with.
-3. `insurerMasterId` — nullable, which is the gap Q9 exists to close.
+**What was built instead**: `OfficeInsurerFormTemplate`, hanging off the office-scoped `Insurer`.
+The same split that already exists one level up, for the same reason:
+
+    InsurerMaster (global)  -> InsurerFormTemplate        shared, catalogue lines only
+    Insurer       (office)  -> OfficeInsurerFormTemplate  one office, either catalogue
+
+**How the three re-derivations actually resolved** — two inverted, one dissolved:
+
+1. **BOTH nullable line FKs — CORRECT, on the new model.** And for the predicted reason: once the
+   child carries an `organizationId`, an office's own added line is a legitimate referent, and the
+   composite-FK guard `(officeInsuranceLineId, organizationId)` becomes available.
+2. **`assertGlobalLine` deleted — WRONG. It stays.** Its stated precondition ("the model is
+   GLOBAL") is still true of the model it guards. The two endpoints now differ deliberately, and
+   `office-insurer-forms.e2e-spec.ts` asserts both halves in ONE test, because either alone would
+   pass against a system that had stopped checking.
+3. **`insurerMasterId` nullable — DISSOLVED.** The new model hangs off `Insurer`, whose
+   `insurerMasterId` is already nullable, so it needs none of its own. The gap Q9 existed to close
+   — "for a locally registered company a form template is unrepresentable" — disappears rather than
+   being patched.
+
+**Measured before choosing**: `InsurerFormTemplate` held 0 rows on dev and 0 on db-test, so neither
+shape had a data-migration cost. That is precisely why the decision was worth making now — both
+were free before any office had mapped a form, and only one stays free afterwards.
+
+**A generated column written, measured, and removed.** The new table first had a `GENERATED`
+`lineKey` (COALESCE of the two line columns), on the argument that `InsurerOfferedLine`'s
+two-nullable-uniques shape becomes unsafe once a `version` joins the key. A temp table with exactly
+those two indexes refused the duplicate, so the argument was false: the `exactly_one_line` CHECK
+means every row is constrained by the index whose column is NOT null. Dropped — it bought nothing
+and cost a database feature `schema.prisma` cannot express plus another `db:divergence` entry.
 
 **On the deploy-time assertion in `20261016100000` forbidding an FK to `OfficeInsuranceLine`:** it
-cannot block Q9 and does not need retiring. Migrations run ONCE, in timestamp order — on a fresh
-database that `DO` block runs before any Q9 migration exists to add the FK, and on an existing
-database it never re-runs. Deliberately **no test** asserts the same thing, because a test WOULD
-block the correct change. The durable statements (this section, the `schema.prisma` comment, and
-`assertGlobalLine`'s docblock) each now name their own precondition instead of reading as a bare
-prohibition — **an assertion that states what would legitimately end it can be removed by someone
-who has met that condition; one that only says "forbidden" gets worked around by someone in a
-hurry, or blocks correct work for a week.**
+never needed retiring, and now never will — it guards the GLOBAL table, which did not change.
+
+**The durable lesson, which is why this correction is kept rather than edited away:** a prediction
+about a future commit is written with the information available then, and the thing it most often
+gets wrong is not the mechanism but WHICH OBJECT changes identity. This one assumed one table would
+become office-scoped; the codebase's own established answer to "a global thing plus an office's own
+thing" is two models, and it was already visible one level up in the same file. **An entry that
+says "re-derive" survives being wrong. One that says "do these three things" would have been
+followed.**
 
 ---
 

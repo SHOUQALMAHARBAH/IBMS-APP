@@ -265,6 +265,7 @@ describe("permission grid — the office administrator", () => {
         "incident.report",
         "information-asset.manage",
         "insurer.directory.read",
+        "insurer.office-form.map",
         "insurer.read",
         "insurer.relationship.manage",
         "permission.read",
@@ -321,6 +322,12 @@ describe("permission grid — the office administrator", () => {
       // columns are an allow-list of public company facts, asserted against
       // `information_schema` by `insurer-directory.e2e-spec.ts`.
       "insurer.directory.read",
+      // Q9's office-scoped form mappings. Granted here and NOT `insurer.form.map`, which is
+      // the pair's whole point: the withheld one becomes the form every other office submits
+      // against, and this one is readable by one office. The test below asserts both halves —
+      // holding this and not that is the distinction, so a grid edit that collapsed them
+      // breaks a test rather than quietly widening an administrator to a platform-wide write.
+      "insurer.office-form.map",
     ];
 
     const legacy = new Set(
@@ -364,6 +371,11 @@ describe("permission grid — the office administrator", () => {
       // (`insurer.master.manage` is deliberately absent from this list: no such
       // code exists in the catalogue, so asserting it is not granted asserts
       // nothing. `insurer.master.read` is the only master-registry code today.)
+      //
+      // Note what is NOT here: `insurer.office-form.map`, which the office administrator DOES
+      // hold. That contrast is the reason the two codes exist, and it is asserted from both
+      // sides — granted in the exact list above, withheld here. A future edit that decided
+      // "these are the same thing really" has to break one of the two.
       "insurer.form.map",
       // reviewing your own access is the control this system exists to enforce
       "access-recertification.review",

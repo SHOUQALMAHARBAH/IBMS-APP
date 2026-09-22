@@ -162,12 +162,16 @@ export class InsurerMasterService {
    * office's private vocabulary on a row the others read. The FK already makes that impossible;
    * this turns "impossible" into a sentence.
    *
-   * THE PRECONDITION THIS RESTRICTION DEPENDS ON, stated so whoever meets it can remove this
-   * method rather than route around it: the model is GLOBAL. Q9 (approved, unbuilt) makes it
-   * office-scoped, and at that point an office's own line becomes a LEGITIMATE reference — an
-   * office that added "Pet" and uploaded that insurer's form for it is the case Q9 exists to
-   * serve. When `InsurerFormTemplate` gains an `organizationId`, delete this check and replace
-   * it with the composite-FK guard, which only becomes possible then.
+   * THE PRECONDITION THIS RESTRICTION DEPENDS ON: the model is GLOBAL. That is still true, and
+   * Q9 — which the previous version of this comment expected to end the restriction — has landed
+   * WITHOUT ending it. An office's own form now lives on `OfficeInsurerFormTemplate`, a
+   * tenant-scoped model hanging off `Insurer`, and `OfficeInsurerFormService.resolveLine` accepts
+   * an office's own line precisely because that row is readable by one office.
+   *
+   * So the two endpoints differ on purpose, and `office-insurer-forms.e2e-spec.ts` asserts BOTH
+   * halves in one test: this method refuses an office line naming why, and the office endpoint
+   * accepts the same id. Removing this check would not "unblock" anything — it would put one
+   * office's private vocabulary on a row every office reads.
    */
   private async assertGlobalLine(insuranceLineId: string): Promise<void> {
     const [standard] = await this.lines.findStandardByIds([insuranceLineId]);
