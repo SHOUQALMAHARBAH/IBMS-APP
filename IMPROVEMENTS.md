@@ -2321,6 +2321,44 @@ reports loudly at boot, and it is a different problem from privilege escalation.
 
 ---
 
+### 1.39 `P2` — The catalogue can grow INTO a collision that both write paths refuse
+
+`InsuranceLineService` refuses an office-added line whose canonical name means the same as a
+catalogue line, on `add` **and** on the rename — `standardLineColliding`, checked both places.
+That guard runs when the OFFICE line is written. **Nothing runs when the catalogue grows.**
+
+Seed a 33rd `InsuranceLine` whose name canonicalises to a line some office added two years ago
+and the collision exists retroactively, having passed every check that was ever written. It is
+not hypothetical: the 32 arrived by seed and a 33rd arrives the same way.
+
+Why it matters beyond tidiness — `InsurerDirectory.lines` carries `code: null` for an
+office-added line, and the directory's `lineCode` filter is an exact match on the code. So every
+company recorded against the colliding office line is **invisible** to a search for the catalogue
+code that means the same thing, and the empty page reads as *"no company writes this cover"*.
+
+**Closed at the read side already, in the honest direction.** The first draft of the line filter
+also matched un-coded lines by canonical name. Measured before keeping it: the colliding set is
+**empty on both databases** (4 office lines on db-test, 0 on dev, 0 collisions either side), so
+the fallback covered nothing that exists — while putting name similarity back on a matching path
+this branch spent weeks clearing, and making the filter return companies whose recorded line was
+not the one asked for. It was removed and replaced with an assertion that the set IS empty
+(`insurer-schema-constraints.e2e-spec.ts`, with a rolled-back plant proving the query can see a
+collision), which is the house shape: **assert the invariant, do not compensate for its absence
+at read time.**
+
+What is still missing is the guard on the other side. Options, cheapest first:
+
+1. A **seed-time check** in `packages/db/prisma/seed.ts`: adding an `InsuranceLine` that
+   canonically collides with any existing `OfficeInsuranceLine` fails the seed, naming the office
+   rows. Cheap, and the seed is already typechecked.
+2. A **migration `DO` block** on any future migration that inserts catalogue lines. Stronger — it
+   runs on the database being deployed to — but only if whoever writes that migration remembers.
+3. The **repointing tool** the remedy actually needs either way: move the `InsurerOfferedLine`
+   rows onto the catalogue line and delete the office one. A refusal with no remedy path just
+   blocks a legitimate catalogue addition.
+
+Do (1) and (3) together. (2) without (3) turns a good change into an outage.
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

@@ -68,6 +68,21 @@ export class InsuranceLineRepository {
     });
   }
 
+  /**
+   * One standard line by its platform CODE.
+   *
+   * Keyed on the code and not the uuid deliberately, and the model's own comment says why:
+   * each database seeds its own rows, so the uuid differs between them while the code does
+   * not. A caller naming a line across a boundary — a URL, a saved filter, a report — must
+   * name it by code, and the directory's line filter is exactly that kind of caller.
+   */
+  findStandardByCode(code: string): Promise<StandardLineRow | null> {
+    return this.prisma.client.insuranceLine.findUnique({
+      where: { code },
+      select: INSURANCE_LINE_SELECT,
+    });
+  }
+
   findStandardByIds(ids: readonly string[]): Promise<StandardLineRow[]> {
     return this.prisma.client.insuranceLine.findMany({
       where: { id: { in: [...ids] } },

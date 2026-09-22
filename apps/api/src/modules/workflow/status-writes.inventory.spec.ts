@@ -164,11 +164,17 @@ describe('no status write bypasses the workflow engine', () => {
   // out: it reports success about files it never opened. Both roots must exist and the total
   // must stay in the hundreds, so moving or renaming a source tree fails here rather than
   // silently narrowing the guard.
+  // The SAME 20s budget as the two scans below, and for a sharper reason: this is the FIRST
+  // caller of `allSources()` in the file, so it is the one that pays the cold tree walk and
+  // fills the memo every later test reads in ~1ms. Written without a budget it timed out at
+  // 10390ms against the 5s default while its siblings passed — a test that reports nothing
+  // about the property it guards, which is exactly the § 1.36 shape the comment below names.
+  // Whichever test runs first here needs the budget; do not move this one without moving it.
   it('sanity: every root exists and the scan still covers the codebase', () => {
     for (const root of ROOTS)
       expect(fs.existsSync(root), `missing root: ${root}`).toBe(true);
     expect(allSources().length).toBeGreaterThan(500);
-  });
+  }, 20_000);
 
   // 20s, not the 5s default, and the number is measured rather than picked: this test runs
   // the tree walk and the whole-tree read that BOTH scans share, at 2810ms in isolation on

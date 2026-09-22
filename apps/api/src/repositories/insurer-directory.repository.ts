@@ -43,6 +43,12 @@ import { PrismaService } from '../prisma/prisma.service';
  * role can actually read, so a column added there is reachable by anything that can run
  * a query, whatever this repository chooses to map.
  *
+ * The LINE FILTER reads `lines`, which is already in this list, so it discloses nothing
+ * new — it is the same disclosure made answerable. Worth stating because the instinct on
+ * seeing a new filter is to check whether it widened the boundary: a caller could always
+ * page the whole directory and filter client-side, and the only thing that changes is
+ * that the page window now bounds MATCHING companies instead of scanned ones.
+ *
  * What is deliberately absent, and must stay absent: `organizationId`, `isActive`,
  * `creditTermsDays`, `financialStrengthRating`, every `rfqContact*` / `claimsContact*` /
  * `underwriterContact`, any count of offices, and any registration timestamp. The first
@@ -70,6 +76,21 @@ export interface DirectoryLine {
   nameAr: string;
 }
 
+/**
+ * A line to filter the directory by, resolved from the PLATFORM catalogue before it gets
+ * here — never a string a caller typed.
+ *
+ * The names travel with the code because of the un-coded case below. The service resolves
+ * them from `InsuranceLine` so this repository cannot be handed a line that does not
+ * exist, which is what makes "no results" mean "nobody writes it" rather than "you
+ * mistyped it".
+ */
+export interface DirectoryLineFilter {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+}
+
 export interface InsurerDirectoryRow {
   directoryKey: string;
   name: string | null;
@@ -87,7 +108,61 @@ export class InsurerDirectoryRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * One page of the directory, newest-first by name.
+   * ONE predicate, built once and used by both the page and the count.
+   *
+   * They were two copies of the same `WHERE` before the line filter arrived, which was
+   * survivable while the filter was a single `ILIKE`. It stops being survivable the moment
+   * the predicate has two clauses: a count over a DIFFERENT predicate than the page reports
+   * a total that describes a set the caller cannot reach, and the two drift silently
+   * because nothing compares them. This codebase has the same lesson recorded about
+   * allow-lists — two lists of the same thing is one more than can be kept in agreement.
+   */
+  /**
+   * ONE predicate, built once and used by both the page and the count.
+   *
+   * They were two copies of the same `WHERE` before the line filter arrived, which was
+   * survivable while the filter was a single `ILIKE`. It stops being survivable the moment
+   * the predicate has two clauses: a count over a DIFFERENT predicate than the page reports
+   * a total describing a set the caller cannot reach, and the two drift silently because
+   * nothing compares them. This codebase has the same lesson recorded about allow-lists —
+   * two lists of the same thing is one more than can be kept in agreement.
+   *
+   * The line clause is an EXACT match on the platform code, and deliberately nothing more.
+   * An earlier draft also matched un-coded lines whose NAME canonicalised to the catalogue
+   * line's, on the theory that an office which typed its own "Motor Comprehensive" instead
+   * of picking the catalogue entry would otherwise be hidden. Measured before keeping it:
+   * `InsuranceLineService` refuses that collision on BOTH write paths (`add` and the
+   * rename), and the colliding set is EMPTY on both databases — 4 office lines on db-test,
+   * 0 on dev, 0 collisions either side. So the fallback covered nothing that exists, at the
+   * price of putting name similarity back on a matching path this branch spent weeks taking
+   * it off, and making the filter return companies whose recorded line is not the one asked
+   * for. `insurer-schema-constraints.e2e-spec.ts` asserts that empty set instead, which is
+   * the house shape: assert the invariant, do not compensate for its absence at read time.
+   */
+  private where(
+    search: string | undefined,
+    line: DirectoryLineFilter | undefined,
+  ): Prisma.Sql {
+    const pattern = search?.trim() ? `%${search.trim()}%` : null;
+    return Prisma.sql`
+      WHERE (
+        ${pattern}::text IS NULL
+        OR "name" ILIKE ${pattern}
+        OR "nameAr" ILIKE ${pattern}
+      )
+      AND (
+        ${line?.code ?? null}::text IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements("lines") AS l
+          WHERE l->>'code' = ${line?.code ?? null}
+        )
+      )
+    `;
+  }
+
+  /**
+   * One page of the directory, alphabetically by name.
    *
    * Ordered by name and not by anything temporal, deliberately: a "recently registered"
    * ordering would let an office infer when other offices added companies, which is the
@@ -97,12 +172,17 @@ export class InsurerDirectoryRepository {
    * There is NO filter on whether anybody currently deals with the company. Presence
    * depends on having been registered, full stop — a company disappearing when the last
    * office stopped dealing with it would itself be a signal about other offices.
+   *
+   * The line filter is applied HERE, in the query, not after the page comes back. Filtering
+   * a page in memory would let the page size decide which companies the caller can see —
+   * the `DpoWorkspaceService` defect this codebase has already paid for once. The window
+   * must bound MATCHING rows, never rows scanned.
    */
   async findPage(
     search: string | undefined,
     window: { take: number; skip: number },
+    line?: DirectoryLineFilter,
   ): Promise<InsurerDirectoryRow[]> {
-    const pattern = search?.trim() ? `%${search.trim()}%` : null;
     return this.prisma.client.$queryRaw<InsurerDirectoryRow[]>(Prisma.sql`
       SELECT
         "directoryKey",
@@ -115,25 +195,23 @@ export class InsurerDirectoryRepository {
         "companyCorrespondenceAddress",
         "lines"
       FROM "InsurerDirectory"
-      WHERE ${pattern}::text IS NULL
-         OR "name" ILIKE ${pattern}
-         OR "nameAr" ILIKE ${pattern}
+      ${this.where(search, line)}
       ORDER BY "name" ASC NULLS LAST, "directoryKey" ASC
       LIMIT ${window.take} OFFSET ${window.skip}
     `);
   }
 
-  /** Entries matching the same filter. A separate count over the same predicate, so the
-   *  total never describes a different set than the page. */
-  async countPage(search: string | undefined): Promise<number> {
-    const pattern = search?.trim() ? `%${search.trim()}%` : null;
+  /** Entries matching the same filter — the same `where()` call, so the total cannot
+   *  describe a different set than the page. */
+  async countPage(
+    search: string | undefined,
+    line?: DirectoryLineFilter,
+  ): Promise<number> {
     const rows = await this.prisma.client.$queryRaw<{ total: bigint }[]>(
       Prisma.sql`
         SELECT count(*)::bigint AS total
         FROM "InsurerDirectory"
-        WHERE ${pattern}::text IS NULL
-           OR "name" ILIKE ${pattern}
-           OR "nameAr" ILIKE ${pattern}
+        ${this.where(search, line)}
       `,
     );
     // `count(*)` comes back as a bigint, which JSON cannot serialise — a `total` that

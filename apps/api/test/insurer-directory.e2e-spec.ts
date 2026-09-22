@@ -48,6 +48,27 @@ const SHARED_EN = `${FIXTURE_PREFIX} Al Yarmouk Insurance`;
 const SHARED_EN_B = `${FIXTURE_PREFIX}   al-yarmouk   insurance`;
 const SHARED_AR = `${FIXTURE_PREFIX} شركة اليرموك للتأمين`;
 
+/**
+ * A company recorded ONLY against a line the office invented, and the filter's honest
+ * boundary.
+ *
+ * The line's name is canonically distinct from every catalogue line ON PURPOSE — an
+ * office-added line that MEANT a catalogue line is refused at both write paths and asserted
+ * absent by `insurer-schema-constraints.e2e-spec.ts`, so a fixture creating one would
+ * violate an invariant this suite's sibling proves. What is left is the genuine residual
+ * gap: private vocabulary for cover the catalogue does name. "Ride-hailing fleet cover" is
+ * motor cover, and no key-fold will ever say so, because `canonical_name_key` folds
+ * orthography and never meaning.
+ *
+ * So this company is UNREACHABLE by any code filter, and the test below asserts exactly
+ * that rather than pretending otherwise. It is the reason the line filter is one axis and
+ * not the only way to read the directory: the unfiltered list still shows it.
+ */
+const LOCAL_LINE_COMPANY = `${FIXTURE_PREFIX} Local Line Only`;
+const LOCAL_LINE_NAME_EN = 'Ride-Hailing Fleet Cover';
+const LOCAL_LINE_NAME_AR = 'تغطية أساطيل النقل الذكي';
+const OTHER_LINE_COMPANY = `${FIXTURE_PREFIX} Marine Only`;
+
 const APP_DB_URL =
   process.env.APP_DATABASE_URL ??
   'postgresql://ibms_app:ibms_app_dev@localhost:5434/ibms_test?schema=public';
@@ -95,7 +116,12 @@ async function removeFixtures(): Promise<void> {
     },
   });
   await rawPrisma.officeInsuranceLine.deleteMany({
-    where: { organizationId: ORG_B_ID },
+    // Office B's by organization; THIS office's by name. db-test is cumulative, so an
+    // office line left behind is not a cosmetic leak — the next run's
+    // `OfficeInsuranceLine_organizationId_canonicalEn_key` refuses the same fixture.
+    where: {
+      OR: [{ organizationId: ORG_B_ID }, { nameEn: LOCAL_LINE_NAME_EN }],
+    },
   });
   await rawPrisma.userRoleAssignment.deleteMany({
     where: { organizationId: ORG_B_ID },
@@ -184,6 +210,14 @@ function canonicalOf(name: string): string {
   return canonicalNameKey(name);
 }
 
+/** The directory filtered by a platform line code, with no name term at all — the query a
+ *  person asking "who writes this cover" actually sends. */
+function filterByLine(code: string, token = officeA.accessToken) {
+  return request(app!.getHttpServer())
+    .get(`/insurer-directory?lineCode=${encodeURIComponent(code)}&pageSize=200`)
+    .set(bearer(token));
+}
+
 function searchDirectory(term: string, token = officeA.accessToken) {
   return request(app!.getHttpServer())
     .get(`/insurer-directory?search=${encodeURIComponent(term)}`)
@@ -254,6 +288,51 @@ beforeAll(async () => {
       organizationId: ORG_B_ID,
       insurerId: insurerB.id,
       insuranceLineId: travel.id,
+    },
+  });
+
+  // --- Two more companies in office A, so the LINE filter has something to leave out. A
+  // --- filter proven only by what it returns is not proven: "return everything" passes.
+  const marine = await rawPrisma.insuranceLine.findFirstOrThrow({
+    where: { code: 'MARINE_CARGO' },
+  });
+  const marineOnly = await prisma.insurer.create({
+    data: {
+      legalName: OTHER_LINE_COMPANY,
+      legalNameAr: `${FIXTURE_PREFIX} البحرية فقط`,
+      structure: 'CONVENTIONAL',
+      companyEmail: 'marine-only@example.test',
+    },
+  });
+  await prisma.insurerOfferedLine.create({
+    data: { insurerId: marineOnly.id, insuranceLineId: marine.id },
+  });
+
+  // The office's OWN line type, for cover the catalogue names differently. Created through
+  // the repository shape the service uses, canonical keys and all, so the row is the one the
+  // application would have written.
+  const officeLine = await prisma.officeInsuranceLine.create({
+    data: {
+      nameEn: LOCAL_LINE_NAME_EN,
+      nameAr: LOCAL_LINE_NAME_AR,
+      canonicalEn: canonicalOf(LOCAL_LINE_NAME_EN),
+      canonicalAr: canonicalOf(LOCAL_LINE_NAME_AR),
+      category: 'GENERAL',
+      createdByUserId: officeA.userId,
+    },
+  });
+  const localOnly = await prisma.insurer.create({
+    data: {
+      legalName: LOCAL_LINE_COMPANY,
+      legalNameAr: `${FIXTURE_PREFIX} خط محلي فقط`,
+      structure: 'CONVENTIONAL',
+      companyEmail: 'local-line@example.test',
+    },
+  });
+  await prisma.insurerOfferedLine.create({
+    data: {
+      insurerId: localOnly.id,
+      officeInsuranceLineId: officeLine.id,
     },
   });
 }, 600_000);
@@ -484,5 +563,147 @@ describe('presence depends on registration, not on anyone still dealing with the
     );
     expect(entry).toBeDefined();
     expect(entry!.lines).toEqual([]);
+  }, 300_000);
+});
+
+/**
+ * Filtering by LINE — the question the directory exists to answer.
+ *
+ * It shipped searchable by company name only, which answers "is this company on the
+ * platform" and never "who writes this cover". These tests are written around the failure
+ * mode that matters most for a lead list: not a wrong row returned, but a company SILENTLY
+ * MISSING — because an empty page looks like an answer, and an office that reads "nobody
+ * writes engineering cover" stops looking.
+ */
+describe('filtering the directory by insurance line', () => {
+  it('returns the companies that write the line and leaves out the ones that do not', async () => {
+    const response = await filterByLine('MOTOR_COMPREHENSIVE').expect(200);
+    const page = response.body as DirectoryPage;
+    const names = page.items.map((e) => e.name);
+
+    // The shared company: office A recorded motor against it.
+    expect(names).toContain(SHARED_EN);
+
+    // EVERY entry carries the line, which is the assertion that cannot pass vacuously.
+    // Planting a neutered predicate proved why it is written this way: with no filter the
+    // page fills with 200 unrelated companies and the fixture rows fall off it entirely, so
+    // a bare `not.toContain(...)` went GREEN on a filter that filtered nothing. An
+    // exclusion assertion cannot tell "correctly excluded" from "never on the page".
+    expect(page.items.length).toBeGreaterThan(0);
+    const withoutTheLine = page.items.filter(
+      (e) => !e.lines.some((l) => l.code === 'MOTOR_COMPREHENSIVE'),
+    );
+    expect(
+      withoutTheLine.map((e) => e.name),
+      'every entry the line filter returns must record that line',
+    ).toEqual([]);
+
+    // And the named exclusions, kept because they are the two cases the fixtures exist for:
+    // a company on a different catalogue line, and one on an office-invented line.
+    expect(names).not.toContain(OTHER_LINE_COMPANY);
+    expect(names).not.toContain(LOCAL_LINE_COMPANY);
+  }, 300_000);
+
+  it('reaches a line only ANOTHER office recorded', async () => {
+    // Travel was registered by office B and by nobody else. Office A asking "who writes
+    // travel" gets the company — which is the entire purpose of a cross-office directory,
+    // and the property a per-office filter could not have.
+    const response = await filterByLine('TRAVEL').expect(200);
+    const entry = (response.body as DirectoryPage).items.find(
+      (e) => e.name === SHARED_EN,
+    );
+    expect(entry).toBeDefined();
+    // Still nothing about WHICH office recorded it: the response is the same allow-list.
+    expect(Object.keys(entry!).sort()).toEqual(
+      [...INSURER_DIRECTORY_COLUMNS].sort(),
+    );
+  }, 300_000);
+
+  it('REFUSES a code the catalogue does not have, rather than answering with an empty page', async () => {
+    // The most dangerous shape of the hiding risk: `[]` is indistinguishable from "nobody
+    // writes this", so a retired or mistyped code must be refused and NAMED.
+    const response = await request(app!.getHttpServer())
+      .get('/insurer-directory?lineCode=MOTOR_COMPREHENSIVE_TYPO')
+      .set(bearer(officeA.accessToken))
+      .expect(422);
+    const body = response.body as { message: string };
+    expect(body.message).toContain('MOTOR_COMPREHENSIVE_TYPO');
+    expect(body.message).toContain('/insurance-lines');
+  }, 300_000);
+
+  it('rejects a line NAME where a code belongs', async () => {
+    // A name is not a filter axis, and the 400 comes from the DTO before any lookup — a
+    // 200-character search phrase must not reach the database as a candidate code.
+    const response = await request(app!.getHttpServer())
+      .get('/insurer-directory?lineCode=Motor%20Comprehensive')
+      .set(bearer(officeA.accessToken))
+      .expect(400);
+    expect(JSON.stringify(response.body)).toContain('MOTOR_COMPREHENSIVE');
+  }, 300_000);
+
+  it('counts the FILTERED set, so the total never describes a page the caller cannot reach', async () => {
+    // The page and the count run the same predicate. If they ever stop doing so this is
+    // the test that notices: an unfiltered count beside a filtered page would show up here
+    // as a total larger than the set.
+    const all = await filterByLine('MARINE_CARGO').expect(200);
+    const allPage = all.body as DirectoryPage;
+    expect(allPage.items.map((e) => e.name)).toContain(OTHER_LINE_COMPANY);
+
+    const paged = await request(app!.getHttpServer())
+      .get('/insurer-directory?lineCode=MARINE_CARGO&pageSize=1')
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const onePage = paged.body as DirectoryPage;
+    expect(onePage.items).toHaveLength(1);
+    expect(onePage.total).toBe(allPage.total);
+    expect(onePage.total).toBe(allPage.items.length);
+  }, 300_000);
+
+  it('combines with the name search as AND, not OR', async () => {
+    // A company that matches the name and not the line must not come back. An OR here
+    // would make the line filter decorative while looking like it worked.
+    const both = await request(app!.getHttpServer())
+      .get(
+        `/insurer-directory?lineCode=MARINE_CARGO&search=${encodeURIComponent('Local Line Only')}`,
+      )
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const page = both.body as DirectoryPage;
+    expect(page.items).toEqual([]);
+    expect(page.total).toBe(0);
+  }, 300_000);
+
+  it('cannot reach a company recorded only against an office-invented line type, and the unfiltered list still shows it', async () => {
+    // The filter's honest boundary, asserted rather than left to be discovered. An office
+    // that invented "Ride-Hailing Fleet Cover" for motor cover has described its panel in
+    // private vocabulary; `canonical_name_key` folds orthography, never meaning, so no code
+    // reaches it. Documented here because the remedy is the line screen refusing the
+    // duplicate — never the directory guessing at synonyms.
+    for (const code of ['MOTOR_COMPREHENSIVE', 'MOTOR_TPL_COMPULSORY']) {
+      const filtered = await filterByLine(code).expect(200);
+      expect(
+        (filtered.body as DirectoryPage).items.map((e) => e.name),
+      ).not.toContain(LOCAL_LINE_COMPANY);
+    }
+
+    // But it is NOT hidden from the directory — only from the code filter. The entry is
+    // there, carrying the office's own line name with a null code, which is what tells a
+    // reader the company writes something the catalogue does not name the same way.
+    const unfiltered = await searchDirectory('Local Line Only').expect(200);
+    const entry = (unfiltered.body as DirectoryPage).items.find(
+      (e) => e.name === LOCAL_LINE_COMPANY,
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.lines).toEqual([
+      { code: null, nameEn: LOCAL_LINE_NAME_EN, nameAr: LOCAL_LINE_NAME_AR },
+    ]);
+  }, 300_000);
+
+  it('is gated on the same permission as the rest of the directory', async () => {
+    // A filter is not a second endpoint, but it is a new query string, and a guard read
+    // from the route rather than the handler is exactly where that distinction gets lost.
+    await filterByLine('MOTOR_COMPREHENSIVE', noDirectory.accessToken).expect(
+      403,
+    );
   }, 300_000);
 });

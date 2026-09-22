@@ -9,14 +9,60 @@ mind.
 ## What it is
 
 A read-only list of the insurance companies **any** office has registered, visible to every
-office, one entry per company, searchable by name in either script. Fed automatically by
-registrations. Nobody curates it, no vendor supplies it, and there is no admin surface for
-it.
+office, one entry per company. Fed automatically by registrations. Nobody curates it, no
+vendor supplies it, and there is no admin surface for it.
 
 Its purpose is a single question: *an office needs cover for a risk nobody on its panel
 writes — who else is out there?* Until this existed, the answer came from asking around.
 
 `GET /insurer-directory`, gated on `insurer.directory.read`.
+
+## Searching it
+
+Two axes, and only two:
+
+| Query | Matches |
+|---|---|
+| `search=` | Containment on the company name, either script. Plain `ILIKE`, not the fuzzy registration matcher — a person typing a few letters is asking an easier question than "is this the same company as one of these". |
+| `lineCode=` | Exact match on a **platform** insurance line code, e.g. `MOTOR_COMPREHENSIVE`. |
+
+Both together are **AND**. Neither has a default; absent means unfiltered.
+
+`lineCode` shipped later than the rest, and the gap is worth recording because the feature's
+whole justification is the question above. Without it the directory answered "is this company
+on the platform" and never "who writes this cover" — the use case was missing, not merely
+unfiltered. The DTO at the time said a line filter was left out because *"every additional
+filter is a place where a wrong default could hide a company that does write the cover
+somebody needs"*, which was right about the risk. It is answered in three places:
+
+1. **No default.** No `lineCode`, no line predicate.
+2. **An unrecognised code is refused with a 422 naming it**, never answered with an empty
+   page. `[]` is indistinguishable from "nobody writes this", and it looks like an answer —
+   the most dangerous shape of exactly the risk the objection named.
+3. **The one company a code-only filter could hide cannot exist.** An office-added line that
+   canonically MEANS a catalogue line is refused on both write paths by
+   `standardLineColliding`, and `insurer-schema-constraints.e2e-spec.ts` asserts the
+   colliding set is empty across every office.
+
+**What `lineCode` cannot reach, by design:** a company recorded only against a line an office
+invented for cover the catalogue names differently — "Ride-Hailing Fleet Cover" is motor
+cover and `canonical_name_key` folds orthography, never meaning. An earlier draft of the
+filter DID match un-coded lines by canonical name; it was removed after measuring the
+colliding set at **0 on both databases**, because it covered nothing real, put name
+similarity back on a matching path this branch spent weeks clearing, and made the filter
+answer with companies whose recorded line was not the one asked for. The remedy for private
+vocabulary is the line-management screen refusing the duplicate, not the directory guessing.
+The unfiltered list still shows such a company, with its office's own line name and a null
+code.
+
+**Not offered:** a free-text line NAME (string matching, on a path deliberately cleared of
+it), a LIST of codes (needs an ANY-vs-ALL decision, and guessing which the caller meant is
+the wrong default the objection warns about), and a `structure` filter (one defaulting to
+conventional would hide every takaful company from an office that never touched the control).
+
+Paging applies to the FILTERED set: the page query and the count query share one predicate,
+so `total` can never describe a set the caller cannot reach, and the window bounds matching
+companies rather than scanned ones.
 
 ## The boundary — not negotiable
 

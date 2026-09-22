@@ -23,8 +23,12 @@ import { RequirePermissions } from '../rbac/decorators/require-permissions.decor
 export class InsurerDirectoryController {
   constructor(private readonly directory: InsurerDirectoryService) {}
 
-  /** Every company any office has registered, one entry per company, searchable by name
-   *  in either script. Never says which offices deal with any of them. */
+  /**
+   * Every company any office has registered, one entry per company. Searchable by name in
+   * either script and filterable by platform line code — "who writes engineering cover"
+   * is the question the directory exists for, and it was unanswerable until the filter
+   * landed. Never says which offices deal with any of them.
+   */
   @RequirePermissions('insurer.directory.read')
   @Get()
   list(@Query() query: ListInsurerDirectoryQueryDto) {

@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import { prisma, rawPrisma, TEST_ORGANIZATION_ID } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
+import { canonicalNameKey } from '../src/common/company-name.util';
 
 /**
  * Insurer management, commit 1 — the three database guarantees the feature is
@@ -378,5 +379,108 @@ describe('the canonical key belongs to the database', () => {
         },
       }),
     ).rejects.toThrow();
+  }, 120_000);
+});
+
+/**
+ * The invariant that lets the directory's line filter be an EXACT match on a code.
+ *
+ * `InsurerDirectory.lines` carries `code: null` for a line an office added itself, and the
+ * directory filters on the code. So a company whose only relevant line is an office-added
+ * duplicate of a catalogue line — an office that typed "Motor Comprehensive" instead of
+ * picking it from the list — would be invisible to a search for that code, and the empty
+ * page would read as "no company writes this cover".
+ *
+ * `InsuranceLineService` refuses that collision on BOTH write paths, `add` and the rename,
+ * via `standardLineColliding`. This test asserts the RESULT of those guards across the
+ * whole table rather than re-testing either one, because the routes they do not cover are
+ * the ones that will actually happen:
+ *
+ *  - a catalogue line SEEDED LATER that collides with an office line already there. The
+ *    guard runs when the office line is written; nothing runs when the catalogue grows, and
+ *    the catalogue has grown before.
+ *  - the demo seed script and any direct SQL, neither of which passes through the service.
+ *
+ * Asserting the empty set is deliberately the alternative to making the directory filter
+ * match by name as well as by code. That fallback was written, measured to cover nothing,
+ * and removed: it put name similarity back on a matching path and made the filter answer
+ * with companies whose recorded line was not the one asked for.
+ */
+describe('no office-added line duplicates a catalogue line', () => {
+  it('holds across every office, in both scripts', async () => {
+    // Raw, and deliberately not scoped to this test's own fixtures: the invariant is about
+    // the whole table, and a query scoped to one office could not see the case that matters
+    // — another office's pre-existing line colliding with a catalogue line seeded later.
+    const collisions = await rawPrisma.$queryRaw<
+      {
+        officeLineId: string;
+        organizationId: string;
+        officeNameEn: string;
+        catalogueCode: string;
+        matched: string;
+      }[]
+    >`
+      SELECT
+        ol."id"             AS "officeLineId",
+        ol."organizationId" AS "organizationId",
+        ol."nameEn"         AS "officeNameEn",
+        sl."code"           AS "catalogueCode",
+        CASE
+          WHEN canonical_name_key(sl."nameEn") = ol."canonicalEn" THEN 'nameEn'
+          ELSE 'nameAr'
+        END                 AS "matched"
+      FROM "OfficeInsuranceLine" ol
+      JOIN "InsuranceLine" sl
+        ON canonical_name_key(sl."nameEn") = ol."canonicalEn"
+        OR canonical_name_key(sl."nameAr") = ol."canonicalAr"
+    `;
+
+    expect(
+      collisions,
+      `An office-added insurance line means the same thing as a catalogue line, so every company recorded against it is INVISIBLE to a directory search for that catalogue code — the empty result reads as "nobody writes this cover". Repoint the InsurerOfferedLine rows at the catalogue line and delete the office one; do NOT make the directory filter match by name instead. Offenders: ${JSON.stringify(collisions)}`,
+    ).toEqual([]);
+  }, 120_000);
+
+  it('would FAIL if such a line existed — proven by planting one', async () => {
+    // The plant, because an assertion that a set is empty passes trivially on an empty
+    // table and tells you nothing. Inside a transaction that always rolls back, so the
+    // invariant this file asserts is never actually violated on the database.
+    const catalogue = await rawPrisma.insuranceLine.findFirstOrThrow({
+      where: { code: 'MOTOR_COMPREHENSIVE' },
+    });
+    const owner = await rawPrisma.user.findFirstOrThrow({
+      where: { organizationId: TEST_ORGANIZATION_ID },
+    });
+
+    let seen = -1;
+    await expect(
+      rawPrisma.$transaction(async (tx) => {
+        await tx.officeInsuranceLine.create({
+          data: {
+            organizationId: TEST_ORGANIZATION_ID,
+            // Spelled badly ON PURPOSE: the canonical key is what collides, not the string.
+            nameEn: `  motor   COMPREHENSIVE `,
+            nameAr: `  ${catalogue.nameAr} `,
+            canonicalEn: canonicalNameKey('  motor   COMPREHENSIVE '),
+            canonicalAr: canonicalNameKey(`  ${catalogue.nameAr} `),
+            category: catalogue.category,
+            createdByUserId: owner.id,
+          },
+        });
+        const found = await tx.$queryRaw<{ n: bigint }[]>`
+          SELECT count(*)::bigint AS n
+            FROM "OfficeInsuranceLine" ol
+            JOIN "InsuranceLine" sl
+              ON canonical_name_key(sl."nameEn") = ol."canonicalEn"
+              OR canonical_name_key(sl."nameAr") = ol."canonicalAr"
+        `;
+        seen = Number(found[0].n);
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+
+    // The query the test above runs DOES see a colliding row when one exists, so its
+    // `toEqual([])` is a real measurement and not a query that never matches anything.
+    expect(seen).toBeGreaterThan(0);
   }, 120_000);
 });
