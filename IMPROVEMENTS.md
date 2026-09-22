@@ -1168,6 +1168,14 @@ start from two axes rather than an enumeration of the cases we happened to obser
 
 ### 1.26 `P1` — TO BUILD: the line migration is TOTAL, and the old column drops on a MEASUREMENT
 
+> **Amended 2026-09-22 — read § 1.40 first.** The migration below IS total over the rows that
+> existed when it ran, and the numbers it reports are accurate. What it does NOT do is change
+> any writer: nothing in the application sets `insuranceLineId` or `officeInsuranceLineId` on
+> these four models, so every row written since is unmapped (measured: 6 on
+> `InsuranceProgramLine`, 4 on `RFQ`, both models the migration mapped 100%). The word
+> "converted" therefore overstates the state, and the drop-the-string gate below cannot go
+> green until the writers land.
+
 The rule for converting the six free-text `insuranceLine` columns, decided before any of it is
 written, because it is the part that goes wrong quietly:
 
@@ -2441,6 +2449,88 @@ What is still missing is the guard on the other side. Options, cheapest first:
    blocks a legitimate catalogue addition.
 
 Do (1) and (3) together. (2) without (3) turns a good change into an outage.
+
+### 1.40 `P1` — The four MUST models were BACKFILLED, not converted: no writer sets the line FK, and every row written since the migration is unmapped
+
+Found while capturing a pre-reset baseline on db-test, by asking a question the migration's own
+success numbers could not answer: *how many rows are unmapped NOW?*
+
+    model                    migration outcome        measured 2026-09-22 (db-test)
+    InsuranceProgramLine     962/962, 0 parked        6 unmapped
+    RFQ                      4,449/4,449, 0 parked    4 unmapped
+    Policy                   4,994 + 632 parked       632 unmapped  (the parked set, expected)
+    CommissionAgreement      287/287                  0 unmapped
+
+The two models the migration mapped COMPLETELY now hold unmapped rows. Dated them against the
+migration (applied 10:41:47Z): every unmapped `RFQ` was written at **13:10 the same day**, two
+and a half hours later. Their `insuranceLine` string is `Property All Risks` — a value the
+mapping table handles perfectly. So these are not rows the conversion missed. They are rows
+written AFTER it, by code that still fills only the string.
+
+**Confirmed structurally, not inferred from the dates:** nothing in `apps/api/src` writes
+`insuranceLineId` or `officeInsuranceLineId` on any of the four models, and
+`commission.repository.ts` still MATCHES on the string —
+`insuranceLine: { equals: value.trim(), mode: 'insensitive' }` — which is the free-text
+matching this whole line of work exists to remove.
+
+**Why this is worth a P1 rather than a note.** The four models were chosen because a line must
+MATCH another model's for the system to work at all: a programme line becomes an RFQ, an RFQ
+becomes a Policy, a commission agreement is applied to a Policy by line. A row with NULL on
+both FKs cannot participate in any FK-based match. Today nothing matches that way, so nothing
+is broken — but the moment a reader is written against the FK it will silently skip every row
+created since the migration, and the symptom will be "the commission did not apply" rather
+than anything pointing here.
+
+**And it makes the deferred gate unreachable.** § 1.26 defers dropping `insuranceLine` until a
+test measures zero unmapped rows. That can never go green while the writers fill only the
+string: the count grows with every run. The order is therefore fixed — writers first, then the
+gate becomes meaningful, then the string can go.
+
+**What the docs now say instead.** "Converted" was the wrong word in § 1.26 and in CLAUDE.md;
+both now say the columns are ADDED and BACKFILLED with the writers pending, because a reader
+would reasonably take "converted" to mean the model uses the FK.
+
+**Not fixed here**, deliberately: the writers are a real piece of work (every create path on
+four models, plus resolving a line id where today a string is typed), and the standing
+instruction on this branch is to record what is out of scope rather than grow the commit. It
+belongs immediately after the current queue, and before anything is written that READS these
+columns.
+
+**The measurement to keep:** re-run the four counts on a database with real volume after the
+writers land. On a freshly reset db-test they all read zero — because the rows are gone, not
+because they mapped, which is exactly the false green this entry exists to prevent.
+
+### 1.41 `P3` — Two e2e harness traps, each of which produced a confident wrong diagnosis
+
+Recorded rather than fixed: both have cheap workarounds, and both cost a full test run before
+being understood. Neither is a defect in the application.
+
+**`ensureRole` UPSERTS, so a mistyped role name becomes a permissionless role.**
+`apps/api/test/tenant-prisma.ts`'s helper takes a name and upserts it, creating the row when it
+is absent. A name that is not in the seeded catalogue therefore succeeds, produces a role with
+**zero grants**, and every request that user makes returns 403 — which reads exactly like a
+broken permission check in the code under test. `'PLACEMENT_OFFICER'` (the real name is
+`PLACEMENT_TECHNICAL_OFFICER`) cost a full run, and left a junk role in the cumulative test
+database until it was deleted by hand.
+
+*Why not simply make it refuse an unknown name:* custom office-scoped roles are a real feature
+since RBAC Phase 3, so a spec may legitimately create one. The honest fix is two functions —
+`ensureCatalogueRole(name)` that refuses anything not seeded, and an explicit
+`createCustomRole(...)` — but it touches a helper many specs share, so it waits for a commit that
+is about the harness.
+
+*Until then:* when a new e2e 403s on everything, check the role name against
+`SELECT DISTINCT name FROM "Role"` before reading any guard.
+
+**`fileParallelism: false` serializes files within ONE command and says nothing about two.**
+Several specs stand up a second `Organization`, and `signup` refuses while one exists. So two
+concurrent e2e commands — including one foregrounded and one backgrounded — make BOTH fail with
+500s on signup and timeouts, in tests that have nothing to do with either change. Seen in both
+directions in one session.
+
+*Until then:* run several spec files as arguments to ONE command, never two commands at once. If
+a spec 500s on signup, `SELECT subdomain FROM "Organization"` before reading the diff — it takes
+seconds and answers the question outright.
 
 ## 2. Bugs found & fixed this session (regression-watch)
 

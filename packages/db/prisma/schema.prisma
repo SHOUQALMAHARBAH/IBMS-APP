@@ -4576,6 +4576,22 @@ enum EmailIntegrationStatus {
   ERROR
 }
 
+/// The GLOBAL catalogue of insurance companies, shared by every office.
+///
+/// FORWARD NOTE, for whoever weighs retiring this model — read
+/// `docs/insurer-master-registry.md` § "the global half's reach SHRINKS over time" before
+/// deciding, because the cost of retirement falls on its own.
+///
+/// Nothing on a registration path creates a row here. Under the directory design every newly
+/// registered insurer is LOCAL: the office registers the company, the canonical name key
+/// deduplicates it per office, and the cross-office directory is how other offices find it. So
+/// this table is the identity of the companies that were seeded into it and of no new ones, and
+/// it is vestigial on the write side.
+///
+/// Two things retire together or not at all: `InsurerFormTemplate` hangs off this model and
+/// `insurerMasterId` is NOT NULL, so it can only ever serve master-linked companies. If this
+/// goes, the global form template goes with it and `OfficeInsurerFormTemplate` becomes the only
+/// path — a coherent end state, not a loss, for a set of companies that stops growing.
 model InsurerMaster {
   id           String   @id @default(uuid())
   /// Unique platform-wide, which is what makes "one row per real company"

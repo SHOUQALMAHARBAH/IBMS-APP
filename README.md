@@ -406,7 +406,7 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run db:migrate:deploy` | Apply existing migrations to the dev DB, no schema drift (also used for CI/prod) |
 | `npm run db:migrate:status` | Whether every migration has been APPLIED to the dev DB. It does **not** read `schema.prisma` and does **not** compare checksums — measured: with a drifted migration present it prints "Database schema is up to date!" and exits 0 |
 | `npm run db:checksums` | Every applied migration's stored checksum vs its file, WHOLE SET. Catches a migration edited after being applied — which `migrate resolve` makes easy, since it stamps the hash of the file as it is at resolve time |
-| `npm run db:divergence` | Whether `schema.prisma` still describes what the database enforces. Asserts the diff is exactly 12 NAMED statements (generated columns, GIN-on-tsvector, composite tenant FKs, one identifier-truncation rename) and fails in **both** directions. This is what caught a `SetNull` declared over an enforced `RESTRICT`, and six real indexes the schema never declared |
+| `npm run db:divergence` | Whether `schema.prisma` still describes what the database enforces. Asserts the diff is exactly 20 NAMED statements (generated columns, GIN-on-tsvector, ten composite tenant FKs, one identifier-truncation rename) — the number grows only when a migration adds an object Prisma genuinely cannot express, and each entry carries its reason and fails in **both** directions. This is what caught a `SetNull` declared over an enforced `RESTRICT`, and six real indexes the schema never declared |
 | `npm run db:test:migrate:dev` | Create/apply a migration against `db-test` — where schema iteration happens |
 | `npm run db:test:migrate:deploy` | Apply existing migrations to `db-test`, no schema drift |
 | `npm run db:divergence` note | It does **not** see partial indexes or CHECK constraints — measured: two live UNIQUE partial indexes on `CommissionAgreement` have never appeared in its output. Where a partial index carries a real invariant, assert it in its own migration's `DO` block (as `20261020100000` does, reading `pg_index.indnullsnotdistinct`) or in a test |
@@ -416,6 +416,8 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run db:studio` | Prisma Studio (dev DB) |
 | `npm run db:seed` | Seed the dev DB — the default office's roles + the global permission catalogue (`packages/db/prisma/seed.ts`), idempotent. Roles are OFFICE-SCOPED as of 2026-09-18; a role name is unique per `Organization`, not globally |
 | `npm run db:test:seed` | Same seed, against `db-test` |
+| `npm run db:fixture:permissions` | Regenerates `apps/web/e2e/fixtures/role-permissions.ts` — the THIRD copy of the role→permission grid, which Playwright mocks `/auth/me` from — by reading the **seeded database** rather than `permissions.ts`. The database is what `/auth/me` answers from, and the two differ exactly when something has gone wrong (a code added after an office was created; a grant the seed upserts but never removes). The fixture header claimed to be generated for months while no generator existed |
+| `npm run db:fixture:permissions:check` | The same, writing nothing and failing if the fixture is stale — a `verify.sh` gate (the `db:test:` variant, run straight after the seed gate). A stale copy renders an empty nav, because the sidebar helpers fail CLOSED, and has already broken four Playwright tests in three unrelated files. **Read the first `git diff` of any regeneration:** this generator's own first run silently dropped `permissionsForRoles()`, an export 86 spec files import, and passed `tsc` doing it |
 | `npm run seed:demo -w api` | Demo data for two Organizations — employees, leads, ~500 customers and full sales-to-policy pipelines — created through the real HTTP API, **dev DB only** (never `.env.test`). Scale is env-configurable; accounts come back with MFA off, so sign in with the password and pair an authenticator at Settings → Security — the run now **fails, naming accounts**, if any is left enrolled with a secret nobody holds. See `apps/api/scripts/README-SEED-DEMO.md` |
 
 **`migrate dev` is still not the way to add a migration here, and the reason has changed.**
@@ -424,7 +426,7 @@ It used to be blocked by checksum drift (five drifted migrations, now normalised
 `schema.prisma` deliberately describes LESS than this database enforces, because Prisma's schema
 language cannot express a STORED generated column, a GIN index on an `Unsupported("tsvector")`
 field, or a composite tenant foreign key. `migrate dev` would generate a migration containing
-exactly the 12 statements `db:divergence` enumerates — dropping four GIN indexes and un-generating
+exactly the statements `db:divergence` enumerates — dropping four GIN indexes and un-generating
 five columns, `Insurer.canonicalName` among them. Hand-write the migration, apply it, then
 `prisma migrate resolve --applied`; run `db:checksums` afterwards, because resolve stamps the
 file's hash at that moment and any later edit to it drifts.

@@ -23,13 +23,31 @@
  * Roles are per-office since RBAC Phase 1, so this reads the DEFAULT organization's roles —
  * the ones the seed grants to, and the ones the fixture's legacy machine names refer to.
  *
- * ## The file exports MORE than the grid
+ * ## A GENERATOR'S OUTPUT IS NOT EVIDENCE ABOUT THE GENERATOR
  *
- * `permissionsForRoles()` is imported by 86 Playwright spec files, so it is part of the emitted
- * template rather than something a human re-adds afterwards. The first run of this script
- * dropped it and would have broken the entire web suite — caught by reading the diff, which is
- * the whole reason to read a generator's first output instead of trusting it. If the fixture
- * grows another export, it belongs HERE.
+ * The rule this script exists to illustrate as much as to serve. Its first run produced a file
+ * that looked right, was valid TypeScript, passed `tsc`, and had **silently dropped
+ * `permissionsForRoles()` — an export 86 Playwright spec files import.** Every gate a generated
+ * file normally passes would have passed. The whole web suite would have failed on the next run,
+ * in files with no connection to the change.
+ *
+ * It was caught by reading `git diff` on the generated file, and nothing else could have caught
+ * it: a green typecheck says the output is well-formed, never that it is complete. **Read the
+ * first diff of anything you generate, line by line, before you trust the tool that made it** —
+ * and read it again the first time the template changes.
+ *
+ * So `permissionsForRoles()` is part of the emitted template rather than something a human
+ * re-adds afterwards. If the fixture grows another export, it belongs HERE.
+ *
+ * ## And why the instruction now names something real
+ *
+ * The fixture's header said "GENERATED from permissions.ts — regenerate rather than hand-edit"
+ * while no generator existed. That is an instruction pointing at a tool nobody built, the same
+ * shape as a refusal message naming an endpoint that was never implemented: the only way to
+ * follow it was to do the opposite and hope. An instruction that cannot be followed is worse
+ * than none, because it reads as a process that is being observed. `--check` is what makes this
+ * one enforceable rather than aspirational — `verify.sh` runs it, so a stale copy is a named red
+ * gate instead of four confusing Playwright failures somewhere else.
  *
  * Usage:  node scripts/generate-role-permissions-fixture.mjs [--check]
  *         npm run db:fixture:permissions

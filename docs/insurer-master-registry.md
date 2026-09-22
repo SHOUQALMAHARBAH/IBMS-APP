@@ -71,6 +71,38 @@ insert, and retries against the new maximum if it loses the race. Reading the
 maximum and trusting it would be a check-then-act
 (`ibms-brain/meta/lex/race-safe-invariants.md`).
 
+## Forward note: the global half's reach SHRINKS over time
+
+Read this before weighing whether to retire `InsurerMaster`, because it changes what that
+decision costs.
+
+The global template serves **only master-linked insurers** — `InsurerFormTemplate.insurerMasterId`
+is NOT NULL, so a company with no catalogue row cannot have one. And under the directory design,
+**every newly registered insurer is local**: an office registers a company it deals with, the
+canonical name key deduplicates it per office, and the cross-office directory is what makes other
+offices able to find it. Nothing in the application creates an `InsurerMaster` row on a
+registration path.
+
+So §5's sharing promise applies to a fixed, historical set of companies and to no new ones. Its
+reach does not stay constant — it shrinks as a proportion of the book, every time an office
+registers someone.
+
+Two consequences, stated so the decision is not re-derived from scratch:
+
+1. **`InsurerMaster` is vestigial on the write side.** It is still the identity of the companies
+   that were seeded into it, and still what makes one mapping readable by every office for those
+   companies. It is not part of how a new company enters the system.
+2. **If `InsurerMaster` is retired, `InsurerFormTemplate` retires with it**, and
+   `OfficeInsurerFormTemplate` becomes the only path. That is a coherent end state rather than a
+   loss: an office would map the forms it holds, for the companies it deals with, and no office
+   would depend on another office's mapping. What would be given up is exactly the property §5
+   asks for — two offices never re-mapping one identical PDF — for the shrinking set of companies
+   that still have a catalogue row.
+
+Nothing here argues for or against the retirement, and nothing should be done about it now. The
+point is that the case for keeping the global half weakens on its own, so the question should be
+asked deliberately rather than inherited.
+
 ## An office's OWN form — Q9, and why it is a second table
 
 An office that contracts with a company outside the platform receives ITS OWN forms
