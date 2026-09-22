@@ -1944,6 +1944,87 @@ hiding each other.
 
 ---
 
+### 1.37 `P1` — A guard has two halves, and the REPORTING half only runs when something is wrong
+
+**Planting is not done when the test goes red. It is done when you have read the failure message
+and it names the right thing.**
+
+A guard detects, and then it reports. The reporting half executes only when something is broken —
+in a healthy repo, never. So it is code that rots in the dark, and every green run is evidence
+about the first half only. § 1.36 is the extreme case: a guard whose reporting branch would have
+thrown `ReferenceError` instead of naming the offender, passing green for as long as nothing was
+wrong.
+
+And the plant that found § 1.36's detection bug did NOT reach its reporting bug, for a reason worth
+stating precisely: **the shape planted was not being matched at all**, so the test went red without
+ever entering the branch that names the offender. A plant that makes a test fail is not the same as
+a plant that exercises the failure path.
+
+#### The inventory, 2026-09-22
+
+Every guard built during this month's work, planted and the message READ. Verdicts are
+`message verified` (failure observed and the text names the offending thing), `fires but says
+little`, or `cannot fire`.
+
+| Guard | Verdict | Evidence |
+|---|---|---|
+| Migration checksum gate | **verified** | Planted a comment-only edit and a missing file; both messages name the migration and print stored-vs-file hashes. Also measured `migrate status` staying silent on the same drift. |
+| Schema divergence gate | **verified** | Planted an un-declared index and a stale allow-list entry; both directions name the exact SQL statement. |
+| Playwright browser gate | **verified** | Planted an orphaned `chromium-1243`; message names it, its size, the wanted revision and the `rm -rf`. |
+| `createTestApp` Organization guard | **verified** | Fired for real (36 failures in 3 files); names the leftover office by legal name, subdomain and id. Its *diagnosis* was wrong — see § 1.31 — and was corrected. |
+| Canonical-key parity table | **verified** | Fired for real on `شركة ١٢٣`; names the input and both keys. |
+| Deploy-time Arabic assertions | **verified** | Fired twice for real, on their author: named the code point (`U+66e`) and the returned value. |
+| Status-write inventory | **verified** (§ 1.36) | Three plants: single-line caught and named `file:line`; `where`-clause status and ungoverned model correctly NOT flagged. |
+| Security-definer view registry | **verified — best message of the set** | Planted an unregistered `security_invoker=false` view; names it and explains the whole hazard and the fix. |
+| Directory view key allow-list | **verified** | Planted an extra allow-list column; three tests fire, naming the risk ("readable by every office") and the criterion ("only if genuinely public company data"). |
+| Permission subset assertion | **verified** | Planted `OFFICE_ADMIN` on `claim.settle.approve`; names the code and both branches — declare it, or the `20261008100000` empty diff is no longer reproducible. Two sibling guards fired too. |
+| Policy-status partition | **verified** | Planted `ACTIVE` out of the in-force set; names the status and the consequence ("disappears from the deactivation impact count"). |
+| Unique-index inventory | **fires but says little** | Planted an extra unique index on `Insurer`. It fails — `expected [ …(5) ] to deeply equal [ …(4) ]`. Counts only: no index name, no reason. The test NAME carries the stakes ("is the inventory the 409 messages depend on"); the message carries nothing. |
+| **RLS coverage enumeration** | **CANNOT FIRE** | See below. |
+
+#### The one that cannot fire, and it guards against a total outage
+
+`tenant-scope.extension.spec.ts` has a test named *"a model with an RLS policy must be in the
+scoped set, or the policy is unsatisfiable"*. Its body:
+
+```ts
+for (const rlsProtected of ['Role', 'RolePermission', 'UserRoleAssignment']) {
+  expect(TENANT_SCOPED_MODELS.has(rlsProtected)).toBe(true);
+}
+```
+
+It checks three hard-coded names. It never enumerates RLS-protected tables, so it cannot detect a
+policy added to a model outside the set — **which is the exact defect it was written after.** Phase
+1 shipped an RLS policy on `RolePermission` without the column the extension keys on; every
+permission read returned empty and every user authenticated and then 403'd everywhere.
+
+Proven: enabled RLS on `InsurerFormTemplate` (not in the set) in db-test and ran the spec — **23
+passed**. The guard saw nothing.
+
+Its own comment even says *"If a future migration adds `tenant_isolation` to another table, that
+table's model belongs here too"* — **§ 1.23 inside the guard, a comment standing in for the check
+the test's name promises.**
+
+**The fix it needs** (queued, not done here): enumerate from `pg_class.relrowsecurity` and diff
+against `TENANT_SCOPED_MODELS`, which makes it an e2e rather than a unit spec because it needs a
+database. Until then the test's name overstates what it does, and a reader who trusts the name has
+no guard at all.
+
+#### The rule
+
+- **Read the failure output.** A test that can go red is not a test that fails usefully, and a
+  guard that fails uselessly delivers its next real catch as a stack trace nobody can act on.
+- **Plant the shape the guard is supposed to catch**, then check the message names it. If the
+  message is a bare `expected [ …(5) ] to deeply equal [ …(4) ]`, the guard will be diagnosed by
+  whoever is on call, from counts.
+- **A test whose NAME claims a universal property and whose BODY checks named instances is not a
+  guard**, it is a comment with an `expect` in it. Check which one you have by planting a case the
+  name covers and the body does not.
+- This completes the pair with § 1.28 and § 1.31 — those were guards that could not SPEAK (timed
+  out, aborted). This is guards that may speak NONSENSE. Same failure, different half.
+
+---
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently
