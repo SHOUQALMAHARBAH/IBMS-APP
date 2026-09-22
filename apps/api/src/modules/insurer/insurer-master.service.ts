@@ -161,6 +161,13 @@ export class InsurerMasterService {
    * mapping is read by EVERY office. A row pointing at an `OfficeInsuranceLine` would put one
    * office's private vocabulary on a row the others read. The FK already makes that impossible;
    * this turns "impossible" into a sentence.
+   *
+   * THE PRECONDITION THIS RESTRICTION DEPENDS ON, stated so whoever meets it can remove this
+   * method rather than route around it: the model is GLOBAL. Q9 (approved, unbuilt) makes it
+   * office-scoped, and at that point an office's own line becomes a LEGITIMATE reference — an
+   * office that added "Pet" and uploaded that insurer's form for it is the case Q9 exists to
+   * serve. When `InsurerFormTemplate` gains an `organizationId`, delete this check and replace
+   * it with the composite-FK guard, which only becomes possible then.
    */
   private async assertGlobalLine(insuranceLineId: string): Promise<void> {
     const [standard] = await this.lines.findStandardByIds([insuranceLineId]);

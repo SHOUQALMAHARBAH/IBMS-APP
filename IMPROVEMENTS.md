@@ -1075,6 +1075,25 @@ would attach a form to the wrong line that every office then submits against.
 Planted two rows on dev and watched it refuse before applying for real. That refusal IS the
 totality rule for the zero-row case: nothing silently dropped, nothing invented.
 
+#### THE RULE, not this commit's reasoning
+
+> **A row every office READS may only point at things every office may SEE.**
+
+Ask it at every one of the remaining conversions, and at any new model: **is this row read by one
+office, or by all of them?** Global-only FKs for the shared ones; both FKs for the office-scoped
+ones.
+
+**The asymmetry is the part to keep.** Getting it backwards on an office-scoped model
+OVER-RESTRICTS — an annoyance, visible immediately, fixed in an afternoon. Getting it backwards on
+a global model DISCLOSES — invisible, and exactly what this architecture exists to prevent. When
+unsure which side a model is on, the safe default is global-only, because the failure mode is the
+recoverable one.
+
+This is the mirror image of the rule `insurer.form.map` produced: *a permission whose effect
+crosses offices is a symptom of cross-office DATA.* Same law read from the other end — that one
+starts at the permission and finds the data; this one starts at the data and constrains the
+reference.
+
 **The design decision the other five do not share.** This model references the GLOBAL
 `InsuranceLine` **only**, never `OfficeInsuranceLine` — the opposite of `InsurerOfferedLine`,
 which carries both. The reason is tenancy, not taste: `InsurerFormTemplate` has no
@@ -1094,6 +1113,38 @@ a disclosure.
 only so `"motor"` would find `"MOTOR"`. Leniency was a symptom of free text; with a managed
 vocabulary the question has one answer, and the e2e test that asserted case-insensitivity was
 replaced by tests for what the id is NOT — unknown id 422, office line 422, non-uuid 400.
+
+#### AND THE INTERACTION THAT INVERTS IT: Q9 — MUST BE RE-DERIVED IN THE Q9 COMMIT
+
+**Q9 (approved, NOT built — measured 2026-09-22) makes `InsurerFormTemplate` OFFICE-SCOPED.** An
+office contracts with a company outside the system; that company sends THAT OFFICE its forms; the
+administrator uploads and field-maps them; they are never shared with another office. The gap
+making it urgent is visible in the schema today: **`insurerMasterId` is `NOT NULL`**, so for a
+locally registered company a form template is not unmapped — it is *unrepresentable*.
+
+Evidence Q9 has not landed: `InsurerFormTemplate` has no `organizationId` column, and
+`pg_class.relrowsecurity` is **false** for both `InsurerFormTemplate` and `InsurerFormField` while
+`Insurer` and `OfficeInsuranceLine` are **true**.
+
+**When Q9 lands, the restriction above INVERTS.** An office-scoped template MAY legitimately
+reference that office's own added line — an office that added "Pet" and uploaded that insurer's
+form for it is precisely the case Q9 serves. So the Q9 commit must **re-derive**, not patch around:
+
+1. The FK choice — office-scoped means BOTH nullable FKs, as `InsurerOfferedLine` has.
+2. `InsurerMasterService.assertGlobalLine` — deleted, replaced by the composite-FK guard
+   `(insuranceLineId, organizationId)`, which only becomes possible once the child carries an
+   `organizationId` to agree with.
+3. `insurerMasterId` — nullable, which is the gap Q9 exists to close.
+
+**On the deploy-time assertion in `20261016100000` forbidding an FK to `OfficeInsuranceLine`:** it
+cannot block Q9 and does not need retiring. Migrations run ONCE, in timestamp order — on a fresh
+database that `DO` block runs before any Q9 migration exists to add the FK, and on an existing
+database it never re-runs. Deliberately **no test** asserts the same thing, because a test WOULD
+block the correct change. The durable statements (this section, the `schema.prisma` comment, and
+`assertGlobalLine`'s docblock) each now name their own precondition instead of reading as a bare
+prohibition — **an assertion that states what would legitimately end it can be removed by someone
+who has met that condition; one that only says "forbidden" gets worked around by someone in a
+hurry, or blocks correct work for a week.**
 
 ---
 
