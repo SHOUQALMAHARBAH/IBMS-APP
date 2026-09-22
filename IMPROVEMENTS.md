@@ -259,12 +259,22 @@ Three consequences worth separating:
    active users; the transaction is O(active subjects) by design and that design
    is fine at real scale. The data volume is the defect, exactly as this entry
    has said since it was written.
-3. **CI is unaffected and is therefore the authority for this file.** CI creates
-   its database from nothing, so one run's users are a few hundred. `rbac`
-   passed in CI on this branch today (run on `3b7a844`, 20m52s green, full
-   unfiltered `turbo run test:e2e`). This is the concrete case the
-   verification-contract rule was written for: *keep CI for being the only
-   environment that starts from NOTHING.*
+3. **CI is unaffected and is therefore the authority for this file** — and the
+   comparison is as clean as this class of finding ever gets, because it is the
+   SAME COMMIT:
+
+   | | `rbac.e2e-spec.ts` on `a17d5b8` |
+   |---|---|
+   | CI (database built from nothing) | **10/10 passed, 14,696 ms** |
+   | This laptop (45,939 active users) | 4/10 failed; individual tests 143,624–260,831 ms |
+
+   Read from the CI log directly (`backend / Integration tests`:
+   `✓ test/rbac.e2e-spec.ts (10 tests) 14696ms`, in a run reporting
+   `Test Files 92 passed (92)`), not inferred from the run being green. **14.7
+   seconds against 260 seconds for a single test** is the accumulated data and
+   nothing else — same code, same spec, same Postgres version. This is the
+   concrete case the verification-contract rule was written for: *keep CI for
+   being the only environment that starts from NOTHING.*
 
 **What to do, in order.** Reset db-test again (`prisma migrate reset` + seed) —
 it is operational hygiene, it needs explicit consent because the command refuses
