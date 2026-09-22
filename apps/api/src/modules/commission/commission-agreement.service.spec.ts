@@ -21,13 +21,21 @@ function makeService(over: Partial<Record<string, unknown>> = {}) {
   // The managed catalogue the service resolves a typed line against. Real codes and names so the
   // resolver is exercised as written; the ids are fabricated because which uuid a database seeded
   // is not what these tests are about.
+  // Both names, because the resolver matches either — and every test in this file was written in
+  // English, which is how an Arabic-only 422 survived until somebody read the screen.
   const listStandard = vi.fn().mockResolvedValue([
     {
       id: 'line-property',
       code: 'PROPERTY_ALL_RISKS',
       nameEn: 'Property All Risks',
+      nameAr: 'تأمين جميع أخطار الممتلكات',
     },
-    { id: 'line-cyber', code: 'CYBER', nameEn: 'Cyber' },
+    {
+      id: 'line-cyber',
+      code: 'CYBER',
+      nameEn: 'Cyber',
+      nameAr: 'التأمين السيبراني',
+    },
   ]);
   const lines = { listStandard };
   const service = new CommissionAgreementService(
@@ -354,5 +362,32 @@ describe('CommissionAgreementService.create — the managed line is resolved, no
         'actor-1',
       ),
     ).rejects.toThrow(/not a line in the managed catalogue/i);
+  });
+});
+
+describe('CommissionAgreementService.create — the line can be named in Arabic', () => {
+  it('resolves the ARABIC catalogue name, because this platform is Arabic-primary', async () => {
+    // Not an edge case: an administrator reading the Arabic rate screen types the Arabic line
+    // name, and the screen's own Arabic placeholder was a line name. The first version of the
+    // resolver matched `code` and `nameEn` only, so that ordinary path was a 422 — found by
+    // reading the caller, not by a test, because the tests were all in English.
+    const { service, commission } = makeService({
+      supersedeAndCreateAgreement: vi.fn().mockResolvedValue(agreementRow()),
+    });
+    await service.create(
+      {
+        insurerId: 'ins-1',
+        insuranceLine: 'تأمين جميع أخطار الممتلكات',
+        ratePercent: '14',
+        effectiveFrom: '2026-01-01',
+      },
+      'actor-1',
+    );
+    const call = (
+      commission.supersedeAndCreateAgreement as unknown as {
+        mock: { calls: { 0: { create: Record<string, unknown> } }[] };
+      }
+    ).mock.calls[0][0];
+    expect(call.create.insuranceLineId).toBe('line-property');
   });
 });

@@ -65,6 +65,45 @@ async function mockCommission(page: Page, opts: { status?: number } = {}) {
       json: [{ id: "ins-1", name: "Acme Insurance" }],
     }),
   );
+  // The managed line catalogue the rate form now PICKS from. It used to be a free-text input with
+  // a placeholder showing a line name — and the Arabic placeholder was worded differently from the
+  // seeded Arabic name, so following it produced a rate on a line nothing could match. The server
+  // now resolves the line and refuses an unknown one, so free text would be a 422 for anyone who
+  // typed.
+  //
+  // The office addition is in this fixture ON PURPOSE: it must NOT be offered, because the API
+  // resolves a rate's line from a platform CODE and an office line has none.
+  await page.route("http://localhost:4000/insurance-lines**", (route) =>
+    route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: "line-property",
+          code: "PROPERTY_ALL_RISKS",
+          nameEn: "Property All Risks",
+          nameAr: "تأمين جميع أخطار الممتلكات",
+          category: "GENERAL",
+          isStandard: true,
+        },
+        {
+          id: "line-cyber",
+          code: "CYBER",
+          nameEn: "Cyber",
+          nameAr: "التأمين السيبراني",
+          category: "GENERAL",
+          isStandard: true,
+        },
+        {
+          id: "line-office",
+          code: null,
+          nameEn: "Drone Hull",
+          nameAr: "أجسام الطائرات المسيرة",
+          category: "GENERAL",
+          isStandard: false,
+        },
+      ],
+    }),
+  );
 }
 
 test("shows the governed rate table with the open + closed windows", async ({
@@ -91,6 +130,19 @@ test("shows the governed rate table with the open + closed windows", async ({
   await expect(page.getByLabel("Insurer")).toBeVisible();
   await expect(page.getByLabel("Rate percent", { exact: true })).toBeVisible();
   await expect(page.getByLabel("VAT rate percent")).toBeVisible();
+
+  // The line field is a PICKER over the managed catalogue, not free text.
+  const line = page.getByLabel("Insurance line");
+  await expect(line).toBeVisible();
+  // Valued by CODE, so what is submitted is language-independent while the label follows the
+  // reader. Asserted on the option's value rather than its text for the same reason.
+  await expect(line.locator("option[value='PROPERTY_ALL_RISKS']")).toHaveText(
+    "Property All Risks",
+  );
+  // And the office's own added line is NOT offered: it has no platform code, so the server would
+  // have to refuse it. Offering a choice the server must reject is worse than not offering it.
+  await expect(line.locator("option")).toHaveCount(3);
+  await expect(line.getByText("Drone Hull")).toHaveCount(0);
 });
 
 test("a user without the permission sees a friendly message", async ({ page }) => {

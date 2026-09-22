@@ -79,11 +79,16 @@ export class CommissionAgreementService {
     const match = catalogue.find(
       (l) =>
         l.code.toLowerCase() === wanted ||
-        l.nameEn.trim().toLowerCase() === wanted,
+        l.nameEn.trim().toLowerCase() === wanted ||
+        // Arabic is the platform's PRIMARY language, so the Arabic name is an ordinary way to
+        // name a line rather than a fallback. `toLowerCase` is a no-op on Arabic and harmless:
+        // the comparison is exact equality, so nothing here relies on case or orthographic
+        // folding.
+        l.nameAr.trim().toLowerCase() === wanted,
     );
     if (!match) {
       throw new UnprocessableEntityException(
-        `"${typed}" is not a line in the managed catalogue, so a commission agreement cannot be recorded against it — this table decides what the broker is paid, and a rate on a line nothing else can match is a rate that will never be applied. Send a catalogue code (e.g. PROPERTY_ALL_RISKS) or a catalogue name exactly; GET /insurance-lines lists all 32. An office's own added line is not yet supported here.`,
+        `"${typed}" is not a line in the managed catalogue, so a commission agreement cannot be recorded against it — this table decides what the broker is paid, and a rate on a line nothing else can match is a rate that will never be applied. Send a catalogue code (e.g. PROPERTY_ALL_RISKS) or a catalogue name in either language, exactly; GET /insurance-lines lists all 32 with both names. An office's own added line is not yet supported here.`,
       );
     }
     return { id: match.id, code: match.code, nameEn: match.nameEn };

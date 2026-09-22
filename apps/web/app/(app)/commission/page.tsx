@@ -10,6 +10,10 @@ import {
   type CommissionAgreement,
   type Insurer,
 } from '../../../lib/commission/commission-api';
+import {
+  listInsuranceLines,
+  type InsuranceLine,
+} from '../../../lib/insurer/insurance-line-api';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
@@ -36,13 +40,14 @@ const headCellStyle: CSSProperties = {
 export default function CommissionRatesPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const canManage =
     !!user &&
     hasPermission(user, 'commission-rate.manage');
 
   const [rows, setRows] = useState<CommissionAgreement[] | null>(null);
   const [insurers, setInsurers] = useState<Insurer[]>([]);
+  const [lines, setLines] = useState<InsuranceLine[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [insurerId, setInsurerId] = useState('');
@@ -55,12 +60,20 @@ export default function CommissionRatesPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ags, ins] = await Promise.all([
+      const [ags, ins, lns] = await Promise.all([
         listCommissionAgreements(),
         listCommissionInsurers().catch(() => [] as Insurer[]),
+        // Swallowed like the insurer list above: a reader without `insurer.read` still sees the
+        // rate table, just without a picker to add one — which is correct, because they cannot
+        // add one anyway.
+        listInsuranceLines().catch(() => [] as InsuranceLine[]),
       ]);
       setRows(ags);
       setInsurers(ins);
+      // Standard lines only. The API resolves a rate's line from a CODE, and an office addition
+      // has none by design — offering one here would render a choice the server must refuse.
+      // Recorded as the follow-up that makes office lines reachable on this table.
+      setLines(lns.filter((l) => l.isStandard && l.code !== null));
       setLoadError(null);
     } catch (err) {
       setRows(null);
@@ -151,13 +164,27 @@ export default function CommissionRatesPage() {
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {t('crateLineLabel')}
-            <input
+            {/*
+              A PICKER, not free text. This was an `<input>` with a placeholder showing a line
+              name — and the Arabic placeholder was worded differently from the seeded Arabic name,
+              so following it produced a rate on a line nothing could match. The server now
+              resolves the line and refuses an unknown one, which would have turned that trap into
+              a 422 for anyone who typed. Choosing a CODE removes the guess entirely and is
+              language-independent: the label follows the reader, the value does not.
+            */}
+            <select
               aria-label={t('crateLineLabel')}
               value={insuranceLine}
               onChange={(e) => setInsuranceLine(e.target.value)}
-              placeholder={t('crateLinePlaceholder')}
               required
-            />
+            >
+              <option value="">{t('crateLineChoose')}</option>
+              {lines.map((l) => (
+                <option key={l.id} value={l.code ?? ''}>
+                  {language === 'AR' ? l.nameAr : l.nameEn}
+                </option>
+              ))}
+            </select>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             {t('crateRateLabel')}

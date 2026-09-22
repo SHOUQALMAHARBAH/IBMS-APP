@@ -2547,11 +2547,32 @@ And the money crossing moved: `agreementLineMatch` matches a Policy to its gover
 line ID, keeping one transitional arm for agreements that predate the migration (removal condition
 and query in its docblock).
 
-**Still not done, deliberately:** the agreement DTO takes a line as a STRING resolved at the
-boundary rather than a line ID, so an office's own added line is not yet reachable on the rate
-table — two offices' private lines may share a name, so nothing in the DTO can name one
-unambiguously. That becomes reachable when the rate screen passes an id; a name lookup would be the
-similarity match this work removes, one level down.
+**And then the SCREEN that calls it turned out to be free text.** `POST /commission/agreements` is
+reached from `/commission`, whose line field was an `<input>` with a placeholder — so the server
+change above would have turned a trap into a 422 for anyone who typed. Two defects, found by
+reading the caller rather than by any test:
+
+1. **The resolver matched `code` and `nameEn` only.** This platform is ARABIC-PRIMARY. An
+   administrator reading the Arabic rate screen and typing the Arabic line name is the ordinary
+   case, and it was a 422. Every test in that file was written in English, which is how it
+   survived. `nameAr` is matched now, with a test.
+2. **The Arabic placeholder was not the Arabic catalogue name.** It read
+   `التأمين على الممتلكات ضد جميع الأخطار`; the seeded name is `تأمين جميع أخطار الممتلكات`.
+   Different wording, so following the screen's own hint produced a line nothing could match —
+   true even BEFORE the resolver existed, meaning the screen has been inviting unmatched rates all
+   along.
+
+The field is now a `<select>` over the managed catalogue, valued by CODE so the submission is
+language-independent while the label follows the reader. Office additions are filtered OUT, because
+the API resolves a rate's line from a platform code and an office line has none — offering a choice
+the server must refuse is worse than not offering it, and a Playwright assertion pins the option
+count with an office line in the fixture.
+
+**Still not done, deliberately:** the agreement DTO takes a line as a STRING (now resolved from a
+code the picker sends) rather than a line ID, so an office's own added line is still not reachable
+on the rate table — two offices' private lines may share a name, so nothing in the DTO can name one
+unambiguously. Closing it means the DTO taking `lineId`; the picker already has the ids to hand, so
+the remaining work is the DTO and its tests.
 
 **THE CAVEAT THAT IS STILL THE WHOLE VALUE OF THIS ENTRY — read it before re-measuring.**
 
