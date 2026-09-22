@@ -484,15 +484,29 @@ decision rather than an oversight:
 ### 1.11 `P1` — `POST /auth/signup` answers a known, expected state with a 500
 
 Once more than one `Organization` exists, signup throws a bare `Error` — so the
-HTTP answer is a 500 with a generic body, and the real message ("more than one
-Organization exists, provision through `POST /admin/users`") only appears in the
+HTTP answer is a 500 with a generic body, and the real message only appears in the
 server log.
 
 This is not theoretical noise: it is the single most expensive diagnostic in this
 suite. Every time a spec leaks a fixture Organization, unrelated files report
 `expected 201 "Created", got 500` from whatever they were doing, and nothing in the
-test output says why. Two separate debugging sessions have started from that
-symptom.
+test output says why. **THREE** separate debugging sessions have now started from that
+symptom — the third on 2026-09-22, when two concurrent e2e commands each leaked an
+Organization into the other's view and `office-administrator` and `rbac` both reported
+unrelated 500s (§ 1.41). The status code is what made that expensive: the message the
+repository writes says exactly what is wrong, and nobody running tests ever sees it.
+
+**The message itself was separately WRONG until 2026-09-22 and is now fixed.** It
+advised provisioning "through `POST /admin/users`, which names the Organization
+explicitly" — and `ProvisionUserDto` has no `organizationId` field, so that route
+creates a user in the CALLER's office and can never create the first user in a new
+one. The advice was circular for the only person who would ever read it. It now says
+plainly that a second office cannot currently be onboarded through the application,
+names Phase 4 as where that lands, and names the only two writers of `Organization`
+(`packages/db/prisma/seed.ts`, `apps/api/scripts/seed-demo.script.ts`, neither
+reachable over HTTP). `organization.repository.spec.ts` pins it, including an
+assertion that the message does NOT mention `/admin/users` — planted by putting the
+sentence back and watching it fail.
 
 It is a `ConflictException` (or 422) with the message it already writes to the log.
 Deliberately **not** changed as a side effect of insurer management, because the

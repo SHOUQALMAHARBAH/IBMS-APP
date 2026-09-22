@@ -1736,10 +1736,19 @@ section that describe the following as open are **superseded**:
   grant/revoke + activate/deactivate (`user.manage`,
   SYSTEM_SECURITY_ADMINISTRATOR), plus an opt-in bootstrap administrator in
   the seed (`BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`). Before
-  this, a production-seeded database had the full role catalogue, all 157
-  permissions, and no way to give anyone a role — sample users are seeded only
-  when `NODE_ENV !== 'production'` and signup grants none. Web:
-  `/settings/users`.
+  this, a production-seeded database had the full role catalogue, all permissions
+  (157 then, 186 today), and no way to give anyone a role — sample users are
+  seeded only when `NODE_ENV !== 'production'` and signup grants none. Web:
+  `/settings/users`. **Within ONE office only:** `ProvisionUserDto` has no
+  `organizationId` and the tenant context supplies it, so this provisions into the
+  CALLER's office and cannot reach another. **A second office cannot currently be
+  onboarded through the application at all** — `Organization` has exactly two
+  writers in the repository, `packages/db/prisma/seed.ts` and
+  `apps/api/scripts/seed-demo.script.ts`, neither reachable over HTTP, and
+  anonymous signup refuses once a second office exists because it cannot tell which
+  one an account belongs to. That is RBAC Phase 4 (subdomain resolution); the
+  refusal message says so, having previously advised `POST /admin/users`, which
+  could never have helped.
 - **Part 3.9 — the renewal module now exists.** `apps/api/src/modules/renewal/`
   — a nightly lead-time sweep opens a `RenewalCase` per expiring ACTIVE policy
   and walks it through `RenewalStatus`. This gives three already-shipped
