@@ -2120,6 +2120,23 @@ What was true is that the null **did nothing** — which is what the block above
 **Two existing tests had to change, and that is the finding.** Both nominated against an
 unconfirmed period and expected success. They were asserting the defect.
 
+#### Recorded, not acted on
+
+**`sanctions-pep.screen` is naming debt, with a condition.** The permission CODE still says PEP
+while no PEP list is synced. Not renamed because a permission-code rename is a data migration
+across every office's `RolePermission` grants, plus the web e2e's copy of the grid — disproportionate
+to a naming fix on its own. **The condition: it renames the next time permission grants are migrated
+for another reason**, where the cost is already being paid. Until then the code is an identifier and
+every piece of PROSE around it says "sanctions".
+
+**Three descriptions of one permission grid.** `packages/db/prisma/seed-data/permissions.ts` is the
+source; `apps/web/e2e/fixtures/role-permissions.ts` is a second copy the web e2e asserts against
+(its own header says regenerate rather than hand-edit, and a stale copy has already broken four
+Playwright tests in three files); and the seeded database is the third. Three descriptions of one
+thing is the pattern this month has been spent removing — § 1.19's whole-set assertions exist
+because of exactly this shape. **Not now, and not in a feature commit.** Recorded so it is a known
+duplication with an owner rather than a surprise.
+
 #### 4. NOSUPERUSER — already asserted, and a REAL gap next to it
 
 **Correction:** the audit cited "`ibms_app` is NOSUPERUSER and cannot" as reasoning and implied it
@@ -2144,6 +2161,24 @@ So the test now also asserts REPLICATION (reads the WAL — every row, regardles
 whole set, so a genuinely needed grant has to be argued for in that assertion. And the test was
 renamed, because "has no SUPERUSER, no BYPASSRLS, and owns no tables" no longer described what it
 checks.
+
+**And then moved to where it can actually fire, because a test never runs against the database we
+deploy to.** A `GRANT` is an act performed ON a database — by a DBA, a provisioning script, a
+migration — which is precisely the class of change no test can see. So the assertion now exists
+twice, deliberately:
+
+- **Migration `20261018100000`** executes on whatever database the schema lands on and REFUSES TO
+  DEPLOY. That is the half that runs on production.
+- **`npm run db:privileges`** (`check-app-role-privileges.mjs`), wired into `verify.sh` and CI
+  beside the checksum and divergence gates, is the RECURRING half — because a migration runs once
+  and catches only a grant that already existed, never one made afterwards.
+
+Both planted and read: the script names the membership (`MEMBERSHIP in ibms — it inherits those
+roles' privileges while rolsuper stays FALSE…`) and separately an attribute
+(`ROLREPLICATION — it can read the write-ahead log…`); the migration refuses with the same
+reasoning and the measured 13,774-row figure in the message. A missing `ibms_app` role is a NOTICE
+and a skip in both, not a failure — that condition is "RLS is inert", which `PrismaService` already
+reports loudly at boot, and it is a different problem from privilege escalation.
 
 ---
 

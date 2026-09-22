@@ -66,6 +66,9 @@ gate "Database Migrations (checksum drift)" npm run db:test:checksums
 # And the third distinct property, which nothing checked either: whether schema.prisma still
 # describes what the database enforces. `migrate status` never reads schema.prisma at all.
 gate "Database Schema (divergence from the database)" npm run db:test:divergence
+# And the privilege surface, which neither of the two above looks at: a GRANT of owner
+# membership leaves rolsuper FALSE and lets the runtime role read past every RLS policy.
+gate "Database Privileges (runtime role)" npm run db:test:privileges
 gate "Database Seed"       npm run db:test:seed
 gate "Integration Tests"   npm run test:e2e
 gate "Contract Tests"      npm run test:contract

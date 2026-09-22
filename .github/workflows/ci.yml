@@ -169,6 +169,9 @@ jobs:
       - name: Verify schema — schema.prisma still describes what the database enforces
         run: npm run db:divergence
 
+      - name: Verify privileges — the runtime role cannot read past row-level security
+        run: npm run db:privileges
+
       - name: Seed database (roles + permission grid)
         run: npm run db:seed
 

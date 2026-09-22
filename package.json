@@ -39,6 +39,8 @@
     "browsers:check": "node scripts/check-playwright-browsers.mjs",
     "db:checksums": "npm run checksums --workspace=@ibms/db",
     "db:divergence": "npm run divergence --workspace=@ibms/db",
+    "db:privileges": "npm run privileges --workspace=@ibms/db",
+    "db:test:privileges": "npm run privileges:test --workspace=@ibms/db",
     "db:test:divergence": "npm run divergence:test --workspace=@ibms/db",
     "db:test:checksums": "npm run checksums:test --workspace=@ibms/db",
     "db:studio": "npm run studio --workspace=@ibms/db",

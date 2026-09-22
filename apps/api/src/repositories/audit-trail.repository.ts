@@ -16,6 +16,23 @@ export interface AuditLogFilter {
   to?: Date;
 }
 
+/**
+ * ## DO NOT ADD A JOIN TO `user` HERE.
+ *
+ * This select is deliberately FLAT — every column comes from the `AuditLogEntry` row itself, and
+ * nothing about an entry is resolved from present state. That is the property that makes the log
+ * an audit log rather than a rendering of current data.
+ *
+ * The obvious change to make is joining `User` so the screen can show a name instead of the raw
+ * `userId` it shows today. **That change reintroduces the defect `20261017100000` was written to
+ * remove**, because `User.fullName` is mutable: renaming or correcting a person's record would
+ * retroactively change who every historical entry appears to name, silently, on an append-only
+ * table. It is the same mistake as resolving the actor's ROLE live, one field over.
+ *
+ * If a display name is needed — and it is, `userId` is not readable — resolve it in the VIEW
+ * layer as a separate lookup that is visibly "who this person is NOW", or store the name on the
+ * entry at write time the way `actorRoleNames` is stored. Either is fine. A join here is not.
+ */
 const AUDIT_LOG_ENTRY_SELECT = {
   id: true,
   userId: true,
