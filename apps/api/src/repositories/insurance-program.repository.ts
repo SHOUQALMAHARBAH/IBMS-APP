@@ -14,6 +14,17 @@ export interface CreateInsuranceProgramInput {
 
 export interface InsuranceProgramLineInput {
   insuranceLine: string;
+  /**
+   * The managed line FK — the IDENTITY, while `insuranceLine` above is the display string it
+   * replaces. Nullable only for a coverage string the programme config has no mapping for; see
+   * `AssembledProgramLine.lineCode`.
+   *
+   * Required as a PROPERTY of the input type rather than left optional, so a future writer
+   * cannot omit it silently. Migration `20261019100000` added the column and nothing populated
+   * it for three days (IMPROVEMENTS.md § 1.40) precisely because it was possible to not think
+   * about it; making the field mandatory-but-nullable forces the decision at every call site.
+   */
+  insuranceLineId: string | null;
   /** Fils-precision — already quantized by the service via money.util.ts. */
   sumInsuredBasis: Prisma.Decimal | null;
 }

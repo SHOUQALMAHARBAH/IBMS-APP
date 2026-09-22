@@ -4,6 +4,7 @@ import { CommissionAgreementService } from './commission-agreement.service';
 import { CommissionLedgerService } from './commission-ledger.service';
 import { CommissionRepository } from '../../repositories/commission.repository';
 import { AuditModule } from '../audit/audit.module';
+import { InsurerModule } from '../insurer/insurer.module';
 import { PolicyModule } from '../policy/policy.module';
 
 /**
@@ -29,7 +30,10 @@ import { PolicyModule } from '../policy/policy.module';
  * global auth guard (no AuthModule import, same as FinanceModule).
  */
 @Module({
-  imports: [AuditModule, PolicyModule],
+  // InsurerModule for `InsuranceLineRepository`: the governed-rate table resolves the line a
+  // typed `insuranceLine` names and REFUSES an unresolvable one, so a rate cannot be recorded
+  // against a line no Policy can carry. Its repository, never its service.
+  imports: [AuditModule, PolicyModule, InsurerModule],
   controllers: [CommissionController],
   providers: [
     CommissionAgreementService,

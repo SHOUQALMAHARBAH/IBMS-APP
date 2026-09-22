@@ -8,7 +8,19 @@ const RECOMMENDATION_INCLUDE = {
   recommendedQuotation: {
     include: {
       insurer: { select: INSURER_IDENTITY_SELECT },
-      rfq: { select: { id: true, insuranceLine: true, opportunityId: true } },
+      // The RFQ's managed-line FK travels with the string, because a Policy INHERITS its line
+      // identity from the RFQ it was placed off rather than resolving it again. Selecting only
+      // `insuranceLine` here is what left `Policy.insuranceLineId` unpopulated after migration
+      // `20261019100000` — the writer had nothing to copy.
+      rfq: {
+        select: {
+          id: true,
+          insuranceLine: true,
+          insuranceLineId: true,
+          officeInsuranceLineId: true,
+          opportunityId: true,
+        },
+      },
     },
   },
   conflictOfInterestDisclosure: true,

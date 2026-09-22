@@ -504,6 +504,9 @@ export class PolicyService {
         customerId: opportunity.customerId,
         insurerId: quote.insurerId,
         insuranceLine: quote.rfq.insuranceLine,
+        // Inherited from the RFQ, not resolved from the string beside it.
+        insuranceLineId: quote.rfq.insuranceLineId,
+        officeInsuranceLineId: quote.rfq.officeInsuranceLineId,
         inceptionDate,
         expiryDate,
         requestedPremium: quantizeMoney(quote.premium),

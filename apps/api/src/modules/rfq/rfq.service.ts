@@ -274,16 +274,35 @@ export class RfqService {
   private async assertLineInProgramme(
     insuranceProgramId: string | null,
     insuranceLine: string,
-  ): Promise<void> {
-    if (!insuranceProgramId) return;
+  ): Promise<{
+    insuranceLineId: string | null;
+    officeInsuranceLineId: string | null;
+  }> {
+    // RETURNS the matched programme line's managed-line reference rather than void, and that is
+    // the change: the RFQ INHERITS its line identity from the programme line it was taken to
+    // market from. "A programme line becomes an RFQ" then means the same line by construction,
+    // instead of two independent lookups from the same string that have to agree forever.
+    //
+    // No programme, or no programme found: no identity to inherit. Reported as nulls rather than
+    // resolved from the string here, because a second resolution path is the defect.
+    const none = { insuranceLineId: null, officeInsuranceLineId: null };
+    if (!insuranceProgramId) return none;
     const programme = await this.programs.findById(insuranceProgramId);
-    if (!programme) return;
-    const lines = programme.lines.map((l) => l.insuranceLine);
-    if (!lines.includes(insuranceLine)) {
+    if (!programme) return none;
+
+    const matched = programme.lines.find(
+      (l) => l.insuranceLine === insuranceLine,
+    );
+    if (!matched) {
+      const lines = programme.lines.map((l) => l.insuranceLine);
       throw new UnprocessableEntityException(
         `"${insuranceLine}" is not a line on this Opportunity's Insurance Program. Designed lines: ${lines.join(', ') || '(none)'}.`,
       );
     }
+    return {
+      insuranceLineId: matched.insuranceLineId,
+      officeInsuranceLineId: matched.officeInsuranceLineId,
+    };
   }
 
   /** Inserts the RFQ row, mapping the `@@unique([opportunityId,
@@ -292,11 +311,18 @@ export class RfqService {
   private async insertRfqRow(
     dto: CreateRfqDto,
     actorId: string,
+    inheritedLine: {
+      insuranceLineId: string | null;
+      officeInsuranceLineId: string | null;
+    },
   ): Promise<RfqWithSubmissions> {
     try {
       const created = await this.rfqs.createRfq({
         opportunityId: dto.opportunityId,
         insuranceLine: dto.insuranceLine,
+        // Copied from the programme line, not resolved from the string above.
+        insuranceLineId: inheritedLine.insuranceLineId,
+        officeInsuranceLineId: inheritedLine.officeInsuranceLineId,
         followUpThresholdDays: dto.followUpThresholdDays,
         issuedByUserId: actorId,
       });
@@ -361,7 +387,7 @@ export class RfqService {
       );
     }
 
-    await this.assertLineInProgramme(
+    const inheritedLine = await this.assertLineInProgramme(
       opportunity.insuranceProgramId,
       dto.insuranceLine,
     );
@@ -382,7 +408,7 @@ export class RfqService {
       );
     }
 
-    const rfq = await this.insertRfqRow(dto, actor.id);
+    const rfq = await this.insertRfqRow(dto, actor.id, inheritedLine);
 
     // Audit CREATE BEFORE the shortlist insert: a crash in between still
     // leaves a CREATE trail, and the resulting zero-insurer RFQ is

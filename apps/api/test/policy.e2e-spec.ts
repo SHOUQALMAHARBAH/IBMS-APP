@@ -171,10 +171,19 @@ async function buildOpportunity(
       status: 'COMPARISON_BUILT',
     },
   });
+  // The RFQ carries the MANAGED line, because a Policy inherits its line identity from the RFQ it
+  // was placed off and a fixture without one could not tell a working writer from a broken one.
+  // Looked up by CODE: the id differs per database, so hard-coding one would pass on this laptop
+  // and fail in CI.
+  const propertyLine = await prisma.insuranceLine.findFirstOrThrow({
+    where: { code: 'PROPERTY_ALL_RISKS' },
+    select: { id: true },
+  });
   const rfq = await prisma.rFQ.create({
     data: {
       opportunityId: opportunity.id,
       insuranceLine: 'Property All Risks',
+      insuranceLineId: propertyLine.id,
     },
   });
   const insurer = await makeInsurer(`Policy E2E ${tag} ins ${rand}`);
@@ -355,6 +364,28 @@ describe('Policy Placement & Issuance (e2e) — backlog Part C #18-19', () => {
     expect(policy.premiumVariance).toBeNull();
     expect(policy.placedByUserId).toBe(plc.userId);
     expect(policy.issuanceComplete).toBe(false);
+
+    // The placed Policy INHERITED the RFQ's managed line — the second link in the chain the four
+    // line-FK models exist for (programme line -> RFQ -> Policy). Asserted as "the SAME id the RFQ
+    // holds" rather than "some id", because equality is the property: a commission agreement is
+    // applied to a Policy by line, so a Policy whose line disagrees with its RFQ's would be priced
+    // against the wrong rate. Read from the stored rows, not the response.
+    const [storedPolicy, storedRfq] = await Promise.all([
+      prisma.policy.findUniqueOrThrow({
+        where: { id: policy.id },
+        select: { insuranceLineId: true, officeInsuranceLineId: true },
+      }),
+      // By opportunity rather than by a threaded id: `acceptedOpportunity` does not return the
+      // RFQ, and widening a helper four other tests call to prove one assertion is the wrong
+      // trade. One RFQ per opportunity per line, and this fixture makes exactly one.
+      prisma.rFQ.findFirstOrThrow({
+        where: { opportunityId },
+        select: { insuranceLineId: true },
+      }),
+    ]);
+    expect(storedPolicy.insuranceLineId).toBe(storedRfq.insuranceLineId);
+    expect(storedPolicy.insuranceLineId).not.toBeNull();
+    expect(storedPolicy.officeInsuranceLineId).toBeNull();
 
     // one policy per opportunity
     await request(app.getHttpServer())

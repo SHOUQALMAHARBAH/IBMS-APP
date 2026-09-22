@@ -13,6 +13,21 @@ import { INSURER_IDENTITY_SELECT, insurerIdentity } from './insurer-identity';
 export interface CreateRfqInput {
   opportunityId: string;
   insuranceLine: string;
+  /**
+   * The managed line FK, INHERITED from the programme line this RFQ was taken to market from —
+   * never resolved independently.
+   *
+   * That inheritance is the whole point of the four models carrying this column: "a programme
+   * line becomes an RFQ" has to mean the SAME line, and copying the parent's id makes them the
+   * same by construction rather than by two lookups agreeing. Resolving it here from the
+   * `insuranceLine` string would reintroduce exactly the free-text match being removed.
+   *
+   * Nullable for the two cases that genuinely have no parent identity: an Opportunity with no
+   * programme (modelled but not reachable today), and a programme line that itself carries no
+   * managed line (an unmapped coverage string).
+   */
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
   followUpThresholdDays?: number;
   issuedByUserId: string;
 }

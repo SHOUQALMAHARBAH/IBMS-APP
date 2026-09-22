@@ -137,6 +137,15 @@ export interface CreatePolicyInput {
   customerId: string;
   insurerId: string;
   insuranceLine: string;
+  /**
+   * The managed line FK, INHERITED from the RFQ this policy was placed off — the second link in
+   * the chain the four models exist to make structural (programme line -> RFQ -> Policy). Copied,
+   * never re-resolved from the string: two lookups that must agree forever is the defect, and a
+   * commission agreement is applied to a Policy BY LINE, so a Policy whose line disagrees with
+   * its RFQ's would be priced against the wrong rate.
+   */
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
   inceptionDate: Date;
   expiryDate: Date | null;
   requestedPremium: Prisma.Decimal;

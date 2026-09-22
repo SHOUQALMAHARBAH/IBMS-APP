@@ -3,6 +3,7 @@ import { Prisma } from '@ibms/db';
 import { CommissionAgreementService } from './commission-agreement.service';
 import type { CommissionRepository } from '../../repositories/commission.repository';
 import type { AuditService } from '../audit/audit.service';
+import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 
 const d = (v: string) => new Prisma.Decimal(v);
 
@@ -17,11 +18,24 @@ function makeService(over: Partial<Record<string, unknown>> = {}) {
     ...over,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The managed catalogue the service resolves a typed line against. Real codes and names so the
+  // resolver is exercised as written; the ids are fabricated because which uuid a database seeded
+  // is not what these tests are about.
+  const listStandard = vi.fn().mockResolvedValue([
+    {
+      id: 'line-property',
+      code: 'PROPERTY_ALL_RISKS',
+      nameEn: 'Property All Risks',
+    },
+    { id: 'line-cyber', code: 'CYBER', nameEn: 'Cyber' },
+  ]);
+  const lines = { listStandard };
   const service = new CommissionAgreementService(
     commission as unknown as CommissionRepository,
     audit as unknown as AuditService,
+    lines as unknown as InsuranceLineRepository,
   );
-  return { service, commission, audit };
+  return { service, commission, audit, lines };
 }
 
 const agreementRow = (over: Record<string, unknown> = {}) => ({
@@ -107,7 +121,11 @@ describe('CommissionAgreementService.create (Process 35)', () => {
     const { service } = makeService();
     await expect(
       service.create(
-        { insurerId: 'ins-1', insuranceLine: 'Motor', ratePercent: '150' },
+        {
+          insurerId: 'ins-1',
+          insuranceLine: 'Property All Risks',
+          ratePercent: '150',
+        },
         'mgr-1',
       ),
     ).rejects.toThrow(/0\.\.100/);
@@ -119,7 +137,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
       service.create(
         {
           insurerId: 'ins-1',
-          insuranceLine: 'Motor',
+          insuranceLine: 'Property All Risks',
           ratePercent: '12',
           vatRatePercent: '150',
         },
@@ -162,7 +180,7 @@ describe('CommissionAgreementService.create (Process 35)', () => {
       service.create(
         {
           insurerId: 'ins-1',
-          insuranceLine: 'Motor',
+          insuranceLine: 'Property All Risks',
           ratePercent: '15',
           effectiveFrom: '2026-01-01',
         },
@@ -177,7 +195,11 @@ describe('CommissionAgreementService.create (Process 35)', () => {
     });
     await expect(
       service.create(
-        { insurerId: 'nope', insuranceLine: 'Motor', ratePercent: '15' },
+        {
+          insurerId: 'nope',
+          insuranceLine: 'Property All Risks',
+          ratePercent: '15',
+        },
         'mgr-1',
       ),
     ).rejects.toThrow(/not found/i);
@@ -193,7 +215,11 @@ describe('CommissionAgreementService.create (Process 35)', () => {
     });
     await expect(
       service.create(
-        { insurerId: 'ins-1', insuranceLine: 'Motor', ratePercent: '15' },
+        {
+          insurerId: 'ins-1',
+          insuranceLine: 'Property All Risks',
+          ratePercent: '15',
+        },
         'mgr-1',
       ),
     ).rejects.toThrow(/concurrently/i);
@@ -245,5 +271,88 @@ describe('CommissionAgreementService.create (Process 35)', () => {
     );
     expect(v.id).toBe('ag-open');
     expect(commission.supersedeAndCreateAgreement).not.toHaveBeenCalled();
+  });
+});
+
+describe('CommissionAgreementService.create — the managed line is resolved, not trusted', () => {
+  it('REFUSES a line the catalogue does not have, rather than writing a rate nothing can match', async () => {
+    // This is the table that decides what the broker is paid, matched to a Policy by line. A rate
+    // recorded against a line no Policy can carry is a rate that will never be applied — so the
+    // write is refused at the boundary instead of producing a row with a NULL identity. That
+    // refusal is what stops the unmapped set growing (IMPROVEMENTS.md § 1.40).
+    const { service, commission } = makeService();
+    await expect(
+      service.create(
+        {
+          insurerId: 'ins-1',
+          insuranceLine: 'Moter Comprehensiv',
+          ratePercent: '15',
+          effectiveFrom: '2026-01-01',
+        },
+        'actor-1',
+      ),
+    ).rejects.toThrow(/not a line in the managed catalogue/i);
+    // And nothing was superseded: the refusal comes before any window is touched.
+    expect(commission.supersedeAndCreateAgreement).not.toHaveBeenCalled();
+  });
+
+  it('accepts a catalogue CODE as well as a catalogue name, and stores the resolved id', async () => {
+    const { service, commission } = makeService({
+      supersedeAndCreateAgreement: vi
+        .fn()
+        .mockResolvedValue(agreementRow({ insuranceLine: 'CYBER' })),
+    });
+    await service.create(
+      {
+        insurerId: 'ins-1',
+        insuranceLine: 'CYBER',
+        ratePercent: '12',
+        effectiveFrom: '2026-01-01',
+      },
+      'actor-1',
+    );
+    const call = (
+      commission.supersedeAndCreateAgreement as unknown as {
+        mock: { calls: { 0: { create: Record<string, unknown> } }[] };
+      }
+    ).mock.calls[0][0];
+    // The FK is the resolved catalogue id; the typed string is stored as typed, not rewritten.
+    expect(call.create.insuranceLineId).toBe('line-cyber');
+    expect(call.create.insuranceLine).toBe('CYBER');
+  });
+
+  it('matches a catalogue NAME case-insensitively but never by similarity', async () => {
+    const { service, commission } = makeService({
+      supersedeAndCreateAgreement: vi.fn().mockResolvedValue(agreementRow()),
+    });
+    await service.create(
+      {
+        insurerId: 'ins-1',
+        insuranceLine: '  property all RISKS  ',
+        ratePercent: '10',
+        effectiveFrom: '2026-01-01',
+      },
+      'actor-1',
+    );
+    const call = (
+      commission.supersedeAndCreateAgreement as unknown as {
+        mock: { calls: { 0: { create: Record<string, unknown> } }[] };
+      }
+    ).mock.calls[0][0];
+    expect(call.create.insuranceLineId).toBe('line-property');
+
+    // "Property All Risks (Fire)" is a VARIANT, not this line — and it must not resolve to it.
+    // Silently folding a fire-only rate onto the all-risks line would reprice real business.
+    await expect(
+      service.create(
+        {
+          insurerId: 'ins-1',
+          insuranceLine: 'Property All Risks (Fire)',
+          ratePercent: '10',
+          effectiveFrom: '2026-01-01',
+        },
+        'actor-1',
+      ),
+    ).rejects.toThrow(/not a line in the managed catalogue/i);
   });
 });

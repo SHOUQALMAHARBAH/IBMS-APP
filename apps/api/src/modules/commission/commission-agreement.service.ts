@@ -12,6 +12,7 @@ import {
   CommissionRepository,
   type AgreementWithInsurer,
 } from '../../repositories/commission.repository';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import {
   agreementAuditSnapshot,
   COMMISSION_MAX_RATE_PERCENT,
@@ -46,7 +47,47 @@ export class CommissionAgreementService {
   constructor(
     private readonly commission: CommissionRepository,
     private readonly audit: AuditService,
+    private readonly lines: InsuranceLineRepository,
   ) {}
+
+  /**
+   * The catalogue line a typed `insuranceLine` names, or a 422.
+   *
+   * REFUSING is the point. Migration `20261019100000` gave this table a line FK and nothing
+   * populated it, so every agreement written afterwards was unmapped — and this is the table that
+   * decides what the broker is PAID, matched to a Policy by line. Refusing an unresolvable line at
+   * the write boundary is what makes the unmapped set stop growing, which is the precondition the
+   * deferred string-column drop has been waiting for (IMPROVEMENTS.md § 1.40).
+   *
+   * Resolution is EXACT — the catalogue `code`, or the catalogue `nameEn` trimmed and
+   * case-insensitively — and deliberately not a similarity match. Name similarity on a matching
+   * path is the defect this whole line of work removes; a caller who typed something the catalogue
+   * does not have gets told so and given where to look, rather than having a line guessed for
+   * them on a money table.
+   *
+   * Office-added lines are NOT resolvable here, and that is a real limitation rather than an
+   * oversight: `CommissionAgreement` already carries an `officeInsuranceLineId` column, but
+   * nothing in this DTO can name one unambiguously by string, because two offices' private lines
+   * may share a name. It becomes reachable when the rate screen passes a line ID — recorded as
+   * the follow-up, not worked around with a name lookup here.
+   */
+  private async resolveCatalogueLine(
+    typed: string,
+  ): Promise<{ id: string; code: string; nameEn: string }> {
+    const wanted = typed.trim().toLowerCase();
+    const catalogue = await this.lines.listStandard();
+    const match = catalogue.find(
+      (l) =>
+        l.code.toLowerCase() === wanted ||
+        l.nameEn.trim().toLowerCase() === wanted,
+    );
+    if (!match) {
+      throw new UnprocessableEntityException(
+        `"${typed}" is not a line in the managed catalogue, so a commission agreement cannot be recorded against it — this table decides what the broker is paid, and a rate on a line nothing else can match is a rate that will never be applied. Send a catalogue code (e.g. PROPERTY_ALL_RISKS) or a catalogue name exactly; GET /insurance-lines lists all 32. An office's own added line is not yet supported here.`,
+      );
+    }
+    return { id: match.id, code: match.code, nameEn: match.nameEn };
+  }
 
   async create(
     dto: CreateCommissionAgreementDto,
@@ -75,6 +116,10 @@ export class CommissionAgreementService {
 
     const effectiveFrom = this.parseEffectiveFrom(dto.effectiveFrom);
     const insuranceLine = dto.insuranceLine.trim();
+    // Resolved BEFORE the open-window checks, so an unresolvable line is refused before anything
+    // is superseded. The typed string is still what gets STORED — this resolves the identity, it
+    // does not rewrite what the administrator wrote.
+    const line = await this.resolveCatalogueLine(insuranceLine);
 
     const open = await this.commission.findOpenAgreement(
       dto.insurerId,
@@ -116,6 +161,7 @@ export class CommissionAgreementService {
         create: {
           insurerId: dto.insurerId,
           insuranceLine,
+          insuranceLineId: line.id,
           ratePercent: rate,
           vatRatePercent: vatRate,
           effectiveFrom,

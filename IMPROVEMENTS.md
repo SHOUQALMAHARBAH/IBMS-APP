@@ -2450,7 +2450,7 @@ What is still missing is the guard on the other side. Options, cheapest first:
 
 Do (1) and (3) together. (2) without (3) turns a good change into an outage.
 
-### 1.40 `P1` — The four MUST models were BACKFILLED, not converted: no writer sets the line FK, and every row written since the migration is unmapped
+### 1.40 — RESOLVED (2026-09-22): the four MUST models were BACKFILLED, not converted — no writer set the line FK, and every row written since the migration was unmapped
 
 Found while capturing a pre-reset baseline on db-test, by asking a question the migration's own
 success numbers could not answer: *how many rows are unmapped NOW?*
@@ -2512,18 +2512,43 @@ gate becomes meaningful, then the string can go.
 both now say the columns are ADDED and BACKFILLED with the writers pending, because a reader
 would reasonably take "converted" to mean the model uses the FK.
 
-**Not fixed here**, deliberately: the writers are a real piece of work (every create path on
-four models, plus resolving a line id where today a string is typed), and the standing
-instruction on this branch is to record what is out of scope rather than grow the commit. It
-belongs immediately after the current queue, and before anything is written that READS these
-columns.
+**FIXED, in the commit after this entry was written.** Identity now flows along the chain rather
+than being re-derived at each step:
 
-**THE CAVEAT THAT IS THE WHOLE VALUE OF THIS ENTRY — read it before re-measuring.**
+- **`InsuranceProgramLine`** is the only writer that RESOLVES. `COVERAGE_LINE_MAPPINGS` gained the
+  catalogue code for each of its 13 coverages — the same pairs migration `20261019100000` used,
+  not re-derived — and the service turns them into ids in one `listStandard()` call per programme.
+  An unmapped coverage string still lands with no FK, which is the honest outcome.
+- **`RFQ`** COPIES the programme line's FK. `assertLineInProgramme` already fetched the programme
+  and matched the line; it returns the matched line's reference instead of `void`.
+- **`Policy`** COPIES the RFQ's, which required widening the recommendation include — selecting
+  only `insuranceLine` there is exactly why the policy writer had nothing to copy.
+- **`CommissionAgreement`** REFUSES. Its input FK is not nullable: the service resolves the typed
+  line against the catalogue by exact code or exact name and 422s anything else, because a rate on
+  a line nothing can match is a rate that will never be applied. This is the one of the four where
+  a NULL has no honest meaning, and the refusal is what makes the unmapped count here stop
+  growing.
 
-db-test was reset on 2026-09-22 (46,153 users to 12). **All four counts now read ZERO. That is
-not because the rows mapped — it is because the rows are GONE.** Anyone re-running the query on a
-fresh database sees a clean number and will conclude this is fixed. It is not: no writer has
-changed, so the count starts climbing again with the first e2e run.
+And the money crossing moved: `agreementLineMatch` matches a Policy to its governing rate on the
+line ID, keeping one transitional arm for agreements that predate the migration (removal condition
+and query in its docblock).
+
+**Still not done, deliberately:** the agreement DTO takes a line as a STRING resolved at the
+boundary rather than a line ID, so an office's own added line is not yet reachable on the rate
+table — two offices' private lines may share a name, so nothing in the DTO can name one
+unambiguously. That becomes reachable when the rate screen passes an id; a name lookup would be the
+similarity match this work removes, one level down.
+
+**THE CAVEAT THAT IS STILL THE WHOLE VALUE OF THIS ENTRY — read it before re-measuring.**
+
+db-test was reset on 2026-09-22 (46,153 users to 12), so **all four counts now read ZERO — and
+that was true BEFORE the writers were fixed, because the rows were gone rather than mapped.** The
+zero is now also true for the right reason, which is precisely why it is a bad measurement: the two
+states are indistinguishable from the number alone.
+
+So a zero on this query proves nothing on its own. What proves the writers work is
+`managed-line-writers.e2e-spec.ts` — a row written through each API path with the stored FK read
+back, and three plants that fail when a writer stops copying. Trust the test, not the count.
 
 So the measurement is only meaningful on a database with REAL VOLUME, taken after the writers
 land, and the query to use is the one at the top of this entry. Until then the honest statement
@@ -2564,6 +2589,21 @@ directions in one session.
 *Until then:* run several spec files as arguments to ONE command, never two commands at once. If
 a spec 500s on signup, `SELECT subdomain FROM "Organization"` before reading the diff — it takes
 seconds and answers the question outright.
+
+**And a third, same family: a turbo gate run DURING an e2e run fails on a locked DLL.**
+`npm run lint` builds `@ibms/db`, which runs `prisma generate`, which replaces
+`node_modules/.prisma/client/query_engine-windows.dll.node`. A running e2e suite has that file
+open, so the rename fails:
+
+```
+EPERM: operation not permitted, rename '…/query_engine-windows.dll.node.tmp6340'
+  -> '…/query_engine-windows.dll.node'
+```
+
+Nothing is wrong with the code, and the error names a file rather than a source line, so it is easy
+to read as a broken install. *Until then:* do not run `lint`, `build`, `typecheck` or anything else
+that triggers `prisma generate` while an e2e suite is running. The same rule as above, one layer
+out — on this host, one long-running job at a time.
 
 ### 1.42 — RESOLVED (2026-09-22): the reviewer pool had no ORDER, so "the first eligible reviewer" named something that did not exist
 

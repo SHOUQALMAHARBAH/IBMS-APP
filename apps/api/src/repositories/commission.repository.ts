@@ -20,9 +20,84 @@ export type AgreementWithInsurer = Prisma.CommissionAgreementGetPayload<
 export interface CreateAgreementRow {
   insurerId: string;
   insuranceLine: string;
+  /**
+   * The managed catalogue line — the IDENTITY a Policy is matched against.
+   *
+   * NOT nullable, unlike the other three MUST models' inputs: the service refuses an
+   * unresolvable line rather than writing NULL, because this is the table that decides what the
+   * broker is paid and a rate on a line nothing can match is a rate that will never be applied.
+   * That refusal is what makes the unmapped set stop growing here.
+   */
+  insuranceLineId: string;
   ratePercent: Prisma.Decimal;
   vatRatePercent: Prisma.Decimal;
   effectiveFrom: Date;
+}
+
+/**
+ * Which line a Policy is for, as the three columns that can say so.
+ *
+ * Passed as an object rather than a string so the caller cannot accidentally hand over only the
+ * display text — the shape is the reminder that the string is no longer the identity.
+ */
+export interface PolicyLineRef {
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
+  /** The retained free-text line. Used ONLY for the transitional clause below. */
+  insuranceLine: string;
+}
+
+/**
+ * The line predicate for matching a Policy to its governing agreement.
+ *
+ * **Identity first.** When the Policy carries a managed line, agreements are matched on that
+ * exact id. No casing, no trimming, no similarity — the same line or not the same line.
+ *
+ * **One transitional clause, with its removal condition stated.** An agreement written before
+ * migration `20261019100000`, or by any writer between that migration and the one that fixed the
+ * writers, may carry a line STRING and no FK. Matching identity-only would make such an agreement
+ * stop governing policies it governs today — a silent 422 on a commission calculation, which is
+ * worse than the leniency being removed. So a Policy WITH an identity also matches agreements
+ * that have NO identity and whose string matches.
+ *
+ * Measured when this was written: 1 such agreement on dev (its line string is `any thing`, which
+ * no policy has) and 0 on db-test. **Remove this clause when that count is zero everywhere** —
+ * the same measurable gate as the string-column drop, and the query is
+ * `SELECT count(*) FROM "CommissionAgreement" WHERE "insuranceLineId" IS NULL AND
+ * "officeInsuranceLineId" IS NULL`.
+ *
+ * **A Policy with NO identity** (the 632 parked rows, and anything written before the writers
+ * were fixed) falls back to the string entirely, because there is nothing else it can use.
+ */
+export function agreementLineMatch(
+  line: PolicyLineRef,
+): Prisma.CommissionAgreementWhereInput {
+  const identity: Prisma.CommissionAgreementWhereInput | null =
+    line.insuranceLineId !== null
+      ? { insuranceLineId: line.insuranceLineId }
+      : line.officeInsuranceLineId !== null
+        ? { officeInsuranceLineId: line.officeInsuranceLineId }
+        : null;
+
+  const byString: Prisma.CommissionAgreementWhereInput = {
+    insuranceLine: { equals: line.insuranceLine.trim(), mode: 'insensitive' },
+  };
+
+  if (identity === null) return byString;
+  return {
+    OR: [
+      identity,
+      // The transitional clause. An agreement that has an identity and a DIFFERENT one is never
+      // matched by this — only an agreement with no identity at all.
+      {
+        AND: [
+          { insuranceLineId: null },
+          { officeInsuranceLineId: null },
+          byString,
+        ],
+      },
+    ],
+  };
 }
 
 /**
@@ -65,20 +140,23 @@ export class CommissionRepository {
   }
 
   /** Every agreement for a pair, newest window first — the input to
-   * `resolveGovernedRate` and the history read. `insuranceLine` is matched
-   * **case-insensitively** and trimmed: both `Policy.insuranceLine` and
-   * `CommissionAgreement.insuranceLine` are free text entered independently, so
-   * a casing / whitespace mismatch must not silently 422 a calculation whose
-   * governing rate does exist. */
+   * `resolveGovernedRate` and the history read.
+   *
+   * ## Matched on the LINE FK now, not on the string — this is the money path
+   *
+   * A policy finding its governing commission rate is the one crossing where a mismatch touches
+   * money, and until now both sides were free text compared case-insensitively. That leniency was
+   * a SYMPTOM: two independently-typed strings had to agree, so the match had to be forgiving,
+   * and a forgiving match on a rate table is how a policy silently earns the wrong rate.
+   *
+   * See `agreementLineMatch` for the predicate and for the one transitional clause it still
+   * carries. */
   findAgreementsForPair(
     insurerId: string,
-    insuranceLine: string,
+    line: PolicyLineRef,
   ): Promise<AgreementWithInsurer[]> {
     return this.prisma.client.commissionAgreement.findMany({
-      where: {
-        insurerId,
-        insuranceLine: { equals: insuranceLine.trim(), mode: 'insensitive' },
-      },
+      where: { insurerId, ...agreementLineMatch(line) },
       ...AGREEMENT_WITH_INSURER,
       orderBy: { effectiveFrom: 'desc' },
     });
