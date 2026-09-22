@@ -206,10 +206,31 @@ export class RoleRepository {
     if (grants.length === 0) return [];
 
     const roleIds = [...new Set(grants.map((g) => g.roleId))];
+    // ORDERED, and the order is load-bearing rather than cosmetic.
+    //
+    // `AccessRecertificationService.pickReviewer` takes the FIRST member of this list that
+    // is not the subject, and README describes that as "always picks the first eligible
+    // member of the pool". Without an `orderBy` there is no first member: Postgres returns
+    // rows in whatever order the plan produces, and the plan changes with the table's size
+    // and statistics. So "the first eligible reviewer" named something that did not exist,
+    // and which reviewer a subject got was unspecified — on a segregation-of-duties control.
+    //
+    // Measured, and this is how it surfaced: `rbac.e2e-spec.ts`'s "not this item's assigned
+    // reviewer" test asserts that the earlier-created of two Compliance Officers is the one
+    // picked. It passed for months against a test database holding 46,153 users and failed
+    // the moment that database was reset to 23 — same code, different plan. A test that
+    // depends on an unspecified order is a test that reports the plan, not the behaviour.
+    //
+    // `grantedAt` then `userId`: the longest-standing eligible reviewer, with a total order
+    // so two grants in the same millisecond still resolve the same way every time. That is a
+    // RULE someone can state, which is the property the old code lacked — it is still not
+    // round-robin, and the README gap about that stands unchanged.
     const assignments = await this.prisma.client.userRoleAssignment.findMany({
       where: { revokedAt: null, roleId: { in: roleIds } },
       select: { userId: true },
+      orderBy: [{ grantedAt: 'asc' }, { userId: 'asc' }],
     });
+    // `Set` preserves insertion order, so the dedupe keeps the ordering above.
     return [...new Set(assignments.map((a) => a.userId))];
   }
 }

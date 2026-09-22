@@ -2481,6 +2481,28 @@ is broken — but the moment a reader is written against the FK it will silently
 created since the migration, and the symptom will be "the commission did not apply" rather
 than anything pointing here.
 
+**And the crossing we converted `CommissionAgreement` FOR is still running on free text.** That
+is the sharpest form of this. A policy finding its governing commission rate is the one crossing
+where a mismatch touches MONEY, and it is why that model was a MUST rather than a
+nice-to-have — `commission.repository.ts` still matches
+`insuranceLine: { equals: value.trim(), mode: 'insensitive' }`. So the column exists, the
+variant axis exists, `NULLS NOT DISTINCT` guards the uniqueness, and **the defect all of it was
+built to remove is untouched.** The database is ready; nothing reads it.
+
+**Two consequences, stated plainly because they change how this should be scheduled:**
+
+1. **The gap WIDENS with use.** Every row written from here is unmapped, so the mapped
+   proportion FALLS over time rather than holding. A migration that converts the existing rows
+   and leaves the writers behind does not decay gracefully — it decays monotonically, and the
+   longer the interval the more rows a future reader silently skips. The 6 and 4 measured today
+   are not a small residue; they are the first two days of an accumulating set.
+2. **The order is a rule, not a preference: writers FIRST, then the gate means something, then
+   the string goes.** § 1.26 called the string drop "deferred", which made it sound scheduled. It
+   is not deferred — it is **UNREACHABLE**: its precondition is "a test measures zero unmapped
+   rows", and no writer can satisfy that while writers fill only the string, because the count
+   grows with every run. A gate whose precondition nothing can satisfy is not waiting for a
+   date; it is waiting for a different change.
+
 **And it makes the deferred gate unreachable.** § 1.26 defers dropping `insuranceLine` until a
 test measures zero unmapped rows. That can never go green while the writers fill only the
 string: the count grows with every run. The order is therefore fixed — writers first, then the
@@ -2496,9 +2518,20 @@ instruction on this branch is to record what is out of scope rather than grow th
 belongs immediately after the current queue, and before anything is written that READS these
 columns.
 
-**The measurement to keep:** re-run the four counts on a database with real volume after the
-writers land. On a freshly reset db-test they all read zero — because the rows are gone, not
-because they mapped, which is exactly the false green this entry exists to prevent.
+**THE CAVEAT THAT IS THE WHOLE VALUE OF THIS ENTRY — read it before re-measuring.**
+
+db-test was reset on 2026-09-22 (46,153 users to 12). **All four counts now read ZERO. That is
+not because the rows mapped — it is because the rows are GONE.** Anyone re-running the query on a
+fresh database sees a clean number and will conclude this is fixed. It is not: no writer has
+changed, so the count starts climbing again with the first e2e run.
+
+So the measurement is only meaningful on a database with REAL VOLUME, taken after the writers
+land, and the query to use is the one at the top of this entry. Until then the honest statement
+is "no writer populates the line FK" — a fact about the CODE, which a reset cannot erase — and
+not any number.
+
+This is the pattern to distrust generally: a gate reading zero on an empty table is measuring
+nothing, and it looks exactly like a gate reading zero on a complete migration.
 
 ### 1.41 `P3` — Two e2e harness traps, each of which produced a confident wrong diagnosis
 
@@ -2531,6 +2564,74 @@ directions in one session.
 *Until then:* run several spec files as arguments to ONE command, never two commands at once. If
 a spec 500s on signup, `SELECT subdomain FROM "Organization"` before reading the diff — it takes
 seconds and answers the question outright.
+
+### 1.42 — RESOLVED (2026-09-22): the reviewer pool had no ORDER, so "the first eligible reviewer" named something that did not exist
+
+Found by resetting db-test, which is the point of doing it on a schedule: the reset changed a
+query plan, and a test that had been reporting the plan rather than the behaviour finally said so.
+
+`RoleRepository.findActiveUserIdsWithPermission` had **no `orderBy`**.
+`AccessRecertificationService.pickReviewer` takes the first member of that list which is not the
+subject, and README described the behaviour as *"always picks the first eligible member of the
+pool"*. Without an order there is no first member — Postgres returns rows in whatever order the
+plan produces, and the plan changes with the table's size and statistics. **Which reviewer a
+subject got was unspecified, on a segregation-of-duties control.**
+
+**How it surfaced, and why it had hidden for months.** `rbac.e2e-spec.ts`'s "not this item's
+assigned reviewer" test creates two Compliance Officers and asserts the earlier-created one is
+picked; its comment states the assumption outright ("compliance was created … and thus resolved as
+the pool's first eligible member"). It passed against a db-test holding 46,153 users and failed
+the moment that database was reset to 23. Same commit, same spec, different plan.
+
+**Diagnosed by elimination, not by guessing**, because three explanations fit the symptom
+(`subjectItem` undefined):
+
+1. *The cycle produced no item for the subject* — `startCycle` skips a subject with no eligible
+   reviewer. Ruled out: the cycles hold 20–23 items against 23 active subjects.
+2. *Pagination dropped it* — ruled out by reading the route: `GET /access-recertification/items`
+   returns the items assigned to the CURRENT reviewer and does not paginate.
+3. *It was assigned to the other reviewer* — which is what an unordered pool permits.
+
+**Fixed** with `orderBy: [{ grantedAt: 'asc' }, { userId: 'asc' }]` — the longest-standing
+eligible reviewer, with a total order so two grants in the same millisecond still resolve
+identically. `rbac.e2e-spec.ts` 10/10 afterwards.
+
+**What is NOT fixed, and is still the documented gap:** this is not round-robin. One reviewer
+takes every subject until they are the subject themselves. That needs a manager-hierarchy field
+that `User`/`Employee` do not have. The difference is that the behaviour is now a RULE somebody
+can state and a test can rely on, instead of a property of the query planner.
+
+**The class, which is the reusable part:** a consumer that takes `[0]` of a set imposes an
+ordering requirement on a query that does not declare one, and nothing type-checks that. Where a
+`find`/`[0]`/`first` decides something that matters, the query it reads from needs an explicit
+total order — and the reason belongs in the query, because the consumer is usually in a different
+file. This is the second ordering defect on this service; the first was a mock that listed the
+routine reviewer first and so passed against a flattened pool.
+
+### 1.43 — A BASELINE IS A MEASUREMENT, and measurements find things
+
+Recorded as a method, because it has now paid twice in one day.
+
+Before resetting db-test, the question asked was not "let me note the current numbers" but
+**"does any outstanding measurement rest on this database's contents?"** — a question with a
+possible answer of *yes*, which makes it a measurement rather than a formality. It returned yes,
+and taking it found § 1.40: the four MUST models are backfilled and no writer populates the line
+FK, visible only as 6 and 4 unmapped rows on two models the migration had mapped 100%.
+
+A baseline taken as a formality would have recorded "6 and 4" as starting values and moved on.
+The finding is not in the numbers; it is in asking what they should have been.
+
+Then the reset itself produced § 1.42, because changing the data changed a query plan and broke a
+test that had been passing on the plan. **A reset is not only hygiene — it is a perturbation, and
+a perturbation is an experiment.** Anything that breaks when the data volume changes and the code
+does not was never measuring the code.
+
+Two habits follow:
+
+- Ask the *yes/no* form of the question before any destructive or environment-changing step, and
+  be prepared for the answer to stop you.
+- Read what a reset breaks as a FINDING rather than as noise to be re-run away. Both of today's
+  came from there.
 
 ## 2. Bugs found & fixed this session (regression-watch)
 

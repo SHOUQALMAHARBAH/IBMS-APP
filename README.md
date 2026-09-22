@@ -1805,10 +1805,15 @@ else.
 - `AccessRecertificationItem` has no per-`UserRoleAssignment` foreign key — one item is
   generated per *user* holding any active role, not per role grant, so a "revoked"
   decision revokes all of that user's active roles, not one.
-- Reviewer-pool assignment always picks the first eligible (≠ subject) member of the
-  COMPLIANCE_OFFICER/BRANCH_DEPARTMENT_MANAGER/EXECUTIVE_MANAGEMENT pool, not
-  round-robin — acceptable for now since there's no manager-hierarchy field on
-  `User`/`Employee` yet.
+- Reviewer-pool assignment picks the LONGEST-STANDING eligible (≠ subject) member of the
+  pool — ordered by `grantedAt` then `userId`, so it is a total order — not round-robin.
+  Acceptable for now since there's no manager-hierarchy field on `User`/`Employee` yet.
+  **This line used to say "the first eligible member", which named something that did not
+  exist:** the pool query had no `orderBy`, so the order was whatever the query plan
+  produced and which reviewer a subject got was unspecified. It surfaced when db-test was
+  reset from 46,153 users to 23 and the assertion about which of two Compliance Officers is
+  picked flipped — same code, different plan. The concentration on one reviewer is the
+  remaining gap; the nondeterminism was a defect and is fixed.
 - `startCycle` skips (logs a warning on) a subject with no eligible reviewer rather than
   blocking the whole cycle.
 
