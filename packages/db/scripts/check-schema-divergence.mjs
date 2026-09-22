@@ -42,6 +42,20 @@
  * entry here means every future `prisma migrate dev` in this repo generates that statement, and
  * someone eventually commits it.
  *
+ * ## A BLIND SPOT, measured — this gate does NOT see PARTIAL indexes
+ *
+ * `migrate diff` does not report a partial index (`CREATE INDEX ... WHERE ...`) that exists in the
+ * database and not in `schema.prisma`. Two of them are live and neither has ever appeared here:
+ * `CommissionAgreement_one_open_per_insurer_line` (since 20260903120000) and
+ * `CommissionAgreement_one_open_per_line_variant` (20261020100000) — both UNIQUE, both guarding
+ * what the broker is paid, both invisible to this check.
+ *
+ * So a partial index can be dropped by a future migration and nothing here notices. Where one
+ * carries a real invariant, assert it in its own migration's `DO` block (as
+ * `20261020100000` does for `indnullsnotdistinct`) or in a test that reads `pg_index` — do not
+ * rely on this gate for it. The same is true of CHECK constraints, which `migrate diff` also
+ * leaves out.
+ *
  * Compares the LIVE database rather than replaying the migrations, which needs no shadow database
  * and therefore no CREATEDB privilege in CI. The two were measured equivalent: replayed into a
  * shadow database, `--from-migrations` produced this identical set.
@@ -98,6 +112,8 @@ const EXPECTED = {
     'STORED generated column',
   'ALTER TABLE "Insurer" ALTER COLUMN "canonicalName" DROP DEFAULT;':
     'STORED generated column over canonical_name_key() — the point is that the application CANNOT write it',
+  'ALTER TABLE "CommissionAgreement" ALTER COLUMN "variantKey" DROP DEFAULT;':
+    'STORED generated column over canonical_name_key() — the commission variant matching key, which the application must not be able to write',
 
   // ---- Identifier truncation ----
   // Postgres and Prisma truncate a >63-character index name at different points. Cosmetic, and

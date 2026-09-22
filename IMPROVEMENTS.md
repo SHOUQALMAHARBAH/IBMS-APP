@@ -998,9 +998,86 @@ names asserted against both.
 
 ---
 
-### 1.25 `P1` — TO BUILD: the commission variant, and the NULL-uniqueness defect in the obvious key
+### 1.25 — RESOLVED (2026-09-22): the commission variant, and the NULL-uniqueness defect in the obvious key
 
-Decided (and NOT yet built — the line conversion commits carry it):
+#### What the data said when it was finally measured
+
+The variant was designed as a prediction — "the 32 cannot express fleet-vs-individual … and
+`Property All Risks (Fire)` carries its own commission rate today". It is now an observation:
+
+```
+ code               | the two strings                                | open rows
+ PROPERTY_ALL_RISKS | Property All Risks ++ Property All Risks (Fire)|     2      (x6 insurers)
+```
+
+**Six insurers each carry TWO simultaneously-open commission agreements**, every one of them that
+same pair. Not duplicates — a fire-only property rate is a different commercial term — and the
+pre-existing partial unique index permitted them only because it keys on the **string**, where the
+two differ.
+
+**So moving that index onto the line id WITHOUT a variant would have collapsed six legitimately
+distinct rates, and the index could not have been created.** The variant is load-bearing, and the
+evidence arrived from the conversion rather than from argument.
+
+**And a correction I owe, of the § 1.20 kind.** I first reported "CommissionAgreement has no unique
+constraint today — only an index". Wrong: `CommissionAgreement_one_open_per_insurer_line`
+(`UNIQUE (insurerId, insuranceLine) WHERE effectiveTo IS NULL`) has existed since
+`20260903120000`, and the repository comment claiming to "mirror the partial UNIQUE index" was
+accurate. I read the Prisma schema — which cannot express a partial index — and concluded none
+existed instead of reading the database. **A grep of the schema is not a read of the schema**, in
+the same file that records that lesson.
+
+#### What was built
+
+`variant` (free text, stored for display) plus **`variantKey`, a `STORED GENERATED` column over the
+same `canonical_name_key()` that backs `Insurer.canonicalName`** — reused rather than reinvented, so
+"Fleet"/"fleet"/" FLEET " are one variant and the Arabic folding comes free. Free text on a
+*matching* path is the defect this whole line of work removes, one level down.
+
+The derivation promoted the distinction out of the retained string — `Property All Risks (Fire)` →
+`Fire`, `Motor Fleet` and `Group Medical` → **`Collective`**, `Individual Medical` → `Individual`.
+Two axes, not four cases: collective is fleet AND group (one contract covering many insureds,
+expressed in two lines of business); `Fire` is a named sub-peril. Named that way so the next person
+asks which AXIS a new variant is, rather than appending to a list of observed spellings. This only
+worked because `20261019100000` retained `insuranceLine` — which is what rule 3 of § 1.26 is for.
+
+#### The NULL defect, proven by three plants rather than by reading the DDL
+
+`UNIQUE (insurerId, insuranceLineId, variantKey)` does not constrain two rows that both have a NULL
+variant, because Postgres treats NULLs as distinct — so **the plain-line case, the common case, is
+exactly the one a naive constraint misses**, on the table that decides what the broker is paid.
+`NULLS NOT DISTINCT` is the fix, and all three plants were read:
+
+1. **Two NULL-variant agreements, same line id, DIFFERENT strings** — so the old string-keyed index
+   could not refuse either and only the new one could:
+   ```
+   ERROR:  duplicate key value violates unique constraint
+           "CommissionAgreement_one_open_per_line_variant"
+   DETAIL:  Key ("insurerId","insuranceLineId","variantKey")=(…, …, null) already exists.
+   ```
+   `null` in the DETAIL is the whole point. My FIRST attempt used the same string twice and was
+   refused by the OLD index — **a plant that proved the wrong constraint**, which is § 1.37's rule
+   arriving on its author: the test went red without exercising the thing under test.
+2. **Plain + a variant on one line: BOTH allowed** — the six real pairs survive, so the index is not
+   merely too strict.
+3. **`'  fIrE  '` refused against `'Fire'`**, key shown as `fire` — the canonical key folds case and
+   whitespace, so a sloppily typed variant cannot open a near-duplicate rate.
+
+A pre-check refuses the migration if any (insurer, line, variant) still has two open agreements,
+naming the insurer and **both rates** — because a migration must not choose what the broker is paid.
+
+#### A BLIND SPOT this found in `db:divergence`
+
+`migrate diff` **does not report partial indexes**. Two live UNIQUE partial indexes on this table —
+the old string-keyed one and the new one — have never appeared in the divergence set, so a future
+migration could drop either and the gate would stay green. CHECK constraints are invisible to it
+too. Recorded in the script's own header, with the rule: where a partial index carries a real
+invariant, assert it in its migration's `DO` block (as `20261020100000` does for
+`indnullsnotdistinct`, read from `pg_index`) or in a test — do not rely on that gate for it.
+
+#### The original decisions, unchanged
+
+Decided (and NOW built):
 
 - A `variant` beside the managed line id on the models that sit on a crossing, because the 32
   cannot express fleet-vs-individual, group-vs-individual medical, or a named sub-peril, and

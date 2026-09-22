@@ -38,7 +38,22 @@ const ESCALATED_ELSEWHERE: Record<string, string> = {
     'ClaimFollowUpAlert + ClaimFollowUpScheduler (Process 27)',
 };
 
+/**
+ * The whole tree's source, read ONCE.
+ *
+ * This walked ~800 files and joined them into one multi-megabyte string on EVERY call, and two
+ * tests below call it — so the work was done twice and the file timed out at 8198ms against
+ * vitest's 5s default. A guard that fails as a TIMEOUT reports nothing about the rule it guards,
+ * which is the worst way for one to fail (IMPROVEMENTS.md § 1.28, § 1.36 — this is the third
+ * source-scanning inventory spec to hit it, so the pattern is the file shape, not one file).
+ */
+let cachedSourceText: string | null = null;
 function sourceText(): string {
+  cachedSourceText ??= readAllSource();
+  return cachedSourceText;
+}
+
+function readAllSource(): string {
   const parts: string[] = [];
   const walk = (dir: string) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -85,13 +100,18 @@ describe('every registered SLA deadline is wired to something', () => {
     expect(required.filter((r) => !names.includes(r))).toEqual([]);
   });
 
+  // 20s, not the 5s default, and measured rather than picked: this test carries the tree walk and
+  // whole-tree read that both scanning tests share — 1985ms in isolation on this host, down from
+  // 8198ms for the file before the read was memoized. The same work has been observed at ~3x under
+  // a full-suite batch, which is how it came to fail as a timeout and report nothing about the
+  // rule. If this figure grows, find out where the time goes before raising it again (§ 1.28).
   it('every registered workflow is referenced by real code, not just declared', () => {
     const src = sourceText();
     const orphans = names.filter(
       (n) => !ESCALATED_ELSEWHERE[n] && !src.includes(n),
     );
     expect(orphans).toEqual([]);
-  });
+  }, 20_000);
 
   it('the escalated-elsewhere list has no stale entries', () => {
     expect(
