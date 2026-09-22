@@ -810,12 +810,28 @@ build actually is today:
   every other office submits against). `OFFICE_ADMINISTRATOR` deliberately does not hold
   it; closing it properly needs a "not office-grantable" marker the model does not have,
   and an answer to who may grant it instead — there is no platform-admin surface. Logged
-  for Phase 4 alongside insurer CRUD, NOT fixed. **Q9 narrowed it without closing it**:
+  for Phase 4, NOT fixed (insurer CRUD itself has since shipped, API and screens
+  both — see `/insurers` below). **Q9 narrowed it without closing it**:
   `insurer.office-form.map` now lets an office map its OWN copy of an insurer's form
   (`OfficeInsurerFormTemplate`, tenant-scoped, RLS, either line catalogue), so an office
   that needs a form mapped no longer has any reason to want the platform-wide code. The
   hole is still a hole — an office administrator who grants themselves `insurer.form.map`
   through the matrix still writes a row every office reads — but nobody now needs to.
+
+- **Insurer management now has screens, not just an API.** `/insurers` — the list
+  (search, and a three-state in-play filter that defaults to BOTH, because a
+  deactivated insurer keeps its policies and is the row an administrator most needs
+  to find), `/insurers/new` (the two identity paths as a radio, so the both-paths
+  combination the API refuses cannot be typed), and `/insurers/[id]` — which keeps
+  COMPANY facts and this office's own RELATIONSHIP terms in separate headed
+  sections, because only the first group may ever cross an office boundary. The
+  deactivation step shows the same five impact counts the audit row is written
+  from, with the two policy figures kept apart: one is cover running on its own,
+  the other is work the insurer still owes. Nav sits beside `/vendors` under
+  Operations — both are counterparty registers, and "New business" is a pipeline of
+  stages rather than a place for a list. Still screenless: the cross-office
+  directory, the insurance-line vocabulary, Q9's office form templates, and the
+  read-only master registry.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

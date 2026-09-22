@@ -270,6 +270,11 @@ const NAV_GROUPS: readonly NavGroup[] = [
     labelKey: 'navGroupOperations',
     items: [
       { href: '/employees', labelKey: 'navEmployees', permissions: ['employee.read'] },
+      // Beside /vendors, because both are counterparty REGISTERS an office maintains — and not in
+      // "New business", which is a pipeline of stages (lead -> prospect -> ... -> opportunity)
+      // rather than a place for a list you keep. Insurers first: for a broker they are the primary
+      // counterparty, and /vendors is everything else.
+      { href: '/insurers', labelKey: 'navInsurers', permissions: ['insurer.read'] },
       { href: '/vendors', labelKey: 'navVendors', permissions: ['vendor.manage'] },
       { href: '/information-assets', labelKey: 'navInformationAssets', permissions: ['information-asset.manage'] },
       { href: '/documents', labelKey: 'navDocuments', permissions: ['document.manage'] },

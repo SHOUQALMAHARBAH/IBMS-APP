@@ -164,9 +164,18 @@ changes only what this office submits. Nothing on the office side writes, versio
 supersedes a shared row — an override is not an edit, and a test asserts the shared
 row is still version 1 afterwards.
 
-There is no mapping **screen** yet — API and tests only, deliberately. Screens
-belong with the Phase 4 UI work, and every new screen needs Arabic alongside
-English.
+There is no mapping **screen** yet — API and tests only, deliberately. That is
+now the exception rather than the rule: `/insurers` (list, register, detail, and
+the deactivation step with its five impact counts) exists, so the claim that
+"screens belong with the Phase 4 UI work" no longer holds generally. The
+form-template mapping screen is a later slice, and it belongs on the insurer
+detail page rather than on its own route — an office's form mapping is a fact
+about its relationship with one company.
+
+Every new screen needs Arabic alongside English, and the i18n dictionary has a
+guard that enforces it: `translations.test.ts` asserts every file on disk is
+registered AND that each keeps exact AR/EN parity. It caught the insurer
+dictionary being unregistered on the first run.
 
 ## What the migration did to existing data
 
