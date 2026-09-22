@@ -68,6 +68,18 @@ const EXPECTED = {
   'ALTER TABLE "RolePermission" DROP CONSTRAINT "RolePermission_role_organization_agree_fkey";':
     'composite tenant FK — the structural answer to grant drift, see the RBAC Phase 1 migration',
 
+  // The four MUST models' office-line FKs (`20261019100000`). Same shape, same reason: without the
+  // composite, office A's Policy could reference office B's private line and the reference would
+  // be structurally valid.
+  'ALTER TABLE "InsuranceProgramLine" DROP CONSTRAINT "InsuranceProgramLine_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "RFQ" DROP CONSTRAINT "RFQ_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "Policy" DROP CONSTRAINT "Policy_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+  'ALTER TABLE "CommissionAgreement" DROP CONSTRAINT "CommissionAgreement_office_line_same_org_fkey";':
+    'composite tenant FK, raw SQL by design',
+
   // ---- GIN indexes on `Unsupported("tsvector")` ----
   // Prisma cannot index a field whose type it does not model. `canonicalTokens` is a plain
   // `String[]`, which it CAN index — so that one was declared rather than listed here.

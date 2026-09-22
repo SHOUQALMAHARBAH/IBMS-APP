@@ -1701,18 +1701,35 @@ model InsuranceProgram {
 }
 
 model InsuranceProgramLine {
-  id                 String           @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId     String           @default(dbgenerated())
-  organization       Organization     @relation(fields: [organizationId], references: [id])
-  insuranceProgramId String
-  insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
-  insuranceLine      String // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
-  sumInsuredBasis    Decimal?         @db.Decimal(18, 3)
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
+  insuranceProgramId    String
+  insuranceProgram      InsuranceProgram     @relation(fields: [insuranceProgramId], references: [id])
+  insuranceLine         String // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `InsuranceProgramLine_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  sumInsuredBasis       Decimal?             @db.Decimal(18, 3)
 
   @@index([insuranceProgramId])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 // ============================================================================
@@ -1774,16 +1791,32 @@ model Opportunity {
 /// Process 11 — RFQ / Market Submission per product/line to a shortlist of
 /// insurers.
 model RFQ {
-  id                    String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId        String       @default(dbgenerated())
-  organization          Organization @relation(fields: [organizationId], references: [id])
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
   opportunityId         String
-  opportunity           Opportunity  @relation(fields: [opportunityId], references: [id])
+  opportunity           Opportunity          @relation(fields: [opportunityId], references: [id])
   insuranceLine         String
-  issuedAt              DateTime     @default(now())
-  followUpThresholdDays Int          @default(9) // Part 3.7-style configurable follow-up
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `RFQ_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  issuedAt              DateTime             @default(now())
+  followUpThresholdDays Int                  @default(9) // Part 3.7-style configurable follow-up
   // Process 11 (backlog Part C #11) provenance — the Placement Officer who
   // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
   issuedByUserId        String?
@@ -1798,6 +1831,7 @@ model RFQ {
   // relaxation (Negotiation #15 / Client Decision #17).
   @@unique([opportunityId, insuranceLine])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 enum RfqInsurerStatus {
@@ -2113,40 +2147,56 @@ enum PolicyStatus {
 
 /// Part 4.1 core entity — the bound insurance contract.
 model Policy {
-  id               String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId   String       @default(dbgenerated())
-  organization     Organization @relation(fields: [organizationId], references: [id])
-  opportunityId    String       @unique
-  opportunity      Opportunity  @relation(fields: [opportunityId], references: [id])
-  customerId       String
-  customer         Customer     @relation(fields: [customerId], references: [id])
-  insurerId        String
-  insurer          Insurer      @relation(fields: [insurerId], references: [id])
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
+  opportunityId         String               @unique
+  opportunity           Opportunity          @relation(fields: [opportunityId], references: [id])
+  customerId            String
+  customer              Customer             @relation(fields: [customerId], references: [id])
+  insurerId             String
+  insurer               Insurer              @relation(fields: [insurerId], references: [id])
   /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
   /// the platform. A bare @unique here is not only a functional bug (two
   /// offices legitimately produce the same value); it leaks across tenants on
   /// its own — a uniqueness-violation error confirms the value already exists
   /// for SOMEONE, with no row ever returned. See @@unique below.
-  policyNumber     String?
-  insuranceLine    String
-  status           PolicyStatus @default(PLACEMENT_CONFIRMED)
-  inceptionDate    DateTime?
-  expiryDate       DateTime?
-  requestedPremium Decimal      @db.Decimal(18, 3)
-  issuedPremium    Decimal?     @db.Decimal(18, 3)
-  currency         String       @default("JOD")
+  policyNumber          String?
+  insuranceLine         String
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `Policy_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  status                PolicyStatus         @default(PLACEMENT_CONFIRMED)
+  inceptionDate         DateTime?
+  expiryDate            DateTime?
+  requestedPremium      Decimal              @db.Decimal(18, 3)
+  issuedPremium         Decimal?             @db.Decimal(18, 3)
+  currency              String               @default("JOD")
   // Process 18-19 (backlog Part C #18-19) provenance — bare scalars, no
   // relation. placedByUserId is the Placement Officer who bound the cover;
   // issuedByUserId is stamped on the PLACEMENT_CONFIRMED -> ISSUED
   // transition. The AuditLogEntry CREATE / TRANSITION rows are the
   // authoritative trail (same pattern as Opportunity.createdByUserId /
   // RFQ.issuedByUserId).
-  placedByUserId   String?
-  issuedByUserId   String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  placedByUserId        String?
+  issuedByUserId        String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   schedules               PolicySchedule[]
   coverNote               CoverNote?
@@ -2168,6 +2218,7 @@ model Policy {
   @@index([status])
   @@index([expiryDate])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 /// Requested/issued coverage snapshot — limits, sums insured, named perils,
@@ -2807,23 +2858,40 @@ model PaymentChannel {
 /// onto each CommissionLedgerEntry at calculate time. DRAFTED default 0 — no
 /// governed tax-rate source is encoded in the system yet.
 model CommissionAgreement {
-  id             String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId String       @default(dbgenerated())
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  insurerId      String
-  insurer        Insurer      @relation(fields: [insurerId], references: [id])
-  insuranceLine  String
-  ratePercent    Decimal      @db.Decimal(5, 2)
-  vatRatePercent Decimal      @default(0) @db.Decimal(5, 2)
-  effectiveFrom  DateTime     @default(now())
-  effectiveTo    DateTime?
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
+  insurerId             String
+  insurer               Insurer              @relation(fields: [insurerId], references: [id])
+  insuranceLine         String
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `CommissionAgreement_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  ratePercent           Decimal              @db.Decimal(5, 2)
+  vatRatePercent        Decimal              @default(0) @db.Decimal(5, 2)
+  effectiveFrom         DateTime             @default(now())
+  effectiveTo           DateTime?
 
   ledgerEntries CommissionLedgerEntry[]
 
   @@index([insurerId, insuranceLine])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 /// Process 35–36 — the governed commission earned on a policy. #35 records the
@@ -4656,8 +4724,12 @@ model InsuranceLine {
   displayOrder Int
   createdAt    DateTime              @default(now())
 
-  offeredBy     InsurerOfferedLine[]
-  formTemplates InsurerFormTemplate[]
+  offeredBy             InsurerOfferedLine[]
+  formTemplates         InsurerFormTemplate[]
+  insuranceProgramLines InsuranceProgramLine[]
+  rfqs                  RFQ[]
+  policies              Policy[]
+  commissionAgreements  CommissionAgreement[]
 
   @@index([category, displayOrder])
 }
@@ -4696,7 +4768,11 @@ model OfficeInsuranceLine {
   /// the kind of change that needs an attributable author.
   createdByUserId String
 
-  offeredBy InsurerOfferedLine[]
+  offeredBy             InsurerOfferedLine[]
+  insuranceProgramLines InsuranceProgramLine[]
+  rfqs                  RFQ[]
+  policies              Policy[]
+  commissionAgreements  CommissionAgreement[]
 
   /// Once per office, per script.
   @@unique([organizationId, canonicalEn])

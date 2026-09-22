@@ -1058,6 +1058,68 @@ rows** — fixture noise, but it is what an unconstrained column attracts, and t
 to tolerate values no mapping table anticipates. That is why the rule is totality plus a
 measured gate, rather than a mapping table plus confidence.
 
+#### FIVE of the six are DONE (2026-09-22): the four MUST models
+
+`InsuranceProgramLine`, `RFQ`, `Policy`, `CommissionAgreement` — the four where a line must MATCH
+another model's for the system to work: a programme line becomes an RFQ, an RFQ becomes a Policy,
+and a CommissionAgreement is applied to a Policy by line. Four independently-typed strings cannot
+be matched; four FKs to one catalogue can.
+
+All four are OFFICE-SCOPED, so all four take **both** FKs with a CHECK that at most one is set —
+the opposite of `InsurerFormTemplate` below, and by the rule rather than by taste.
+
+**The mapping was derived from the data, not imagined.** Measured first, then written:
+
+| | outcome |
+|---|---|
+| `InsuranceProgramLine` | **962 / 962 mapped**, 0 parked |
+| `RFQ` | **4,449 / 4,449 mapped**, 0 parked |
+| `Policy` | **4,994 mapped, 632 parked** |
+| `CommissionAgreement` | **287 / 287** on db-test; on dev **42 / 43**, the parked one being `'any thing'` |
+
+The 632 is exactly the 393 bare `motor`/`Motor` rows plus the 239 `portfolio-e2e-line-<timestamp>`
+fixture rows predicted from the vocabulary survey — the measurement confirming the analysis rather
+than a number that happened to appear.
+
+**`motor` parks deliberately, and this is the judgement worth recording.** Unqualified "motor" is
+ambiguous between `MOTOR_TPL_COMPULSORY` and `MOTOR_COMPREHENSIVE` — compulsory third-party cover
+and comprehensive cover are different products at different premiums. A mapping that guessed would
+silently reprice business. Parking 393 rows is the cheap outcome; guessing is the expensive one.
+
+**Four values map to the right LINE with their variant pending**: `Motor Fleet`, `Group Medical`,
+`Individual Medical`, `Property All Risks (Fire)`. The 32 cannot express fleet-vs-individual or a
+named sub-peril. That is not information loss **because the original string is retained** — which is
+the whole reason rule 3 exists — and § 1.25's variant axis derives them next.
+
+Note the catalogue's own asymmetry, which decided two of those: `LIFE_GROUP` and `LIFE_INDIVIDUAL`
+are separate lines, so `Group Life` maps to a real line, while there is only one `MEDICAL_HEALTH`,
+so `Group Medical` needs a variant. Recorded as SEEN and left alone when the 32 were seeded.
+
+**The tenancy guarantee is proven, not asserted.** Each model got a composite
+`(officeInsuranceLineId, organizationId) -> OfficeInsuranceLine(id, organizationId)` FK. Planted a
+cross-office reference inside a rolled-back transaction — a second office, its own line, then a
+Policy from the first office pointed at it:
+
+```
+ERROR:  insert or update on table "Policy" violates foreign key constraint
+        "Policy_office_line_same_org_fkey"
+DETAIL:  Key (officeInsuranceLineId, organizationId)=(plant-line-x, 00000000-…-000000000001)
+         is not present in table "OfficeInsuranceLine".
+```
+
+The simple FK was satisfied — the line exists — so only the composite could refuse it. Rolled back,
+Organization count still 1, so the two-Organization guard was never exposed to a leak.
+
+**And `db:divergence` caught my own migration TWICE**, which is the week's investment paying for
+itself again. First the four `@@index([insuranceLineId])` declarations (expressible, so declared
+rather than allow-listed). Then the one that mattered: I had added only the COMPOSITE FK, while
+`schema.prisma` declares an ordinary relation — so the next generated migration would have added
+the simple FK as an unreviewed change. `InsurerOfferedLine` has had **both** since it was built
+(measured), and they do different jobs: the simple one is what Prisma's client and referential
+actions are built against; the composite one is the tenancy guarantee. Fixed forward in
+`20261019110000` rather than by editing an applied file, with an assertion that BOTH survive —
+because "tidying away the duplicate FK" reads as cleanup and removes tenant isolation.
+
 #### One of the six is DONE (2026-10-16): `InsurerFormTemplate.insuranceLine`
 
 The easy one, and worth recording precisely because its ease does not transfer. It held **zero
