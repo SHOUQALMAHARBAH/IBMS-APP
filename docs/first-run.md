@@ -229,7 +229,7 @@ yarmouk insurance (Demo)
 | **كل شاشة ترفض العمل والتنبيه التحذيري ظاهر** | لم يتم ربط تطبيق المصادقة. القسم ٦. |
 | **شاشة تقول إنك لا تملك صلاحية** | هذا الحساب فعلًا لا يملكها — راجعي جدول القسم ٧ واستخدمي الحساب المناسب. |
 | **`npm run seed:demo` يتوقف فورًا ويقول `DEMO_PASSWORD is not set`** | نافذة الأوامر هذه لا تحمل كلمة المرور. كرّري سطر `$env:DEMO_PASSWORD = (Read-Host ...)` في **نفس** النافذة. |
-| **`Port 3000 is in use`** | النظام يعمل في نافذة أخرى. استخدمي تلك النافذة، أو أغلقيها وابدئي من جديد. |
+| **`Port 3000 is in use` ثم `Another next dev server is already running`** | نسخة أخرى من النظام تعمل بالفعل. **المهم أن تعرفي أن الأمر كله يفشل، لا الواجهة وحدها**: يختار Next المنفذ 3001 ثم يرفض العمل، فيتوقف `turbo` ومعه الخدمة الخلفية — فلا تعملي على المنفذ القديم بافتراض أن كل شيء يعمل، لأن الخدمة الخلفية قد لا تكون قائمة. Next يطبع لك رقم العملية والأمر اللازم لإيقافها؛ نفّذيه ثم أعيدي `npm run dev`: `taskkill /PID <الرقم> /F` — ولإيقاف الخدمة الخلفية أيضًا إن بقيت: `netstat -ano | findstr :4000` ثم نفس الأمر على رقمها. |
 | **قاعدة البيانات لا تعمل** | افتحي Docker Desktop وتأكدي أن الحاوية `ibms-app-db-1` حالتها `healthy`، أو نفّذي `docker compose up -d db`. |
 
 ## ١١. ما لا يمكن فعله بعد — بصراحة
@@ -460,7 +460,7 @@ for holding policies.
 | **Every screen refuses and the warning banner is showing** | The authenticator is not paired. See §6. |
 | **A screen says you lack a permission** | That account genuinely lacks it — check the §7 table and use the right account. |
 | **`npm run seed:demo` stops immediately with `DEMO_PASSWORD is not set`** | That window does not carry the password. Repeat the `$env:DEMO_PASSWORD = (Read-Host ...)` line in the **same** window. |
-| **`Port 3000 is in use`** | The system is already running in another window. Use that one, or close it and start again. |
+| **`Port 3000 is in use`, then `Another next dev server is already running`** | Another copy is already running. **The part worth knowing is that the whole command fails, not just the website**: Next picks port 3001, then refuses, and `turbo` brings the API task down with it — so do not carry on against the old port assuming everything is up, because the API may not be. Next prints the PID and the exact command to stop it; run that, then `npm run dev` again: `taskkill /PID <pid> /F`. If an API is also left behind, find it with `netstat -ano | findstr :4000` and stop that PID the same way. |
 | **The database is not running** | In Docker Desktop, confirm `ibms-app-db-1` is `healthy`, or run `docker compose up -d db`. |
 
 ## 11. What you cannot do yet — honestly
