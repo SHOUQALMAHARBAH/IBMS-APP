@@ -829,9 +829,12 @@ build actually is today:
   from, with the two policy figures kept apart: one is cover running on its own,
   the other is work the insurer still owes. Nav sits beside `/vendors` under
   Operations — both are counterparty registers, and "New business" is a pipeline of
-  stages rather than a place for a list. Still screenless: the cross-office
-  directory, the insurance-line vocabulary, Q9's office form templates, and the
-  read-only master registry.
+  stages rather than a place for a list. `/insurer-directory` has its own
+  entry and its own permission — a refused line code renders as a REFUSAL rather
+  than an empty page, because `[]` reads as "nobody writes this cover". Still
+  screenless: the insurance-line vocabulary, Q9's office form templates, and the
+  read-only master registry (see `IMPROVEMENTS.md` § 1.44 for the measured list of
+  every API surface with no UI).
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

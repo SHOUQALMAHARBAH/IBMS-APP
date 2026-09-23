@@ -2708,6 +2708,90 @@ Two habits follow:
 - Read what a reset breaks as a FINDING rather than as noise to be re-run away. Both of today's
   came from there.
 
+### 1.44 `P2` — MEASURED: four API surfaces are built and unreachable from the UI, and the office administrator holds three codes it cannot exercise
+
+Asked because the insurer feature had been **unreachable for weeks with every gate green** — 74 nav
+links and not one for insurers. That is the same shape as "no spec covers this" predicting "and it
+is broken", so the question was whether anything else is in that state. **Recorded, not acted on.**
+
+Method: every `@Controller('...')` prefix in `apps/api/src` (90 of them) against every reference to
+that path anywhere under `apps/web/lib|app|components`, excluding `.next`. Seven came back with no
+reference; each was then checked by hand, because the grep cannot match a PARAMETERISED prefix
+literally and one result was a false positive for exactly that reason.
+
+**Built and genuinely unreachable — no web file mentions them at all:**
+
+| Surface | Routes | Permission | Note |
+|---|---|---|---|
+| `admin/email-integration` | 6 (`GET`, `authorize-url`, `connect`, `verify`, `test`, `revoke`) | `email.integration.manage` | An office cannot connect, test or revoke its own outbound mailbox. The only web mention of the permission is the Playwright fixture. |
+| `POST /imports/customers` | 1 | `customer.bulk-import` | No import screen exists. |
+| `insurer-directory` | 1 | `insurer.directory.read` | Known — the next screen slice. |
+| `insurers/:insurerId/form-templates` | 3 | `insurer.read` / `insurer.office-form.map` | Known — Q9's UI, a later slice. |
+
+**The sharpest way to put the first two:** `email.integration.read`, `email.integration.manage` and
+`customer.bulk-import` are all in the OFFICE_ADMINISTRATOR's 25-code set
+(`office-administrator.e2e-spec.ts` lines 91-93). So **the office administrator is granted three
+capabilities the product gives them no way to exercise.** A granted permission with no surface is
+not harmless: it reads as "this is supported" to whoever audits the grid, and the access
+recertification reviewer confirming it is confirming access to nothing.
+
+**Correctly absent, and not defects:**
+
+- `auth/sso` — `@Public() POST :provider/callback`. A callback is invoked by the identity PROVIDER,
+  never by the browser app, and README already records SSO as a deferred edge with no IdP
+  configured. A nav entry would be wrong.
+- `orgs` — `@Public() GET resolve`. Subdomain resolution, which is RBAC Phase 4's mechanism; called
+  by infrastructure, not a destination.
+- `customers/:customerId` — **false positive.** The web reaches it as `` `/customers/${id}` `` in
+  three libs (`customer-api`, `crm-api`, `kyc-api`). The method cannot see a template literal, which
+  is worth stating because it is the method's one blind spot: a parameterised prefix must be checked
+  by hand or it reads as unreachable.
+
+**What this does NOT measure**, so nobody over-reads it: a page can exist with no nav entry and
+still be reachable by a link from another page — `/insurers/[id]` is, from the list. This asks the
+narrower question "does any web code call this API at all", which is the one that catches a surface
+built and then forgotten.
+
+### 1.45 — A CAST THAT SILENCES THE COMPILER USUALLY MEANS THE QUESTION WAS GOOD
+
+``t(`enumInsurerStructure${s}` as never)`` — a translation key built by template concatenation,
+with `as never` to make the type error go away. There were **no structure labels at all, in either
+language**, and the screen would have shipped rendering raw key strings. The compiler knew; the cast
+was the thing stopping it from saying so.
+
+Replaced with `STRUCTURE_LABEL_KEY`, a `satisfies Record<InsurerStructure, string>` map, so adding a
+member to the union is a compile error until its label exists.
+
+Two general forms, both worth applying beyond this instance:
+
+1. **A cast written to stop a complaint is a recorded decision to ignore it.** `as never`,
+   `as unknown as T` and `@ts-expect-error` are sometimes right — but the reason belongs beside them,
+   and if the reason is "it was noisy" the complaint was probably correct.
+2. **A key built by concatenation cannot be checked.** ``t(`prefix${value}`)`` compiles whatever it
+   is handed, so a missing or renamed entry becomes a runtime miss rather than a build failure. A
+   total map over the union is the form that cannot express the mistake — the opening principle of
+   this file, applied to a lookup.
+
+### 1.46 — EVIDENCE THAT THE GUARDS ARE WORTH THEIR COST: one caught a genuine repeat
+
+`apps/web/lib/i18n/translations.test.ts` asserts that every dictionary file ON DISK is registered in
+its own map, and its comment says why it exists: *"without this, the map above silently under-covers
+the moment someone adds a dictionary — which is exactly what happened when auth.ts was created: the
+two checks below kept passing while ignoring the new file entirely."*
+
+On 2026-09-23 it caught exactly that again. `insurers.ts` was created and merged into the flat
+translation namespace, but not registered in the test's map — so the AR/EN parity check and the
+key-collision check were both silently ignoring **88 new keys** while passing.
+
+**This is the first time one of these guards has caught a genuine repeat of the thing it was built
+for**, and it is the evidence the class of test earns its cost. Worth stating plainly, because a
+guard that has never fired is indistinguishable from a guard that cannot — which is the § 1.37
+problem — and this one has now fired on its own stated scenario.
+
+The pattern to reuse: when a check derives its expected set from the FILESYSTEM rather than from a
+list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
+set" guard in this repo has that shape, and this is why.
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently

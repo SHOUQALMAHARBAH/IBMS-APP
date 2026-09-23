@@ -275,6 +275,16 @@ const NAV_GROUPS: readonly NavGroup[] = [
       // rather than a place for a list you keep. Insurers first: for a broker they are the primary
       // counterparty, and /vendors is everything else.
       { href: '/insurers', labelKey: 'navInsurers', permissions: ['insurer.read'] },
+      // Its OWN nav entry and its own permission, not a tab on /insurers. They answer opposite
+      // questions — "who does my office deal with, on what terms" versus "which companies exist at
+      // all" — and `insurer.directory.read` is separate from `insurer.read` precisely so an office
+      // can be given the market without also being given its own panel. A tab would imply one of
+      // them grants the other.
+      {
+        href: '/insurer-directory',
+        labelKey: 'navInsurerDirectory',
+        permissions: ['insurer.directory.read'],
+      },
       { href: '/vendors', labelKey: 'navVendors', permissions: ['vendor.manage'] },
       { href: '/information-assets', labelKey: 'navInformationAssets', permissions: ['information-asset.manage'] },
       { href: '/documents', labelKey: 'navDocuments', permissions: ['document.manage'] },

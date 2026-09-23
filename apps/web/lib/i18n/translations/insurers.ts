@@ -114,6 +114,29 @@ export const INSURERS = {
     insStatusBusyButton: 'جارٍ التنفيذ…',
     insStatusError: 'تعذر تغيير حالة التعامل.',
     insDeactivatedNotice: 'أوقف مكتبك التعامل مع هذه الشركة.',
+
+    // directory/page.tsx — the cross-office directory
+    insDirHeading: 'دليل شركات التأمين',
+    insDirIntro:
+      'كل شركة سجّلها أي مكتب على المنصة، مدخل واحد لكل شركة. للعثور على من يكتب تغطية ' +
+      'لا يكتبها أحد على قائمة مكتبك — ولا يذكر الدليل أبداً أي مكتب يتعامل مع أي شركة.',
+    insDirBoundaryNote:
+      'يُظهر الدليل بيانات الشركة العامة فقط: لا شروط سداد، ولا تصنيفاً، ولا جهات اتصال خاصة بمكتب، ' +
+      'ولا أي إشارة إلى المكاتب الأخرى.',
+    insDirNoPermission: 'لا تملك صلاحية insurer.directory.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    insDirLoadError: 'تعذر تحميل الدليل.',
+    insDirSearchLabel: 'ابحث باسم الشركة',
+    insDirLineLabel: 'الخط التأميني',
+    insDirLineAny: 'أي خط',
+    insDirSearchButton: 'ابحث',
+    insDirEmpty: 'لا توجد شركة مطابقة.',
+    insDirEmptyForLine: 'لم يسجّل أي مكتب شركة تكتب هذا الخط.',
+    insDirLoading: 'جارٍ التحميل…',
+    insDirTotal: '{count} شركة',
+    insDirNoContact: 'لم تُسجَّل بيانات اتصال.',
+    insDirUnknownLine:
+      'رفض الدليل هذا الخط لأنه ليس في الفهرس المُدار. هذا ليس نتيجة فارغة: ' +
+      'اختر خطاً من القائمة.',
   },
   EN: {
     // page.tsx — the list
@@ -221,5 +244,26 @@ export const INSURERS = {
     insStatusBusyButton: 'Working…',
     insStatusError: 'Could not change the dealing status.',
     insDeactivatedNotice: 'Your office has stopped dealing with this company.',
+
+    // directory/page.tsx — the cross-office directory
+    insDirHeading: 'Insurer directory',
+    insDirIntro:
+      'Every company any office on the platform has registered, one entry per company. For finding who writes cover nobody on your panel writes — and it never says which offices deal with any of them.',
+    insDirBoundaryNote:
+      'The directory shows public company facts only: no credit terms, no rating, no office-specific contacts, and nothing at all about other offices.',
+    insDirNoPermission:
+      'You do not hold insurer.directory.read, so there is nothing to show here.',
+    insDirLoadError: 'Could not load the directory.',
+    insDirSearchLabel: 'Search by company name',
+    insDirLineLabel: 'Insurance line',
+    insDirLineAny: 'Any line',
+    insDirSearchButton: 'Search',
+    insDirEmpty: 'No company matches.',
+    insDirEmptyForLine: 'No office has registered a company that writes this line.',
+    insDirLoading: 'Loading…',
+    insDirTotal: '{count} companies',
+    insDirNoContact: 'No contact details recorded.',
+    insDirUnknownLine:
+      'The directory refused that line because it is not in the managed catalogue. This is NOT an empty result — pick a line from the list.',
   },
 } as const;

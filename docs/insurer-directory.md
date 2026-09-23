@@ -164,6 +164,34 @@ which companies — the fact this whole boundary exists to keep private.
 
 Do not add one.
 
+## THE SCREEN NOW EXISTS: `/insurer-directory`
+
+Its own nav entry and its own permission, not a tab on `/insurers` — they answer opposite
+questions ("who does my office deal with, on what terms" vs "which companies exist at all"),
+and `insurer.directory.read` is separate from `insurer.read` precisely so an office can be
+given the market without also being given its own panel. A tab would imply one grants the
+other.
+
+Three things the screen does that are decisions rather than rendering:
+
+- **A refused line code renders as a REFUSAL, never as no-results.** The 422 lands in its own
+  error slot with the API's sentence plus what to do about it. `[]` is indistinguishable from
+  "nobody writes this cover" and looks like an answer — an office reading it stops looking.
+  Proven by planting the swallow: making the 422 set an empty list turns the error invisible
+  and the empty state visible, and the test goes red on the missing error.
+- **Two different empty states.** With no line filter, the honest sentence is about the search
+  ("no company matches"). With one applied AND accepted, it may say something about the market
+  ("no office has registered a company that writes this line") — which is only safe to say
+  because an unknown code was refused upstream rather than landing here.
+- **The picker offers platform codes only.** An office addition has no code, so the API would
+  refuse it; the option count is asserted rather than only the wanted options, because an
+  assertion that names what it wants cannot tell "correctly excluded" from "never rendered".
+
+There is deliberately **no action** on the screen: no "register this company", no contact
+request, no "we approached them" note. Everything after the search happens outside the system.
+An endpoint that recorded an approach would be the first step towards the platform knowing
+which offices are talking to which companies.
+
 ## A CONSTRAINT ON THE SEARCH SCREEN
 
 The view re-aggregates **every insurer on the platform** on every query. Measured on

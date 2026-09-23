@@ -251,10 +251,20 @@ test("a reader without insurer.relationship.manage sees no register or deactivat
     route.fulfill({ status: 200, json: ACTIVE_INSURER }),
   );
 
+  // Each absence assertion is ANCHORED on something that proves the page actually rendered first.
+  // `toHaveCount(0)` is satisfied by a blank page, so without the anchor this test passes whether
+  // the control is correctly withheld or the screen simply has not loaded — and it raced under
+  // parallel workers for exactly that reason, failing once in two runs before this was added. Same
+  // defect class as an exclusion filter that cannot tell "excluded" from "never returned".
   await page.goto("/insurers");
+  await expect(page.getByRole("heading", { name: "Insurers" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Al-Yarmouk Insurance" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Register an insurer" })).toHaveCount(0);
 
   await page.goto("/insurers/ins-1");
+  await expect(
+    page.getByRole("heading", { name: "Al-Yarmouk Insurance" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Stop dealing with them" }),
   ).toHaveCount(0);
