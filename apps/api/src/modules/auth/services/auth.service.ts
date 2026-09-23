@@ -209,6 +209,36 @@ export class AuthService {
     // Resolved from the roles' own security attributes, not their names: a name
     // list could not recognise a role an office defined, so a custom role
     // silently qualified for the skip (see `RoleSecurityAttributes`).
+    // `mfaEnabled` is a FLAG; an active credential is the FACT. When they disagree — the flag set
+    // with nothing behind it — challenging the user is a dead end, not a control: there is no
+    // credential to check a code against, so every code they type is wrong and no screen offers a
+    // way out. Measured: a fresh account planted into that state answered `mfaRequired: true` with a
+    // challenge token, which the web renders as a six-digit box with no QR and nothing to pair.
+    //
+    // That state is reachable without anyone doing something stupid. Enrolment is TWO calls
+    // (`create` then `activate`), so an interrupted enrolment leaves an INACTIVE credential; a
+    // cleanup that deletes credentials without clearing the flag lands here; and so does any future
+    // "reset this user's MFA" action that forgets one of the two writes.
+    //
+    // So the honest reading of flag-without-credential is "enrolment owed", and the user is let
+    // through to a session — NOT to the application. `MfaRequiredGuard` keys on the same predicate
+    // and still refuses every route but enrolment itself, which is why this cannot be a bypass:
+    // both sides now ask the same question.
+    const activeCredentials = user.mfaEnabled
+      ? await this.mfaCredentials.findActiveByUser(user.id)
+      : [];
+
+    if (user.mfaEnabled && activeCredentials.length === 0) {
+      await this.audit.record({
+        userId: user.id,
+        action: 'LOGIN',
+        entityType: 'User',
+        entityId: user.id,
+        afterValue: { outcome: 'MFA_ENROLLMENT_OWED_FLAG_WITHOUT_CREDENTIAL' },
+      });
+      return this.issueSession(user, meta);
+    }
+
     if (user.mfaEnabled) {
       const security = roleSecurityAttributes(
         await this.users.getRoleRefs(user.id),

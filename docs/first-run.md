@@ -21,6 +21,11 @@
 - **Docker Desktop** ويعمل (منه تعمل قاعدة البيانات).
 - **Node.js 20.19.0** (الإصدار مكتوب في ملف `.nvmrc`).
 
+**وقبل كل شيء: تطبيق مصادقة على هاتفك.** هذا أول ما سيطلبه النظام منك، ولن تستطيعي استخدام
+أي شاشة قبل ربطه. نزّلي **Microsoft Authenticator** أو **Google Authenticator** (أو أي تطبيق
+TOTP) الآن، قبل أن تبدئي — لا بعد ذلك. وإن كان التطبيق على نفس الجهاز الذي تفتحين عليه النظام
+فلا مشكلة: الشاشة تعرض المفتاح مكتوباً لتُدخليه يدوياً بدلاً من مسح الرمز.
+
 تحتاجين نافذة أوامر (PowerShell) مفتوحة على مجلد المشروع:
 `C:\Users\user\Downloads\ibms-app`
 
@@ -141,8 +146,9 @@ http://localhost:3000
 4. في شاشة **الأمان** ستجدين الحالة: `غير مسجَّلة — مطلوبة قبل استخدام معظم أجزاء النظام`،
    وزرًّا لبدء التسجيل. اضغطيه.
 
-5. **سيظهر رمز QR**. افتحي تطبيق مصادقة على هاتفك — Microsoft Authenticator أو Google
-   Authenticator أو ما شابه — واختاري «إضافة حساب» ثم «مسح رمز QR»، وامسحي الرمز.
+5. **سيظهر رمز QR، ومعه المفتاح مكتوباً.** افتحي تطبيق المصادقة على هاتفك واختاري «إضافة حساب»
+   ثم «مسح رمز QR». وإن لم تستطيعي المسح — لأن التطبيق على نفس الجهاز، أو لأن الكاميرا لا تقرأ
+   الرمز — فاختاري «إدخال المفتاح يدوياً» في التطبيق واكتبي المفتاح المعروض تحت الرمز.
 
 6. سيعطيك التطبيق **رقمًا من ست خانات يتغير كل ٣٠ ثانية**. اكتبيه في الخانة واضغطي التأكيد.
    إن تغيّر الرقم قبل أن تُكملي الكتابة، اكتبي الرقم الجديد — الرقم القديم يصبح غير صالح.
@@ -273,6 +279,12 @@ You need **Docker Desktop** running (it hosts the database) and **Node.js 20.19.
 in `.nvmrc`). Open a PowerShell window in the project folder,
 `C:\Users\user\Downloads\ibms-app`.
 
+**And before anything else: an authenticator app on your phone.** It is the first thing the system
+asks for, and no screen works until it is paired. Install **Microsoft Authenticator** or **Google
+Authenticator** (or any TOTP app) *now*, not when you get there. If the app is on the same device
+you are browsing from, that is fine: the screen also shows the key as text, so you can type it in
+by hand instead of scanning.
+
 ## 2. Step one: choose your own password
 
 **Do not use the password written in the requirements document.** A password in a file
@@ -381,8 +393,10 @@ In order — this is what actually happened when the path was walked:
 4. On **Security** the status reads `Not enrolled — required before using most of the
    system`, with a button to begin. Click it.
 
-5. **A QR code appears.** In an authenticator app on your phone (Microsoft Authenticator,
-   Google Authenticator, or similar) choose "add account" → "scan QR code", and scan it.
+5. **A QR code appears, with the key written out beneath it.** In your authenticator app choose
+   "add account" → "scan QR code". If you cannot scan — the app is on this same device, or the
+   camera will not read it — choose "enter a setup key manually" instead and type the key shown
+   under the code.
 
 6. The app shows a **six-digit number that changes every 30 seconds**. Type it in and
    confirm. If it changes while you are typing, use the new one — the old one is no longer
@@ -551,6 +565,42 @@ them in the tooling around the system rather than in the system:
    rediscovered.
 
 After all five: a complete run reports **160 rows created, 0 failed attempts**.
+
+**Then the owner hit the door anyway, and that found the defect none of the above would have.**
+She reported a screen asking for a six-digit code with no QR and nothing to pair against — on an
+account that had never enrolled. Measured rather than guessed at:
+
+- `login` issued an MFA challenge whenever `User.mfaEnabled` was true, **without checking that a
+  credential existed**. Planted on a fresh account: flag set, zero credentials, and the API answered
+  `mfaRequired: true` with a challenge token. The web renders that as a code box. There is no
+  credential to check a code against, so every code is wrong and nothing on screen offers a way out
+  — a permanent lockout from one boolean.
+- It is reachable without anyone doing anything careless: enrolment is TWO calls (`create`, then
+  `activate`), so an interrupted enrolment leaves an INACTIVE credential; a cleanup that deletes
+  credentials without clearing the flag lands there; and the demo seed itself passes through that
+  state for minutes on every run.
+- The fix makes both sides ask the same question. `login` treats flag-without-active-credential as
+  *enrolment owed* and issues a session; `MfaRequiredGuard` now keys on an **active credential**
+  rather than the flag, so that session still reaches nothing but enrolment. Doing only the first
+  half would have been an MFA bypass, which is why the test asserts both and a plant that reverts
+  the guard kills it.
+- An **unconfirmed** credential deliberately does not count: it has never proven the holder has the
+  secret.
+
+**And the enrolment screen now shows the secret as text**, grouped in fours, beside the QR. A screen
+whose only route is a camera locks out anyone whose authenticator lives on the same device, and
+leaves nothing to fall back on if the image fails. The secret was already in the enrolment response;
+it was simply never shown.
+
+**Verified on a GENUINELY FRESH account** — provisioned the way an administrator provisions one,
+temporary password owed, no credential, no trusted device, no history, because a recycled demo
+account cannot reproduce a first login: temp password → **straight to the forced password change**
+(two fields, live policy checklist) → lands on the home page **with the enrolment banner and no code
+box** → the banner's link reaches Security → the QR **paints** (228×228, measured, not assumed) →
+the manual key renders. The earlier walk had read the secret out of the network response and
+generated codes with otplib, so it never once looked at whether a human could see a QR. That is the
+gap that let a verified path fail for the first real person to walk it.
+
 
 **What the browser walk confirmed**, against a live stack with no mocks: sign-in lands on the home
 page; the enrolment banner renders with the wording in § 6 and the screen beneath it does NOT claim

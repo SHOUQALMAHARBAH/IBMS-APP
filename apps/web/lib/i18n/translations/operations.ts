@@ -13,6 +13,11 @@ export const OPERATIONS = {
     // ---- Account security -------------------------------------------------
     secHeading: 'الأمان',
     secMfaHeading: 'المصادقة متعدّدة العوامل',
+    // A QR is unusable to anyone whose authenticator is on the SAME device as the screen, or who
+    // has no camera, or whose camera cannot focus on it. The key is the same secret in a form a
+    // person can type, which is why every authenticator offers manual entry.
+    secManualKeyLabel: 'أو أدخل هذا المفتاح يدوياً في التطبيق:',
+    secManualKeyHint: 'استخدم هذا إن كان تطبيق المصادقة على نفس الجهاز، أو إن لم تتمكن من مسح الرمز.',
     secScanInstruction:
       'امسح رمز الاستجابة السريعة بتطبيق المصادقة لديك، ثم أدخل الرمز المكوّن من ستة أرقام الذي يعرضه.',
     secSession: 'الجلسة',
@@ -450,6 +455,8 @@ export const OPERATIONS = {
   EN: {
     secHeading: 'Security',
     secMfaHeading: 'Multi-factor authentication',
+    secManualKeyLabel: 'Or type this key into the app by hand:',
+    secManualKeyHint: 'Use this if your authenticator is on the same device as this screen, or you cannot scan the code.',
     secScanInstruction:
       'Scan this QR code with your authenticator app, then enter the 6-digit code it shows.',
     secSession: 'Session',

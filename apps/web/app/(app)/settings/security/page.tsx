@@ -15,7 +15,15 @@ import {
   type TrustedDevice,
 } from '../../../../lib/auth/auth-api';
 import { ApiError } from '../../../../lib/auth/api-client';
-import { buttonDisabledStyle, buttonStyle, errorStyle, inputStyle, labelStyle, successStyle } from '../../../../components/auth/auth-form.styles';
+import {
+  buttonDisabledStyle,
+  buttonStyle,
+  errorStyle,
+  inputStyle,
+  labelStyle,
+  manualKeyStyle,
+  successStyle,
+} from '../../../../components/auth/auth-form.styles';
 import {
   PasswordRequirements,
   meetsPasswordPolicy,
@@ -29,6 +37,21 @@ export default function SecuritySettingsPage() {
   const { language, t, tPlural } = useLanguage();
 
   const [enrollment, setEnrollment] = useState<MfaEnrollResponse | null>(null);
+
+  /**
+   * The base32 secret the QR encodes, pulled out of the otpauth:// URI so it can be shown as text.
+   * Grouped in fours because a 32-character unbroken run is a transcription error waiting to happen,
+   * and authenticators ignore the spaces.
+   */
+  const manualKey = (() => {
+    if (!enrollment?.otpAuthUri) return null;
+    try {
+      const secret = new URL(enrollment.otpAuthUri).searchParams.get('secret');
+      return secret ? (secret.match(/.{1,4}/g) ?? [secret]).join(' ') : null;
+    } catch {
+      return null;
+    }
+  })();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -199,10 +222,26 @@ export default function SecuritySettingsPage() {
 
         {message ? <p style={successStyle}>{message}</p> : null}
 
+        {/* Parsed from the enrolment URI rather than added to the API response: the secret is
+            already there, and a second field carrying the same secret is a second place for it to
+            leak from. `URLSearchParams` so a padded or reordered URI still yields it. */}
         {user.mfaEnabled ? null : enrollment ? (
           <div>
             <p>{t('secScanInstruction')}</p>
             <Image src={enrollment.qrCodeDataUrl} alt={t('secQrAlt')} width={200} height={200} unoptimized />
+            {/* The same secret the QR encodes, in a form a person can type. A screen whose ONLY
+                route is a camera locks out anyone whose authenticator lives on this device, and
+                leaves nothing to fall back on if the image does not render. The secret is already
+                in `otpAuthUri`; it was simply never shown. */}
+            {manualKey ? (
+              <p style={{ marginTop: '0.75rem' }}>
+                <span style={labelStyle}>{t('secManualKeyLabel')}</span>
+                <code data-mfa-manual-key style={manualKeyStyle}>{manualKey}</code>
+                <span style={{ display: 'block', fontSize: '0.8rem', opacity: 0.8 }}>
+                  {t('secManualKeyHint')}
+                </span>
+              </p>
+            ) : null}
             <form onSubmit={(e) => void handleVerify(e)}>
               <label htmlFor="code" style={labelStyle}>
                 {t('secAuthCodeLabel')}
