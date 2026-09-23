@@ -286,6 +286,14 @@ export const OPERATIONS = {
     homeKycQueueBlurb: 'راجع سجلات «اعرف عميلك» المعلّقة واعتمدها قبل تفعيل العميل.',
     homeAccessRecertBlurb: 'نفّذ دورة مراجعة الصلاحيات الدورية وأكملها.',
     homeSecurityBlurb: 'أدر المصادقة متعدّدة العوامل وراجع سياسة جلستك.',
+    // The three destinations an office administrator holds and had no card for, plus the heading the
+    // launcher needs now that it groups what it shows.
+    homeRolesBlurb: 'أنشئ أدوار مكتبك وحدّد صلاحيات كل دور من مصفوفة الصلاحيات الكاملة.',
+    homeUsersBlurb: 'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
+    homeEmployeesBlurb: 'سجلات الموظفين والتراخيص والشهادات والتدريب.',
+    navGroupAccount: 'حسابك',
+    homeNoDestinations:
+      'لا توجد شاشة متاحة لحسابك حالياً — لم تُسند إليك أي صلاحية بعد. راجع مسؤول النظام في مكتبك.',
     homeWelcome: 'مرحباً، {name}',
     homeSignedInAs: 'نظام إدارة وساطة التأمين. تسجيل الدخول باسم {roles}.',
     homeNoRole: 'لم يتم تعيين دور',
@@ -715,6 +723,12 @@ export const OPERATIONS = {
     homeKycQueueBlurb: 'Review and approve pending KYC records before a customer is activated.',
     homeAccessRecertBlurb: 'Run and complete the periodic access-review cycle.',
     homeSecurityBlurb: 'Manage multi-factor authentication and review your session policy.',
+    homeRolesBlurb: "Define your office's roles and set each one's permissions from the full matrix.",
+    homeUsersBlurb: 'Create user accounts, grant or revoke roles, activate or deactivate access.',
+    homeEmployeesBlurb: 'Employee records, licences, certifications and training.',
+    navGroupAccount: 'Your account',
+    homeNoDestinations:
+      'No screen is available to your account yet — no permissions have been granted to it. Ask your office administrator.',
     homeWelcome: 'Welcome, {name}',
     homeSignedInAs: 'Insurance Brokerage Management System. Signed in as {roles}.',
     homeNoRole: 'no role assigned',

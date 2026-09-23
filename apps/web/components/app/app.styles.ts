@@ -377,3 +377,13 @@ export const mfaBannerCtaStyle: CSSProperties = {
   // Never `nowrap` on the Arabic string, which is the longer of the two.
   whiteSpace: 'normal',
 };
+
+/** Group heading on the home launcher, which now groups what it offers by module. */
+export const homeGroupHeadingStyle: CSSProperties = {
+  fontSize: '0.8rem',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--ink-secondary)',
+  margin: '0 0 0.6rem',
+};

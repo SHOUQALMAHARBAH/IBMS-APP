@@ -2814,6 +2814,45 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
+### 1.48 — A PARTIAL VERDICT REPORTED AS COMPLETE: "screens hidden, not denied" was true of the nav and false of the launcher
+
+**Corrects an earlier audit verdict of my own.** Audit item 5 — *screens are hidden rather than
+shown-then-denied* — came back **BUILT**, evidenced by `AppNav` assembling the sidebar from the
+resolved permission set. That evidence was real and the verdict was wrong, because the sidebar is
+not the only surface that offers routes.
+
+`app/(app)/page.tsx` — the FIRST screen after login, and the most prominent surface in the product —
+carried its own hard-coded list of six cards with **no permission check at all**. Measured on the
+office administrator's 29 codes: four of the six answered 403 for her (`/leads`, `/prospects`,
+`/customers`, `/customers/kyc-queue`) and the three screens she could actually use — `/settings/roles`,
+`/settings/users`, `/employees` — had **no card at all**.
+
+The consequence was not cosmetic. She reported that there was **no page to create a role**. There
+is: `/settings/roles` is 642 lines, it creates, renames, sets the permission matrix, retires and
+reactivates, and `CLAUDE.md`'s claim about it is accurate. It sits in the `الإدارة` group, which is
+collapsed unless it holds the current route, and nothing else pointed at it. **A working feature was
+indistinguishable from a missing one for the person it was built for.**
+
+**The class.** I measured the mechanism I knew to look at. The verdict should have been *"true of
+AppNav; every other surface that renders a destination is unchecked"*, which is a different
+sentence and would have sent someone to the launcher. The same shape as the seed: the walkthrough
+was written from the code, and the one step never executed was the one that broke.
+
+**The fix is structural rather than repeated.** `components/app/destinations.ts` now holds the
+single destination catalogue and the single predicate (`canReach`); `AppNav` and the launcher both
+read it. The rule to keep: **if a destination is rendered anywhere, its gating permission decides
+whether it renders — one mechanism, not one per surface.** A second hard-coded list cannot satisfy
+`e2e/home-launcher.spec.ts`, whose third test enumerates what the launcher offers and asserts every
+entry is reachable; planting the unfiltered version kills all four tests.
+
+**Two things the fix had to get right, both found by the tests rather than by reasoning.**
+`/settings/security` is ungated on purpose, so it is appended unconditionally — which made the
+"nothing to show" message unreachable when it keyed on the full group list; it keys on the MODULE
+groups now, and a zero-permission account sees both the explanation and its one route. And the
+enumerating test read the DOM before hydration and got zero cards, which would have passed every
+"must not contain" assertion for entirely the wrong reason — it anchors on a card that must be
+present first.
+
 ### 1.47 `P2` — FOUR web Playwright tests are chronically flaky in CI, and a green run has been hiding them
 
 Found while diagnosing a genuine red, which is how a retried flake usually surfaces: you go looking
