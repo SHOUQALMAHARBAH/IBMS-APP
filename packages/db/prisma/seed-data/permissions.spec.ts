@@ -239,11 +239,15 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 22 codes", () => {
+  it("holds exactly 25 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
     // to move together.
+    //
+    // 22 at the Phase 3 migration, 24 with insurer management, 25 with the
+    // cross-office directory. Every code that moved the number is declared in
+    // ADDED_AFTER_THE_MIGRATION below, so the facts cannot drift apart.
     expect(codesGrantedTo(OFFICE_ADMIN).sort()).toEqual(
       [
         "access-recertification.cycle.start",
@@ -260,6 +264,10 @@ describe("permission grid — the office administrator", () => {
         "incident.contain",
         "incident.report",
         "information-asset.manage",
+        "insurer.directory.read",
+        "insurer.office-form.map",
+        "insurer.read",
+        "insurer.relationship.manage",
         "permission.read",
         "role.manage",
         "role.read",
@@ -272,23 +280,81 @@ describe("permission grid — the office administrator", () => {
     );
   });
 
-  it("is a STRICT SUBSET of what the legacy administrator already holds", () => {
-    // This is the property that makes migration 20261008100000 a zero-delta
-    // change: granting this role to every existing `user.manage` holder adds
-    // nothing to anybody's effective permissions, which was measured as a
-    // byte-identical per-user diff on both databases. If a later edit grants the
-    // office administrator something the legacy administrator lacks, that
-    // measurement silently stops being reproducible — so it fails here instead.
-    const legacy = new Set(codesGrantedTo(RoleName.SYSTEM_SECURITY_ADMINISTRATOR));
-    const officeAdmin = codesGrantedTo(OFFICE_ADMIN);
-    const exclusive = officeAdmin.filter((code) => !legacy.has(code));
+  it("was a strict subset of the legacy administrator AT THE MIGRATION — a historical property, now stated as one", () => {
+    // ## Why this assertion changed shape rather than being deleted
+    //
+    // Migration 20261008100000 granted `OFFICE_ADMINISTRATOR` to every existing
+    // holder of `user.manage`. That was safe to do blind because its 22 codes were
+    // a strict subset of what the legacy `SYSTEM_SECURITY_ADMINISTRATOR` already
+    // held, so nobody's effective permissions changed — measured as a
+    // byte-identical per-user diff on both databases, 36,688 users and 31.
+    //
+    // The subset was never meant to hold FOREVER. It was the precondition for one
+    // migration, and that migration has run. Insurer management then adds
+    // `insurer.relationship.manage` to the office administrator, which the legacy
+    // role does not hold — deferred from Phase 3 precisely so it would land after
+    // the migration rather than invalidate it.
+    //
+    // So the assertion is restated as the historical fact it is: every code the
+    // office administrator held AT THAT POINT is still one the legacy
+    // administrator holds. Codes added afterwards are listed explicitly, which
+    // means a new one cannot slip in without a decision — the protection the
+    // original assertion actually provided.
+    const ADDED_AFTER_THE_MIGRATION = [
+      // Insurer management, both halves. Office-scoped: registering and
+      // maintaining this office's own insurer records, and reading the list those
+      // writes act on. The legacy administrator has no insurer capability at all,
+      // which is why these are not subset violations but a deliberate divergence.
+      //
+      // The pair is deliberate and mirrors `role.read` + `role.manage`: an
+      // administrator holding only the write would get the controls on a screen
+      // that renders nothing, because you cannot manage records you cannot list.
+      "insurer.read",
+      "insurer.relationship.manage",
+      // The cross-office directory. The administrator is the one who REGISTERS an
+      // insurer, and registration is where a duplicate has to be caught — the
+      // match-at-registration suggestion reads this same list to ask "did you mean
+      // one of these?". An administrator who could register a company but not see
+      // which companies already exist is the one person guaranteed to create the
+      // duplicate.
+      //
+      // It exposes no office's data: the route reads a security-definer view whose
+      // columns are an allow-list of public company facts, asserted against
+      // `information_schema` by `insurer-directory.e2e-spec.ts`.
+      "insurer.directory.read",
+      // Q9's office-scoped form mappings. Granted here and NOT `insurer.form.map`, which is
+      // the pair's whole point: the withheld one becomes the form every other office submits
+      // against, and this one is readable by one office. The test below asserts both halves —
+      // holding this and not that is the distinction, so a grid edit that collapsed them
+      // breaks a test rather than quietly widening an administrator to a platform-wide write.
+      "insurer.office-form.map",
+    ];
+
+    const legacy = new Set(
+      codesGrantedTo(RoleName.SYSTEM_SECURITY_ADMINISTRATOR),
+    );
+    const atMigration = codesGrantedTo(OFFICE_ADMIN).filter(
+      (code) => !ADDED_AFTER_THE_MIGRATION.includes(code),
+    );
+    const exclusive = atMigration.filter((code) => !legacy.has(code));
     expect(
       exclusive,
-      "the office administrator holds codes the legacy administrator does not, so the migration is no longer zero-delta",
+      "a code was added to the office administrator without being declared as post-migration — if it is deliberate, add it to ADDED_AFTER_THE_MIGRATION with the reason; if not, the 20261008100000 empty diff is no longer reproducible from this grid",
     ).toEqual([]);
-    // Strict, not merely equal — the legacy role holds destructive and
-    // platform-level codes this one is deliberately denied.
-    expect(officeAdmin.length).toBeLessThan(legacy.size);
+
+    // Still STRICT, not merely equal: the legacy role holds destructive and
+    // platform-level codes this one is deliberately denied, and that has not
+    // changed.
+    expect(atMigration.length).toBeLessThan(legacy.size);
+
+    // And the declared additions are real codes the role actually holds — so this
+    // list cannot rot into an exemption for something that was later removed.
+    for (const code of ADDED_AFTER_THE_MIGRATION) {
+      expect(
+        codesGrantedTo(OFFICE_ADMIN),
+        `${code} is declared post-migration but is not granted to the office administrator`,
+      ).toContain(code);
+    }
   });
 
   it("is denied the eight codes withheld from it on purpose", () => {
@@ -305,6 +371,11 @@ describe("permission grid — the office administrator", () => {
       // (`insurer.master.manage` is deliberately absent from this list: no such
       // code exists in the catalogue, so asserting it is not granted asserts
       // nothing. `insurer.master.read` is the only master-registry code today.)
+      //
+      // Note what is NOT here: `insurer.office-form.map`, which the office administrator DOES
+      // hold. That contrast is the reason the two codes exist, and it is asserted from both
+      // sides — granted in the exact list above, withheld here. A future edit that decided
+      // "these are the same thing really" has to break one of the two.
       "insurer.form.map",
       // reviewing your own access is the control this system exists to enforce
       "access-recertification.review",
@@ -313,7 +384,9 @@ describe("permission grid — the office administrator", () => {
       "employee.national-id.reveal",
       "customer.national-id.reveal",
     ]) {
-      expect(granted, `${withheld} must not be granted`).not.toContain(withheld);
+      expect(granted, `${withheld} must not be granted`).not.toContain(
+        withheld,
+      );
     }
   });
 
@@ -330,9 +403,10 @@ describe("permission grid — the office administrator", () => {
       "claim.settle.approve",
       "customer.360-view.read",
     ]) {
-      expect(granted, `${code} is business data, not administration`).not.toContain(
-        code,
-      );
+      expect(
+        granted,
+        `${code} is business data, not administration`,
+      ).not.toContain(code);
     }
   });
 });

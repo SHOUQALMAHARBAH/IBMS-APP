@@ -102,9 +102,16 @@ export class CommissionLedgerService {
 
     // Resolve the governed rate in force when the business was written.
     const at = policy.inceptionDate ?? policy.createdAt;
+    // The policy's line IDENTITY, not its display string. `agreementLineMatch` matches on the FK
+    // and keeps one transitional clause for agreements that predate the writers being fixed —
+    // see its docblock for the condition that retires it.
     const agreements = await this.commission.findAgreementsForPair(
       policy.insurerId,
-      policy.insuranceLine,
+      {
+        insuranceLineId: policy.insuranceLineId,
+        officeInsuranceLineId: policy.officeInsuranceLineId,
+        insuranceLine: policy.insuranceLine,
+      },
     );
     const governed = resolveGovernedRate(agreements, at);
     if (!governed) {

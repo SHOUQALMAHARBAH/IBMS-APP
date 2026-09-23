@@ -319,7 +319,7 @@ stays cheap; nothing in the schema references the enum any more.
 | `apps/api/src/modules/rbac/checker-roles.config.ts` | the thirteen checker permissions and the detective signal |
 | `apps/api/src/common/rbac-visibility.util.ts` | the seven cross-owner permissions |
 | `packages/db/prisma/seed-data/roles.ts` | the legacy eleven and `OFFICE_ADMINISTRATOR` |
-| `packages/db/prisma/seed-data/permissions.ts` | the 182-code grid |
+| `packages/db/prisma/seed-data/permissions.ts` | the permission grid — 186 codes as of 2026-09-22 (182 at Phase 3, plus the three insurer codes and Q9's `insurer.office-form.map`) |
 | `apps/api/test/office-administrator.e2e-spec.ts` | the every-office rule and the `isSystem` bypass test |
 | `apps/api/test/national-id-reveal-split.e2e-spec.ts` | why one split is per route and the other per field |
 | `apps/api/test/last-administrator-lock.e2e-spec.ts` | the advisory lock and its serialisation proof |

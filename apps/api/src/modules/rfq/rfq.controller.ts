@@ -25,10 +25,18 @@ export class RfqController {
     return this.rfqs.createRfq(dto, user);
   }
 
-  /** The insurer master data the shortlist picker offers. Declared before
-   * `:id` so "selectable-insurers" is never parsed as an RFQ id. Gated by
-   * `rfq.create` — it is only needed on the create screen. */
-  @RequirePermissions('rfq.create')
+  /**
+   * The insurers this office can shortlist. Declared before `:id` so
+   * "selectable-insurers" is never parsed as an RFQ id.
+   *
+   * Gated on `insurer.read`, not `rfq.create`. It reads the office's OWN insurer
+   * rows — their names, and (once the insurer feature lands) only the active ones
+   * — so the permission that governs reading those rows is the right gate.
+   * `rfq.create` was a shortcut from when this was the list's only consumer, and
+   * it meant a Manager or Compliance Officer who may read an insurer could not
+   * ask which insurers exist.
+   */
+  @RequirePermissions('insurer.read')
   @Get('selectable-insurers')
   selectableInsurers() {
     return this.rfqs.listSelectableInsurers();

@@ -19,6 +19,8 @@ function logRow(over: Partial<AuditLogEntryRow> = {}): AuditLogEntryRow {
     beforeValue: null,
     afterValue: { status: 'VERIFIED' },
     isSensitiveDataAccess: false,
+    actorRoleIds: [],
+    actorRoleNames: [],
     occurredAt: new Date('2026-09-07T08:00:00.000Z'),
     ...over,
   };

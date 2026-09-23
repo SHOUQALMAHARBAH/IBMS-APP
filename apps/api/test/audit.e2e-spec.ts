@@ -23,6 +23,19 @@ describe('AuditLogEntry immutability (e2e) — Part 10.3', () => {
     if (app) await app.close();
   });
 
+  /**
+   * An EXPLICIT timeout, because this test has no headroom under its inherited one.
+   *
+   * Measured: 99.5 seconds in isolation, against the suite default of 180 s in
+   * `vitest-e2e.config.ts` — 55% of budget before any other file has touched the database.
+   * It boots the Nest app, signs a user up and logs them in (two bcrypt hashes at the
+   * configured cost) and then attacks the row at the database layer, and every one of those
+   * stretches when eight other spec files have run first.
+   *
+   * It duly failed once inside a batch and passed alone and on re-run, which reads exactly
+   * like a flake and is not one — see IMPROVEMENTS.md § 1.22. A test that needs more than
+   * half its budget when nothing else is running will fail when something else is.
+   */
   it('rejects UPDATE and DELETE against AuditLogEntry at the database layer', async () => {
     const app = await boot();
     const email = uniqueEmail('audit-immutable');
@@ -61,5 +74,5 @@ describe('AuditLogEntry immutability (e2e) — Part 10.3', () => {
       where: { id: entry!.id },
     });
     expect(stillThere).not.toBeNull();
-  });
+  }, 600_000);
 });

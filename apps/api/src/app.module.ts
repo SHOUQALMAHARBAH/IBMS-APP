@@ -63,6 +63,7 @@ import { DocumentModule } from './modules/supporting-operations/document.module'
 import { BcpDrPlanModule } from './modules/supporting-operations/bcp-dr-plan.module';
 import { KnowledgeBaseArticleModule } from './modules/supporting-operations/knowledge-base-article.module';
 import { InsurerMasterModule } from './modules/insurer/insurer-master.module';
+import { InsurerModule } from './modules/insurer/insurer.module';
 import { EmailModule } from './modules/email/email.module';
 import { ScheduledJobsGuard } from './common/scheduled-jobs.guard';
 import { OrganizationModule } from './modules/organization/organization.module';
@@ -434,6 +435,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // already pre-seeded.
     KnowledgeBaseArticleModule,
     InsurerMasterModule,
+    InsurerModule,
     EmailModule,
     OrganizationModule,
   ],

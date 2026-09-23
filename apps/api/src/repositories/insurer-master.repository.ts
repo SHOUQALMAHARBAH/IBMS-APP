@@ -4,6 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const TEMPLATE_INCLUDE = {
   fields: { orderBy: { displayOrder: 'asc' } },
+  // The managed line, so the view can name it instead of echoing an opaque uuid. Global
+  // catalogue only — see the schema comment on `InsurerFormTemplate.insuranceLineId` for why
+  // an office's own line cannot be reached from a row every office reads.
+  insuranceLine: {
+    select: { id: true, code: true, nameEn: true, nameAr: true },
+  },
 } as const satisfies Prisma.InsurerFormTemplateInclude;
 
 export type FormTemplateWithFields = Prisma.InsurerFormTemplateGetPayload<{
@@ -47,17 +53,23 @@ export class InsurerMasterRepository {
 
   listTemplates(
     insurerMasterId: string,
-    insuranceLine?: string,
+    insuranceLineId?: string,
   ): Promise<FormTemplateWithFields[]> {
     return this.prisma.client.insurerFormTemplate.findMany({
       where: {
         insurerMasterId,
-        ...(insuranceLine === undefined
-          ? {}
-          : { insuranceLine: { equals: insuranceLine, mode: 'insensitive' } }),
+        // An exact id match, replacing a case-INSENSITIVE string compare. That
+        // `mode: 'insensitive'` was itself a symptom: it existed because the caller sent free
+        // text and "Motor" had to find "motor". With a managed vocabulary the question has one
+        // answer, and a filter that cannot half-match is a different guarantee, not a tidier
+        // version of the same one.
+        ...(insuranceLineId === undefined ? {} : { insuranceLineId }),
       },
       include: TEMPLATE_INCLUDE,
-      orderBy: [{ insuranceLine: 'asc' }, { version: 'desc' }],
+      // By the line's stable CODE, not its uuid: a uuid order is arbitrary and differs between
+      // databases, so the list would come back in a different order on dev and in production
+      // for no reason a reader could see.
+      orderBy: [{ insuranceLine: { code: 'asc' } }, { version: 'desc' }],
     });
   }
 
@@ -81,7 +93,7 @@ export class InsurerMasterRepository {
    */
   async createNextVersion(input: {
     insurerMasterId: string;
-    insuranceLine: string;
+    insuranceLineId: string;
     sourceDocumentRef: string | null;
     fields: FormFieldRow[];
   }): Promise<FormTemplateWithFields> {
@@ -90,7 +102,7 @@ export class InsurerMasterRepository {
       const latest = await this.prisma.client.insurerFormTemplate.findFirst({
         where: {
           insurerMasterId: input.insurerMasterId,
-          insuranceLine: input.insuranceLine,
+          insuranceLineId: input.insuranceLineId,
         },
         orderBy: { version: 'desc' },
         select: { version: true },
@@ -101,7 +113,7 @@ export class InsurerMasterRepository {
         return await this.prisma.client.insurerFormTemplate.create({
           data: {
             insurerMasterId: input.insurerMasterId,
-            insuranceLine: input.insuranceLine,
+            insuranceLineId: input.insuranceLineId,
             version,
             sourceDocumentRef: input.sourceDocumentRef,
             fields: { create: input.fields },

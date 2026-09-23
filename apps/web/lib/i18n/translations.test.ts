@@ -19,6 +19,7 @@ import { DASHBOARDS } from './translations/dashboards';
 import { OPERATIONS } from './translations/operations';
 import { DETAIL_PAGES } from './translations/detail-pages';
 import { ENUMS } from './translations/enums';
+import { INSURERS } from './translations/insurers';
 
 describe('translate', () => {
   it('returns the AR string for AR', () => {
@@ -71,6 +72,7 @@ describe('the merged dictionary', () => {
     'operations.ts': OPERATIONS,
     'detail-pages.ts': DETAIL_PAGES,
     'enums.ts': ENUMS,
+    'insurers.ts': INSURERS,
   };
 
   // Without this, the map above silently under-covers the moment someone adds

@@ -35,6 +35,14 @@ interface QuotationChainBody {
 }
 interface RecommendationBody {
   id: string;
+  /** F8 — the recommendation must NAME the insurer it recommends. The view
+   *  returned the raw Prisma join, so `insurer.name` was undefined and
+   *  `RecommendationSection.tsx` rendered a blank name on the one screen whose
+   *  job is telling a client which insurer to go with. */
+  recommendedQuotation: {
+    insurerId: string;
+    insurer: { name?: string; nameAr?: string | null };
+  };
   approvalRequired: boolean;
   conflictOfInterestFlagged: boolean;
   coiCompetingQuotationId: string | null;
@@ -330,6 +338,14 @@ describe('Broker Recommendation (e2e) — backlog Part C #16', () => {
       .set(bearer(placement.accessToken))
       .expect(201);
     expect((sent.body as RecommendationBody).sentToClientAt).not.toBeNull();
+    // The recommended insurer is named on the wire — asserted here rather than
+    // only through the UI, because the web mocks this endpoint with the flattened
+    // shape it wishes for and a mismatch would pass on both sides.
+    const recommended = (sent.body as RecommendationBody).recommendedQuotation;
+    expect(
+      recommended.insurer.name,
+      'a recommendation must name the insurer it recommends',
+    ).toBeTruthy();
 
     const opp = await request(app.getHttpServer())
       .get(`/opportunities/${opportunityId}`)

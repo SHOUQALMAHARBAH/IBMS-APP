@@ -42,6 +42,35 @@ export class OrganizationRepository {
    * intended failure: it stops a second office being onboarded through a
    * signup path that cannot tell which office the account belongs to, and
    * forces Phase 4's subdomain resolution to land first.
+   *
+   * ## The message used to name a route that cannot do what it claimed
+   *
+   * It said "provision users through POST /admin/users, which names the Organization
+   * explicitly". Both halves were false, and the sentence is REMOVED rather than reworded:
+   *
+   *  - **It does not name the Organization.** `ProvisionUserDto` has no `organizationId` field;
+   *    `tenantScopeExtension` supplies it from the CALLER's context. So the route can only ever
+   *    create a user in the office the caller already belongs to.
+   *  - **It therefore cannot onboard a second office.** Calling it requires an authenticated user
+   *    inside the target office, and creating the first one is the thing being asked for. The
+   *    advice was circular.
+   *
+   * Measured rather than assumed: `Organization` has exactly TWO writers in the whole repository,
+   * `packages/db/prisma/seed.ts` and `apps/api/scripts/seed-demo.script.ts`, neither reachable
+   * over HTTP.
+   *
+   * This is the § 1.23 shape — an instruction pointing at something that was never built — and it
+   * is worse here than in a comment, because this text reaches an operator at the moment signup
+   * has already failed. Being told to use a route that cannot help costs them the time it takes
+   * to discover that for themselves.
+   *
+   * ## What is still wrong here, deliberately left
+   *
+   * This throws a bare `Error`, so the HTTP answer is a 500 with a generic body and this text
+   * reaches only the server log (§ 1.11). That is a separate commit by prior decision: the status
+   * code is part of the auth contract and several specs assert on it. Today it caused its THIRD
+   * expensive diagnostic — two concurrent e2e runs each leaked an Organization into the other's
+   * view and unrelated files reported `expected 201, got 500` with nothing saying why.
    */
   async soleOrganizationIdOrThrow(): Promise<string> {
     const organizations = await this.prisma.client.organization.findMany({
@@ -57,8 +86,11 @@ export class OrganizationRepository {
     if (organizations.length > 1) {
       throw new Error(
         'More than one Organization exists, so anonymous signup can no longer tell which office an account belongs to. ' +
-          'Phase 4 (§4.10) resolves the Organization from the request subdomain before the sign-in form is shown; ' +
-          'until that lands, provision users through POST /admin/users, which names the Organization explicitly.',
+          'A second office cannot currently be onboarded through the application at all: nothing in it creates an ' +
+          'Organization, and no request can create the first user inside one. Phase 4 (§4.10) is where that lands — ' +
+          'the Organization resolved from the request subdomain before the sign-in form is shown. ' +
+          'Today the only two writers of Organization are `packages/db/prisma/seed.ts` and ' +
+          '`apps/api/scripts/seed-demo.script.ts`, both developer tools run against a local database.',
       );
     }
     return organizations[0].id;

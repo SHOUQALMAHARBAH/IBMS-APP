@@ -64,11 +64,27 @@ const RFQ = {
   ],
 };
 
+/**
+ * The insurer identity the API returns, mirrored here.
+ *
+ * This fixture used to be the only place the FLATTENED shape existed: the API
+ * passed the raw Prisma join through on three endpoints, so `insurer.name` was
+ * undefined in production while this mock supplied it and every web test passed.
+ * The mock was asserting the shape the web wished for. Those three views now
+ * flatten through `insurerIdentity()` and each has an API-side assertion on its
+ * own wire shape, so this is a mirror of a checked contract rather than the
+ * authority on an unchecked one.
+ *
+ * Keep it aligned with `insurerIdentity()`'s return. `isActive` is part of that
+ * contract because a deactivated insurer's quote stays comparable and has to be
+ * marked wherever it can be chosen.
+ */
 const INSURER_IDENTITY = {
   id: "ins-1",
   name: "Jordan Insurance Co",
   nameAr: null,
   financialStrengthRating: "A-",
+  isActive: true,
 };
 
 function quoteVersion(over: Record<string, unknown> = {}) {
@@ -129,6 +145,10 @@ function negotiationHistory(
 async function mockRfqApi(
   page: Page,
   opts: {
+    /** Serve the insurer as deactivated everywhere this fixture returns one —
+     *  the comparison rows, the quotation chains and the recommendation. Used by
+     *  the marker test, because all three read the same identity. */
+    insurerDeactivated?: boolean;
     onCreateRfq?: () => void;
     onTransition?: (status: string) => void;
     onLogComm?: (body: { direction: string; body: string }) => void;
@@ -191,6 +211,18 @@ async function mockRfqApi(
     opportunityStatus?: string;
   } = {},
 ) {
+  // The identity this fixture serves, honouring `insurerDeactivated`. Local rather
+  // than a mutated module constant: these specs share a module instance within a
+  // worker, and a test that flipped a shared object would change what the next one
+  // sees.
+  const insurer = opts.insurerDeactivated
+    ? { ...INSURER_IDENTITY, isActive: false }
+    : INSURER_IDENTITY;
+  /** A quote version carrying this fixture's identity — the comparison rows embed
+   *  a quotation, so the flag has to reach them through here too. */
+  const quote = (over: Record<string, unknown> = {}) =>
+    quoteVersion({ insurer, ...over });
+
   // Correspondence log — starts empty, a POST appends so the list re-renders
   // with the new row.
   const comms: Record<string, unknown>[] = [];
@@ -217,8 +249,8 @@ async function mockRfqApi(
         negotiationNotes?: string;
       };
       opts.onReviseQuote?.(b);
-      const v1 = quoteVersion({ isCurrentVersion: false });
-      const v2 = quoteVersion({
+      const v1 = quote({ isCurrentVersion: false });
+      const v2 = quote({
         id: "q-2",
         versionNumber: 2,
         previousVersionId: "q-1",
@@ -230,7 +262,7 @@ async function mockRfqApi(
           rfqId: "rfq-1",
           insurerId: "ins-1",
           insuranceLine: "Property All Risks",
-          insurer: INSURER_IDENTITY,
+          insurer,
           current: v2,
           versions: [v1, v2],
           history: negotiationHistory([v1, v2]),
@@ -244,13 +276,13 @@ async function mockRfqApi(
         premium: string;
       };
       opts.onCaptureQuote?.(b);
-      const v1 = quoteVersion({ premium: b.premium });
+      const v1 = quote({ premium: b.premium });
       chains = [
         {
           rfqId: "rfq-1",
           insurerId: "ins-1",
           insuranceLine: "Property All Risks",
-          insurer: INSURER_IDENTITY,
+          insurer,
           current: v1,
           versions: [v1],
           history: negotiationHistory([v1]),
@@ -275,7 +307,7 @@ async function mockRfqApi(
         quotationId: "q-1",
         insurerQualityScore: null,
         serviceScore: null,
-        quotation: quoteVersion({ premium: "125000.500" }),
+        quotation: quote({ premium: "125000.500" }),
       },
     ],
     missingInsurers: [
@@ -390,7 +422,7 @@ async function mockRfqApi(
         rationaleFactors: Record<string, string>;
       };
       opts.onDraftRecommendation?.(b);
-      const q = quoteVersion({ premium: "125000.500" });
+      const q = quote({ premium: "125000.500" });
       recommendation = {
         id: "rec-1",
         opportunityId: "opp-1",
@@ -398,7 +430,7 @@ async function mockRfqApi(
         recommendedQuotation: {
           id: q.id,
           insurerId: q.insurerId,
-          insurer: INSURER_IDENTITY,
+          insurer,
           insuranceLine: "Property All Risks",
           premium: q.premium,
           currency: "JOD",
@@ -498,7 +530,7 @@ async function mockRfqApi(
           opportunityId: "opp-1",
           customerId: "cust-1",
           insurerId: "ins-1",
-          insurer: INSURER_IDENTITY,
+          insurer,
           policyNumber: "POL-SEED-1",
           insuranceLine: "Property All Risks",
           status: opts.seedActivePolicy ? "ACTIVE" : "ISSUED",
@@ -762,7 +794,7 @@ async function mockRfqApi(
         opportunityId: "opp-1",
         customerId: "cust-1",
         insurerId: "ins-1",
-        insurer: INSURER_IDENTITY,
+        insurer,
         policyNumber: null,
         insuranceLine: "Property All Risks",
         status: "PLACEMENT_CONFIRMED",
@@ -1630,6 +1662,76 @@ test("builds the comparison matrix and shows the missing-insurer flag", async ({
   await expect(
     page.getByText("Middle East Assurance (No response)"),
   ).toBeVisible();
+});
+
+test("marks a deactivated insurer on every surface where one can be chosen", async ({
+  page,
+}) => {
+  // The consequence of keeping quotation capture legal for a deactivated insurer.
+  //
+  // You cannot solicit anything NEW from them — the RFQ picker does not offer them
+  // and an existing RFQ will not take them — but a premium they actually sent is a
+  // factual event and stays recorded. So the quote reaches the comparison and can be
+  // recommended, and without a marker a broker could present it and a client choose
+  // it, with nobody finding out until placement refused. That is a worse failure
+  // than not recording the quote.
+  //
+  // All three surfaces read the same identity, so one fixture flag covers them.
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, { insurerDeactivated: true });
+
+  await page.goto("/rfqs/rfq-1");
+
+  // Nothing shows an insurer until something exists to show: this fixture starts
+  // with no quotation chains and no comparison, which is the honest initial state
+  // of an RFQ that has just gone out.
+  //
+  // 1. The quotation chain — where a quote is read before anything is compared.
+  await expect(page.getByRole("heading", { name: "Quotations" })).toBeVisible();
+  await page.getByLabel("Insurer", { exact: true }).selectOption("ins-1");
+  await page.getByLabel("Premium *").fill("125000.500");
+  await page.getByRole("button", { name: "Capture quote" }).click();
+  await expect(
+    page.locator("[data-deactivated-insurer]").first(),
+    "a captured quote from a deactivated insurer must be marked on the chain",
+  ).toBeVisible();
+  await expect(page.getByText("No longer dealt with").first()).toBeVisible();
+
+  // 2. The comparison row — the surface a broker presents from.
+  await page.getByRole("button", { name: "Build comparison" }).click();
+  await expect(
+    page.getByRole("button", { name: "Rebuild comparison" }),
+  ).toBeVisible();
+  const badges = page.locator("[data-deactivated-insurer]");
+  await expect(
+    badges,
+    "the chain and the comparison row must each carry the marker",
+  ).not.toHaveCount(0);
+
+  // The insurer is still NAMED alongside the marker — the point is that the quote
+  // is real and the insurer is not available, so blanking either would be wrong.
+  await expect(page.getByText("Jordan Insurance Co").first()).toBeVisible();
+
+  // 3. And the badge explains itself rather than just labelling.
+  await expect(
+    page.locator("[data-deactivated-insurer]").first(),
+  ).toHaveAttribute("title", /cannot be placed with them/);
+});
+
+test("shows no deactivated marker for an insurer the office still deals with", async ({
+  page,
+}) => {
+  // The other half: a marker that appeared for every insurer would be worse than
+  // none, because it would stop meaning anything.
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page);
+
+  await page.goto("/rfqs/rfq-1");
+  await page.getByRole("button", { name: "Build comparison" }).click();
+  await expect(
+    page.getByRole("button", { name: "Rebuild comparison" }),
+  ).toBeVisible();
+  await expect(page.locator("[data-deactivated-insurer]")).toHaveCount(0);
 });
 
 test("downloads a bilingual quotation-comparison PDF once a comparison exists", async ({

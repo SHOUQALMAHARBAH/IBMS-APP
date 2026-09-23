@@ -11,6 +11,60 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import { INSURER_IDENTITY_SELECT } from './insurer-identity';
 
+/**
+ * The two ways a policy can still matter to an insurer — SEPARATE named sets, because
+ * they are operationally different questions and collapsing them hides the half that
+ * should give somebody pause.
+ *
+ * **In force**: cover is running. It will expire on its own and needs nothing further
+ * from the insurer.
+ *
+ * **In issuance**: the insurer still owes an ACTION — issue the policy, resolve a
+ * discrepancy, deliver it. This is the set an administrator deciding whether to stop
+ * dealing with a company needs most, because it is the list of things still outstanding
+ * FROM them. A policy sitting at `DISCREPANCY` is the clearest case: an open matter with
+ * that specific insurer that needs them to act.
+ *
+ * Together with the two terminal statuses below they partition `PolicyStatus` exactly,
+ * which `policy-status-sets.spec.ts` asserts — so a new status cannot be added without
+ * somebody deciding which of the three it belongs to.
+ *
+ * Both were promoted here from `cross-sell-opportunity.repository.ts`, where
+ * `IN_FORCE_POLICY_STATUSES` was defined for the gap scan and then acquired a second
+ * consumer. A policy-status vocabulary belongs with policies, and putting the two sets
+ * side by side is what lets the comment contrast them.
+ */
+export const IN_FORCE_POLICY_STATUSES: readonly PolicyStatus[] = ['ACTIVE'];
+
+/**
+ * Deliberately NOT folded into `IN_FORCE_POLICY_STATUSES`, and this is the point of
+ * having two names.
+ *
+ * The cross-sell gap scan wants the narrow reading — its own comment argues for it: "a
+ * `DELIVERED` policy is days from `ACTIVE` and the nightly sweep catches it then". The
+ * insurer-deactivation impact count wants this one, because an audit row reading
+ * `policiesInForce: 0` while six policies sit mid-issuance is a confident wrong answer,
+ * which is worse than no count at all.
+ *
+ * Quietly widening the shared constant to serve the second caller would have changed the
+ * first caller's meaning without anyone deciding to. One meaning per name; two names.
+ */
+export const OPEN_OBLIGATION_POLICY_STATUSES: readonly PolicyStatus[] = [
+  'PLACEMENT_CONFIRMED',
+  'ISSUED',
+  'CHECKING_IN_PROGRESS',
+  'DISCREPANCY',
+  'VERIFIED',
+  'DELIVERED',
+];
+
+/** Over: the cover ended, by its own terms or by cancellation. Neither in force nor
+ *  awaiting anything, and therefore in neither set above. */
+export const CLOSED_POLICY_STATUSES: readonly PolicyStatus[] = [
+  'CANCELLED',
+  'EXPIRED',
+];
+
 const POLICY_INCLUDE = {
   insurer: { select: INSURER_IDENTITY_SELECT },
   // Identity only — the book-wide list has to say WHICH client each policy
@@ -83,6 +137,15 @@ export interface CreatePolicyInput {
   customerId: string;
   insurerId: string;
   insuranceLine: string;
+  /**
+   * The managed line FK, INHERITED from the RFQ this policy was placed off — the second link in
+   * the chain the four models exist to make structural (programme line -> RFQ -> Policy). Copied,
+   * never re-resolved from the string: two lookups that must agree forever is the defect, and a
+   * commission agreement is applied to a Policy BY LINE, so a Policy whose line disagrees with
+   * its RFQ's would be priced against the wrong rate.
+   */
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
   inceptionDate: Date;
   expiryDate: Date | null;
   requestedPremium: Prisma.Decimal;
@@ -141,6 +204,13 @@ export class PolicyRepository {
   /** Just the id + status — for a bounded status-walk loop
    * (`PolicyCheckingService.driveCheckingOutcome`) that re-reads the live
    * status before every hop and does not need the full include. */
+  // REMOVED: `isInsurerActive`.
+  //
+  // It existed for one commit, while `isActive` was deliberately kept out of
+  // `INSURER_IDENTITY_SELECT`. That changed when the comparison matrix needed the
+  // flag, so placement now reads it from the quote's own insurer — one definition
+  // of "is this insurer still ours", not two that could disagree.
+
   findStatus(id: string): Promise<{ id: string; status: PolicyStatus } | null> {
     return this.prisma.client.policy.findUnique({
       where: { id },

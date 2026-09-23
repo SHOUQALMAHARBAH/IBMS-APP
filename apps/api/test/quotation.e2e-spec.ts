@@ -255,6 +255,30 @@ describe('Quotation negotiation & immutability (e2e) — backlog Part C #15', ()
       '121500.000',
     ]);
     expect(rows.map((r) => r.isCurrentVersion)).toEqual([false, false, true]);
+
+    // F8 — the chain must NAME its insurer.
+    //
+    // `GET /quotations?rfqId=` returned the raw Prisma join, so `insurer.name` was
+    // undefined and `QuotationsSection.tsx` rendered a blank insurer on every
+    // chain. Nothing caught it: no API test read this field, and the web e2e mocks
+    // the endpoint with the flattened shape it wishes for. Asserted on the wire
+    // now, so the mock can no longer be the authority.
+    const chains = await request(app.getHttpServer())
+      .get(`/quotations?rfqId=${rfqId}`)
+      .set(bearer(placementToken))
+      .expect(200);
+    interface Chain {
+      insurerId: string;
+      insurer: { name?: string; nameAr?: string | null };
+    }
+    const chainRows = chains.body as Chain[];
+    expect(chainRows.length).toBeGreaterThan(0);
+    for (const chain of chainRows) {
+      expect(
+        chain.insurer.name,
+        'a quotation chain must name the insurer that quoted',
+      ).toBeTruthy();
+    }
   });
 
   it('rejects revising a superseded version (422) — the chain only grows from its head', async () => {

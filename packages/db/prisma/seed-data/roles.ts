@@ -94,7 +94,7 @@ export const ROLES: (RoleSeed & { name: RoleName })[] = [
     requiresMfaAlways: true,
     requiresHardwareToken: true,
     description:
-      "Approves KYC/EDD, runs sanctions/PEP screening, manages conflict-of-interest disclosures, broker regulatory filings, and third-party risk tiering. Cannot originate sales transactions or act as DPO on data-subject requests unless formally dual-hatted.",
+      "Approves KYC/EDD, runs sanctions screening, manages conflict-of-interest disclosures, broker regulatory filings, and third-party risk tiering. Cannot originate sales transactions or act as DPO on data-subject requests unless formally dual-hatted.",
   },
   {
     name: RoleName.BRANCH_DEPARTMENT_MANAGER,

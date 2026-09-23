@@ -90,23 +90,62 @@ let adminBId: string;
  * Organization behind, because a second one breaks signup everywhere else.
  */
 async function removeFixtureOrg(): Promise<void> {
-  await rawPrisma.$transaction(async (tx) => {
-    // See the file header: the audit trail is immutable by trigger, and these
-    // rows would otherwise pin the Organization forever. Owner connection only —
-    // `ibms_app` is NOSUPERUSER and genuinely cannot do this.
-    await tx.$executeRawUnsafe(`SET LOCAL session_replication_role = replica`);
-    await tx.$executeRaw`DELETE FROM "AuditLogEntry" WHERE "organizationId" = ${ORG_ID}`;
-  });
-  await rawPrisma.userSession.deleteMany({ where: { organizationId: ORG_ID } });
-  await rawPrisma.userRoleAssignment.deleteMany({
-    where: { organizationId: ORG_ID },
-  });
-  await rawPrisma.rolePermission.deleteMany({
-    where: { organizationId: ORG_ID },
-  });
-  await rawPrisma.role.deleteMany({ where: { organizationId: ORG_ID } });
-  await rawPrisma.user.deleteMany({ where: { organizationId: ORG_ID } });
-  await rawPrisma.organization.deleteMany({ where: { id: ORG_ID } });
+  // Up to three passes, because one pass can LOSE A RACE and the cost of losing
+  // it is borne by other files.
+  //
+  // Observed, after the first version of this retry-less sweep: all 15 tests pass,
+  // the FILE fails in `afterAll`, and the Organization survives — then
+  // `invoice.e2e-spec.ts` reports ten 500s that are really "More than one
+  // Organization exists". Nothing referenced the surviving row by the time it was
+  // examined, which is the signature of a write landing between this sweep's
+  // child deletes and its delete of the parent: the app's own audit path is not
+  // fully quiesced the instant `app.close()` resolves, and one late `AuditLogEntry`
+  // is enough to pin the office by foreign key.
+  //
+  // So the sweep is idempotent AND verified. A pass that cannot finish is retried
+  // rather than reported, and only a row that survives every pass throws — at
+  // which point the message says what the consequence is, because the next file to
+  // fail will not.
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await rawPrisma.$transaction(async (tx) => {
+        // See the file header: the audit trail is immutable by trigger, and these
+        // rows would otherwise pin the Organization forever. Owner connection only
+        // — `ibms_app` is NOSUPERUSER and genuinely cannot do this.
+        await tx.$executeRawUnsafe(
+          `SET LOCAL session_replication_role = replica`,
+        );
+        await tx.$executeRaw`DELETE FROM "AuditLogEntry" WHERE "organizationId" = ${ORG_ID}`;
+      });
+      await rawPrisma.userSession.deleteMany({
+        where: { organizationId: ORG_ID },
+      });
+      await rawPrisma.userRoleAssignment.deleteMany({
+        where: { organizationId: ORG_ID },
+      });
+      await rawPrisma.rolePermission.deleteMany({
+        where: { organizationId: ORG_ID },
+      });
+      await rawPrisma.role.deleteMany({ where: { organizationId: ORG_ID } });
+      await rawPrisma.user.deleteMany({ where: { organizationId: ORG_ID } });
+      await rawPrisma.organization.deleteMany({ where: { id: ORG_ID } });
+    } catch {
+      // Swallowed deliberately, and only here: the next attempt re-runs every
+      // delete, and the check below is what decides whether this succeeded. A
+      // throw from a first attempt is exactly the case this loop exists for.
+    }
+
+    const survivors = await rawPrisma.organization.count({
+      where: { id: ORG_ID },
+    });
+    if (survivors === 0) return;
+  }
+
+  throw new Error(
+    `Could not remove the fixture Organization ${ORG_ID} after three attempts. ` +
+      'Leaving it behind breaks POST /auth/signup — and therefore every later ' +
+      'spec file that creates a user — so this fails here rather than there.',
+  );
 }
 
 /** Put both fixture roles back to granting exactly `user.manage`.
@@ -214,7 +253,12 @@ afterAll(async () => {
   await app?.close();
   app = null;
   await removeFixtureOrg();
-});
+  // An EXPLICIT timeout, because vitest's default for a hook is 10 seconds and
+  // this one can now take longer: the sweep retries, and a retry that inherits a
+  // 10s budget times out, fails the hook, and leaves the Organization behind —
+  // which is the exact outcome the retry was added to prevent. Observed as
+  // "Hook timed out in 10000ms" followed by 500s from `signup` in two later files.
+}, 120_000);
 
 describe('withCapabilityLocked actually serialises', () => {
   it('does not let a second holder of the same key enter before the first leaves', async () => {

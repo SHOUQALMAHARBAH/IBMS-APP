@@ -11,6 +11,8 @@ function makeEntry(overrides?: Partial<AuditLogEntry>): AuditLogEntry {
     action: 'READ',
     entityType: 'Customer',
     entityId: 'customer-1',
+    actorRoleIds: [],
+    actorRoleNames: [],
     beforeValue: null,
     afterValue: null,
     isSensitiveDataAccess: false,

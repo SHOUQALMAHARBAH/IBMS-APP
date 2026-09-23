@@ -22,6 +22,47 @@ import { RoleName } from "@prisma/client";
  * Part C business modules (Lead, Policy, Claim, ...) have no application
  * code yet — these codes exist now so each module adopts an existing code
  * instead of inventing one when it lands.
+ *
+ * ## No code in this grid may have an effect outside the granting office
+ *
+ * Every permission here is granted BY an office TO its own roles, so its effect
+ * must stop at that office. A code that seems to need a wider effect is a sign
+ * that the MODEL it acts on is scoped wrongly — the cure belongs at the table, not
+ * in a special case on the permission.
+ *
+ * `insurer.form.map` is the case that proved it, and it is worth knowing because
+ * the wrong fix was nearly built. `InsurerFormTemplate` hung off the GLOBAL
+ * `InsurerMaster`, so mapping a submission form changed what every other office
+ * would submit against — and the Phase 3 permission matrix let any office grant
+ * itself that code. The proposed fix was a `Permission.scope` column with a
+ * server-side refusal and a matrix filter: real machinery to make one permission
+ * special.
+ *
+ * What actually fixed it was scoping the TEMPLATE to the office, after which the
+ * code's effect no longer crossed anything and the scope column had zero cases —
+ * leaving only a guard testable against a fabricated violation invented so it had
+ * something to refuse. If a genuinely platform-wide capability is ever needed, the
+ * column is the same work then, with a real case to test against.
+ *
+ * ## The constructive form of the same rule: ABSENCE beats a guard
+ *
+ * A table the application cannot write cannot be a channel between offices.
+ *
+ * That is the stronger statement, and it is available more often than it looks.
+ * Permission-based protection asks a guard to be right on every path, for every
+ * caller, forever; absence asks nothing of anyone, and there is no code to review
+ * because there is no code. So when a shared resource has to be readable by every
+ * office, prefer making it UNWRITABLE by the application over making it writable
+ * behind a strict code.
+ *
+ * `InsuranceLine` — the 32 standard insurance lines — is built that way and is the
+ * reference case. It is global, every office reads it, and it has no write route at
+ * all: no endpoint, no service method, no repository method. Rows arrive from
+ * `seed.ts` and change in a release. An office that needs a line the list lacks adds
+ * an `OfficeInsuranceLine`, which is tenant-scoped like everything else. Note what
+ * did NOT have to be invented: no `insurance-line.manage` code, no platform-admin
+ * surface, and no test proving a guard refuses the wrong office — because nothing
+ * can reach the table to be refused.
  */
 export interface PermissionSeed {
   code: string;
@@ -120,7 +161,7 @@ const commercialFrontOffice: PermissionSeed[] = [
   {
     code: "screening.run",
     module: "commercial-front-office",
-    description: "Run sanctions/PEP/AML screening",
+    description: "Run sanctions/AML screening",
     roles: [COMPLIANCE],
   },
   {
@@ -299,6 +340,74 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, MANAGER, EXEC],
   },
   {
+    // The office's OWN insurer list — its relationships, contacts, credit terms
+    // and product lines. NOT the same read as the global catalogue below, and
+    // deliberately not folded into it: `insurer.master.read` describes companies
+    // and leaks nothing about any office, while this one exposes one office's
+    // commercial terms. One code for both would mean the auditor who may see the
+    // shared catalogue also sees every credit term.
+    //
+    // Held by the roles that actually PICK an insurer — an RFQ shortlist, a
+    // quotation, a comparison, a placement — AND by the office administrator,
+    // which needs it to render the screen its own management permission acts on.
+    // You cannot manage records you cannot list: an administrator holding
+    // `insurer.relationship.manage` without this would get the controls on a
+    // screen that renders nothing. The Phase 3 pair is the exact precedent —
+    // `OFFICE_ADMINISTRATOR` holds `role.read` alongside `role.manage` for the
+    // same reason, and the Role screen is built on that split.
+    //
+    // `GET /rfqs/selectable-insurers` moved onto this from `rfq.create` — it reads
+    // office insurers, and gating it on the create permission was a shortcut from
+    // when it was the only consumer.
+    code: "insurer.read",
+    module: "insurance-operations",
+    description:
+      "Read this office's own insurer relationships — contacts, credit terms, financial strength and the lines they offer",
+    roles: [SALES, PLACEMENT, MANAGER, EXEC, COMPLIANCE, AUDITOR, OFFICE_ADMIN],
+  },
+  {
+    // Register an insurer, maintain the relationship, retire it, set its lines.
+    //
+    // DEFERRED FROM PHASE 3 ON PURPOSE, and this is where it lands. Putting it on
+    // `OFFICE_ADMINISTRATOR` during Phase 3 would have broken the strict-subset
+    // property that made migration 20261008100000 a provably empty per-user diff:
+    // the legacy `SYSTEM_SECURITY_ADMINISTRATOR` does not hold this code, so the
+    // office administrator would have gained something the legacy one lacked. That
+    // migration has now run, so the subset is a historical fact rather than a
+    // standing constraint — `permissions.spec.ts` says so in those terms.
+    //
+    // Covers BOTH registration paths: linking to a company already in the global
+    // catalogue, and registering one that is in no catalogue at all. It does NOT
+    // cover writing the global catalogue — that is `insurer.master.manage`, which
+    // does not exist and which nobody would hold by default if it did.
+    code: "insurer.relationship.manage",
+    module: "insurance-operations",
+    description:
+      "Register and maintain this office's own insurer records, their lines of business, and their active status",
+    roles: [OFFICE_ADMIN],
+  },
+  {
+    // The cross-office DIRECTORY — every company any office has registered, as a lead
+    // list. Its own code and not folded into `insurer.read`, because they answer
+    // opposite questions: `insurer.read` is "who does MY office deal with, on what
+    // terms", and this is "which companies exist at all". One code for both would mean
+    // an office could not be given the market without also being given its own panel,
+    // or vice versa.
+    //
+    // Audience: everyone who works on quoting and placement, plus the administrator who
+    // registers insurers — the match-at-registration suggestion reads the same list.
+    // Deliberately NOT Compliance or the External Auditor: neither has a reason to
+    // browse the market, and a code nobody needs is a code somebody eventually holds.
+    //
+    // What it grants access to is a SECURITY DEFINER view with no office-scoped column
+    // in it. The permission gates the route; the schema is what makes the boundary real.
+    code: "insurer.directory.read",
+    module: "insurance-operations",
+    description:
+      "Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms.",
+    roles: [SALES, PLACEMENT, MANAGER, EXEC, OFFICE_ADMIN],
+  },
+  {
     code: "insurer.master.read",
     module: "insurance-operations",
     description:
@@ -325,6 +434,18 @@ const insuranceOperations: PermissionSeed[] = [
     description:
       "Map an insurer's official submission form for one product line (Part I §5). Platform-wide in effect: the mapping becomes the form every other office submits against, which is why it is not granted to the roles that merely consume it.",
     roles: [PLACEMENT, ADMIN],
+  },
+  {
+    // The office-scoped twin of the code above, and the split is the reason both exist. That
+    // one is withheld from the office administrator BECAUSE its effect crosses offices; this
+    // one's does not — the row is readable by one office and no other office's submissions
+    // change. Folding them together would force a choice between denying an administrator
+    // their own office's forms and handing them a platform-wide write.
+    code: "insurer.office-form.map",
+    module: "insurance-operations",
+    description:
+      "Map THIS OFFICE's own copy of an insurer's submission form, for a company it deals with directly (Q9). Office-scoped in effect: the mapping is readable only by this office, takes precedence over the shared mapping for this office's own submissions, and never alters the shared one. Unlike insurer.form.map it may point at a line this office added itself.",
+    roles: [PLACEMENT, ADMIN, OFFICE_ADMIN],
   },
   {
     code: "rfq.insurer.update",
@@ -800,7 +921,7 @@ const complianceRisk: PermissionSeed[] = [
   {
     code: "sanctions-pep.screen",
     module: "compliance-risk",
-    description: "Run recurring sanctions/PEP screening batches",
+    description: "Run recurring sanctions screening batches",
     roles: [COMPLIANCE],
   },
   {
@@ -832,7 +953,17 @@ const complianceRisk: PermissionSeed[] = [
     code: "incident.report",
     module: "compliance-risk",
     description: "Report a security/privacy incident",
-    roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE, MANAGER, ADMIN, DPO, OFFICE_ADMIN],
+    roles: [
+      SALES,
+      PLACEMENT,
+      CLAIMS,
+      FINANCE,
+      COMPLIANCE,
+      MANAGER,
+      ADMIN,
+      DPO,
+      OFFICE_ADMIN,
+    ],
   },
   {
     code: "incident.contain",

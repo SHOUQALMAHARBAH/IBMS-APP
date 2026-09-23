@@ -212,7 +212,16 @@ async function removeOfficeB(): Promise<void> {
   await rawPrisma.commissionAgreement.deleteMany({
     where: { organizationId: ORG_B_ID },
   });
+  // Before both the insurer and the office line it points at: every foreign key on
+  // `InsurerOfferedLine` is RESTRICT, so one of these rows pins two parents and, via
+  // them, the Organization itself.
+  await rawPrisma.insurerOfferedLine.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
   await rawPrisma.insurer.deleteMany({ where: { organizationId: ORG_B_ID } });
+  await rawPrisma.officeInsuranceLine.deleteMany({
+    where: { organizationId: ORG_B_ID },
+  });
   // `InsurerMaster.legalName` is globally unique, so a master left behind by a
   // crashed run would collide with the next run's fixture rather than simply
   // taking up space. Masters are global and shared, so only the ones this
@@ -258,10 +267,16 @@ async function removeOfficeB(): Promise<void> {
 }
 
 beforeAll(async () => {
-  app = await createTestApp();
-
-  // Clear any office B a crashed run left behind, BEFORE signing anyone up.
+  // Clear any office B a previous run left behind FIRST — before `createTestApp`, not
+  // after it. `createTestApp` refuses to boot while two Organizations exist (the whole
+  // point of that guard: a leaked office B breaks `makeUser` in every later spec for no
+  // visible reason). With the order the other way round, the guard fired before this
+  // self-heal could run, so the suite could not recover from its own leftover and the
+  // guard's own advice — "re-run the spec that owns that id, each sweeps in beforeAll" —
+  // was not true of this spec. It is now.
   await removeOfficeB();
+
+  app = await createTestApp();
 
   // EVERY account this suite needs is created while exactly one Organization
   // exists, because signup refuses to guess once there are two. Office B is
@@ -336,14 +351,32 @@ beforeAll(async () => {
   customerBId = customerB.id;
 }, 120_000);
 
+// 120s, not vitest's 10s default for a hook, and the number is a measurement rather than
+// a guess. This teardown issues 16 sequential `deleteMany` calls plus a trigger-suspending
+// transaction against `db-test`, which is CUMULATIVE — 6,291 Insurer rows at the time of
+// writing — so its cost grows with the database. Measured across three runs on this host:
+// **15180ms, 21669ms, 50517ms** — already past the default it had quietly crossed, and with
+// enough variance under load that a tight budget would fail intermittently.
+//
+// A timeout here is not a cosmetic failure, which is why the budget is generous rather
+// than tight: the hook is aborted PARTWAY, office B survives, and then every spec file
+// that runs afterwards fails on the two-Organization guard. Measured once: one killed
+// sweep produced 36 failures across three unrelated spec files, all with the same
+// mystifying signature. See IMPROVEMENTS.md § 1.28 — if this figure ever grows again,
+// find out where the time goes rather than raising it a second time.
 afterAll(async () => {
   await app?.close();
   app = null;
   // Owner connection: RLS would otherwise stop the cleanup seeing the very
   // rows it needs to remove. Leaving office B behind would break signup for
   // every spec file that runs after this one.
+  const startedAt = Date.now();
   await removeOfficeB();
-});
+  const elapsed = Date.now() - startedAt;
+  // Surfaced rather than silent: growth in this number is the early warning that the
+  // budget above is heading for the same cliff again.
+  console.log(`[tenant-isolation] removeOfficeB() took ${elapsed}ms`);
+}, 120_000);
 
 describe('Part V — two Organizations cannot reach each other (item 1)', () => {
   it('both offices hold a customer of the identical legal name', async () => {
@@ -507,9 +540,16 @@ describe('Part V — raw SQL is protected by RLS alone (item 3)', () => {
 });
 
 describe('Part V — the runtime role cannot sidestep the policies (item 4)', () => {
-  it('has no SUPERUSER, no BYPASSRLS, and owns no tables', async () => {
-    const role = await ownerQuery<{ rolsuper: boolean; rolbypassrls: boolean }>(
-      `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'ibms_app'`,
+  it('holds no attribute and no MEMBERSHIP that could sidestep RLS, and owns no tables', async () => {
+    const role = await ownerQuery<{
+      rolsuper: boolean;
+      rolbypassrls: boolean;
+      rolreplication: boolean;
+      rolcreaterole: boolean;
+      rolcreatedb: boolean;
+    }>(
+      `SELECT rolsuper, rolbypassrls, rolreplication, rolcreaterole, rolcreatedb
+         FROM pg_roles WHERE rolname = 'ibms_app'`,
     );
 
     expect(role).toHaveLength(1);
@@ -521,6 +561,35 @@ describe('Part V — the runtime role cannot sidestep the policies (item 4)', ()
         WHERE schemaname = 'public' AND tableowner = 'ibms_app'`,
     );
     expect(Number(owned[0].n)).toBe(0);
+
+    // The three attributes above are not the whole surface. `rolsuper` is what a reader checks
+    // and it is not the only way to get superuser privileges:
+    //
+    //  * REPLICATION can read the WAL, which is every row in the database regardless of RLS.
+    //  * CREATEROLE can grant itself membership in anything, including the owner.
+    //  * CREATEDB is not a data bypass but has no business on a runtime role.
+    expect(role[0].rolreplication).toBe(false);
+    expect(role[0].rolcreaterole).toBe(false);
+    expect(role[0].rolcreatedb).toBe(false);
+
+    // AND MEMBERSHIP, which is the hole the attribute checks leave open: `GRANT ibms TO
+    // ibms_app` or `GRANT pg_read_all_data TO ibms_app` gives the runtime role the owner's
+    // privileges — and Postgres exempts a table's OWNER from its own RLS policies — while
+    // `rolsuper` stays false and every assertion above keeps passing.
+    //
+    // Asserted as the whole set rather than as named exclusions: `ibms_app` belongs to NO role.
+    // A membership that is genuinely needed can then be argued for here, which is the point.
+    const memberships = await ownerQuery<{ granted: string }>(
+      `SELECT g.rolname AS granted
+         FROM pg_auth_members m
+         JOIN pg_roles r ON r.oid = m.member
+         JOIN pg_roles g ON g.oid = m.roleid
+        WHERE r.rolname = 'ibms_app'`,
+    );
+    expect(
+      memberships.map((m) => m.granted),
+      'the runtime role has been granted membership in another role, so it now inherits that role’s privileges — and if that role owns the tables it is exempt from their RLS policies, with rolsuper still false',
+    ).toEqual([]);
   });
 
   it('every tenant-scoped table has RLS enabled and a policy on it', async () => {
@@ -766,11 +835,17 @@ describe('Part V — an insurer form mapped once serves every office (item 8)', 
   it("office B reads office A's mapping unmodified, without re-mapping it", async () => {
     // §5's actual promise: the company's IDENTITY and its mapped submission
     // form are GLOBAL, so the second office to deal with an insurer inherits
-    // the first office's work. This is the one Part V item where the correct
-    // answer is that a row IS visible across offices — every other item here
-    // asserts the opposite, which is exactly why it is worth pinning: a
-    // well-meaning `organizationId` added to `InsurerFormTemplate` would pass
-    // every other test in this file and silently break this promise.
+    // the first office's work. Worth pinning because every other item in this
+    // file asserts the opposite: a well-meaning `organizationId` added to
+    // `InsurerFormTemplate` would pass all of them and silently break this.
+    //
+    // No longer the ONLY such item, which is why this comment changed. The
+    // cross-office insurer DIRECTORY is the second deliberate cross-office read,
+    // and it is proven in `insurer-directory.e2e-spec.ts` — the file with the
+    // second Organization and the boundary tests that belong beside it — rather
+    // than duplicated here. Two files, because the directory's boundary needs a
+    // security-definer view, planted leaks and an allow-list, none of which is a
+    // tenancy-matrix question.
     const master = await rawPrisma.insurerMaster.create({
       data: {
         legalName: `Cross-Office Mapped Insurer ${Date.now()}`,
@@ -795,7 +870,13 @@ describe('Part V — an insurer form mapped once serves every office (item 8)', 
       .post(`/insurer-masters/${master.id}/form-templates`)
       .set(bearer(isolationAdmin.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        // By CODE, not a literal uuid: each database seeds its own ids.
+        insuranceLineId: (
+          await rawPrisma.insuranceLine.findUniqueOrThrow({
+            where: { code: 'MOTOR_COMPREHENSIVE' },
+            select: { id: true },
+          })
+        ).id,
         sourceDocumentRef: 'shared-motor-form.pdf',
         fields: [
           {
@@ -816,16 +897,21 @@ describe('Part V — an insurer form mapped once serves every office (item 8)', 
     // template were tenant-scoped in either layer, this returns nothing.
     const visible = await asAppRole<{
       id: string;
-      insuranceLine: string;
+      code: string;
       version: number;
       sourceDocumentRef: string | null;
     }>(
       ORG_B_ID,
-      `SELECT id, "insuranceLine", version, "sourceDocumentRef"
-         FROM "InsurerFormTemplate" WHERE id = '${templateId}'`,
+      // Joined to `InsuranceLine` deliberately: office B must be able to reach the LINE as well
+      // as the template, or it has a mapping it cannot name. The line catalogue is global and
+      // unscoped, and this is the read that proves it stayed that way.
+      `SELECT t.id, l.code, t.version, t."sourceDocumentRef"
+         FROM "InsurerFormTemplate" t
+         JOIN "InsuranceLine" l ON l.id = t."insuranceLineId"
+        WHERE t.id = '${templateId}'`,
     );
     expect(visible).toHaveLength(1);
-    expect(visible[0].insuranceLine).toBe('MOTOR');
+    expect(visible[0].code).toBe('MOTOR_COMPREHENSIVE');
     expect(visible[0].version).toBe(1);
     expect(visible[0].sourceDocumentRef).toBe('shared-motor-form.pdf');
 
@@ -893,6 +979,104 @@ describe("Part V — two offices' commercial terms with the same insurer (item 9
     // No cleanup here on purpose: `removeOfficeB` owns it, and runs whether or
     // not this test passes.
   });
+});
+
+describe("Part V — one office's insurer RECORD is absent, not forbidden (item 9b)", () => {
+  it("office A gets a 404 for office B's insurer and never sees it listed", async () => {
+    // The management endpoints insurer CRUD added are the first WRITE path onto
+    // `Insurer`, and the first read of it addressed by id. Both have to behave the
+    // way every other tenant-scoped read here does: another office's row is
+    // ABSENT, not forbidden. A 403 would confirm the row exists, which is the same
+    // disclosure by a different status code — and for an insurer that disclosure is
+    // precisely what the Part I §5 boundary forbids, because whether a competing
+    // brokerage deals with a given company is not public.
+    //
+    // Registered as an office-LOCAL insurer on purpose: that is the row shape with
+    // no global counterpart, so nothing about it is legitimately shared.
+    const insurerB = await rawPrisma.insurer.create({
+      data: {
+        organizationId: ORG_B_ID,
+        legalName: `Office B Only Insurer ${Date.now()}`,
+        legalNameAr: 'شركة مكتب ب فقط',
+      },
+    });
+
+    await request(app!.getHttpServer())
+      .get(`/insurers/${insurerB.id}`)
+      .set(bearer(officeA.accessToken))
+      .expect(404);
+
+    // And not merely hidden from the page: the TOTAL is zero, so it is the filter
+    // and not the page window doing the work.
+    const list = await request(app!.getHttpServer())
+      .get(`/insurers?search=${encodeURIComponent('Office B Only Insurer')}`)
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const body = list.body as { items: { id: string }[]; total: number };
+    expect(body.items.map((i) => i.id)).not.toContain(insurerB.id);
+    expect(body.total).toBe(0);
+    // No cleanup here on purpose: `removeOfficeB` owns every ORG_B row and runs
+    // whether or not this test passes.
+  }, 60_000);
+});
+
+describe('Part V — an office insurance-line addition does not cross offices (item 9c)', () => {
+  it("office A cannot see or reference office B's added line, but shares the standard 32", async () => {
+    // The vocabulary is deliberately TWO tables, and this is the test that the split
+    // does what it is for. The standard list is global and shared — that is the whole
+    // reason it is not copied per office. An office's own ADDITION is tenant-scoped
+    // like any other row, so it must be invisible next door.
+    const addition = await rawPrisma.officeInsuranceLine.create({
+      data: {
+        organizationId: ORG_B_ID,
+        nameEn: 'Office B Only Line',
+        nameAr: 'خط مكتب ب فقط',
+        category: 'GENERAL',
+        canonicalEn: 'b line office only',
+        canonicalAr: 'ب خط فقط مكتب',
+        createdByUserId: officeA.id,
+      },
+    });
+
+    const listed = await request(app!.getHttpServer())
+      .get('/insurance-lines')
+      .set(bearer(officeA.accessToken))
+      .expect(200);
+    const lines = listed.body as {
+      id: string;
+      code: string | null;
+      isStandard: boolean;
+    }[];
+    expect(lines.map((l) => l.id)).not.toContain(addition.id);
+    // And the shared half genuinely is shared: office A sees the standard list in
+    // full, which is what makes copying it per office unnecessary.
+    expect(lines.filter((l) => l.isStandard)).toHaveLength(32);
+
+    // Naming it directly is reported UNKNOWN rather than forbidden — a 403 would
+    // confirm that some other office has a line by that id.
+    const refused = await request(app!.getHttpServer())
+      .post('/insurers')
+      .set(bearer(isolationAdmin.accessToken))
+      .send({
+        legalName: `Cross Office Line Probe ${Date.now()}`,
+        legalNameAr: 'فحص خط عبر المكاتب',
+        companyPhone: '+962 6 400 0000',
+        companyEmail: `probe-${Date.now()}@example.test`,
+        structure: 'CONVENTIONAL',
+        lineIds: [addition.id],
+      });
+    // `isolationAdmin` holds SYSTEM_SECURITY_ADMINISTRATOR, which does not hold
+    // `insurer.relationship.manage` — so the permission gate answers first. Either
+    // answer proves the point (the row is never written), and asserting the actual one
+    // keeps this test honest about what it measured.
+    expect([403, 422]).toContain(refused.status);
+    expect(
+      await rawPrisma.insurerOfferedLine.count({
+        where: { officeInsuranceLineId: addition.id },
+      }),
+    ).toBe(0);
+    // No cleanup here: `removeOfficeB` owns every ORG_B row and runs either way.
+  }, 60_000);
 });
 
 /**

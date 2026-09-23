@@ -4,7 +4,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { authenticator } from 'otplib';
 import { type RoleName } from '@ibms/db';
-import { ensureRole, prisma } from './tenant-prisma';
+import { TEST_ORGANIZATION_ID, ensureRole, prisma } from './tenant-prisma';
 import { createTestApp } from './utils/test-app';
 
 /**
@@ -21,6 +21,13 @@ let mapper: { accessToken: string; id: string };
 let reader: { accessToken: string; id: string };
 let noAccess: { accessToken: string; id: string };
 let masterId: string;
+/** Two GLOBAL `InsuranceLine` ids, looked up by their stable `code`. Not hard-coded: each
+ *  database seeds its own uuids (see `InsuranceLine.code`'s own comment), so a literal id would
+ *  pass here and fail on any other database. */
+let motorLineId: string;
+let marineLineId: string;
+/** An OFFICE's own line — the id the service must refuse for a globally-readable mapping. */
+let officeLineId: string;
 
 const tag = Math.random().toString(36).slice(2, 8);
 
@@ -30,7 +37,7 @@ function bearer(token: string) {
 
 interface TemplateBody {
   id: string;
-  insuranceLine: string;
+  insuranceLine: { id: string; code: string; nameEn: string; nameAr: string };
   version: number;
   sourceDocumentRef: string | null;
   fields: {
@@ -124,6 +131,36 @@ beforeAll(async () => {
   ]);
   noAccess = await makeUser(app, `ins-master-none-${tag}`, ['CLAIMS_OFFICER']);
 
+  // By CODE, never by a literal uuid: each database seeds its own ids.
+  const [motor, marine] = await Promise.all([
+    prisma.insuranceLine.findUniqueOrThrow({
+      where: { code: 'MOTOR_COMPREHENSIVE' },
+      select: { id: true },
+    }),
+    prisma.insuranceLine.findUniqueOrThrow({
+      where: { code: 'MARINE_CARGO' },
+      select: { id: true },
+    }),
+  ]);
+  motorLineId = motor.id;
+  marineLineId = marine.id;
+
+  // An office-scoped addition, created directly: the point is the SERVICE refusing it, and
+  // going through the HTTP route to create it would only test that route.
+  const officeLine = await prisma.officeInsuranceLine.create({
+    data: {
+      organizationId: TEST_ORGANIZATION_ID,
+      nameEn: `Drone Hull ${tag}`,
+      nameAr: `هياكل الطائرات المسيرة ${tag}`,
+      canonicalEn: `drone hull ${tag}`,
+      canonicalAr: `${tag} الطائرات المسيرة هياكل`,
+      category: 'GENERAL',
+      createdByUserId: mapper.id,
+    },
+    select: { id: true },
+  });
+  officeLineId = officeLine.id;
+
   const master = await prisma.insurerMaster.create({
     data: {
       legalName: `Master Registry E2E Insurer ${tag}`,
@@ -137,6 +174,18 @@ beforeAll(async () => {
 afterAll(async () => {
   await app?.close();
   app = null;
+  // GUARDED, and this is not defensive padding — it is a real defect that fired.
+  //
+  // `masterId` is only assigned at the end of `beforeAll`. When `beforeAll` failed
+  // for an unrelated reason (a leaked Organization elsewhere in the suite made
+  // `signup` return 500), it stayed undefined — and Prisma treats
+  // `where: { insurerMasterId: undefined }` as NO FILTER, so this teardown
+  // attempted to delete EVERY insurer in the office. It only failed instead of
+  // succeeding because `RFQInsurer_insurerId_fkey` is RESTRICT and some other
+  // fixture happened to hold a reference. On a database where nothing did, this
+  // would have deleted the office's entire insurer book while reporting a
+  // teardown error about something else.
+  if (!masterId) return;
   await prisma.insurerFormTemplate.deleteMany({
     where: { insurerMasterId: masterId },
   });
@@ -180,7 +229,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
     // has mapped this yet" is a real answer the caller acts on.
     const res = await request(app!.getHttpServer())
       .get(`/insurer-masters/${masterId}/form-templates/current`)
-      .query({ insuranceLine: 'MOTOR' })
+      .query({ insuranceLineId: motorLineId })
       .set(bearer(reader.accessToken))
       .expect(200);
 
@@ -192,7 +241,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(reader.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         fields: [
           {
             fieldKey: 'insured_full_name',
@@ -210,7 +259,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         sourceDocumentRef: 'motor-proposal-2026.pdf',
         fields: [
           {
@@ -256,21 +305,92 @@ describe('mapping an insurer form (§5, one-time)', () => {
   it('serves the mapped form as the current one', async () => {
     const res = await request(app!.getHttpServer())
       .get(`/insurer-masters/${masterId}/form-templates/current`)
-      .query({ insuranceLine: 'MOTOR' })
+      .query({ insuranceLineId: motorLineId })
       .set(bearer(reader.accessToken))
       .expect(200);
 
     expect((res.body as TemplateBody).version).toBe(1);
   });
 
-  it('matches the line case-insensitively — "motor" is the same form', async () => {
+  // The test this replaces asserted that "motor" found the form mapped as "MOTOR" — a
+  // case-INSENSITIVE match, which existed only because the caller sent free text. With a
+  // managed vocabulary the question has exactly one answer and there is nothing to be lenient
+  // about, so the tests worth having are about what the id is NOT.
+
+  it('names the line in both languages rather than echoing its id', async () => {
     const res = await request(app!.getHttpServer())
       .get(`/insurer-masters/${masterId}/form-templates/current`)
-      .query({ insuranceLine: 'motor' })
+      .query({ insuranceLineId: motorLineId })
       .set(bearer(reader.accessToken))
       .expect(200);
 
-    expect((res.body as TemplateBody).version).toBe(1);
+    const body = res.body as TemplateBody;
+    expect(body.insuranceLine.id).toBe(motorLineId);
+    expect(body.insuranceLine.code).toBe('MOTOR_COMPREHENSIVE');
+    expect(body.insuranceLine.nameEn.length).toBeGreaterThan(0);
+    // The Arabic name is the half a bilingual UI cannot render without, and the half most
+    // likely to be dropped by a view that "already returns the line".
+    expect(body.insuranceLine.nameAr).toMatch(/[ؠ-ي]/);
+  });
+
+  it('422s an unknown line id rather than answering with an empty list', async () => {
+    // An unknown id filtered into a query returns [] , which reads as "nobody has mapped this
+    // line" when the truth is "that is not a line". Two different answers the caller cannot
+    // tell apart, so the read validates too.
+    const res = await request(app!.getHttpServer())
+      .get(`/insurer-masters/${masterId}/form-templates`)
+      // A well-formed v4 uuid that exists nowhere. The first attempt here used
+      // '00000000-...-0000000000ff', which `@IsUUID()` rejects at 400 because its version
+      // nibble is 0 — so the test proved the validator, not the lookup.
+      .query({ insuranceLineId: '11111111-1111-4111-8111-111111111111' })
+      .set(bearer(reader.accessToken))
+      .expect(422);
+
+    expect(JSON.stringify(res.body)).toContain('does not exist');
+  });
+
+  it("422s an OFFICE's own line — a global mapping cannot point at one office's vocabulary", async () => {
+    // The tenancy property, as an error message. `InsurerFormTemplate` has no organizationId,
+    // so a row pointing at an OfficeInsuranceLine would put this office's private line on a row
+    // every other office reads. The FK makes it impossible; this makes it explicable.
+    const res = await request(app!.getHttpServer())
+      .post(`/insurer-masters/${masterId}/form-templates`)
+      .set(bearer(mapper.accessToken))
+      .send({
+        insuranceLineId: officeLineId,
+        fields: [
+          {
+            fieldKey: 'hull_serial',
+            labelEn: 'Hull serial',
+            dataType: 'TEXT',
+            displayOrder: 0,
+          },
+        ],
+      })
+      .expect(422);
+
+    const message = JSON.stringify(res.body);
+    expect(message).toContain('every office');
+    // Named, so the officer can see WHICH of their lines it was.
+    expect(message).toContain('Drone Hull');
+  });
+
+  it('400s something that is not an id at all — the validator, not the lookup', async () => {
+    await request(app!.getHttpServer())
+      .post(`/insurer-masters/${masterId}/form-templates`)
+      .set(bearer(mapper.accessToken))
+      .send({
+        insuranceLineId: 'MOTOR',
+        fields: [
+          {
+            fieldKey: 'x',
+            labelEn: 'X',
+            dataType: 'TEXT',
+            displayOrder: 0,
+          },
+        ],
+      })
+      .expect(400);
   });
 
   it('re-mapping creates a NEW version, never edits the one in use', async () => {
@@ -280,7 +400,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         fields: [
           {
             fieldKey: 'insured_full_name',
@@ -296,7 +416,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
 
     const all = await request(app!.getHttpServer())
       .get(`/insurer-masters/${masterId}/form-templates`)
-      .query({ insuranceLine: 'MOTOR' })
+      .query({ insuranceLineId: motorLineId })
       .set(bearer(reader.accessToken))
       .expect(200);
 
@@ -305,7 +425,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
 
     const current = await request(app!.getHttpServer())
       .get(`/insurer-masters/${masterId}/form-templates/current`)
-      .query({ insuranceLine: 'MOTOR' })
+      .query({ insuranceLineId: motorLineId })
       .set(bearer(reader.accessToken))
       .expect(200);
     expect((current.body as TemplateBody).version).toBe(2);
@@ -316,7 +436,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MARINE',
+        insuranceLineId: marineLineId,
         fields: [
           {
             fieldKey: 'vessel_name',
@@ -336,7 +456,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         fields: [
           {
             fieldKey: 'sum_insured',
@@ -362,7 +482,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         fields: [
           {
             fieldKey: 'cover_type',
@@ -381,7 +501,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         fields: [
           {
             fieldKey: 'x',
@@ -398,7 +518,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
     await request(app!.getHttpServer())
       .post(`/insurer-masters/${masterId}/form-templates`)
       .set(bearer(mapper.accessToken))
-      .send({ insuranceLine: 'MOTOR', fields: [] })
+      .send({ insuranceLineId: motorLineId, fields: [] })
       .expect(400);
   });
 
@@ -409,7 +529,7 @@ describe('mapping an insurer form (§5, one-time)', () => {
       )
       .set(bearer(mapper.accessToken))
       .send({
-        insuranceLine: 'MOTOR',
+        insuranceLineId: motorLineId,
         fields: [
           {
             fieldKey: 'x',

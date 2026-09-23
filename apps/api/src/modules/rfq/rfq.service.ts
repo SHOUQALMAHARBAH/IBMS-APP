@@ -230,16 +230,36 @@ export class RfqService {
     return rfq;
   }
 
-  private async assertInsurersExist(insurerIds: string[]): Promise<void> {
+  /**
+   * Every shortlisted insurer must be one this office still deals with.
+   *
+   * Two refusals, not one, because they mean different things to whoever hits
+   * them. An unknown id is a client bug. A DEACTIVATED insurer is a decision the
+   * office made deliberately and can undo, so the message names the insurers and
+   * says what to do — refusing with "does not exist" for a company sitting in the
+   * office's own list would send someone hunting for a bug that is not there.
+   *
+   * This is the chokepoint for starting new business with an insurer: a quotation
+   * must be on an RFQ's shortlist, and a policy is placed from a quotation. So
+   * guarding the shortlist is what stops a deactivated insurer being taken to
+   * market at all.
+   */
+  private async assertInsurersSelectable(insurerIds: string[]): Promise<void> {
     if (insurerIds.length === 0) {
       throw new UnprocessableEntityException(
         'Select at least one insurer for the shortlist.',
       );
     }
-    const known = await this.rfqs.countInsurersByIds(insurerIds);
-    if (known !== insurerIds.length) {
+    const { inactiveIds, unknownIds } =
+      await this.rfqs.classifyInsurersByIds(insurerIds);
+    if (unknownIds.length > 0) {
       throw new UnprocessableEntityException(
         'One or more shortlisted insurers do not exist.',
+      );
+    }
+    if (inactiveIds.length > 0) {
+      throw new UnprocessableEntityException(
+        `Cannot shortlist a deactivated insurer (${inactiveIds.join(', ')}). Reactivate it from the insurer screen, or choose another — its existing policies, claims and invoices are unaffected either way.`,
       );
     }
   }
@@ -254,16 +274,35 @@ export class RfqService {
   private async assertLineInProgramme(
     insuranceProgramId: string | null,
     insuranceLine: string,
-  ): Promise<void> {
-    if (!insuranceProgramId) return;
+  ): Promise<{
+    insuranceLineId: string | null;
+    officeInsuranceLineId: string | null;
+  }> {
+    // RETURNS the matched programme line's managed-line reference rather than void, and that is
+    // the change: the RFQ INHERITS its line identity from the programme line it was taken to
+    // market from. "A programme line becomes an RFQ" then means the same line by construction,
+    // instead of two independent lookups from the same string that have to agree forever.
+    //
+    // No programme, or no programme found: no identity to inherit. Reported as nulls rather than
+    // resolved from the string here, because a second resolution path is the defect.
+    const none = { insuranceLineId: null, officeInsuranceLineId: null };
+    if (!insuranceProgramId) return none;
     const programme = await this.programs.findById(insuranceProgramId);
-    if (!programme) return;
-    const lines = programme.lines.map((l) => l.insuranceLine);
-    if (!lines.includes(insuranceLine)) {
+    if (!programme) return none;
+
+    const matched = programme.lines.find(
+      (l) => l.insuranceLine === insuranceLine,
+    );
+    if (!matched) {
+      const lines = programme.lines.map((l) => l.insuranceLine);
       throw new UnprocessableEntityException(
         `"${insuranceLine}" is not a line on this Opportunity's Insurance Program. Designed lines: ${lines.join(', ') || '(none)'}.`,
       );
     }
+    return {
+      insuranceLineId: matched.insuranceLineId,
+      officeInsuranceLineId: matched.officeInsuranceLineId,
+    };
   }
 
   /** Inserts the RFQ row, mapping the `@@unique([opportunityId,
@@ -272,11 +311,18 @@ export class RfqService {
   private async insertRfqRow(
     dto: CreateRfqDto,
     actorId: string,
+    inheritedLine: {
+      insuranceLineId: string | null;
+      officeInsuranceLineId: string | null;
+    },
   ): Promise<RfqWithSubmissions> {
     try {
       const created = await this.rfqs.createRfq({
         opportunityId: dto.opportunityId,
         insuranceLine: dto.insuranceLine,
+        // Copied from the programme line, not resolved from the string above.
+        insuranceLineId: inheritedLine.insuranceLineId,
+        officeInsuranceLineId: inheritedLine.officeInsuranceLineId,
         followUpThresholdDays: dto.followUpThresholdDays,
         issuedByUserId: actorId,
       });
@@ -341,13 +387,13 @@ export class RfqService {
       );
     }
 
-    await this.assertLineInProgramme(
+    const inheritedLine = await this.assertLineInProgramme(
       opportunity.insuranceProgramId,
       dto.insuranceLine,
     );
 
     const insurerIds = [...new Set(dto.insurerIds)];
-    await this.assertInsurersExist(insurerIds);
+    await this.assertInsurersSelectable(insurerIds);
 
     // The `@@unique([opportunityId, insuranceLine])` is the real enforcement
     // — insertRfqRow() maps its violation to 409. This pre-check is the fast
@@ -362,7 +408,7 @@ export class RfqService {
       );
     }
 
-    const rfq = await this.insertRfqRow(dto, actor.id);
+    const rfq = await this.insertRfqRow(dto, actor.id, inheritedLine);
 
     // Audit CREATE BEFORE the shortlist insert: a crash in between still
     // leaves a CREATE trail, and the resulting zero-insurer RFQ is
@@ -406,7 +452,7 @@ export class RfqService {
     this.assertOpportunityInMarketPhase(opportunityStatus);
 
     const insurerIds = [...new Set(dto.insurerIds)];
-    await this.assertInsurersExist(insurerIds);
+    await this.assertInsurersSelectable(insurerIds);
 
     const alreadyOn = new Set(
       await this.rfqs.findExistingShortlistInsurerIds(rfqId, insurerIds),

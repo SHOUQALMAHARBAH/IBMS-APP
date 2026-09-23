@@ -307,6 +307,37 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
         (l) => l.insuranceLine === 'Public Liability',
       );
       expect(publicLiability?.sumInsuredBasis).toBeNull();
+
+      // Every assembled line carries the MANAGED line FK, read from the stored rows rather than
+      // the response — a view could resolve a line for display while the column stays null,
+      // which is exactly what happened for three days after migration `20261019100000` added
+      // the column and changed no writer (IMPROVEMENTS.md § 1.40).
+      const stored = await prisma.insuranceProgramLine.findMany({
+        where: { insuranceProgramId: body.id },
+        select: {
+          insuranceLine: true,
+          insuranceLineId: true,
+          insuranceLine_managed: { select: { code: true } },
+        },
+      });
+      expect(stored).toHaveLength(3);
+      expect(stored.every((l) => l.insuranceLineId !== null)).toBe(true);
+      // And the FK is the RIGHT line, not merely a populated one: asserted as the pairing the
+      // coverage mapping declares, so a mapping pointing at the wrong catalogue entry fails here.
+      expect(
+        stored
+          .map(
+            (l) =>
+              `${l.insuranceLine}=${l.insuranceLine_managed?.code ?? 'NONE'}`,
+          )
+          .sort(),
+      ).toEqual(
+        [
+          'Burglary=BURGLARY_THEFT',
+          'Property All Risks=PROPERTY_ALL_RISKS',
+          'Public Liability=PUBLIC_GENERAL_LIABILITY',
+        ].sort(),
+      );
     });
 
     it('refuses to assemble from a needs assessment that is not APPROVED', async () => {

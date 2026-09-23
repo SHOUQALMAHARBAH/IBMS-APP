@@ -21,7 +21,28 @@ import { WORKFLOW_TRANSITIONS } from './workflow-transitions.config';
  * transition validation in one line.
  */
 
-const SRC = path.join(__dirname, '../..');
+/**
+ * Every root the rule applies to — application code that runs at RUNTIME and could therefore
+ * bypass the engine.
+ *
+ * This was `apps/api/src` alone, which is narrower than the tests' own claim: a raw status
+ * write in `packages/db` or in an operational script would never have been seen. Found while
+ * asking what had slipped during the window when the raw-SQL scan was silently timing out —
+ * the one-off check that answered that question reached further than the guard did, which is
+ * fixing the instance and leaving the blind spot.
+ *
+ * DELIBERATELY NOT COVERED: `packages/db/prisma/migrations/*.sql`. A migration that sets a
+ * status column is a reviewed, one-off data change, not a runtime path around `transition()` —
+ * and a legitimate backfill (adding a status column and populating it) would be a false
+ * positive that teaches people to weaken the guard. The exclusion is stated in the test names
+ * below rather than left implicit. Checked once by hand on 2026-10-15: no migration sets a
+ * status column today.
+ */
+const ROOTS = [
+  path.join(__dirname, '../..'), //                        apps/api/src
+  path.join(__dirname, '../../../../../packages/db/src'), // packages/db/src
+  path.join(__dirname, '../../../scripts'), //              apps/api/scripts
+];
 
 /** Every entity whose status the engine governs, as Prisma client accessors
  *  (`Policy` -> `policy`, `RFQInsurer` -> `rFQInsurer`). */
@@ -39,6 +60,37 @@ function sourceFiles(dir: string, acc: string[] = []): string[] {
       acc.push(full);
   }
   return acc;
+}
+
+/**
+ * Every source file's path AND contents, read ONCE.
+ *
+ * Both scans below want every file, and each used to walk the tree and read all of it
+ * again — two full passes over ~800 files. The second scan then failed as a TIMEOUT
+ * (7.0s against vitest's 5s default), which is the worst way for a guard to fail: it
+ * reports nothing about the property it guards, and the obvious response is to raise
+ * the budget and leave the cost in place (IMPROVEMENTS.md § 1.28).
+ */
+let cachedSources: { file: string; text: string }[] | null = null;
+function allSources(): { file: string; text: string }[] {
+  cachedSources ??= ROOTS.flatMap((root) => sourceFiles(root)).map((file) => ({
+    file,
+    text: fs.readFileSync(file, 'utf8'),
+  }));
+  return cachedSources;
+}
+
+/** The text inside a `{ … }` whose opening brace is at `openBraceAt`, brace-balanced. */
+function braceBodyAt(text: string, openBraceAt: number): string {
+  let depth = 1;
+  let i = openBraceAt + 1;
+  const start = i;
+  while (depth > 0 && i < text.length) {
+    if (text[i] === '{') depth += 1;
+    else if (text[i] === '}') depth -= 1;
+    i += 1;
+  }
+  return text.slice(start, i - 1);
 }
 
 /** The text inside the `{ … }` that `opener` matches, brace-balanced. */
@@ -67,14 +119,25 @@ function braceBody(text: string, opener: RegExp): string {
 function directStatusWrites(): string[] {
   const governed = new Set(governedAccessors());
   const found: string[] = [];
-  for (const file of sourceFiles(SRC)) {
-    const text = fs.readFileSync(file, 'utf8');
-    const write =
-      /\.(\w+)\.(create|update|updateMany|upsert)\(\s*\{([\s\S]{0,900}?)\n\s*\}\s*\)/g;
+  for (const { file, text } of allSources()) {
+    // Matches only the OPENER, then brace-matches the argument object.
+    //
+    // It used to match the whole call and require a NEWLINE before the closing brace, with the
+    // body capped at 900 characters. Both were silent blind spots: a one-line
+    // `p.policy.update({ where: { id: 1 }, data: { status: 'X' } })` was invisible to this
+    // guard entirely, and so was any call longer than 900 characters.
+    //
+    // This spec's own history is why that is worth spelling out. `braceBody` below was added
+    // precisely because a single-line `data: { … }` defeated the PAYLOAD extraction — and the
+    // fix stopped there, leaving the OUTER match still demanding a newline. Half the hole was
+    // closed and the comment recorded the whole thing as solved. Proven by planting both
+    // shapes on 2026-10-16: multi-line was caught, single-line passed green.
+    const write = /\.(\w+)\.(create|update|updateMany|upsert)\(\s*\{/g;
     let m: RegExpExecArray | null;
     while ((m = write.exec(text)) !== null) {
-      const [, model, , body] = m;
+      const [, model] = m;
       if (!governed.has(model)) continue;
+      const body = braceBodyAt(text, m.index + m[0].length - 1);
       // Isolate the `data:` object by MATCHING BRACES, not by a regex that
       // hoped for a newline before the closing one. The first version here
       // required `\n\s*\}`, so a single-line `data: { status: 'CLOSED' }`
@@ -83,7 +146,9 @@ function directStatusWrites(): string[] {
       const payload = braceBody(body, /\bdata:\s*\{/);
       if (/\bstatus\s*:/.test(payload)) {
         const line = text.slice(0, m.index).split('\n').length;
-        found.push(`${path.relative(SRC, file).replace(/\\/g, '/')}:${line}`);
+        found.push(
+          `${path.relative(ROOTS[0], file).replace(/\\/g, '/')}:${line}`,
+        );
       }
     }
   }
@@ -95,21 +160,54 @@ describe('no status write bypasses the workflow engine', () => {
     expect(governedAccessors().length).toBeGreaterThan(10);
   });
 
+  // A scan that quietly covers less than it used to is the same failure as a scan that times
+  // out: it reports success about files it never opened. Both roots must exist and the total
+  // must stay in the hundreds, so moving or renaming a source tree fails here rather than
+  // silently narrowing the guard.
+  // The SAME 20s budget as the two scans below, and for a sharper reason: this is the FIRST
+  // caller of `allSources()` in the file, so it is the one that pays the cold tree walk and
+  // fills the memo every later test reads in ~1ms. Written without a budget it timed out at
+  // 10390ms against the 5s default while its siblings passed — a test that reports nothing
+  // about the property it guards, which is exactly the § 1.36 shape the comment below names.
+  // Whichever test runs first here needs the budget; do not move this one without moving it.
+  it('sanity: every root exists and the scan still covers the codebase', () => {
+    for (const root of ROOTS)
+      expect(fs.existsSync(root), `missing root: ${root}`).toBe(true);
+    expect(allSources().length).toBeGreaterThan(500);
+  }, 20_000);
+
+  // 20s, not the 5s default, and the number is measured rather than picked: this test runs
+  // the tree walk and the whole-tree read that BOTH scans share, at 2810ms in isolation on
+  // this host. Under a full-suite batch the same work has been observed at 3x, which is how
+  // its sibling came to fail as a timeout and report nothing about the property it guards.
+  // If this figure grows, find out where the time goes before raising it again — that is the
+  // rule § 1.28 exists for.
   it('no Prisma write sets `status` in its data payload on a governed entity', () => {
     // A status move belongs in `WorkflowTransitionService.transition()`, which
     // validates the edge against the allowed-transitions map and writes the
     // TRANSITION audit row. A direct write skips both.
     expect(directStatusWrites()).toEqual([]);
-  });
+  }, 20_000);
 
-  it('no raw SQL updates a status column', () => {
+  it('no raw SQL in application code updates a status column (migrations excluded — see ROOTS)', () => {
     // `$executeRaw` is outside the reach of the scan above, and is how a
     // status write would most plausibly hide.
-    const offenders = sourceFiles(SRC).filter((f) =>
-      /\$executeRaw[\s\S]{0,200}?UPDATE[\s\S]{0,200}?status/i.test(
-        fs.readFileSync(f, 'utf8'),
-      ),
-    );
+    //
+    // The cheap `includes` is not an optimisation to be tidied away — it is what keeps
+    // this test inside its budget. The regex nests two bounded lazy quantifiers, which
+    // backtracks hard on a long file. A file with no `$executeRaw` anywhere cannot match
+    // a pattern requiring one, so the filter changes no outcome.
+    //
+    // Measured on this host, this test alone: 7056ms, which TIMED OUT against vitest's
+    // 5s default -> 1837ms with the filter -> 5.9ms once the read is shared. The
+    // remaining cost moved to the scan below, which now populates the cache.
+    const offenders = allSources()
+      .filter(
+        ({ text }) =>
+          text.includes('$executeRaw') &&
+          /\$executeRaw[\s\S]{0,200}?UPDATE[\s\S]{0,200}?status/i.test(text),
+      )
+      .map(({ file }) => file);
     expect(offenders).toEqual([]);
   });
 });

@@ -7,6 +7,9 @@
 // pacing decision.
 export const RFQ = {
   AR: {
+    insurerDeactivatedBadge: 'غير متعامل معها',
+    insurerDeactivatedExplain:
+      'أوقف مكتبك التعامل مع هذه الشركة. عرض السعر المسجَّل صحيح ويظل معروضاً للمقارنة، لكن لا يمكن إصدار وثيقة معها حتى تُعاد إلى التعامل.',
     // opportunities/page.tsx
     oppListHeading: 'طلب عروض الأسعار / السوق',
     oppListIntro:
@@ -334,6 +337,9 @@ export const RFQ = {
     cdEvidenceEmailConfirmation: 'تأكيد عبر البريد الإلكتروني',
   },
   EN: {
+    insurerDeactivatedBadge: 'No longer dealt with',
+    insurerDeactivatedExplain:
+      'Your office has stopped dealing with this company. The recorded quote is genuine and stays in the comparison, but a policy cannot be placed with them until they are reactivated.',
     // opportunities/page.tsx
     oppListHeading: 'RFQ / market',
     oppListIntro:

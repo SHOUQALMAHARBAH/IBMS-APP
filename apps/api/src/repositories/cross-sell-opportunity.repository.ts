@@ -1,27 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  CrossSellOpportunity,
-  CrossSellStatus,
-  PolicyStatus,
-} from '@ibms/db';
+import type { CrossSellOpportunity, CrossSellStatus } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+// The gap scan wants the NARROW reading of "in force" — see the constant's own
+// comment. It lives with the policy repository now that a second caller needed a
+// different one; both meanings are named there, side by side.
+import { IN_FORCE_POLICY_STATUSES } from './policy.repository';
 
 export interface CreateCrossSellGapInput {
   customerId: string;
   gapLine: string;
   detectedByUserId: string;
 }
-
-/**
- * Policy statuses that count as "cover currently in force" for the
- * cross-sell gap comparison. Deliberately just `ACTIVE` — a `DELIVERED`
- * policy is days from `ACTIVE` and the nightly sweep catches it then. The
- * Policy module (Domain B, Processes 18-22) is not built, so the `Policy`
- * table is empty in every environment today; this comparison is correct and
- * simply produces nothing until real policies exist (README § Known gaps,
- * Part C #8).
- */
-export const IN_FORCE_POLICY_STATUSES: readonly PolicyStatus[] = ['ACTIVE'];
 
 /**
  * Process 8 — Cross-Selling (backlog Part C #8). Owns `CrossSellOpportunity`

@@ -543,7 +543,15 @@ const POLICY = {
   opportunityId: "opp-1",
   customerId: "cust-1",
   insurerId: "ins-1",
-  insurer: { id: "ins-1", name: "Union Insurance", nameAr: "الاتحاد للتأمين" },
+  // `isActive` is part of `insurerIdentity()`'s contract — a deactivated insurer's
+  // quote stays comparable and gets a badge, so a mock without it renders the
+  // wrong thing in the evidence screenshots.
+  insurer: {
+    id: "ins-1",
+    name: "Union Insurance",
+    nameAr: "الاتحاد للتأمين",
+    isActive: true,
+  },
   policyNumber: "POL-2026-0451",
   insuranceLine: "Property All Risks",
   status: "ACTIVE",

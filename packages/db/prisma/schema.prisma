@@ -338,6 +338,10 @@ model Organization {
   userRoleAssignments             UserRoleAssignment[]
   userSessions                    UserSession[]
   vendors                         Vendor[]
+  officeInsuranceLines            OfficeInsuranceLine[]
+  officeInsurerFormTemplates      OfficeInsurerFormTemplate[]
+  officeInsurerFormFields         OfficeInsurerFormField[]
+  insurerOfferedLines             InsurerOfferedLine[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -496,18 +500,20 @@ model User {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  roles               UserRoleAssignment[]
-  auditLogEntries     AuditLogEntry[]             @relation("AuditLogUser")
-  accessAnomalyAlerts AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
-  recertifications    AccessRecertificationItem[] @relation("RecertificationReviewer")
-  mfaCredentials      MfaCredential[]
-  refreshTokens       RefreshToken[]
-  sessions            UserSession[]
-  passwordResetTokens PasswordResetToken[]
+  roles                      UserRoleAssignment[]
+  auditLogEntries            AuditLogEntry[]             @relation("AuditLogUser")
+  accessAnomalyAlerts        AccessAnomalyAlert[]        @relation("AccessAnomalyAlertUser")
+  recertifications           AccessRecertificationItem[] @relation("RecertificationReviewer")
+  mfaCredentials             MfaCredential[]
+  refreshTokens              RefreshToken[]
+  sessions                   UserSession[]
+  passwordResetTokens        PasswordResetToken[]
   /// Spec §4.1.4 / §4.1.3 — populated by the Phase 4 auth rebuild. Declared
   /// here now because Phase 1 creates the tables they point at.
-  trustedDevices      TrustedDevice[]
-  passwordHistory     PasswordHistoryEntry[]
+  trustedDevices             TrustedDevice[]
+  passwordHistory            PasswordHistoryEntry[]
+  officeInsuranceLines       OfficeInsuranceLine[]
+  officeInsurerFormTemplates OfficeInsurerFormTemplate[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -1389,6 +1395,10 @@ model ScreeningRequest {
   @@index([outcome])
   @@index([correlationId])
   @@index([organizationId])
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([subjectFingerprint])
 }
 
 enum RiskLevel {
@@ -1694,18 +1704,35 @@ model InsuranceProgram {
 }
 
 model InsuranceProgramLine {
-  id                 String           @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId     String           @default(dbgenerated())
-  organization       Organization     @relation(fields: [organizationId], references: [id])
-  insuranceProgramId String
-  insuranceProgram   InsuranceProgram @relation(fields: [insuranceProgramId], references: [id])
-  insuranceLine      String // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
-  sumInsuredBasis    Decimal?         @db.Decimal(18, 3)
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
+  insuranceProgramId    String
+  insuranceProgram      InsuranceProgram     @relation(fields: [insuranceProgramId], references: [id])
+  insuranceLine         String // Property All Risks | BI | Machinery Breakdown | General/Product Liability | Motor Fleet | Group Medical | Group Life | Workers Comp | Cyber | ...
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `InsuranceProgramLine_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  sumInsuredBasis       Decimal?             @db.Decimal(18, 3)
 
   @@index([insuranceProgramId])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 // ============================================================================
@@ -1767,16 +1794,32 @@ model Opportunity {
 /// Process 11 — RFQ / Market Submission per product/line to a shortlist of
 /// insurers.
 model RFQ {
-  id                    String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId        String       @default(dbgenerated())
-  organization          Organization @relation(fields: [organizationId], references: [id])
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
   opportunityId         String
-  opportunity           Opportunity  @relation(fields: [opportunityId], references: [id])
+  opportunity           Opportunity          @relation(fields: [opportunityId], references: [id])
   insuranceLine         String
-  issuedAt              DateTime     @default(now())
-  followUpThresholdDays Int          @default(9) // Part 3.7-style configurable follow-up
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `RFQ_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  issuedAt              DateTime             @default(now())
+  followUpThresholdDays Int                  @default(9) // Part 3.7-style configurable follow-up
   // Process 11 (backlog Part C #11) provenance — the Placement Officer who
   // issued this RFQ. Bare scalar; the AuditLogEntry CREATE row is authoritative.
   issuedByUserId        String?
@@ -1791,6 +1834,7 @@ model RFQ {
   // relaxation (Negotiation #15 / Client Decision #17).
   @@unique([opportunityId, insuranceLine])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 enum RfqInsurerStatus {
@@ -2106,40 +2150,56 @@ enum PolicyStatus {
 
 /// Part 4.1 core entity — the bound insurance contract.
 model Policy {
-  id               String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId   String       @default(dbgenerated())
-  organization     Organization @relation(fields: [organizationId], references: [id])
-  opportunityId    String       @unique
-  opportunity      Opportunity  @relation(fields: [opportunityId], references: [id])
-  customerId       String
-  customer         Customer     @relation(fields: [customerId], references: [id])
-  insurerId        String
-  insurer          Insurer      @relation(fields: [insurerId], references: [id])
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
+  opportunityId         String               @unique
+  opportunity           Opportunity          @relation(fields: [opportunityId], references: [id])
+  customerId            String
+  customer              Customer             @relation(fields: [customerId], references: [id])
+  insurerId             String
+  insurer               Insurer              @relation(fields: [insurerId], references: [id])
   /// Multi-tenancy Phase 1 step 5 — unique WITHIN an Organization, not across
   /// the platform. A bare @unique here is not only a functional bug (two
   /// offices legitimately produce the same value); it leaks across tenants on
   /// its own — a uniqueness-violation error confirms the value already exists
   /// for SOMEONE, with no row ever returned. See @@unique below.
-  policyNumber     String?
-  insuranceLine    String
-  status           PolicyStatus @default(PLACEMENT_CONFIRMED)
-  inceptionDate    DateTime?
-  expiryDate       DateTime?
-  requestedPremium Decimal      @db.Decimal(18, 3)
-  issuedPremium    Decimal?     @db.Decimal(18, 3)
-  currency         String       @default("JOD")
+  policyNumber          String?
+  insuranceLine         String
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `Policy_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  status                PolicyStatus         @default(PLACEMENT_CONFIRMED)
+  inceptionDate         DateTime?
+  expiryDate            DateTime?
+  requestedPremium      Decimal              @db.Decimal(18, 3)
+  issuedPremium         Decimal?             @db.Decimal(18, 3)
+  currency              String               @default("JOD")
   // Process 18-19 (backlog Part C #18-19) provenance — bare scalars, no
   // relation. placedByUserId is the Placement Officer who bound the cover;
   // issuedByUserId is stamped on the PLACEMENT_CONFIRMED -> ISSUED
   // transition. The AuditLogEntry CREATE / TRANSITION rows are the
   // authoritative trail (same pattern as Opportunity.createdByUserId /
   // RFQ.issuedByUserId).
-  placedByUserId   String?
-  issuedByUserId   String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  placedByUserId        String?
+  issuedByUserId        String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
   schedules               PolicySchedule[]
   coverNote               CoverNote?
@@ -2161,6 +2221,7 @@ model Policy {
   @@index([status])
   @@index([expiryDate])
   @@index([organizationId])
+  @@index([insuranceLineId])
 }
 
 /// Requested/issued coverage snapshot — limits, sums insured, named perils,
@@ -2800,23 +2861,67 @@ model PaymentChannel {
 /// onto each CommissionLedgerEntry at calculate time. DRAFTED default 0 — no
 /// governed tax-rate source is encoded in the system yet.
 model CommissionAgreement {
-  id             String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId String       @default(dbgenerated())
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  insurerId      String
-  insurer        Insurer      @relation(fields: [insurerId], references: [id])
-  insuranceLine  String
-  ratePercent    Decimal      @db.Decimal(5, 2)
-  vatRatePercent Decimal      @default(0) @db.Decimal(5, 2)
-  effectiveFrom  DateTime     @default(now())
-  effectiveTo    DateTime?
+  organizationId        String               @default(dbgenerated())
+  organization          Organization         @relation(fields: [organizationId], references: [id])
+  insurerId             String
+  insurer               Insurer              @relation(fields: [insurerId], references: [id])
+  insuranceLine         String
+  /// The managed line, replacing the free-text `insuranceLine` beside it.
+  ///
+  /// BOTH FKs, exactly one set (CHECK `CommissionAgreement_line_exactly_one`), because this model is
+  /// OFFICE-SCOPED: an office may legitimately reference a line it added itself. That is the
+  /// opposite of `InsurerFormTemplate`, which is global and therefore global-catalogue only — the
+  /// rule is that a row every office READS may only point at things every office may SEE, and this
+  /// row is read by one office. See IMPROVEMENTS.md § 1.26.
+  ///
+  /// NULLABLE while `insuranceLine` still exists. Migration `20261019100000` mapped what it could
+  /// and PARKED the rest with the original string retained — nothing was guessed and nothing was
+  /// funnelled into an "Unclassified" line. The string column drops only when a test MEASURES zero
+  /// unmapped rows, not when we believe there are none.
+  insuranceLineId       String?
+  insuranceLine_managed InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+  /// The crossing the 32 managed lines cannot express — fleet-vs-individual, group-vs-individual
+  /// medical, a named sub-peril. Free text, stored for DISPLAY.
+  ///
+  /// NOT a managed catalogue, deliberately: a second vocabulary with its own add-flow, invented
+  /// before the shape is known, is the closed-list mistake one level down. The entry control offers
+  /// the variants already used for that line IN THIS OFFICE, so consistency is the default path
+  /// rather than a discipline somebody maintains.
+  ///
+  /// This is load-bearing rather than speculative, and it was MEASURED: six insurers on dev each
+  /// carry two simultaneously-open agreements, every one of them the pair
+  /// `Property All Risks` + `Property All Risks (Fire)`. Two strings, one line id, both open —
+  /// permitted today only because the existing partial unique index keys on the STRING. Moving
+  /// that index to the line id WITHOUT a variant would collapse six legitimately distinct
+  /// commercial rates into conflicts and the index could not be created.
+  variant               String?
+  /// The canonical key of `variant`, matched on instead of the raw text — free text on a MATCHING
+  /// path is the defect this whole line of work removes, one level down. Generated by the same
+  /// `canonical_name_key()` that backs `Insurer.canonicalName`, so "Fleet", "fleet" and " FLEET "
+  /// are one variant, and the Arabic folding comes for free.
+  ///
+  /// STRICT, so a NULL variant yields a NULL key — which is exactly why the unique index below
+  /// needs `NULLS NOT DISTINCT`. Not in `schema.prisma` as a real field beyond this declaration:
+  /// Prisma cannot express a generated column, so `db:divergence` names it.
+  variantKey            String?
+  ratePercent           Decimal              @db.Decimal(5, 2)
+  vatRatePercent        Decimal              @default(0) @db.Decimal(5, 2)
+  effectiveFrom         DateTime             @default(now())
+  effectiveTo           DateTime?
 
   ledgerEntries CommissionLedgerEntry[]
 
   @@index([insurerId, insuranceLine])
   @@index([organizationId])
+  @@index([insuranceLineId])
+  /// The entry control's own query — "which variants has this office already used for this line"
+  /// — so offering the existing ones is the default path rather than a discipline.
+  @@index([organizationId, insuranceLineId, variantKey], map: "CommissionAgreement_variant_lookup_idx")
 }
 
 /// Process 35–36 — the governed commission earned on a policy. #35 records the
@@ -3441,6 +3546,11 @@ model WatchlistEntry {
   /// published generation and in the one being downloaded beside it.
   @@unique([source, sourceRecordId, datasetVersionId])
   @@index([normalizedName])
+  /// Declared, not added — the database has had this index since
+  /// `20260911120000_screening_provider_and_matching`, and no migration accompanies the
+  /// declaration. It showed as a DROP in `migrate diff`, so the next generated migration
+  /// would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([canonicalTokens], type: Gin)
   @@index([source])
   @@index([datasetVersionId])
 }
@@ -3595,6 +3705,14 @@ model ScreeningMatch {
   @@index([assignedToUserId, caseStatus])
   @@index([caseStatus])
   @@index([organizationId])
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([listType, status])
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([screeningRequestId])
 }
 
 /// Part B §16 — a note on a screening case.
@@ -3648,6 +3766,11 @@ model WatchlistSyncRun {
   /// that has since grown, which the screening hold reports.
   addedCount   Int?
   errorMessage String?
+
+  /// Declared, not added — the database has had this index since `20260911120000_screening_provider_and_matching`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([status, completedAt(sort: Desc)])
 }
 
 /// Process 51 — configurable compliance calendar for CBJ regulatory
@@ -4453,6 +4576,22 @@ enum EmailIntegrationStatus {
   ERROR
 }
 
+/// The GLOBAL catalogue of insurance companies, shared by every office.
+///
+/// FORWARD NOTE, for whoever weighs retiring this model — read
+/// `docs/insurer-master-registry.md` § "the global half's reach SHRINKS over time" before
+/// deciding, because the cost of retirement falls on its own.
+///
+/// Nothing on a registration path creates a row here. Under the directory design every newly
+/// registered insurer is LOCAL: the office registers the company, the canonical name key
+/// deduplicates it per office, and the cross-office directory is how other offices find it. So
+/// this table is the identity of the companies that were seeded into it and of no new ones, and
+/// it is vestigial on the write side.
+///
+/// Two things retire together or not at all: `InsurerFormTemplate` hangs off this model and
+/// `insurerMasterId` is NOT NULL, so it can only ever serve master-linked companies. If this
+/// goes, the global form template goes with it and `OfficeInsurerFormTemplate` becomes the only
+/// path — a coherent end state, not a loss, for a set of companies that stops growing.
 model InsurerMaster {
   id           String   @id @default(uuid())
   /// Unique platform-wide, which is what makes "one row per real company"
@@ -4463,6 +4602,10 @@ model InsurerMaster {
   /// e.g. ["MOTOR","LIFE","MARINE","HEALTH"] — what this company writes at
   /// all, distinct from `InsurerProduct`, which is what ONE office actually
   /// places with them.
+  /// Conventional, takaful, or a takaful window inside a conventional company.
+  /// What the company offers, on the GLOBAL row. Untouched by the managed-line
+  /// vocabulary: the catalogue is vestigial (no new registration creates a master),
+  /// and the directory reads `InsurerOfferedLine`, not this column.
   linesOffered String[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -4483,7 +4626,42 @@ model InsurerFormTemplate {
   id                String        @id @default(uuid())
   insurerMasterId   String
   insurerMaster     InsurerMaster @relation(fields: [insurerMasterId], references: [id])
-  insuranceLine     String
+  /// The managed line this form is FOR — the GLOBAL catalogue only, never an office's own
+  /// addition, and that restriction is structural rather than stylistic.
+  ///
+  /// `InsurerFormTemplate` carries no `organizationId`: it hangs off `InsurerMaster`, so one
+  /// mapping is read by EVERY office (that is the whole point of § 5 — an office that has never
+  /// touched an insurer still gets the mapping someone else made). An `OfficeInsuranceLine`
+  /// belongs to exactly one office, so referencing one from a globally-readable row would put
+  /// office A's private vocabulary on a row office B reads — a cross-office disclosure of the
+  /// kind the insurer directory exists to prevent. And there is no composite-FK guard available
+  /// here, because a global child has no `organizationId` to agree with its parent.
+  ///
+  /// WHAT WOULD LEGITIMATELY END THIS RESTRICTION was stated here as "this model becoming
+  /// OFFICE-SCOPED, which Q9 will do". **Q9 has now landed and did NOT do that**, so the
+  /// restriction stands and this note records why rather than leaving a prediction that was
+  /// overtaken.
+  ///
+  /// Q9 is `OfficeInsurerFormTemplate`, a SECOND model hanging off the office-scoped `Insurer`.
+  /// Adding `organizationId` here would have withdrawn Part I §5's promise silently:
+  /// `applyTenantScope` filters every query on any model that carries the column, and the scoped
+  /// set is derived from the DMMF, so a row readable by every office and a table the extension
+  /// scopes are mutually exclusive. The inversion the old note predicted DID happen — but on the
+  /// new model, where an office's own added line is a legitimate referent because the row is
+  /// readable by one office, and where the composite-FK guard `(officeInsuranceLineId,
+  /// organizationId)` is available because that child carries an `organizationId` to agree with.
+  ///
+  /// So `insurerMasterId` stays NOT NULL here, correctly: a globally shared mapping is a fact
+  /// about a catalogue company. The gap the old note named — "for a LOCALLY registered company a
+  /// form template is unrepresentable" — is closed by the new model, which hangs off `Insurer`
+  /// and therefore needs no `insurerMasterId` at all.
+  ///
+  /// Keyed by uuid rather than `code` deliberately, despite `InsuranceLine.code`'s own warning
+  /// that uuids differ between databases: that warning applies to anything SEEDED, which must
+  /// mean the same line in two databases. A form template is runtime data created in one
+  /// database, so the FK is the right reference and the uuid is the right key.
+  insuranceLineId   String
+  insuranceLine     InsuranceLine @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
   version           Int           @default(1)
   /// The originally uploaded PDF/Word this mapping was derived from.
   sourceDocumentRef String?
@@ -4494,7 +4672,7 @@ model InsurerFormTemplate {
   /// One version of a given line's form per insurer. A re-map is a NEW
   /// version, never an edit of the one other offices are already submitting
   /// against.
-  @@unique([insurerMasterId, insuranceLine, version])
+  @@unique([insurerMasterId, insuranceLineId, version])
   @@index([insurerMasterId])
 }
 
@@ -4530,18 +4708,388 @@ enum InsurerFormFieldType {
   BOOLEAN
 }
 
+/// Q9 — an office's OWN mapped submission form for a company only it deals with.
+///
+/// A SECOND model rather than an `organizationId` on `InsurerFormTemplate`, and the
+/// reasoning is the whole point of the pair. `InsurerFormTemplate` hangs off the global
+/// `InsurerMaster`, so one mapping is readable by EVERY office — Part I §5's promise that
+/// two offices never re-map the same objectively-identical PDF. `applyTenantScope` adds
+/// `where: { organizationId }` to every query on any model that carries the column, and the
+/// scoped set is derived from the DMMF, so a shared row and a scoped table are mutually
+/// exclusive. Adding the column there would have withdrawn §5 silently.
+///
+/// This one hangs off the office-scoped `Insurer`, whose `insurerMasterId` is already
+/// nullable — so it serves a locally registered company and a catalogue-linked one with the
+/// same shape, and needs no `insurerMasterId` of its own. That is how the gap Q9 exists to
+/// close ("for a locally registered company a form template is unrepresentable") disappears
+/// instead of being patched.
+///
+/// It is NOT a private edit of a shared mapping. Nothing here writes, versions or supersedes
+/// an `InsurerFormTemplate` row; an office's own form takes precedence FOR THAT OFFICE and
+/// the shared row is untouched and unaware.
+model OfficeInsurerFormTemplate {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  /// This office's own insurer row. Not `insurerMasterId`: the office relationship is the
+  /// thing a private form belongs to, and it exists for locally registered companies too.
+  insurerId String
+  insurer   Insurer @relation(fields: [insurerId], references: [id])
+
+  /// The line this form is FOR — catalogue OR this office's own addition, exactly one.
+  ///
+  /// This is where the restriction on `InsurerFormTemplate.insuranceLineId` INVERTS, as
+  /// IMPROVEMENTS.md §1.26 predicted it would. There, a row is readable by every office, so
+  /// pointing at one office's private vocabulary would be a cross-office disclosure. Here the
+  /// row is readable by ONE office, so its own added line is a legitimate referent — an office
+  /// that added "Pet" and holds that insurer's Pet form is precisely the case Q9 serves.
+  ///
+  /// The composite-FK guard that was unavailable on the global model is available here,
+  /// because the child finally has an `organizationId` to agree with: see the migration's
+  /// `_office_line_same_org_fkey`, which Prisma cannot express.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  version           Int      @default(1)
+  sourceDocumentRef String?
+  createdAt         DateTime @default(now())
+  /// Stored, unlike the global table which records its author only in the audit log: "who
+  /// mapped this" is the first question asked when a submission is rejected.
+  createdByUser     User     @relation(fields: [createdByUserId], references: [id])
+  createdByUserId   String
+
+  fields OfficeInsurerFormField[]
+
+  /// One version per line per insurer, expressed as TWO uniques over the nullable columns
+  /// rather than one over a derived key. Safe because the database's
+  /// `OfficeInsurerFormTemplate_exactly_one_line` CHECK (not expressible here) guarantees
+  /// exactly one is non-null, so every row is constrained by the index whose column is NOT
+  /// null. A `GENERATED` COALESCE key was written first and removed after measuring that this
+  /// shape already refuses the duplicate — it bought nothing and cost a divergence entry.
+  @@unique([insurerId, insuranceLineId, version], map: "OfficeInsurerFormTemplate_insurerId_insuranceLineId_version_key")
+  @@unique([insurerId, officeInsuranceLineId, version], map: "OfficeInsurerFormTemplate_insurerId_officeLineId_version_key")
+  /// The target of `OfficeInsurerFormField`'s composite foreign key.
+  @@unique([id, organizationId])
+  @@index([organizationId, insurerId, insuranceLineId, version(sort: Desc)], map: "OfficeInsurerFormTemplate_resolve_standard_idx")
+  @@index([organizationId, insurerId, officeInsuranceLineId, version(sort: Desc)], map: "OfficeInsurerFormTemplate_resolve_office_idx")
+  @@index([organizationId])
+}
+
+/// A field on an office's own form mapping.
+///
+/// Carries `organizationId` even though its parent already does, because of the Phase 1 RBAC
+/// outage: an RLS policy scoped through a JOIN to a parent can never be satisfied, since
+/// `tenantScopeExtension` sets `app.current_org_id` only for models that CARRY the column. The
+/// drift that denormalizing invites is answered structurally by the composite FK
+/// `(templateId, organizationId)`, which Prisma cannot express — see the migration.
+model OfficeInsurerFormField {
+  id             String       @id @default(uuid())
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  templateId String
+  template   OfficeInsurerFormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fieldKey     String
+  labelEn      String
+  labelAr      String?
+  dataType     InsurerFormFieldType
+  isRequired   Boolean              @default(false)
+  options      String[]
+  displayOrder Int
+
+  @@unique([templateId, fieldKey])
+  @@index([templateId])
+  @@index([organizationId])
+}
+
+/// The two halves of the market classification. Not a regulatory taxonomy: the
+/// Central Bank of Jordan regulates the sector but publishes only this
+/// general/life split, so this enum is the part that IS authoritative and the 32
+/// lines below it are practical seed data an office extends.
+enum InsuranceLineCategory {
+  GENERAL
+  LIFE
+}
+
+/// How a company is structured, as a fact about the COMPANY rather than a doubling
+/// of its product list.
+///
+/// A boolean cannot carry this: the Jordanian market has takaful windows operating
+/// inside otherwise conventional insurers, which is neither of two values. The third
+/// value costs nothing if windows turn out not to be permitted; a boolean that turns
+/// out to be insufficient costs a migration.
+///
+/// Deliberately NOT modelled as separate takaful lines. Takaful is a structure, and
+/// doubling 32 entries to 64 would break vocabulary search for no gain — a client
+/// needing Sharia-compliant motor cover wants Motor Comprehensive from a takaful
+/// company, not a different product.
+enum InsurerStructure {
+  CONVENTIONAL
+  TAKAFUL
+  TAKAFUL_WINDOW
+}
+
+/// A standard insurance line — GLOBAL, and read-only from the application.
+///
+/// ## Why this table is global and has no Organization column
+///
+/// The vocabulary is what makes anything match anything. Free text means
+/// "مركبات", "تأمين مركبات" and "سيارات" are three unrelated values: directory
+/// search fails, a policy's line never matches an insurer's, and every report
+/// fragments. A closed list means waiting on a release whenever the market invents
+/// a product — the external dependency this whole design exists to remove. So the
+/// answer is a managed list with office-side additions, and this is the managed
+/// half.
+///
+/// **Nothing in the application writes this table.** There is no service, no
+/// endpoint and no repository write method; rows arrive by seed and change only in
+/// a release. That is what keeps the permission-grid invariant intact without
+/// copying 32 rows into every office — no code can have an effect outside the
+/// granting office through a table no code writes at all. Copying them per office
+/// would also recreate the Phase 2 seed-drift problem, where a later correction to
+/// a standard name never reaches an office that already holds its own copy.
+///
+/// An office that wants to hide a standard line it never sells needs a per-office
+/// PREFERENCE against a global row, not ownership of the row. Nothing needs that
+/// yet.
+model InsuranceLine {
+  id           String                @id @default(uuid())
+  /// Stable machine name, unique platform-wide. This and not the uuid is what a
+  /// seed upserts on and what a report groups by: the uuid differs between
+  /// databases because each seeds its own rows, so anything that had to mean the
+  /// same line across two databases would be wrong keyed on the id.
+  code         String                @unique
+  nameEn       String
+  nameAr       String
+  category     InsuranceLineCategory
+  /// Presentation order within a category — the order the list was given in, which
+  /// is neither alphabetical nor by code. The four engineering lines share a name
+  /// prefix and sit together here; that grouping is visual, not a hierarchy, because
+  /// an insurer may write one of them and not another.
+  displayOrder Int
+  createdAt    DateTime              @default(now())
+
+  offeredBy             InsurerOfferedLine[]
+  formTemplates         InsurerFormTemplate[]
+  officeFormTemplates   OfficeInsurerFormTemplate[]
+  insuranceProgramLines InsuranceProgramLine[]
+  rfqs                  RFQ[]
+  policies              Policy[]
+  commissionAgreements  CommissionAgreement[]
+
+  @@index([category, displayOrder])
+}
+
+/// A line type an office added because the standard list did not have it.
+///
+/// Office-scoped exactly like `Insurer`: two offices adding the same new type
+/// create two rows, and the directory aggregates them by canonical name the same
+/// way it aggregates companies. An addition never reaches another office's picker
+/// directly, which is the same boundary every other tenant-scoped table keeps.
+model OfficeInsuranceLine {
+  id             String                @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
+  /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
+  organizationId String                @default(dbgenerated())
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  nameEn         String
+  nameAr         String
+  category       InsuranceLineCategory
+
+  /// `canonicalNameKey()` of each name, STORED so a unique index can enforce
+  /// "once per office" — which is a database invariant, not something a writer
+  /// remembers to check (ibms-brain/meta/lex/race-safe-invariants.md). A derived
+  /// column invites drift, so exactly one function computes both and one service
+  /// writes them.
+  ///
+  /// Two keys rather than one combined key, because the same type can be added by
+  /// two people who agree on the Arabic name and differ on the English one, and
+  /// either collision is a duplicate.
+  canonicalEn String
+  canonicalAr String
+
+  createdAt       DateTime @default(now())
+  createdByUser   User     @relation(fields: [createdByUserId], references: [id])
+  /// Who added it. A vocabulary entry the whole office then picks from is exactly
+  /// the kind of change that needs an attributable author.
+  createdByUserId String
+
+  offeredBy             InsurerOfferedLine[]
+  insuranceProgramLines InsuranceProgramLine[]
+  rfqs                  RFQ[]
+  policies              Policy[]
+  commissionAgreements  CommissionAgreement[]
+  officeFormTemplates   OfficeInsurerFormTemplate[]
+
+  /// Once per office, per script.
+  @@unique([organizationId, canonicalEn])
+  @@unique([organizationId, canonicalAr])
+  /// The target of `InsurerOfferedLine`'s composite foreign key — see that model.
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+/// Which lines a registered company OFFERS.
+///
+/// This is the COMPANY half of the boundary, and the distinction from
+/// `InsurerProduct` is the whole reason it is a separate table: `InsurerProduct` is
+/// what THIS office actually places with this insurer — a relationship fact that
+/// must never cross an office boundary — while this is what the company sells, which
+/// is public and is what a cross-office directory search is for.
+///
+/// A row points at EITHER a standard line or one of the office's own additions,
+/// never both and never neither, enforced by a CHECK rather than by convention.
+model InsurerOfferedLine {
+  id             String       @id @default(uuid())
+  /// Part I §3.2 (multi-tenancy) — the Organization this row belongs to.
+  /// Supplied by `tenantScopeExtension`, never by hand.
+  ///
+  /// DENORMALIZED from `Insurer.organizationId` for the same reason
+  /// `RolePermission.organizationId` is: a table with an RLS policy but no
+  /// `organizationId` has a policy nothing can satisfy, because the extension sets
+  /// `app.current_org_id` only for models carrying this column. The drift worry is
+  /// answered structurally — composite foreign keys `(insurerId, organizationId)`
+  /// and `(officeInsuranceLineId, organizationId)` (raw SQL in the migration;
+  /// Prisma models the single-column relations below and does not express those)
+  /// make a row that claims an office its parent does not belong to unINSERTable.
+  organizationId String       @default(dbgenerated())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  insurerId String
+  insurer   Insurer @relation(fields: [insurerId], references: [id])
+
+  /// Exactly one of these two is set.
+  /// `onDelete: Restrict`, not Prisma's SET NULL default for an optional relation —
+  /// the same correction `PaymentChannel` carries. SET NULL would turn "this insurer
+  /// offers Marine Cargo" into a row offering nothing, which the
+  /// `InsurerOfferedLine_exactly_one_line` CHECK would then refuse anyway; RESTRICT
+  /// says the real rule, which is that a line something references is not deletable.
+  insuranceLineId       String?
+  insuranceLine         InsuranceLine?       @relation(fields: [insuranceLineId], references: [id], onDelete: Restrict)
+  officeInsuranceLineId String?
+  officeInsuranceLine   OfficeInsuranceLine? @relation(fields: [officeInsuranceLineId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  /// Once per insurer per line. Both columns are nullable, so Postgres treats
+  /// NULLs as distinct — which is what makes these two uniques correct rather than
+  /// conflicting: an insurer may hold many rows whose `insuranceLineId` is NULL
+  /// (its office-added lines) while still being unable to hold the same standard
+  /// line twice.
+  @@unique([insurerId, insuranceLineId])
+  @@unique([insurerId, officeInsuranceLineId])
+  @@index([organizationId])
+  @@index([insuranceLineId])
+}
+
 /// Part I §5 — ONE OFFICE'S working relationship with a master insurer, not
 /// the insurer itself. The company's identity moved to `InsurerMaster`; what
 /// stays here is what genuinely differs per office and must never be visible
 /// to another one: the negotiated commercial terms and the named contacts.
 model Insurer {
-  id              String        @id @default(uuid())
+  id              String         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId  String        @default(dbgenerated())
-  organization    Organization  @relation(fields: [organizationId], references: [id])
-  insurerMasterId String
-  insurerMaster   InsurerMaster @relation(fields: [insurerMasterId], references: [id])
+  organizationId  String         @default(dbgenerated())
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  /// The GLOBAL company this relationship is with — NULLABLE, and that is the
+  /// whole insurer-management feature.
+  ///
+  /// An office must be able to register an insurer that is in no catalogue, so
+  /// a global row cannot be a prerequisite. Auto-creating one behind the scenes
+  /// was rejected for a reason worth keeping written down:
+  /// `InsurerMaster.legalName` is unique PLATFORM-WIDE, so office A entering
+  /// "Acme Insurance" would collide with office B's entry — turning an error
+  /// message into an oracle for what other offices deal with, and giving an
+  /// office a way to probe by name. There is no wording that makes that error
+  /// safe, which is what makes it a data-model problem rather than a copy one.
+  ///
+  /// NULL means the identity below is authoritative. A row with neither is
+  /// nameless, which a CHECK constraint refuses — see the migration.
+  insurerMasterId String?
+  /// `onDelete: Restrict` is DECLARED rather than defaulted, and the declaration is the fix
+  /// for a real divergence. The database has enforced `ON DELETE RESTRICT` since
+  /// `20260929100000_insurer_master_split` created this FK; Prisma's default for an OPTIONAL
+  /// relation is `SetNull`, so the schema silently described a weaker rule than the database
+  /// enforces. Measured with `migrate diff --from-migrations --to-schema-datamodel`: the one
+  /// statement pair in that diff that was NOT a Prisma-inexpressible object was this FK being
+  /// dropped and recreated as `SET NULL` — meaning the next auto-generated migration would
+  /// have quietly weakened it.
+  ///
+  /// RESTRICT is the right rule: nulling `insurerMasterId` would convert a catalogue-linked
+  /// insurer into a locally registered one carrying no `legalName`, which `Insurer_has_identity`
+  /// forbids — so the delete fails either way, and this way it fails as the foreign-key
+  /// violation it is rather than as a confusing CHECK violation on an unrelated column.
+  insurerMaster   InsurerMaster? @relation(fields: [insurerMasterId], references: [id], onDelete: Restrict)
+
+  /// Office-local identity, populated ONLY when `insurerMasterId` is NULL.
+  ///
+  /// Both scripts are required for a local row, for the same reason Phase 1 made
+  /// them required on `Role`: Arabic is this system's primary language, and a
+  /// name that exists only in Latin script shows up untranslated mid-sentence on
+  /// an Arabic page. `insurer-identity.ts` coalesces master name over local name
+  /// — the global catalogue is the authority whenever there is a link, so a
+  /// local override would be a second source of truth for one fact.
+  legalName     String?
+  legalNameAr   String?
+  /// GENERATED BY THE DATABASE — `canonical_name_key("legalName")`, STORED. Prisma has no
+  /// syntax for a generated column, so it appears here as an ordinary optional field:
+  /// **never write it.** Postgres refuses the write, which is the point — the application
+  /// cannot get this value wrong because it does not supply it.
+  ///
+  /// The single definition of "are these two names the same name": alef forms, diacritics,
+  /// tatweel, ة/ه, ى/ي, the definite article, punctuation and word order. The insurer
+  /// directory groups by it and `Insurer_one_local_company_per_org` enforces one local
+  /// company per office on it, so registration now refuses exactly what the directory
+  /// merges. Before this, registration refused on `lower(legalName)` and the two disagreed
+  /// — measurably: two rows accepted, one directory entry shown.
+  ///
+  /// NULL for a catalogue-linked row, which has no local name and groups by
+  /// `insurerMasterId` instead. Inside the partial index's scope it can never be NULL,
+  /// because `Insurer_has_identity` guarantees a row with no catalogue link has a name.
+  canonicalName String?
+
+  /// Conventional, takaful, or a takaful window inside a conventional company.
+  /// A COMPANY-level fact, so the directory may show it; nullable because every
+  /// insurer registered before this column existed has no answer and inventing one
+  /// would be worse than an absent one. Required by the registration DTO.
+  ///
+  /// This replaced a free-text `linesOffered String[]`, which nothing ever wrote —
+  /// what the company offers is now `InsurerOfferedLine`, pointing at the managed
+  /// vocabulary, because three spellings of one line are three unrelated values to
+  /// every search and report that reads them.
+  structure InsurerStructure?
+
+  /// COMPANY-level contact details — the switchboard and the general mailbox, not
+  /// a person this office deals with.
+  ///
+  /// The distinction is the directory boundary, not tidiness. These four describe
+  /// the company and are therefore safe to show across offices; the
+  /// `rfqContact*` / `claimsContact*` / `underwriterContact` fields below are
+  /// RELATIONSHIP contacts — the named people who answer THIS office — and must
+  /// never leave it. A field added to the wrong group is a disclosure, so the two
+  /// groups are kept apart here and named so the difference survives a skim.
+  ///
+  /// Phone and email are REQUIRED at registration and nullable in the column, and
+  /// that is not a contradiction: every insurer registered before this existed has
+  /// neither, and backfilling a phone number nobody knows would be inventing data.
+  /// The DTO is what requires them, so the rule applies to new registrations only.
+  companyPhone                 String?
+  companyEmail                 String?
+  /// Optional: it lets somebody check what a company offers before making the
+  /// call, but demanding it would add friction to registration for no gain. Stored
+  /// as entered, which may be scheme-less ("petra.jo") — a renderer has to prepend
+  /// a scheme rather than emit it as a relative href.
+  companyWebsite               String?
+  /// Optional, and specifically the address that FORMAL PAPERWORK goes to — a
+  /// brokerage agreement has to be sent somewhere. Not a head-office location and
+  /// not a branch list.
+  companyCorrespondenceAddress String?
 
   /// Part I §10.2 — three DIFFERENT people, not one generic contact: pricing
   /// and RFQ, claims, and underwriting.
@@ -4559,7 +5107,17 @@ model Insurer {
   isActive                Boolean  @default(true)
   createdAt               DateTime @default(now())
 
+  /// What the COMPANY offers — directory-visible. Replaced `linesOffered String[]`,
+  /// which was free text with no referent and which nothing had ever written.
+  offeredLines         InsurerOfferedLine[]
+  /// What THIS office places with them — a relationship fact that never leaves the
+  /// office. The two are deliberately different tables; see `InsurerOfferedLine`.
   products             InsurerProduct[]
+  /// This office's OWN mapped submission forms for this company (Q9). Distinct from
+  /// `InsurerMaster.formTemplates`, which is the GLOBAL mapping every office shares —
+  /// see `OfficeInsurerFormTemplate` for why the two are separate models rather than
+  /// one table with an `organizationId`.
+  officeFormTemplates  OfficeInsurerFormTemplate[]
   slaAgreements        InsurerSlaAgreement[]
   rfqSubmissions       RFQInsurer[]
   quotations           Quotation[]
@@ -4572,8 +5130,16 @@ model Insurer {
   /// One relationship row per office per real insurer. Without this an office
   /// could hold two divergent sets of commercial terms for the same company.
   @@unique([organizationId, insurerMasterId])
+  /// The target of `InsurerOfferedLine`'s composite foreign key — the same
+  /// structural answer to denormalized-org drift that `Role` carries for
+  /// `RolePermission`.
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@index([insurerMasterId])
+  /// Declared, not added — the database has had this index since `20261013100000_one_canonical_name_key`, and no migration
+  /// accompanies the declaration. It showed as a DROP in `migrate diff`, so the next
+  /// generated migration would have removed a real index. IMPROVEMENTS.md § 1.30.
+  @@index([canonicalName])
 }
 
 /// Narrative process 31 — "Products / Classes" per insurer, the lines of
@@ -4590,6 +5156,14 @@ model InsurerProduct {
   productName    String?
   isActive       Boolean      @default(true)
 
+  /// One row per line per insurer. A plain compound unique, not a partial one —
+  /// neither column is nullable, so there is no NULL-collision trap here.
+  ///
+  /// Added when this model got its first reader: the insurer screen replaces the
+  /// whole line set in one transaction, and "this insurer offers this line, once"
+  /// is a database invariant rather than something the writer remembers to check
+  /// (ibms-brain/meta/lex/race-safe-invariants.md).
+  @@unique([insurerId, insuranceLine])
   @@index([organizationId])
 }
 
@@ -4692,6 +5266,33 @@ model AuditLogEntry {
   beforeValue           Json?
   afterValue            Json?
   isSensitiveDataAccess Boolean      @default(false) // Part 10.3: reads of Sensitive Personal Data specifically flagged
+  /// The roles this actor HELD AT THE MOMENT OF THE ACTION — stored, never resolved later.
+  ///
+  /// Both halves are needed and neither substitutes for the other:
+  ///
+  ///  * `actorRoleIds` identifies WHICH `Role` rows, which survives a rename and is what a
+  ///    reviewer follows to the grant history.
+  ///  * `actorRoleNames` captures the LABEL as it stood. An office can rename its own roles
+  ///    (`/settings/roles`), and a rename must not retroactively relabel every historical entry
+  ///    — "approved by Claims Triage Desk" cannot silently become "approved by Legacy Desk".
+  ///
+  /// Why stored rather than joined: roles are mutable. A promotion, a revocation, or a role
+  /// retirement would otherwise rewrite what every past entry appears to say about that person —
+  /// silently, with no trace, on an append-only table. This is the one audit field that cannot be
+  /// backfilled later, because a role held in the past that was never written down is not
+  /// recoverable from anything.
+  ///
+  /// EMPTY IS MEANINGFUL, not missing: a write with no authenticated actor in context — a
+  /// scheduled sweep, a seed, or the session-rejection paths that audit their own refusal — held
+  /// no role. Rows predating migration `20261017100000` are also empty, which honestly says "not
+  /// recorded" rather than inventing a role for them.
+  /// `@default([])` is DECLARED because the database has it: migration `20261017100000` added both
+  /// columns `NOT NULL DEFAULT '{}'`, which is what gave 5,934,528 existing rows a value without
+  /// rewriting the largest table in the database. Undeclared, `db:divergence` caught it
+  /// immediately — the next generated migration would have DROPPED those defaults, and then an
+  /// insert omitting the field would fail against a NOT NULL column.
+  actorRoleIds          String[]     @default([])
+  actorRoleNames        String[]     @default([])
   occurredAt            DateTime     @default(now())
 
   @@index([entityType, entityId])

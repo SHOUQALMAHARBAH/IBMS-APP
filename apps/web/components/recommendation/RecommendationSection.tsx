@@ -27,6 +27,7 @@ import type { TranslationKey } from '../../lib/i18n/translations';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { DeactivatedInsurerBadge } from '../insurer/DeactivatedInsurerBadge';
 
 const FACTOR_LABEL_KEY: Record<keyof RationaleFactors, TranslationKey> = {
   coverage: 'recFactorCoverage',
@@ -301,6 +302,9 @@ export function RecommendationSection({
             }}
           >
             <strong>{rec.recommendedQuotation.insurer.name}</strong>
+            <DeactivatedInsurerBadge
+              isActive={rec.recommendedQuotation.insurer.isActive}
+            />
             <span style={rfqBadgeStyle}>
               {rec.sentToClientAt
                 ? t('recSentToClientBadge')

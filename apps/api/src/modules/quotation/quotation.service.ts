@@ -30,6 +30,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CaptureQuotationDto } from './dto/capture-quotation.dto';
 import type { ReviseQuotationDto } from './dto/revise-quotation.dto';
 import type { ListQuotationsQueryDto } from './dto/list-quotations-query.dto';
+import { insurerIdentity } from '../../repositories/insurer-identity';
 
 /** One insurer's full quotation history on one RFQ line — the shape every
  * quotation read returns. `current` is the live version (`isCurrentVersion`);
@@ -41,7 +42,11 @@ export interface QuotationChainView {
   rfqId: string;
   insurerId: string;
   insuranceLine: string;
-  insurer: QuotationWithContext['insurer'];
+  /** The RESOLVED identity, not the Prisma join. Declaring this as
+   *  `QuotationWithContext['insurer']` is what hid the defect: the API type said
+   *  "whatever Prisma returns" while the web type said "what I wish it returned",
+   *  and neither side ever met the other. */
+  insurer: ReturnType<typeof insurerIdentity>;
   current: QuotationWithContext;
   versions: QuotationWithContext[];
   history: NegotiationRound[];
@@ -249,7 +254,12 @@ export class QuotationService {
         rfqId: head.rfqId,
         insurerId: head.insurerId,
         insuranceLine: head.rfq.insuranceLine,
-        insurer: head.insurer,
+        // Flattened, not raw. This carried the Prisma join straight to the wire,
+        // so `insurer.name` was undefined and `QuotationsSection.tsx` rendered a
+        // blank insurer on every chain. Same defect as the comparison had, same
+        // cause: Part I §5 moved identity onto `InsurerMaster` and the views that
+        // did not go through `insurerIdentity()` silently stopped naming anybody.
+        insurer: insurerIdentity(head.insurer),
         current: ordered.find((v) => v.isCurrentVersion) ?? head,
         versions: ordered,
         history: buildNegotiationHistory(ordered),

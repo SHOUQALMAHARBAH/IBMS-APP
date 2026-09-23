@@ -303,22 +303,35 @@ export class InvoiceRepository {
       SELECT
         i.id AS "invoiceId",
         p."insurerId",
-        im."legalName" AS "insurerName",
+        -- COALESCE, not im."legalName": an office-local insurer has no master
+        -- row and carries its own name. See the LEFT JOIN below.
+        COALESCE(im."legalName", ins."legalName") AS "insurerName",
         i."premiumAmount",
         i."commissionDeducted",
         -- The instalment that COMPLETED collection starts the clock: the
         -- broker owes nothing onward until the premium is whole.
         MAX(r."receivedAt") AS "collectedAt"
       FROM "Invoice" i
-      -- INNER joins: the WHERE already requires a policy, and an insurer is
-      -- mandatory on one.
+      -- These two stay INNER: the WHERE already requires a policy, and an
+      -- insurer is mandatory on one. The InsurerMaster join below is not.
       JOIN "Policy" p ON p.id = i."policyId"
       JOIN "Insurer" ins ON ins.id = p."insurerId"
-      -- Part I §5: the company's name lives on the GLOBAL InsurerMaster now;
-      -- an Insurer row is only this office's relationship with it. Every one
-      -- of them has a master (NOT NULL + FK), so this stays an INNER join.
-      -- (No backticks in this comment: it sits inside a template literal.)
-      JOIN "InsurerMaster" im ON im.id = ins."insurerMasterId"
+      -- LEFT join, and the reason is the worst failure shape available.
+      --
+      -- Part I §5 put the company's name on the GLOBAL InsurerMaster, and this
+      -- was an INNER join because every Insurer row had a master (NOT NULL +
+      -- FK). Insurer management removed that: an office can register a company
+      -- that is in no catalogue, so insurerMasterId is nullable.
+      --
+      -- An INNER join would therefore silently DROP every invoice whose insurer
+      -- is office-local -- a financial report quietly missing rows, with no
+      -- error anywhere and nothing to notice. Hence LEFT, with the COALESCE
+      -- above supplying the name from whichever source the row has.
+      --
+      -- im.id stays in the GROUP BY: it is NULL for a local insurer, and a NULL
+      -- group is a group. (No backticks in this comment: it sits inside a
+      -- template literal.)
+      LEFT JOIN "InsurerMaster" im ON im.id = ins."insurerMasterId"
       JOIN "Receipt" r
         ON r."invoiceId" = i.id
        AND r."receivedAt" < ${scope.asOfExclusiveUpper}

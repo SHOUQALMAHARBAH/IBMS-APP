@@ -216,6 +216,30 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       .set(bearer(dpo.accessToken))
       .expect(201);
 
+    // AND an UNCONFIRMED period still refuses, with the hold gone. Two independent gates:
+    // releasing the hold does not make a draft period actionable. Destroying records against a
+    // number nobody has legally confirmed is the one step in this workflow that cannot be
+    // undone, and the dual control below governs WHO approves, not whether the period is real.
+    const unconfirmed = await request(app.getHttpServer())
+      .post('/disposal-batches')
+      .set(bearer(manager.accessToken))
+      .send({ retentionScheduleItemId: itemId })
+      .expect(422);
+    expect(JSON.stringify(unconfirmed.body)).toContain(
+      'has not been confirmed by legal counsel',
+    );
+    // Named, so the officer can see WHICH category is blocking.
+    expect(JSON.stringify(unconfirmed.body)).toContain(category);
+
+    // confirm the period — the act this gate exists to require
+    const legallyConfirmed = await request(app.getHttpServer())
+      .post(`/retention-schedule/${itemId}/confirm`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+    expect(
+      (legallyConfirmed.body as RetentionScheduleItemBody).isConfirmed,
+    ).toBe(true);
+
     // now nomination succeeds — the exclusion is re-derived live, not cached
     const batchRes = await request(app.getHttpServer())
       .post('/disposal-batches')
@@ -311,15 +335,9 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       .expect(201);
     expect((closed.body as DisposalBatchBody).status).toBe('CLOSED');
 
-    // confirm the retention-schedule item by Legal Counsel (Compliance,
-    // standing in for Legal Counsel — no such role exists in this RBAC grid)
-    const confirmed = await request(app.getHttpServer())
-      .post(`/retention-schedule/${itemId}/confirm`)
-      .set(bearer(compliance.accessToken))
-      .expect(201);
-    expect((confirmed.body as RetentionScheduleItemBody).isConfirmed).toBe(
-      true,
-    );
+    // The confirm step moved EARLIER in this flow — nomination now requires it, so it is
+    // exercised above, before the batch exists. Confirming again here would be refused, which
+    // is itself correct: a confirmed period is a record, not an editable draft.
 
     // a confirmed item can no longer be edited
     await request(app.getHttpServer())
@@ -529,6 +547,13 @@ describe('Data Retention & Secure Disposal (e2e) — backlog Part D, Process #52
       })
       .expect(201);
     const itemId = (item.body as { id: string }).id;
+
+    // Confirm the period first: nomination refuses a draft, and this test is about the
+    // maker/checker refusal rather than about that gate.
+    await request(app.getHttpServer())
+      .post(`/retention-schedule/${itemId}/confirm`)
+      .set(bearer(both.accessToken))
+      .expect(201);
 
     const batch = await request(app.getHttpServer())
       .post('/disposal-batches')

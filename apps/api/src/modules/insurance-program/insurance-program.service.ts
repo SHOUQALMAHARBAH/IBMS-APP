@@ -19,6 +19,7 @@ import {
 import { NeedsAssessmentRepository } from '../../repositories/needs-assessment.repository';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
+import { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
@@ -98,6 +99,7 @@ export class InsuranceProgramService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    private readonly lines: InsuranceLineRepository,
   ) {}
 
   private canReachAnyCustomer(actor: AuthenticatedUser): boolean {
@@ -185,19 +187,46 @@ export class InsuranceProgramService {
     );
   }
 
-  private toLineInputs(
+  /**
+   * Turns assembled lines into rows, resolving each coverage mapping's catalogue CODE into the
+   * line id the FK needs.
+   *
+   * Async now, and that is the whole change: the code is what `insurance-program.config.ts` can
+   * state, and the id differs between databases because each seeds its own rows — so a lookup is
+   * unavoidable. ONE `listStandard()` call for the whole programme (32 rows), not one per line.
+   *
+   * A line whose code resolves to nothing lands with a NULL FK and its string, and says so in the
+   * log rather than silently. That is reachable two ways: an unmapped coverage string (see
+   * `AssembledProgramLine.lineCode`), or a code in the config that the catalogue does not have —
+   * which `insurance-program.config.spec.ts` now makes a failing test, so it should never reach
+   * here.
+   */
+  private async toLineInputs(
     lines: readonly AssembledProgramLine[],
-  ): InsuranceProgramLineInput[] {
-    return lines.map((line) => ({
-      insuranceLine: line.insuranceLine,
-      // Already a fils-precision string off deriveSumInsured — quantize again
-      // at the persistence boundary per money-decimal-jod.md rather than
-      // trusting the upstream format.
-      sumInsuredBasis:
-        line.sumInsuredBasis == null
-          ? null
-          : quantizeMoney(line.sumInsuredBasis),
-    }));
+  ): Promise<InsuranceProgramLineInput[]> {
+    const catalogue = await this.lines.listStandard();
+    const idByCode = new Map(catalogue.map((l) => [l.code, l.id]));
+
+    return lines.map((line) => {
+      const insuranceLineId =
+        line.lineCode === null ? null : (idByCode.get(line.lineCode) ?? null);
+      if (line.lineCode !== null && insuranceLineId === null) {
+        this.logger.warn(
+          `Coverage line "${line.insuranceLine}" maps to catalogue code ${line.lineCode}, which is not in the seeded catalogue — the programme line is being written with no managed-line reference. Fix COVERAGE_LINE_MAPPINGS or seed the line.`,
+        );
+      }
+      return {
+        insuranceLine: line.insuranceLine,
+        insuranceLineId,
+        // Already a fils-precision string off deriveSumInsured — quantize again
+        // at the persistence boundary per money-decimal-jod.md rather than
+        // trusting the upstream format.
+        sumInsuredBasis:
+          line.sumInsuredBasis == null
+            ? null
+            : quantizeMoney(line.sumInsuredBasis),
+      };
+    });
   }
 
   private async buildContext(
@@ -342,7 +371,7 @@ export class InsuranceProgramService {
       },
     });
 
-    await this.programs.createLines(program.id, this.toLineInputs(lines));
+    await this.programs.createLines(program.id, await this.toLineInputs(lines));
 
     return this.toView(await this.mustFind(program.id));
   }
@@ -389,7 +418,7 @@ export class InsuranceProgramService {
     const result = await this.programs.reassembleLines(
       program.id,
       actor.id,
-      this.toLineInputs(lines),
+      await this.toLineInputs(lines),
     );
     if (!result) {
       throw new ConflictException(

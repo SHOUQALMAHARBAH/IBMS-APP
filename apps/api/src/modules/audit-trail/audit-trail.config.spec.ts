@@ -27,6 +27,8 @@ describe('deriveAuditLogEntryView', () => {
       beforeValue: { status: 'ISSUED' },
       afterValue: { status: 'VERIFIED' },
       isSensitiveDataAccess: false,
+      actorRoleIds: ['role-compliance'],
+      actorRoleNames: ['Compliance Officer'],
       occurredAt: new Date('2026-09-07T08:00:00.000Z'),
     };
     expect(deriveAuditLogEntryView(row)).toEqual({
@@ -38,6 +40,11 @@ describe('deriveAuditLogEntryView', () => {
       beforeValue: { status: 'ISSUED' },
       afterValue: { status: 'VERIFIED' },
       isSensitiveDataAccess: false,
+      // The roles the actor HELD, carried through to the view. `toEqual` on the whole object is
+      // what makes this a mapping test rather than a spot check: a field added to the row and
+      // forgotten in the derivation fails here.
+      actorRoleIds: ['role-compliance'],
+      actorRoleNames: ['Compliance Officer'],
       occurredAt: '2026-09-07T08:00:00.000Z',
     });
   });

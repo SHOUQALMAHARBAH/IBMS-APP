@@ -401,17 +401,35 @@ its own `.claude/` rather than relying on `ibms-brain/.claude/`:
 | `npm run test:smoke` | `bash scripts/smoke.sh api` — dispatches to the api service's smoke test (see below) |
 | `npm run e2e` | Playwright functional e2e (web) — **excludes** `@a11y`-tagged specs (`--grep-invert @a11y`) |
 | `npm run test:a11y` | Playwright + axe-core accessibility checks (web) — **only** `@a11y`-tagged specs. A separate gate: a green `npm run e2e` says nothing about accessibility, so run both and report both counts |
-| `npm run db:validate` | `prisma validate` — schema is internally valid (not a drift check; that's `db:migrate:status`) |
+| `npm run db:validate` | `prisma validate` — schema is internally valid. **Not** a drift check, and `db:migrate:status` is not one either — see the two rows below, which are |
 | `npm run db:migrate:dev` | Create/apply a migration against the dev DB (`packages/db`) |
 | `npm run db:migrate:deploy` | Apply existing migrations to the dev DB, no schema drift (also used for CI/prod) |
-| `npm run db:migrate:status` | Check dev DB migration history against `schema.prisma` for drift |
+| `npm run db:migrate:status` | Whether every migration has been APPLIED to the dev DB. It does **not** read `schema.prisma` and does **not** compare checksums — measured: with a drifted migration present it prints "Database schema is up to date!" and exits 0 |
+| `npm run db:checksums` | Every applied migration's stored checksum vs its file, WHOLE SET. Catches a migration edited after being applied — which `migrate resolve` makes easy, since it stamps the hash of the file as it is at resolve time |
+| `npm run db:divergence` | Whether `schema.prisma` still describes what the database enforces. Asserts the diff is exactly 20 NAMED statements (generated columns, GIN-on-tsvector, ten composite tenant FKs, one identifier-truncation rename) — the number grows only when a migration adds an object Prisma genuinely cannot express, and each entry carries its reason and fails in **both** directions. This is what caught a `SetNull` declared over an enforced `RESTRICT`, and six real indexes the schema never declared |
 | `npm run db:test:migrate:dev` | Create/apply a migration against `db-test` — where schema iteration happens |
 | `npm run db:test:migrate:deploy` | Apply existing migrations to `db-test`, no schema drift |
-| `npm run db:test:migrate:status` | Check `db-test` migration history against `schema.prisma` for drift |
+| `npm run db:divergence` note | It does **not** see partial indexes or CHECK constraints — measured: two live UNIQUE partial indexes on `CommissionAgreement` have never appeared in its output. Where a partial index carries a real invariant, assert it in its own migration's `DO` block (as `20261020100000` does, reading `pg_index.indnullsnotdistinct`) or in a test |
+| `npm run db:privileges` | Whether the runtime role can read past row-level security: five attributes (SUPERUSER, BYPASSRLS, REPLICATION, CREATEROLE, CREATEDB) **and membership in no role at all**. The membership half is the one that matters — `GRANT ibms TO ibms_app` leaves `rolsuper` FALSE and hands the runtime role the owner's privileges, and Postgres exempts a table's owner from its own RLS policies. Measured on a planted grant: an unfiltered cross-office read returned 13,774 rows where 1 was expected. Migration `20261018100000` carries the same assertion, because a migration runs on the database being DEPLOYED to; the script is the recurring half, since a migration runs once |
+| `npm run db:test:migrate:status` | As above, against `db-test` |
+| `npm run db:test:checksums` / `db:test:divergence` / `db:test:privileges` | The two real checks above, against `db-test`. `scripts/verify.sh` runs the `db-test` variants; CI runs the dev ones against its own service container |
 | `npm run db:studio` | Prisma Studio (dev DB) |
 | `npm run db:seed` | Seed the dev DB — the default office's roles + the global permission catalogue (`packages/db/prisma/seed.ts`), idempotent. Roles are OFFICE-SCOPED as of 2026-09-18; a role name is unique per `Organization`, not globally |
 | `npm run db:test:seed` | Same seed, against `db-test` |
+| `npm run db:fixture:permissions` | Regenerates `apps/web/e2e/fixtures/role-permissions.ts` — the THIRD copy of the role→permission grid, which Playwright mocks `/auth/me` from — by reading the **seeded database** rather than `permissions.ts`. The database is what `/auth/me` answers from, and the two differ exactly when something has gone wrong (a code added after an office was created; a grant the seed upserts but never removes). The fixture header claimed to be generated for months while no generator existed |
+| `npm run db:fixture:permissions:check` | The same, writing nothing and failing if the fixture is stale — a `verify.sh` gate (the `db:test:` variant, run straight after the seed gate). A stale copy renders an empty nav, because the sidebar helpers fail CLOSED, and has already broken four Playwright tests in three unrelated files. **Read the first `git diff` of any regeneration:** this generator's own first run silently dropped `permissionsForRoles()`, an export 86 spec files import, and passed `tsc` doing it |
 | `npm run seed:demo -w api` | Demo data for two Organizations — employees, leads, ~500 customers and full sales-to-policy pipelines — created through the real HTTP API, **dev DB only** (never `.env.test`). Scale is env-configurable; accounts come back with MFA off, so sign in with the password and pair an authenticator at Settings → Security — the run now **fails, naming accounts**, if any is left enrolled with a secret nobody holds. See `apps/api/scripts/README-SEED-DEMO.md` |
+
+**`migrate dev` is still not the way to add a migration here, and the reason has changed.**
+It used to be blocked by checksum drift (five drifted migrations, now normalised — IMPROVEMENTS.md
+§ 1.29), so "the drift is fixed" reads like an invitation to go back to it. It is not:
+`schema.prisma` deliberately describes LESS than this database enforces, because Prisma's schema
+language cannot express a STORED generated column, a GIN index on an `Unsupported("tsvector")`
+field, or a composite tenant foreign key. `migrate dev` would generate a migration containing
+exactly the statements `db:divergence` enumerates — dropping four GIN indexes and un-generating
+five columns, `Insurer.canonicalName` among them. Hand-write the migration, apply it, then
+`prisma migrate resolve --applied`; run `db:checksums` afterwards, because resolve stamps the
+file's hash at that moment and any later edit to it drifts.
 
 ## `scripts/`
 
@@ -774,10 +792,15 @@ build actually is today:
   backed by 15 database `*_maker_checker_distinct` CHECK constraints, so holding
   several roles cannot weaken
   separation of duties. The `RoleName` enum type and the pre-migration global role rows
-  are deliberately kept for at least one release so rollback stays cheap. Insurer CRUD
-  and `insurer.relationship.manage` remain specification-only and are deliberately
-  deferred: including that code would have broken the strict-subset property the
-  administrator migration's empty diff depends on. Phase 4 (the unified screen's
+  are deliberately kept for at least one release so rollback stays cheap. **Insurer CRUD
+  and `insurer.relationship.manage` have since SHIPPED** — this sentence said they
+  "remain specification-only" throughout the branch that built them, which is the doc rot
+  `meta/lex/definition-of-done.md` names: a deferral is true when written and nobody
+  revisits it. The reason for the deferral was real and its PROPERTY survives: including
+  that code at the time would have broken the strict-subset property the administrator
+  migration's empty diff depends on, so the four insurer codes now sit outside that set
+  and are listed explicitly in `ADDED_AFTER_THE_MIGRATION`, where a fifth cannot slip in
+  without a decision. Phase 4 (the unified screen's
   org-structure half, subdomain resolution, and the business-function routing table
   that finally retires those four role-name sites) and Phase 5 (migration rehearsal,
   dropping the `RoleName` enum type and the pre-migration rows) are not built. See
@@ -792,7 +815,31 @@ build actually is today:
   every other office submits against). `OFFICE_ADMINISTRATOR` deliberately does not hold
   it; closing it properly needs a "not office-grantable" marker the model does not have,
   and an answer to who may grant it instead — there is no platform-admin surface. Logged
-  for Phase 4 alongside insurer CRUD, NOT fixed.
+  for Phase 4, NOT fixed (insurer CRUD itself has since shipped, API and screens
+  both — see `/insurers` below). **Q9 narrowed it without closing it**:
+  `insurer.office-form.map` now lets an office map its OWN copy of an insurer's form
+  (`OfficeInsurerFormTemplate`, tenant-scoped, RLS, either line catalogue), so an office
+  that needs a form mapped no longer has any reason to want the platform-wide code. The
+  hole is still a hole — an office administrator who grants themselves `insurer.form.map`
+  through the matrix still writes a row every office reads — but nobody now needs to.
+
+- **Insurer management now has screens, not just an API.** `/insurers` — the list
+  (search, and a three-state in-play filter that defaults to BOTH, because a
+  deactivated insurer keeps its policies and is the row an administrator most needs
+  to find), `/insurers/new` (the two identity paths as a radio, so the both-paths
+  combination the API refuses cannot be typed), and `/insurers/[id]` — which keeps
+  COMPANY facts and this office's own RELATIONSHIP terms in separate headed
+  sections, because only the first group may ever cross an office boundary. The
+  deactivation step shows the same five impact counts the audit row is written
+  from, with the two policy figures kept apart: one is cover running on its own,
+  the other is work the insurer still owes. Nav sits beside `/vendors` under
+  Operations — both are counterparty registers, and "New business" is a pipeline of
+  stages rather than a place for a list. `/insurer-directory` has its own
+  entry and its own permission — a refused line code renders as a REFUSAL rather
+  than an empty page, because `[]` reads as "nobody writes this cover". Still
+  screenless: the insurance-line vocabulary, Q9's office form templates, and the
+  read-only master registry (see `IMPROVEMENTS.md` § 1.44 for the measured list of
+  every API surface with no UI).
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,
@@ -1713,10 +1760,19 @@ section that describe the following as open are **superseded**:
   grant/revoke + activate/deactivate (`user.manage`,
   SYSTEM_SECURITY_ADMINISTRATOR), plus an opt-in bootstrap administrator in
   the seed (`BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`). Before
-  this, a production-seeded database had the full role catalogue, all 157
-  permissions, and no way to give anyone a role — sample users are seeded only
-  when `NODE_ENV !== 'production'` and signup grants none. Web:
-  `/settings/users`.
+  this, a production-seeded database had the full role catalogue, all permissions
+  (157 then, 186 today), and no way to give anyone a role — sample users are
+  seeded only when `NODE_ENV !== 'production'` and signup grants none. Web:
+  `/settings/users`. **Within ONE office only:** `ProvisionUserDto` has no
+  `organizationId` and the tenant context supplies it, so this provisions into the
+  CALLER's office and cannot reach another. **A second office cannot currently be
+  onboarded through the application at all** — `Organization` has exactly two
+  writers in the repository, `packages/db/prisma/seed.ts` and
+  `apps/api/scripts/seed-demo.script.ts`, neither reachable over HTTP, and
+  anonymous signup refuses once a second office exists because it cannot tell which
+  one an account belongs to. That is RBAC Phase 4 (subdomain resolution); the
+  refusal message says so, having previously advised `POST /admin/users`, which
+  could never have helped.
 - **Part 3.9 — the renewal module now exists.** `apps/api/src/modules/renewal/`
   — a nightly lead-time sweep opens a `RenewalCase` per expiring ACTIVE policy
   and walks it through `RenewalStatus`. This gives three already-shipped
@@ -1782,10 +1838,15 @@ else.
 - `AccessRecertificationItem` has no per-`UserRoleAssignment` foreign key — one item is
   generated per *user* holding any active role, not per role grant, so a "revoked"
   decision revokes all of that user's active roles, not one.
-- Reviewer-pool assignment always picks the first eligible (≠ subject) member of the
-  COMPLIANCE_OFFICER/BRANCH_DEPARTMENT_MANAGER/EXECUTIVE_MANAGEMENT pool, not
-  round-robin — acceptable for now since there's no manager-hierarchy field on
-  `User`/`Employee` yet.
+- Reviewer-pool assignment picks the LONGEST-STANDING eligible (≠ subject) member of the
+  pool — ordered by `grantedAt` then `userId`, so it is a total order — not round-robin.
+  Acceptable for now since there's no manager-hierarchy field on `User`/`Employee` yet.
+  **This line used to say "the first eligible member", which named something that did not
+  exist:** the pool query had no `orderBy`, so the order was whatever the query plan
+  produced and which reviewer a subject got was unspecified. It surfaced when db-test was
+  reset from 46,153 users to 23 and the assertion about which of two Compliance Officers is
+  picked flipped — same code, different plan. The concentration on one reviewer is the
+  remaining gap; the nondeterminism was a defect and is fixed.
 - `startCycle` skips (logs a warning on) a subject with no eligible reviewer rather than
   blocking the whole cycle.
 

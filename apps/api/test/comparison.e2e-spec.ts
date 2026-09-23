@@ -100,7 +100,7 @@ async function buildRfqWithQuotes(
   ownerUserId: string,
   languagePreference: 'AR' | 'EN',
   tag: string,
-): Promise<{ rfqId: string }> {
+): Promise<{ rfqId: string; insurerIds: string[]; insurerNames: string[] }> {
   const customer = await prisma.customer.create({
     data: {
       customerType: 'CORPORATE',
@@ -124,10 +124,14 @@ async function buildRfqWithQuotes(
       insuranceLine: 'Property All Risks',
     },
   });
+  const insurerIds: string[] = [];
+  const insurerNames: string[] = [];
   for (let i = 0; i < 2; i += 1) {
     const insurer = await makeInsurer(
       `Cmp E2E ${tag} ins ${i} ${Math.random().toString(36).slice(2, 6)}`,
     );
+    insurerIds.push(insurer.id);
+    insurerNames.push(insurer.name);
     await prisma.rFQInsurer.create({
       data: { rfqId: rfq.id, insurerId: insurer.id, status: 'SENT' },
     });
@@ -142,13 +146,64 @@ async function buildRfqWithQuotes(
       })
       .expect(201);
   }
-  return { rfqId: rfq.id };
+  return { rfqId: rfq.id, insurerIds, insurerNames };
 }
 
 describe('Quote Comparison document generation (e2e) — Part F item #7', () => {
   afterAll(async () => {
     if (sharedApp) await sharedApp.close();
     sharedApp = undefined;
+  });
+
+  it('returns a NAMED insurer on every comparison row', async () => {
+    // The comparison exists to compare insurers on more than price — so a row that
+    // cannot say WHO quoted is the one thing it must never do. Asserted on the wire
+    // shape rather than through the UI, because the web mocks this endpoint in its
+    // own tests and a mismatch between the two would pass on both sides.
+    //
+    // The marker that says an insurer is deactivated is the next commit's; this one
+    // is only about being able to name them at all, because a marker on a nameless
+    // row is worthless.
+    const app = await boot();
+    const placement = await makeUser(
+      app,
+      'cmp-named-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+    );
+    // `insurerIds` is not needed here — the deactivated marker is the next commit,
+    // and destructuring it just to leave it unused is how a test acquires noise.
+    const { rfqId, insurerNames } = await buildRfqWithQuotes(
+      placement.accessToken,
+      placement.userId,
+      'EN',
+      'named',
+    );
+
+    await request(app.getHttpServer())
+      .post('/comparison-matrices')
+      .set(bearer(placement.accessToken))
+      .send({ rfqId })
+      .expect(201);
+
+    const read = await request(app.getHttpServer())
+      .get(`/comparison-matrices?rfqId=${rfqId}`)
+      .set(bearer(placement.accessToken))
+      .expect(200);
+    interface Row {
+      quotation: {
+        insurerId: string;
+        insurer: { name?: string; isActive?: boolean };
+      };
+    }
+    const rows = (read.body as { rows: Row[] }).rows;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(
+        row.quotation.insurer.name,
+        'a comparison row must name the insurer that quoted',
+      ).toBeTruthy();
+      expect(insurerNames).toContain(row.quotation.insurer.name);
+    }
   });
 
   it('generates a bilingual quotation-comparison PDF, respecting comparison visibility, defaulting to the customer language, and honoring an explicit override', async () => {

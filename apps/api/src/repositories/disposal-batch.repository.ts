@@ -35,6 +35,19 @@ export class DisposalBatchRepository {
       .then((n) => n > 0);
   }
 
+  /** The category and whether a lawyer has confirmed its period — both, in one read, because
+   *  the refusal message names the category and a second query to get the name would be a
+   *  round trip for a string we already had. */
+  findRetentionScheduleItemForNomination(id: string): Promise<{
+    recordCategory: string;
+    confirmedByLegalCounselAt: Date | null;
+  } | null> {
+    return this.prisma.client.retentionScheduleItem.findUnique({
+      where: { id },
+      select: { recordCategory: true, confirmedByLegalCounselAt: true },
+    });
+  }
+
   create(input: CreateDisposalBatchInput): Promise<DisposalBatch> {
     return this.prisma.client.disposalBatch.create({ data: input });
   }

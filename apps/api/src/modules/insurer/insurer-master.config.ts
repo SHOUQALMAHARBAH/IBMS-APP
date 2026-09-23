@@ -19,10 +19,21 @@ export interface InsurerFormFieldView {
   displayOrder: number;
 }
 
+/** The managed line a form is for, named rather than echoed as a uuid. */
+export interface InsurerFormLineView {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+}
+
 export interface InsurerFormTemplateView {
   id: string;
   insurerMasterId: string;
-  insuranceLine: string;
+  /** The line as an OBJECT, not a string. The old `insuranceLine: string` was free text the
+   *  caller typed; a uuid in its place would be a worse answer than either, so the view names
+   *  the line — code for machines, both languages for people. */
+  insuranceLine: InsurerFormLineView;
   version: number;
   sourceDocumentRef: string | null;
   fields: InsurerFormFieldView[];
@@ -48,7 +59,12 @@ export function deriveTemplateView(
   return {
     id: template.id,
     insurerMasterId: template.insurerMasterId,
-    insuranceLine: template.insuranceLine,
+    insuranceLine: {
+      id: template.insuranceLine.id,
+      code: template.insuranceLine.code,
+      nameEn: template.insuranceLine.nameEn,
+      nameAr: template.insuranceLine.nameAr,
+    },
     version: template.version,
     sourceDocumentRef: template.sourceDocumentRef,
     fields: template.fields.map((f) => ({

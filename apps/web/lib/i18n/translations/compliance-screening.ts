@@ -58,7 +58,7 @@ export const COMPLIANCE_SCREENING = {
     slapDurationAria: 'المدة لـ {name}',
     shYouDonTHoldThe: 'لا تملك صلاحية sanctions-pep.screen.',
     shCouldNotLoadScreeningHealth: 'تعذّر تحميل حالة الفحص — حاول مرة أخرى.',
-    shScreeningHealth: 'حالة فحص العقوبات والأشخاص السياسيين',
+    shScreeningHealth: 'حالة فحص العقوبات',
     shWhichProviderActuallyPerformsScreening:
       'يوضّح هذا الجدول أي مزوّد يُجري الفحص فعلياً، وما إذا كانت بياناته حديثة، وما الذي يغطيه. «غير مهيأ» أو «غير متاح» تعني أنّ الفحص لم يجرِ — وهي ليست نتيجة سلبية.',
     shLoading: 'جارٍ التحميل…',

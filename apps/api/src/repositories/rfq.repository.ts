@@ -13,6 +13,21 @@ import { INSURER_IDENTITY_SELECT, insurerIdentity } from './insurer-identity';
 export interface CreateRfqInput {
   opportunityId: string;
   insuranceLine: string;
+  /**
+   * The managed line FK, INHERITED from the programme line this RFQ was taken to market from —
+   * never resolved independently.
+   *
+   * That inheritance is the whole point of the four models carrying this column: "a programme
+   * line becomes an RFQ" has to mean the SAME line, and copying the parent's id makes them the
+   * same by construction rather than by two lookups agreeing. Resolving it here from the
+   * `insuranceLine` string would reintroduce exactly the free-text match being removed.
+   *
+   * Nullable for the two cases that genuinely have no parent identity: an Opportunity with no
+   * programme (modelled but not reachable today), and a programme line that itself carries no
+   * managed line (an unmapped coverage string).
+   */
+  insuranceLineId: string | null;
+  officeInsuranceLineId: string | null;
   followUpThresholdDays?: number;
   issuedByUserId: string;
 }
@@ -246,6 +261,12 @@ export class RfqRepository {
    * module yet (narrative Process 31). */
   async findSelectableInsurers(): Promise<SelectableInsurer[]> {
     const rows = await this.prisma.client.insurer.findMany({
+      // ACTIVE only. `Insurer.isActive` existed since the model was created and
+      // was read by NOTHING — this query returned every insurer the office had
+      // ever dealt with, so a company it had deliberately stopped dealing with was
+      // still offered on the new-RFQ screen. Insurer management adds a deactivate
+      // button, and a button that changes nothing is worse than no button.
+      where: { isActive: true },
       select: INSURER_IDENTITY_SELECT,
     });
     const insurers = rows.map(insurerIdentity);
@@ -259,12 +280,36 @@ export class RfqRepository {
     return insurers.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }
 
-  /** How many of `insurerIds` actually exist — the createRfq / addInsurers
-   * "every shortlisted insurer is real" guard. */
-  countInsurersByIds(insurerIds: readonly string[]): Promise<number> {
-    return this.prisma.client.insurer.count({
+  /**
+   * Which of `insurerIds` the office can actually shortlist, split by WHY not.
+   *
+   * This was `countInsurersByIds`, and the createRfq / addInsurers guard reported
+   * "one or more shortlisted insurers do not exist" for anything it could not
+   * count. That message is wrong for a DEACTIVATED insurer, and the difference
+   * matters to whoever hits it: an unknown id is a client bug, a deactivated
+   * insurer is a decision the office made and can undo. Splitting them here rather
+   * than in the caller avoids a second query to tell them apart.
+   */
+  async classifyInsurersByIds(insurerIds: readonly string[]): Promise<{
+    activeIds: string[];
+    inactiveIds: string[];
+    unknownIds: string[];
+  }> {
+    const rows = await this.prisma.client.insurer.findMany({
       where: { id: { in: [...insurerIds] } },
+      select: { id: true, isActive: true },
     });
+    const byId = new Map(rows.map((r) => [r.id, r.isActive]));
+    const activeIds: string[] = [];
+    const inactiveIds: string[] = [];
+    const unknownIds: string[] = [];
+    for (const id of insurerIds) {
+      const isActive = byId.get(id);
+      if (isActive === undefined) unknownIds.push(id);
+      else if (isActive) activeIds.push(id);
+      else inactiveIds.push(id);
+    }
+    return { activeIds, inactiveIds, unknownIds };
   }
 
   // --------------------------------------------------------------------

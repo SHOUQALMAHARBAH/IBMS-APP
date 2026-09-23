@@ -6,6 +6,7 @@ import { AuditModule } from '../audit/audit.module';
 import { CustomerModule } from '../customer/customer.module';
 import { RiskProfileModule } from '../risk-profile/risk-profile.module';
 import { NeedsAssessmentModule } from '../needs-assessment/needs-assessment.module';
+import { InsurerModule } from '../insurer/insurer.module';
 
 /** Process 7 — Product Recommendation / Program Design (backlog Part C #7).
  *
@@ -17,13 +18,19 @@ import { NeedsAssessmentModule } from '../needs-assessment/needs-assessment.modu
  *   - RiskProfileModule     -> RiskProfileRepository (that assessment's
  *     parent Risk Profile + its asset survey, for the Sum Insured basis)
  *   - CustomerModule        -> CustomerRepository (that Risk Profile's
- *     Customer owner, for visibility) */
+ *     Customer owner, for visibility)
+ *   - InsurerModule         -> InsuranceLineRepository, to resolve a coverage mapping's
+ *     catalogue CODE into the line id this office's rows must reference. The code is what
+ *     `insurance-program.config.ts` can state; the id differs per database, so the lookup is
+ *     unavoidable. Its repository, never its service — the rule every cross-module read here
+ *     follows. */
 @Module({
   imports: [
     AuditModule,
     NeedsAssessmentModule,
     RiskProfileModule,
     CustomerModule,
+    InsurerModule,
   ],
   controllers: [InsuranceProgramController],
   providers: [InsuranceProgramService, InsuranceProgramRepository],

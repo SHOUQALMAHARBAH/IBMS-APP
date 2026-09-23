@@ -82,14 +82,14 @@ services:
     environment:
       # Talks to the `db` service over the Docker network, not the host-side
       # DATABASE_URL in .env (which points at localhost:5433 for host tools).
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ibms}:${POSTGRES_PASSWORD:-ibms}@db:5432/${POSTGRES_DB:-ibms}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ibms}:${POSTGRES_PASSWORD:-ibms}@db:5432/${POSTGRES_DB:-ibms}?schema=public&connection_limit=5
       # Multi-tenancy Phase 2 step 8 — the RUNTIME connection, a NON-OWNER role.
       # Postgres exempts a table's owner from its own row-level security
       # policies, so the API must not use DATABASE_URL above or all 118 policies
       # are silently inert. Provision the role once with
       # `APP_DB_PASSWORD=... npm run db:provision-app-role`, then set
       # APP_DB_PASSWORD in .env so this matches.
-      APP_DATABASE_URL: postgresql://${APP_DB_ROLE:-ibms_app}:${APP_DB_PASSWORD:-ibms_app_dev}@db:5432/${POSTGRES_DB:-ibms}?schema=public
+      APP_DATABASE_URL: postgresql://${APP_DB_ROLE:-ibms_app}:${APP_DB_PASSWORD:-ibms_app_dev}@db:5432/${POSTGRES_DB:-ibms}?schema=public&connection_limit=15
       PORT: ${PORT:-4000}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
       # Dev-only fallbacks below, same placeholders as .env.example — this

@@ -10,6 +10,7 @@ import type { InsuranceProgramRepository } from '../../repositories/insurance-pr
 import type { NeedsAssessmentRepository } from '../../repositories/needs-assessment.repository';
 import type { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import type { CustomerRepository } from '../../repositories/customer.repository';
+import type { InsuranceLineRepository } from '../../repositories/insurance-line.repository';
 import type { AuditService } from '../audit/audit.service';
 import type { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -73,6 +74,18 @@ function makeDeps() {
     reassembleLines,
   } as unknown as InsuranceProgramRepository;
 
+  // The catalogue the service resolves a coverage mapping's CODE against. Real codes and
+  // fabricated ids, because what is under test is that the mapped code reaches the row as an
+  // id — not which uuid a particular database happened to seed.
+  const listStandard = vi.fn().mockResolvedValue([
+    { id: 'line-property', code: 'PROPERTY_ALL_RISKS' },
+    { id: 'line-bi', code: 'BUSINESS_INTERRUPTION' },
+    { id: 'line-cyber', code: 'CYBER' },
+  ]);
+  const lines = {
+    listStandard,
+  } as unknown as InsuranceLineRepository;
+
   const findAssessmentById = vi.fn().mockResolvedValue({ ...APPROVED_NA });
   const assessments = {
     findById: findAssessmentById,
@@ -131,8 +144,10 @@ function makeDeps() {
       customers,
       audit,
       workflow,
+      lines,
     ),
     mocks: {
+      listStandard,
       createProgram,
       findProgramById,
       findManyByCustomerId,

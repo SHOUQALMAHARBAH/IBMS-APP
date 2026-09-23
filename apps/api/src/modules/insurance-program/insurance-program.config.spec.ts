@@ -38,15 +38,30 @@ describe('assembleProgramLines', () => {
       summary(),
     );
 
+    // Asserted WITH `lineCode`, not around it: the code is the managed-line identity the row's
+    // FK is resolved from, so a mapping that lost its code has to fail here.
     expect(lines).toEqual([
-      { insuranceLine: 'Property All Risks', sumInsuredBasis: '620000.500' },
+      {
+        insuranceLine: 'Property All Risks',
+        lineCode: 'PROPERTY_ALL_RISKS',
+        sumInsuredBasis: '620000.500',
+      },
       {
         insuranceLine: 'Business Interruption',
+        lineCode: 'BUSINESS_INTERRUPTION',
         sumInsuredBasis: '480000.000',
       },
-      { insuranceLine: 'Public Liability', sumInsuredBasis: null },
-      { insuranceLine: 'Motor Fleet', sumInsuredBasis: null },
-      { insuranceLine: 'Cyber', sumInsuredBasis: null },
+      {
+        insuranceLine: 'Public Liability',
+        lineCode: 'PUBLIC_GENERAL_LIABILITY',
+        sumInsuredBasis: null,
+      },
+      {
+        insuranceLine: 'Motor Fleet',
+        lineCode: 'MOTOR_COMPREHENSIVE',
+        sumInsuredBasis: null,
+      },
+      { insuranceLine: 'Cyber', lineCode: 'CYBER', sumInsuredBasis: null },
     ]);
   });
 
@@ -68,8 +83,16 @@ describe('assembleProgramLines', () => {
       EMPTY_SURVEY,
     );
     expect(lines).toEqual([
-      { insuranceLine: 'Property All Risks', sumInsuredBasis: null },
-      { insuranceLine: 'Business Interruption', sumInsuredBasis: null },
+      {
+        insuranceLine: 'Property All Risks',
+        lineCode: 'PROPERTY_ALL_RISKS',
+        sumInsuredBasis: null,
+      },
+      {
+        insuranceLine: 'Business Interruption',
+        lineCode: 'BUSINESS_INTERRUPTION',
+        sumInsuredBasis: null,
+      },
     ]);
   });
 
@@ -112,13 +135,25 @@ describe('assembleProgramLines', () => {
       summary(),
     );
     expect(lines).toEqual([
-      { insuranceLine: 'Property All Risks', sumInsuredBasis: '620000.500' },
-      { insuranceLine: 'Kidnap & Ransom', sumInsuredBasis: null },
+      {
+        insuranceLine: 'Property All Risks',
+        lineCode: 'PROPERTY_ALL_RISKS',
+        sumInsuredBasis: '620000.500',
+      },
+      // The unknown coverage string carries through with NO code — the honest outcome, and the
+      // one case where a programme line is legitimately written with no managed-line FK.
+      {
+        insuranceLine: 'Kidnap & Ransom',
+        lineCode: null,
+        sumInsuredBasis: null,
+      },
     ]);
   });
 
   it('deduplicates a repeated coverage line', () => {
     const lines = assembleProgramLines(['Cyber', 'Cyber', 'Cyber'], summary());
-    expect(lines).toEqual([{ insuranceLine: 'Cyber', sumInsuredBasis: null }]);
+    expect(lines).toEqual([
+      { insuranceLine: 'Cyber', lineCode: 'CYBER', sumInsuredBasis: null },
+    ]);
   });
 });

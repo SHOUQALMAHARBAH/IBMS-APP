@@ -6,14 +6,16 @@
  * sidebar and every §10.4 control render from that field, and a mock without
  * it silently renders an empty nav (the helpers fail CLOSED by design).
  *
- * GENERATED from packages/db/prisma/seed-data/permissions.ts. If a permission
- * is added to or removed from a role there, regenerate rather than hand-edit,
- * or this becomes the second copy of the grid that §10.4 exists to prevent.
+ * DO NOT HAND-EDIT. Regenerate with:
  *
- * Last regenerated for office-scoped custom RBAC Phase 2, which added the seven
- * `*.all-owners.read` cross-owner codes, split `incident.classify` into
- * classify / co-sign / senior-management-notify, and added
- * `access-recertification.review.routine`.
+ *     npm run db:fixture:permissions
+ *
+ * which reads the SEEDED DATABASE — what `/auth/me` actually answers from —
+ * rather than `permissions.ts`, which is the seed's input and would reproduce
+ * the grid as declared instead of as granted. `--check` fails without writing,
+ * so a stale copy is a red gate rather than four confusing Playwright failures.
+ *
+ * 12 roles, 427 grants, from the default office.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   BRANCH_DEPARTMENT_MANAGER: [
@@ -54,7 +56,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.report',
     'insurer-accounting.read',
     'insurer-performance.view',
+    'insurer.directory.read',
     'insurer.master.read',
+    'insurer.read',
     'interaction.log',
     'internal-audit.close',
     'kb.publish',
@@ -143,6 +147,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.notify-regulator',
     'incident.report',
     'information-asset.manage',
+    'insurer.read',
     'interaction.log',
     'internal-audit.close',
     'internal-audit.record',
@@ -222,7 +227,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.senior-management.notify',
     'insurer-accounting.read',
     'insurer-performance.view',
+    'insurer.directory.read',
     'insurer.master.read',
+    'insurer.read',
     'internal-controls.view',
     'kpi-dashboard.view',
     'lead.all-owners.read',
@@ -259,6 +266,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'financial-report.view',
     'insurer-accounting.read',
     'insurer.master.read',
+    'insurer.read',
     'internal-controls.view',
     'sla-dashboard.view',
     'sla.policy.read',
@@ -309,6 +317,10 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.contain',
     'incident.report',
     'information-asset.manage',
+    'insurer.directory.read',
+    'insurer.office-form.map',
+    'insurer.read',
+    'insurer.relationship.manage',
     'permission.read',
     'role.manage',
     'role.read',
@@ -336,8 +348,11 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'endorsement.create',
     'endorsement.read',
     'incident.report',
+    'insurer.directory.read',
     'insurer.form.map',
     'insurer.master.read',
+    'insurer.office-form.map',
+    'insurer.read',
     'interaction.log',
     'kb.publish',
     'needs-assessment.read',
@@ -395,7 +410,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'endorsement.read',
     'feedback.log',
     'incident.report',
+    'insurer.directory.read',
     'insurer.master.read',
+    'insurer.read',
     'interaction.log',
     'kyc.capture',
     'lead.create',
@@ -442,6 +459,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'incident.report',
     'information-asset.manage',
     'insurer.form.map',
+    'insurer.office-form.map',
     'permission.read',
     'role.manage',
     'role.read',

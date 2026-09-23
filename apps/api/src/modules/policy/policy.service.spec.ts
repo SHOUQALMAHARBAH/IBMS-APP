@@ -87,6 +87,9 @@ interface Opts {
   // undefined -> no BrokerLicense record configured (not blocked); pass an
   // explicit object to exercise the gate.
   brokerLicense?: { licenseNumber: string; status: string; expiresAt: Date };
+  // Insurer management — `false` exercises the deactivated-insurer refusal, `null`
+  // an insurer that does not exist. Defaults to active.
+  insurerActive?: boolean | null;
 }
 
 function makeDeps(opts: Opts = {}) {
@@ -137,6 +140,21 @@ function makeDeps(opts: Opts = {}) {
     .fn()
     .mockResolvedValue(opts.existingPolicy ?? null);
   const findManyByCustomerId = vi.fn().mockResolvedValue([policyRow()]);
+  // Insurer management — `place()` refuses an insurer the office has deactivated,
+  // reading the flag off the recommendation's own quote (the real
+  // `RECOMMENDATION_INCLUDE` loads it through `INSURER_IDENTITY_SELECT`). Defaults
+  // to active; `null` models an insurer the include did not resolve, which must NOT
+  // be treated as deactivated.
+  const quotedInsurer =
+    opts.insurerActive === null
+      ? null
+      : {
+          id: 'ins-1',
+          name: 'Sample Insurer',
+          nameAr: null,
+          financialStrengthRating: null,
+          isActive: opts.insurerActive ?? true,
+        };
   const findManyForActor = vi.fn().mockResolvedValue([policyRow()]);
   const countForActor = vi.fn().mockResolvedValue(1);
   const createIssuanceArtifacts = vi
@@ -214,6 +232,11 @@ function makeDeps(opts: Opts = {}) {
     recommendedQuotation: {
       id: 'q-1',
       insurerId: 'ins-1',
+      // The real `RECOMMENDATION_INCLUDE` loads the insurer through
+      // `INSURER_IDENTITY_SELECT`, which carries `isActive`. The mock has to as
+      // well, or the placement guard reads `undefined` and the test proves nothing
+      // about it either way.
+      insurer: quotedInsurer,
       premium: new Prisma.Decimal('120000'),
       currency: 'JOD',
       rfq: {
@@ -437,6 +460,43 @@ describe('PolicyService', () => {
           placement(),
         ),
       ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('422 when the insurer has been DEACTIVATED, and the policy is not created', async () => {
+      // Insurer management. Placement is where the decision bites: it is the moment
+      // the office commits money and obligation, and the insurer can be deactivated
+      // AFTER it quoted and after the client accepted — the case the RFQ shortlist
+      // guard cannot cover.
+      //
+      // The message names the insurer and says existing policies are unaffected,
+      // because whoever hits this needs to know deactivation broke nothing already
+      // placed.
+      const { service, mocks } = makeDeps({ insurerActive: false });
+      await expect(
+        service.place(
+          { opportunityId: 'opp-1', inceptionDate: '2026-10-01' },
+          placement(),
+        ),
+      ).rejects.toThrow(/deactivated insurer/);
+      expect(
+        mocks.create,
+        'a refused placement must not write a Policy',
+      ).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when the insurer row is missing rather than inactive', async () => {
+      // `null` means the insurer does not exist, which is a different problem and
+      // not this guard's to report — the FK would refuse the write, and inventing a
+      // second "insurer not found" path here would duplicate that badly. Asserted so
+      // the `=== false` comparison is deliberate rather than a loose falsy check: a
+      // truthiness test would refuse this case too.
+      const { service } = makeDeps({ insurerActive: null });
+      await expect(
+        service.place(
+          { opportunityId: 'opp-1', inceptionDate: '2026-10-01' },
+          placement(),
+        ),
+      ).resolves.toBeDefined();
     });
 
     it('404 (no oracle) when the Opportunity customer is not visible to the caller', async () => {

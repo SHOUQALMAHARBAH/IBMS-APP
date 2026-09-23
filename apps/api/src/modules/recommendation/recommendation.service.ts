@@ -31,6 +31,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import type { DraftRecommendationDto } from './dto/draft-recommendation.dto';
 import type { DiscloseConflictOfInterestDto } from './dto/disclose-conflict-of-interest.dto';
 import type { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dto';
+import { insurerIdentity } from '../../repositories/insurer-identity';
 
 /** The recommendation as the API returns it. `blockedFromSend` lists the
  * gates that still stand between the current state and `send` — empty means
@@ -42,7 +43,9 @@ export interface RecommendationView {
   recommendedQuotation: {
     id: string;
     insurerId: string;
-    insurer: RecommendationWithContext['recommendedQuotation']['insurer'];
+    /** The RESOLVED identity — see the quotation service's note on why aliasing
+     *  the Prisma payload here hid a blank insurer name from both test suites. */
+    insurer: ReturnType<typeof insurerIdentity>;
     insuranceLine: string;
     premium: string;
     currency: string;
@@ -374,7 +377,9 @@ export class RecommendationService {
       recommendedQuotation: {
         id: q.id,
         insurerId: q.insurerId,
-        insurer: q.insurer,
+        // Flattened — see the quotation service. `RecommendationSection.tsx` reads
+        // `rec.recommendedQuotation.insurer.name`, which the raw join does not have.
+        insurer: insurerIdentity(q.insurer),
         insuranceLine: q.rfq.insuranceLine,
         premium: formatMoney(q.premium),
         currency: q.currency,
