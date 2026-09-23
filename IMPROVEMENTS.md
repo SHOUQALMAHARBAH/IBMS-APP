@@ -2568,11 +2568,33 @@ the API resolves a rate's line from a platform code and an office line has none 
 the server must refuse is worse than not offering it, and a Playwright assertion pins the option
 count with an office line in the fixture.
 
-**Still not done, deliberately:** the agreement DTO takes a line as a STRING (now resolved from a
-code the picker sends) rather than a line ID, so an office's own added line is still not reachable
-on the rate table — two offices' private lines may share a name, so nothing in the DTO can name one
-unambiguously. Closing it means the DTO taking `lineId`; the picker already has the ids to hand, so
-the remaining work is the DTO and its tests.
+**Still not done, deliberately — and CHECKED before calling the feature done, because "an office
+can add a line and then cannot price it" would be a hole rather than a follow-up.** It is not one,
+measured four independent ways on 2026-09-23:
+
+1. `InsuranceProgramLineInput` has **no `officeInsuranceLineId` field at all**, so no API path can
+   put an office-added line on a programme line.
+2. `RFQ` and `Policy` only COPY their parent's reference, so with nothing upstream to copy neither
+   can acquire one.
+3. The needs assessment DERIVES its coverage list from answers (`deriveRecommendedCoverageLines`),
+   so it is always a subset of the fixed `COVERAGE_LINES` — the `unknown` branch of
+   `assembleProgramLines`, which is the only other way a programme line loses its FK, needs a
+   hand-edited row.
+4. Row counts on dev: **0** office-line references across `InsuranceProgramLine`, `RFQ`, `Policy`
+   and `CommissionAgreement`.
+
+So no policy can carry an office-added line, and nothing can need a rate for one. The DTO change
+is completeness, not a hole.
+
+**But nothing would NOTICE the day that stops being true**, and the symptom would be a commission
+calculation refusing a policy for no visible reason — `resolveGovernedRate` finding nothing, with
+no way to create the missing agreement. So the assumption is now a guard:
+`managed-line-writers.e2e-spec.ts` asserts no `Policy` (and no programme line or RFQ) carries an
+office line, with a message naming this entry and the step to close. Planted by inserting such a
+policy inside a rolled-back transaction, so the empty-set assertion is a real measurement.
+
+**Closing it** means the DTO taking `lineId` — the rate screen's picker already has the ids to
+hand, so the remaining work is the DTO, the resolver branch, and their tests.
 
 **THE CAVEAT THAT IS STILL THE WHOLE VALUE OF THIS ENTRY — read it before re-measuring.**
 

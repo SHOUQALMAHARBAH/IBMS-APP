@@ -357,3 +357,102 @@ describe('the mapping table cannot name a line the catalogue does not have', () 
     expect(COVERAGE_LINE_CODES.length).toBeGreaterThan(10);
   }, 300_000);
 });
+
+describe('the rate table and the policy chain agree about what a line can BE', () => {
+  it('no Policy carries an office-added line, because no commission rate could govern it', async () => {
+    // ## The invariant, and why it is asserted rather than assumed
+    //
+    // `POST /commission/agreements` resolves its line against the PLATFORM catalogue and refuses
+    // anything else, so `CommissionAgreement.officeInsuranceLineId` can never be populated through
+    // the API. A Policy on an office-added line would therefore have no rate that could govern it
+    // and no way to create one — `resolveGovernedRate` would find nothing and the calculation
+    // would 422 permanently.
+    //
+    // Today that is unreachable, measured four ways: `InsuranceProgramLineInput` has no
+    // `officeInsuranceLineId` field at all, so no API path can put one on a programme line; RFQ and
+    // Policy only COPY their parent's reference, so with nothing upstream there is nothing to
+    // inherit; the needs assessment derives its coverage list from answers, so it is always a
+    // subset of the fixed `COVERAGE_LINES`; and the row counts are zero on every model.
+    //
+    // **So this test is not guarding a bug — it is guarding the ASSUMPTION that makes § 1.40's
+    // remaining step a convenience rather than a hole.** The day something writes an office line
+    // onto a programme line, that step becomes urgent, and without this nothing would say so: the
+    // symptom would be a commission calculation refusing a policy for no visible reason.
+    const offenders = await rawPrisma.policy.findMany({
+      where: { officeInsuranceLineId: { not: null } },
+      select: { id: true, insuranceLine: true, officeInsuranceLineId: true },
+      take: 10,
+    });
+    expect(
+      offenders,
+      'A Policy carries an office-added insurance line, and the commission rate table cannot express an agreement for one — so this policy can never have a governing rate and the calculation will 422 with nothing to fix it. Close the remaining step in IMPROVEMENTS.md § 1.40 (the agreement DTO taking a lineId) before allowing an office line onto the policy chain.',
+    ).toEqual([]);
+
+    // And the same for the two models upstream, so the guard names the step where it entered
+    // rather than only the end of the chain.
+    const upstream = await Promise.all([
+      rawPrisma.insuranceProgramLine.count({
+        where: { officeInsuranceLineId: { not: null } },
+      }),
+      rawPrisma.rFQ.count({ where: { officeInsuranceLineId: { not: null } } }),
+    ]);
+    expect(
+      { programmeLines: upstream[0], rfqs: upstream[1] },
+      'an office-added line has entered the programme -> RFQ -> Policy chain; see the message above',
+    ).toEqual({ programmeLines: 0, rfqs: 0 });
+  }, 300_000);
+
+  it('would FAIL if such a policy existed — proven by planting one', async () => {
+    // The plant, because a set-is-empty assertion passes trivially and tells you nothing on its
+    // own. Rolled back, so the invariant is never actually violated on the database.
+    const insurer = await makeInsurer(`${FIXTURE_PREFIX} Plant Ins ${tag}`);
+    const officeLine = await prisma.officeInsuranceLine.create({
+      data: {
+        nameEn: `${FIXTURE_PREFIX} Plant Line ${tag}`,
+        nameAr: `${FIXTURE_PREFIX} خط الزرع ${tag}`,
+        canonicalEn: `line writers plant line ${tag}`,
+        canonicalAr: `line writers plant ar ${tag}`,
+        category: 'GENERAL',
+        createdByUserId: placement.userId,
+      },
+    });
+    const { opportunityId } = await marketReadyOpportunity(placement.userId, {
+      insuranceLine: 'Property All Risks',
+      insuranceLineId: propertyLineId,
+    });
+
+    let seen = -1;
+    await expect(
+      rawPrisma.$transaction(async (tx) => {
+        const opp = await tx.opportunity.findUniqueOrThrow({
+          where: { id: opportunityId },
+          select: { customerId: true, organizationId: true },
+        });
+        await tx.policy.create({
+          data: {
+            opportunityId,
+            customerId: opp.customerId,
+            // Named explicitly: `rawPrisma` is the OWNER client and does not stamp the tenant
+            // column — only the scoped client does. Taken from the opportunity so the plant
+            // cannot accidentally sit in a different office than its own parent.
+            organizationId: opp.organizationId,
+            insurerId: insurer.id,
+            insuranceLine: `${FIXTURE_PREFIX} Plant Line ${tag}`,
+            officeInsuranceLineId: officeLine.id,
+            inceptionDate: new Date('2026-10-01'),
+            requestedPremium: '1000.000',
+            currency: 'JOD',
+          },
+        });
+        seen = await tx.policy.count({
+          where: { officeInsuranceLineId: { not: null } },
+        });
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+
+    // The query the guard above runs DOES see such a policy when one exists, so its `toEqual([])`
+    // is a real measurement rather than a query that can never match.
+    expect(seen).toBeGreaterThan(0);
+  }, 300_000);
+});
