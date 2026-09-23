@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listInsurers, type Insurer } from '../../../lib/insurer/insurer-api';
-import { ApiError } from '../../../lib/auth/api-client';
+import { ApiError, isMfaEnrolmentError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
   cardMetaStyle,
@@ -59,8 +59,10 @@ export default function InsurersPage() {
       } catch (err) {
         setInsurers(null);
         setLoadError(
-          err instanceof ApiError && err.status === 403
-            ? t('insListNoPermission')
+          isMfaEnrolmentError(err)
+            ? t('insMfaRequired')
+            : err instanceof ApiError && err.status === 403
+              ? t('insListNoPermission')
             : err instanceof ApiError
               ? err.message
               : t('insListLoadError'),

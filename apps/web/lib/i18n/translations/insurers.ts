@@ -14,6 +14,11 @@ export const INSURERS = {
       'شركات التأمين التي يتعامل معها مكتبك. يمكن تسجيل شركة من الدليل العام، أو شركة ' +
       'لا يعرفها أي دليل — كلتا الحالتين تمرّان من هنا.',
     insListNoPermission: 'لا تملك صلاحية insurer.read، لذا لا يوجد ما يمكن عرضه هنا.',
+    // A 403 has two very different causes and telling a person the wrong one costs them an
+    // afternoon: the MFA guard refuses EVERY screen until an authenticator is paired, and it looks
+    // identical to a missing permission unless the response code is read.
+    insMfaRequired:
+      'لم تُسجِّل بعد تطبيق المصادقة، والنظام يمنع كل الشاشات حتى تفعل. هذه ليست مشكلة صلاحيات: افتح «الأمان» من أسفل القائمة الجانبية، وامسح رمز QR بتطبيق مصادقة، وأدخل الرمز المكوَّن من ستة أرقام — ثم عُد إلى هنا.',
     insListLoadError: 'تعذر تحميل شركات التأمين.',
     insListEmpty: 'لم يسجّل مكتبك أي شركة تأمين بعد.',
     insListEmptyFiltered: 'لا توجد شركة تأمين مطابقة لهذا البحث.',
@@ -146,6 +151,8 @@ export const INSURERS = {
       'catalogue, or one no catalogue has heard of — both paths run through here.',
     insListNoPermission:
       'You do not hold insurer.read, so there is nothing to show here.',
+    insMfaRequired:
+      'You have not paired an authenticator app yet, and the system blocks every screen until you do. This is NOT a permissions problem: open Security at the bottom of the sidebar, scan the QR code with an authenticator app, enter the six-digit code — then come back here.',
     insListLoadError: 'Could not load insurers.',
     insListEmpty: 'Your office has not registered an insurer yet.',
     insListEmptyFiltered: 'No insurer matches that search.',

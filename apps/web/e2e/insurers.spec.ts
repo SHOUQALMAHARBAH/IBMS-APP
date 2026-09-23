@@ -317,3 +317,47 @@ test("insurer screens have no serious/critical accessibility violations @a11y", 
     ).toEqual([]);
   }
 });
+
+/**
+ * A 403 reaches these screens for two unrelated reasons and they used to report both as the same
+ * thing. Measured on a real first sign-in: an administrator who held `insurer.read` was told she did
+ * not, because the refusal had actually come from the forced-MFA-enrolment guard, and she went
+ * looking for a permissions problem that did not exist.
+ *
+ * The status is identical in both cases; only the response `code` separates them. These two tests
+ * are a pair on purpose — either one alone passes against a screen that has gone back to guessing.
+ */
+test("tells an unenrolled user to pair an authenticator, not that she lacks the permission", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers**", (route) =>
+    route.fulfill({
+      status: 403,
+      json: {
+        code: "MFA_ENROLLMENT_REQUIRED",
+        message: "Multi-factor authentication must be enrolled before continuing.",
+      },
+    }),
+  );
+
+  await page.goto("/insurers");
+  await expect(page.getByText(/not paired an authenticator app yet/i)).toBeVisible();
+  await expect(page.getByText(/NOT a permissions problem/i)).toBeVisible();
+  await expect(page.getByText(/do not hold insurer\.read/i)).toHaveCount(0);
+});
+
+test("still says so plainly when the 403 really is a missing permission", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/insurers**", (route) =>
+    route.fulfill({
+      status: 403,
+      // No `code` — what a bare permission refusal looks like on the wire.
+      json: { message: "Forbidden" },
+    }),
+  );
+
+  await page.goto("/insurers");
+  await expect(page.getByText(/do not hold insurer\.read/i)).toBeVisible();
+  await expect(page.getByText(/not paired an authenticator app yet/i)).toHaveCount(0);
+});

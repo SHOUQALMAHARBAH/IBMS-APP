@@ -27,6 +27,13 @@ export const COMMON = {
     commonActions: 'الإجراءات',
     commonStatus: 'الحالة',
     commonTryAgain: 'تعذر تحميل البيانات — حاول مرة أخرى.',
+    // Rendered by app/(app)/layout.tsx above EVERY authenticated screen while no authenticator is
+    // paired. Without it the first sign-in lands on a home page whose every link answers 403, and
+    // nothing on screen connects that to enrolment.
+    mfaBannerTitle: 'خطوة واحدة قبل أن يعمل النظام: اربط تطبيق المصادقة',
+    mfaBannerBody:
+      'معظم الشاشات سترفض العمل حتى تربط تطبيق مصادقة بحسابك. هذه ليست مشكلة في صلاحياتك.',
+    mfaBannerCta: 'اذهب إلى الأمان لإتمام الربط',
     pagingAria: 'تصفّح الصفحات',
     pagingRange: 'عرض {from}–{to} من {total}',
     pagingPrevious: 'السابق',
@@ -58,6 +65,10 @@ export const COMMON = {
     commonActions: 'Actions',
     commonStatus: 'Status',
     commonTryAgain: 'Could not load this — try again.',
+    mfaBannerTitle: 'One step before the system works: pair an authenticator app',
+    mfaBannerBody:
+      'Most screens will refuse to load until you pair an authenticator app with your account. This is not a problem with your permissions.',
+    mfaBannerCta: 'Go to Security to finish pairing',
     pagingAria: 'Pagination',
     pagingRange: 'Showing {from}–{to} of {total}',
     pagingPrevious: 'Previous',

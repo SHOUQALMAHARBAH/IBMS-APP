@@ -156,6 +156,24 @@ const COVERAGE_LINE_MAPPINGS: Record<CoverageLine, CoverageLineMapping> = {
  * `managed-line-writers.e2e-spec.ts` — not in a unit test, because a unit test would have to
  * mock the very list it is checking against.
  */
+/**
+ * The catalogue CODE for a programme-side line string, or null.
+ *
+ * Exported so nothing else has to restate the pairing. The demo seed needs exactly this — it
+ * describes its insurers with the same programme vocabulary — and a second copy of "which
+ * catalogue line is `Motor Fleet`" is the kind of duplicate this whole line of work exists to
+ * remove. Matched on the trimmed, case-folded string because the callers are describing a line in
+ * prose; the result is an identity, which is what the caller then stores.
+ */
+export function lineCodeForProgrammeLine(insuranceLine: string): string | null {
+  const wanted = insuranceLine.trim().toLowerCase();
+  for (const mapping of Object.values(COVERAGE_LINE_MAPPINGS)) {
+    if (mapping.insuranceLine.trim().toLowerCase() === wanted)
+      return mapping.lineCode;
+  }
+  return null;
+}
+
 export const COVERAGE_LINE_CODES: readonly string[] = [
   ...new Set(Object.values(COVERAGE_LINE_MAPPINGS).map((m) => m.lineCode)),
 ];

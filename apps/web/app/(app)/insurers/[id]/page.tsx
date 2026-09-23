@@ -12,7 +12,7 @@ import {
   type Insurer,
   type InsurerStatusImpact,
 } from '../../../../lib/insurer/insurer-api';
-import { ApiError } from '../../../../lib/auth/api-client';
+import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import {
@@ -80,8 +80,10 @@ export default function InsurerDetailPage() {
       setLoadError(
         err instanceof ApiError && err.status === 404
           ? t('insDetailNotFound')
-          : err instanceof ApiError && err.status === 403
-            ? t('insListNoPermission')
+          : isMfaEnrolmentError(err)
+            ? t('insMfaRequired')
+            : err instanceof ApiError && err.status === 403
+              ? t('insListNoPermission')
             : t('insListLoadError'),
       );
     }

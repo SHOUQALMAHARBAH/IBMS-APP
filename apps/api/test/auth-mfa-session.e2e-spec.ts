@@ -298,7 +298,13 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       .get('/customers')
       .set(bearer(session))
       .expect(403);
-    expect(JSON.stringify(blocked.body)).toContain('MFA_ENROLLMENT_REQUIRED');
+    // Asserted at `body.code`, not as a substring of the whole serialised body: the web client's
+    // `isMfaEnrolmentError` reads exactly that field to tell this refusal apart from a missing
+    // permission, and a `JSON.stringify(...).toContain(...)` would stay green if the discriminator
+    // moved into `message` and left every screen guessing again.
+    expect((blocked.body as { code?: string }).code).toBe(
+      'MFA_ENROLLMENT_REQUIRED',
+    );
 
     // And the enrolment screen itself is reachable, or the user would be stuck.
     await request(app!.getHttpServer())
