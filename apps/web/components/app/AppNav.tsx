@@ -111,6 +111,31 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { href: '/risk-profiles', labelKey: 'navRiskSurveys', permissions: ['risk-profile.read'] },
       { href: '/insurance-programs', labelKey: 'navInsurancePrograms', permissions: ['program.read'] },
       { href: '/opportunities', labelKey: 'navRfqMarket', permissions: ['opportunity.read'] },
+      // ## Why the insurer register lives HERE and not in Operations
+      //
+      // It was in Operations first, beside `/vendors`, on the argument that both are counterparty
+      // REGISTERS while New business is a pipeline of stages. CI refuted that argument, and the
+      // refutation is the better rule: `sidebar-executive.spec.ts` asserts an Executive sees NO
+      // Operations group at all, and an Executive holds `insurer.read` AND
+      // `insurer.directory.read` — so the entry made an administrative group appear for a role
+      // that deliberately has none of it.
+      //
+      // The rule that settles it is not what KIND of thing a screen is, it is WHO holds the
+      // permission that gates it. A nav entry must sit in a group every holder of its permission
+      // can see. `insurer.read` is broad — Sales, Placement, Manager, Executive, Compliance, the
+      // external auditor — and Operations is narrow by design (`*.manage` registers). New business
+      // is where every one of those roles already works, and insurers are the counterparties of
+      // the market `/opportunities` takes business to.
+      { href: '/insurers', labelKey: 'navInsurers', permissions: ['insurer.read'] },
+      // Its OWN entry and its own permission, never a tab on `/insurers`. They answer opposite
+      // questions — "who does my office deal with, on what terms" versus "which companies exist at
+      // all" — and `insurer.directory.read` is separate precisely so an office can be given the
+      // market without also being given its own panel. A tab would imply one grants the other.
+      {
+        href: '/insurer-directory',
+        labelKey: 'navInsurerDirectory',
+        permissions: ['insurer.directory.read'],
+      },
     ],
   },
   {
@@ -270,21 +295,6 @@ const NAV_GROUPS: readonly NavGroup[] = [
     labelKey: 'navGroupOperations',
     items: [
       { href: '/employees', labelKey: 'navEmployees', permissions: ['employee.read'] },
-      // Beside /vendors, because both are counterparty REGISTERS an office maintains — and not in
-      // "New business", which is a pipeline of stages (lead -> prospect -> ... -> opportunity)
-      // rather than a place for a list you keep. Insurers first: for a broker they are the primary
-      // counterparty, and /vendors is everything else.
-      { href: '/insurers', labelKey: 'navInsurers', permissions: ['insurer.read'] },
-      // Its OWN nav entry and its own permission, not a tab on /insurers. They answer opposite
-      // questions — "who does my office deal with, on what terms" versus "which companies exist at
-      // all" — and `insurer.directory.read` is separate from `insurer.read` precisely so an office
-      // can be given the market without also being given its own panel. A tab would imply one of
-      // them grants the other.
-      {
-        href: '/insurer-directory',
-        labelKey: 'navInsurerDirectory',
-        permissions: ['insurer.directory.read'],
-      },
       { href: '/vendors', labelKey: 'navVendors', permissions: ['vendor.manage'] },
       { href: '/information-assets', labelKey: 'navInformationAssets', permissions: ['information-asset.manage'] },
       { href: '/documents', labelKey: 'navDocuments', permissions: ['document.manage'] },

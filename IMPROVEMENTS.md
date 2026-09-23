@@ -2792,6 +2792,42 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
+### 1.47 `P2` — Two web Playwright tests are CHRONICALLY flaky in CI, and a green run has been hiding them
+
+Found while diagnosing a genuine red, which is how a retried flake usually surfaces: you go looking
+for one failure and find the run has been carrying two others for a while.
+
+`apps/web/e2e/rfq.spec.ts` "tracks the adjuster survey…" (line 2456) and "settles a small claim
+straight through as four distinct figures" (line 2574) both fail on a first attempt in CI with
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    57 × waiting for element to be visible, enabled and stable
+
+waiting on `Documentation · complete`, and both pass on retry. Playwright reports them as **2
+flaky** and the job still concludes SUCCESS.
+
+**Measured across two consecutive runs**, which is what makes this chronic rather than a one-off:
+
+| CI run | Overall | Those two |
+|---|---|---|
+| `35784578362` | **success** | already flaky, retried green |
+| `35789856896` | failure (an unrelated real defect) | flaky again, retried green |
+
+**Why this matters even though the gate is green.** A retried flake is a signal the suite has
+stopped carrying: the run says success, so nobody looks, and the same two tests could begin failing
+for a NEW reason without anyone noticing the change. It also cost real time here — three failures
+appeared in one red run and two of them were noise, so the diagnosis started by ruling out a
+connection to a nav change that had none.
+
+**Not fixed, and not a code defect as far as measured:** the timeout is on a claims-documentation
+checklist becoming complete, which is a multi-step interaction; the likeliest cause is CI's slower
+single-core runner against a step that waits on several sequential writes. It wants its own look —
+either an explicit wait on the state the click depends on, or the acknowledgement that the step is
+genuinely slow and the timeout is wrong for CI.
+
+**The rule worth taking from it:** `2 flaky` in a green run is a finding, not a formatting detail.
+Read the flaky count, not only the conclusion.
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently
