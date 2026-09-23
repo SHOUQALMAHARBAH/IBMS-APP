@@ -81,16 +81,29 @@ npm run seed:demo -w api
 - **مكتبان** (مؤسستان منفصلتان): `Default Brokerage Office` و
   `Rawabi Insurance Brokerage (demo)`. المكتبان ضروريان — دليل شركات التأمين لا يُظهر شيئًا
   ذا معنى بمكتب واحد.
-- **٢٠ موظفًا و٥٠٠ عميل** لكل مكتب، مع عروض وطلبات تسعير ووثائق ومطالبات وفواتير وشكاوى.
+- **١٠ موظفين و٢٥٠ عميلًا لكل مكتب في كل تشغيل**، مع عروض وطلبات تسعير ووثائق ومطالبات
+  وفواتير وشكاوى. **والتشغيل يضيف ولا يستبدل**: تشغيلان يعطيان ضعف العدد. إن أردتِ الرقم
+  الذي سجّلتِه — ٢٠ موظفًا و٥٠٠ عميل — في تشغيل واحد، اضبطي المتغيرين قبل الأمر:
+
+  ```powershell
+  $env:DEMO_EMPLOYEES_PER_ORG = '20'
+  $env:DEMO_CUSTOMERS_PER_ORG = '500'
+  ```
 - **شركات تأمين بالطريقتين**: شركات مرتبطة بالكتالوج العام، وشركات سجّلها المكتب بنفسه
   ولا وجود لها في أي كتالوج (مثل `Petra Takaful (demo)` و`Yarmouk Insurance (demo)`).
-- **شركة واحدة موقوفة عن التعامل ولها التزامات قائمة**، حتى تظهر أرقام حقيقية في شاشة
-  الإيقاف بدلًا من أصفار.
+- **شركة موقوفة عن التعامل على الأقل، ولها التزامات قائمة**، حتى تظهر أرقام حقيقية في شاشة
+  الإيقاف بدلًا من أصفار. كل تشغيل يوقف الشركة الأكثر وثائق إن لم تكن موقوفة، فقد تجدين أكثر
+  من واحدة بعد عدة تشغيلات.
 - في نهايته **يفتح الحسابات التجريبية للدخول البشري**: يمسح أي تسجيل مصادقة قديم ويطبع
   قائمة الحسابات. هذه الخطوة مهمة — اقرئي القسم ١٠ لمعرفة السبب.
 
 انتظري حتى ترى في النهاية سطرًا مثل:
 `All 16 demo accounts released — password-only sign-in, MFA enrolment on first login.`
+
+**اتركيه يُكمل.** تحرير الحسابات للدخول البشري يحدث في **آخر** خطوة من الأمر. إن أوقفتِه في
+المنتصف (Ctrl+C أو إغلاق النافذة) تبقى الحسابات الستة عشر مربوطة بتطبيق مصادقة لا يملك أحد
+سرّه — وهذه بالضبط حالة «الرمز صحيح ويقول خطأ». العلاج سطر واحد:
+`npm run demo:release -w api`.
 
 ## ٥. الخطوة الرابعة: العنوان والحساب
 
@@ -229,6 +242,7 @@ yarmouk insurance (Demo)
 | **كل شاشة ترفض العمل والتنبيه التحذيري ظاهر** | لم يتم ربط تطبيق المصادقة. القسم ٦. |
 | **شاشة تقول إنك لا تملك صلاحية** | هذا الحساب فعلًا لا يملكها — راجعي جدول القسم ٧ واستخدمي الحساب المناسب. |
 | **`npm run seed:demo` يتوقف فورًا ويقول `DEMO_PASSWORD is not set`** | نافذة الأوامر هذه لا تحمل كلمة المرور. كرّري سطر `$env:DEMO_PASSWORD = (Read-Host ...)` في **نفس** النافذة. |
+| **أوقفتُ أمر تجهيز البيانات في المنتصف** | الحسابات تبقى مربوطة بمصادقة لا يملك أحد سرّها، فلا يمكنك الدخول. نفّذي `npm run demo:release -w api` ثم سجّلي الدخول عادي. البيانات التي أُنشئت قبل الإيقاف تبقى، والتشغيل مرة أخرى يكمل الباقي. |
 | **`Port 3000 is in use` ثم `Another next dev server is already running`** | نسخة أخرى من النظام تعمل بالفعل. **المهم أن تعرفي أن الأمر كله يفشل، لا الواجهة وحدها**: يختار Next المنفذ 3001 ثم يرفض العمل، فيتوقف `turbo` ومعه الخدمة الخلفية — فلا تعملي على المنفذ القديم بافتراض أن كل شيء يعمل، لأن الخدمة الخلفية قد لا تكون قائمة. Next يطبع لك رقم العملية والأمر اللازم لإيقافها؛ نفّذيه ثم أعيدي `npm run dev`: `taskkill /PID <الرقم> /F` — ولإيقاف الخدمة الخلفية أيضًا إن بقيت: `netstat -ano | findstr :4000` ثم نفس الأمر على رقمها. |
 | **قاعدة البيانات لا تعمل** | افتحي Docker Desktop وتأكدي أن الحاوية `ibms-app-db-1` حالتها `healthy`، أو نفّذي `docker compose up -d db`. |
 
@@ -309,18 +323,31 @@ minutes. It creates:
 
 - **Two offices** — `Default Brokerage Office` and `Rawabi Insurance Brokerage (demo)`. Two
   are necessary: the cross-office insurer directory shows nothing meaningful with one.
-- **20 employees and 500 customers** per office, with opportunities, RFQs, policies, claims,
-  invoices and complaints.
+- **10 employees and 250 customers per office, per run**, with opportunities, RFQs, policies,
+  claims, invoices and complaints. **A run ADDS rather than replaces**, so two runs give twice
+  as much. To get the figures you recorded — 20 employees and 500 customers — in a single run,
+  set both variables before the command:
+
+  ```powershell
+  $env:DEMO_EMPLOYEES_PER_ORG = '20'
+  $env:DEMO_CUSTOMERS_PER_ORG = '500'
+  ```
 - **Insurers registered both ways** — linked to the shared catalogue, and registered locally
   by the office with no catalogue row behind them (`Petra Takaful (demo)`,
   `Yarmouk Insurance (demo)`).
-- **One insurer deactivated while holding live commitments**, so the deactivation screen
-  shows real impact counts instead of zeros.
+- **At least one insurer deactivated while holding live commitments**, so the deactivation
+  screen shows real impact counts instead of zeros. Each run deactivates the insurer holding the
+  most policies if it is not already deactivated, so several runs can leave more than one.
 - At the end it **releases the demo logins for human sign-in**, clearing any stale
   authenticator registration. That step matters; see §10.
 
 Wait for the closing line:
 `All 16 demo accounts released — password-only sign-in, MFA enrolment on first login.`
+
+**Let it finish.** Releasing the logins for human sign-in is the command's **last** step. Stop it
+half-way — Ctrl+C, or closing the window — and all sixteen accounts stay paired to an
+authenticator whose secret nobody holds, which is exactly the "correct code is rejected" state.
+One line fixes it: `npm run demo:release -w api`.
 
 ## 5. Step four: the address and the account
 
@@ -460,6 +487,7 @@ for holding policies.
 | **Every screen refuses and the warning banner is showing** | The authenticator is not paired. See §6. |
 | **A screen says you lack a permission** | That account genuinely lacks it — check the §7 table and use the right account. |
 | **`npm run seed:demo` stops immediately with `DEMO_PASSWORD is not set`** | That window does not carry the password. Repeat the `$env:DEMO_PASSWORD = (Read-Host ...)` line in the **same** window. |
+| **I stopped the seed half-way** | The accounts stay paired to an authenticator nobody holds a secret for, so you cannot sign in. Run `npm run demo:release -w api`, then sign in normally. Data created before the stop stays; running the seed again completes the rest. |
 | **`Port 3000 is in use`, then `Another next dev server is already running`** | Another copy is already running. **The part worth knowing is that the whole command fails, not just the website**: Next picks port 3001, then refuses, and `turbo` brings the API task down with it — so do not carry on against the old port assuming everything is up, because the API may not be. Next prints the PID and the exact command to stop it; run that, then `npm run dev` again: `taskkill /PID <pid> /F`. If an API is also left behind, find it with `netstat -ano | findstr :4000` and stop that PID the same way. |
 | **The database is not running** | In Docker Desktop, confirm `ibms-app-db-1` is `healthy`, or run `docker compose up -d db`. |
 
@@ -489,6 +517,49 @@ for them:
 ---
 
 ## For whoever maintains this
+
+**This document was walked end to end on 2026-09-23, with a throwaway `DEMO_PASSWORD`, before it
+was handed over.** The seed ran, the browser signed in, the authenticator was paired, and the
+insurer screens were read. Doing that found **five defects that reading the code had not**, all of
+them in the tooling around the system rather than in the system:
+
+1. **`npm run seed:demo` was a one-shot.** It boots the app through `createTestApp()`, whose
+   one-Organization guard refuses at two offices — and the seed's own first run creates the second
+   office. So every run after the first was refused before reaching a line of seeding logic. The
+   guard is right for the e2e suite and its premise never applied here: the seed creates Office B
+   and every account through `rawPrisma` precisely BECAUSE `POST /auth/signup` refuses at two
+   offices. It now passes `multipleOrganizationsAreExpected` — the only caller of 93 that does.
+2. **The duplicate-spelling prover sent an incomplete payload.** `RegisterInsurerDto` requires
+   `structure`, `companyPhone` and `companyEmail`; without them the request is a 400 from the
+   ValidationPipe and the collision check never runs — so the assertion reported "no refusal came"
+   about a request the endpoint never considered. It also threw, which took office A's entire seed
+   down with it. A check on the DOCS must not be able to cost the DATA: failures are collected now
+   and raised at the end, where failing is free.
+3. **Commission agreements could not be seeded past the first line per insurer.** The live
+   constraint is `UNIQUE (insurerId, insuranceLineId, variantKey) NULLS NOT DISTINCT WHERE
+   effectiveTo IS NULL`, and this writer set neither the FK nor the variant — so every agreement for
+   one insurer was the tuple `(insurer, NULL, NULL)`. § 1.40's lesson landing on one more writer.
+   It now resolves the managed line, matches existing rows on EITHER key (a row written before the
+   FK existed carries the string and a NULL FK, and looking it up by FK alone collides on the string
+   index — measured, four failures in one run), and backfills the FK when it finds one missing.
+4. **The seed asked the API to shortlist an insurer it had itself deactivated.** The deactivation
+   step runs last; the next run picked that company for an RFQ and `POST /rfqs` refused with a 422
+   naming it. Three failures per run, recurring forever. Deactivated insurers are now held back
+   from placement only — they stay registered and stay on the screens.
+5. **A killed run strands all sixteen logins.** Observed twice here, both times repaired by
+   `npm run demo:release -w api` in seconds. Documented in § 4 and § 10 rather than left to be
+   rediscovered.
+
+After all five: a complete run reports **160 rows created, 0 failed attempts**.
+
+**What the browser walk confirmed**, against a live stack with no mocks: sign-in lands on the home
+page; the enrolment banner renders with the wording in § 6 and the screen beneath it does NOT claim
+a missing permission; the banner's link reaches Security; the QR is issued, the six-digit code is
+accepted, the status becomes enabled and the banner clears everywhere. The insurer list shows **11
+cards** including both locally-registered companies with their "registered locally" badge and **two
+deactivated insurers shown by default**, with no error alerts. The directory went from **12 entries
+unfiltered to 1** when searched for `يرموك` — which is § 9's promise, on screen, in Arabic.
+
 
 - The measured facts above — startup times, the per-account permission table, the 29
   administrator codes, which spellings collide — were taken from the dev database on

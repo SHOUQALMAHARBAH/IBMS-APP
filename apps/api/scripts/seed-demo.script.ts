@@ -390,6 +390,22 @@ const LOCAL_INSURER_SEEDS: Record<'a' | 'b', { legalName: string; legalNameAr: s
  * does not come — an instruction nobody re-checks is exactly the kind that rots into "it just let
  * me save it".
  */
+/**
+ * Promises `docs/first-run.md` makes that this run could not confirm.
+ *
+ * Collected rather than thrown at the point of discovery, and the difference is not stylistic.
+ * The first version threw, the throw reached `seedOrganization`'s caller, and the console read
+ * "Default Brokerage Office FAILED entirely" — one wrong assertion about a documentation step had
+ * skipped that office's employees, customers, pipelines and claims. A check on the DOCS must not
+ * be able to cost the DATA; the run still fails at the end, where failing is free.
+ */
+const brokenPromises: string[] = [];
+
+function recordBrokenPromise(detail: string): void {
+  brokenPromises.push(detail);
+  console.log(`  !!! walkthrough promise NOT confirmed: ${detail}`);
+}
+
 const DUPLICATE_SPELLING_DEMO = {
   attempt: 'yarmouk insurance (Demo)',
   attemptAr: 'شركة اليرموك للتامين',
@@ -947,18 +963,29 @@ async function proveDuplicateSpellingIsRefused(
     .send({
       legalName: DUPLICATE_SPELLING_DEMO.attempt,
       legalNameAr: DUPLICATE_SPELLING_DEMO.attemptAr,
+      // `structure`, `companyPhone` and `companyEmail` are REQUIRED by `RegisterInsurerDto` on
+      // both registration paths. Sending only the two names — which is what the first version of
+      // this function did — is a 400 from the ValidationPipe, and the collision check never runs:
+      // the assertion then reports "the refusal did not come" about a request the endpoint never
+      // considered. Found by running the seed, which is the only way it could have been found.
+      structure: 'CONVENTIONAL',
+      companyPhone: '+962 6 000 0000',
+      companyEmail: 'duplicate.check@example.invalid',
     });
 
   if (res.status !== 409) {
-    throw new Error(
+    recordBrokenPromise(
       [
         `The walkthrough promises that registering ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} in office A is refused`,
         `because ${JSON.stringify(DUPLICATE_SPELLING_DEMO.collidesWith)} is already registered there, but POST /insurers answered`,
         `${res.status}, not 409: ${JSON.stringify(res.body)}.`,
-        'Either the canonical name key changed or the office A seed no longer holds the colliding name.',
+        'Either the canonical name key changed, or the office A seed no longer holds the colliding',
+        'name, or this request never reached the collision check at all — a 400 means the payload',
+        'itself was refused by the DTO.',
         'Fix the step in docs/first-run.md (§ the duplicate she is asked to try) before this seed is used for a demo.',
       ].join(' '),
     );
+    return;
   }
 
   // A 409 is the right status for several distinct collisions on this endpoint, so check it is THIS
@@ -969,13 +996,14 @@ async function proveDuplicateSpellingIsRefused(
   const message = String((res.body as { message?: unknown }).message ?? '');
   const namesTheAttempt = message.toLowerCase().includes(DUPLICATE_SPELLING_DEMO.attempt.toLowerCase());
   if (!namesTheAttempt || !message.includes('reactivate')) {
-    throw new Error(
+    recordBrokenPromise(
       [
         'POST /insurers refused with 409, but not recognisably for the name collision the walkthrough',
         `describes — the message neither quotes ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} nor mentions reactivation:`,
         JSON.stringify(res.body),
       ].join(' '),
     );
+    return;
   }
   console.log(
     `  - duplicate-spelling demo verified: ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} -> 409`,
@@ -1075,7 +1103,34 @@ async function ensureInsurersForOrg(orgId: string, tally: Tally): Promise<OrgIns
     await attachCompanyFactsAndLines(local.id, orgId, seed.lines, tally);
     out.push({ id: local.id, insurerMasterId: null, name: seed.legalName, lines: seed.lines });
   }
-  return out;
+
+  /**
+   * Deactivated insurers are dropped from the list the PIPELINES use, and only from that list.
+   *
+   * This run deactivates one insurer on purpose, at the end, so the deactivation screen has real
+   * impact counts. The next run then picked that same company for an RFQ shortlist and `POST /rfqs`
+   * refused it — correctly, with a 422 naming the company. Measured: three such failures in one
+   * run, all the same insurer, and they will recur on every run after a deactivation.
+   *
+   * The refusal is right and the seed was wrong to ask. The rows stay in the database and on the
+   * screens, which is the point of showing a deactivated insurer in the list at all — they are just
+   * not offered to code that is about to place NEW business with them.
+   */
+  const activeIds = new Set(
+    (
+      await rawPrisma.insurer.findMany({
+        where: { organizationId: orgId, id: { in: out.map((i) => i.id) }, isActive: true },
+        select: { id: true },
+      })
+    ).map((i) => i.id),
+  );
+  const placeable = out.filter((i) => activeIds.has(i.id));
+  if (placeable.length < out.length) {
+    console.log(
+      `  - ${out.length - placeable.length} deactivated insurer(s) held back from placement (still registered, still on the screens)`,
+    );
+  }
+  return placeable;
 }
 
 /** `CommissionAgreement` also has no HTTP create endpoint exercised anywhere
@@ -1090,22 +1145,80 @@ async function ensureCommissionAgreements(
   tally: Tally,
 ): Promise<void> {
   for (const insurer of insurers) {
+    // The lines an insurer offers can be two DIFFERENT strings resolving to ONE catalogue line —
+    // "Property All Risks" and "Property All Risks (Fire)" are the real pair that motivated the
+    // variant axis. Only one open agreement may exist per (insurer, line, variant), so the second
+    // is skipped deliberately rather than attempted and failed.
+    const claimedLineIds = new Set<string>();
     for (const line of insurer.lines) {
       await attempt(tally, 'commissionAgreement', async () => {
+        // Resolve the managed line, because the live constraint is keyed on the FK and NOT on the
+        // free-text column beside it: UNIQUE (insurerId, insuranceLineId, variantKey) NULLS NOT
+        // DISTINCT WHERE effectiveTo IS NULL. Writing NULL there — which this function did until it
+        // was actually RUN — means every agreement for one insurer is the tuple (insurer, NULL,
+        // NULL), so the FIRST line got an agreement and every later one failed the constraint.
+        // Measured on the dev database: two such failures in one run, silent in a green exit.
+        // This is § 1.40's lesson landing on one more writer: the column was added, the rows were
+        // backfilled, and this writer was never changed.
+        const code = lineCodeForProgrammeLine(line);
+        const managed = code
+          ? await rawPrisma.insuranceLine.findUnique({ where: { code }, select: { id: true } })
+          : null;
+
+        if (managed && claimedLineIds.has(managed.id)) {
+          // Not an error: the invariant is correct and this is the second string for a line that
+          // already has an open agreement. Saying so beats a constraint violation in the tally.
+          console.log(
+            `  - skipping a second open agreement for ${insurer.id} on "${line}" — the same managed line is already covered`,
+          );
+          return null;
+        }
+
+        // Matched on EITHER key, because this table now has two live partial unique indexes and a
+        // row can be caught by the one the lookup did not check:
+        //   (insurerId, insuranceLine)                        WHERE effectiveTo IS NULL
+        //   (insurerId, insuranceLineId, variantKey) NULLS NOT DISTINCT, same predicate
+        // A row written before the FK existed carries the STRING and a NULL FK. Looking it up by
+        // FK alone misses it, the create then collides on the string index, and the failure reads
+        // as a duplicate when the real problem is that the lookup and the constraints disagree.
         const existing = await rawPrisma.commissionAgreement.findFirst({
-          where: { organizationId: orgId, insurerId: insurer.id, insuranceLine: line },
+          where: {
+            organizationId: orgId,
+            insurerId: insurer.id,
+            effectiveTo: null,
+            OR: managed
+              ? [{ insuranceLineId: managed.id }, { insuranceLine: line }]
+              : [{ insuranceLine: line }],
+          },
         });
-        if (existing) return existing;
-        return rawPrisma.commissionAgreement.create({
+        if (existing) {
+          if (managed) claimedLineIds.add(managed.id);
+          // Backfill rather than leave it: this is the writer, and a row it can see with a
+          // resolvable line and a NULL FK is exactly the decay § 1.40 is about. The money crossing
+          // (policy -> governing rate) matches on the FK, so a NULL here is a rate that cannot be
+          // found by the code that pays the broker.
+          if (managed && existing.insuranceLineId === null) {
+            return rawPrisma.commissionAgreement.update({
+              where: { id: existing.id },
+              data: { insuranceLineId: managed.id },
+            });
+          }
+          return existing;
+        }
+
+        const created = await rawPrisma.commissionAgreement.create({
           data: {
             organizationId: orgId,
             insurerId: insurer.id,
             insuranceLine: line,
+            insuranceLineId: managed?.id ?? null,
             ratePercent: money(randomInt(10, 20)).replace(/\.000$/, '.00'),
             vatRatePercent: '16.00',
             effectiveFrom: new Date(isoDateDaysAgo(365)),
           },
         });
+        if (managed) claimedLineIds.add(managed.id);
+        return created;
       });
     }
   }
@@ -1753,7 +1866,11 @@ async function seedOrganization(
 
 it('seeds demo data for two Organizations through the real API', async () => {
   const tally = newTally();
-  const app = await createTestApp();
+  // Two offices are the POINT of this script, so the one-Organization guard in
+  // `createTestApp` does not apply to it — see `CreateTestAppOptions`. Passing this is what
+  // makes the run repeatable: before it, the first run created Office B and every later run
+  // was refused before reaching a single line of seeding logic.
+  const app = await createTestApp({ multipleOrganizationsAreExpected: true });
   // Captured rather than allowed to propagate, so the release below still runs
   // and can never replace the error that actually caused it.
   let fatal: Error | undefined;
@@ -1881,6 +1998,14 @@ it('seeds demo data for two Organizations through the real API', async () => {
   await rawPrisma.$disconnect();
 
   if (fatal) throw fatal;
+  if (brokenPromises.length > 0) {
+    throw new Error(
+      `Seeding finished and the data is in place, but ${brokenPromises.length} promise(s) that ` +
+        `docs/first-run.md makes to its reader could NOT be confirmed against this run:\n  - ` +
+        `${brokenPromises.join('\n  - ')}\n` +
+        'The environment is usable; the DOCUMENT is wrong until that is fixed.',
+    );
+  }
   if (stillLocked.length > 0) {
     throw new Error(
       `Seeding finished, but ${stillLocked.length} demo account(s) are still ` +
