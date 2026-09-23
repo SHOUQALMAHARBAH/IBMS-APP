@@ -2792,7 +2792,7 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
-### 1.47 `P2` — Two web Playwright tests are CHRONICALLY flaky in CI, and a green run has been hiding them
+### 1.47 `P2` — FOUR web Playwright tests are chronically flaky in CI, and a green run has been hiding them
 
 Found while diagnosing a genuine red, which is how a retried flake usually surfaces: you go looking
 for one failure and find the run has been carrying two others for a while.
@@ -2806,12 +2806,28 @@ straight through as four distinct figures" (line 2574) both fail on a first atte
 waiting on `Documentation · complete`, and both pass on retry. Playwright reports them as **2
 flaky** and the job still concludes SUCCESS.
 
-**Measured across two consecutive runs**, which is what makes this chronic rather than a one-off:
+**Measured across three consecutive runs, and the count GREW while every gate stayed green:**
 
-| CI run | Overall | Those two |
+| CI run | Overall | Flaky |
 |---|---|---|
-| `35784578362` | **success** | already flaky, retried green |
-| `35789856896` | failure (an unrelated real defect) | flaky again, retried green |
+| `35784578362` | **success** | 2 — already flaky before any of this session's screen work |
+| `35789856896` | failure (an unrelated real defect, since fixed) | 2 |
+| `35827299885` | **success** | **4** |
+
+The two new ones are `rfq.spec.ts:2621` ("a large claim settlement blocks on a mandatory distinct
+second approver") and `:2673` ("closes a settled claim once the client payment receipt is
+confirmed"). So the flake is not two tests — it is the CLAIMS BLOCK of that file, four consecutive
+tests, and it is spreading.
+
+**Ruled out: a cascade.** Consecutive tests sharing state would explain 2 growing to 4, so it was
+checked — each of the four calls `mockAuth` + `mockRfqApi` itself and runs in its own browser
+context, so none inherits another's state. They are independent tests that happen to do the same
+expensive thing.
+
+**What they share is the SHAPE.** Each files four claim documents in a loop — a `selectOption`, two
+`fill`s and a `click` per document, so roughly sixteen sequential interactions — and only then
+asserts `Documentation · complete`, against a 30s per-test timeout. On CI's slower single-core
+runner that budget is marginal, which is why the count tracks load rather than any code change.
 
 **Why this matters even though the gate is green.** A retried flake is a signal the suite has
 stopped carrying: the run says success, so nobody looks, and the same two tests could begin failing
@@ -2819,14 +2835,20 @@ for a NEW reason without anyone noticing the change. It also cost real time here
 appeared in one red run and two of them were noise, so the diagnosis started by ruling out a
 connection to a nav change that had none.
 
-**Not fixed, and not a code defect as far as measured:** the timeout is on a claims-documentation
-checklist becoming complete, which is a multi-step interaction; the likeliest cause is CI's slower
-single-core runner against a step that waits on several sequential writes. It wants its own look —
-either an explicit wait on the state the click depends on, or the acknowledgement that the step is
-genuinely slow and the timeout is wrong for CI.
+**Not fixed here** — it is a claims-test concern in a file this session has no other business in,
+and the queue has docs next. Named so it can be picked up deliberately:
 
-**The rule worth taking from it:** `2 flaky` in a green run is a finding, not a formatting detail.
-Read the flaky count, not only the conclusion.
+1. The four tests share one helper-shaped loop. Extract it, and have it wait on the state each
+   click depends on rather than on the final label — sixteen interactions with one assertion at the
+   end reports "slow" and "broken" identically.
+2. Then decide the timeout on evidence. Raising it first would be the § 1.1 mistake again: a
+   mitigation that buys time and hides the next crossing.
+
+**The rule worth taking from it now:** `4 flaky` in a green run is a finding. Read the flaky count,
+not only the conclusion — and read whether it CHANGED, because a growing count is a different
+problem from a stable one.
+
+
 
 ## 2. Bugs found & fixed this session (regression-watch)
 

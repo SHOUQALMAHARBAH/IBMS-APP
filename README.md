@@ -792,10 +792,15 @@ build actually is today:
   backed by 15 database `*_maker_checker_distinct` CHECK constraints, so holding
   several roles cannot weaken
   separation of duties. The `RoleName` enum type and the pre-migration global role rows
-  are deliberately kept for at least one release so rollback stays cheap. Insurer CRUD
-  and `insurer.relationship.manage` remain specification-only and are deliberately
-  deferred: including that code would have broken the strict-subset property the
-  administrator migration's empty diff depends on. Phase 4 (the unified screen's
+  are deliberately kept for at least one release so rollback stays cheap. **Insurer CRUD
+  and `insurer.relationship.manage` have since SHIPPED** — this sentence said they
+  "remain specification-only" throughout the branch that built them, which is the doc rot
+  `meta/lex/definition-of-done.md` names: a deferral is true when written and nobody
+  revisits it. The reason for the deferral was real and its PROPERTY survives: including
+  that code at the time would have broken the strict-subset property the administrator
+  migration's empty diff depends on, so the four insurer codes now sit outside that set
+  and are listed explicitly in `ADDED_AFTER_THE_MIGRATION`, where a fifth cannot slip in
+  without a decision. Phase 4 (the unified screen's
   org-structure half, subdomain resolution, and the business-function routing table
   that finally retires those four role-name sites) and Phase 5 (migration rehearsal,
   dropping the `RoleName` enum type and the pre-migration rows) are not built. See
