@@ -114,3 +114,27 @@ export const matrixSectionAllStyle: CSSProperties = {
   color: 'var(--ink-secondary)',
   cursor: 'pointer',
 };
+
+/** Departments and branches side by side: two short lists, not a page each. */
+export const orgUnitGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(19rem, 1fr))',
+  gap: '1.25rem',
+  marginTop: '1.25rem',
+};
+
+export const orgUnitColumnStyle: CSSProperties = {
+  padding: '0.9rem 1rem',
+  background: 'var(--surface-card)',
+  border: '1px solid var(--border-subtle)',
+  borderRadius: '0.5rem',
+};
+
+export const orgUnitRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: '0.5rem',
+  padding: '0.45rem 0',
+  borderTop: '1px solid var(--border-subtle)',
+};

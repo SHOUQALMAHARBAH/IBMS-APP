@@ -259,6 +259,13 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       // roles but not change them gets the screen read-only rather than no link
       // at all. That is the whole reason the prep step split those two names.
       { href: '/settings/roles', labelKey: 'navRoleAdmin', permissions: ['role.read'] },
+      {
+        href: '/settings/org-units',
+        labelKey: 'navOrgUnits',
+        // Either code opens the screen; each column renders only for the one that gates it. A single
+        // gate here would hide branches from someone who may read them but not departments.
+        permissions: ['department.read', 'branch.read'],
+      },
     ],
   },
 ];

@@ -291,6 +291,7 @@ export const OPERATIONS = {
     homeRolesBlurb: 'أنشئ أدوار مكتبك وحدّد صلاحيات كل دور من مصفوفة الصلاحيات الكاملة.',
     homeUsersBlurb: 'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
     homeEmployeesBlurb: 'سجلات الموظفين والتراخيص والشهادات والتدريب.',
+    homeOrgUnitsBlurb: 'أسماء أقسام مكتبك وفروعه — تُنشأ قبل تسجيل أول موظف.',
     navGroupAccount: 'حسابك',
     homeNoDestinations:
       'لا توجد شاشة متاحة لحسابك حالياً — لم تُسند إليك أي صلاحية بعد. راجع مسؤول النظام في مكتبك.',
@@ -407,6 +408,24 @@ export const OPERATIONS = {
     roleIntro:
       'كل دور هنا يخصّ مكتبك وحده. تُحدَّد الصلاحيات لكل دور، ولا يمنح أي دور شيئاً لم يُعطَ له صراحةً.',
     // --- Role screen: the permission matrix, the generated machine name, and delete ---
+    // --- Departments and branches (the four-action pilot) ---
+    orgUnitHeading: 'الأقسام والفروع',
+    orgUnitIntro:
+      'أسماء أقسام مكتبك وفروعه. تُسند كل موظفة إلى قسم وفرع، ولهذا يجب إنشاؤها قبل تسجيل أول شخص. لا تمنح هذه الأسماء أي صلاحية ولا تحدّد من يرى ماذا.',
+    orgUnitDepartments: 'الأقسام',
+    orgUnitBranches: 'الفروع',
+    orgUnitNameEn: 'الاسم بالإنجليزية',
+    orgUnitNameAr: 'الاسم بالعربية (اختياري)',
+    orgUnitCreateButton: 'إضافة',
+    orgUnitRename: 'إعادة تسمية',
+    orgUnitRetire: 'إيقاف',
+    orgUnitCreated: 'تمت الإضافة.',
+    orgUnitRenamed: 'تم تغيير الاسم.',
+    orgUnitRetired: 'تم الإيقاف — تبقى الإسنادات القائمة كما هي.',
+    orgUnitNone: 'لا يوجد شيء بعد — أضِف الأول.',
+    orgUnitLoadError: 'تعذّر تحميل الأقسام والفروع — حاول مرة أخرى.',
+    orgUnitNoPermission:
+      'يتطلب هذا القسم صلاحية department.read أو branch.read. راجع مسؤول مكتبك.',
     roleMatrixSummary: 'هذا الدور يملك {granted} من {total} صلاحية.',
     roleMatrixNeedsCatalogue:
       'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
@@ -769,6 +788,7 @@ export const OPERATIONS = {
     homeRolesBlurb: "Define your office's roles and set each one's permissions from the full matrix.",
     homeUsersBlurb: 'Create user accounts, grant or revoke roles, activate or deactivate access.',
     homeEmployeesBlurb: 'Employee records, licences, certifications and training.',
+    homeOrgUnitsBlurb: "Your office's department and branch names — created before the first employee.",
     navGroupAccount: 'Your account',
     homeNoDestinations:
       'No screen is available to your account yet — no permissions have been granted to it. Ask your office administrator.',
@@ -885,6 +905,24 @@ export const OPERATIONS = {
     roleIntro:
       'Every role here belongs to your office alone. Permissions are set per role, and a role grants nothing it has not explicitly been given.',
     // --- Role screen: the permission matrix, the generated machine name, and delete ---
+    // --- Departments and branches (the four-action pilot) ---
+    orgUnitHeading: 'Departments and branches',
+    orgUnitIntro:
+      "Your office's department and branch names. Every employee is assigned to one of each, which is why these must exist before the first person is registered. These names grant no permission and decide nothing about who sees what.",
+    orgUnitDepartments: 'Departments',
+    orgUnitBranches: 'Branches',
+    orgUnitNameEn: 'Name (English)',
+    orgUnitNameAr: 'Name (Arabic) — optional',
+    orgUnitCreateButton: 'Add',
+    orgUnitRename: 'Rename',
+    orgUnitRetire: 'Retire',
+    orgUnitCreated: 'Added.',
+    orgUnitRenamed: 'Renamed.',
+    orgUnitRetired: 'Retired — existing assignments are unchanged.',
+    orgUnitNone: 'Nothing here yet — add the first one.',
+    orgUnitLoadError: 'Could not load departments and branches — try again.',
+    orgUnitNoPermission:
+      'This screen needs department.read or branch.read. Ask your office administrator.',
     roleMatrixSummary: 'This role has {granted} of {total} permissions.',
     roleMatrixNeedsCatalogue:
       'The permission matrix cannot be shown — your account does not hold permission.read. You can still create the role, and someone who holds it can set its permissions.',

@@ -55,6 +55,7 @@ const ROLE_CATALOGUE = [
     nameEn: "Sales / Relationship Officer",
     nameAr: "موظف المبيعات وعلاقات العملاء",
     description: null,
+    status: "ACTIVE",
   },
   {
     // A role the OFFICE defined. It has no translation key and never will, so its
@@ -65,6 +66,18 @@ const ROLE_CATALOGUE = [
     nameEn: "Claims Triage Desk",
     nameAr: "مكتب فرز المطالبات",
     description: "First look at every new claim.",
+    status: "ACTIVE",
+  },
+  {
+    // RETIRED. The endpoint returns it (an office must be able to reactivate one), and this screen
+    // must not OFFER it: permission resolution filters on `role.status = 'ACTIVE'`, so granting it
+    // would hand someone a row that reads as access and confers none.
+    id: "33333333-3333-4333-8333-333333333333",
+    name: "OLD_DESK",
+    nameEn: "Old Desk",
+    nameAr: "مكتب قديم",
+    description: "Retired last year.",
+    status: "INACTIVE",
   },
 ];
 
@@ -310,4 +323,58 @@ test("users screen has no serious/critical accessibility violations @a11y", asyn
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+/**
+ * The two defects the owner hit on this screen, and the scope line for the new org units.
+ */
+test("does not offer a RETIRED role to grant, and does not offer one when provisioning", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockAdmin(page);
+  await page.goto("/settings/users");
+
+  // Positive anchor: the active roles ARE offered, so the absence below is a filter and not an
+  // empty screen.
+  const grant = page.locator("[data-grant-select]").first();
+  await expect(grant).toBeVisible();
+  const options = await grant.locator("option").allInnerTexts();
+  expect(options.length).toBeGreaterThan(0);
+  expect(options.join(" | ")).not.toContain("Old Desk");
+
+  // The provisioning fieldset too: a new account created with a retired role would have no access
+  // on its first sign-in.
+  await expect(page.getByText("Old Desk")).toHaveCount(0);
+});
+
+test("a role picked in one row does NOT appear selected in every other row", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockAdmin(page);
+  await page.goto("/settings/users");
+
+  const selects = page.locator("[data-grant-select]");
+  // Anchor before counting. Reading `count()` straight after `goto` measures "React has not
+  // hydrated yet" and returns 0 — which would fail this test for the wrong reason, and would pass
+  // an absence assertion for the wrong reason. Fourth time this session.
+  await expect(selects.first()).toBeVisible();
+  const count = await selects.count();
+  expect(count, "this test needs at least two rows to mean anything").toBeGreaterThan(1);
+
+  const first = selects.nth(0);
+  const second = selects.nth(1);
+  const before = await second.inputValue();
+  // Pick the OTHER role in the first row.
+  const options = await first.locator("option").evaluateAll((els) =>
+    els.map((e) => (e as HTMLOptionElement).value),
+  );
+  const firstValue = await first.inputValue();
+  const other = options.find((v) => v !== firstValue);
+  expect(other, "the fixture must offer at least two ACTIVE roles").toBeTruthy();
+  await first.selectOption(other!);
+
+  // The grant always went to the right user; the screen was the only thing lying. So this asserts
+  // the DISPLAY, which is what was wrong.
+  expect(await first.inputValue()).toBe(other);
+  expect(await second.inputValue()).toBe(before);
 });
