@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client';
 
 /**
  * Office-scoped custom RBAC, PHASE 3 — the Role screen's client.
@@ -73,6 +73,17 @@ export interface CreateRoleInput {
 
 export function createRole(input: CreateRoleInput): Promise<RoleAdminEntry> {
   return apiPost('/rbac/roles', input);
+}
+
+/**
+ * Delete a role. 204, nothing returned.
+ *
+ * Soft by mechanism and immediate by behaviour: the API removes the grants, revokes every live
+ * assignment, and stamps the row deleted — the history of who held it survives because
+ * `UserRoleAssignment.roleId` is ON DELETE RESTRICT and that history is the point.
+ */
+export function deleteRole(roleId: string): Promise<void> {
+  return apiDelete(`/rbac/roles/${encodeURIComponent(roleId)}`);
 }
 
 export function updateRole(

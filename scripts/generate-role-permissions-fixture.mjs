@@ -91,13 +91,39 @@ async function main() {
     );
   }
 
+  // The whole catalogue, not just the granted codes: the Role screen's matrix renders EVERY
+  // permission, and the test that pins its shape (13 five-state families / 27 codes / 159 toggles)
+  // has to run against the real 186 rather than the union of what happens to be granted. Emitting it
+  // here keeps one generated source of truth and makes `--check` fail when a permission is added.
+  const catalogue = await prisma.permission.findMany({
+    select: { code: true, module: true, description: true },
+    orderBy: [{ module: 'asc' }, { code: 'asc' }],
+  });
+  if (catalogue.length === 0) {
+    throw new Error(
+      'The permission catalogue is empty. Run `npm run db:seed`; an empty catalogue would generate a matrix fixture that hides every permission.',
+    );
+  }
+  const catalogueBody = catalogue
+    .map(
+      (perm) =>
+        `  { code: '${perm.code}', module: '${perm.module}', description: ${JSON.stringify(perm.description ?? '')} },`,
+    )
+    .join('\n');
+
   const body = roles
     .map((role) => {
       const codes = role.permissions
         .map((grant) => grant.permission.code)
         .sort((a, b) => a.localeCompare(b, 'en'));
       const lines = codes.map((code) => `    '${code}',`).join('\n');
-      return `  ${role.name}: [\n${lines}\n  ],`;
+      // QUOTED via JSON.stringify: the API accepts ANY 1-100 character string as a machine name
+      // today, so a role named with spaces or non-Latin characters emits an invalid object key and
+      // breaks this fixture for every spec that imports it. Measured — one such role existed and did
+      // exactly that, taking the whole web unit suite down with a parse error.
+      return `  ${JSON.stringify(role.name)}: [
+${lines}
+  ],`;
     })
     .join('\n');
 
@@ -134,6 +160,22 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
   }
   return [...set].sort();
 }
+
+/**
+ * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
+ *
+ * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
+ * this rather than a hand-written sample: ${catalogue.length} codes across ${
+    new Set(catalogue.map((c) => c.module)).size
+  } modules at generation time.
+ */
+export const PERMISSION_CATALOGUE: readonly {
+  code: string;
+  module: string;
+  description: string;
+}[] = [
+${catalogueBody}
+];
 `;
 
   if (CHECK_ONLY) {

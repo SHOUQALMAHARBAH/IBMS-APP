@@ -5,7 +5,6 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,9 +13,13 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../../lib/auth/api-client';
+import { PermissionMatrix } from '../../../../components/admin/PermissionMatrix';
+import { createMatrixStyle, generatedNameStyle } from '../../../../components/admin/admin.styles';
+import { machineNameProblem, toMachineName } from '../../../../lib/admin/role-name';
 import { stepUp } from '../../../../lib/auth/auth-api';
 import {
   createRole,
+  deleteRole,
   getRoleWithGrants,
   listPermissionCatalogue,
   listRolesForAdmin,
@@ -70,7 +73,6 @@ const warningStyle: CSSProperties = {
   margin: '0.75rem 0',
   maxWidth: '48rem',
 };
-const moduleStyle: CSSProperties = { margin: '1rem 0' };
 const codeRowStyle: CSSProperties = {
   display: 'flex',
   gap: '0.5rem',
@@ -101,6 +103,7 @@ export default function RoleAdminPage() {
   const canManage = hasPermission(user, 'role.manage');
   const canReadCatalogue = hasPermission(user, 'permission.read');
 
+
   const [roles, setRoles] = useState<RoleAdminEntry[] | null>(null);
   const [catalogue, setCatalogue] = useState<PermissionCatalogueEntry[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,6 +113,9 @@ export default function RoleAdminPage() {
 
   // The role whose matrix is open, with the grants it currently holds.
   const [editing, setEditing] = useState<RoleWithGrants | null>(null);
+  /** The grant set being chosen for a role that does not exist yet. */
+  const [newCodes, setNewCodes] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<RoleAdminEntry | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [nameEn, setNameEn] = useState('');
   const [nameAr, setNameAr] = useState('');
@@ -118,8 +124,11 @@ export default function RoleAdminPage() {
   const [hardwareToken, setHardwareToken] = useState(true);
 
   // Create form.
-  const [newName, setNewName] = useState('');
   const [newNameEn, setNewNameEn] = useState('');
+  // Derived on every keystroke so the permanent identifier is visible before it is written, and so
+  // the refusal appears while there is still something to fix.
+  const generatedName = toMachineName(newNameEn);
+  const nameProblem = machineNameProblem(newNameEn);
   const [newNameAr, setNewNameAr] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
@@ -172,6 +181,31 @@ export default function RoleAdminPage() {
     }
   }, [t]);
 
+  /**
+   * Delete a role. The confirmation is a step, not a gate: it exists because the act is one-way, and
+   * it explains the two consequences the owner explicitly accepted — the role is withdrawn from
+   * everyone with no reassignment, and a user left with nothing keeps nothing.
+   */
+  const onDelete = useCallback(
+    async (role: RoleAdminEntry) => {
+      setBusy(true);
+      setActionError(null);
+      try {
+        await deleteRole(role.id);
+        setDeleting(null);
+        // Close the matrix if it was open on the role that no longer exists.
+        setEditing((current) => (current && current.id === role.id ? null : current));
+        setSavedMessage(t('roleDeleted'));
+        await load();
+      } catch (err) {
+        setActionError(err instanceof ApiError ? err.message : t('roleCouldNotLoad'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [t, load],
+  );
+
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
@@ -196,20 +230,6 @@ export default function RoleAdminPage() {
     })();
   }, [user, canRead, canReadCatalogue, load]);
 
-  const byModule = useMemo(() => {
-    const groups = new Map<string, PermissionCatalogueEntry[]>();
-    for (const entry of [...catalogue].sort((a, b) =>
-      a.module === b.module
-        ? a.code.localeCompare(b.code)
-        : a.module.localeCompare(b.module),
-    )) {
-      const list = groups.get(entry.module) ?? [];
-      list.push(entry);
-      groups.set(entry.module, list);
-    }
-    return [...groups.entries()];
-  }, [catalogue]);
-
   const segregationWarning = violatesSegregationPair(selected);
 
   async function openMatrix(roleId: string) {
@@ -233,19 +253,26 @@ export default function RoleAdminPage() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
+    // The form refuses rather than storing an identifier nobody can read back to a role. Checked
+    // here as well as on the button, because a form can be submitted with Enter.
+    if (machineNameProblem(newNameEn)) return;
     setBusy(true);
     setActionError(null);
     try {
       await createRole({
-        name: newName,
+        // The GENERATED name, not a typed one.
+        name: generatedName,
         nameEn: newNameEn,
         nameAr: newNameAr,
         description: newDescription || undefined,
+        // Required by the API, and the whole point of the flow: the role arrives with its
+        // permissions rather than existing for a while able to do nothing.
+        permissionCodes: [...newCodes],
       });
-      setNewName('');
       setNewNameEn('');
       setNewNameAr('');
       setNewDescription('');
+      setNewCodes(new Set());
       await load();
     } catch (err) {
       setActionError(
@@ -446,6 +473,19 @@ export default function RoleAdminPage() {
                             : t('roleReactivateButton')}
                         </button>
                       )}
+                      {/* Absent on a system role, like the retire control beside it — the platform
+                          defined those rows and the office's screen does not get to remove them. */}
+                      {!role.isSystem ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setDeleting(role)}
+                          data-delete-role={role.name}
+                          style={{ marginInlineStart: '0.4rem' }}
+                        >
+                          {t('roleDeleteButton')}
+                        </button>
+                      ) : null}
                     </td>
                   ) : null}
                 </tr>
@@ -459,29 +499,44 @@ export default function RoleAdminPage() {
         <section style={sectionStyle}>
           <h2>{t('roleCreateHeading')}</h2>
           <form onSubmit={onCreate} style={formStyle}>
-            <label style={labelStyle}>
-              {t('roleFieldName')}
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                required
-              />
-              <small>{t('roleFieldNameHint')}</small>
-            </label>
+            {/* English name FIRST, because the machine name is derived from it and a person should
+                see the cause before the effect. Required — owner decision, 2026-09-24 — precisely
+                because it is the source of a permanent identifier. */}
             <label style={labelStyle}>
               {t('roleFieldNameEn')}
               <input
                 value={newNameEn}
                 onChange={(e) => setNewNameEn(e.target.value)}
                 required
+                /* An explicit hook. The edit panel carries fields with the same labels, and a test
+                   that reaches for a label here has to guess which form it landed in. */
+                data-create-name-en
               />
             </label>
+            {/* GENERATED, shown, and never typed. An office administrator is a broker, not a
+                programmer, and this string is immutable and lands in every audit row that mentions
+                the role. Shown read-only as she types so nothing is written that she never saw. */}
+            <label style={labelStyle}>
+              {t('roleMachineNameLabel')}
+              <output data-generated-machine-name style={generatedNameStyle}>
+                {generatedName || '—'}
+              </output>
+              <small>{t('roleMachineNameHint')}</small>
+            </label>
+            {nameProblem ? (
+              <p role="alert" style={errorStyle} data-machine-name-problem>
+                {nameProblem === 'empty'
+                  ? t('roleEnglishNameRequired')
+                  : t('roleMachineNameUnreadable')}
+              </p>
+            ) : null}
             <label style={labelStyle}>
               {t('roleFieldNameAr')}
               <input
                 value={newNameAr}
                 onChange={(e) => setNewNameAr(e.target.value)}
                 required
+                data-create-name-ar
               />
             </label>
             <label style={labelStyle}>
@@ -491,10 +546,50 @@ export default function RoleAdminPage() {
                 onChange={(e) => setNewDescription(e.target.value)}
               />
             </label>
-            <button type="submit" disabled={busy}>
+            {/* Permissions belong to CREATION. Choosing what a role can do is part of making it,
+                not an errand to be found later — and the API has always accepted the whole set in
+                the same POST (`CreateRoleDto.permissionCodes` is required, which is why the old
+                four-field form could not create a role at all: it omitted the field and got a 400
+                about it). */}
+            <fieldset style={createMatrixStyle}>
+              <legend>{t('roleCreatePermissionsHeading')}</legend>
+              <p>{t('roleCreatePermissionsIntro')}</p>
+              {catalogue.length > 0 ? (
+                <PermissionMatrix
+                  catalogue={catalogue}
+                  selected={newCodes}
+                  onChange={setNewCodes}
+                />
+              ) : (
+                <p role="status">{t('roleMatrixNeedsCatalogue')}</p>
+              )}
+            </fieldset>
+            <button type="submit" disabled={busy || nameProblem !== null}>
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
+        </section>
+      ) : null}
+
+      {deleting ? (
+        <section style={sectionStyle} data-delete-confirm={deleting.name}>
+          <h2>{t('roleDeleteConfirmHeading', { role: roleLabel(deleting) })}</h2>
+          <p>{t('roleDeleteConfirmBody')}</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onDelete(deleting)}
+            data-confirm-delete
+          >
+            {t('roleDeleteConfirmButton')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleting(null)}
+            style={{ marginInlineStart: '0.4rem' }}
+          >
+            {t('commonCancel')}
+          </button>
         </section>
       ) : null}
 
@@ -518,35 +613,16 @@ export default function RoleAdminPage() {
 
           {savedMessage ? <p role="status">{savedMessage}</p> : null}
 
-          {byModule.map(([module, entries]) => (
-            <div key={module} style={moduleStyle}>
-              <h3>{module}</h3>
-              {entries.map((entry) => (
-                <label key={entry.code} style={codeRowStyle}>
-                  <input
-                    type="checkbox"
-                    /* An untranslated hook per code. Every box's visible label is
-                       the code plus its description, and a test that selected one
-                       by index would silently follow the catalogue's sort order —
-                       which is by module, then by code, so it moves whenever a
-                       code is added. */
-                    data-code={entry.code}
-                    checked={selected.has(entry.code)}
-                    disabled={editing.isSystem}
-                    onChange={(e) => {
-                      const next = new Set(selected);
-                      if (e.target.checked) next.add(entry.code);
-                      else next.delete(entry.code);
-                      setSelected(next);
-                    }}
-                  />
-                  <span>
-                    <code>{entry.code}</code> — {entry.description}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ))}
+          {/* The SAME component the creation form uses. It was two implementations for about an
+              hour, and that hour produced two matrices on one page with the same `data-code` hooks —
+              which broke three pre-existing tests with a strict-mode ambiguity and would have let
+              the two drift. One matrix, used twice. */}
+          <PermissionMatrix
+            catalogue={catalogue}
+            selected={selected}
+            onChange={setSelected}
+            disabled={editing.isSystem}
+          />
 
           {editing.isSystem ? null : (
             <>

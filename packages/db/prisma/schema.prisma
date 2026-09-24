@@ -745,6 +745,15 @@ model Role {
   /// only job is to prove a user holding an isSystem role with no permissions
   /// reaches nothing.
   isSystem              Boolean      @default(false)
+  /// Set when the office DELETES the role. The row survives because
+  /// `UserRoleAssignment.roleId` is ON DELETE RESTRICT and the historical
+  /// assignment rows must keep naming which role they were — see migration
+  /// `20261022100000_role_soft_delete` for why this is a soft delete and not the
+  /// hard one it looks like from the screen. Deletion also REMOVES the
+  /// `RolePermission` rows, so a deleted role cannot grant anything through any
+  /// read path, filtered or not. Never reactivated: a CHECK constraint holds it
+  /// INACTIVE, and delete is deliberately one-way.
+  deletedAt             DateTime?
   createdAt             DateTime     @default(now())
 
   users       UserRoleAssignment[]

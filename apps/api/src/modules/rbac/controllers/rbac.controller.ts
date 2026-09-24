@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -144,6 +146,22 @@ export class RbacController {
   /** A POST, not a DELETE — there is no delete. `Role.status` is the only removal
    *  there is, because the grant rows pointing here are the record of who held
    *  what and when. */
+  /**
+   * Delete a role. Soft by mechanism, immediate by behaviour — see `RoleAdminService.remove`.
+   *
+   * `@HttpCode(204)`: there is nothing meaningful to return, and returning the deleted row would
+   * invite a screen to render it.
+   */
+  @RequirePermissions('role.manage')
+  @Delete('roles/:id')
+  @HttpCode(204)
+  async removeRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<void> {
+    await this.roleAdmin.remove(id, user.id);
+  }
+
   @RequirePermissions('role.manage')
   @Post('roles/:id/retire')
   @HttpCode(200)

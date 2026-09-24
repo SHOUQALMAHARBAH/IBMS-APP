@@ -406,6 +406,82 @@ export class RoleAdminService {
   }
 
   /**
+   * Delete one of the office's own roles.
+   *
+   * The owner's decision, verbatim in its parts: the role and its effect go immediately, there is no
+   * "reassign the users first" gate, and a user left with zero roles and zero permissions is an
+   * accepted outcome rather than something to prevent. Permissions resolve from the role at request
+   * time, so nothing is copied onto a user that could survive this.
+   *
+   * It is a SOFT delete — see `RoleRepository.softDelete` and the migration for why the FK makes a
+   * hard one impossible without discarding the history she asked to keep.
+   *
+   * ONE refusal is kept, and it is deliberately NOT a reassignment gate: deleting the last role that
+   * grants user administration would leave the office with nobody able to grant it back, and there
+   * is no route into the application that repairs that. It is the same guard the other three write
+   * paths already carry (retiring a role, unchecking `user.manage` in the matrix, revoking the last
+   * grant), under the same per-office lock, so delete cannot slip past a control the other three
+   * respect. Losing every permission is recoverable by an administrator; losing every administrator
+   * is not.
+   */
+  async remove(roleId: string, actorUserId: string): Promise<void> {
+    const role = await this.users.findRoleById(roleId);
+    if (!role) throw new NotFoundException(`Role ${roleId} not found.`);
+    if (role.deletedAt) {
+      throw new UnprocessableEntityException(
+        `Role ${role.name} is already deleted.`,
+      );
+    }
+    this.assertNotSystem(role, 'deleted');
+
+    const guarded = await this.users.roleGrantsPermission(
+      role.id,
+      USER_ADMIN_PERMISSION,
+    );
+    if (!guarded) {
+      await this.applyRemoval(role, actorUserId);
+      return;
+    }
+
+    await this.users.withCapabilityLocked(USER_ADMIN_PERMISSION, async () => {
+      const holders = await this.users.findActiveHoldersOfPermission(
+        USER_ADMIN_PERMISSION,
+      );
+      const remaining = new Set(
+        holders.filter((h) => h.roleId !== role.id).map((h) => h.userId),
+      );
+      if (remaining.size === 0) {
+        throw new UnprocessableEntityException(
+          'Refusing to delete the last role that grants user administration — nobody would be able to grant it back. Give another role that permission first.',
+        );
+      }
+      await this.applyRemoval(role, actorUserId);
+    });
+  }
+
+  /** The write half, called from both sides of the lockout guard so the guarded and unguarded paths
+   *  cannot drift — the same shape `setStatus` uses. */
+  private async applyRemoval(role: Role, actorUserId: string): Promise<void> {
+    const { permissionCodes, assignmentsRevoked } = await this.roles.softDelete(
+      role.id,
+    );
+
+    await this.safeAudit({
+      userId: actorUserId,
+      action: 'DELETE',
+      entityType: 'Role',
+      entityId: role.id,
+      // The codes go in the BEFORE value because the grants no longer exist anywhere else: this row
+      // is now the only record of what the role could do.
+      beforeValue: { name: role.name, permissionCodes },
+      afterValue: { deleted: true, assignmentsRevoked },
+    });
+    // Not optional. Until this runs, a session that resolved this role keeps its permissions for up
+    // to the cache TTL — a deletion that takes a minute to bite is the one direction that matters.
+    this.permissions.invalidateCache();
+  }
+
+  /**
    * Retire or reactivate one of the office's own roles.
    *
    * Retirement is the only removal there is — see `Role.status` in the schema for

@@ -284,21 +284,21 @@ test("saves the whole grant set at once, grouped by module", async ({ page }) =>
     .getByRole("button", { name: "Permissions" })
     .click();
 
-  // Grouped by module, and the two modules in the fixture are both headings.
-  // `exact: true` — the matrix's own heading is "Permissions for Claims Triage
-  // Desk", and `getByRole(name)` matches case-insensitive substrings.
-  await expect(
-    page.getByRole("heading", { name: "claims", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "compliance-risk", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("Selected: 2 of 4")).toBeVisible();
+  // Grouped by module, and each module is now a collapsible section carrying its own count — the
+  // matrix renders 186 permissions in the real catalogue, so it opens collapsed and nobody scrolls
+  // 159 lines to see what a role holds. The module headings are `summary` elements now, not `h3`s.
+  const matrix = page.locator("[data-matrix-for] [data-permission-matrix]");
+  await expect(matrix.locator('details[data-module="claims"]')).toBeVisible();
+  await expect(matrix.locator('details[data-module="compliance-risk"]')).toBeVisible();
+  // The permanent summary answers "what can this role do?" without expanding anything.
+  await expect(matrix.locator("[data-matrix-summary]")).toContainText("2 of 4");
 
-  // Add one, remove one — then the PUT must carry the state the screen believes,
-  // not a delta.
-  await page.locator('[data-code="incident.classify"]').check();
-  await page.locator('[data-code="claim.register"]').uncheck();
+  // Add one, remove one — then the PUT must carry the state the screen believes, not a delta. The
+  // modules have to be opened first, which is the collapsed default working as intended.
+  await matrix.locator('details[data-module="compliance-risk"] summary').click();
+  await matrix.locator('details[data-module="claims"] summary').click();
+  await matrix.locator('[data-code="incident.classify"]').check();
+  await matrix.locator('[data-code="claim.register"]').uncheck();
   await page.getByRole("button", { name: "Save permissions" }).click();
   await expect(page.getByText("Permissions saved.")).toBeVisible();
 
@@ -339,8 +339,13 @@ test("warns — and still saves — when one role both classifies and co-signs",
   // One half checked: no warning yet.
   await expect(page.locator("[data-segregation-warning]")).toHaveCount(0);
 
+  // Scoped to the edit panel and opened first: the page now has a matrix in the creation form too,
+  // so an unscoped `[data-code]` matches twice, and modules start collapsed by design.
   await page
-    .locator('[data-code="incident.classification.co-sign"]')
+    .locator('[data-matrix-for] details[data-module="compliance-risk"] summary')
+    .click();
+  await page
+    .locator('[data-matrix-for] [data-code="incident.classification.co-sign"]')
     .check();
   await expect(page.locator("[data-segregation-warning]")).toHaveCount(1);
   await expect(page.getByText("classifies an incident and co-signs")).toBeVisible();
@@ -481,13 +486,16 @@ test("creates a role the office named itself", async ({ page }) => {
   });
 
   await page.goto("/settings/roles");
-  await page.getByLabel("Machine name").fill("RENEWALS_DESK");
+  // The machine name is no longer typed — it is generated from the English name and shown read-only.
+  // Owner decision, 2026-09-24: an office administrator must not be asked to invent an immutable
+  // identifier that lands in the audit log.
   await page.getByLabel("Name (English)").fill("Renewals Desk");
   await page.getByLabel("Name (Arabic)").fill("مكتب التجديدات");
   await page.getByRole("button", { name: "Create role" }).click();
 
   await expect.poll(() => created).not.toBeNull();
   expect(created).toMatchObject({
+    // Generated from "Renewals Desk", not typed.
     name: "RENEWALS_DESK",
     nameEn: "Renewals Desk",
     nameAr: "مكتب التجديدات",
@@ -595,4 +603,130 @@ test("says so when the API answers with something it cannot parse", async ({ pag
 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText(/تعذّر تحميل الأدوار|Could not load/i)).toBeVisible();
+});
+
+/**
+ * Piece 2: permissions belong to CREATION, the machine name is generated, and delete is immediate.
+ *
+ * Every test here asserts what a person sees or what the API was asked to store — not a status code.
+ */
+test("creation carries the permissions with it, in ONE request", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+
+  let posted: Record<string, unknown> | null = null;
+  await page.route("http://localhost:4000/rbac/roles", async (route) => {
+    if (route.request().method() !== "POST") {
+      return route.fulfill({ status: 200, json: [CUSTOM_ROLE, SYSTEM_ROLE] });
+    }
+    posted = route.request().postDataJSON() as Record<string, unknown>;
+    return route.fulfill({ status: 201, json: { ...CUSTOM_ROLE, id: "role-new" } });
+  });
+
+  await page.goto("/settings/roles");
+  // Scoped to the creation form: the edit panel carries its own English/Arabic name fields, so an
+  // unscoped label query matches twice once a role is open.
+  await page.locator("[data-create-name-en]").fill("Claims Triage Desk");
+  await page.locator("[data-create-name-ar]").fill("مكتب فرز المطالبات");
+
+  // The matrix is INSIDE the creation form.
+  const matrix = page.locator("form [data-permission-matrix]");
+  await expect(matrix).toBeVisible();
+  await matrix.locator('[data-module="claims"]').locator("summary").click();
+  const firstCode = matrix.locator('[data-module="claims"] input[type=checkbox]').first();
+  await firstCode.check();
+
+  await page.getByRole("button", { name: /Create role|إنشاء الدور/ }).click();
+  await expect.poll(() => posted !== null).toBe(true);
+
+  const body = posted as unknown as { name: string; permissionCodes: string[] };
+  // The machine name was GENERATED from the English name, not typed.
+  expect(body.name).toBe("CLAIMS_TRIAGE_DESK");
+  // And the permissions travelled with it.
+  expect(body.permissionCodes.length).toBeGreaterThan(0);
+});
+
+test("shows the generated machine name before saving, and refuses an unreadable one", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  const english = page.locator("[data-create-name-en]");
+  const shown = page.locator("[data-generated-machine-name]");
+
+  await english.fill("Senior Underwriter");
+  await expect(shown).toHaveText("SENIOR_UNDERWRITER");
+
+  // Arabic in the English-name field folds to nothing — the measured real-world failure. The form
+  // must refuse rather than store an identifier nobody can read back to a role.
+  await english.fill("دور جديد");
+  await expect(page.locator("[data-machine-name-problem]")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Create role|إنشاء الدور/ })).toBeDisabled();
+
+  // Digits alone say nothing about which role this is.
+  await english.fill("2024");
+  await expect(page.locator("[data-machine-name-problem]")).toBeVisible();
+
+  await english.fill("HR");
+  await expect(shown).toHaveText("HR");
+  await expect(page.locator("[data-machine-name-problem]")).toHaveCount(0);
+});
+
+test("the matrix opens collapsed, counts each module, and searches across all of them", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  const matrix = page.locator("form [data-permission-matrix]");
+  // The answer to "what can this role do?" without expanding anything.
+  await expect(matrix.locator("[data-matrix-summary]")).toBeVisible();
+  const modules = matrix.locator("details[data-module]");
+  await expect(modules).not.toHaveCount(0);
+  // Collapsed on arrival: no module is open until someone opens it.
+  expect(await modules.evaluateAll((els) => els.filter((e) => (e as HTMLDetailsElement).open).length)).toBe(0);
+  // Every module carries its own count.
+  await expect(matrix.locator("[data-module-count]").first()).toBeVisible();
+
+  // Search reaches a permission without knowing which module owns it, and opens what it matched.
+  await matrix.locator("[data-matrix-search]").fill("incident.classify");
+  await expect(matrix.locator('input[data-code="incident.classify"]')).toBeVisible();
+  await matrix.locator("[data-matrix-search]").fill("zzz-nothing-matches");
+  await expect(matrix.getByRole("status")).toBeVisible();
+});
+
+test("deleting a role withdraws it immediately, and says what that means first", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  let deleted: string | null = null;
+  await page.route(`http://localhost:4000/rbac/roles/${CUSTOM_ROLE.id}`, async (route) => {
+    if (route.request().method() === "DELETE") {
+      deleted = CUSTOM_ROLE.id;
+      return route.fulfill({ status: 204, body: "" });
+    }
+    return route.fallback();
+  });
+
+  await page.goto("/settings/roles");
+  await page.locator(`[data-delete-role="${CUSTOM_ROLE.name}"]`).click();
+
+  // The confirmation states the two consequences the owner accepted, rather than asking to reassign.
+  const confirm = page.locator(`[data-delete-confirm="${CUSTOM_ROLE.name}"]`);
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText(/no reassignment|بلا إعادة إسناد/);
+  await confirm.locator("[data-confirm-delete]").click();
+  await expect.poll(() => deleted).toBe(CUSTOM_ROLE.id);
+});
+
+test("a system role offers no delete control at all", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  // Positive anchor first, so the absence below means something.
+  await expect(page.locator(`[data-delete-role="${CUSTOM_ROLE.name}"]`)).toBeVisible();
+  await expect(page.locator(`[data-delete-role="${SYSTEM_ROLE.name}"]`)).toHaveCount(0);
 });

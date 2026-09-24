@@ -2834,16 +2834,29 @@ refusal — which exists, and is correctly worded — never renders. Measured on
 state, no reason.
 
 Fixed on `/settings/roles` (a `!canRead` branch, plus a loading line for the window before the
-first response, which also rendered nothing). **Fourteen other screens carry the same shape** — an
-early-return load gate and no no-permission text anywhere in the file:
+first response, which also rendered nothing).
 
-`claims/[id]`, `cross-sell/[id]`, `insurance-programs/[id]`, `leads/[id]`, `needs-assessments/[id]`,
-`opportunities/[id]`, `policies/[id]`, `prospects/[id]`, `rfqs/[id]`, `up-sell/[id]`,
-`screening-health`, `screening-matches`, `settings/security`, `sla-policies`.
+**I then reported fourteen other screens with the same shape. That was wrong, and the mistake is
+worth more than the list was.** My grep matched every screen whose load effect returns early —
+`if (!user) return;` — and that is NOT this defect. A screen gated only on `!user` still calls the
+API, still receives the 403, and still renders `loadError`; the message is reachable. The defect
+needs a CAPABILITY inside the early return, because that is what stops the request from being made
+at all and therefore stops the message that lives in the catch.
 
-Recorded, not fixed, on instruction. The detail pages matter less than the list pages — a person
-reaches them from a row they could already see — so `screening-health`, `screening-matches` and
-`sla-policies` are the three to do first.
+Re-measured with the right pattern (`!can…` inside the guard) across all 96 screens:
+
+    apps/web/app/(app)/settings/roles/page.tsx:221   if (!user || !canRead) return;
+    apps/web/app/(app)/settings/roles/page.tsx:228   if (!canReadCatalogue) return;
+
+**One file — the one already fixed.** The three I named as worth doing first
+(`screening-health`, `screening-matches`, `sla-policies`) were then read individually, and each
+renders `loadError` on a 403. They were false positives, and folding them into this work would have
+meant changing screens that were not broken.
+
+The class, which is the part to keep: **a grep for a SHAPE is not a measurement of a DEFECT.** I
+searched for the pattern I had just fixed rather than the one that caused the symptom, and fourteen
+files matched it innocently. Reading three of them took two minutes and removed thirteen from the
+list — verify a sample before quoting a count.
 
 **And the test lesson, which is the reason this survived 454 green Playwright tests.** My first
 version of the proving test asserted a page-wide `getByRole("status").or(getByRole("alert"))` and

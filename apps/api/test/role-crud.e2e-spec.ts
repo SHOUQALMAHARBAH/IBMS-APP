@@ -450,3 +450,155 @@ describe('the security attributes are behind a step-up challenge', () => {
     expect(after.name).toBe(`Step Up Target ${tag}`);
   }, 300_000);
 });
+
+describe('role deletion', () => {
+  /**
+   * Delete, and the one assertion a 204 cannot make.
+   *
+   * The owner decided the behaviour: the role and its effect go immediately, no reassignment gate, a
+   * user left with zero permissions is accepted, AND the record of who held it survives marked
+   * revoked. The last part is why this is a soft delete — `UserRoleAssignment.roleId` is ON DELETE
+   * RESTRICT, so a hard delete would either fail or take the history with it.
+   *
+   * So the proof is reading the rows back, not the status code.
+   */
+  it('deletes a role, withdraws it from its holders, and KEEPS the record that they held it', async () => {
+    const role = await seedRole(`Deletable ${tag}`, ['claim.read']);
+    const holder = await makeUser(`delete-holder-${tag}`);
+    await prisma.userRoleAssignment.create({
+      data: { userId: holder.userId, roleId: role.id },
+    });
+
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${role.id}`)
+      .set(bearer(admin.accessToken))
+      .expect(204);
+
+    // 1. The grants are GONE, which is what makes the effect vanish through every read path rather
+    //    than only the ones that remember to check a flag.
+    expect(
+      await prisma.rolePermission.count({ where: { roleId: role.id } }),
+    ).toBe(0);
+
+    // 2. The assignment row SURVIVES, still names the role, and carries revokedAt.
+    const assignment = await prisma.userRoleAssignment.findFirstOrThrow({
+      where: { userId: holder.userId, roleId: role.id },
+    });
+    expect(assignment.roleId).toBe(role.id);
+    expect(assignment.revokedAt).not.toBeNull();
+
+    // 3. The role is stamped deleted and forced inactive.
+    const after = await prisma.role.findUniqueOrThrow({
+      where: { id: role.id },
+    });
+    expect(after.deletedAt).not.toBeNull();
+    expect(after.status).toBe('INACTIVE');
+
+    // 4. And it is gone from the catalogue the screen reads — retired roles stay so they can be
+    //    reactivated; a deleted one must not offer that.
+    const list = await request(app!.getHttpServer())
+      .get('/rbac/roles')
+      .set(bearer(admin.accessToken))
+      .expect(200);
+    expect((list.body as { id: string }[]).map((r) => r.id)).not.toContain(
+      role.id,
+    );
+  }, 300_000);
+
+  it("takes the permission away on the holder's NEXT request, not a cache TTL later", async () => {
+    // "Permissions resolve from the role at request time" is the owner's requirement, and a 60-second
+    // cache would make it a lie in the one direction that matters: someone's access is removed and
+    // they keep it for another minute.
+    //
+    // WHAT A PLANT SHOWED, recorded here so this test is not read as more than it is: removing
+    // `invalidateCache()` from the delete path does NOT make this test fail. The immediacy on THIS
+    // path comes from somewhere else — the per-request role read filters `revokedAt: null` and
+    // `role.status = 'ACTIVE'`, and deletion sets both, so the role drops out of the caller's role
+    // set and the cache KEY changes. The invalidation is belt-and-braces here and load-bearing on the
+    // grant-set path, which its own test ("takes effect IMMEDIATELY when grants change") covers.
+    const role = await seedRole(`Immediate ${tag}`, ['claim.read']);
+    const holder = await makeUser(`delete-immediate-${tag}`);
+    await prisma.userRoleAssignment.create({
+      data: { userId: holder.userId, roleId: role.id },
+    });
+
+    // Warm the cache by actually using the permission.
+    await request(app!.getHttpServer())
+      .get('/claims')
+      .set(bearer(holder.accessToken))
+      .expect(200);
+
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${role.id}`)
+      .set(bearer(admin.accessToken))
+      .expect(204);
+
+    // The very next request, with the same session.
+    await request(app!.getHttpServer())
+      .get('/claims')
+      .set(bearer(holder.accessToken))
+      .expect(403);
+  }, 300_000);
+
+  it('accepts leaving a user with no roles and no permissions at all', async () => {
+    // Explicitly NOT an error. The owner overruled a reassignment gate: "if that leaves a user with
+    // zero roles/zero permissions, that's an accepted, expected outcome, not something to prevent."
+    const role = await seedRole(`Only Role ${tag}`, ['claim.read']);
+    const holder = await makeUser(`delete-last-role-${tag}`);
+    await prisma.userRoleAssignment.create({
+      data: { userId: holder.userId, roleId: role.id },
+    });
+
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${role.id}`)
+      .set(bearer(admin.accessToken))
+      .expect(204);
+
+    const live = await prisma.userRoleAssignment.count({
+      where: { userId: holder.userId, revokedAt: null },
+    });
+    expect(live).toBe(0);
+  }, 300_000);
+
+  it('refuses to delete a system role, and refuses a second delete', async () => {
+    const system = await seedRole(`Platform ${tag}`, [], { isSystem: true });
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${system.id}`)
+      .set(bearer(admin.accessToken))
+      .expect(422);
+
+    const once = await seedRole(`Twice ${tag}`, []);
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${once.id}`)
+      .set(bearer(admin.accessToken))
+      .expect(204);
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${once.id}`)
+      .set(bearer(admin.accessToken))
+      .expect(422);
+  }, 300_000);
+
+  it('creates a role WITH its permissions in one request, and stores exactly those', async () => {
+    const res = await request(app!.getHttpServer())
+      .post('/rbac/roles')
+      .set(bearer(admin.accessToken))
+      .send({
+        name: `CREATED_WITH_GRANTS_${tag.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`,
+        nameEn: 'Created With Grants',
+        nameAr: 'أُنشئ مع صلاحياته',
+        permissionCodes: ['claim.read', 'customer.create'],
+      })
+      .expect(201);
+    const roleId = (res.body as { id: string }).id;
+    createdRoleIds.push(roleId);
+
+    const stored = await prisma.rolePermission.findMany({
+      where: { roleId },
+      select: { permission: { select: { code: true } } },
+    });
+    expect(stored.map((r) => r.permission.code).sort()).toEqual([
+      'claim.read',
+      'customer.create',
+    ]);
+  }, 300_000);
+});
