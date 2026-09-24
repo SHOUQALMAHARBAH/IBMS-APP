@@ -445,6 +445,11 @@ model User {
   organizationId       String             @default(dbgenerated())
   organization         Organization       @relation(fields: [organizationId], references: [id])
   fullName             String
+  /// How this ACCOUNT signs in. RECORDED ONLY — `WINDOWS` states the office's intent and grants
+  /// nothing: there is no external authentication behind it, and the password path is the only one
+  /// that works. On `User` and not `Employee` because it describes the account: an employee with no
+  /// login has nothing to register, and the external-auditor account has no employee.
+  registrationType     RegistrationType   @default(DEFAULT)
   /// Spec §3.2 / §4.1.3 — email is unique WITHIN an Organization, not across
   /// the platform. The global `@unique` was dropped: two brokerage offices may
   /// legitimately employ people whose addresses follow the same pattern, or in
@@ -888,6 +893,12 @@ model AccessRecertificationItem {
 
 /// Supporting structure referenced by "filterable by branch" dashboards
 /// (Part 13) and Branch/Department Manager role (Part 5.1).
+/// How an account signs in. RECORDED ONLY — see `User.registrationType`.
+enum RegistrationType {
+  DEFAULT
+  WINDOWS
+}
+
 model Branch {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
@@ -902,6 +913,7 @@ model Branch {
   /// and keeps every existing assignment. See migration `20261023100000`.
   deactivatedAt  DateTime?
   users          User[]
+  employees      Employee[]
 
   @@index([organizationId])
 }
@@ -919,6 +931,20 @@ model Employee {
   fatherName                       String?
   grandfatherName                  String?
   familyName                       String?
+  /// The same four parts in ENGLISH, and a composed `fullNameEn` beside them.
+  ///
+  /// The owner's requirement is a four-part name in both scripts, and the name belongs to the PERSON
+  /// and the compliance record — documents render from here. All five are nullable and start NULL on
+  /// every existing employee: a transliterated Arabic name is a guess about someone's own spelling of
+  /// their name, and a guess stored in a compliance record cannot be told apart from a fact.
+  givenNameEn                      String?
+  fatherNameEn                     String?
+  grandfatherNameEn                String?
+  familyNameEn                     String?
+  /// Composed from the four English parts by `composeFullName`, the same one helper that composes
+  /// `fullName` from the Arabic ones. Denormalised for the same reason: one column for every
+  /// consumer that sorts, searches or prints a name.
+  fullNameEn                       String?
   nationalIdEnc                    String // -- ENCRYPT (Part 10.2 field-level encryption)
   position                         String?
   hireDate                         DateTime?
@@ -935,6 +961,11 @@ model Employee {
   /// NOT a Role, and NOT a Branch — see the Department model.
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
+  /// A person belongs to a branch as well as a department. `Employee` carried only the department
+  /// while `ProvisionUserDto` REQUIRED both, which is part of why the person and the account could
+  /// not be registered in one act.
+  branchId     String?
+  branch       Branch?     @relation(fields: [branchId], references: [id])
 
   user                    User?
   trainings               SecurityAwarenessTraining[]
