@@ -22,7 +22,6 @@ import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
-import { listEmployees, type EmployeeListRow } from '../../../../lib/supporting-operations/employee-api';
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the eleven seeded names. A role
  *  an office defines is deliberately NOT one of these. */
@@ -64,7 +63,6 @@ export default function UserAdminPage() {
   const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
-  const canLinkEmployee = hasPermission(user, 'employee.read');
   const canReadRoles = hasPermission(user, 'role.read');
 
   /**
@@ -137,8 +135,6 @@ export default function UserAdminPage() {
   const [branches, setBranches] = useState<OrgUnit[]>([]);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [employees, setEmployees] = useState<EmployeeListRow[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -172,19 +168,15 @@ export default function UserAdminPage() {
     if (!user || !isAdmin) return;
     void (async () => {
       try {
-        const [depts, brs, emps, cat] = await Promise.all([
+        const [depts, brs, cat] = await Promise.all([
           listDepartments(),
           listBranches(),
-          // Only when the caller can read it — GET /employees needs
-          // employee.read, and a 403 here would blank the other two.
-          canLinkEmployee ? listEmployees() : Promise.resolve([]),
-          // Same shape of guard: GET /rbac/roles needs `role.read`, which a
-          // holder of `user.manage` does not necessarily have.
+          // GET /rbac/roles needs `role.read`, which a holder of `user.manage`
+          // does not necessarily have.
           canReadRoles ? listRoles() : Promise.resolve([]),
         ]);
         setDepartments(depts);
         setBranches(brs);
-        setEmployees(emps);
         setRoleCatalogue(cat);
         // The grant dropdown's default is whatever the office actually has.
         // No shared default any more: each row falls back to the first ACTIVE role at render time,
@@ -194,7 +186,7 @@ export default function UserAdminPage() {
         // is self-explanatory and must not blank the user list beside it.
       }
     })();
-  }, [user, isAdmin, canLinkEmployee, canReadRoles, t]);
+  }, [user, isAdmin, canReadRoles, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -223,9 +215,8 @@ export default function UserAdminPage() {
         departmentId,
         branchId,
         roleIds,
-        // Omitted rather than sent empty: the DTO treats absence as "no link",
-        // and an empty string would fail validation as a malformed id.
-        employeeId: employeeId || undefined,
+        // No employeeId: this form is for an account with no person behind it. Linking one happens on
+        // that person's own page, where the person is already on screen.
       });
       setFullName('');
       setEmail('');
@@ -233,7 +224,6 @@ export default function UserAdminPage() {
       setRoleIds([]);
       setDepartmentId('');
       setBranchId('');
-      setEmployeeId('');
     });
   }
 
@@ -311,31 +301,20 @@ export default function UserAdminPage() {
             </select>
           </label>
           {/*
-            Optional, and rendered only for someone who can actually read the
-            employee list — `GET /employees` needs `employee.read`, and a
-            select that 403s on load is worse than no select.
+            THE EMPLOYEE PICKER IS GONE, DELIBERATELY.
 
-            Link-only by design: an Employee cannot be created from here
-            because it requires a national ID, which is Highly Confidential
-            and has no business being typed into an account-creation form.
+            It listed existing HR records so a new account could name one — and the person being
+            registered was, by definition, never in it. That is what made "record the person, then
+            create their account" two screens in a fixed order, and it reached the owner as a broken
+            button.
+
+            Both of its cases moved to where the person is:
+              - a NEW person who needs a login: one form on /employees, one Save, one transaction;
+              - a person recorded EARLIER who now needs one: their own page, /employees/[id].
+
+            What is left here is the account with NO person behind it — the external auditor — which is
+            the only case this screen was ever the right place for.
           */}
-          {canLinkEmployee ? (
-            <label>
-              {t('usrEmployeeRecord')}
-              <select
-                aria-label={t('usrEmployeeRecord')}
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-              >
-                <option value="">{t('usrNoEmployeeLink')}</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.fullName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             {t('usrBranch')}
             <select

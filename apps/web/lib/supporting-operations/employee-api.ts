@@ -56,9 +56,19 @@ export interface EmployeeDetail {
   updatedAt: string;
   trainings: SecurityAwarenessTraining[];
   deprovisioningChecklist: AccessDeprovisioningChecklist | null;
+  /** The login this person holds, when they hold one. Here so the screen never offers to create a
+   *  second one and then be refused — User.employeeId is unique. */
+  account: { id: string; email: string } | null;
 }
 
-export interface CreateEmployeeInput {
+/**
+ * A PERSON, as the form collects one — shared with the account route.
+ *
+ * The same fields are accepted by `POST /employees` (a person with no login) and by the `employee`
+ * block of `POST /admin/users` (a person and their login, in one transaction). One type, because the
+ * unified form fills one set of fields and only the destination changes.
+ */
+export interface PersonInput {
   /** Jordanian national-ID-convention name parts (Part F item #4) — an
    * Employee is always a real individual. `fullName` is computed
    * server-side from these, not accepted directly. */
@@ -66,13 +76,26 @@ export interface CreateEmployeeInput {
   fatherName?: string;
   grandfatherName?: string;
   familyName: string;
+  /** The same four in English, optional as a SET. Left empty they are stored as NULL — nothing
+   *  transliterates an Arabic name on a person's behalf. */
+  givenNameEn?: string;
+  fatherNameEn?: string;
+  grandfatherNameEn?: string;
+  familyNameEn?: string;
   nationalId: string;
   position?: string;
   hireDate: string;
   licensedRole?: string;
   confidentialityAgreementSignedAt?: string;
   backgroundCheckCompletedAt?: string;
+}
+
+export interface CreateEmployeeInput extends PersonInput {
   userId?: string;
+  /** §4.1.2 / §4.2.2 — the org chart and the location. One pair of fields on the form feeds both the
+   *  person and, when there is one, the account. */
+  departmentId?: string;
+  branchId?: string;
 }
 
 export function listEmployees(): Promise<EmployeeListRow[]> {

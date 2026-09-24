@@ -1,4 +1,5 @@
 import { apiGet, apiPatch, apiPost } from '../auth/api-client';
+import type { PersonInput } from '../supporting-operations/employee-api';
 
 // Backlog A.2 — user provisioning and role assignment. `POST /auth/signup`
 // creates an account with NO roles (and therefore no permissions); every real
@@ -65,7 +66,10 @@ export interface OrgUnit {
 }
 
 export interface ProvisionUserInput {
-  fullName: string;
+  /** Required for an account with NO person, and REFUSED when `employee` is present: with a person
+   *  the display name is composed from the four name parts, and two spellings of one person leave
+   *  nothing to say which is right. */
+  fullName?: string;
   email: string;
   password: string;
   languagePreference?: 'AR' | 'EN';
@@ -82,6 +86,16 @@ export interface ProvisionUserInput {
   /** Role IDS. A name is unique only within an office and an office can edit it,
    *  so it is not an identity — see the API's `RoleAssignmentDto`. */
   roleIds: string[];
+  /**
+   * Create the person and the account in ONE request, in one transaction.
+   *
+   * The alternative was two calls from the browser, where the second can fail and leave a person who
+   * half exists with nothing on screen to say which half. Requires `employee.create` in addition to
+   * the `user.manage` this route is gated on — a Manager holds the first and not the second.
+   */
+  employee?: PersonInput;
+  /** Recorded only; no authentication path reads it yet. */
+  registrationType?: 'DEFAULT' | 'WINDOWS';
   /** Part 5.1 — the EXTERNAL_AUDITOR role's time-boxed access window. */
   accessValidFrom?: string;
   accessValidUntil?: string;

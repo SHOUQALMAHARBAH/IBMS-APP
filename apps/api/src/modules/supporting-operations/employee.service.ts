@@ -224,10 +224,14 @@ export class EmployeeService {
     const employee = await this.employees.findByIdWithRelations(id);
     if (!employee) throw new NotFoundException('Employee not found');
     const masked = await this.toMasked(employee, actorUserId);
+    // Whether this person already has a login. The screen needs it to decide between offering one and
+    // naming the one that exists; `findUserByEmployeeId` is tenant-scoped like every other read here.
+    const account = await this.employees.findUserByEmployeeId(id);
     return {
       ...masked,
       trainings: employee.trainings,
       deprovisioningChecklist: employee.deprovisioningChecklist,
+      account: account ? { id: account.id, email: account.email } : null,
     };
   }
 

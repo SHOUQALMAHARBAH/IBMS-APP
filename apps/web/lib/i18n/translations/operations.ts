@@ -60,6 +60,47 @@ export const OPERATIONS = {
     empGivenName: 'الاسم الأول',
     empCreateHeading: 'تسجيل موظف جديد',
 
+    // ---- The unified person form: one screen, one Save ----------------------
+    empPersonHeading: 'بيانات الشخص',
+    empEnglishNameHeading: 'الاسم بالإنجليزية (اختياري)',
+    empEnglishNameHint:
+      'لا يُترجم النظام الاسم العربي تلقائياً — إن تُرك فارغاً يبقى فارغاً، ويظهر الاسم العربي في كل الشاشات.',
+    empGivenNameEn: 'الاسم الأول بالإنجليزية',
+    empFatherNameEn: 'اسم الأب بالإنجليزية',
+    empGrandfatherNameEn: 'اسم الجد بالإنجليزية',
+    empFamilyNameEn: 'اسم العائلة بالإنجليزية',
+    empPlacementHeading: 'الموقع في المنظمة',
+    empDepartment: 'القسم',
+    empBranch: 'الفرع',
+    empUnset: '— غير محدَّد —',
+    empOrgUnitsMissing:
+      'لا توجد أقسام أو فروع بعد. أنشئها من شاشة الأقسام والفروع أولاً.',
+    empOrgUnitsLink: 'الأقسام والفروع',
+    empAccountHeading: 'حساب الدخول',
+    empGiveLogin: 'منح هذا الشخص حساب دخول',
+    empGiveLoginHint:
+      'حفظ واحد يُنشئ الشخص وحسابه معاً. الاسم يُبنى من أجزاء الاسم أعلاه، والقسم والفرع يُستخدمان للاثنين.',
+    empAccountNeedsOrgUnits:
+      'حساب الدخول يحتاج قسماً وفرعاً. أنشئ واحداً من كل منهما من شاشة الأقسام والفروع، ثم عد إلى هنا.',
+    empAccountEmail: 'البريد الإلكتروني',
+    empTempPassword: 'كلمة مرور مؤقتة',
+    empTempPasswordHint:
+      'سيُطلب من الشخص تغييرها وتسجيل عامل مصادقة ثانٍ عند أول دخول.',
+    empRolesHeading: 'الأدوار',
+    empRolesHint: 'دور واحد على الأقل — الحساب بلا أدوار لا يملك أي صلاحية.',
+    empRolesNone: 'لا توجد أدوار فعّالة لمنحها.',
+    empRoleRequired: 'اختر دوراً واحداً على الأقل.',
+    empRegistrationType: 'طريقة الدخول',
+    empRegistrationDefault: 'كلمة مرور في هذا النظام',
+    empRegistrationWindows: 'حساب ويندوز (مُسجَّل فقط)',
+    empRegistrationHint:
+      'مُسجَّل للتوثيق فقط — لا يوجد ربط مع مجال ويندوز بعد، وكل حساب يحتاج كلمة مرور هنا.',
+    empSubmitWithLogin: 'تسجيل الشخص وإنشاء الحساب',
+    empCreatedPerson: 'تم تسجيل الشخص.',
+    empCreatedWithLogin: 'تم تسجيل الشخص وإنشاء حساب الدخول.',
+    empNoLoginPermission:
+      'لا تملك صلاحية user.manage، لذا يمكنك تسجيل الأشخاص دون إنشاء حسابات دخول لهم.',
+
     // ---- Vendors (#67 / #71) ------------------------------------------------
     venHeading: 'المورّدون',
     venIntro:
@@ -363,8 +404,6 @@ export const OPERATIONS = {
     renRequired: 'مطلوبة',
     renInsurerTermsWorsened: 'شروط المؤمِّن ساءت',
     renRiskChanged: 'تغيّر الخطر',
-    usrEmployeeRecord: 'سجل الموظف',
-    usrNoEmployeeLink: 'بدون ربط',
     secDevicesHeading: 'الأجهزة الموثوقة',
     secDevicesIntro:
       'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
@@ -567,6 +606,47 @@ export const OPERATIONS = {
     empFatherName: "Father's name (optional)",
     empGivenName: 'Given name',
     empCreateHeading: 'Record a new employee',
+
+    // ---- The unified person form: one screen, one Save ----------------------
+    empPersonHeading: 'The person',
+    empEnglishNameHeading: 'Name in English (optional)',
+    empEnglishNameHint:
+      'Nothing is transliterated for you — left empty it stays empty, and the Arabic name is what every screen shows.',
+    empGivenNameEn: 'Given name in English',
+    empFatherNameEn: "Father's name in English",
+    empGrandfatherNameEn: "Grandfather's name in English",
+    empFamilyNameEn: 'Family name in English',
+    empPlacementHeading: 'Where they sit',
+    empDepartment: 'Department',
+    empBranch: 'Branch',
+    empUnset: '— not set —',
+    empOrgUnitsMissing:
+      'No departments or branches yet. Create them on the Departments & branches screen first.',
+    empOrgUnitsLink: 'Departments & branches',
+    empAccountHeading: 'Login',
+    empGiveLogin: 'Give this person a login',
+    empGiveLoginHint:
+      'One Save creates the person and their account together. The name comes from the parts above, and the department and branch are used for both.',
+    empAccountNeedsOrgUnits:
+      'A login needs a department and a branch. Create one of each on the Departments & branches screen, then come back.',
+    empAccountEmail: 'Email',
+    empTempPassword: 'Temporary password',
+    empTempPasswordHint:
+      'They will be asked to change it and to enrol a second factor on first sign-in.',
+    empRolesHeading: 'Roles',
+    empRolesHint: 'At least one — an account with no roles holds no permissions at all.',
+    empRolesNone: 'No active roles to grant.',
+    empRoleRequired: 'Pick at least one role.',
+    empRegistrationType: 'How they sign in',
+    empRegistrationDefault: 'A password held here',
+    empRegistrationWindows: 'Windows account (recorded only)',
+    empRegistrationHint:
+      'Recorded for the record only — there is no domain integration yet, and every account still needs a password here.',
+    empSubmitWithLogin: 'Record the person and create the login',
+    empCreatedPerson: 'The person was recorded.',
+    empCreatedWithLogin: 'The person was recorded and their login created.',
+    empNoLoginPermission:
+      'You do not hold user.manage, so you can record people without creating logins for them.',
 
     venHeading: 'Vendors',
     venIntro:
@@ -858,8 +938,6 @@ export const OPERATIONS = {
     renRequired: 'Required',
     renInsurerTermsWorsened: 'Insurer terms worsened',
     renRiskChanged: 'Risk changed',
-    usrEmployeeRecord: 'Employee record',
-    usrNoEmployeeLink: 'Not linked',
     secDevicesHeading: 'Trusted devices',
     secDevicesIntro:
       'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
