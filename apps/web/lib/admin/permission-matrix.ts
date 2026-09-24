@@ -19,7 +19,21 @@ import type { PermissionCatalogueEntry } from './role-admin-api';
  * is the point of deriving this at render time. The owner's notes said ~58 of 167; the proportions
  * changed with the catalogue and the rule did not.
  */
-const CRUD_VERBS = new Set(['read', 'create', 'update', 'delete', 'view', 'manage']);
+/**
+ * `deactivate` counts as the DELETE action, because the owner's rule is that delete MEANS
+ * deactivate — a record retires rather than disappearing wherever something points at it. Leaving it
+ * out put the fourth action of the department/branch pilot in a separate toggle beside its own row,
+ * which is the four-action scheme rendered as three-plus-one.
+ */
+const CRUD_VERBS = new Set([
+  'read',
+  'create',
+  'update',
+  'delete',
+  'deactivate',
+  'view',
+  'manage',
+]);
 
 /** The minimum number of CRUD-verb codes that makes a family genuinely CRUD-shaped. One verb is a
  *  single action with a verb-like name, not a family with sub-states. */

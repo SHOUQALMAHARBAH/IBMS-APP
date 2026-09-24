@@ -98,6 +98,18 @@ const OFFICE_ADMINISTRATOR_CODES = [
   'information-asset.manage',
   'bcp-dr.manage',
   'vendor.manage',
+  // The department/branch four-action pilot. Eight codes rather than one `.manage` each, because
+  // separability is the decision: a role can be given view without edit. Declared here as well as in
+  // `permissions.spec.ts` because the two copies are deliberately independent — if only one moved,
+  // the other fails, which is the point of keeping both.
+  'department.read',
+  'department.create',
+  'department.update',
+  'department.deactivate',
+  'branch.read',
+  'branch.create',
+  'branch.update',
+  'branch.deactivate',
   // Insurer management — office-scoped, and a PAIR. Reading the office's own
   // insurer list, and registering/maintaining those records. NOT writing the
   // global catalogue.

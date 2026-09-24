@@ -33,15 +33,19 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
 
     // THE MEASURED SHAPE. If a permission is added, one of these numbers changes and this test
     // fails — which is the alarm, not an inconvenience. Re-measure and update deliberately.
-    expect(PERMISSION_CATALOGUE.length).toBe(186);
-    expect(crud.length).toBe(13);
-    expect(crud.flatMap(codesOfRow).length).toBe(27);
+    // Recomputed from the catalogue after the department/branch four-action pilot added 8 codes.
+    // The previous pins were 186 / 13 / 27 / 159 and this test FAILED on them, which is the alarm
+    // working: a permission cannot be added quietly. Not loosened, not a range, not read from the
+    // source it checks.
+    expect(PERMISSION_CATALOGUE.length).toBe(194);
+    expect(crud.length).toBe(15);
+    expect(crud.flatMap(codesOfRow).length).toBe(35);
     expect(toggles.length).toBe(159);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 
   it('every five-state row really has two or more CRUD verbs — the rule, not the count', () => {
-    const VERBS = ['read', 'create', 'update', 'delete', 'view', 'manage'];
+    const VERBS = ['read', 'create', 'update', 'delete', 'deactivate', 'view', 'manage'];
     for (const row of matrix.flatMap((m) => m.rows)) {
       if (row.kind !== 'crud') continue;
       const verbs = Object.keys(row.codes);

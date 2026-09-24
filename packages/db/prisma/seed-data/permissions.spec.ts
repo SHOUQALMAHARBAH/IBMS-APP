@@ -239,21 +239,34 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 25 codes", () => {
+  it("holds exactly 34 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
     // to move together.
     //
-    // 22 at the Phase 3 migration, 24 with insurer management, 25 with the
-    // cross-office directory. Every code that moved the number is declared in
-    // ADDED_AFTER_THE_MIGRATION below, so the facts cannot drift apart.
+    // 22 at the Phase 3 migration, 24 with insurer management, 26 with the cross-office directory
+    // and Q9's office form mapping, 34 with the department/branch four-action pilot (8 codes).
+    // Every code that moved the number is declared in ADDED_AFTER_THE_MIGRATION below, so the facts
+    // cannot drift apart.
+    //
+    // The TITLE said 25 while the assertion held 26 — stale by one, and harmless only because the
+    // list is what actually runs. Corrected while adding to it: a title that disagrees with its own
+    // assertion is the thing a reader trusts and the thing nothing checks.
     expect(codesGrantedTo(OFFICE_ADMIN).sort()).toEqual(
       [
         "access-recertification.cycle.start",
         "audit-log.read",
         "bcp-dr.manage",
+        "branch.create",
+        "branch.deactivate",
+        "branch.read",
+        "branch.update",
         "customer.bulk-import",
+        "department.create",
+        "department.deactivate",
+        "department.read",
+        "department.update",
         "deprovisioning.execute",
         "email.integration.manage",
         "email.integration.read",
@@ -328,6 +341,27 @@ describe("permission grid — the office administrator", () => {
       // holding this and not that is the distinction, so a grid edit that collapsed them
       // breaks a test rather than quietly widening an administrator to a platform-wide write.
       "insurer.office-form.map",
+      // Departments and branches — the FIRST CLEAN INSTANCE of the owner's four-action scheme
+      // (view / create / edit / delete-as-deactivate as four separate codes, so a role can be given
+      // view without edit). Eight codes, not two: that separability IS the decision.
+      //
+      // They are granted to the administrator rather than withheld because the administrator is the
+      // only role that registers a person, and `ProvisionUserDto` REQUIRES `departmentId` and
+      // `branchId` — measured: the users screen submitted two empty strings and got a 400, which the
+      // owner read as "the create button is broken". An administrator who may register people but
+      // cannot create the two things a person must be assigned to is that same defect with a
+      // permission error instead of a validation error.
+      //
+      // `.deactivate` and not `.delete`, by the owner's rule that delete means deactivate: a
+      // department a person was once assigned to is part of that person's record.
+      "department.read",
+      "department.create",
+      "department.update",
+      "department.deactivate",
+      "branch.read",
+      "branch.create",
+      "branch.update",
+      "branch.deactivate",
     ];
 
     const legacy = new Set(

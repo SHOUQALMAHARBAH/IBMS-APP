@@ -249,12 +249,14 @@ export function PermissionMatrix({
 
 /** Verb -> label key. A verb with no entry falls back to a generic label rather than rendering the
  *  raw English word on an Arabic page. */
-const VERB_LABEL: Record<string, 'roleVerbView' | 'roleVerbCreate' | 'roleVerbEdit' | 'roleVerbDelete' | 'roleVerbManage'> = {
+const VERB_LABEL: Record<string, 'roleVerbView' | 'roleVerbCreate' | 'roleVerbEdit' | 'roleVerbDelete' | 'roleVerbDeactivate' | 'roleVerbManage'> = {
   read: 'roleVerbView',
   view: 'roleVerbView',
   create: 'roleVerbCreate',
   update: 'roleVerbEdit',
   delete: 'roleVerbDelete',
+  // Named for what it does to the record, not for the word in the code.
+  deactivate: 'roleVerbDeactivate',
   manage: 'roleVerbManage',
 };
 

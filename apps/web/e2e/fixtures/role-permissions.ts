@@ -15,12 +15,13 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 roles, 427 grants, from the default office.
+ * 13 roles, 449 grants, from the default office.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   "BRANCH_DEPARTMENT_MANAGER": [
     'access-recertification.review',
     'access-recertification.review.routine',
+    'branch.read',
     'claim.all-owners.read',
     'claim.read',
     'claim.settle.approve',
@@ -45,6 +46,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'dashboard.financial.view',
     'dashboard.policy.view',
     'dashboard.sales.view',
+    'department.read',
     'email.integration.read',
     'employee-performance.view',
     'employee.create',
@@ -306,7 +308,15 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'access-recertification.cycle.start',
     'audit-log.read',
     'bcp-dr.manage',
+    'branch.create',
+    'branch.deactivate',
+    'branch.read',
+    'branch.update',
     'customer.bulk-import',
+    'department.create',
+    'department.deactivate',
+    'department.read',
+    'department.update',
     'deprovisioning.execute',
     'email.integration.manage',
     'email.integration.read',
@@ -441,12 +451,26 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'up-sell.detect',
     'up-sell.read',
   ],
+  "SHOUQ": [
+    'claim.document',
+    'claim.followup.manage',
+    'claim.notify',
+    'claim.settle.approve',
+  ],
   "SYSTEM_SECURITY_ADMINISTRATOR": [
     'access-recertification.cycle.start',
     'audit-log.read',
     'bcp-dr.manage',
+    'branch.create',
+    'branch.deactivate',
+    'branch.read',
+    'branch.update',
     'claim.delete',
     'customer.bulk-import',
+    'department.create',
+    'department.deactivate',
+    'department.read',
+    'department.update',
     'deprovisioning.execute',
     'document.delete-override',
     'email.integration.manage',
@@ -485,7 +509,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 186 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 194 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -495,6 +519,14 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'access-recertification.cycle.start', module: 'admin', description: "Start an access-recertification cycle" },
   { code: 'access-recertification.review', module: 'admin', description: "Review and decide an access-recertification item (never one's own)" },
   { code: 'access-recertification.review.routine', module: 'admin', description: "Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review)" },
+  { code: 'branch.create', module: 'admin', description: "Create a branch in this office" },
+  { code: 'branch.deactivate', module: 'admin', description: "Retire a branch so it is no longer offered for new people (existing records keep it)" },
+  { code: 'branch.read', module: 'admin', description: "View the office's branches" },
+  { code: 'branch.update', module: 'admin', description: "Rename a branch" },
+  { code: 'department.create', module: 'admin', description: "Create a department in this office" },
+  { code: 'department.deactivate', module: 'admin', description: "Retire a department so it is no longer offered for new people (existing records keep it)" },
+  { code: 'department.read', module: 'admin', description: "View the office's departments" },
+  { code: 'department.update', module: 'admin', description: "Rename a department" },
   { code: 'encryption-key.read', module: 'admin', description: "View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access)" },
   { code: 'permission.read', module: 'admin', description: "View the global permission catalogue (the codes a role can be granted)" },
   { code: 'role.manage', module: 'admin', description: "Create, edit, activate and deactivate the office's own roles, and set what they grant (Phase 3)" },

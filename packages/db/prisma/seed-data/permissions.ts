@@ -1415,6 +1415,74 @@ const admin: PermissionSeed[] = [
     description: "Provision/deprovision user accounts and role assignments",
     roles: [ADMIN, OFFICE_ADMIN],
   },
+
+  // ---------------------------------------------------------------------------
+  // Departments and branches — THE FIRST CLEAN INSTANCE OF THE FOUR-ACTION SCHEME.
+  //
+  // Owner decision, 2026-09-24: each thing in the system carries four separate
+  // permissions — view, create, edit, delete — as separate checkboxes, so a role can
+  // be given view without edit. These two are new, nothing depends on them, and codes
+  // added at birth are free while re-guarding later is rework. They are the pilot:
+  // get the shape right here and the rest of the catalogue follows it.
+  //
+  // `.deactivate` rather than `.delete`, deliberately and by the same owner rule that
+  // governs roles: a department a person was once assigned to is part of that person's
+  // record, so it retires rather than disappears. The code is named for what it does.
+  //
+  // The measured reason this could not wait: `ProvisionUserDto` requires
+  // `departmentId` and `branchId` (`@Length(1, 100)`, no `@IsOptional`), and nothing
+  // could create either, so the users screen submitted two empty strings and got a
+  // 400. The owner read that as "the create button is broken".
+  {
+    code: "department.read",
+    module: "admin",
+    description: "View the office's departments",
+    roles: [ADMIN, OFFICE_ADMIN, MANAGER],
+  },
+  {
+    code: "department.create",
+    module: "admin",
+    description: "Create a department in this office",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "department.update",
+    module: "admin",
+    description: "Rename a department",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "department.deactivate",
+    module: "admin",
+    description:
+      "Retire a department so it is no longer offered for new people (existing records keep it)",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "branch.read",
+    module: "admin",
+    description: "View the office's branches",
+    roles: [ADMIN, OFFICE_ADMIN, MANAGER],
+  },
+  {
+    code: "branch.create",
+    module: "admin",
+    description: "Create a branch in this office",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "branch.update",
+    module: "admin",
+    description: "Rename a branch",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "branch.deactivate",
+    module: "admin",
+    description:
+      "Retire a branch so it is no longer offered for new people (existing records keep it)",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
   {
     code: "security-config.read",
     module: "admin",

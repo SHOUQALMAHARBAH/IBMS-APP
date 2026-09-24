@@ -376,6 +376,11 @@ model Department {
   name           String
   /// Arabic department name — the org chart renders in Arabic by default.
   nameAr         String?
+  /// Set when the office RETIRES this unit. Not deleted: `User.departmentId` and
+  /// `Employee.departmentId` point here, and a unit a person was once assigned to is
+  /// part of that person's record. A retired unit stops being offered for new people
+  /// and keeps every existing assignment. See migration `20261023100000`.
+  deactivatedAt  DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -891,6 +896,11 @@ model Branch {
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
   nameAr         String?
+  /// Set when the office RETIRES this unit. Not deleted: `User.departmentId` and
+  /// `Employee.departmentId` point here, and a unit a person was once assigned to is
+  /// part of that person's record. A retired unit stops being offered for new people
+  /// and keeps every existing assignment. See migration `20261023100000`.
+  deactivatedAt  DateTime?
   users          User[]
 
   @@index([organizationId])

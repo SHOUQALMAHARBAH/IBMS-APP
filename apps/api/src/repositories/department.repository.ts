@@ -19,10 +19,26 @@ export class DepartmentRepository {
   }
 
   list(): Promise<Department[]> {
-    return this.prisma.client.department.findMany({ orderBy: { name: 'asc' } });
+    // LIVE units only. A retired one keeps every existing assignment readable on the person's
+    // record; it simply stops being offered for new ones, and this is the read every picker uses.
+    return this.prisma.client.department.findMany({
+      where: { deactivatedAt: null },
+      orderBy: { name: 'asc' },
+    });
   }
 
   create(data: { name: string; nameAr?: string | null }): Promise<Department> {
     return this.prisma.client.department.create({ data });
+  }
+
+  rename(id: string, data: { name?: string; nameAr?: string | null }) {
+    return this.prisma.client.department.update({ where: { id }, data });
+  }
+
+  deactivate(id: string) {
+    return this.prisma.client.department.update({
+      where: { id },
+      data: { deactivatedAt: new Date() },
+    });
   }
 }

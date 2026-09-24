@@ -23,10 +23,26 @@ export class BranchRepository {
   }
 
   list(): Promise<Branch[]> {
-    return this.prisma.client.branch.findMany({ orderBy: { name: 'asc' } });
+    // LIVE units only. A retired one keeps every existing assignment readable on the person's
+    // record; it simply stops being offered for new ones, and this is the read every picker uses.
+    return this.prisma.client.branch.findMany({
+      where: { deactivatedAt: null },
+      orderBy: { name: 'asc' },
+    });
   }
 
   create(data: { name: string; nameAr?: string | null }): Promise<Branch> {
     return this.prisma.client.branch.create({ data });
+  }
+
+  rename(id: string, data: { name?: string; nameAr?: string | null }) {
+    return this.prisma.client.branch.update({ where: { id }, data });
+  }
+
+  deactivate(id: string) {
+    return this.prisma.client.branch.update({
+      where: { id },
+      data: { deactivatedAt: new Date() },
+    });
   }
 }
