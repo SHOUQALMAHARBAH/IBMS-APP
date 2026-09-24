@@ -238,6 +238,14 @@ export default function RoleAdminPage() {
     try {
       const role = await getRoleWithGrants(roleId);
       setEditing(role);
+      // The editor now renders above the table, so it is already in view for most of the page — but
+      // not for someone who scrolled down a long list of roles to reach the row they clicked. A
+      // deliberate scroll is what makes the click's effect unmissable rather than merely present.
+      requestAnimationFrame(() => {
+        document
+          .querySelector('[data-matrix-for]')
+          ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
       setSelected(new Set(role.permissionCodes));
       setNameEn(role.nameEn);
       setNameAr(role.nameAr);
@@ -411,89 +419,11 @@ export default function RoleAdminPage() {
 
       {roles && roles.length === 0 ? <p>{t('roleNoRoles')}</p> : null}
 
-      {roles && roles.length > 0 ? (
-        <section style={sectionStyle}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-            <thead>
-              <tr>
-                <th style={head}>{t('roleTableName')}</th>
-                <th style={head}>{t('roleTableStatus')}</th>
-                <th style={head}>{t('roleTableHolders')}</th>
-                <th style={head}>{t('roleTablePermissions')}</th>
-                <th style={head}>{t('roleTableMfa')}</th>
-                {canManage ? (
-                  <th style={head}>{t('roleTableActions')}</th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {roles.map((role) => (
-                <tr key={role.id} data-role={role.name}>
-                  <td style={cell}>
-                    <bdi>{roleLabel(role)}</bdi>
-                    {role.isSystem ? (
-                      <span
-                        style={badgeStyle}
-                        title={t('roleSystemExplain')}
-                        data-system-badge=""
-                      >
-                        {t('roleSystemBadge')}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td style={cell} data-status={role.status}>
-                    {role.status === 'ACTIVE'
-                      ? t('roleStatusActive')
-                      : t('roleStatusInactive')}
-                  </td>
-                  <td style={cell}>{role.holderCount}</td>
-                  <td style={cell}>{role.permissionCount}</td>
-                  <td style={cell}>
-                    {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
-                  </td>
-                  {canManage ? (
-                    <td style={cell}>
-                      <button
-                        type="button"
-                        onClick={() => void openMatrix(role.id)}
-                      >
-                        {t('roleEditButton')}
-                      </button>
-                      {/* A system role is protected from retirement, so the
-                          control is absent rather than present-and-refused. */}
-                      {role.isSystem ? null : (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void onToggleStatus(role)}
-                          style={{ marginInlineStart: '0.4rem' }}
-                        >
-                          {role.status === 'ACTIVE'
-                            ? t('roleRetireButton')
-                            : t('roleReactivateButton')}
-                        </button>
-                      )}
-                      {/* Absent on a system role, like the retire control beside it — the platform
-                          defined those rows and the office's screen does not get to remove them. */}
-                      {!role.isSystem ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setDeleting(role)}
-                          data-delete-role={role.name}
-                          style={{ marginInlineStart: '0.4rem' }}
-                        >
-                          {t('roleDeleteButton')}
-                        </button>
-                      ) : null}
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
+      {/* ORDER MATTERS, and it was wrong. The create form sat BELOW the table, so adding a role
+          meant scrolling past every existing one — and the permissions editor sat below that, so
+          clicking a row's permissions button appeared to do nothing at all. Both were the same
+          defect: the thing a person just asked for was rendered last. Create, then the open
+          editor, then the table — which is also the users screen's arrangement. */}
 
       {canManage ? (
         <section style={sectionStyle}>
@@ -701,6 +631,91 @@ export default function RoleAdminPage() {
           </button>
         </section>
       ) : null}
+
+      {roles && roles.length > 0 ? (
+        <section style={sectionStyle}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={head}>{t('roleTableName')}</th>
+                <th style={head}>{t('roleTableStatus')}</th>
+                <th style={head}>{t('roleTableHolders')}</th>
+                <th style={head}>{t('roleTablePermissions')}</th>
+                <th style={head}>{t('roleTableMfa')}</th>
+                {canManage ? (
+                  <th style={head}>{t('roleTableActions')}</th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {roles.map((role) => (
+                <tr key={role.id} data-role={role.name}>
+                  <td style={cell}>
+                    <bdi>{roleLabel(role)}</bdi>
+                    {role.isSystem ? (
+                      <span
+                        style={badgeStyle}
+                        title={t('roleSystemExplain')}
+                        data-system-badge=""
+                      >
+                        {t('roleSystemBadge')}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td style={cell} data-status={role.status}>
+                    {role.status === 'ACTIVE'
+                      ? t('roleStatusActive')
+                      : t('roleStatusInactive')}
+                  </td>
+                  <td style={cell}>{role.holderCount}</td>
+                  <td style={cell}>{role.permissionCount}</td>
+                  <td style={cell}>
+                    {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
+                  </td>
+                  {canManage ? (
+                    <td style={cell}>
+                      <button
+                        type="button"
+                        onClick={() => void openMatrix(role.id)}
+                      >
+                        {t('roleEditButton')}
+                      </button>
+                      {/* A system role is protected from retirement, so the
+                          control is absent rather than present-and-refused. */}
+                      {role.isSystem ? null : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onToggleStatus(role)}
+                          style={{ marginInlineStart: '0.4rem' }}
+                        >
+                          {role.status === 'ACTIVE'
+                            ? t('roleRetireButton')
+                            : t('roleReactivateButton')}
+                        </button>
+                      )}
+                      {/* Absent on a system role, like the retire control beside it — the platform
+                          defined those rows and the office's screen does not get to remove them. */}
+                      {!role.isSystem ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setDeleting(role)}
+                          data-delete-role={role.name}
+                          style={{ marginInlineStart: '0.4rem' }}
+                        >
+                          {t('roleDeleteButton')}
+                        </button>
+                      ) : null}
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
 
       {stepUpPending ? (
         <section style={sectionStyle} data-step-up="">

@@ -255,7 +255,7 @@ test("a system role is read-only, and its retire button is absent rather than re
   ).toHaveCount(1);
   await expect(page.getByText("This is a system role")).toBeVisible();
   // Every checkbox disabled, and no save control at all.
-  const boxes = page.locator('[data-matrix-for] input[type="checkbox"]');
+  const boxes = page.locator('[data-matrix-for] input[type="checkbox"][data-code]');
   await expect(boxes).toHaveCount(CATALOGUE.length);
   for (let i = 0; i < CATALOGUE.length; i += 1) {
     await expect(boxes.nth(i)).toBeDisabled();
@@ -729,4 +729,94 @@ test("a system role offers no delete control at all", async ({ page }) => {
   // Positive anchor first, so the absence below means something.
   await expect(page.locator(`[data-delete-role="${CUSTOM_ROLE.name}"]`)).toBeVisible();
   await expect(page.locator(`[data-delete-role="${SYSTEM_ROLE.name}"]`)).toHaveCount(0);
+});
+
+/**
+ * Part 1 — the four things the owner hit while using the screen. Every one of these asserts what she
+ * would see, and each corresponds to a sentence in her feedback.
+ */
+test("puts the create form ABOVE the table, so adding a role needs no scrolling past it", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  const createForm = page.locator("form:has([data-generated-machine-name])");
+  const table = page.locator("table");
+  await expect(createForm).toBeVisible();
+  await expect(table).toBeVisible();
+
+  // Position, not order in the DOM as a proxy for it: the form's top edge must be above the table's.
+  const formBox = await createForm.boundingBox();
+  const tableBox = await table.boundingBox();
+  expect(formBox!.y).toBeLessThan(tableBox!.y);
+});
+
+test("the row's permissions button opens the editor and shows what that role holds", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page, { grants: ["claim.read", "claim.register"] });
+  await page.goto("/settings/roles");
+
+  // It appeared to "do nothing" because the editor rendered below everything else.
+  await expect(page.locator("[data-matrix-for]")).toHaveCount(0);
+  await page
+    .locator(`[data-role="${CUSTOM_ROLE.name}"]`)
+    .getByRole("button", { name: "Permissions" })
+    .click();
+
+  const editor = page.locator("[data-matrix-for]");
+  await expect(editor).toBeVisible();
+  // And it shows what the role currently holds, not an empty matrix.
+  await expect(editor.locator("[data-matrix-summary]")).toContainText("2 of 4");
+  await editor.locator('details[data-module="claims"] summary').click();
+  await expect(editor.locator('input[data-code="claim.read"]')).toBeChecked();
+
+  // Above the table, so the click lands somewhere visible.
+  const editorBox = await editor.boundingBox();
+  const tableBox = await page.locator("table").boundingBox();
+  expect(editorBox!.y).toBeLessThan(tableBox!.y);
+});
+
+test("the section-level control selects EVERY permission in that section", async ({ page }) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  const matrix = page.locator("form [data-permission-matrix]");
+  const claims = matrix.locator('details[data-module="claims"]');
+  await claims.locator("summary").click();
+  const boxes = claims.locator('input[type=checkbox][data-code]');
+  const count = await boxes.count();
+  expect(count).toBeGreaterThan(1);
+
+  await matrix.locator('[data-select-all="claims"]').check();
+  // EVERY one, not the first, and not only the CRUD-shaped rows.
+  for (let i = 0; i < count; i += 1) await expect(boxes.nth(i)).toBeChecked();
+  await expect(matrix.locator('[data-module-count="claims"]')).toContainText(`${count} / ${count}`);
+
+  // And it clears the whole section again.
+  await matrix.locator('[data-select-all="claims"]').uncheck();
+  for (let i = 0; i < count; i += 1) await expect(boxes.nth(i)).not.toBeChecked();
+});
+
+test("explains a permission in a line of prose beneath its name, not as the code repeated", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  const matrix = page.locator("form [data-permission-matrix]");
+  await matrix.locator('details[data-module="claims"] summary').click();
+
+  // The slot exists and carries the stored description until the reviewed Arabic line arrives.
+  const explanation = matrix.locator('[data-describes="claim.register"]');
+  await expect(explanation).toBeVisible();
+  const text = (await explanation.innerText()).trim();
+  expect(text.length).toBeGreaterThan(0);
+  // Not the code restated — that would look like an explanation and say nothing.
+  expect(text).not.toBe("claim.register");
 });

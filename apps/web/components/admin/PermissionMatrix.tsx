@@ -9,6 +9,7 @@ import {
 } from '../../lib/admin/permission-matrix';
 import type { PermissionCatalogueEntry } from '../../lib/admin/role-admin-api';
 import { useLanguage } from '../../lib/i18n/language-context';
+import { describePermission } from '../../lib/admin/permission-descriptions';
 import {
   matrixCountStyle,
   matrixModuleStyle,
@@ -16,6 +17,8 @@ import {
   matrixSearchStyle,
   matrixSummaryStyle,
   matrixVerbStyle,
+  matrixDescriptionStyle,
+  matrixSectionAllStyle,
 } from './admin.styles';
 
 /**
@@ -52,7 +55,7 @@ export function PermissionMatrix({
   onChange: (next: Set<string>) => void;
   disabled?: boolean;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
 
@@ -73,6 +76,16 @@ export function PermissionMatrix({
 
   const totalGranted = catalogue.reduce((n, p) => (selected.has(p.code) ? n + 1 : n), 0);
 
+  /** Stored description per code, so the explanation line can be looked up without rescanning. */
+  const stored = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of catalogue) map.set(entry.code, entry.description);
+    return map;
+  }, [catalogue]);
+
+  /** The line under a checkbox. `null` when there is nothing honest to show yet. */
+  const explain = (code: string) => describePermission(code, language, stored.get(code));
+
   function apply(codes: string[], on: boolean) {
     const next = new Set(selected);
     for (const code of codes) {
@@ -84,6 +97,7 @@ export function PermissionMatrix({
 
   function renderRow(row: MatrixRow) {
     if (row.kind === 'toggle') {
+      const line = explain(row.code);
       return (
         <label key={row.code} style={matrixRowStyle}>
           <input
@@ -95,7 +109,14 @@ export function PermissionMatrix({
           />
           <span>
             <code>{row.code}</code>
-            {row.description ? ` — ${row.description}` : null}
+            {/* One short line BENEATH the name, not appended to it: the owner's finding is that a
+                code is not an explanation, and a description crammed onto the same line after an
+                em-dash reads as part of the identifier. */}
+            {line ? (
+              <span style={matrixDescriptionStyle} data-describes={row.code}>
+                {line}
+              </span>
+            ) : null}
           </span>
         </label>
       );
@@ -120,7 +141,7 @@ export function PermissionMatrix({
             {t('roleVerbFull')}
           </label>
           {Object.entries(row.codes).map(([verb, code]) => (
-            <label key={code}>
+            <label key={code} title={explain(code) ?? undefined}>
               <input
                 type="checkbox"
                 data-code={code}
@@ -133,6 +154,21 @@ export function PermissionMatrix({
             </label>
           ))}
         </span>
+        {/* Each state of a CRUD family means something different to a person, so each gets its own
+            line rather than one line for the family. Rendered only where a description exists, so a
+            missing line is visibly missing instead of silently absent. */}
+        {Object.values(row.codes).some((code) => explain(code)) ? (
+          <span style={{ flexBasis: '100%' }}>
+            {Object.entries(row.codes).map(([verb, code]) => {
+              const line = explain(code);
+              return line ? (
+                <span key={code} style={matrixDescriptionStyle} data-describes={code}>
+                  {t(VERB_LABEL[verb] ?? 'roleVerbOther')}: {line}
+                </span>
+              ) : null;
+            })}
+          </span>
+        ) : null}
       </div>
     );
   }
@@ -180,6 +216,29 @@ export function PermissionMatrix({
                 {grantedInModule(moduleEntry, selected)} / {moduleEntry.codes.length}
               </span>
             </summary>
+            {/* SECTION-level select-all, which the owner expected the row-level "الكل" to be. It
+                covers every permission in the section, five-state families included.
+                INSIDE the section rather than in its `summary`: `summary` is itself an interactive
+                disclosure control, so a checkbox within it nests interactive controls — axe flagged
+                76 nodes for exactly that, and it also made the disclosure's own click target depend
+                on where the label happened to end. */}
+            <label style={matrixSectionAllStyle} data-select-all-label={moduleEntry.module}>
+              <input
+                type="checkbox"
+                data-select-all={moduleEntry.module}
+                checked={grantedInModule(moduleEntry, selected) === moduleEntry.codes.length}
+                disabled={disabled}
+                ref={(el) => {
+                  if (!el) return;
+                  // Partly granted reads as neither on nor off, which is the truth and stops the box
+                  // from claiming the section is empty when it is half full.
+                  const granted = grantedInModule(moduleEntry, selected);
+                  el.indeterminate = granted > 0 && granted < moduleEntry.codes.length;
+                }}
+                onChange={(e) => apply(moduleEntry.codes, e.target.checked)}
+              />
+              {t('roleSelectAllInSection')}
+            </label>
             {moduleEntry.rows.map(renderRow)}
           </details>
         );

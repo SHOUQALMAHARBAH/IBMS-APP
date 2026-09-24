@@ -91,3 +91,26 @@ export const createMatrixStyle: CSSProperties = {
   border: '1px solid var(--border-default)',
   borderRadius: '0.45rem',
 };
+
+/** The one-line explanation beneath a permission's name. Muted and on its own line: the owner's
+ *  finding is that a code is not an explanation, and an em-dash continuation reads as part of the
+ *  identifier rather than as prose about it. */
+export const matrixDescriptionStyle: CSSProperties = {
+  display: 'block',
+  marginTop: '0.1rem',
+  fontSize: '0.8rem',
+  lineHeight: 1.5,
+  color: 'var(--ink-secondary)',
+};
+
+/** The section-level select-all, in the module's summary line. */
+export const matrixSectionAllStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.3rem',
+  marginInlineStart: '0.75rem',
+  fontSize: '0.8rem',
+  fontWeight: 400,
+  color: 'var(--ink-secondary)',
+  cursor: 'pointer',
+};
