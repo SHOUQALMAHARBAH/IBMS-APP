@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { anchoredAttributes, anchoredCount, anchoredTexts } from "./support/anchored";
 
 /**
  * Office-scoped custom RBAC, PHASE 3 — the unified User/Employee screen.
@@ -338,8 +339,9 @@ test("does not offer a RETIRED role to grant, and does not offer one when provis
   // Positive anchor: the active roles ARE offered, so the absence below is a filter and not an
   // empty screen.
   const grant = page.locator("[data-grant-select]").first();
-  await expect(grant).toBeVisible();
-  const options = await grant.locator("option").allInnerTexts();
+  // The anchor is the SELECT, not its options: an option inside a closed select has no bounding box,
+  // so it could never anchor itself.
+  const options = await anchoredTexts(grant.locator("option"), grant);
   expect(options.length).toBeGreaterThan(0);
   expect(options.join(" | ")).not.toContain("Old Desk");
 
@@ -354,20 +356,14 @@ test("a role picked in one row does NOT appear selected in every other row", asy
   await page.goto("/settings/users");
 
   const selects = page.locator("[data-grant-select]");
-  // Anchor before counting. Reading `count()` straight after `goto` measures "React has not
-  // hydrated yet" and returns 0 — which would fail this test for the wrong reason, and would pass
-  // an absence assertion for the wrong reason. Fourth time this session.
-  await expect(selects.first()).toBeVisible();
-  const count = await selects.count();
+  const count = await anchoredCount(selects);
   expect(count, "this test needs at least two rows to mean anything").toBeGreaterThan(1);
 
   const first = selects.nth(0);
   const second = selects.nth(1);
   const before = await second.inputValue();
   // Pick the OTHER role in the first row.
-  const options = await first.locator("option").evaluateAll((els) =>
-    els.map((e) => (e as HTMLOptionElement).value),
-  );
+  const options = await anchoredAttributes(first.locator("option"), "value", first);
   const firstValue = await first.inputValue();
   const other = options.find((v) => v !== firstValue);
   expect(other, "the fixture must offer at least two ACTIVE roles").toBeTruthy();

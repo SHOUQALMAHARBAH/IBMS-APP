@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { anchoredAttributes, anchoredCount, expectNone } from "./support/anchored";
 
 /**
  * Office-scoped custom RBAC, PHASE 3 — the Role screen.
@@ -687,7 +688,7 @@ test("the matrix opens collapsed, counts each module, and searches across all of
   const modules = matrix.locator("details[data-module]");
   await expect(modules).not.toHaveCount(0);
   // Collapsed on arrival: no module is open until someone opens it.
-  expect(await modules.evaluateAll((els) => els.filter((e) => (e as HTMLDetailsElement).open).length)).toBe(0);
+  expect((await anchoredAttributes(modules, "open")).filter((v) => v !== null)).toEqual([]);
   // Every module carries its own count.
   await expect(matrix.locator("[data-module-count]").first()).toBeVisible();
 
@@ -760,8 +761,13 @@ test("the row's permissions button opens the editor and shows what that role hol
   await mockRoles(page, { grants: ["claim.read", "claim.register"] });
   await page.goto("/settings/roles");
 
-  // It appeared to "do nothing" because the editor rendered below everything else.
-  await expect(page.locator("[data-matrix-for]")).toHaveCount(0);
+  // It appeared to "do nothing" because the editor rendered below everything else. Anchored on the
+  // row whose button is about to be pressed: otherwise "no editor yet" and "nothing rendered yet"
+  // are the same observation.
+  await expectNone(
+    page.locator("[data-matrix-for]"),
+    page.locator(`[data-role="${CUSTOM_ROLE.name}"]`),
+  );
   await page
     .locator(`[data-role="${CUSTOM_ROLE.name}"]`)
     .getByRole("button", { name: "Permissions" })
@@ -789,7 +795,7 @@ test("the section-level control selects EVERY permission in that section", async
   const claims = matrix.locator('details[data-module="claims"]');
   await claims.locator("summary").click();
   const boxes = claims.locator('input[type=checkbox][data-code]');
-  const count = await boxes.count();
+  const count = await anchoredCount(boxes);
   expect(count).toBeGreaterThan(1);
 
   await matrix.locator('[data-select-all="claims"]').check();

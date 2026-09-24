@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -125,7 +126,12 @@ test("only offers a transition action on the officer's own lead, and moving it u
 
   await page.goto("/leads");
 
-  await expect(page.getByRole("button", { name: /Not Mine/ })).toHaveCount(0);
+  // Anchored on the officer's OWN action, which must be present: otherwise "no button on someone
+  // else's lead" and "the board has not rendered" are indistinguishable.
+  await expectNone(
+    page.getByRole("button", { name: /Not Mine/ }),
+    page.getByRole("button", { name: "Mark contacted — Ahmad Al-Test" }),
+  );
   await page.getByRole("button", { name: "Mark contacted — Ahmad Al-Test" }).click();
 
   await expect(page.getByRole("button", { name: "Mark contacted — Ahmad Al-Test" })).toHaveCount(0);

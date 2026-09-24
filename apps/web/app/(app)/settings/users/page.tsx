@@ -16,7 +16,6 @@ import {
   type AdminUser,
   type OrgUnit,
   type RoleCatalogueEntry,
-  type RoleName,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';

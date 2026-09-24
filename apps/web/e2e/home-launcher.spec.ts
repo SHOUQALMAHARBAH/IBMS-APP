@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { anchoredAttributes } from "./support/anchored";
 
 /**
  * The launcher is the FIRST screen after login, and it used to be the only surface in the product
@@ -74,9 +75,7 @@ test("every card on the launcher is a route the user's permissions allow", async
   // every "must not contain" assertion below for entirely the wrong reason.
   await expect(page.locator('[data-home-card="/settings/security"]')).toBeVisible();
 
-  const hrefs = await page.locator("[data-home-card]").evaluateAll((els) =>
-    els.map((e) => e.getAttribute("data-home-card")!),
-  );
+  const hrefs = await anchoredAttributes(page.locator("[data-home-card]"), "data-home-card");
   expect(hrefs.length).toBeGreaterThan(0);
 
   // Security is ungated by design — the one route a user owing MFA enrolment must always reach.
