@@ -2814,7 +2814,60 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
-### 1.49 `P2` — FOURTEEN screens can render a heading and nothing else, and the pattern that causes it
+### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
+
+Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
+API on the dev database. **Sanctions screening works. PEP screening is a label on a sanctions result.**
+
+**What happens today, from the screen.** A corporate customer named `'ABBAS, Yasir` — a name taken
+FROM the live synced list rather than invented — created, KYC submitted, screening run:
+
+    RESULT SANCTIONS  HIT    list=OFAC_SDN (PAARSSR-EO13894)  provider=built_in  escalated=yes
+    RESULT PEP        HIT    list=OFAC_SDN (PAARSSR-EO13894)  provider=built_in  escalated=yes
+    RESULT AML        HIT    list=OFAC_SDN (PAARSSR-EO13894)  provider=built_in  escalated=yes
+    ScreeningMatch queued for human review: 1   (status `pending`)
+    KYC status after screening: SCREENING       (not auto-approved)
+
+An invented name came back CLEAR on all three, escalated nothing, queued nothing. So the machinery —
+match, store, escalate, queue for review, hold the KYC record — works, and the queue is reachable by
+`COMPLIANCE_OFFICER` (3 live grants) at `/screening-matches`, gated on `sanctions-pep.screen`.
+
+**THE DEFECT.** A "PEP HIT" cites an OFAC SDN sanctions programme as its source. The three types are
+one computation stored under three labels, which the whole-database distribution confirms exactly:
+27 CLEAR / 11 HIT / 6 PENDING_INVESTIGATION for EACH of SANCTIONS, PEP and AML — identical because it
+is one result written three times.
+
+**There is no PEP data to screen against.** `WatchlistEntry` has no list-type column at all; its only
+classifier is `source`, and the only sources are `OFAC_SDN` (58,172 rows) and `UN_CONSOLIDATED`
+(3,033). Both are sanctions lists. So a politically exposed person who is NOT sanctioned returns
+**PEP: CLEAR** — a false negative on the check a regulator asks about, reported with the same
+confidence as a true one — and a sanctioned person returns PEP: HIT, a true answer to a question
+nobody asked.
+
+`ScreeningService`'s own header says as much ("a real integration would call three distinct
+lists/providers per type; this is a deliberate simplification"). The simplification has become a
+false claim on screen, because the screen shows a PEP result and names no caveat.
+
+**Specified and NOT implemented, named exactly.** `ScreeningMatch` already carries `listType`,
+`pepPosition`, `providerEntityId`, `provider`, `reviewThreshold` and `algorithmVersion`; the schema
+anticipates a commercial PEP provider with positions and per-provider thresholds. `ScreeningResult`
+carries `provider` and `attemptOutcome`. Nothing sits behind any of it — every stored row is
+`provider=built_in`.
+
+**Two smaller measurements.** Every HIT predating this test came from the dev-only FIXTURE
+(`listSource` = "Sample OFAC SDN List (fixture)", 33 rows), not from the 61,205 real entries; and
+`ScreeningMatch` was **0** across the whole database, so the human-review queue had never held a row.
+Both are explained by seeded customers having randomly generated names that match nothing — the first
+real match appeared the moment a real listed name was used. Neither is a fault; both would have been
+easy to mistake for one.
+
+**Nothing changed in this area, per instruction.** The options are not equivalent: buy a PEP data
+source, or remove the PEP and AML labels until there is one. The second is free and honest; the first
+is the actual requirement. What must not continue is a screen reporting PEP: CLEAR to a compliance
+officer on the strength of a sanctions list.
+
+
+### 1.49 — ONE screen could render a heading and nothing else. My first count of FOURTEEN was wrong, and the correction is the useful part
 
 Found while diagnosing a blank `/settings/roles`. The screen was not broken — it renders 12 role
 rows against a healthy API, and it shows an explicit error when the response cannot be parsed
