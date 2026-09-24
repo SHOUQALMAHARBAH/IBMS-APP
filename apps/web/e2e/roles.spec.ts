@@ -538,3 +538,61 @@ test("roles screen has no serious/critical accessibility violations @a11y", asyn
     ),
   ).toEqual([]);
 });
+
+/**
+ * The owner reported this screen rendering blank, and 454 green Playwright tests had not caught a
+ * screen that renders nothing — because a navigation test that stops at the href shares the
+ * assumption it should be checking.
+ *
+ * These two assert CONTENT. Neither asserts a status code and neither asserts an href.
+ */
+test("shows the office's roles as CONTENT — a heading and real rows, not just a reachable route", async ({
+  page,
+}) => {
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.goto("/settings/roles");
+
+  // The heading alone is not evidence the screen works: it renders before any data arrives, which
+  // is exactly how a blank-looking screen still passes a smoke test.
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator("tbody tr")).not.toHaveCount(0);
+  await expect(page.locator(`[data-role="${CUSTOM_ROLE.name}"]`)).toBeVisible();
+});
+
+test("a caller who cannot read roles is TOLD so, rather than left on a near-empty screen", async ({
+  page,
+}) => {
+  // Holding nothing relevant. The client knows this before it asks the API, so it never asks — and
+  // the no-permission message lived only in the failed-request path, which therefore never ran.
+  // Result: a heading, one sentence of intro, and nothing else: no table, no empty state, no
+  // explanation. The requirement is explicit — no screen leaves a person facing a blank page.
+  await mockAuthWithPermissions(page, ["claim.read"]);
+  await page.goto("/settings/roles");
+
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // Scoped to `main`, and to the sentence itself. The first version of this test asserted a
+  // page-wide role=status|alert and PASSED on cb24c60 — satisfied by an empty-text live region
+  // outside the content area, while `main` held 157 characters of heading and intro and nothing
+  // else. A test that can be satisfied from outside the screen is not testing the screen.
+  await expect(
+    page.locator("main").getByText(/role\.read|صلاحية role\.read/),
+  ).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(0);
+});
+
+test("says so when the API answers with something it cannot parse", async ({ page }) => {
+  // The reported symptom shape: 200, a body that is not JSON (an HTML page document), nothing to
+  // render. A screen that cannot parse a response must say so, not fall silent.
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await page.route("http://localhost:4000/rbac/roles", (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><html></html>" }),
+  );
+  await page.route("http://localhost:4000/rbac/permissions", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+  await page.goto("/settings/roles");
+
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText(/تعذّر تحميل الأدوار|Could not load/i)).toBeVisible();
+});

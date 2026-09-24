@@ -363,6 +363,25 @@ export default function RoleAdminPage() {
       {loadError ? <p style={errorStyle}>{loadError}</p> : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
 
+      {/* A caller the CLIENT already knows cannot read roles never reaches `load()`, so the
+          no-permission message — which lived only in that function's catch — never rendered. The
+          screen showed a heading, one sentence of intro, and nothing else: no table, no empty state,
+          no reason. Measured at 157 characters inside `main`.
+
+          Stated as its own branch rather than by making the effect fire a request it knows will be
+          refused: asking the API in order to be told what we already know is a round trip for a
+          sentence, and it would put a guaranteed 403 in everyone's network log. */}
+      {!canRead ? (
+        <p role="status" style={errorStyle}>
+          {t('roleNoPermission')}
+        </p>
+      ) : null}
+
+      {/* And the window before the first response: `roles` is null and there is no error yet, which
+          used to render nothing at all. A person who opens this screen on a slow connection must see
+          that something is happening. */}
+      {canRead && roles === null && !loadError ? <p role="status">{t('commonLoading')}</p> : null}
+
       {roles && roles.length === 0 ? <p>{t('roleNoRoles')}</p> : null}
 
       {roles && roles.length > 0 ? (

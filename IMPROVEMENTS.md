@@ -2814,6 +2814,47 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
+### 1.49 `P2` — FOURTEEN screens can render a heading and nothing else, and the pattern that causes it
+
+Found while diagnosing a blank `/settings/roles`. The screen was not broken — it renders 12 role
+rows against a healthy API, and it shows an explicit error when the response cannot be parsed
+(both measured). What WAS broken is narrower and worth naming, because it is a pattern rather
+than a bug:
+
+```ts
+useEffect(() => {
+  if (!user || !canRead) return;   // <- the client already knows; it never asks
+  void load();                      // <- and the no-permission message lives in load()'s catch
+}, [user, canRead, load]);
+```
+
+A caller the CLIENT knows cannot read never reaches `load()`, so the message that explains the
+refusal — which exists, and is correctly worded — never renders. Measured on the roles screen: the
+`main` element held **157 characters**, a heading and one sentence of intro. No table, no empty
+state, no reason.
+
+Fixed on `/settings/roles` (a `!canRead` branch, plus a loading line for the window before the
+first response, which also rendered nothing). **Fourteen other screens carry the same shape** — an
+early-return load gate and no no-permission text anywhere in the file:
+
+`claims/[id]`, `cross-sell/[id]`, `insurance-programs/[id]`, `leads/[id]`, `needs-assessments/[id]`,
+`opportunities/[id]`, `policies/[id]`, `prospects/[id]`, `rfqs/[id]`, `up-sell/[id]`,
+`screening-health`, `screening-matches`, `settings/security`, `sla-policies`.
+
+Recorded, not fixed, on instruction. The detail pages matter less than the list pages — a person
+reaches them from a row they could already see — so `screening-health`, `screening-matches` and
+`sla-policies` are the three to do first.
+
+**And the test lesson, which is the reason this survived 454 green Playwright tests.** My first
+version of the proving test asserted a page-wide `getByRole("status").or(getByRole("alert"))` and
+**PASSED on the broken build** — satisfied by an empty-text live region OUTSIDE the content area
+while `main` held nothing but the heading. A test that can be satisfied from outside the screen is
+not testing the screen. Scoped to `main` and to the sentence itself, it fails on `cb24c60` and
+passes after the fix.
+
+The general form: **a navigation test that stops at the href shares the assumption it should be
+checking.** Assert content — a row, a named value, or an explicit empty-state message.
+
 ### 1.48 — A PARTIAL VERDICT REPORTED AS COMPLETE: "screens hidden, not denied" was true of the nav and false of the launcher
 
 **Corrects an earlier audit verdict of my own.** Audit item 5 — *screens are hidden rather than
