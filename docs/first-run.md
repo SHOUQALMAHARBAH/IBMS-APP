@@ -191,8 +191,10 @@ http://localhost:3000
 
 | العمل | أين | مجموعة القائمة |
 |---|---|---|
-| **إنشاء موظف** وتعديله | `الموظفون` ← `/employees` | العمليات |
-| **إنشاء مستخدم** ومنحه دورًا أو سحبه | `المستخدمون` ← `/settings/users` | العمليات |
+| **تسجيل شخص** وتعديله، **وإنشاء حساب دخوله بالحفظ نفسه** (علّم «منح هذا الشخص حساب دخول») | `الموظفون` ← `/employees` | العمليات |
+| **إنشاء حساب دخول لشخص مسجَّل سابقًا** | صفحة الشخص ← `/employees/<id>` | العمليات |
+| **إنشاء حساب دخول بلا سجل موظف** (المدقّق الخارجي)، ومنح الأدوار أو سحبها، وإيقاف الحساب | `المستخدمون` ← `/settings/users` | العمليات |
+| **إنشاء قسم أو فرع** وتعديله أو إيقافه | `الأقسام والفروع` ← `/settings/org-units` | العمليات |
 | **تعريف دور جديد** وتحديد صلاحياته، أو إيقافه | `الأدوار والصلاحيات` ← `/settings/roles` | العمليات |
 | **تسجيل شركة تأمين** (بالكتالوج أو محليًا)، تعديلها، **إيقافها عن التعامل** | `شركات التأمين` ← `/insurers` | الأعمال الجديدة |
 | **البحث في دليل الشركات** عبر المكاتب | `دليل شركات التأمين` ← `/insurer-directory` | الأعمال الجديدة |
@@ -442,8 +444,10 @@ customer**.
 
 | Task | Where | Sidebar group |
 |---|---|---|
-| **Create and edit an employee** | `Employees` → `/employees` | Operations |
-| **Create a user**, grant or revoke a role | `Users` → `/settings/users` | Operations |
+| **Record a person** and edit them, **and create their login in the same Save** (tick "Give this person a login") | `Employees` → `/employees` | Operations |
+| **Give a login to someone recorded earlier** | that person's page → `/employees/<id>` | Operations |
+| **Create a login with no person behind it** (the external auditor), grant or revoke a role, deactivate an account | `Users` → `/settings/users` | Operations |
+| **Create a department or a branch**, rename or retire one | `Departments & branches` → `/settings/org-units` | Operations |
 | **Define a role**, set its permissions, retire it | `Roles & permissions` → `/settings/roles` | Operations |
 | **Register an insurer** (catalogue or local), edit it, **deactivate** it | `Insurers` → `/insurers` | New business |
 | **Search the cross-office directory** | `Insurer directory` → `/insurer-directory` | New business |
