@@ -15,6 +15,8 @@ import type { AuthenticatedUser } from '../../auth/auth.types';
 import { DepartmentRepository } from '../../../repositories/department.repository';
 import { BranchRepository } from '../../../repositories/branch.repository';
 import { EmployeeRepository } from '../../../repositories/employee.repository';
+import type { EncryptionService } from '../../security/encryption.service';
+import type { PrismaService } from '../../../prisma/prisma.service';
 
 const actor = { id: 'admin-1' } as AuthenticatedUser;
 
@@ -125,7 +127,22 @@ function makeDeps(over: Record<string, unknown> = {}) {
   // behaves as it did before the field existed.
   const employees = {
     findById: vi.fn().mockResolvedValue(null),
+    // The paired create writes one; the account-only path never calls it.
+    create: vi
+      .fn()
+      .mockImplementation((input: { id: string }) => Promise.resolve(input)),
     ...(over.employees as object),
+  };
+  // Only the paired person-and-account path touches either of these two, so the default mocks are
+  // deliberately hostile: an encryption call that was not expected throws, and `$transaction` is
+  // absent until a test that needs it supplies one.
+  const encryption = {
+    encrypt: vi.fn().mockResolvedValue('enc:national-id'),
+    ...(over.encryption as object),
+  };
+  const prisma = {
+    client: {},
+    ...(over.prisma as object),
   };
   const service = new UserAdminService(
     departments as unknown as DepartmentRepository,
@@ -135,9 +152,13 @@ function makeDeps(over: Record<string, unknown> = {}) {
     passwords as unknown as PasswordService,
     permissions as unknown as PermissionsService,
     audit as unknown as AuditService,
+    encryption as unknown as EncryptionService,
+    prisma as unknown as PrismaService,
   );
   return {
     service,
+    encryption,
+    prisma,
     users,
     passwords,
     permissions,

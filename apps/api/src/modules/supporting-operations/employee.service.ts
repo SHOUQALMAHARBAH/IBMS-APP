@@ -14,6 +14,7 @@ import type {
 } from '@ibms/db';
 import { EmployeeRepository } from '../../repositories/employee.repository';
 import { DepartmentRepository } from '../../repositories/department.repository';
+import { BranchRepository } from '../../repositories/branch.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { EncryptionService } from '../security/encryption.service';
@@ -25,7 +26,10 @@ import {
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { SessionService } from '../auth/services/session.service';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
-import { composeFullName } from '../../common/person-name.util';
+import {
+  composeFullName,
+  composeOptionalFullName,
+} from '../../common/person-name.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type {
   CreateEmployeeDto,
@@ -57,6 +61,7 @@ export class EmployeeService {
   constructor(
     private readonly employees: EmployeeRepository,
     private readonly departments: DepartmentRepository,
+    private readonly branches: BranchRepository,
     private readonly audit: AuditService,
     private readonly encryption: EncryptionService,
     private readonly reveal: SensitiveFieldRevealService,
@@ -90,6 +95,18 @@ export class EmployeeService {
       if (!department) {
         throw new UnprocessableEntityException(
           "Unknown department. Pick one of this office's own departments.",
+        );
+      }
+    }
+
+    // §4.2.2's location axis, validated exactly like the department above: the tenant-scoped read
+    // means an Office A record can never be filed under an Office B branch, and an id from another
+    // office reads as "unknown" rather than as a hint that the row exists somewhere.
+    if (dto.branchId) {
+      const branch = await this.branches.findById(dto.branchId);
+      if (!branch) {
+        throw new UnprocessableEntityException(
+          "Unknown branch. Pick one of this office's own branches.",
         );
       }
     }
@@ -135,6 +152,16 @@ export class EmployeeService {
       familyName: dto.familyName,
     });
 
+    // The English set is optional as a WHOLE, so this composes to undefined rather than to an empty
+    // string when none of it was given — `Employee.fullNameEn` stays NULL, which is what every row
+    // predating migration 20261024100000 holds and what the screens fall back from.
+    const fullNameEn = composeOptionalFullName({
+      givenName: dto.givenNameEn,
+      fatherName: dto.fatherNameEn,
+      grandfatherName: dto.grandfatherNameEn,
+      familyName: dto.familyNameEn,
+    });
+
     const employee = await this.employees.create({
       id,
       fullName,
@@ -142,9 +169,15 @@ export class EmployeeService {
       fatherName: dto.fatherName,
       grandfatherName: dto.grandfatherName,
       familyName: dto.familyName,
+      givenNameEn: dto.givenNameEn,
+      fatherNameEn: dto.fatherNameEn,
+      grandfatherNameEn: dto.grandfatherNameEn,
+      familyNameEn: dto.familyNameEn,
+      fullNameEn,
       nationalIdEnc: encrypted.nationalIdEnc,
       position: dto.position,
       departmentId: dto.departmentId,
+      branchId: dto.branchId,
       hireDate,
       licensedRole: dto.licensedRole,
       confidentialityAgreementSignedAt,

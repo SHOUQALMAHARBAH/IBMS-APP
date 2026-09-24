@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { MfaMethod, Role, User, UserRoleAssignment } from '@ibms/db';
+import type {
+  MfaMethod,
+  RegistrationType,
+  Role,
+  User,
+  UserRoleAssignment,
+} from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import type { TenantTransactionClient } from '../prisma/tenant-scope.extension';
 import { OrgContextService } from '../common/org-context/org-context.service';
 
 /** One of a caller's active roles. `id` is what authorization resolves from;
@@ -253,23 +260,29 @@ export class UserRepository {
    * `accessValidFrom`/`accessValidUntil` exist for the EXTERNAL_AUDITOR role's
    * time-boxed access window (backlog A.1) — `AuthService.assertAccessWindow
    * Active` enforces them at login. */
-  provision(data: {
-    fullName: string;
-    email: string;
-    passwordHash: string;
-    languagePreference?: 'AR' | 'EN';
-    /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
-    departmentId?: string;
-    employeeId?: string;
-    /** Part II §4.2.2 — the organizational location, likewise required by the
-     * DTO and likewise distinct from both Department and Role. */
-    branchId?: string;
-    roleIds: string[];
-    accessValidFrom?: Date;
-    accessValidUntil?: Date;
-  }): Promise<User> {
+  provision(
+    data: {
+      fullName: string;
+      email: string;
+      passwordHash: string;
+      languagePreference?: 'AR' | 'EN';
+      /** Part II §4.2.2 — separate from `roleIds`, and required by the DTO. */
+      departmentId?: string;
+      employeeId?: string;
+      /** Part II §4.2.2 — the organizational location, likewise required by the
+       * DTO and likewise distinct from both Department and Role. */
+      branchId?: string;
+      /** Recorded only — no authentication path reads it. See `ProvisionUserDto`. */
+      registrationType?: RegistrationType;
+      roleIds: string[];
+      accessValidFrom?: Date;
+      accessValidUntil?: Date;
+    },
+    /** Joins a caller's transaction — the person-and-account pair. See `EmployeeRepository.create`. */
+    tx?: TenantTransactionClient,
+  ): Promise<User> {
     const { roleIds, ...user } = data;
-    return this.prisma.client.user.create({
+    return (tx ?? this.prisma.client).user.create({
       data: {
         ...user,
         passwordUpdatedAt: new Date(),
