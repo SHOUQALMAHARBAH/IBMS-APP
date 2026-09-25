@@ -87,6 +87,10 @@ enum AuditAction {
   READ
   UPDATE
   DELETE
+  // Class B piece 1 — a record raised in error, withdrawn before it took effect. NOT a DELETE (the row
+  // stays, carrying actor/timestamp/reason) and deliberately not an UPDATE, which would make withdrawing a
+  // wrongly raised endorsement indistinguishable from correcting its premium in a filtered audit list.
+  DISCARD
   APPROVE
   REJECT
   TRANSITION
@@ -1835,10 +1839,13 @@ model Opportunity {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
-  rfqs           RFQ[]
-  recommendation Recommendation?
-  clientDecision ClientDecision?
-  policy         Policy?
+  rfqs            RFQ[]
+  /// One-to-MANY since the discard: an opportunity can carry one LIVE recommendation and any number of
+  /// discarded ones. A partial unique index (live rows only) is what keeps "one live" true; the relation
+  /// can no longer claim at most one row, because that is no longer the case.
+  recommendations Recommendation[]
+  clientDecision  ClientDecision?
+  policy          Policy?
 
   // "At most one live Opportunity per InsuranceProgram" is enforced by a
   // partial UNIQUE index (insuranceProgramId WHERE status <> 'CLOSED_LOST')
@@ -1996,8 +2003,10 @@ model Quotation {
   /// same "metadata not body" shape as exclusions / conditions).
   negotiationNotes      String?
 
-  comparisonRows ComparisonMatrixRow[]
-  recommendation Recommendation?       @relation("RecommendedQuotation")
+  comparisonRows  ComparisonMatrixRow[]
+  /// One-to-MANY for the same reason: a quotation may have been recommended by a recommendation that was
+  /// then discarded, and by the live one that replaced it.
+  recommendations Recommendation[]      @relation("RecommendedQuotation")
 
   @@index([rfqId])
   @@index([insurerId])
@@ -2094,9 +2103,15 @@ model Recommendation {
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   organizationId            String       @default(dbgenerated())
   organization              Organization @relation(fields: [organizationId], references: [id])
-  opportunityId             String       @unique
+  /// NOT `@unique`: a PARTIAL unique index, live rows only — `WHERE "discardedAt" IS NULL`. Prisma
+  /// cannot express a partial index, so it lives in migration 20261027100000 and asserts itself there.
+  /// One LIVE recommendation per opportunity is the invariant that matters; discarded ones stay beside it
+  /// with their author, timestamp and reason.
+  opportunityId             String
   opportunity               Opportunity  @relation(fields: [opportunityId], references: [id])
-  recommendedQuotationId    String       @unique
+  /// Partial unique for the same reason, in the same migration: discarding a recommendation must not
+  /// block re-recommending the quotation it named.
+  recommendedQuotationId    String
   recommendedQuotation      Quotation    @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
   rationale                 String // free-text overall summary
   rationaleFactors          Json // { coverage, price, financialStrength, claimsService, deductible, policyConditions } — a non-empty note each
@@ -2112,11 +2127,30 @@ model Recommendation {
   approvedAt                DateTime?
   sentToClientAt            DateTime?
   sentByUserId              String?
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  ///
+  /// This model is also where the discard forced a constraint change. `opportunityId` and
+  /// `recommendedQuotationId` were plain `@unique`, which would have made a discarded recommendation
+  /// block its own replacement for ever — a broker unable to write a second recommendation because the
+  /// first was a typo. Both are now PARTIAL unique indexes, live rows only; see the migration.
+  discardedAt               DateTime?
+  discardedByUserId         String?
+  discardedReason           String?
   createdAt                 DateTime     @default(now())
 
   conflictOfInterestDisclosure ConflictOfInterestDisclosure?
 
   @@index([draftedByUserId])
+  /// Declared because migration 20261027100000 CREATES them — the partial unique indexes cover live rows
+  /// only, so reading a recommendation history by opportunity or by quotation needs its own index. Left
+  /// undeclared, the next migrate dev would emit DROP INDEX, which is what db:divergence caught.
+  @@index([opportunityId])
+  @@index([recommendedQuotationId])
   @@index([organizationId])
 }
 
@@ -2257,6 +2291,15 @@ model Policy {
   // RFQ.issuedByUserId).
   placedByUserId        String?
   issuedByUserId        String?
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  discardedAt           DateTime?
+  discardedByUserId     String?
+  discardedReason       String?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
@@ -2424,6 +2467,15 @@ model Endorsement {
   // version). `{ limits, sumsInsured, namedPerils, extensions }`; null means
   // "carry the current coverage forward, just mark the new version boundary".
   targetCoverage                  Json?
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  discardedAt                     DateTime?
+  discardedByUserId               String?
+  discardedReason                 String?
   createdAt                       DateTime          @default(now())
 
   schedule           PolicySchedule?
@@ -2536,6 +2588,15 @@ model Claim {
   insurerClaimReference      String?
   followUpAlertThresholdDays Int                @default(9)
   classification             DataClassification @default(HIGHLY_CONFIDENTIAL) // medical/health claim data
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  discardedAt                DateTime?
+  discardedByUserId          String?
+  discardedReason            String?
   createdAt                  DateTime           @default(now())
   updatedAt                  DateTime           @updatedAt
 

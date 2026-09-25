@@ -617,4 +617,29 @@ export class ClaimRepository {
     });
     return { wrote: count === 1, settlement };
   }
+  /**
+   * Mark this record discarded — raised in error, never took effect.
+   *
+   * `updateMany` re-asserting `discardedAt: null` in its own `where`, not `update`: two people discarding
+   * the same record at once must not have the second silently overwrite the first one's reason. A count of
+   * 0 means somebody else got there, and the service turns that into a 409 naming it
+   * (`race-safe-invariants.md`).
+   *
+   * The three columns are written together because a CHECK constraint refuses them apart — a discard
+   * carrying no reason is the one shape nobody can read later.
+   */
+  async discard(
+    id: string,
+    input: { discardedByUserId: string; discardedReason: string },
+  ): Promise<{ discarded: boolean }> {
+    const { count } = await this.prisma.client.claim.updateMany({
+      where: { id, discardedAt: null },
+      data: {
+        discardedAt: new Date(),
+        discardedByUserId: input.discardedByUserId,
+        discardedReason: input.discardedReason.trim(),
+      },
+    });
+    return { discarded: count > 0 };
+  }
 }

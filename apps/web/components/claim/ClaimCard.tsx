@@ -27,6 +27,10 @@ import {
   quoteChainCardStyle,
   quoteFieldStyle,
 } from '../quotation/quotation.styles';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../lib/i18n/translations';
@@ -51,6 +55,8 @@ import type { Language, TranslationKey } from '../../lib/i18n/translations';
 /** What a claim card may offer, per the caller's own permissions. The page
  *  decides; this component only renders what it is told is allowed. */
 export interface ClaimCardAbilities {
+  /** `claim.discard` — its own code, not implied by the ability to notify one. */
+  canDiscard: boolean;
   canRegister: boolean;
   canDocument: boolean;
   canAssess: boolean;
@@ -839,6 +845,7 @@ export function ClaimCard({
 }) {
   const { language, t } = useLanguage();
   const {
+    canDiscard,
     canRegister,
     canDocument,
     canAssess,
@@ -862,8 +869,22 @@ export function ClaimCard({
           {t('claimLossOnLabel')} {formatDate(claim.lossDate, language)}
           {claim.isLargeClaim ? ` · ${t('claimLargeClaimSuffix')}` : ''}
         </strong>
-        <span style={rfqBadgeStyle}>{t(ENUM_LABEL.ClaimStatus[claim.status])}</span>
+        <span style={rfqBadgeStyle}>
+          {claim.discard
+            ? t('discardedBadge')
+            : t(ENUM_LABEL.ClaimStatus[claim.status])}
+        </span>
       </div>
+      <DiscardedNotice discard={claim.discard} />
+      <DiscardControl
+        collection="claims"
+        id={claim.id}
+        canDiscard={canDiscard}
+        // NOTIFIED means the client told us; REGISTERED means we told the insurer, and after that there is a
+        // claim number in somebody else's system.
+        discardable={!claim.discard && claim.status === 'NOTIFIED'}
+        onDiscarded={onChanged}
+      />
       <p style={{ margin: '0.4rem 0' }}>
         {t('claimEstimatedLossLabel')} {formatMoney(claim.estimatedLoss, language)}
         {claim.claimNumber ? (
@@ -934,7 +955,10 @@ export function ClaimCard({
       <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
         {coverageLabel(claim, language, t)}
       </p>
-      {canRegister && claim.status === 'NOTIFIED' ? (
+      {/* Registration is the only forward move from NOTIFIED, and a withdrawn claim is not making it. The
+          other sub-blocks below all require a status past NOTIFIED, which a discarded claim can never
+          reach — the engine refuses the transition — so this is the one place the flag is needed. */}
+      {canRegister && claim.status === 'NOTIFIED' && !claim.discard ? (
         <ClaimRegistrationForm claimId={claim.id} onDone={onChanged} />
       ) : null}
       {claim.status !== 'NOTIFIED' ? (

@@ -30,6 +30,13 @@ import {
 } from '../policy/policy.config';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
 import {
+  assertDiscardWon,
+  assertDiscardable,
+  discardView,
+  type DiscardView,
+} from '../../common/discard.util';
+import { DiscardDto } from '../../common/dto/discard.dto';
+import {
   CANCELLATION_CHANGE_TYPE,
   cancellationAuditSnapshot,
   cancellationReturnPremium,
@@ -81,6 +88,12 @@ export interface EndorsementView {
   commissionReversal: { amount: string } | null;
   scheduleVersioned: boolean;
   createdAt: Date;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. Carries the actor, the
+   * timestamp and the mandatory reason, because a record that vanished and a record marked withdrawn tell a
+   * reader two different things and only one of them is true here.
+   */
+  discard: DiscardView | null;
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -238,6 +251,7 @@ export class EndorsementService {
   private toView(e: EndorsementWithContext): EndorsementView {
     return {
       id: e.id,
+      discard: discardView(e),
       policyId: e.policyId,
       customerId: e.policy.customerId,
       type: e.type,
@@ -848,6 +862,49 @@ export class EndorsementService {
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<EndorsementView> {
+    return this.toView(await this.loadVisibleEndorsement(id, actor));
+  }
+  /**
+   * DISCARD — this endorsement was raised in error and never took effect.
+   *
+   * The record STAYS. It is marked discarded, carrying who withdrew it, when, and a mandatory reason, which
+   * is the whole difference between this and a delete: somebody reading the file next year needs to see that
+   * a endorsement was raised before it was applied to the policy and withdrawn, not a gap where one used to be.
+   *
+   * Three properties are not decided here, deliberately:
+   *  - WHETHER IT MAY BE DISCARDED is `assertDiscardable`, shared by all four entities, so the commitment
+   *    rule and the reason's floor cannot drift between them.
+   *  - THE PERMISSION is `@RequirePermissions('endorsement.discard')` on the route — one code, because
+   *    `PermissionsGuard` ORs what it is given and a second code there would weaken rather than tighten it.
+   *  - WHETHER IT MAY STILL ADVANCE afterwards is the engine's guard, not this method's problem.
+   *
+   * VISIBILITY comes from the same `loadVisibleEndorsement` every other read of this entity uses, so a discard reaches
+   * exactly the records the caller could already see — a permission to discard is not a permission to
+   * discover.
+   */
+  async discard(
+    id: string,
+    dto: DiscardDto,
+    actor: AuthenticatedUser,
+  ): Promise<EndorsementView> {
+    const row = await this.loadVisibleEndorsement(id, actor);
+    assertDiscardable('Endorsement', id, row, dto.reason);
+
+    const { discarded } = await this.endorsements.discard(id, {
+      discardedByUserId: actor.id,
+      discardedReason: dto.reason,
+    });
+    assertDiscardWon('Endorsement', id, discarded);
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'DISCARD',
+      entityType: 'Endorsement',
+      entityId: id,
+      beforeValue: { status: row.status },
+      afterValue: { discardedReason: dto.reason.trim() },
+    });
+
     return this.toView(await this.loadVisibleEndorsement(id, actor));
   }
 }

@@ -9,6 +9,7 @@ import {
 } from './dto/endorsement-step.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { DiscardDto } from '../../common/dto/discard.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /** Process 22 — Endorsement Management (backlog Part C #22, Domain B). Raise
@@ -106,5 +107,22 @@ export class EndorsementController {
   @Post('endorsements/:id/notify-client')
   notify(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.endorsements.notifyClient(id, user);
+  }
+  /**
+   * Mark this endorsement as raised in error. Terminal, reason mandatory, and refused once the endorsement has been
+   * applied — the record stays either way.
+   *
+   * ONE permission code, not two. `PermissionsGuard` ORs what it is given, so
+   * `@RequirePermissions('endorsement.discard', 'endorsement.create')` would let a holder of EITHER through alone,
+   * which is the opposite of the intent.
+   */
+  @RequirePermissions('endorsement.discard')
+  @Post('endorsements/:id/discard')
+  discard(
+    @Param('id') id: string,
+    @Body() dto: DiscardDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.endorsements.discard(id, dto, user);
   }
 }

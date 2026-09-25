@@ -138,6 +138,13 @@ export class EndorsementRepository {
       where: {
         policyId,
         changeType: 'cancellation',
+        // A DISCARDED CANCELLATION MUST FREE THE POLICY. Without this clause a cancellation raised in error
+        // and withdrawn would block every future cancellation of that policy — permanently, since a
+        // discarded record cannot advance to CLIENT_NOTIFIED. That is the trap this feature exists to
+        // remove, reappearing one level down. The partial UNIQUE index behind this pre-check carries the
+        // same predicate (migration `20261027120000`), because the index is the real backstop and a
+        // friendlier application check in front of a refusing constraint helps nobody.
+        discardedAt: null,
         status: { not: 'CLIENT_NOTIFIED' },
       },
     });
@@ -256,5 +263,30 @@ export class EndorsementRepository {
       });
       return { refund, ledgerEntry };
     });
+  }
+  /**
+   * Mark this record discarded — raised in error, never took effect.
+   *
+   * `updateMany` re-asserting `discardedAt: null` in its own `where`, not `update`: two people discarding
+   * the same record at once must not have the second silently overwrite the first one's reason. A count of
+   * 0 means somebody else got there, and the service turns that into a 409 naming it
+   * (`race-safe-invariants.md`).
+   *
+   * The three columns are written together because a CHECK constraint refuses them apart — a discard
+   * carrying no reason is the one shape nobody can read later.
+   */
+  async discard(
+    id: string,
+    input: { discardedByUserId: string; discardedReason: string },
+  ): Promise<{ discarded: boolean }> {
+    const { count } = await this.prisma.client.endorsement.updateMany({
+      where: { id, discardedAt: null },
+      data: {
+        discardedAt: new Date(),
+        discardedByUserId: input.discardedByUserId,
+        discardedReason: input.discardedReason.trim(),
+      },
+    });
+    return { discarded: count > 0 };
   }
 }

@@ -6,6 +6,10 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  discardableEntity,
+  discardedRefusal,
+} from '../../common/discard.config';
 import { AuditService } from '../audit/audit.service';
 import {
   getWorkflowDelegate,
@@ -68,6 +72,26 @@ export class WorkflowTransitionService {
     if (!current) {
       throw new NotFoundException(`${entityType} ${entityId} not found`);
     }
+    // A DISCARDED RECORD CANNOT ADVANCE — and this is the only place that has to say so.
+    //
+    // Every forward move of a Policy, a Claim or an Endorsement passes through here, so the guard lives
+    // here rather than in each of their services: four copies of a terminal-state rule is four chances for
+    // one of them to be forgotten, and the one forgotten would be the one that mattered.
+    //
+    // The cast is deliberate and narrow. This engine serves eighteen entity types and only three of them
+    // carry a discard, so the column is read defensively — but WHICH types may carry it is registered in
+    // `discard.config.ts` rather than inferred from the column being present, because a column renamed
+    // would otherwise turn the guard off silently.
+    if (discardableEntity(entityType)) {
+      const discardedAt = (current as { discardedAt?: Date | null })
+        .discardedAt;
+      if (discardedAt != null) {
+        throw new UnprocessableEntityException(
+          discardedRefusal(entityType, entityId),
+        );
+      }
+    }
+
     const fromStatus = current.status as WorkflowStatusMap[E];
 
     if (fromStatus === (toStatus as unknown as WorkflowStatusMap[E])) {

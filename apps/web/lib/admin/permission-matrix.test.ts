@@ -41,10 +41,18 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // The interesting movement is 35 -> 51 five-state codes against 159 -> 155 toggles: splitting an
     // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
     // scheme becoming visible on the screen, which is the point of it.
-    expect(PERMISSION_CATALOGUE.length).toBe(206);
+    //
+    // 206 -> 210 (Class B piece 1: `policy.discard`, `claim.discard`, `endorsement.discard`,
+    // `recommendation.discard`). All four land in the TOGGLE list, 155 -> 159, and the five-state rows do
+    // not move: `discard` is not one of the seven CRUD verbs a family row is built from, and it should not
+    // become one. A five-state control offers none / read / read+write / +delete / full, and a discard is not
+    // a point on that scale — it is a separate act with its own terminal semantics. An office granting
+    // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
+    // rendering it as its own checkbox.
+    expect(PERMISSION_CATALOGUE.length).toBe(210);
     expect(crud.length).toBe(19);
     expect(crud.flatMap(codesOfRow).length).toBe(51);
-    expect(toggles.length).toBe(155);
+    expect(toggles.length).toBe(159);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

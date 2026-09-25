@@ -532,6 +532,13 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, MANAGER, EXEC],
   },
   {
+    code: "recommendation.discard",
+    module: "insurance-operations",
+    description:
+      "Mark a recommendation drafted in error as discarded, before it is sent to the client — terminal, with a mandatory reason",
+    roles: [PLACEMENT],
+  },
+  {
     code: "recommendation.draft",
     module: "insurance-operations",
     description:
@@ -588,6 +595,16 @@ const insuranceOperations: PermissionSeed[] = [
     roles: [SALES, PLACEMENT, MANAGER, EXEC],
   },
   {
+    // DISCARD (Class B piece 1). Granted to exactly the roles that can RAISE a policy: whoever can make the
+    // mistake can withdraw it, and nobody else gains anything. A discard is terminal and only possible
+    // before issuance — see `common/discard.config.ts`.
+    code: "policy.discard",
+    module: "insurance-operations",
+    description:
+      "Mark a policy raised in error as discarded, before it is issued — terminal, with a mandatory reason",
+    roles: [PLACEMENT],
+  },
+  {
     code: "policy.create",
     module: "insurance-operations",
     description: "Create a Policy from an accepted Opportunity",
@@ -624,6 +641,16 @@ const insuranceOperations: PermissionSeed[] = [
     module: "insurance-operations",
     description: "Record policy delivery date/method/recipient/acknowledgement",
     roles: [SALES, PLACEMENT],
+  },
+  {
+    // The one this whole feature exists for. Before it, the only exit from a wrongly raised endorsement was
+    // to APPLY it — changing a real policy, its premium and its commission — and then correct it with a
+    // second endorsement. To undo the mistake you had to commit it.
+    code: "endorsement.discard",
+    module: "insurance-operations",
+    description:
+      "Mark an endorsement raised in error as discarded, before it is applied — terminal, with a mandatory reason",
+    roles: [PLACEMENT],
   },
   {
     code: "endorsement.create",
@@ -699,6 +726,15 @@ const insuranceOperations: PermissionSeed[] = [
 // Domain C — Claims (Processes 23-30)
 // ----------------------------------------------------------------------
 const claims: PermissionSeed[] = [
+  {
+    // The same rule: the roles that can notify a claim are the ones that can discard one before it is
+    // registered with the insurer.
+    code: "claim.discard",
+    module: "claims",
+    description:
+      "Mark a claim notified in error as discarded, before it is registered with the insurer — terminal, with a mandatory reason",
+    roles: [SALES, CLAIMS],
+  },
   {
     code: "claim.notify",
     module: "claims",

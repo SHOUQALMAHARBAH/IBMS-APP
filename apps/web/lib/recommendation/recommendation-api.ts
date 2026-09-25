@@ -4,6 +4,7 @@
 // mandatory conflict-of-interest disclosure, then send it to the client.
 
 import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export interface RecommendationInsurer {
   id: string;
@@ -77,6 +78,11 @@ export interface Recommendation {
   draftedByUserId: string;
   createdAt: string;
   blockedFromSend: string[];
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface DraftRecommendationInput {

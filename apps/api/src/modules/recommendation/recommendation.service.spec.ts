@@ -120,6 +120,13 @@ function disclosureRow(over: Record<string, unknown> = {}) {
 function recommendationRow(over: Record<string, unknown> = {}) {
   return {
     id: 'rec-1',
+    // A LIVE record. Present rather than omitted because the model has the column: `assertNotDiscarded`
+    // refuses to advance anything whose discard state is not exactly `null`, deliberately — a row loaded
+    // without it is a row whose state nobody knows, and the safe answer to "may this advance" is no. A
+    // fixture missing it therefore fails, which is the fixture being wrong about the model, not the guard.
+    discardedAt: null,
+    discardedByUserId: null,
+    discardedReason: null,
     opportunityId: 'opp-1',
     recommendedQuotationId: 'q-rec',
     rationale: DRAFT_DTO.rationale,

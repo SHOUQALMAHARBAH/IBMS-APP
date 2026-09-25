@@ -28,6 +28,13 @@ import {
   quantizeMoney,
 } from '../../common/money.util';
 import {
+  assertDiscardWon,
+  assertDiscardable,
+  discardView,
+  type DiscardView,
+} from '../../common/discard.util';
+import { DiscardDto } from '../../common/dto/discard.dto';
+import {
   PLACEMENT_DECISION,
   assertCoverageFigures,
   parseCalendarDate,
@@ -130,6 +137,12 @@ export interface PolicyView {
   deliveryComplete: boolean;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. Carries the actor, the
+   * timestamp and the mandatory reason, because a record that vanished and a record marked withdrawn tell a
+   * reader two different things and only one of them is true here.
+   */
+  discard: DiscardView | null;
 }
 
 const P2002 = 'P2002';
@@ -338,6 +351,7 @@ export class PolicyService {
   private toView(policy: PolicyWithContext): PolicyView {
     return {
       id: policy.id,
+      discard: discardView(policy),
       opportunityId: policy.opportunityId,
       customerId: policy.customerId,
       customer: policy.customer
@@ -803,6 +817,49 @@ export class PolicyService {
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<PolicyView> {
+    return this.toView(await this.loadVisible(id, actor));
+  }
+  /**
+   * DISCARD — this policy was raised in error and never took effect.
+   *
+   * The record STAYS. It is marked discarded, carrying who withdrew it, when, and a mandatory reason, which
+   * is the whole difference between this and a delete: somebody reading the file next year needs to see that
+   * a policy was raised before the insurer issued it and withdrawn, not a gap where one used to be.
+   *
+   * Three properties are not decided here, deliberately:
+   *  - WHETHER IT MAY BE DISCARDED is `assertDiscardable`, shared by all four entities, so the commitment
+   *    rule and the reason's floor cannot drift between them.
+   *  - THE PERMISSION is `@RequirePermissions('policy.discard')` on the route — one code, because
+   *    `PermissionsGuard` ORs what it is given and a second code there would weaken rather than tighten it.
+   *  - WHETHER IT MAY STILL ADVANCE afterwards is the engine's guard, not this method's problem.
+   *
+   * VISIBILITY comes from the same `loadVisible` every other read of this entity uses, so a discard reaches
+   * exactly the records the caller could already see — a permission to discard is not a permission to
+   * discover.
+   */
+  async discard(
+    id: string,
+    dto: DiscardDto,
+    actor: AuthenticatedUser,
+  ): Promise<PolicyView> {
+    const row = await this.loadVisible(id, actor);
+    assertDiscardable('Policy', id, row, dto.reason);
+
+    const { discarded } = await this.policies.discard(id, {
+      discardedByUserId: actor.id,
+      discardedReason: dto.reason,
+    });
+    assertDiscardWon('Policy', id, discarded);
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'DISCARD',
+      entityType: 'Policy',
+      entityId: id,
+      beforeValue: { status: row.status },
+      afterValue: { discardedReason: dto.reason.trim() },
+    });
+
     return this.toView(await this.loadVisible(id, actor));
   }
 }

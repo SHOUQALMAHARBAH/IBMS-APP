@@ -21,6 +21,10 @@ import {
   type OpportunityWithContext,
 } from '../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../lib/auth/api-client';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -43,6 +47,8 @@ interface Props {
   isPlacement: boolean;
   isManager: boolean;
   isCompliance: boolean;
+  /** `recommendation.discard` — its own code, not implied by the ability to draft one. */
+  canDiscard: boolean;
   onOpportunityChanged: () => void;
 }
 
@@ -59,6 +65,7 @@ export function RecommendationSection({
   opportunity,
   isPlacement,
   isManager,
+  canDiscard,
   isCompliance,
   onOpportunityChanged,
 }: Props) {
@@ -306,11 +313,13 @@ export function RecommendationSection({
               isActive={rec.recommendedQuotation.insurer.isActive}
             />
             <span style={rfqBadgeStyle}>
-              {rec.sentToClientAt
-                ? t('recSentToClientBadge')
-                : rec.blockedFromSend.length === 0
-                  ? t('recReadyToSendBadge')
-                  : t('recBlockedBadge')}
+              {rec.discard
+                ? t('discardedBadge')
+                : rec.sentToClientAt
+                  ? t('recSentToClientBadge')
+                  : rec.blockedFromSend.length === 0
+                    ? t('recReadyToSendBadge')
+                    : t('recBlockedBadge')}
             </span>
           </div>
           <p style={{ margin: '0.4rem 0' }}>
@@ -374,7 +383,8 @@ export function RecommendationSection({
             {isManager &&
             rec.approvalRequired &&
             !rec.approvedByUserId &&
-            !rec.sentToClientAt ? (
+            !rec.sentToClientAt &&
+            !rec.discard ? (
               <button
                 type="button"
                 disabled={busy}
@@ -388,7 +398,8 @@ export function RecommendationSection({
             ) : null}
             {isPlacement &&
             !rec.sentToClientAt &&
-            rec.blockedFromSend.length === 0 ? (
+            rec.blockedFromSend.length === 0 &&
+            !rec.discard ? (
               <button
                 type="button"
                 disabled={busy}
@@ -412,12 +423,23 @@ export function RecommendationSection({
                 {t('recDownloadReportButton')}
               </button>
             ) : null}
+            <DiscardControl
+              collection="recommendations"
+              id={rec.id}
+              canDiscard={canDiscard}
+              // Sent to the client IS the commitment — after that the client decision records what happened
+              // to it, and a different recommendation is a new one.
+              discardable={!rec.discard && !rec.sentToClientAt}
+              onDiscarded={load}
+            />
           </div>
+          <DiscardedNotice discard={rec.discard} />
 
           {(isPlacement || isCompliance) &&
           rec.conflictOfInterestFlagged &&
           !rec.conflictOfInterestDisclosure &&
-          !rec.sentToClientAt ? (
+          !rec.sentToClientAt &&
+          !rec.discard ? (
             <div style={{ ...quoteFieldStyle, marginTop: '0.8rem' }}>
               <label htmlFor="rec-coi">{t('recCoiDisclosureLabel')}</label>
               <textarea

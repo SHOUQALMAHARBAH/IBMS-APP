@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 473 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 478 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -108,6 +108,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'claim.all-owners.read',
     'claim.assess',
     'claim.close',
+    'claim.discard',
     'claim.document',
     'claim.followup.manage',
     'claim.notify',
@@ -376,6 +377,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'endorsement.all-owners.read',
     'endorsement.apply',
     'endorsement.create',
+    'endorsement.discard',
     'endorsement.read',
     'incident.report',
     'insurer.directory.read',
@@ -391,6 +393,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'policy.all-owners.read',
     'policy.create',
     'policy.deliver',
+    'policy.discard',
     'policy.issue',
     'policy.read',
     'privacy-notice.read',
@@ -400,6 +403,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'quotation.negotiate',
     'quotation.read',
     'recommendation.all-owners.read',
+    'recommendation.discard',
     'recommendation.draft',
     'recommendation.read',
     'recommendation.send',
@@ -421,6 +425,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'policy.read',
   ],
   "SALES_RELATIONSHIP_OFFICER": [
+    'claim.discard',
     'claim.notify',
     'claim.read',
     'client-decision.capture',
@@ -532,7 +537,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 206 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 210 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -563,6 +568,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'claim.assess', module: 'claims', description: "Track claim survey/investigation and log status changes" },
   { code: 'claim.close', module: 'claims', description: "Close a claim after the client's receipt of payment is confirmed" },
   { code: 'claim.delete', module: 'claims', description: "Delete a claim record — disabled by default, logged privileged override only" },
+  { code: 'claim.discard', module: 'claims', description: "Mark a claim notified in error as discarded, before it is registered with the insurer — terminal, with a mandatory reason" },
   { code: 'claim.document', module: 'claims', description: "Attach mandatory claim documentation" },
   { code: 'claim.followup.manage', module: 'claims', description: "Manage claim follow-up alerts" },
   { code: 'claim.notify', module: 'claims', description: "Record a claim notification (loss date/location/cause/estimate)" },
@@ -659,6 +665,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'endorsement.all-owners.read', module: 'insurance-operations', description: "See any Endorsement regardless of owner (Finance handles the premium adjustment an endorsement produces)" },
   { code: 'endorsement.apply', module: 'insurance-operations', description: "Advance a confirmed endorsement through the financial-adjustment / apply steps and version the policy schedule" },
   { code: 'endorsement.create', module: 'insurance-operations', description: "Request a positive/negative endorsement" },
+  { code: 'endorsement.discard', module: 'insurance-operations', description: "Mark an endorsement raised in error as discarded, before it is applied — terminal, with a mandatory reason" },
   { code: 'endorsement.read', module: 'insurance-operations', description: "List/read endorsements, their premium adjustment, the tied commission reversal, the refund approval state and the versioned coverage schedule" },
   { code: 'insurance-line.create', module: 'insurance-operations', description: "Add a line of business to this office's vocabulary" },
   { code: 'insurance-line.update', module: 'insurance-operations', description: "Correct a line of business this office added" },
@@ -677,12 +684,14 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'policy.check', module: 'insurance-operations', description: "Independently check an issued policy against requested coverage line-by-line (maker/checker: never the officer who placed it) — a discrepancy blocks Delivery and auto-logs a PI risk event" },
   { code: 'policy.create', module: 'insurance-operations', description: "Create a Policy from an accepted Opportunity" },
   { code: 'policy.deliver', module: 'insurance-operations', description: "Record policy delivery date/method/recipient/acknowledgement" },
+  { code: 'policy.discard', module: 'insurance-operations', description: "Mark a policy raised in error as discarded, before it is issued — terminal, with a mandatory reason" },
   { code: 'policy.issue', module: 'insurance-operations', description: "Record the insurer-issued policy/schedule/certificates/invoice" },
   { code: 'policy.read', module: 'insurance-operations', description: "List/read policies, their coverage schedules, electronic-file documents and the quality-control check result" },
   { code: 'quotation.capture', module: 'insurance-operations', description: "Capture an insurer's quotation" },
   { code: 'quotation.negotiate', module: 'insurance-operations', description: "Record a negotiation round as a new quotation version (the prior version is never deleted or replaced — Process 15)" },
   { code: 'quotation.read', module: 'insurance-operations', description: "List/read insurer quotations and their version history" },
   { code: 'recommendation.approve', module: 'insurance-operations', description: "Approve a recommendation above the configurable premium threshold before it is sent to the client (maker/checker: never the drafter)" },
+  { code: 'recommendation.discard', module: 'insurance-operations', description: "Mark a recommendation drafted in error as discarded, before it is sent to the client — terminal, with a mandatory reason" },
   { code: 'recommendation.draft', module: 'insurance-operations', description: "Draft the broker recommendation with documented rationale (all six factors: coverage/price/financial strength/claims service/deductible/policy conditions)" },
   { code: 'recommendation.read', module: 'insurance-operations', description: "List/read broker recommendations and their approval / conflict-of-interest state" },
   { code: 'recommendation.send', module: 'insurance-operations', description: "Send an approved / cleared recommendation to the client" },

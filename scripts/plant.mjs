@@ -72,8 +72,16 @@ export function applyPlant({ file, from, to }) {
   if (readBack === before) {
     throw `${file} is unchanged on disk after the write. The plant did NOT apply.`;
   }
-  if (readBack.includes(from)) {
-    throw `${file} still contains the text this plant was supposed to replace.`;
+  // The invariant is "the file on disk is EXACTLY what this plant intended", not "the original text is
+  // gone". Those differ for an INSERTION — a plant whose replacement keeps the text it anchors on and adds
+  // to it, which is how you prove a test observes a side effect rather than a changed branch. The earlier
+  // `readBack.includes(from)` check refused every such plant, and refused it AFTER writing the file: it
+  // reported "did not apply" with the plant live on disk and a backup nobody knew to revert. That is the
+  // same class as the bug this tool was built for — the report and the reality diverging — with the
+  // dangerous halves swapped (a loud failure covering a real change, rather than a quiet success covering
+  // no change). Found by writing a plant that inserts a write instead of flipping a condition.
+  if (readBack !== after) {
+    throw `${file} on disk does not match what this plant intended to write. The file HAS been modified and a backup exists — revert this plant before doing anything else.`;
   }
   return {
     file,
@@ -233,6 +241,25 @@ function selfTest() {
   } else {
     console.log("  ok    revert restored byte for byte");
   }
+
+  // AN INSERTION IS A LEGITIMATE PLANT. Some guards can only be observed through a side effect — "the
+  // discard also touches the policy" — and that plant keeps the line it anchors on and adds a write
+  // above it. The first version of this tool verified "the original text is gone", which refused every
+  // insertion AFTER writing it: it said "did not apply" with the plant live on disk. This case is that
+  // shape.
+  writeFileSync(file, "const gate = true;\n");
+  check(
+    "a plant that INSERTS around the text it anchors on succeeds",
+    () => applyPlant({ file, from: "const gate", to: "sideEffect();\nconst gate" }),
+    "ok",
+  );
+  if (readFileSync(file, "utf8") !== "sideEffect();\nconst gate = true;\n") {
+    console.log("  FAIL  the inserting plant did not write what it intended");
+    failures += 1;
+  } else {
+    console.log("  ok    the inserting plant wrote exactly what it intended");
+  }
+  revertPlant({ file });
 
   check(
     "a second revert with no backup FAILS rather than guessing",

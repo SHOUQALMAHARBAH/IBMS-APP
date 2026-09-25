@@ -7,6 +7,7 @@
 // notify the client.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export type EndorsementStatus =
   | 'REQUESTED'
@@ -71,6 +72,11 @@ export interface Endorsement {
   commissionReversal: { amount: string } | null;
   scheduleVersioned: boolean;
   createdAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RequestEndorsementInput {

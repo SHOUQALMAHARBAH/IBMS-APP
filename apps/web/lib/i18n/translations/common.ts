@@ -48,6 +48,25 @@ export const COMMON = {
     entitySearchActorNone: '— كل الأشخاص —',
     entitySearchActorNoMatches: 'لا يوجد شخص بهذا الاسم في سجل التدقيق.',
     entitySearchActorError: 'تعذّر تنفيذ البحث عن الأشخاص. حاول مرة أخرى.',
+    // DiscardControl.tsx — withdrawing a record raised in error, shared by policy / claim / endorsement /
+    // recommendation. NOT «إلغاء» anywhere: that word is this product's CANCELLATION (a cancellation
+    // endorsement on a live policy), and reusing it here would make a withdrawal read as cancelling the
+    // client's cover. «سحب» throughout, including the back button, which is where the collision would
+    // otherwise slip in unnoticed.
+    discardButton: 'سحب السجل — أُنشئ بالخطأ',
+    discardHeading: 'سحب سجل أُنشئ بالخطأ',
+    discardExplanation:
+      'يبقى السجل ظاهراً ومُعلَّماً كمسحوب، ولا يُحذف. السحب نهائي: لا يمكن التراجع عنه ولا تعديله، ومن يحتاج سجلاً صحيحاً يُنشئ سجلاً جديداً.',
+    discardReasonLabel: 'السبب',
+    discardReasonHint:
+      '{min} أحرف على الأقل. يبقى السبب على السجل بشكل دائم، وهو كل ما سيعتمد عليه من يقرؤه لاحقاً.',
+    discardConfirmButton: 'تأكيد السحب',
+    discardCancelButton: 'رجوع',
+    discardWorkingButton: 'جارٍ الحفظ…',
+    discardActionError: 'تعذّر سحب السجل. حاول مرة أخرى.',
+    discardedBadge: 'مسحوب — أُنشئ بالخطأ',
+    discardedOn: 'سُحب في {when}',
+    discardedReasonLabel: 'السبب:',
   },
   EN: {
     commonLoading: 'Loading…',
@@ -88,5 +107,20 @@ export const COMMON = {
     entitySearchActorNone: '— everyone —',
     entitySearchActorNoMatches: 'Nobody by that name appears in the audit log.',
     entitySearchActorError: 'The person search could not be run. Try again.',
+    // DiscardControl.tsx — see the note in the Arabic block above on why «إلغاء» is not used there.
+    discardButton: 'Withdraw as raised in error',
+    discardHeading: 'Withdraw a record raised in error',
+    discardExplanation:
+      'The record stays visible, marked withdrawn — it is not deleted. A withdrawal is terminal: it cannot be reversed or edited, and anybody who needs a correct record creates a new one.',
+    discardReasonLabel: 'Reason',
+    discardReasonHint:
+      'At least {min} characters. The reason stays on the record permanently and is all anybody reading it later has to go on.',
+    discardConfirmButton: 'Confirm withdrawal',
+    discardCancelButton: 'Back',
+    discardWorkingButton: 'Saving…',
+    discardActionError: 'Could not withdraw the record. Try again.',
+    discardedBadge: 'Withdrawn — raised in error',
+    discardedOn: 'Withdrawn on {when}',
+    discardedReasonLabel: 'Reason:',
   },
 } as const;

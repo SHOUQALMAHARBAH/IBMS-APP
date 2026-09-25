@@ -26,6 +26,8 @@ interface Props {
   opportunityId: string;
   /** Sales / Claims — record a claim notification. */
   canNotify: boolean;
+  /** Claims — withdraw a claim notified in error, before it reaches the insurer. */
+  canDiscard: boolean;
   /** Claims — register a NOTIFIED claim with the insurer + assign the adjuster. */
   canRegister: boolean;
   /** Claims — file claim documentation against the mandatory checklist. */
@@ -49,6 +51,7 @@ interface Props {
 export function ClaimSection({
   opportunityId,
   canNotify,
+  canDiscard,
   canRegister,
   canDocument,
   canAssess,
@@ -206,6 +209,7 @@ export function ClaimSection({
             key={c.id}
             claim={c}
             abilities={{
+              canDiscard,
               canRegister,
               canDocument,
               canAssess,

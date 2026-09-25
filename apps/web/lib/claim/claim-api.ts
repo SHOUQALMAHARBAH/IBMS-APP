@@ -14,6 +14,7 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 import type { Paginated } from '../api/paginated';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export const CLAIM_DOC_TYPE_OPTIONS = [
   'claim_form',
@@ -146,6 +147,11 @@ export interface Claim {
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RecordSettlementInput {

@@ -2909,8 +2909,59 @@ Build the sharp check as a gate. Do NOT build the co-change check: it cannot be 
 hatch, and with one it is a reminder that costs a false alarm on every wording fix. If the owner wants the
 co-change signal anyway, it belongs in review as a printed diff summary, never as a pass/fail.
 
-Recorded with an answer rather than built, because it is a new guard and the owner's order puts Part 5 and
-the discard first.
+**BUILT (2026-09-25, commit `c1fbc0c`).** The owner's instruction was to build the one recommended here and
+not the co-change check. It lives in `apps/web/lib/i18n/translations.test.ts` — inside the existing merged-
+dictionary describe, so it reuses that file's own file list rather than re-deriving one — with the allow-list
+enumerated (`e.g`, `i.e`, `privacy-notice-v1.2`) and a non-vacuity assertion beside it: both languages must
+quote more than 50 real codes and their AR/EN ratio must exceed 0.8, so the check cannot pass by finding
+nothing to check. The sibling (`/route` tokens against the destination catalogue) is NOT built.
+
+### 1.55 — § 1.40'S SHAPE, CAUGHT BEFORE SHIPPING: adding a STATE and leaving the READERS
+
+§ 1.40 is about a migration that converted rows and left the writers. Class B piece 1 is the same shape with
+the halves swapped, and it was found by asking § 1.40's question in advance rather than discovering it on a
+later baseline: **a discarded record keeps its status, so which existing readers now answer with withdrawn
+records?**
+
+Measured across all 31 read sites over the four models. A discarded record's state is pinned — a discarded
+Policy is `PLACEMENT_CONFIRMED` forever, a Claim `NOTIFIED`, a Recommendation unsent — because a discarded
+record cannot advance, so the question is decidable per query rather than a guess. Seven answers were wrong:
+
+    insurer.repository.ts        open-obligation count   PLACEMENT_CONFIRMED is in the set — and this
+                                                         number is written into a deactivation AUDIT ROW
+    claims-dashboard.repository  open-claims ageing      `status != CLOSED` holds forever, so a withdrawn
+                                                         claim ages without limit in the one report built
+                                                         to surface claims nobody is progressing
+    endorsement.repository       findLiveCancellation    see below — the sharp one
+    insurer-performance (x2)     responsiveness ratio    an insurer answerable for a claim we withdrew;
+                                                         filtered in BOTH halves or the score moves
+    interaction.repository (x2)  the 360° timeline       a withdrawn policy reading "in placement" to
+                                                         whoever is on the phone with the client
+
+The other 24 were already correct, and for a reason worth keeping: the analytics reads deliberately start
+PAST the pre-commitment statuses (`ANALYTICS_WRITTEN_POLICY_STATUSES`, `AWAITING_INSURER_STATUSES`), so the
+new state cannot reach them. An entity's OWN list and its matching count are excluded deliberately, not
+overlooked — a withdrawn record stays in its own register, the way a deactivated insurer stays in the
+insurer list, because hiding it reads as deletion. That is the rule the seven fixes implement: **a discarded
+record stays in its own register and leaves every derived view.**
+
+**THE SHARP ONE: the trap reappeared one level down, in the database.** `Endorsement_one_live_cancellation_per_policy`
+is a partial UNIQUE index predicated on `changeType = 'cancellation' AND status <> 'CLIENT_NOTIFIED'`. A
+discarded endorsement can never reach `CLIENT_NOTIFIED` — a discard is terminal. So the moment the discard
+columns existed, withdrawing a wrongly raised cancellation would have blocked every future cancellation of
+that policy, permanently, at the database level, and the only exit would have been to APPLY the cancellation
+nobody wanted. That is precisely the trap this feature was built to remove, rebuilt by the feature itself.
+
+Two things about how it was caught. It came from the measurement, not from hitting it — no test would have
+failed until somebody discarded a cancellation and then needed a second one, which is a Tuesday in a
+brokerage and never in a test suite. And it sits in `db:divergence`'s measured blind spot (partial indexes),
+so the assertion lives in the migration's own `DO` block, per the rule already recorded for that gate; the
+assertion was run against the un-widened index first and printed the real predicate in its refusal.
+
+**The generalisation, for the next time a state is added to an existing model:** enumerate every read of
+that model and answer, per read, "can a row in the new state reach this, and is the answer it gives still
+true?" The cost here was one measurement pass over 31 sites. The cost of not doing it is § 1.40's — a number
+that drifts from correct to wrong with use, while every gate stays green.
 
 ### 1.52 — THREE AUDIT FILTERS THE API ACCEPTS AND NO CONTROL OFFERS
 
@@ -2926,10 +2977,10 @@ Not built here deliberately — the owner's ask was the search component and the
 halves, and an action/date filter is a different feature. Recorded so the next person does not have to
 re-measure the DTO to find out.
 
-### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Three ways a proof can be absent while looking present
+### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Five ways a proof can be absent while looking present
 
-Three separate mechanisms, found together on 2026-09-24/25, all with the same signature: the evidence
-LOOKED like evidence.
+Five separate mechanisms, found between 2026-09-24 and 2026-09-25, all with the same signature: the
+evidence LOOKED like evidence.
 
 **(a) A plant that never applied.** Three plants reported PASSING and had not touched a file.
 `process.argv[2]` is empty when node runs with `-e` — no script path occupies argv[1] — so the
@@ -2988,6 +3039,26 @@ The question to ask of every plant, before believing a green suite: **on this su
 broken version have done differently?** If the answer is "nothing observable", the plant proved the
 plant, not the guard.
 
+**(e) A plant that APPLIED, and the tool said it had NOT — leaving the plant live.** The mirror image of
+(a), and the more dangerous half of the pair. `plant.mjs` verified the wrong invariant after writing:
+"the text this plant replaces is gone". That is right for a substitution and wrong for an INSERTION — a
+plant whose replacement keeps the line it anchors on and adds a write above it, which is how you prove a
+test observes a SIDE EFFECT rather than a changed branch. The endorsement plant ("the discard also touches
+the policy") is exactly that shape. The tool wrote the file, re-read it, saw the anchor text still present,
+and exited non-zero saying the plant had not applied — with the plant in the working tree and a backup
+nobody had been told to revert. The suite then failed for the planted reason while the tool's own output
+said nothing had been planted.
+
+Worth stating plainly because the first instinct is to read a loud failure as safe: **a loud failure that
+misdescribes what happened is not safer than a quiet success — it is the same defect with the halves
+swapped.** (a) reported success over no change; (e) reported no change over a real one. Both end with the
+operator believing something false about the tree.
+
+The invariant is now "the file on disk is EXACTLY what this plant intended to write", which is the thing
+actually being claimed, and it admits insertions. `--self-test` gained a case that applies an inserting
+plant and compares the whole file; restoring the old condition makes exactly that case fail, which is how
+the fix was shown to be non-vacuous.
+
 **A GUARD FIRING ON ITS BUILDER.** Worth recording separately, because it is the return on every one of
 these. Four-action Phase 1 declared two new permissions under a module (`sales-crm`) that no other code
 used, when their siblings live in `commercial-front-office`. A permission's module is what groups it on
@@ -2998,10 +3069,12 @@ said so, in the same run as the catalogue-count pin.
 The pin was written two commits earlier, by the same hands, for exactly this. That is what a measured pin
 is for: it does not care who is wrong, and it does not get tired the way a reviewer does.
 
-The class, stated once: **a proof is only a proof if its absence is loud.** A plant, a guard file, and a
-CI job all have a silent-absence mode, and all three were in it simultaneously. A fourth was added a week
-later by the same reasoning applied one level deeper: a plant that lands on a surface where nothing can
-observe it is silent absence wearing a green suite.
+The class, stated once: **a proof is only a proof if its absence is loud, AND its report has to describe
+what actually happened.** A plant, a guard file, and a CI job all have a silent-absence mode, and all three
+were in it simultaneously. A fourth was added by the same reasoning applied one level deeper: a plant that
+lands on a surface where nothing can observe it is silent absence wearing a green suite. The fifth is the
+one that says loudness is not sufficient — a tool can fail loudly about the wrong thing, and then the
+operator is misinformed with a non-zero exit code to back it up.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

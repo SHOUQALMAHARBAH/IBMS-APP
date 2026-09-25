@@ -26,6 +26,10 @@ import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatDateTime, formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -45,6 +49,8 @@ interface Props {
   isPlacement: boolean;
   canCheck: boolean;
   canDeliver: boolean;
+  /** `policy.discard` — its own code, not implied by the ability to place one. */
+  canDiscard: boolean;
   onOpportunityChanged: () => void;
 }
 
@@ -159,6 +165,7 @@ export function PolicySection({
   isPlacement,
   canCheck,
   canDeliver,
+  canDiscard,
   onOpportunityChanged,
 }: Props) {
   const { language, t } = useLanguage();
@@ -368,8 +375,23 @@ export function PolicySection({
             <strong>
               <bdi>{policy.insurer?.name ?? policy.insurerId}</bdi>
             </strong>
-            <span style={rfqBadgeStyle}>{t(ENUM_LABEL.PolicyStatus[policy.status])}</span>
+            <span style={rfqBadgeStyle}>
+              {policy.discard
+                ? t('discardedBadge')
+                : t(ENUM_LABEL.PolicyStatus[policy.status])}
+            </span>
           </div>
+          <DiscardedNotice discard={policy.discard} />
+          <DiscardControl
+            collection="policies"
+            id={policy.id}
+            canDiscard={canDiscard}
+            // PLACEMENT_CONFIRMED is the only pre-issuance status a policy has. Once the insurer has issued
+            // it the document exists in the world, and the correction path is an endorsement or a
+            // cancellation.
+            discardable={!policy.discard && policy.status === 'PLACEMENT_CONFIRMED'}
+            onDiscarded={load}
+          />
           <p style={{ margin: '0.4rem 0' }}>
             <bdi>{policy.insuranceLine}</bdi>
             {policy.policyNumber ? (
@@ -397,7 +419,7 @@ export function PolicySection({
             Expiry {policy.expiryDate ? formatDate(policy.expiryDate, language) : '—'}
           </p>
 
-          {policy.status === 'PLACEMENT_CONFIRMED' && isPlacement ? (
+          {policy.status === 'PLACEMENT_CONFIRMED' && isPlacement && !policy.discard ? (
             <div style={{ marginTop: '0.8rem', maxWidth: '36rem' }}>
               <strong>{t('policyRecordIssuanceHeading')}</strong>
               <div style={quoteFieldStyle}>

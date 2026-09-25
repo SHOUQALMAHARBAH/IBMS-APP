@@ -26,6 +26,10 @@ import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { rfqBadgeStyle } from '../rfq/rfq.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
 import type { TranslationKey } from '../../lib/i18n/translations';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 
@@ -35,6 +39,14 @@ interface Props {
   canManage: boolean;
   /** Manager — approve a return-premium refund above the value threshold. */
   canApproveRefund: boolean;
+  /**
+   * `endorsement.discard` — its own code, deliberately not implied by `canManage`.
+   *
+   * This is the control the discard feature exists for: before it, the only exit from a wrongly raised
+   * endorsement was to APPLY it, changing a real policy, its premium and its commission, and then correct it
+   * with a second endorsement.
+   */
+  canDiscard: boolean;
 }
 
 /** The one action each endorsement status offers, given the caller's role. */
@@ -85,6 +97,7 @@ export function EndorsementSection({
   opportunityId,
   canManage,
   canApproveRefund,
+  canDiscard,
 }: Props) {
   const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null | undefined>(undefined);
@@ -216,7 +229,8 @@ export function EndorsementSection({
                   ? t('endorsementNewVersionOpened')
                   : t('endorsementNoVersionYet')}
               </p>
-              {action ? (
+              <DiscardedNotice discard={e.discard} />
+              {action && !e.discard ? (
                 <button
                   type="button"
                   disabled={busy}
@@ -226,6 +240,21 @@ export function EndorsementSection({
                   {busy ? t('endorsementWorkingButton') : action.label}
                 </button>
               ) : null}
+              <DiscardControl
+                collection="endorsements"
+                id={e.id}
+                canDiscard={canDiscard}
+                // Everything up to APPLIED, matching `discard.config.ts`. SUBMITTED_TO_INSURER is
+                // deliberately still discardable: the insurer has been told, which a discard cannot retract,
+                // so whoever withdraws it has to tell them — and the mandatory reason is where that is
+                // recorded. Refusing here instead would leave applying it as the only exit, which is the trap.
+                discardable={
+                  !e.discard &&
+                  e.status !== 'APPLIED' &&
+                  e.status !== 'CLIENT_NOTIFIED'
+                }
+                onDiscarded={load}
+              />
             </div>
           );
         })

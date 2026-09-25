@@ -11,6 +11,7 @@ import { CloseClaimDto } from './dto/close-claim.dto';
 import { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { DiscardDto } from '../../common/dto/discard.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /** Process 23-29 — Claim Notification + Registration + Documentation +
@@ -179,5 +180,22 @@ export class ClaimController {
   @Get(':id')
   get(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.claims.get(id, user);
+  }
+  /**
+   * Mark this claim as raised in error. Terminal, reason mandatory, and refused once the claim has been
+   * registered with the insurer — the record stays either way.
+   *
+   * ONE permission code, not two. `PermissionsGuard` ORs what it is given, so
+   * `@RequirePermissions('claim.discard', 'claim.create')` would let a holder of EITHER through alone,
+   * which is the opposite of the intent.
+   */
+  @RequirePermissions('claim.discard')
+  @Post(':id/discard')
+  discard(
+    @Param('id') id: string,
+    @Body() dto: DiscardDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.claims.discard(id, dto, user);
   }
 }

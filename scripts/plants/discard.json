@@ -1,0 +1,32 @@
+{
+  "reason-optional": {
+    "file": "apps/api/src/common/discard.util.ts",
+    "from": "  const trimmed = reason.trim();\n  if (trimmed.length < DISCARD_REASON_MIN_LENGTH) {",
+    "to": "  const trimmed = reason.trim();\n  if (false) {"
+  },
+  "discarded-may-advance": {
+    "file": "apps/api/src/modules/workflow/workflow-transition.service.ts",
+    "from": "    if (discardableEntity(entityType)) {\n      const discardedAt = (current as { discardedAt?: Date | null }).discardedAt;\n      if (discardedAt != null) {",
+    "to": "    if (discardableEntity(entityType)) {\n      const discardedAt = (current as { discardedAt?: Date | null }).discardedAt;\n      if (false) {"
+  },
+  "committed-may-be-discarded": {
+    "file": "apps/api/src/common/discard.util.ts",
+    "from": "  if (!entity.discardableWhen(row)) {",
+    "to": "  if (false) {"
+  },
+  "endorsement-discard-touches-the-policy": {
+    "file": "apps/api/src/repositories/endorsement.repository.ts",
+    "from": "    const { count } = await this.prisma.client.endorsement.updateMany({\n      where: { id, discardedAt: null },",
+    "to": "    const target = await this.prisma.client.endorsement.findUniqueOrThrow({\n      where: { id },\n      select: { policyId: true, premiumAdjustment: true },\n    });\n    await this.prisma.client.policy.update({\n      where: { id: target.policyId },\n      data: { issuedPremium: { increment: target.premiumAdjustment ?? 0 } },\n    });\n    const { count } = await this.prisma.client.endorsement.updateMany({\n      where: { id, discardedAt: null },"
+  },
+  "recommendation-may-advance": {
+    "file": "apps/api/src/modules/recommendation/recommendation.service.ts",
+    "from": "    if (rec.discardedAt !== null) {",
+    "to": "    if (false) {"
+  },
+  "control-ignores-the-permission": {
+    "file": "apps/web/components/ui/DiscardControl.tsx",
+    "from": "  if (!canDiscard || !discardable) return null;",
+    "to": "  if (!discardable) return null;"
+  }
+}
