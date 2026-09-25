@@ -43,6 +43,11 @@ export const COMMON = {
     customerPickerNonePlaceholder: '— اختر عميلاً —',
     customerPickerNoMatches: 'لا يوجد عميل مطابق لهذا الاسم.',
     customerPickerSearchError: 'تعذّر تنفيذ بحث العملاء. حاول مرة أخرى.',
+    entitySearchActorLabel: 'ابحث عن شخص',
+    entitySearchActorPlaceholder: 'اسم الشخص الذي نفّذ الإجراء',
+    entitySearchActorNone: '— كل الأشخاص —',
+    entitySearchActorNoMatches: 'لا يوجد شخص بهذا الاسم في سجل التدقيق.',
+    entitySearchActorError: 'تعذّر تنفيذ البحث عن الأشخاص. حاول مرة أخرى.',
   },
   EN: {
     commonLoading: 'Loading…',
@@ -78,5 +83,10 @@ export const COMMON = {
     customerPickerNonePlaceholder: '— select a customer —',
     customerPickerNoMatches: 'No customer matches that name.',
     customerPickerSearchError: 'The customer search could not run. Try again.',
+    entitySearchActorLabel: 'Find a person',
+    entitySearchActorPlaceholder: 'The name of whoever did it',
+    entitySearchActorNone: '— everyone —',
+    entitySearchActorNoMatches: 'Nobody by that name appears in the audit log.',
+    entitySearchActorError: 'The person search could not be run. Try again.',
   },
 } as const;

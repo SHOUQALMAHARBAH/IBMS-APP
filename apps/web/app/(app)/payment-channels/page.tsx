@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -161,7 +161,8 @@ export default function PaymentChannelsPage() {
               list with a different search, and a customer picker there would
               be worse than the box it replaced. */}
           {ownerType === 'customer' ? (
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={ownerId}
               onChange={setOwnerId}
               label={t('pcCustomerIdLabel')}

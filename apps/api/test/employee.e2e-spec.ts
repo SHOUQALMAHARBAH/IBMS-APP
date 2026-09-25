@@ -224,9 +224,9 @@ describe('Human Resources (e2e) — backlog Part C #66', () => {
         branchId: 'a-branch-that-does-not-exist',
       })
       .expect(422);
-    expect(JSON.stringify((res.body as { message: unknown }).message)).toContain(
-      'branch',
-    );
+    expect(
+      JSON.stringify((res.body as { message: unknown }).message),
+    ).toContain('branch');
   });
 
   it("omits father's/grandfather's name from the computed fullName when they are not supplied", async () => {

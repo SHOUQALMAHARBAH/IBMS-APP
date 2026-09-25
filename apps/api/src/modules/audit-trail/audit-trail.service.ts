@@ -3,6 +3,7 @@ import type { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { AuditTrailRepository } from '../../repositories/audit-trail.repository';
+import { UserRepository } from '../../repositories/user.repository';
 import { pageWindow, type Paginated } from '../../common/pagination';
 import {
   AUDIT_TRAIL_READ_LIMIT,
@@ -11,6 +12,7 @@ import {
   type AuditLogEntryView,
   type DocumentHistoryView,
 } from './audit-trail.config';
+import type { AuditActorView } from './audit-trail.config';
 import type { ListAuditTrailQueryDto } from './dto/list-audit-trail-query.dto';
 import type { WorkflowHistoryQueryDto } from './dto/workflow-history-query.dto';
 
@@ -32,6 +34,15 @@ import type { WorkflowHistoryQueryDto } from './dto/workflow-history-query.dto';
  * SLA dashboard's `hasSensitiveEntityType` does; it treats every read here
  * as sensitive by default.
  */
+/**
+ * A bound on the actor search, not a page.
+ *
+ * The control is a picker: a reader types a name and chooses. Returning more rows than a person will
+ * ever scan would make the response large for no gain, and an unbounded read of a table that grows
+ * forever is the shape this codebase caps everywhere else.
+ */
+export const ACTOR_SEARCH_LIMIT = 50;
+
 @Injectable()
 export class AuditTrailService {
   private readonly logger = new Logger(AuditTrailService.name);
@@ -39,7 +50,35 @@ export class AuditTrailService {
   constructor(
     private readonly repo: AuditTrailRepository,
     private readonly audit: AuditService,
+    /** Resolving actor ids to names, and backing the actor search below. */
+    private readonly users: UserRepository,
   ) {}
+
+  /**
+   * THE PEOPLE WHO APPEAR IN THIS OFFICE'S AUDIT LOG, BY NAME.
+   *
+   * The screen could filter by `entityType` and `entityId` and nothing else, so "what did this person
+   * do" — the question an audit trail is read for — had no control, even though the API has accepted a
+   * `userId` filter all along. Nobody knows a uuid, so that filter was unusable.
+   *
+   * Its own endpoint rather than `GET /admin/users`, and that is a measurement not a preference:
+   * `audit-log.read` is held by COMPLIANCE, EXTERNAL_AUDITOR, SYSTEM_SECURITY_ADMINISTRATOR and
+   * OFFICE_ADMINISTRATOR, while `user.manage` is held by only the last two. Sourcing this from the
+   * admin user list would have 403'd for the compliance officer and the external auditor — the audit
+   * trail's primary readers — which is the same defect as a form whose owner cannot use it.
+   *
+   * Only users who ACTUALLY APPEAR as an actor are returned. That leaks nothing the log does not
+   * already show this caller (their id is in rows they can read, and the names are now on those rows),
+   * and it keeps a read-only external auditor from enumerating the whole staff directory through a
+   * filter control.
+   *
+   * No audit row is written for this search, deliberately: a lookup that writes to the log pollutes the
+   * thing being searched, and a reader typing four characters would create four rows of noise in the
+   * record they are trying to read. The browse itself is still recorded, which is the reviewable event.
+   */
+  listActors(search: string | undefined): Promise<AuditActorView[]> {
+    return this.repo.findActors(search, ACTOR_SEARCH_LIMIT);
+  }
 
   async browseAuditLog(
     query: ListAuditTrailQueryDto,
@@ -65,6 +104,17 @@ export class AuditTrailService {
       this.repo.countAuditLog(filter),
     ]);
 
+    // One lookup for the whole page, keyed on the DISTINCT actors in it — never one per row. A page of
+    // 50 rows written by one person is one id, and this is the read that turns a column of uuids into a
+    // column of names.
+    const distinctActors = [...new Set(rows.map((r) => r.userId))];
+    const names = new Map(
+      (await this.users.findSummariesByIds(distinctActors)).map((u) => [
+        u.id,
+        u.fullName,
+      ]),
+    );
+
     await this.recordReadBestEffort(
       'AuditLogEntry',
       'browse',
@@ -89,7 +139,7 @@ export class AuditTrailService {
     );
 
     return {
-      items: rows.map(deriveAuditLogEntryView),
+      items: rows.map((row) => deriveAuditLogEntryView(row, names)),
       total,
       page: window.page,
       pageSize: window.pageSize,
@@ -125,7 +175,7 @@ export class AuditTrailService {
     return {
       requestedDocumentId: documentId,
       versions,
-      auditTrail: auditRows.map(deriveAuditLogEntryView),
+      auditTrail: auditRows.map((row) => deriveAuditLogEntryView(row)),
     };
   }
 
@@ -150,7 +200,7 @@ export class AuditTrailService {
       actorUserId,
     );
 
-    return rows.map(deriveAuditLogEntryView);
+    return rows.map((row) => deriveAuditLogEntryView(row));
   }
 
   private warnIfTruncated(loaded: number, view: string): void {

@@ -16,6 +16,7 @@ import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -64,7 +65,20 @@ function AuditLogTable({ rows }: { rows: AuditLogEntry[] }) {
                 <td style={cell}>
                   {r.entityType} <span style={{ opacity: 0.7 }}>· {r.entityId}</span>
                 </td>
-                <td style={cell}>{r.userId}</td>
+                <td style={cell} data-audit-actor={r.userId}>
+                  {/*
+                    The name, falling back to the id.
+
+                    This column is headed "User" and rendered a raw uuid — unreadable by the person the
+                    audit trail exists for, who is being asked to review who did what. The name is
+                    resolved per page by the API.
+
+                    The fallback is defence, not a state reachable today: `userId` is NOT NULL and the
+                    actor FK is ON DELETE RESTRICT, so an actor cannot be deleted out from under their
+                    rows. If that ever changes, this cell shows the id rather than reading as "nobody".
+                  */}
+                  <bdi>{r.actorName ?? r.userId}</bdi>
+                </td>
                 <td style={cell}>{r.isSensitiveDataAccess ? 'Yes' : ''}</td>
               </tr>
             ))
@@ -80,6 +94,7 @@ export default function AuditTrailPage() {
   const { user, isLoading } = useAuth();
   const { t } = useLanguage();
 
+  const [browseUserId, setBrowseUserId] = useState('');
   const [browseEntityType, setBrowseEntityType] = useState('');
   const [browseEntityId, setBrowseEntityId] = useState('');
   const [browseRows, setBrowseRows] = useState<AuditLogEntry[] | null>(null);
@@ -88,6 +103,7 @@ export default function AuditTrailPage() {
   // paged, or typing a new filter and then clicking Next would ask for page 2
   // of a search that was never run.
   const [browseApplied, setBrowseApplied] = useState<{
+    userId?: string;
     entityType?: string;
     entityId?: string;
     to?: string;
@@ -116,6 +132,7 @@ export default function AuditTrailPage() {
   async function runBrowse(ev: React.FormEvent) {
     ev.preventDefault();
     const filters = {
+      userId: browseUserId || undefined,
       entityType: browseEntityType || undefined,
       entityId: browseEntityId || undefined,
       // Pinned to the instant this browse was submitted, and reused for every
@@ -139,6 +156,7 @@ export default function AuditTrailPage() {
   async function browseTo(
     nextPage: number,
     filters: {
+      userId?: string;
       entityType?: string;
       entityId?: string;
       to?: string;
@@ -203,6 +221,18 @@ export default function AuditTrailPage() {
       <section style={sectionStyle}>
         <h2>{t('atAuditLogHeading')}</h2>
         <form onSubmit={runBrowse} style={formStyle}>
+          {/*
+            "What did this person do" is the question an audit trail is read for, and there was no
+            control for it — while the API has accepted a `userId` filter all along. Nobody knows a
+            uuid, so the filter existed and was unusable, which is the same defect as a form asking for
+            an id whose source screen was never built.
+          */}
+          <EntitySearch
+            kind="auditActor"
+            value={browseUserId}
+            onChange={setBrowseUserId}
+            label={t('atActorLabel')}
+          />
           <label>
             {t('atEntityTypeLabel')}{' '}
             <input
