@@ -826,3 +826,57 @@ test("explains a permission in a line of prose beneath its name, not as the code
   // Not the code restated — that would look like an explanation and say nothing.
   expect(text).not.toBe("claim.register");
 });
+
+test("lists the operations that need two people, WORST first", async ({ page }) => {
+  // Part 5's first honesty fix. The office found out which operations need two people by being refused
+  // halfway through one; this is the list, on the screen where an office arranges exactly that.
+  //
+  // The ordering is the property. A row saying "nobody can complete this" is the reason the list exists,
+  // and the API returns them in registry order — Refund (READY) first — so rendering that order would bury
+  // the one row that matters.
+  await mockAuth(page, ["OFFICE_ADMINISTRATOR"]);
+  await mockRoles(page);
+  await page.route("http://localhost:4000/rbac/duty-segregation-readiness", (route) =>
+    route.fulfill({ status: 200, json: [
+      {
+        "entityType": "Refund",
+        "pairLabel": "raisedByUserId / approvedByUserId",
+        "constraint": "Refund_maker_checker_distinct",
+        "checkerPermission": "refund.approve",
+        "holderCount": 3,
+        "status": "READY"
+      },
+      {
+        "entityType": "DisposalBatch",
+        "pairLabel": "nominatedByUserId / dpoApprovedByUserId",
+        "constraint": "DisposalBatch_maker_checker_distinct",
+        "checkerPermission": "retention.dispose.approve",
+        "holderCount": 0,
+        "status": "NOBODY"
+      },
+      {
+        "entityType": "PolicyChecking",
+        "pairLabel": "placedByUserId / checkedByUserId",
+        "constraint": "PolicyChecking_maker_checker_distinct",
+        "checkerPermission": "policy.check",
+        "holderCount": 1,
+        "status": "SINGLE_HOLDER"
+      }
+    ] }),
+  );
+
+  await page.goto("/settings/roles");
+  const section = page.locator("[data-duty-segregation]");
+  await expect(section.getByRole("heading", { name: "Operations that need two different people" })).toBeVisible();
+
+  const statuses = await anchoredAttributes(
+    section.locator("[data-duty-row]"),
+    "data-duty-row",
+    section,
+  );
+  expect(statuses).toEqual(["NOBODY", "SINGLE_HOLDER", "READY"]);
+
+  // And each row says what to do about it: the permission a second person needs.
+  await expect(section.getByText("retention.dispose.approve")).toBeVisible();
+  await expect(section.getByText("Cannot be completed", { exact: false })).toBeVisible();
+});

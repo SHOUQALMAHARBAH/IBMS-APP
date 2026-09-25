@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type Role, type RoleStatus } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
+import { MAKER_CHECKER_REGISTRY } from '../../../common/maker-checker-pairs.config';
 import { RoleRepository } from '../../../repositories/role.repository';
 import { PermissionRepository } from '../../../repositories/permission.repository';
 import { OrgContextService } from '../../../common/org-context/org-context.service';
@@ -70,6 +71,22 @@ const USER_ADMIN_PERMISSION = 'user.manage';
  * one administrator role while another request revokes the last grant on a
  * different one — serialise rather than both observing a survivor.
  */
+/**
+ * One row of the readiness list: an operation that needs two people, and whether this office has them.
+ *
+ * `constraint` is carried so the row can be tied back to what actually refuses — the CHECK constraint —
+ * rather than only to a label somebody might rename.
+ */
+export interface DutySegregationReadiness {
+  entityType: string;
+  pairLabel: string;
+  constraint: string | null;
+  checkerPermission: string;
+  /** Distinct ACTIVE users holding the checker permission. */
+  holderCount: number;
+  status: 'NOBODY' | 'SINGLE_HOLDER' | 'READY';
+}
+
 @Injectable()
 export class RoleAdminService {
   private readonly logger = new Logger(RoleAdminService.name);
@@ -591,5 +608,56 @@ export class RoleAdminService {
         `Failed to write the audit entry for Role ${input.entityId}: ${(err as Error).message}`,
       );
     }
+  }
+  /**
+   * WHICH OPERATIONS NEEDING TWO PEOPLE CAN THIS OFFICE ACTUALLY COMPLETE?
+   *
+   * Part 5's first honesty fix. Fifteen operations in this system require a second person by law and by
+   * constraint, and an office found that out the way the owner did: by being refused halfway through one.
+   * Nothing told anybody in advance, and nothing said which of them the office had nobody able to finish.
+   *
+   * For each pair this returns the checker permission and how many ACTIVE people hold it —
+   * `findActiveHoldersOfPermission` already excludes retired roles and expired access windows, which is
+   * the hard-won part. Distinct USERS, not grants: one person holding the code through two roles is one
+   * person.
+   *
+   * Three states, and the middle one is the useful one:
+   *
+   *   NOBODY         nobody holds the checker permission — the operation cannot be completed at all
+   *   SINGLE_HOLDER  exactly one person does — completable only when they are not also the maker
+   *   READY          two or more
+   *
+   * It deliberately does NOT try to say "and therefore you are fine". Whether a specific record can be
+   * checked depends on who raised it, which is a per-instance question this cannot answer. What it answers
+   * is the office-level one, which is the one nobody could ask before.
+   */
+  async dutySegregationReadiness(): Promise<DutySegregationReadiness[]> {
+    // One lookup per DISTINCT permission, not per pair: two NeedsAssessment pairs share
+    // `needs-assessment.approve`, and asking twice would be two identical queries.
+    const codes = [
+      ...new Set(MAKER_CHECKER_REGISTRY.map((p) => p.checkerPermission)),
+    ];
+    const holders = new Map<string, number>();
+    for (const code of codes) {
+      const grants = await this.users.findActiveHoldersOfPermission(code);
+      holders.set(code, new Set(grants.map((g) => g.userId)).size);
+    }
+
+    return MAKER_CHECKER_REGISTRY.map((pair) => {
+      const holderCount = holders.get(pair.checkerPermission) ?? 0;
+      return {
+        entityType: pair.entityType,
+        pairLabel: pair.pairLabel,
+        constraint: pair.dbCheckConstraint,
+        checkerPermission: pair.checkerPermission,
+        holderCount,
+        status:
+          holderCount === 0
+            ? ('NOBODY' as const)
+            : holderCount === 1
+              ? ('SINGLE_HOLDER' as const)
+              : ('READY' as const),
+      };
+    });
   }
 }

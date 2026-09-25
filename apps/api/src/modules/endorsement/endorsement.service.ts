@@ -775,7 +775,12 @@ export class EndorsementService {
         `Refund ${refundId} has already been approved.`,
       );
     }
-    assertDifferentActors(refund.raisedByUserId, actor.id, 'Refund.approve');
+    assertDifferentActors(
+      refund.raisedByUserId,
+      actor.id,
+      'Refund.approve',
+      'Refund_maker_checker_distinct',
+    );
 
     const updated = await this.endorsements.recordRefundApproval(
       refundId,

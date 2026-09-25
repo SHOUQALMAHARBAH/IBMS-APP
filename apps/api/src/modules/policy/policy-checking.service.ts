@@ -173,12 +173,18 @@ export class PolicyCheckingService {
       policy.placedByUserId,
       actor.id,
       'PolicyChecking.check (placing officer)',
+      'PolicyChecking_maker_checker_distinct',
     );
     if (policy.issuedByUserId !== null) {
       assertDifferentActors(
         policy.issuedByUserId,
         actor.id,
         'PolicyChecking.check (issuing officer)',
+        // The DATABASE constraint covers checker <> PLACER only; checker <> ISSUER is enforced here and
+        // nowhere else. The constraint name is still passed because what the message needs is the
+        // permission a second person requires, and that is policy.check either way — but the asymmetry
+        // is real, and it is recorded in IMPROVEMENTS rather than left for Part 4 to discover.
+        'PolicyChecking_maker_checker_distinct',
       );
     }
 

@@ -89,6 +89,17 @@ export class RbacController {
     return this.roleAdmin.get(id);
   }
 
+  /**
+   * The operations that need two people, and whether this office has them. Part 5's honesty fix: gated on
+   * `role.read` because it describes the office's permission arrangement, which is what that code is for,
+   * and because the audience is whoever arranges it.
+   */
+  @RequirePermissions('role.read')
+  @Get('duty-segregation-readiness')
+  dutySegregationReadiness() {
+    return this.roleAdmin.dutySegregationReadiness();
+  }
+
   @RequirePermissions('role.create')
   @Post('roles')
   createRole(

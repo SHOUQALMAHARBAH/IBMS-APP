@@ -164,6 +164,7 @@ export class DisposalBatchService {
       batch.nominatedByUserId,
       actorUserId,
       'DisposalBatch.dpoApprove',
+      'DisposalBatch_maker_checker_distinct',
     );
     await this.assertNoActiveLegalHold(batch.retentionScheduleItemId);
 

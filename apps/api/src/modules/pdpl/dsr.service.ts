@@ -551,6 +551,7 @@ export class DsrService {
       dsr.processedByUserId,
       actorUserId,
       'DataSubjectRequest.close',
+      'DataSubjectRequest_closure_maker_checker_distinct',
     );
 
     try {

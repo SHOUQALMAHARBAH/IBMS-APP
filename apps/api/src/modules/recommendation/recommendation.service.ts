@@ -554,6 +554,7 @@ export class RecommendationService {
       rec.draftedByUserId,
       actor.id,
       'Recommendation.approve',
+      'Recommendation_maker_checker_distinct',
     );
 
     const updated = await this.recommendations.recordApproval(id, actor.id);
@@ -599,6 +600,11 @@ export class RecommendationService {
       rec.draftedByUserId,
       actor.id,
       'ConflictOfInterestDisclosure.acknowledge',
+      // DELIBERATELY no constraint name. This compares against Recommendation.draftedByUserId, but the
+      // act is a conflict-of-interest disclosure gated by conflict-of-interest.disclose, not by
+      // recommendation.approve — and NO check constraint covers this pair at all. Naming the
+      // Recommendation constraint would put the wrong permission in the remedy, which is worse than no
+      // remedy. Recorded in IMPROVEMENTS as one of the two application-only pairs.
     );
 
     // Resolve which competing quote this disclosure is against. Default to

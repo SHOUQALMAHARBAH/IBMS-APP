@@ -34,6 +34,17 @@ import {
 } from '../../../../lib/admin/role-admin-api';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  listDutySegregationReadiness,
+  type DutySegregationReadiness,
+} from '../../../../lib/admin/role-admin-api';
+
+/** Worst first: the row that says nobody can complete an operation is why the list exists. */
+const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
+  NOBODY: 0,
+  SINGLE_HOLDER: 1,
+  READY: 2,
+};
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the legacy names. A role an
  *  office defines is deliberately NOT one of these. */
@@ -104,6 +115,9 @@ export default function RoleAdminPage() {
   // now give someone the ability to define roles without the ability to retire them, or to adjust what
   // an existing role grants without being able to add new ones. Each control asks for its own.
   const canCreate = hasPermission(user, 'role.create');
+  /** Part 5: the operations that need two people, and whether this office has them. */
+  const [readiness, setReadiness] = useState<DutySegregationReadiness[] | null>(null);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
   const canUpdate = hasPermission(user, 'role.update');
   const canRetire = hasPermission(user, 'role.deactivate');
   /** The actions column exists if ANY row action does. */
@@ -216,6 +230,25 @@ export default function RoleAdminPage() {
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
+
+  // The readiness list. Its own effect and its own error line: a failure here must not blank the role
+  // catalogue beside it, which is what this screen is actually for.
+  useEffect(() => {
+    if (!user || !canRead) return;
+    void (async () => {
+      try {
+        setReadiness(await listDutySegregationReadiness());
+        setReadinessError(null);
+      } catch (err) {
+        setReadiness(null);
+        setReadinessError(
+          err instanceof ApiError && err.status === 403
+            ? t('dutySegNoPermission')
+            : t('dutySegLoadError'),
+        );
+      }
+    })();
+  }, [user, canRead, t]);
 
   // The async IIFE is the house pattern here, and it is also what the
   // cascading-render lint rule wants: everything this effect does has to settle
@@ -431,6 +464,55 @@ export default function RoleAdminPage() {
           clicking a row's permissions button appeared to do nothing at all. Both were the same
           defect: the thing a person just asked for was rendered last. Create, then the open
           editor, then the table — which is also the users screen's arrangement. */}
+
+      {readinessError ? (
+        <p role="alert" style={errorStyle}>
+          {readinessError}
+        </p>
+      ) : null}
+      {readiness ? (
+        <section style={sectionStyle} data-duty-segregation>
+          <h2>{t('dutySegHeading')}</h2>
+          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>{t('dutySegIntro')}</p>
+          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
+            <thead>
+              <tr>
+                <th style={head}>{t('dutySegColOperation')}</th>
+                <th style={head}>{t('dutySegColPermission')}</th>
+                <th style={head}>{t('dutySegColHolders')}</th>
+                <th style={head}>{t('dutySegColStatus')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* WORST FIRST. Sorted by how badly the office is missing a second person, not
+                  alphabetically and not by entity: a row saying "nobody can complete this" is the reason
+                  the list exists, and it must not be below fourteen rows saying "ready". */}
+              {[...readiness]
+                .sort(
+                  (a, b) =>
+                    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+                    a.entityType.localeCompare(b.entityType),
+                )
+                .map((row) => (
+                  <tr key={row.constraint ?? row.entityType + row.pairLabel} data-duty-row={row.status}>
+                    <td style={cell}>{row.entityType}</td>
+                    <td style={cell}>
+                      <code>{row.checkerPermission}</code>
+                    </td>
+                    <td style={cell}>{row.holderCount}</td>
+                    <td style={cell}>
+                      {row.status === 'NOBODY'
+                        ? t('dutySegStatusNobody')
+                        : row.status === 'SINGLE_HOLDER'
+                          ? t('dutySegStatusSingle')
+                          : t('dutySegStatusReady')}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       {canCreate ? (
         <section style={sectionStyle}>

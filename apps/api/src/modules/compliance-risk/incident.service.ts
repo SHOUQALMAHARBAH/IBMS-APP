@@ -276,6 +276,7 @@ export class IncidentService {
       incident.classifiedByDpoUserId,
       actor.id,
       'IncidentReport.co-sign',
+      'IncidentReport_classification_maker_checker_distinct',
     );
 
     const res = await this.repo.recordCoSign(id, actor.id);

@@ -75,7 +75,16 @@ export function applyPlant({ file, from, to }) {
   if (readBack.includes(from)) {
     throw `${file} still contains the text this plant was supposed to replace.`;
   }
-  return { file, bytesBefore: before.length, bytesAfter: readBack.length };
+  return {
+    file,
+    bytesBefore: before.length,
+    bytesAfter: readBack.length,
+    // Playwright serves the LAST BUILD, not the working tree. A web plant that is not followed by a
+    // rebuild tests the previous source — and so does the REVERT, which is the half that bites: the suite
+    // then fails with the plant still in the served bundle and nothing in the working tree to explain it.
+    // Four occurrences in one session before this line existed.
+    needsWebRebuild: /apps[\/]web[\/]/.test(file),
+  };
 }
 
 export function revertPlant({ file }) {
@@ -129,11 +138,21 @@ function cli(argv) {
     if (rest.includes("--revert")) {
       const done = revertPlant(plant);
       console.log(`REVERTED ${name} — ${done.file} restored (${done.bytes} bytes)`);
+      if (/apps[\/]web[\/]/.test(plant.file)) {
+        console.log(
+          "plant: apps/web — REBUILD now, or Playwright keeps serving the planted bundle.",
+        );
+      }
     } else {
       const done = applyPlant(plant);
       console.log(
         `PLANTED ${name} — ${done.file} (${done.bytesBefore} -> ${done.bytesAfter} bytes), verified on disk`,
       );
+      if (done.needsWebRebuild) {
+        console.log(
+          "plant: this file is in apps/web — REBUILD before running Playwright, and rebuild again after reverting. The dev server serves the last build, not the working tree.",
+        );
+      }
     }
   } catch (message) {
     die(1, String(message));

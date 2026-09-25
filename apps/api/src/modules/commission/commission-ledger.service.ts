@@ -327,6 +327,7 @@ export class CommissionLedgerService {
       entry.overrideRequestedByUserId,
       actorId,
       'CommissionLedgerEntry.approveOverride',
+      'CommissionLedgerEntry_maker_checker_distinct',
     );
 
     // The `where` re-asserts the exact requester `assertDifferentActors` was

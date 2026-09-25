@@ -522,6 +522,18 @@ export const OPERATIONS = {
     roleSystemExplain:
       'دور يحدّده النظام لا يحدّده المكتب: لا يمكن تغيير اسمه ولا تقاعده ولا تعديل صلاحياته. هذه العلامة لا تمنح أي صلاحية بحد ذاتها.',
     roleNoRoles: 'لا توجد أدوار بعد.',
+    dutySegHeading: 'عمليات تحتاج شخصين مختلفين',
+    dutySegIntro:
+      'خمس عشرة عملية في هذا النظام لا يمكن أن ينفّذها شخص واحد: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه قائمة بها، ومعها ما إذا كان مكتبك يملك شخصاً ثانياً لكل منها اليوم.',
+    dutySegColOperation: 'العملية',
+    dutySegColPermission: 'صلاحية المعتمِد',
+    dutySegColHolders: 'عدد من يملكها',
+    dutySegColStatus: 'الحالة',
+    dutySegStatusNobody: 'لا يمكن إتمامها — لا أحد يملك الصلاحية',
+    dutySegStatusSingle: 'شخص واحد فقط — تتعطّل إن كان هو من سجّل الإجراء',
+    dutySegStatusReady: 'جاهزة',
+    dutySegNoPermission: 'لا تملك صلاحية role.read اللازمة لعرض هذه القائمة.',
+    dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين.',
     roleCreateHeading: 'إنشاء دور',
     roleFieldName: 'الاسم البرمجي',
     roleFieldNameHint: 'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
@@ -1058,6 +1070,18 @@ export const OPERATIONS = {
     roleSystemExplain:
       'A role the platform defines rather than your office: it cannot be renamed, retired, or re-granted. The flag itself grants nothing.',
     roleNoRoles: 'No roles yet.',
+    dutySegHeading: 'Operations that need two different people',
+    dutySegIntro:
+      'Fifteen operations in this system cannot be done by one person: whoever records the action cannot be the one who approves it. This is the list, with whether your office has a second person for each of them today.',
+    dutySegColOperation: 'Operation',
+    dutySegColPermission: "Approver's permission",
+    dutySegColHolders: 'People who hold it',
+    dutySegColStatus: 'Status',
+    dutySegStatusNobody: 'Cannot be completed — nobody holds the permission',
+    dutySegStatusSingle: 'Only one person — blocked whenever they are the one who recorded it',
+    dutySegStatusReady: 'Ready',
+    dutySegNoPermission: 'You do not hold the role.read permission needed to see this list.',
+    dutySegLoadError: 'The list of operations needing two people could not be loaded.',
     roleCreateHeading: 'Create a role',
     roleFieldName: 'Machine name',
     roleFieldNameHint:

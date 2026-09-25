@@ -144,6 +144,7 @@ export class DataSharingApprovalService {
       existing.requestedByUserId,
       actorUserId,
       'DataSharingApproval.approve',
+      'DataSharingApproval_maker_checker_distinct',
     );
 
     const decidedAt = new Date();

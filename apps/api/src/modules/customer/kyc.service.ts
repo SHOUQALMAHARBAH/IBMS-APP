@@ -281,6 +281,7 @@ export class KycService {
       kyc.createdByUserId,
       actorUserId,
       'KYCRecord.approve',
+      'KYCRecord_maker_checker_distinct',
     );
 
     if (decision === 'REJECTED' && !reason?.trim()) {

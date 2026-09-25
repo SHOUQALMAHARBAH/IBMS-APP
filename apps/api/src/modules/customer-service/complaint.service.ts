@@ -453,6 +453,7 @@ export class ComplaintService {
       complaint.resolvedByUserId,
       actorUserId,
       'Complaint.close',
+      'Complaint_closure_maker_checker_distinct',
     );
 
     await this.workflow.transition({

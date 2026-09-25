@@ -225,6 +225,7 @@ export class NeedsAssessmentService {
       assessment.createdByUserId,
       actor.id,
       'NeedsAssessment.review',
+      'NeedsAssessment_reviewer_maker_checker_distinct',
     );
     await this.workflow.transition({
       entityType: 'NeedsAssessment',
@@ -248,6 +249,7 @@ export class NeedsAssessmentService {
       assessment.createdByUserId,
       actor.id,
       'NeedsAssessment.approve',
+      'NeedsAssessment_approver_maker_checker_distinct',
     );
     await this.workflow.transition({
       entityType: 'NeedsAssessment',
@@ -309,6 +311,8 @@ export class NeedsAssessmentService {
       assessment.createdByUserId,
       actor.id,
       'NeedsAssessment.reject',
+      // Rejecting is the approver's act, so the remedy names the approver's permission.
+      'NeedsAssessment_approver_maker_checker_distinct',
     );
     if (!reason?.trim()) {
       throw new BadRequestException(

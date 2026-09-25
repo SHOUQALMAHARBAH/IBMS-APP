@@ -98,6 +98,7 @@ export class DataProcessingAgreementService {
       existing.assessedByUserId ?? '',
       actorUserId,
       'DataProcessingAgreement.dpoApprove',
+      'DataProcessingAgreement_maker_checker_distinct',
     );
 
     const approved = await this.dpas.dpoApprove(id, actorUserId);

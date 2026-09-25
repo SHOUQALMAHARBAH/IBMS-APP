@@ -195,9 +195,32 @@ http://localhost:3000
 | **إنشاء حساب دخول لشخص مسجَّل سابقًا** | صفحة الشخص ← `/employees/<id>` | العمليات |
 | **إنشاء حساب دخول بلا سجل موظف** (المدقّق الخارجي)، ومنح الأدوار أو سحبها، وإيقاف الحساب | `المستخدمون` ← `/settings/users` | العمليات |
 | **إنشاء قسم أو فرع** وتعديله أو إيقافه | `الأقسام والفروع` ← `/settings/org-units` | العمليات |
+| **معرفة أي العمليات تحتاج شخصين** وهل يملك مكتبك شخصاً ثانياً لها | `الأدوار والصلاحيات` ← `/settings/roles` (أعلى الصفحة) | العمليات |
 | **تعريف دور جديد** وتحديد صلاحياته، أو إيقافه | `الأدوار والصلاحيات` ← `/settings/roles` | العمليات |
 | **تسجيل شركة تأمين** (بالكتالوج أو محليًا)، تعديلها، **إيقافها عن التعامل** | `شركات التأمين` ← `/insurers` | الأعمال الجديدة |
 | **البحث في دليل الشركات** عبر المكاتب | `دليل شركات التأمين` ← `/insurer-directory` | الأعمال الجديدة |
+
+### عمليات لا يستطيع شخص واحد إتمامها
+
+خمس عشرة عملية في هذا النظام تتطلّب شخصين مختلفين: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه ليست
+إعداداً يمكن إلغاؤه — القاعدة محفوظة في قاعدة البيانات نفسها، فلا يمكن لأي شاشة أو تكامل مستقبلي تجاوزها.
+
+أمثلة: اعتماد استرداد مبلغ، فحص وثيقة سجّلها موظف آخر، اعتماد إتلاف سجلات، الموافقة الثانية على تسوية
+مطالبة كبيرة، إغلاق شكوى حلّها شخص آخر.
+
+**قبل أن تبدأ العمل**، افتح `الأدوار والصلاحيات` واقرأ الجدول في أعلى الصفحة. يظهر لكل عملية صلاحية
+المعتمِد وعدد من يملكها في مكتبك الآن، والصفوف الأكثر إلحاحاً في الأعلى:
+
+- **لا يمكن إتمامها**: لا أحد يملك الصلاحية. العملية متوقّفة تماماً حتى تُمنح لشخص ما.
+- **شخص واحد فقط**: تُتمّ فقط إذا لم يكن هو نفسه من سجّل الإجراء.
+- **جاهزة**: شخصان أو أكثر.
+
+وإن رُفض إجراء لهذا السبب، تذكر الرسالة اسم الصلاحية التي يحتاجها شخص ثانٍ، لا القاعدة وحدها.
+
+> مكتب بشخص واحد فقط: هذا وضع معروف وقيد العمل عليه — سيتمكّن المكتب من إعلان أنه يعمل بشخص واحد، فتُسجّل
+> هذه الأعمال باسم من نفّذها بدل أن تُرفض. لا يوجد بعد؛ ما هو موجود اليوم هو الجدول أعلاه، حتى تعرف أين
+> تقف قبل أن تتعطّل في منتصف معاملة.
+
 
 **«إدخال العملاء الحاليين» ليس من عمل المدير في هذه النسخة.** لا يملك حساب الإدارة أي
 صلاحية قراءة أو إضافة عميل — الصلاحية الوحيدة المتعلقة بالعملاء التي يملكها هي الاستيراد
@@ -448,9 +471,36 @@ customer**.
 | **Give a login to someone recorded earlier** | that person's page → `/employees/<id>` | Operations |
 | **Create a login with no person behind it** (the external auditor), grant or revoke a role, deactivate an account | `Users` → `/settings/users` | Operations |
 | **Create a department or a branch**, rename or retire one | `Departments & branches` → `/settings/org-units` | Operations |
+| **See which operations need two people**, and whether your office has a second person for each | `Roles & permissions` → `/settings/roles` (top of the page) | Operations |
 | **Define a role**, set its permissions, retire it | `Roles & permissions` → `/settings/roles` | Operations |
 | **Register an insurer** (catalogue or local), edit it, **deactivate** it | `Insurers` → `/insurers` | New business |
 | **Search the cross-office directory** | `Insurer directory` → `/insurer-directory` | New business |
+
+### Operations one person cannot complete
+
+Fifteen operations in this system need two different people: whoever records the action cannot be the one
+who approves it. This is not a setting that can be switched off — the rule is held in the database itself,
+so no screen and no future integration can get past it.
+
+Examples: approving a refund, checking a policy someone else placed, approving the destruction of records,
+the second approval on a large claim settlement, closing a complaint someone else resolved.
+
+**Before you start working**, open `Roles & permissions` and read the table at the top of the page. For
+each operation it shows the approver's permission and how many people in your office hold it right now,
+with the most urgent rows first:
+
+- **Cannot be completed** — nobody holds the permission. The operation is stuck until somebody is given it.
+- **Only one person** — it goes through only when that person is not also the one who recorded it.
+- **Ready** — two or more.
+
+And if an action is refused for this reason, the message names the permission a second person needs, not
+only the rule.
+
+> An office with only one person: this is a known situation and is being worked on — an office will be able
+> to declare that it operates with one person, and those acts will then be RECORDED against whoever
+> performed them instead of being refused. It does not exist yet. What exists today is the table above, so
+> you know where you stand before you are stopped in the middle of a transaction.
+
 
 **"Entering existing customers" is not the administrator's job on this build.** The account
 holds no customer read or create permission at all — its only customer-related code is bulk

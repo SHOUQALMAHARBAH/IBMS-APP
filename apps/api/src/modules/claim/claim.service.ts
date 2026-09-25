@@ -1646,6 +1646,7 @@ export class ClaimService {
       s.approvedByUserId,
       actor.id,
       'Settlement.secondApprove',
+      'Settlement_maker_checker_distinct',
     );
 
     const updated = await this.claims.recordSettlementSecondApproval(
