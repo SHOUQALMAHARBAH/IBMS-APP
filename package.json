@@ -50,6 +50,7 @@
     "db:backup:drill": "bash scripts/backup-restore-drill.sh",
     "db:fixture:permissions": "dotenv -e .env -- node scripts/generate-role-permissions-fixture.mjs",
     "db:fixture:permissions:check": "dotenv -e .env -- node scripts/generate-role-permissions-fixture.mjs --check",
+    "db:test:fixture:permissions": "dotenv -e .env.test -- node scripts/generate-role-permissions-fixture.mjs",
     "db:test:fixture:permissions:check": "dotenv -e .env.test -- node scripts/generate-role-permissions-fixture.mjs --check"
   },
   "devDependencies": {
