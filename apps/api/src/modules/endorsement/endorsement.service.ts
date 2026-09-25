@@ -18,7 +18,8 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { canReadAllEndorsementOwners } from '../../common/rbac-visibility.util';
-import { assertDifferentActors } from '../../common/maker-checker.util';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import { ApproveRefundDto } from './dto/approve-refund.dto';
 import {
   compareMoney,
   formatMoney,
@@ -110,7 +111,8 @@ function isUniqueViolation(err: unknown): boolean {
  * → FINANCIAL_ADJUSTMENT_CALCULATED → (REFUND_APPROVAL_PENDING →) APPLIED →
  * CLIENT_NOTIFIED`. The child `Cancellation` / `Refund` / `CommissionReversal`
  * have no `status` (their lifecycle is the parent endorsement's). `Refund`
- * approval is maker/checker (`assertDifferentActors` + the
+ * approval is maker/checker (`DutySegregationService`, which still refuses through
+ * `assertDifferentActors` in a SEGREGATED office, + the
  * `Refund_maker_checker_distinct` CHECK). The commission reversal is created
  * **automatically** in the same step as the refund from the same return
  * premium — never a separate hand calculation (`policy-lifecycle.md`).
@@ -127,6 +129,7 @@ export class EndorsementService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly commissionLedger: CommissionLedgerService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   private canReachAnyPolicy(actor: AuthenticatedUser): boolean {
@@ -764,6 +767,8 @@ export class EndorsementService {
 
   async approveRefund(
     refundId: string,
+    /** Present only when the approver is also the raiser and the office has declared COMBINED mode. */
+    dto: ApproveRefundDto | undefined,
     actor: AuthenticatedUser,
   ): Promise<EndorsementView> {
     const refund = await this.endorsements.findRefundById(refundId);
@@ -789,16 +794,24 @@ export class EndorsementService {
         `Refund ${refundId} has already been approved.`,
       );
     }
-    assertDifferentActors(
-      refund.raisedByUserId,
-      actor.id,
-      'Refund.approve',
-      'Refund_maker_checker_distinct',
-    );
+    // Part 4 — in a SEGREGATED office this throws exactly as `assertDifferentActors` did and returns
+    // nothing; in a COMBINED one it requires a reason, records the act with the hat the approver wore, and
+    // returns the id the write below has to carry. The CHECK constraint refuses the write either way if the
+    // id is null, so a caller that dropped the value on the floor would be refused by the database.
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'Refund_maker_checker_distinct',
+      makerId: refund.raisedByUserId,
+      checkerId: actor.id,
+      entityId: refundId,
+      context: 'Refund.approve',
+      actor,
+      reason: dto?.combinedDutyReason,
+    });
 
     const updated = await this.endorsements.recordRefundApproval(
       refundId,
       actor.id,
+      combinedDutyActId,
     );
     if (updated === null) {
       throw new ConflictException(

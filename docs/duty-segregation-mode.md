@@ -230,9 +230,11 @@ pair" — which authorization cannot answer, because it flattens. The pieces:
 
 Each step ships whole and is verifiable on its own.
 
-**Status: steps 1 and 2 have SHIPPED. The mode is not usable yet** — the database can express COMBINED and
-refuses everything that would abuse it, and no code path can set it. That is the intended intermediate state:
-the control exists before anything can rely on it.
+**Status: steps 1 and 2 have SHIPPED, and step 3 is PART-WIRED — the engine exists and ONE of the fifteen
+pairs goes through it (`Refund.approve`). The mode is still not settable** by any endpoint, screen or service,
+so nothing in production can reach any of it. That is the intended order: the control exists before anything
+can rely on it, and the remaining fourteen pairs are a mechanical repeat of one worked example rather than
+fourteen decisions.
 
 1. **[DONE]** **Bring the three lists to 15.** `maker-checker.util.ts`'s table (11 → 15), the pair→checker-permission
    map, and a test that derives the expected set from `pg_constraint` so a sixteenth constraint cannot be
@@ -275,10 +277,37 @@ the control exists before anything can rely on it.
    the one that matters: a predicate loosened to `TRUE OR (escape IS NOT NULL)` would satisfy a check that
    only looked for the escape column and would refuse nothing. Run against the un-migrated database first,
    where it failed naming the real predicate.
-3. **The application layer.** `assertDifferentActors` gains the mode and the act: in SEGREGATED it behaves
-   exactly as today; in COMBINED it requires a reason, records the act, and returns its id for the write to
-   carry. All 19 call sites across 14 files pass through it — and the 15-pair map is what tells each one which constraint
-   column to fill.
+3. **[PART-WIRED — the engine plus 1 of 19 call sites]** **The application layer.**
+
+   `assertDifferentActors` stayed a pure function and is still the refusal. What gained the mode is a new
+   `DutySegregationService.resolve()`, which returns the escape-column value the caller's write must carry:
+   `null` for every ordinary two-person act, an act id for a declared combined one.
+
+   **Why a service shared across modules, when this codebase shares repositories and never services.** There
+   is one established exception and this follows it exactly: `WorkflowTransitionService`, an ENGINE that
+   fifteen modules import from its own `@Global()` module because every status change must pass through one
+   implementation. Nineteen call sites in fourteen modules record a checker decision, and "may one person do
+   both halves, and what must be recorded if they do" has to have one answer. It is not a domain service — it
+   knows nothing about refunds or claims.
+
+   **The ordinary path costs nothing.** Two different people, or no checker yet, returns before any database
+   read. A SEGREGATED office pays nothing for the existence of the mode, which is the constraint that ruled
+   out reading the mode inside fifteen triggers, and there is a unit test asserting the office is NOT read on
+   that path — a cost assertion, not a style one.
+
+   **The act is written BEFORE the caller's write and is not rolled back if that write loses a race.** The
+   escape column is a foreign key, so the act must exist first. If the caller's status-conditional update then
+   matches zero rows, the act remains and the report shows a declared act against a record whose approval did
+   not land. Deliberate: the alternatives are making the evidence table mutable or threading a transaction
+   client through nineteen repositories, and over-recording a control event beats under-recording one.
+
+   **Wired: `Refund.approve`** — the sharpest of the fifteen, because the refund exists to move money back to
+   a client and the second signature is what stands between that and a broker refunding themselves. The route
+   takes an OPTIONAL `combinedDutyReason`; optional is the point, since an ordinary approval sends nothing and
+   behaves exactly as before. Fourteen pairs and eighteen call sites remain.
+
+   `PermissionRepository.findRolesGrantingCode` is new and is what makes the hat recordable: the cached
+   authorization read flattens role provenance away, deliberately, so the hat cannot be derived from it.
 4. **The mode screen**, its permission, and the audited change.
 5. **The record screens** — a combined act is visible where the record is read.
 6. **The self-approval report** — THE SHIPPING GATE above. It does not exist today, and the mode cannot be
@@ -290,7 +319,24 @@ the control exists before anything can rely on it.
 
 ## The plants that decide whether this is real
 
-**Status after step 2: plants 1, 2, 3 and 5 are RUN, and 1, 3 and 5 are now permanent tests rather than
+**Status after step 3a: ALL FIVE of the plan's plants are run, and four are permanent tests.** Plant 4 —
+withholding the checker permission in a COMBINED office — is `duty-segregation-combined.e2e-spec.ts`'s third
+test: a Placement officer who does not hold `refund.approve` declares a reason and is still refused 403, and
+the refusal must NOT mention segregation (otherwise it would tell somebody to find a second signature when
+what they need is the permission).
+
+**Two further plants on step 3a's own code**, each stated before running:
+
+  - **The call site drops the act id.** Which test should die: the COMBINED approval. Why observable: the
+    write then carries a null escape column. Result: 201 became **500** — the CHECK constraint refused the
+    service's mistake, which is the backstop existing rather than being described.
+  - **The engine ignores the mode** (`if (false)` on the mode branch). Which test should die: the SEGREGATED
+    refusal. Why observable: the same person's approval stops being refused at the mode check. Result: 403
+    became 422 — it died at the reason gate, one step before the trigger. Worth stating precisely: this plant
+    proved the test fails, and the TRIGGER's backstop for the same mistake is proven separately by the
+    schema spec's forge-an-act-in-a-segregated-office test rather than by this run.
+
+**Status after step 2: plants 1, 2, 3 and 5 were RUN, and 1, 3 and 5 became permanent tests rather than
 one-off plants** — `apps/api/test/duty-segregation-schema.e2e-spec.ts`, 7 tests. Plant 4 needs step 3's
 application layer. What was proven:
 

@@ -1,0 +1,12 @@
+{
+  "call-site-drops-the-act": {
+    "file": "apps/api/src/modules/endorsement/endorsement.service.ts",
+    "from": "    const updated = await this.endorsements.recordRefundApproval(\n      refundId,\n      actor.id,\n      combinedDutyActId,\n    );",
+    "to": "    const updated = await this.endorsements.recordRefundApproval(\n      refundId,\n      actor.id,\n    );"
+  },
+  "engine-ignores-the-mode": {
+    "file": "apps/api/src/modules/duty-segregation/duty-segregation.service.ts",
+    "from": "    if (office?.dutySegregationMode !== 'COMBINED') {",
+    "to": "    if (false) {"
+  }
+}

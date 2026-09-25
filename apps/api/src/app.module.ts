@@ -14,6 +14,7 @@ import { SecurityModule } from './modules/security/security.module';
 import { SlaModule } from './modules/sla/sla.module';
 import { ScreeningProvidersModule } from './modules/screening-providers/screening-providers.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { DutySegregationModule } from './modules/duty-segregation/duty-segregation.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { ProspectModule } from './modules/prospect/prospect.module';
 import { CustomerModule } from './modules/customer/customer.module';
@@ -94,6 +95,9 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // Depends on AuditModule's global AuditService for the TRANSITION audit
     // row every transition() call writes.
     WorkflowModule,
+    // Part 4 — the one place an office's declared duty-segregation mode is applied. `@Global()` for the
+    // same reason WorkflowModule is: nineteen call sites in fourteen modules pass through it.
+    DutySegregationModule,
     AuthModule,
     // Depends on AuthModule's exported UserRepository (system service
     // account lookup for escalation-sweep audit rows) — imported after it.

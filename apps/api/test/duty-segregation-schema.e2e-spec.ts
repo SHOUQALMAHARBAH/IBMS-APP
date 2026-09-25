@@ -34,6 +34,10 @@ let app: INestApplication<App> | null = null;
 const ROLLBACK =
   'rollback: the mode change and the act must not outlive this test';
 
+/** Distinctive, so the absence assertion below is about THIS attempt and not about the office's history. */
+const FORGED_REASON =
+  'A forged declaration in an office that never declared the mode.';
+
 beforeAll(async () => {
   app = await createTestApp();
 }, 300_000);
@@ -77,11 +81,9 @@ describe('duty segregation mode — the database half (e2e)', () => {
     for (const office of offices) {
       expect(office.dutySegregationMode).toBe('SEGREGATED');
     }
-    // And nobody declared anything, because there is no way to yet.
-    const declared = await rawPrisma.organization.count({
-      where: { dutySegregationModeDeclaredAt: { not: null } },
-    });
-    expect(declared).toBe(0);
+    // NOT asserted here: that no office has ever declared a mode. That is true only until step 4 ships a way
+    // to declare one, and an assertion which a later step must delete is a liability rather than a guard —
+    // the useful property is the one above, that every office reads SEGREGATED right now.
   }, 120_000);
 
   it('an UNDECLARED self-approval is still refused by the CHECK', async () => {
@@ -115,16 +117,18 @@ describe('duty segregation mode — the database half (e2e)', () => {
           entityId: 'no-such-refund',
           constraintName: 'Refund_maker_checker_distinct',
           actorUserId: actor,
-          reason:
-            'A forged declaration in an office that never declared the mode.',
+          reason: FORGED_REASON,
         },
       }),
       // Without this the escape column is a universal bypass and the mode is a value nobody reads.
     ).rejects.toThrow(/SEGREGATED mode/);
 
+    // Scoped to THIS test's own attempt, never a count of the office's acts. db-test is cumulative, and a
+    // spec that exercises a COMBINED office legitimately leaves acts behind — a global zero here would be a
+    // cross-spec coupling that breaks on run ORDER, which is a trap this suite has been bitten by before.
     expect(
       await rawPrisma.combinedDutyAct.count({
-        where: { organizationId: TEST_ORGANIZATION_ID },
+        where: { reason: FORGED_REASON },
       }),
     ).toBe(0);
   }, 120_000);

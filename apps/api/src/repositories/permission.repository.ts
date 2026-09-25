@@ -75,4 +75,34 @@ export class PermissionRepository {
     });
     return [...new Set(links.map((l) => l.permission.code))];
   }
+  /**
+   * WHICH of these roles actually grant this code — the "hat" a combined-duty act records.
+   *
+   * `findCodesForRoles` above flattens: it answers "may this actor do X" and deliberately erases WHICH role
+   * said yes, because authorization does not care. A declared combined-duty act does care, and cannot
+   * reconstruct it from the flattened set — that is the whole reason this method exists rather than being
+   * derived from the cached answer.
+   *
+   * Returns ids AND names. A role renamed or retired years later is unrecoverable from an id alone, which is
+   * the same reason the audit row stores `actorRoleNames` beside `actorRoleIds`.
+   *
+   * `status: 'ACTIVE'` matches the authorization read exactly: a retired role grants nothing, so it cannot be
+   * the hat either. Diverging on that would let an act record a role that could not have permitted it.
+   */
+  async findRolesGrantingCode(
+    roleIds: string[],
+    code: string,
+  ): Promise<{ id: string; name: string }[]> {
+    if (roleIds.length === 0) return [];
+    const links = await this.prisma.client.rolePermission.findMany({
+      where: {
+        roleId: { in: roleIds },
+        role: { status: 'ACTIVE' },
+        permission: { code },
+      },
+      select: { role: { select: { id: true, name: true } } },
+    });
+    const byId = new Map(links.map((l) => [l.role.id, l.role.name]));
+    return [...byId].map(([id, name]) => ({ id, name }));
+  }
 }

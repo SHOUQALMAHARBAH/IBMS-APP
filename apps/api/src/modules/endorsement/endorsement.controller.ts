@@ -10,6 +10,7 @@ import {
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { DiscardDto } from '../../common/dto/discard.dto';
+import { ApproveRefundDto } from './dto/approve-refund.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /** Process 22 — Endorsement Management (backlog Part C #22, Domain B). Raise
@@ -97,9 +98,10 @@ export class EndorsementController {
   @Post('refunds/:id/approve')
   approveRefund(
     @Param('id') id: string,
+    @Body() dto: ApproveRefundDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.endorsements.approveRefund(id, user);
+    return this.endorsements.approveRefund(id, dto, user);
   }
 
   /** APPLIED → CLIENT_NOTIFIED. */

@@ -198,12 +198,22 @@ export class EndorsementRepository {
   async recordRefundApproval(
     id: string,
     approvedByUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the approver IS the raiser in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person approval, which is every approval until an office
+     * declares the mode.
+     *
+     * The column is what `Refund_maker_checker_distinct` reads: with it null, a self-approval is refused by
+     * the constraint no matter what the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Refund | null> {
     const { count } = await this.prisma.client.refund.updateMany({
       where: { id, approvedByUserId: null },
       data: {
         approvedByUserId,
         approvalThresholdMatrixLevel: 'approved_above_threshold',
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
       },
     });
     if (count === 0) return null;
