@@ -973,6 +973,9 @@ model Employee {
   performanceRecords      EmployeePerformanceRecord[]
 
   @@index([departmentId])
+  // Declared because the migration CREATES it. Left undeclared, the next `migrate dev` would emit
+  // `DROP INDEX "Employee_branchId_idx"` — which is exactly what db:divergence caught in CI.
+  @@index([branchId])
   @@index([organizationId])
 }
 

@@ -2814,6 +2814,54 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
+### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Three ways a proof can be absent while looking present
+
+Three separate mechanisms, found together on 2026-09-24/25, all with the same signature: the evidence
+LOOKED like evidence.
+
+**(a) A plant that never applied.** Three plants reported PASSING and had not touched a file.
+`process.argv[2]` is empty when node runs with `-e` — no script path occupies argv[1] — so the
+selector was `undefined`, no branch matched, and the suite was green for the only reason a suite is
+ever green: nothing was wrong with it. A plant that silently does nothing is INDISTINGUISHABLE from a
+guard that works; both print a green suite, and the output is then used to justify "this guard is
+proven". Audited across the whole week from the session record: 121 plant runs, 67 showing a test
+dying, 52 setup/revert steps, and **exactly 3 that reported everything passing** — 2026-09-21T19:48,
+2026-09-22T06:38 and 2026-09-24T20:43. All three were noticed and re-run within a minute, which is the
+only reason this was survivable.
+
+**(b) A plant DEFINED and never invoked.** A fourth failure mode the "all passed" signal cannot catch,
+because nothing ran at all: `plant-ua.mjs` defined four named plants and the loop listed three. The
+commit message claimed four. The missing one (`encrypt-inside`, proving no KMS round trip happens
+inside the person-and-account transaction) was run afterwards and the guard SURVIVES — but it was
+unproven for the whole time it was described as proven.
+
+**(c) A guard file that CI ran, failed on, and nobody read.** `permission-only-gates.e2e-spec.ts`
+caught four wrong route gates on `477965d` immediately, naming them:
+`expected [ 'GET /admin/departments', …(3) ] to deeply equal []`. It caught them again on
+`a7a977d`. Then `395a0a3` introduced an undeclared index, `db:divergence` went red EARLIER in the
+same job, the job short-circuited, and **the api e2e suite stopped running at all for three commits** —
+so the original failure vanished behind a newer red while local gates stayed green.
+
+The fixes are all structural, because none of these is a thing to be more careful about:
+
+- `scripts/plant.mjs` is the only plant mechanism now. It refuses a missing name, an unknown name, a
+  `from` that is absent (the code moved, so the plant is stale), a `from` that occurs more than once
+  (ambiguous site), a replacement identical to the original, and it RE-READS the file from disk to
+  confirm the edit landed before printing `PLANTED`. Revert restores from a backup written at apply
+  time, byte for byte, so a half-reverted plant is not a state you can reach. `--self-test` plants on
+  the plant mechanism itself — eleven cases, including the original bug as a test (invoked with no name,
+  it must exit non-zero) — and is a gate in `verify.sh`.
+- `scripts/check-ci.sh` is the LAST gate in `verify.sh`: it reads the CI conclusion for HEAD and
+  fails when a run is red, unfinished, or absent-though-pushed, printing the `gh run view` command for
+  each failing run. Being unable to check (no `gh`) is also a failure, because "I could not check" is
+  the state that produced this. It passes quietly when HEAD is not pushed yet.
+- `ci.yml`'s seed, integration and contract steps carry `if: ${{ !cancelled() }}`, so a red
+  verification step no longer hides every test behind it. The job still fails; it stops being a
+  one-signal job.
+
+The class, stated once: **a proof is only a proof if its absence is loud.** A plant, a guard file, and a
+CI job all have a silent-absence mode, and all three were in it simultaneously.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

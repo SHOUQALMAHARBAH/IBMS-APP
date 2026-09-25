@@ -51,6 +51,12 @@ gate() {
   RESULTS+=("${label} -> ${evidence}")
 }
 
+# A plant is how this project proves a test CAN fail, and on 2026-09-24 three plants reported
+# passing without ever having applied — `process.argv[2]` is empty under `node -e`. A plant that
+# silently does nothing is indistinguishable from a guard that works: both print a green suite. This
+# gate proves every failure mode of `scripts/plant.mjs` is loud, including the original bug (invoked
+# with no plant name, it must exit non-zero rather than no-op).
+gate "Plant mechanism"     node scripts/plant.mjs --self-test
 gate "Types"               npm run typecheck
 gate "Lint"                npm run lint
 gate "Unit Tests"          npm run test
@@ -89,6 +95,15 @@ gate "Build"               npm run build
 # forever; Playwright resolves by revision directory, so the old one is unreachable weight.
 # 1.21 GB of it was found by accident on 2026-09-21. This is the witness that was missing.
 gate "Playwright browsers"  npm run browsers:check
+
+# THE LAST GATE IS NOT LOCAL.
+#
+# Every gate above ran on this machine, and every one of them was green on 2026-09-24 while the backend
+# job in CI was red — first on a real e2e failure naming four wrong route gates, then on a schema gate
+# that short-circuited the job so the e2e suite stopped running at all. Three commits were reported as
+# verified in that state. A green laptop is not the branch's verdict; CI is, and something has to make a
+# person read it. Passes quietly when HEAD is not pushed yet, because CI cannot have run it.
+gate "CI on this commit"    bash scripts/check-ci.sh
 
 # Housekeeping, deliberately NOT a gate — it must never fail a verification run. Turborepo has
 # no size cap on its local cache and this one reached 36 GB in ten days (~3.6 GB/day), filling

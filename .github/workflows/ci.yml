@@ -172,7 +172,13 @@ jobs:
       - name: Verify privileges — the runtime role cannot read past row-level security
         run: npm run db:privileges
 
+      # `!cancelled()` so a failed VERIFICATION step above cannot hide this one.
+      # Measured: `db:divergence` went red on 395a0a3 over an undeclared index and short-circuited the
+      # job for three commits — during which the api e2e suite did not run at all, and a real e2e
+      # failure it had already caught twice (permission-only-gates, four wrong route gates) disappeared
+      # behind the newer red. The job still FAILS; it just stops being a one-signal job.
       - name: Seed database (roles + permission grid)
+        if: ${{ !cancelled() }}
         run: npm run db:seed
 
       - name: Install Chromium for PdfRendererService (Part F item #7)
@@ -182,10 +188,14 @@ jobs:
         # browser and will fail without this.
         run: npx playwright-core install --with-deps chromium
 
+      # `!cancelled()` for the reason given on the seed step above.
       - name: Integration tests
+        if: ${{ !cancelled() }}
         run: npx turbo run test:e2e --filter=api...
 
+      # `!cancelled()` for the reason given on the seed step above.
       - name: Contract tests (OpenAPI)
+        if: ${{ !cancelled() }}
         run: npx turbo run test:contract --filter=api...
 
       - name: Smoke tests

@@ -15,7 +15,8 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 13 roles, 449 grants, from the default office.
+ * 12 seeded (`isSystem`) roles, 445 grants, from the default office. An office's own
+ * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   "BRANCH_DEPARTMENT_MANAGER": [
@@ -450,12 +451,6 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'up-sell.convert',
     'up-sell.detect',
     'up-sell.read',
-  ],
-  "SHOUQ": [
-    'claim.document',
-    'claim.followup.manage',
-    'claim.notify',
-    'claim.settle.approve',
   ],
   "SYSTEM_SECURITY_ADMINISTRATOR": [
     'access-recertification.cycle.start',

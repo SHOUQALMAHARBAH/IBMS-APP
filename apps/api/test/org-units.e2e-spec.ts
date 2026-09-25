@@ -23,6 +23,17 @@ let app: INestApplication<App> | null = null;
 const bearer = (t: string) =>
   ({ Authorization: `Bearer ${t}` }) as Record<string, string>;
 
+/**
+ * Every role this file creates, so `afterAll` can remove exactly those.
+ *
+ * db-test is CUMULATIVE. This file leaked two roles per run for six runs before
+ * `db:fixture:permissions:check` caught it: 24 roles where the seed defines 12, which makes the
+ * role-permission fixture generator read TEST roles as though they were part of the seeded grid. The
+ * sibling `permission-only-gates.e2e-spec.ts` carries this exact warning in a comment, which is not
+ * the same as carrying the teardown.
+ */
+const createdRoleIds: string[] = [];
+
 async function makeUserWith(codes: string[], label: string): Promise<string> {
   const email = `${label}.${tag}@org-units.test`;
   const org = await rawPrisma.organization.findFirstOrThrow({
@@ -52,6 +63,8 @@ async function makeUserWith(codes: string[], label: string): Promise<string> {
       },
     },
   });
+
+  createdRoleIds.push(role.id);
 
   await request(app!.getHttpServer())
     .post('/auth/signup')
@@ -125,6 +138,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.close();
+  // Named ids, never a name pattern: a LIKE on 'OU%' would happily delete a real office's role.
+  if (createdRoleIds.length > 0) {
+    await rawPrisma.userRoleAssignment.deleteMany({
+      where: { roleId: { in: createdRoleIds } },
+    });
+    await rawPrisma.rolePermission.deleteMany({
+      where: { roleId: { in: createdRoleIds } },
+    });
+    await rawPrisma.role.deleteMany({ where: { id: { in: createdRoleIds } } });
+  }
 });
 
 describe('departments and branches — the four-action pilot', () => {

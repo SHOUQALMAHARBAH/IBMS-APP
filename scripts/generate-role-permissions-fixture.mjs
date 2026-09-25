@@ -77,8 +77,20 @@ async function main() {
     );
   }
 
+  // SEEDED roles only — `isSystem`, and in the default office.
+  //
+  // Without the `isSystem` filter this gate is unsatisfiable on any database where somebody has used
+  // the Role screen, which is the screen's whole purpose. Measured: the write variant reads the DEV
+  // database and the `verify.sh` check reads DB-TEST, and dev's default office carried two roles the
+  // owner had created by hand while testing ("LOL123", "SHOUQ") — 14 roles / 467 grants against
+  // db-test's 12 / 445. The 22-grant difference was exactly those two roles: the seeded grid itself
+  // agreed to the grant. So the gate reported STALE forever, and regenerating would have baked a
+  // stranger's experimental role into the web e2e fixture.
+  //
+  // An office's own roles are data. The fixture mirrors what the SEED grants, which is what every
+  // Playwright spec mocks `/auth/me` with.
   const roles = await prisma.role.findMany({
-    where: { organizationId: org.id },
+    where: { organizationId: org.id, isSystem: true },
     select: {
       name: true,
       permissions: { select: { permission: { select: { code: true } } } },
@@ -87,7 +99,7 @@ async function main() {
   });
   if (roles.length === 0) {
     throw new Error(
-      `The default office has no roles. Run \`npm run db:seed\`; an empty grid here would generate a fixture that makes every Playwright nav assertion fail closed.`,
+      `The default office has no SYSTEM roles. Run \`npm run db:seed\`; an empty grid here would generate a fixture that makes every Playwright nav assertion fail closed.`,
     );
   }
 
@@ -145,7 +157,8 @@ ${lines}
  * the grid as declared instead of as granted. \`--check\` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * ${roles.length} roles, ${total} grants, from the default office.
+ * ${roles.length} seeded (\`isSystem\`) roles, ${total} grants, from the default office. An office's own
+ * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
 ${body}
