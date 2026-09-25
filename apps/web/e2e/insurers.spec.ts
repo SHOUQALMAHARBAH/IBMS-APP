@@ -240,10 +240,10 @@ test("refuses to confirm a deactivation with no reason", async ({ page }) => {
   expect(posted).toBe(false);
 });
 
-test("a reader without insurer.relationship.manage sees no register or deactivate control", async ({
+test("a reader without the insurer write codes sees no register or deactivate control", async ({
   page,
 }) => {
-  // Compliance holds `insurer.read` and NOT `insurer.relationship.manage` — the split this feature
+  // Compliance holds `insurer.read` and NOT `insurer.create`/`insurer.deactivate` — the split this feature
   // deliberately keeps, so reading the panel never implies changing it.
   await mockAuth(page, ["COMPLIANCE_OFFICER"]);
   await mockList(page, [ACTIVE_INSURER]);

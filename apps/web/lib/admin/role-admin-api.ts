@@ -10,7 +10,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client
  * their security attributes, their grants, and who holds them.
  *
  * Two permissions, and the names matter. `role.read` reads the catalogue;
- * `role.manage` changes it. They were one badly-named code until the Phase 3 prep
+ * the write codes change it. They were one badly-named code until the Phase 3 prep
  * step split them, precisely so this screen could offer a read-only view to a
  * caller who may look but not edit.
  */

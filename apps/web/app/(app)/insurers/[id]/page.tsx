@@ -59,7 +59,10 @@ export default function InsurerDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const { user, isLoading } = useAuth();
-  const canManage = !!user && hasPermission(user, 'insurer.relationship.manage');
+  // Deactivating and reactivating are one capability pointed two ways, and this section is the only
+  // thing on the page behind it. `insurer.deactivate` also gates the impact read the dialog performs,
+  // so the button and the request it makes ask for the same code.
+  const canDeactivate = !!user && hasPermission(user, 'insurer.deactivate');
 
   const [insurer, setInsurer] = useState<Insurer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -232,7 +235,7 @@ export default function InsurerDetailPage() {
         </div>
       </section>
 
-      {canManage ? (
+      {canDeactivate ? (
         <section style={sectionStyle}>
           {confirming === null ? (
             insurer.isActive ? (

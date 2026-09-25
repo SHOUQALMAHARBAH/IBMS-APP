@@ -2873,8 +2873,27 @@ The fixes are all structural, because none of these is a thing to be more carefu
   verification step no longer hides every test behind it. The job still fails; it stops being a
   one-signal job.
 
+**(d) A plant that APPLIED, and nothing died — because the test could not observe the thing it
+guards.** One week after (a), `scripts/plant.mjs` removed the `preventDefault` from EntitySearch's Enter
+handler, reported `PLANTED … 10327 -> 10291 bytes, verified on disk`, and all seven tests stayed GREEN.
+The tool was right: the bytes changed. The test was wrong: it asserted "no POST happened" on a form whose
+required fields make the browser block submission regardless, so both worlds look identical from where it
+was standing.
+
+**The standard is "bytes changed AND a test died". "Bytes changed" alone is not.** The plant tool cannot
+catch this one — it can only prove the edit landed. Choosing a surface where the two worlds differ
+observably is the part no tool does: the rewritten test runs on the audit browse form, which has no
+required fields and whose submit is an observable request, and it additionally asserts that the button
+still submits, so a dead form cannot pass for a prevented default.
+
+The question to ask of every plant, before believing a green suite: **on this surface, what would the
+broken version have done differently?** If the answer is "nothing observable", the plant proved the
+plant, not the guard.
+
 The class, stated once: **a proof is only a proof if its absence is loud.** A plant, a guard file, and a
-CI job all have a silent-absence mode, and all three were in it simultaneously.
+CI job all have a silent-absence mode, and all three were in it simultaneously. A fourth was added a week
+later by the same reasoning applied one level deeper: a plant that lands on a surface where nothing can
+observe it is silent absence wearing a green suite.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

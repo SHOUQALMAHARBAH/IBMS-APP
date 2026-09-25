@@ -74,7 +74,7 @@ export const INSURERS = {
     insNewClaimsEmailLabel: 'بريد جهة اتصال المطالبات',
     insNewSubmitButton: 'سجّل',
     insNewSavingButton: 'جارٍ الحفظ…',
-    insNewNoPermission: 'لا تملك صلاحية insurer.relationship.manage لتسجيل شركة تأمين.',
+    insNewNoPermission: 'لا تملك صلاحية insurer.create لتسجيل شركة تأمين.',
     insNewError: 'تعذر إكمال التسجيل.',
 
     // [id]/page.tsx — detail
@@ -207,7 +207,7 @@ export const INSURERS = {
     insNewSubmitButton: 'Register',
     insNewSavingButton: 'Saving…',
     insNewNoPermission:
-      'You do not hold insurer.relationship.manage, so you cannot register an insurer.',
+      'You do not hold insurer.create, so you cannot register an insurer.',
     insNewError: 'Could not complete the registration.',
 
     // [id]/page.tsx — detail

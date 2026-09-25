@@ -85,7 +85,11 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     // their authority is bounded, not unlimited — they can't escalate
     // their own access (not ADMIN) or act as the DPO's final sign-off.
     expect(granted).not.toContain("security-config.manage");
-    expect(granted).not.toContain("role.manage");
+    // `role.manage` split in four-action Phase 1. An assertion naming a code that no longer exists
+    // passes because nothing can contain it — so all three successors are named instead.
+    expect(granted).not.toContain("role.create");
+    expect(granted).not.toContain("role.update");
+    expect(granted).not.toContain("role.deactivate");
     expect(granted).not.toContain("permission.manage");
     expect(granted).not.toContain("dsr.close");
     expect(granted).not.toContain("retention.dispose.approve");
@@ -239,14 +243,17 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 34 codes", () => {
+  it("holds exactly 43 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
     // to move together.
     //
     // 22 at the Phase 3 migration, 24 with insurer management, 26 with the cross-office directory
-    // and Q9's office form mapping, 34 with the department/branch four-action pilot (8 codes).
+    // and Q9's office form mapping, 34 with the department/branch four-action pilot (8 codes),
+    // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
+    // became their successors (insurer.relationship.manage into five, role.manage into three,
+    // vendor.manage into four), so the count moved by nine while what the role can do did not.
     // Every code that moved the number is declared in ADDED_AFTER_THE_MIGRATION below, so the facts
     // cannot drift apart.
     //
@@ -277,18 +284,27 @@ describe("permission grid — the office administrator", () => {
         "incident.contain",
         "incident.report",
         "information-asset.manage",
+        "insurance-line.create",
+        "insurance-line.update",
+        "insurer.create",
+        "insurer.deactivate",
         "insurer.directory.read",
         "insurer.office-form.map",
         "insurer.read",
-        "insurer.relationship.manage",
+        "insurer.update",
         "permission.read",
-        "role.manage",
+        "role.create",
+        "role.deactivate",
         "role.read",
+        "role.update",
         "security-config.manage",
         "security-config.read",
         "training.record",
         "user.manage",
-        "vendor.manage",
+        "vendor.create",
+        "vendor.deactivate",
+        "vendor.read",
+        "vendor.update",
       ].sort(),
     );
   });
@@ -319,11 +335,18 @@ describe("permission grid — the office administrator", () => {
       // writes act on. The legacy administrator has no insurer capability at all,
       // which is why these are not subset violations but a deliberate divergence.
       //
-      // The pair is deliberate and mirrors `role.read` + `role.manage`: an
+      // The pair is deliberate and mirrors `role.read` + `role.update`: an
       // administrator holding only the write would get the controls on a screen
       // that renders nothing, because you cannot manage records you cannot list.
       "insurer.read",
-      "insurer.relationship.manage",
+      // `insurer.relationship.manage` split in four-action Phase 1. Five successors, not four: it gated
+      // two entities — the office's insurer records and the insurance LINES they carry — and mapping a
+      // line onto "update an insurer" would have been a lie about what the code gates.
+      "insurer.create",
+      "insurer.update",
+      "insurer.deactivate",
+      "insurance-line.create",
+      "insurance-line.update",
       // The cross-office directory. The administrator is the one who REGISTERS an
       // insurer, and registration is where a duplicate has to be caught — the
       // match-at-registration suggestion reads this same list to ask "did you mean

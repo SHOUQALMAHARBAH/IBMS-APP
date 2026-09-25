@@ -8,7 +8,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 /**
  * Process 71 (backlog Part C #71, Domain H) — `DataProcessingAgreement`
  * routes. Creation and listing are nested under the owning vendor
- * (`vendor.manage`, the maker side); DPO approval is its own flat route
+ * (`vendor.update`, the maker side); DPO approval is its own flat route
  * gated by the pre-seeded, distinct `dpa.approve` permission (the checker
  * side) — two separate permission codes, the maker-checker default.
  */
@@ -17,7 +17,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 export class DataProcessingAgreementController {
   constructor(private readonly dpas: DataProcessingAgreementService) {}
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.update')
   @Post('vendors/:vendorId/data-processing-agreements')
   create(
     @Param('vendorId') vendorId: string,
@@ -26,13 +26,13 @@ export class DataProcessingAgreementController {
     return this.dpas.create(vendorId, user.id);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.read')
   @Get('vendors/:vendorId/data-processing-agreements')
   listByVendor(@Param('vendorId') vendorId: string) {
     return this.dpas.listByVendor(vendorId);
   }
 
-  @RequirePermissions('vendor.manage')
+  @RequirePermissions('vendor.update')
   @Post('data-processing-agreements/:id/sign')
   sign(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.dpas.sign(id, user.id);

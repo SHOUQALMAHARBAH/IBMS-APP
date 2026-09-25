@@ -405,7 +405,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // general vendor record." A foundational Vendor CRUD, shared with
     // #71 (Vendor Management, not built here) — riskTier/DPA fields are
     // deliberately untouched. No new permission, no migration —
-    // vendor.manage was already pre-seeded for #71's future use.
+    // vendor.manage was already pre-seeded for #71's future use (split into four in Phase 1).
     VendorModule,
     // Process 69 — Cybersecurity. The backlog claims "fully covered by
     // Part A + IncidentReport + InformationAsset" — verified, and only
@@ -420,7 +420,7 @@ import { OrganizationModule } from './modules/organization/organization.module';
     // sat dormant since before this process. First real writer of a
     // second version, the deletion-lock override, and the "highest
     // classification present" rollup. No new permission, no migration —
-    // document.manage / document.delete-override were both pre-seeded.
+    // document.manage (now document.read/create) and document.delete-override were both pre-seeded.
     DocumentModule,
     // Process 72-73 — Business Continuity & Disaster Recovery. BcpDrPlan
     // pre-exists with zero prior application code. Plans + RTO/RPO +

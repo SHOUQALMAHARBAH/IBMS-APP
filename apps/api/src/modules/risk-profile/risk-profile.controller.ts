@@ -63,7 +63,7 @@ export class RiskProfileController {
     return this.riskProfiles.get(id, user);
   }
 
-  @RequirePermissions('risk-profile.create')
+  @RequirePermissions('risk-profile.update')
   @Post(':id/assets')
   addAsset(
     @Param('id') id: string,
@@ -75,7 +75,7 @@ export class RiskProfileController {
 
   /** Replaces the asset's survey fields wholesale — send the complete body
    * (see CreateAssetDto). */
-  @RequirePermissions('risk-profile.create')
+  @RequirePermissions('risk-profile.update')
   @Patch(':id/assets/:assetId')
   updateAsset(
     @Param('id') id: string,
@@ -86,7 +86,7 @@ export class RiskProfileController {
     return this.riskProfiles.updateAsset(id, assetId, dto, user);
   }
 
-  @RequirePermissions('risk-profile.create')
+  @RequirePermissions('risk-profile.update')
   @Delete(':id/assets/:assetId')
   @HttpCode(204)
   async removeAsset(

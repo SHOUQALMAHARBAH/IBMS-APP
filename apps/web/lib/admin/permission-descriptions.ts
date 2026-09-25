@@ -42,9 +42,22 @@ export const PERMISSION_DESCRIPTIONS: Readonly<Record<string, PermissionDescript
     ar: 'الاطّلاع على أدوار المكتب وصلاحيات كل دور، دون تعديلها.',
     en: "See the office's roles and what each one grants, without changing them.",
   },
-  'role.manage': {
-    ar: 'إنشاء الأدوار وتعديل صلاحياتها وإيقافها أو حذفها.',
-    en: 'Create roles, change what they grant, retire or delete them.',
+  // `role.manage` split into three in four-action Phase 1. Its Arabic line described all three at once,
+  // so it cannot simply be copied onto each: "إنشاء الأدوار وتعديل صلاحياتها وإيقافها أو حذفها" is the
+  // umbrella's sentence, and three narrower ones are three judgements about wording that belong to the
+  // owner. The English is written here as the shape; the Arabic stays absent and therefore visibly
+  // missing, which is this file's whole rule.
+  'role.create': {
+    ar: '',
+    en: "Define a new role in the office's catalogue.",
+  },
+  'role.update': {
+    ar: '',
+    en: 'Rename a role, change what it grants, and set its MFA requirements.',
+  },
+  'role.deactivate': {
+    ar: '',
+    en: 'Retire a role, bring a retired one back, or delete one that was never used.',
   },
   'user.manage': {
     ar: 'إنشاء حسابات الدخول وإسناد الأدوار أو سحبها وتفعيل الحساب أو إلغاؤه.',

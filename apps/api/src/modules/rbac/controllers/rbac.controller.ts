@@ -64,7 +64,7 @@ export class RbacController {
     private readonly roleAdmin: RoleAdminService,
   ) {}
 
-  // `role.read`, not `role.manage`: this reads the catalogue. `role.manage` now
+  // `role.read`, not a write code: this reads the catalogue. The write codes now
   // means changing it, and Phase 3's CRUD is what will carry that.
   @RequirePermissions('role.read')
   @Get('roles')
@@ -89,7 +89,7 @@ export class RbacController {
     return this.roleAdmin.get(id);
   }
 
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.create')
   @Post('roles')
   createRole(
     @Body() dto: CreateRoleDto,
@@ -98,7 +98,7 @@ export class RbacController {
     return this.roleAdmin.create(dto, user.id);
   }
 
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.update')
   @Patch('roles/:id')
   updateRole(
     @Param('id') id: string,
@@ -110,7 +110,7 @@ export class RbacController {
 
   /** The whole grant set at once, not one code per request: a partial save would
    *  leave a role half-built, and the matrix submits the state it believes. */
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.update')
   @Put('roles/:id/permissions')
   setRolePermissions(
     @Param('id') id: string,
@@ -132,7 +132,7 @@ export class RbacController {
    * This is the FIRST consumer of `@RequireStepUp`. The gate has existed since
    * backlog A.1 with no business endpoint to attach to; its own comment said so.
    */
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.update')
   @RequireStepUp()
   @Patch('roles/:id/security-attributes')
   setRoleSecurityAttributes(
@@ -152,7 +152,7 @@ export class RbacController {
    * `@HttpCode(204)`: there is nothing meaningful to return, and returning the deleted row would
    * invite a screen to render it.
    */
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.deactivate')
   @Delete('roles/:id')
   @HttpCode(204)
   async removeRole(
@@ -162,14 +162,14 @@ export class RbacController {
     await this.roleAdmin.remove(id, user.id);
   }
 
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.deactivate')
   @Post('roles/:id/retire')
   @HttpCode(200)
   retireRole(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.roleAdmin.setStatus(id, 'INACTIVE', user.id);
   }
 
-  @RequirePermissions('role.manage')
+  @RequirePermissions('role.deactivate')
   @Post('roles/:id/reactivate')
   @HttpCode(200)
   reactivateRole(

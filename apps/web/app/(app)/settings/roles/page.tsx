@@ -90,7 +90,7 @@ const codeRowStyle: CSSProperties = {
  * an advisory lock. What was missing was the screen to create one.
  *
  * Two permissions, and the split matters. `role.read` renders everything here;
- * `role.manage` is what turns the controls on. A caller with only the first sees
+ * the role write codes are what turn the controls on. A caller with only the first sees
  * the catalogue and no buttons, which is why the prep step separated those names
  * before this screen was written.
  */
@@ -100,7 +100,14 @@ export default function RoleAdminPage() {
   const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const canRead = hasPermission(user, 'role.read');
-  const canManage = hasPermission(user, 'role.manage');
+  // The umbrella became three codes, and this screen is where that has to be visible: an office can
+  // now give someone the ability to define roles without the ability to retire them, or to adjust what
+  // an existing role grants without being able to add new ones. Each control asks for its own.
+  const canCreate = hasPermission(user, 'role.create');
+  const canUpdate = hasPermission(user, 'role.update');
+  const canRetire = hasPermission(user, 'role.deactivate');
+  /** The actions column exists if ANY row action does. */
+  const canActOnRow = canUpdate || canRetire;
   const canReadCatalogue = hasPermission(user, 'permission.read');
 
 
@@ -425,7 +432,7 @@ export default function RoleAdminPage() {
           defect: the thing a person just asked for was rendered last. Create, then the open
           editor, then the table — which is also the users screen's arrangement. */}
 
-      {canManage ? (
+      {canCreate ? (
         <section style={sectionStyle}>
           <h2>{t('roleCreateHeading')}</h2>
           <form onSubmit={onCreate} style={formStyle}>
@@ -642,7 +649,7 @@ export default function RoleAdminPage() {
                 <th style={head}>{t('roleTableHolders')}</th>
                 <th style={head}>{t('roleTablePermissions')}</th>
                 <th style={head}>{t('roleTableMfa')}</th>
-                {canManage ? (
+                {canActOnRow ? (
                   <th style={head}>{t('roleTableActions')}</th>
                 ) : null}
               </tr>
@@ -672,7 +679,7 @@ export default function RoleAdminPage() {
                   <td style={cell}>
                     {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
                   </td>
-                  {canManage ? (
+                  {canActOnRow ? (
                     <td style={cell}>
                       <button
                         type="button"

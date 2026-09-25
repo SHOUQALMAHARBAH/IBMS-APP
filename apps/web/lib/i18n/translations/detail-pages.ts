@@ -240,7 +240,7 @@ export const DETAIL_PAGES = {
     vendRiskTierLabel: 'فئة المخاطر:',
     vendTypeLabel: 'النوع:',
     vendDpaApproveError: 'تعذّر تسجيل اعتماد مسؤول حماية البيانات — قد لا تملك صلاحية dpa.approve.',
-    vendNoPermission: 'لا تملك صلاحية vendor.manage اللازمة لعرض هذا المورّد.',
+    vendNoPermission: 'لا تملك صلاحية vendor.read اللازمة لعرض هذا المورّد.',
 
     // ---- Needs assessment (new + detail) -----------------------------------------------
     nanRiskProfileLabel: 'ملف المخاطر',
@@ -675,7 +675,7 @@ export const DETAIL_PAGES = {
     vendRiskTierLabel: 'Risk tier:',
     vendTypeLabel: 'Type:',
     vendDpaApproveError: 'Could not record DPO approval — you may not hold dpa.approve.',
-    vendNoPermission: "You don't hold the vendor.manage permission.",
+    vendNoPermission: "You don't hold the vendor.read permission.",
 
     nanRiskProfileLabel: 'Risk profile',
     nanNoRiskProfile: 'No risk profile yet — add one below.',

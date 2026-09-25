@@ -185,6 +185,15 @@ const commercialFrontOffice: PermissionSeed[] = [
     roles: [COMPLIANCE],
   },
   {
+    // The PATCH route rode on `needs-assessment.create`, so correcting an assessment required the
+    // permission to raise one. Held by the same role today — this splits the capability, it does not
+    // move it.
+    code: "needs-assessment.update",
+    module: "commercial-front-office",
+    description: "Correct a needs assessment before it is submitted",
+    roles: [SALES],
+  },
+  {
     code: "needs-assessment.create",
     module: "commercial-front-office",
     description: "Capture a Needs Assessment questionnaire",
@@ -202,6 +211,15 @@ const commercialFrontOffice: PermissionSeed[] = [
     description:
       "Review and approve a Needs Assessment before linking to an Opportunity/RFQ",
     roles: [MANAGER],
+  },
+  {
+    // The asset routes — add, correct, remove — all rode on `risk-profile.create`. There is no
+    // deactivate route for a risk profile, so no `risk-profile.deactivate` is declared: a code nothing
+    // can exercise is worse than an umbrella, because it reads as a capability that exists.
+    code: "risk-profile.update",
+    module: "commercial-front-office",
+    description: "Add, correct and remove the insured assets on a risk profile",
+    roles: [SALES, PLACEMENT],
   },
   {
     code: "risk-profile.create",
@@ -351,9 +369,9 @@ const insuranceOperations: PermissionSeed[] = [
     // quotation, a comparison, a placement — AND by the office administrator,
     // which needs it to render the screen its own management permission acts on.
     // You cannot manage records you cannot list: an administrator holding
-    // `insurer.relationship.manage` without this would get the controls on a
+    // an insurer write code without this would get the controls on a
     // screen that renders nothing. The Phase 3 pair is the exact precedent —
-    // `OFFICE_ADMINISTRATOR` holds `role.read` alongside `role.manage` for the
+    // `OFFICE_ADMINISTRATOR` holds `role.read` alongside the role write codes for the
     // same reason, and the Role screen is built on that split.
     //
     // `GET /rfqs/selectable-insurers` moved onto this from `rfq.create` — it reads
@@ -365,25 +383,46 @@ const insuranceOperations: PermissionSeed[] = [
       "Read this office's own insurer relationships — contacts, credit terms, financial strength and the lines they offer",
     roles: [SALES, PLACEMENT, MANAGER, EXEC, COMPLIANCE, AUDITOR, OFFICE_ADMIN],
   },
+  // `insurer.relationship.manage` split. It covered TWO entities, so an honest split is five codes and
+  // not four: the office's insurer records, and the insurance LINES those records carry. Mapping a line
+  // onto "update an insurer" would have been a lie about what the code gates.
+  //
+  // `insurer.read` already exists and is the fourth insurer action. None of these covers writing the
+  // GLOBAL catalogue — that is `insurer.master.manage`, which does not exist and which nobody would
+  // hold by default if it did.
   {
-    // Register an insurer, maintain the relationship, retire it, set its lines.
-    //
-    // DEFERRED FROM PHASE 3 ON PURPOSE, and this is where it lands. Putting it on
-    // `OFFICE_ADMINISTRATOR` during Phase 3 would have broken the strict-subset
-    // property that made migration 20261008100000 a provably empty per-user diff:
-    // the legacy `SYSTEM_SECURITY_ADMINISTRATOR` does not hold this code, so the
-    // office administrator would have gained something the legacy one lacked. That
-    // migration has now run, so the subset is a historical fact rather than a
-    // standing constraint — `permissions.spec.ts` says so in those terms.
-    //
-    // Covers BOTH registration paths: linking to a company already in the global
-    // catalogue, and registering one that is in no catalogue at all. It does NOT
-    // cover writing the global catalogue — that is `insurer.master.manage`, which
-    // does not exist and which nobody would hold by default if it did.
-    code: "insurer.relationship.manage",
+    code: "insurer.create",
     module: "insurance-operations",
     description:
-      "Register and maintain this office's own insurer records, their lines of business, and their active status",
+      "Register an insurer for this office, whether it is in the global catalogue or in none",
+    roles: [OFFICE_ADMIN],
+  },
+  {
+    code: "insurer.update",
+    module: "insurance-operations",
+    description: "Maintain this office's own record of an insurer and its relationship terms",
+    roles: [OFFICE_ADMIN],
+  },
+  {
+    // Also gates the impact read that precedes it: "what breaks if I deactivate this insurer" is part of
+    // the deactivation decision, and reactivation is the same capability pointed the other way —
+    // splitting them would leave someone able to stop dealing with an insurer and unable to undo it.
+    code: "insurer.deactivate",
+    module: "insurance-operations",
+    description:
+      "Stop and resume dealing with an insurer, and read the live impact of doing so",
+    roles: [OFFICE_ADMIN],
+  },
+  {
+    code: "insurance-line.create",
+    module: "insurance-operations",
+    description: "Add a line of business to this office's vocabulary",
+    roles: [OFFICE_ADMIN],
+  },
+  {
+    code: "insurance-line.update",
+    module: "insurance-operations",
+    description: "Correct a line of business this office added",
     roles: [OFFICE_ADMIN],
   },
   {
@@ -1204,10 +1243,35 @@ const supportingOperations: PermissionSeed[] = [
       "Execute the access de-provisioning checklist on an employment-status change",
     roles: [ADMIN, OFFICE_ADMIN],
   },
+  // `vendor.manage` split into the four actions (Phase 1 of the four-action scheme). Every role that
+  // held the umbrella holds all four, so nobody lost a capability — migration 20261026100000 does the
+  // same for every database, including an office's own custom roles.
   {
-    code: "vendor.manage",
+    code: "vendor.read",
     module: "supporting-operations",
-    description: "Manage a vendor record and its risk tier",
+    description: "View the vendor register, a vendor's record, and its data-share readiness",
+    roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "vendor.create",
+    module: "supporting-operations",
+    description: "Register a vendor",
+    roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN],
+  },
+  {
+    // Also gates the risk tier, the annual review, and raising or signing a data-processing agreement.
+    // Signing a legal agreement is not an edit, and it wants its own code — recorded in IMPROVEMENTS
+    // rather than invented here, because inventing one is a capability decision the owner has not made.
+    code: "vendor.update",
+    module: "supporting-operations",
+    description:
+      "Correct a vendor record, set its risk tier, record an annual review, raise and sign a data-processing agreement",
+    roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "vendor.deactivate",
+    module: "supporting-operations",
+    description: "Terminate a vendor and revoke its access",
     roles: [COMPLIANCE, MANAGER, ADMIN, OFFICE_ADMIN],
   },
   {
@@ -1234,10 +1298,22 @@ const supportingOperations: PermissionSeed[] = [
     description: "Publish a knowledge-base article",
     roles: [COMPLIANCE, MANAGER, PLACEMENT],
   },
+  // `document.manage` split into the two actions that EXIST. There is no route that edits a document
+  // in place — a change is a new version, which is a create — and deletion already has its own code
+  // (`document.delete-override`). Declaring `document.update` and `document.deactivate` to make the set
+  // look symmetrical would add two codes nothing can exercise, which is the unreachable-surface defect
+  // of IMPROVEMENTS § 1.44 pointed the other way. They arrive when the capability does (Phase 2 owns
+  // the "manage implies update" lie).
   {
-    code: "document.manage",
+    code: "document.read",
     module: "supporting-operations",
-    description: "Upload/version a document",
+    description: "View the document register, a document, and the classification summary",
+    roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE],
+  },
+  {
+    code: "document.create",
+    module: "supporting-operations",
+    description: "Upload a document and add a new version of one",
     roles: [SALES, PLACEMENT, CLAIMS, FINANCE, COMPLIANCE],
   },
   {
@@ -1389,13 +1465,29 @@ const admin: PermissionSeed[] = [
     description: "View the office's role catalogue",
     roles: [ADMIN, OFFICE_ADMIN],
   },
+  // `role.manage` split into three; `role.read` above is the fourth and already existed.
   {
-    // Nothing gates on this yet. Phase 3's Role CRUD is what will, and it exists
-    // now so the matrix screen is built against the final name.
-    code: "role.manage",
+    code: "role.create",
+    module: "admin",
+    description: "Define a new role in this office's catalogue",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    // Renaming a role and RE-GRANTING it are the same code here, exactly as they were under
+    // `role.manage` — this split neither widens nor narrows that. It is worth knowing that they are
+    // different kinds of act: one changes a label, the other can hand a role every permission in the
+    // system. Separating them is a capability decision, not a rename, so it is recorded rather than
+    // taken (IMPROVEMENTS § 1.53).
+    code: "role.update",
     module: "admin",
     description:
-      "Create, edit, activate and deactivate the office's own roles, and set what they grant (Phase 3)",
+      "Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge)",
+    roles: [ADMIN, OFFICE_ADMIN],
+  },
+  {
+    code: "role.deactivate",
+    module: "admin",
+    description: "Retire a role, reactivate a retired one, and delete one that was never used",
     roles: [ADMIN, OFFICE_ADMIN],
   },
   {

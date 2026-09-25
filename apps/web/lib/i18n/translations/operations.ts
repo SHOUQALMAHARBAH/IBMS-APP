@@ -118,7 +118,7 @@ export const OPERATIONS = {
     venSubmitButton: 'تسجيل المورّد',
     venCreateHeading: 'تسجيل مورّد جديد',
     venUpdateError: 'تعذّر تحديث المورّد.',
-    venNoPermission: 'لا تملك صلاحية vendor.manage اللازمة لعرض المورّدين.',
+    venNoPermission: 'لا تملك صلاحية vendor.read اللازمة لعرض المورّدين.',
 
     // ---- Documents (#70) -----------------------------------------------------
     docHeading: 'المستندات',
@@ -150,7 +150,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'معرّف الوثيقة',
     docPolicyNotFound: 'الوثيقة غير موجودة.',
     docComputeError: 'تعذّر احتساب ملخّص التصنيف.',
-    docNoPermission: 'لا تملك صلاحية document.manage اللازمة لعرض المستندات.',
+    docNoPermission: 'لا تملك صلاحية document.read اللازمة لعرض المستندات.',
     docsHighestClassification: '— أعلى تصنيف:',
     docsClassificationNone: 'لا يوجد',
 
@@ -664,7 +664,7 @@ export const OPERATIONS = {
     venSubmitButton: 'Record vendor',
     venCreateHeading: 'Record a new vendor',
     venUpdateError: 'Could not update the vendor.',
-    venNoPermission: "You don't hold the vendor.manage permission.",
+    venNoPermission: "You don't hold the vendor.read permission.",
 
     docHeading: 'Documents',
     docIntro:
@@ -695,7 +695,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'Policy ID',
     docPolicyNotFound: 'Policy not found.',
     docComputeError: 'Could not compute the classification summary.',
-    docNoPermission: "You don't hold the document.manage permission.",
+    docNoPermission: "You don't hold the document.read permission.",
     docsHighestClassification: '— highest classification:',
     docsClassificationNone: 'none',
 

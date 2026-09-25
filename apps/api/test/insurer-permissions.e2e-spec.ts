@@ -227,34 +227,45 @@ describe('insurer.read gates the shortlist picker', () => {
   }, 300_000);
 });
 
-describe('insurer.relationship.manage sits on the office administrator', () => {
-  it('is held by OFFICE_ADMINISTRATOR and by no other seeded role', async () => {
-    // The code deferred from Phase 3 so it would land after the administrator
-    // migration rather than invalidate its empty-diff property. Asserted against
-    // the DATABASE rather than the seed source, because the seed is what the grid
-    // says and this is what the office actually has.
-    const holders = await prisma.role.findMany({
-      where: {
-        permissions: {
-          some: { permission: { code: 'insurer.relationship.manage' } },
-        },
-      },
-      select: { name: true },
-      orderBy: { name: 'asc' },
-    });
-    expect(holders.map((r) => r.name)).toEqual(['OFFICE_ADMINISTRATOR']);
+describe('the insurer relationship codes sit on the office administrator', () => {
+  /** `insurer.relationship.manage` became these five in four-action Phase 1. */
+  const RELATIONSHIP_CODES = [
+    'insurer.create',
+    'insurer.update',
+    'insurer.deactivate',
+    'insurance-line.create',
+    'insurance-line.update',
+  ] as const;
+
+  it('are held by OFFICE_ADMINISTRATOR and by no other seeded role', async () => {
+    // The capability deferred from Phase 3 so it would land after the administrator migration rather than
+    // invalidate its empty-diff property. Asserted against the DATABASE rather than the seed source,
+    // because the seed is what the grid says and this is what the office actually has.
+    //
+    // Every successor is checked, not one of them: the point of splitting the umbrella is that the five
+    // can now be granted apart, so a test naming only one would stop noticing if the other four drifted.
+    for (const code of RELATIONSHIP_CODES) {
+      const holders = await prisma.role.findMany({
+        where: { permissions: { some: { permission: { code } } } },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      });
+      expect(
+        holders.map((r) => r.name),
+        code,
+      ).toEqual(['OFFICE_ADMINISTRATOR']);
+    }
   }, 120_000);
 
   it('reaches the office administrator as a PAIR — the write is useless without the read', async () => {
     // Both codes, deliberately, and this was corrected during review rather than
     // discovered later.
     //
-    // The management screen's own design is "insurer.read renders it,
-    // insurer.relationship.manage turns the controls on". An administrator holding
-    // only the write would get the controls on a screen that renders nothing —
-    // you cannot manage records you cannot list. The exact precedent is the Phase 3
-    // pair: `OFFICE_ADMINISTRATOR` holds `role.read` alongside `role.manage`, and
-    // the Role screen is built on that same split.
+    // The management screen's own design is "insurer.read renders it, and each write code turns its own
+    // control on". An administrator holding only the writes would get controls on a screen that renders
+    // nothing — you cannot manage records you cannot list. The exact precedent is the Phase 3 pair:
+    // `OFFICE_ADMINISTRATOR` holds `role.read` alongside the role write codes, and the Role screen is
+    // built on that same split.
     //
     // Asserted through `/auth/me` rather than against the grid, because what matters
     // is what a session actually resolves.
@@ -272,7 +283,9 @@ describe('insurer.relationship.manage sits on the office administrator', () => {
       .set(bearer(admin.accessToken))
       .expect(200);
     const permissions = (me.body as { permissions: string[] }).permissions;
-    expect(permissions).toContain('insurer.relationship.manage');
+    for (const code of RELATIONSHIP_CODES) {
+      expect(permissions, code).toContain(code);
+    }
     expect(permissions).toContain('insurer.read');
 
     // And it can therefore use the read — proven on the one office-insurer read

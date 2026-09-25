@@ -127,7 +127,7 @@ describe('Document Management (e2e) — backlog Part C #70', () => {
     sharedApp = undefined;
   });
 
-  it('gates document.manage and document.delete-override separately', async () => {
+  it('gates document.create and document.delete-override separately', async () => {
     const app = await boot();
     const outsider = await makeUser(
       app,
@@ -165,7 +165,7 @@ describe('Document Management (e2e) — backlog Part C #70', () => {
       })
       .expect(403);
 
-    // Placement holds document.manage but not document.delete-override.
+    // Placement holds document.create but not document.delete-override.
     await request(app.getHttpServer())
       .post(`/documents/${doc.id}/deletion-override`)
       .set(bearer(placement.accessToken))
@@ -279,7 +279,7 @@ describe('Document Management (e2e) — backlog Part C #70', () => {
       .set(bearer(admin.accessToken))
       .expect(204);
 
-    // admin holds document.delete-override but not document.manage (no
+    // admin holds document.delete-override but not document.create (no
     // read permission) — confirm the row is actually gone directly.
     expect(
       await prisma.document.findUnique({ where: { id: doc.id } }),

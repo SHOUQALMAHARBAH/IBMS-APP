@@ -44,7 +44,7 @@ const ADMIN_ROUTE_PERMISSIONS = [
   // `role.read` / `permission.read`, not `.manage`. Those two codes gated
   // read-only GETs while being named "manage"; the Phase 3 prep step renamed
   // them in place before the permission-matrix screen is built against them, and
-  // the new `role.manage` means CHANGING a role (nothing gates on it yet).
+  // the write side means CHANGING a role, and split into role.create/update/deactivate in Phase 1.
   'role.read',
   'permission.read',
   'encryption-key.read',

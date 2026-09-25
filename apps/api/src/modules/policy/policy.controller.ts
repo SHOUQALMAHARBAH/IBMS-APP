@@ -128,7 +128,7 @@ export class PolicyController {
   /** Attach documents to the policy's electronic Insurance File (Part 4.2)
    * at any lifecycle stage — used when certificates / an endorsement
    * template / the wording PDF arrive separately. */
-  @RequirePermissions('document.manage')
+  @RequirePermissions('document.create')
   @Post(':id/documents')
   attachDocuments(
     @Param('id') id: string,

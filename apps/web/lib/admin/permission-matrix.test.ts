@@ -33,14 +33,18 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
 
     // THE MEASURED SHAPE. If a permission is added, one of these numbers changes and this test
     // fails — which is the alarm, not an inconvenience. Re-measure and update deliberately.
-    // Recomputed from the catalogue after the department/branch four-action pilot added 8 codes.
-    // The previous pins were 186 / 13 / 27 / 159 and this test FAILED on them, which is the alarm
-    // working: a permission cannot be added quietly. Not loosened, not a range, not read from the
-    // source it checks.
-    expect(PERMISSION_CATALOGUE.length).toBe(194);
-    expect(crud.length).toBe(15);
-    expect(crud.flatMap(codesOfRow).length).toBe(35);
-    expect(toggles.length).toBe(159);
+    // Recomputed after four-action Phase 1: four umbrellas became 14 successors and two ride-along
+    // actions got their own codes. 194 -> 206. The previous pins were 194 / 15 / 35 / 159 and this test
+    // FAILED on them, which is the alarm working — twice now, for the same reason. Not loosened, not a
+    // range, not read from the source it checks.
+    //
+    // The interesting movement is 35 -> 51 five-state codes against 159 -> 155 toggles: splitting an
+    // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
+    // scheme becoming visible on the screen, which is the point of it.
+    expect(PERMISSION_CATALOGUE.length).toBe(206);
+    expect(crud.length).toBe(19);
+    expect(crud.flatMap(codesOfRow).length).toBe(51);
+    expect(toggles.length).toBe(155);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

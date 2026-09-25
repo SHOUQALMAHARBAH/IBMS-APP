@@ -239,9 +239,9 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
     labelKey: 'navGroupOperations',
     items: [
       { href: '/employees', labelKey: 'navEmployees', permissions: ['employee.read'] },
-      { href: '/vendors', labelKey: 'navVendors', permissions: ['vendor.manage'] },
+      { href: '/vendors', labelKey: 'navVendors', permissions: ['vendor.read'] },
       { href: '/information-assets', labelKey: 'navInformationAssets', permissions: ['information-asset.manage'] },
-      { href: '/documents', labelKey: 'navDocuments', permissions: ['document.manage'] },
+      { href: '/documents', labelKey: 'navDocuments', permissions: ['document.read'] },
       { href: '/bcp-dr-plans', labelKey: 'navBcpDrPlans', permissions: ['bcp-dr.manage'] },
       { href: '/knowledge-base', labelKey: 'navKnowledgeBase', permissions: ['kb.publish'] },
     ],
@@ -255,7 +255,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         permissions: ['access-recertification.review'],
       },
       { href: '/settings/users', labelKey: 'navUserAdmin', permissions: ['user.manage'] },
-      // `role.read`, not `role.manage`: a caller who may look at the office's
+      // `role.read`, not a write code: a caller who may look at the office's
       // roles but not change them gets the screen read-only rather than no link
       // at all. That is the whole reason the prep step split those two names.
       { href: '/settings/roles', labelKey: 'navRoleAdmin', permissions: ['role.read'] },

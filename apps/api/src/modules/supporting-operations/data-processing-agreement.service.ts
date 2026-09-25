@@ -13,7 +13,7 @@ import { assertDifferentActors } from '../../common/maker-checker.util';
 
 /** Process 71 (backlog Part C #71, Domain H) — `DataProcessingAgreement`'s
  * first real writer. The maker (`assessedByUserId`, this module's own
- * `vendor.manage`) and checker (`dpoApprovedByUserId`, `dpa.approve`)
+ * `vendor.update`) and checker (`dpoApprovedByUserId`, `dpa.approve`)
  * are two DISTINCT pre-seeded permission codes — the maker-checker
  * default, already anticipated by the DB `CHECK` constraint added in the
  * A.5 foundational work. */

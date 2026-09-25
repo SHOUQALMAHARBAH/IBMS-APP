@@ -10,7 +10,7 @@ import { anchoredAttributes, anchoredCount, expectNone } from "./support/anchore
  * deciding what each one can do. Everything asserted here is a decision that was
  * made deliberately and would be invisible in a snapshot:
  *
- *  - `role.read` shows the catalogue; `role.manage` is what turns the controls
+ *  - `role.read` shows the catalogue; `role.create`/`.update`/`.deactivate` turn the controls
  *    on. Two names, split by the prep step precisely so a caller who may look
  *    but not edit gets a usable read-only screen rather than a 403.
  *  - A system role is read-only, and its retire button is ABSENT rather than
@@ -55,9 +55,9 @@ async function mockAuth(page: Page, roles: string[], language = "EN") {
  * A caller whose permissions are named directly rather than derived from a
  * seeded role.
  *
- * Needed for exactly one case: `role.read` WITHOUT `role.manage`. No seeded role
+ * Needed for exactly one case: `role.read` WITHOUT the write codes. No seeded role
  * holds that combination — every holder of `role.read` in the grid also holds
- * `role.manage` — so the read-only caller is a role an OFFICE would define, which
+ * the write codes — so the read-only caller is a role an OFFICE would define, which
  * is the entire point of the phase. Deriving it from a legacy role name would be
  * asserting against a role that cannot exist.
  */
@@ -206,7 +206,7 @@ test("lists the office's own roles, retired ones included, with holder counts", 
 test("role.read alone renders the catalogue with no editing controls", async ({
   page,
 }) => {
-  // The reason `role.manage` was split out of it. A caller who may audit the
+  // The reason the write codes were split out of it. A caller who may audit the
   // office's roles but not change them is a real caller, and must get a usable
   // screen rather than a 403 or a row of buttons that fail.
   await mockAuthWithPermissions(page, ["role.read", "permission.read"]);

@@ -1,7 +1,7 @@
 import { IsBoolean, IsOptional } from 'class-validator';
 
 /**
- * Process 71 — `POST /vendors/:id/terminate` (`vendor.manage`).
+ * Process 71 — `POST /vendors/:id/terminate` (`vendor.deactivate`).
  * `confirmDataReturnOrDestruction: true` is MANDATORY (checked in the
  * service, not by `class-validator`, the `FulfilDsrDto` staff-attestation
  * precedent) — there is no automated verification that a vendor actually

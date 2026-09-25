@@ -517,7 +517,7 @@ function secretFromOtpAuthUri(uri: string): string {
  * grants permissions to the DEFAULT organization's roles only, so every code
  * added after the demo office was created never reached it. It was measured, not
  * theorised — Office B's `SYSTEM_SECURITY_ADMINISTRATOR` was three codes behind
- * the grid (`employee.create`, `employee.update`, `role.manage`), so the demo
+ * the grid (`employee.create`, `employee.update`, `role.update`), so the demo
  * office's administrator silently could not do things the default office's could.
  *
  * The default office is the right source because `preflight()` already refuses to

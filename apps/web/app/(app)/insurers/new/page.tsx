@@ -47,7 +47,7 @@ const STRUCTURES: readonly InsurerStructure[] = [
  *
  * ## Why the catalogue path can be unavailable
  *
- * The picker needs `insurer.master.read`. A user who holds `insurer.relationship.manage` without it
+ * The picker needs `insurer.master.read`. A user who holds `insurer.create` without it
  * can still register locally — which is the path that needs no catalogue — so a 403 on the
  * catalogue disables that half and says so, rather than failing the whole screen.
  */
@@ -55,7 +55,7 @@ export default function RegisterInsurerPage() {
   const { t, language } = useLanguage();
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const canManage = !!user && hasPermission(user, 'insurer.relationship.manage');
+  const canRegister = !!user && hasPermission(user, 'insurer.create');
 
   const [path, setPath] = useState<'MASTER' | 'LOCAL'>('MASTER');
   const [masters, setMasters] = useState<InsurerMaster[] | null>(null);
@@ -156,7 +156,7 @@ export default function RegisterInsurerPage() {
   }
 
   if (isLoading || !user) return null;
-  if (!canManage)
+  if (!canRegister)
     return (
       <main style={pageStyle}>
         <h1>{t('insNewHeading')}</h1>

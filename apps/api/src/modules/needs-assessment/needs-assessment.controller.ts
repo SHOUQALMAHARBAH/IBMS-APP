@@ -66,7 +66,7 @@ export class NeedsAssessmentController {
     return this.assessments.get(id, user);
   }
 
-  @RequirePermissions('needs-assessment.create')
+  @RequirePermissions('needs-assessment.update')
   @Patch(':id')
   update(
     @Param('id') id: string,

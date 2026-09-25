@@ -127,11 +127,13 @@ async function seedRole(
 
 beforeAll(async () => {
   app = await createTestApp();
-  // The administrator that drives the CRUD routes needs both codes #22 settled:
-  // `role.read` to load the catalogue and `role.manage` to change it.
+  // `role.manage` split in four-action Phase 1, so the administrator that drives these routes now needs
+  // the four codes rather than two: read the catalogue, define, change, retire.
   const adminRole = await seedRole(`Role Administrator ${tag}`, [
     'role.read',
-    'role.manage',
+    'role.create',
+    'role.update',
+    'role.deactivate',
   ]);
   admin = await makeUser(`role-crud-admin-${tag}`, adminRole.id);
 }, 240_000);
@@ -258,6 +260,58 @@ describe('Role CRUD', () => {
     expect(row).toBeDefined();
     expect(row!.permissionCount).toBe(2);
   }, 300_000);
+
+  it('SEPARABILITY: create without deactivate can define a role and cannot retire one', async () => {
+    // The whole point of splitting `role.manage`. If this passes with the umbrella restored, the split is
+    // decoration — so it asserts both halves on ONE account: the create succeeds, and the retire of the
+    // very role it just created is refused.
+    const partialRole = await seedRole(`Role Definer ${tag}`, [
+      'role.read',
+      'role.create',
+    ]);
+    const definer = await makeUser(`role-definer-${tag}`, partialRole.id);
+
+    const created = await request(app!.getHttpServer())
+      .post('/rbac/roles')
+      .set(bearer(definer.accessToken))
+      .send({
+        name: `DEFINED_BY_A_PARTIAL_HOLDER_${tag}`,
+        nameEn: 'Defined by a partial holder',
+        nameAr: 'أُنشئ بصلاحية جزئية',
+        permissionCodes: ['customer.360-view.read'],
+      })
+      .expect(201);
+    const newRoleId = (created.body as { id: string }).id;
+    createdRoleIds.push(newRoleId);
+
+    // Cannot retire it...
+    await request(app!.getHttpServer())
+      .post(`/rbac/roles/${newRoleId}/retire`)
+      .set(bearer(definer.accessToken))
+      .send({})
+      .expect(403);
+    // ...cannot delete it...
+    await request(app!.getHttpServer())
+      .delete(`/rbac/roles/${newRoleId}`)
+      .set(bearer(definer.accessToken))
+      .expect(403);
+    // ...and cannot rename it either, because renaming is `role.update`.
+    await request(app!.getHttpServer())
+      .patch(`/rbac/roles/${newRoleId}`)
+      .set(bearer(definer.accessToken))
+      .send({ nameEn: 'Renamed without permission' })
+      .expect(403);
+
+    // And the role it created is really there — so the 403s above are about the permission and not about
+    // a request that failed for some other reason.
+    const listed = await request(app!.getHttpServer())
+      .get('/rbac/roles')
+      .set(bearer(definer.accessToken))
+      .expect(200);
+    expect((listed.body as { id: string }[]).map((r) => r.id)).toContain(
+      newRoleId,
+    );
+  });
 
   it('refuses a duplicate name with 422, not a 500', async () => {
     // `@@unique([organizationId, name])`. Without the P2002 translation this is a
