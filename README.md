@@ -306,6 +306,19 @@ npm run test:e2e
 npm run db:migrate:deploy
 ```
 
+**The two databases must never share a name, and that is a control rather than a convention.** `db` holds
+`ibms` on host port 5433; `db-test` holds `ibms_test` on 5434. On 2026-09-26 both containers restarted on
+their own and came back with those host ports **crossed** — 5433 answering the db-test instance. Because the
+database names differ, every connection failed immediately with `Database "ibms" does not exist`. Had both
+been called `ibms`, the api e2e suite would have run its 105 spec files against the DEV database and passed,
+because nothing in the suite knows which database it reached. So "simplify both to `ibms`" is a change that
+looks like tidying and removes the only thing standing between a crossed port mapping and a test run
+rewriting development data (IMPROVEMENTS § 1.56).
+
+Diagnosing it: `docker exec <container> psql` bypasses the port mapping and looks healthy, and `docker
+inspect` reports the mapping as correct. Connect over the PORT and ask the instance what it holds — 5433 must
+list `ibms`, 5434 must list `ibms_test`. `docker compose restart db db-test` re-binds them.
+
 ### Scheduled jobs are switched OFF in the test environment
 
 `.env.test.example` sets `SCHEDULED_JOBS=disabled`, and `ScheduledJobsGuard`

@@ -2916,6 +2916,36 @@ enumerated (`e.g`, `i.e`, `privacy-notice-v1.2`) and a non-vacuity assertion bes
 quote more than 50 real codes and their AR/EN ratio must exceed 0.8, so the check cannot pass by finding
 nothing to check. The sibling (`/route` tokens against the destination catalogue) is NOT built.
 
+### 1.56 — THE DEV AND TEST DATABASES SWAPPED PORTS, AND ONLY THEIR NAMES MADE IT LOUD
+
+On 2026-09-26 both Postgres containers restarted unprompted and came back with their published ports
+**crossed**: host 5433 answered the db-test instance, 5434 answered the dev one. Every gate and every
+application connection goes through those ports; `docker exec <container> psql` does not, which is why the
+containers looked healthy while `npm run db:checksums` said `Database "ibms" does not exist`. `docker inspect`
+reported the mapping as correct the whole time, so inspecting the container is not a check either.
+`docker compose restart db db-test` re-bound them.
+
+**What stopped this from being serious is a naming choice nobody made for this reason.** The dev database is
+`ibms`, the test one is `ibms_test`. A crossed mapping therefore lands on an instance that does not have the
+requested database and fails immediately. Had both been called `ibms`, an api e2e run — 105 spec files that
+create, mutate and delete — would have executed against the DEV database, and every one of them would have
+passed. The suite has no way to notice which database it is on.
+
+So the property is load-bearing and should be written down as one: **the two databases must never share a
+name.** It is the only thing between a crossed port mapping and a test suite silently rewriting development
+data. "Simplify the config so both are just `ibms`" is a change that would look like tidying.
+
+**What this says about a verification run.** Every gate and suite in this session ran BEFORE the restart and
+is unaffected — the failure appeared on the first command after it, and the timeline is in the session record.
+But the general form is worth stating: a green run is evidence about the database the run actually reached,
+and nothing in the output says which one that was. A cheap gate would fix that — have each db script print
+`current_database()` and the instance's database list beside its result, so "which database was this" is in
+the evidence rather than assumed. Not built here; recorded with the answer.
+
+Host-specific companions already recorded in project memory: Docker Desktop's stuck backend after a GUI
+relaunch, and the VHDX that fills the C: drive. This is the third failure mode on this host whose symptom
+points somewhere other than its cause.
+
 ### 1.55 — § 1.40'S SHAPE, CAUGHT BEFORE SHIPPING: adding a STATE and leaving the READERS
 
 § 1.40 is about a migration that converted rows and left the writers. Class B piece 1 is the same shape with
