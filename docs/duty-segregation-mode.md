@@ -65,9 +65,10 @@ Two structural facts that shape the design:
 > Spec §10.5 — OPTIONAL edge-case fallback only. […] This exists solely for an office small enough that
 > one person holds both titles, and names whoever approves in their place.
 
-That is Part 4's problem, recognised once, solved for one pair — and **`grep` finds no consumer in
-`apps/api/src`.** So the current answer to "this office has one person" is a dormant column. This plan
-must say what happens to it; see the open questions.
+That is Part 4's problem, recognised once, solved for one pair — and **nothing anywhere reads it**: six
+references in the repository, all of them the declaration, its migration, a null-setting test fixture, a
+README note and this plan. So the current answer to "this office has one person" is a dormant column, and
+it is now marked SUPERSEDED — see the decision below.
 
 ### The machinery Rule 3 does not have to invent
 
@@ -203,7 +204,9 @@ Each step ships whole and is verifiable on its own.
    column to fill.
 4. **The mode screen**, its permission, and the audited change.
 5. **The record screens** — a combined act is visible where the record is read.
-6. **Tests and plants**, below.
+6. **The self-approval report**, which does not exist today. Its first ordering rule is the owner's
+   condition: a self-review of ACCESS at the top, flagged as highest attention, never mixed into the list.
+7. **Tests and plants**, below.
 
 ---
 
@@ -230,24 +233,71 @@ SEGREGATED, and the per-user effective-permission diff must be empty — this ch
 
 ---
 
+## Decided — access recertification is included, with a condition
+
+The owner's decision, with her reasoning on the record because it settles a class of question and not just
+this pair:
+
+- **The system is built on a DECLARED mode, not a computed one.** A rule that computes itself from today's
+  headcount would make the system inconsistent with itself, and make behaviour change day to day for
+  reasons no user can see.
+- **The protection is not lost, it changes form: from IMPOSSIBLE to VISIBLE.** A refusal leaves no trace. A
+  recorded self-review leaves a line with a name and a date that an auditor reads.
+- **Keeping it locked relocates the trap.** A single-operator office could never CLOSE a recertification
+  cycle — which is the same dead end, one table over.
+
+### THE CONDITION, which is part of the decision
+
+**A person's review of their OWN access appears at the TOP of the self-approval report, flagged as the
+highest-attention row.** Not mixed into the list, not sorted by date with everything else.
+
+Every other self-approval concerns a transaction — a customer, a claim, a refund. This one concerns the
+PERMISSIONS THEMSELVES: it is the control over whoever distributes control, and it must not read as one
+line among many.
+
+**Measured consequence: that report does not exist.** `segregationSignal()` produces a log line today —
+`logger.error` when it is a self-grant, `logger.warn` otherwise — plus an audit row. There is no endpoint
+and no screen that lists self-approvals, in any form. So the condition is not a sort order to add to
+something; it is a requirement on a report Part 4 has to build, and it is that report's first ordering
+rule. Implementation must not treat "flag it at the top" as done by writing a log line at a higher level.
+
+---
+
+## Decided — `dpoAlternateApproverUserId` is SUPERSEDED
+
+Marked superseded in `schema.prisma` and here. **Removed in the deferred cleanup track, not in this
+work** — the point is that two mechanisms for one problem must not both appear live, and one of them being
+unread is exactly how the next person implements the wrong one.
+
+Measured before marking it, because "nothing reads it" is the kind of claim that ages: **six references in
+the whole repository, none of them a reader.**
+
+    packages/db/prisma/schema.prisma                     the declaration
+    packages/db/prisma/migrations/20260925100000_…       the migration that created it
+    apps/api/src/common/org-context/per-organization.runner.spec.ts   a fixture setting it to null
+    README.md                                            a known-gap note (below)
+    docs/duty-segregation-mode.md                        this plan, twice
+
+Nothing in `apps/web`, nothing in the seed, no service, no repository, no controller.
+
+The README already states the consequence honestly and it is worth keeping in view, because it is the same
+trap the owner's decision above names: *"the `dpoAlternateApproverUserId` fallback, which has no consumer,
+so in the one edge case it exists for a destruction batch cannot be approved by anyone… an AVAILABILITY
+gap, never a safety one."* A single-operator office cannot approve a disposal batch TODAY. The mode is what
+closes that, which makes this column superseded by design rather than merely unused.
+
+---
+
 ## Open questions — for the owner, not for me
 
-1. **`AccessRecertificationItem` under uniform application.** Rule 5 says all the pairs, and applying it
-   here means a person can review their own access recertification in a COMBINED office. That is the
-   control over the person who grants access, and it is also the one the reviewer pool picks automatically
-   (`pickReviewer`). Planned as uniform per the rule; flagged because it is the one pair where uniformity
-   has a consequence worth stating out loud.
-2. **`dpoAlternateApproverUserId`.** Superseded by the mode, kept as a narrower option, or removed? It is
-   dormant either way, so nothing breaks — but leaving two mechanisms for one problem is how the next
-   person ends up implementing the wrong one.
-3. **Who may switch the mode, and does it need a step-up challenge?** Under the four-action scheme this
+1. **Who may switch the mode, and does it need a step-up challenge?** Under the four-action scheme this
    wants its own code (`duty-segregation.manage`, say) rather than riding on `user.manage`. It is the
    largest deliberate control relaxation in the product; the MFA-attribute screen is the existing
    precedent for requiring a fresh challenge.
-4. **May an office tighten back to SEGREGATED while combined acts exist?** This design says yes, and
+2. **May an office tighten back to SEGREGATED while combined acts exist?** This design says yes, and
    history stays exactly as recorded. Worth confirming, because the opposite choice would change the
    schema (it is the only reason to consider the rejected cascade design).
-5. **Reason per act, or per mode declaration?** Planned per act, minimum length, like the national-ID
+3. **Reason per act, or per mode declaration?** Planned per act, minimum length, like the national-ID
    reveal. A single reason at mode-declaration time would make the fiftieth combined act unexplained.
 
 ---

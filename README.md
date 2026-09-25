@@ -681,7 +681,9 @@ build actually is today:
   Gmail accept the live payloads (needs a real OAuth consent, which cannot be
   faked — everything around it is proven), and the `dpoAlternateApproverUserId`
   fallback, which has no consumer, so in the one edge case it exists for a
-  destruction batch cannot be approved by anyone. That second one is an
+  destruction batch cannot be approved by anyone. That column is now marked
+  SUPERSEDED: what closes the gap is the per-office duty-segregation mode
+  (`docs/duty-segregation-mode.md`), not a consumer for the column. That second one is an
   AVAILABILITY gap, never a safety one: the failure is a stuck batch, never a
   wrongly-approved one, and it is logged as a known gap rather than patched
   because letting a non-DPO approve changes a dual-control path. Fuzzy sanctions

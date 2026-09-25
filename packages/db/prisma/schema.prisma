@@ -205,6 +205,12 @@ model Organization {
   /// Nothing consumes it yet; `GET /orgs/resolve` arrives in Phase 4.
   subdomain                  String    @unique
   status                     OrgStatus @default(ACTIVE)
+  /// SUPERSEDED by the per-office duty-segregation MODE — see
+  /// `docs/duty-segregation-mode.md`. Kept until the deferred cleanup track removes it, and
+  /// deliberately NOT given a consumer in the meantime: two live mechanisms for one problem is how the
+  /// next person implements the wrong one. Measured when it was marked: six references in the whole
+  /// repository, none of them a reader.
+  ///
   /// Spec §10.5 — OPTIONAL edge-case fallback only. In the normal org chart the
   /// DPO (Office Manager) and a Branch/Department Manager are structurally
   /// different people, so maker/checker on a disposal batch already resolves to

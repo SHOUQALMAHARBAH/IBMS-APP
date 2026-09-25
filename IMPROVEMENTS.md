@@ -2850,10 +2850,67 @@ The shape to watch for is a code, a route or a field name appearing inside a TRA
 then has to reach two files, and the one a developer greps for is the one in their own language.
 
 Worth knowing that `translations.test.ts` cannot catch this: it enforces AR/EN key PARITY, not that the
-two halves say the same thing. Nothing checks that a permission code inside an Arabic string still exists.
-A guard could: scan every translated string for something shaped like a permission code and assert it is in
-the catalogue. That would have caught both of these, and it is cheap — recorded rather than built, because
-it is a new guard and this entry is a finding.
+two halves say the same thing.
+
+## The check the owner asked for, and the answer
+
+**Asked**: a check that fails when an English string changes in a commit and its Arabic counterpart does
+not. **Answer: it is expressible, it is not the right check, and there is a sharper one that is.**
+
+### It is expressible — here is exactly how
+
+For each dictionary file, build `key -> value` for the `AR` and `EN` halves at the merge base and in the
+working tree. Then `changedEN = { k : EN_before[k] !== EN_after[k] }`, the same for AR, and require the two
+key SETS to be equal. No parsing ambiguity: the dictionaries are plain object literals and both halves are
+in one file, so one `git show <base>:<file>` plus one read of the working tree is the whole input.
+
+### Why it is not the right check
+
+**It fires on legitimate single-language edits.** Fixing an English typo, tightening English phrasing, or
+improving an Arabic sentence are all normal and all asymmetric by nature. An escape hatch — a marker in the
+commit message or the file — turns the gate into a reminder, and a reminder is what we already had.
+
+**And it cannot catch the worse version of the same bug.** If a permission is renamed and NEITHER language
+is updated, nothing changed, so there is no asymmetry to detect: the check passes on a dictionary where
+both languages now name a code that does not exist. That is a strictly worse state than the one we hit, and
+the co-change check is blind to it.
+
+### The sharper check, measured
+
+Scan the VALUES in every dictionary for tokens shaped like a machine identifier
+(`[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+`) and assert that any token which looks like a permission code
+IS in the catalogue.
+
+Measured on today's dictionaries before proposing it:
+
+    99 distinct dotted tokens, 286 occurrences
+    82 of them ARE permission codes  (customer.360-view.read appears 8 times, user.manage 6, …)
+    17 are not, and are trivially separable: page.tsx, enums.ts, e.g, privacy-notice-v1.2
+
+So the check has real teeth — 82 codes are quoted at users in refusal messages, in both languages — and its
+allow-list is small enough to enumerate and defend. Properties the co-change check does not have:
+
+- **Language-symmetric by construction.** It reads both halves the same way, so the Arabic half cannot be
+  the one nobody asserts.
+- **Catches the stale-in-both case**, which is the worse one.
+- **No false-positive class for prose edits**, so it can be a hard gate rather than an advisory.
+- **No git plumbing**: works on a fresh clone, in the fast gate, and cannot be fooled by a squash.
+
+### The sibling worth building at the same time
+
+The same shape catches the `docs/first-run.md` class — a translated string naming a ROUTE
+(`/settings/users`) that no longer does what the sentence says. Assert every `/route` mentioned in a
+dictionary value exists in the destination catalogue (`components/app/destinations.ts`). That is the
+"two rows would have sent her to the wrong screen" defect as a test.
+
+### Recommendation
+
+Build the sharp check as a gate. Do NOT build the co-change check: it cannot be a gate without an escape
+hatch, and with one it is a reminder that costs a false alarm on every wording fix. If the owner wants the
+co-change signal anyway, it belongs in review as a printed diff summary, never as a pass/fail.
+
+Recorded with an answer rather than built, because it is a new guard and the owner's order puts Part 5 and
+the discard first.
 
 ### 1.52 — THREE AUDIT FILTERS THE API ACCEPTS AND NO CONTROL OFFERS
 
