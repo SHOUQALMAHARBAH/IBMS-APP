@@ -16,6 +16,46 @@ The owner's instruction, restated as the five rules this design has to satisfy:
 
 ---
 
+## THE SHIPPING GATE
+
+**COMBINED mode may not ship before the self-approval report exists and works.**
+
+Not a task in the list below — a gate on the whole mode. The reason is a commitment, not a preference: the
+owner accepted uniform application, INCLUDING a person reviewing their own access, on the stated mitigation
+that every such act would surface in the self-approval report, flagged at the top. That mitigation was
+offered against a report which, measured, **has no reader**: `segregationSignal()` writes a
+`logger.error`/`logger.warn` line and an audit row, and there is no endpoint and no screen in any form.
+
+So a control was weakened on the strength of a report nobody can open. Shipping the mode without the report
+would leave exactly that state, and the mode is not shippable until it is closed.
+
+### What the report is
+
+An endpoint and a screen, reachable by holders of `internal-controls.view`, listing declared
+combined-duty acts. Each row carries:
+
+  - the actor, by name, and the timestamp
+  - which PAIR it was, named by the constraint so a rename cannot blur it
+  - the roles worn — the granting subset, and the multi-grant flag when it is ambiguous
+  - the office's mode, and the date the mode was declared
+
+### Its first ordering rule
+
+**Access-recertification self-reviews are flagged and sit at the top.** Not sorted in among the others by
+date. Every other self-approval concerns a transaction; this one concerns the permissions themselves.
+
+And the warning that belongs beside it, because it is the shape this exact requirement fails in: "flag it
+at the top" is NOT satisfied by logging at a higher level. The row has to be at the top of a list a person
+opens.
+
+### How it is proven
+
+By content, not by a status code: the report shows a REAL declared act, and a self-recertification appears
+ABOVE a self-approved refund, with both present. A test that only asserts the endpoint returns 200, or that
+one row exists, would pass against a report that cannot order itself.
+
+---
+
 ## What is actually there today — measured, not assumed
 
 Three different answers to "how many maker/checker pairs are there", all live in the repository at once:
@@ -204,8 +244,9 @@ Each step ships whole and is verifiable on its own.
    column to fill.
 4. **The mode screen**, its permission, and the audited change.
 5. **The record screens** — a combined act is visible where the record is read.
-6. **The self-approval report**, which does not exist today. Its first ordering rule is the owner's
-   condition: a self-review of ACCESS at the top, flagged as highest attention, never mixed into the list.
+6. **The self-approval report** — THE SHIPPING GATE above. It does not exist today, and the mode cannot be
+   released without it. Its first ordering rule is the owner's condition: a self-review of ACCESS at the
+   top, flagged, never mixed into the list.
 7. **Tests and plants**, below.
 
 ---
@@ -301,6 +342,33 @@ closes that, which makes this column superseded by design rather than merely unu
    reveal. A single reason at mode-declaration time would make the fiftieth combined act unexplained.
 
 ---
+
+## A LIMIT, NOT A GAP: two pairs have no database backstop
+
+**In COMBINED mode, two of the seventeen maker/checker rules this system enforces are protected by
+application code alone.** Written here in plain words because a known limit and a hidden gap are different
+things, and because Part 4 cannot fix it: the mode works by making a CHECK constraint conditional, and
+these two pairs have no constraint to condition.
+
+    ConflictOfInterestDisclosure.acknowledge   compares against Recommendation.draftedByUserId
+                                               gated by conflict-of-interest.disclose
+                                               NO check constraint covers this pair
+
+    PolicyChecking.check (issuing officer)     compares against Policy.issuedByUserId
+                                               the constraint covers checker <> PLACER only
+                                               checker <> ISSUER is application code and nothing else
+
+Both were found while wiring the remedy into `assertDifferentActors` in Part 5 — not by design review, by
+touching all nineteen call sites and finding two that would not map.
+
+What this means concretely: in a SEGREGATED office these two are enforced by the application, as today, and
+a caller that bypasses application code entirely (raw SQL, a future integration) can write a self-approval
+for them, TODAY, before any of this work. In a COMBINED office they relax with everything else, and there
+is no second layer underneath.
+
+**Deliberately not fixed here.** Adding two CHECK constraints is a schema change with a backfill question
+attached — existing rows may already violate them — and that is its own work with its own measurement, not
+a rider on the mode. It belongs in the deferred cleanup track beside the other recorded debts.
 
 ## Out of scope, explicitly
 
