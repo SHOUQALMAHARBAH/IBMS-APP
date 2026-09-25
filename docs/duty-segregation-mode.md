@@ -407,6 +407,50 @@ and no screen that lists self-approvals, in any form. So the condition is not a 
 something; it is a requirement on a report Part 4 has to build, and it is that report's first ordering
 rule. Implementation must not treat "flag it at the top" as done by writing a log line at a higher level.
 
+### MEASURED WHILE WIRING STEP 3: this pair's constraint fires at CREATION, not at review — and that is a decision the owner has not been asked yet
+
+Found by reading `access-recertification.service.ts` against the schema rather than by assuming this pair
+works like the other fourteen. It does not, and the difference decides whether the condition above is
+reachable.
+
+**The other fourteen pairs are decided by an UPDATE.** A refund exists with `approvedByUserId` null; the
+approval writes it; the CHECK is evaluated on that write; the escape column is written in the same statement.
+Whoever approves is present, and can be asked for a reason.
+
+**`AccessRecertificationItem` is decided by an INSERT.** `reviewerUserId` is NOT NULL and is assigned when
+`startCycle` creates the item — and that constraint has no null guards at all
+(`CHECK ("reviewerUserId" <> "subjectUserId")`), so it fires at cycle start. In an office with one person,
+`pickReviewer` finds nobody, and the cycle cannot be started at all. **`decide()` is never reached, so wiring
+`decide()` through the engine would change nothing whatsoever for the case the owner's decision is about.**
+
+So including access recertification requires `startCycle` to be able to assign a subject as their own
+reviewer, which means the ACT has to be declared at cycle start, by whoever starts the cycle. Three ways out,
+and the choice is the owner's because it changes what the report's flagged row means:
+
+1. **Declare at cycle start.** `startCycle` takes a reason and writes one act per self-assigned item. Honest
+   and simple; the reason is genuinely available then ("this office has one person"). The cost: the act is
+   dated and attributed to the CYCLE START, not to the review, so the report's top row reads "she was
+   assigned her own access to review on the 1st", not "she reviewed her own access on the 14th". The owner's
+   words are *"a person's review of their OWN access"*.
+2. **Declare at cycle start AND again at decide.** Two acts for one situation: the assignment and the review.
+   The report then has the row the condition describes, dated when the review happened. The cost is that one
+   arrangement produces two rows, and a reader has to understand why.
+3. **Make `reviewerUserId` nullable and assign the reviewer at decide time.** Then this pair behaves like the
+   other fourteen. The cost is real and wider than it looks: assigning the reviewer at cycle start is what
+   makes the cycle a work LIST, `pickReviewer`'s total ordering was a recorded fix on this exact query
+   (IMPROVEMENTS § 1.42 — which reviewer a subject got was being decided by the query plan), and a nullable
+   reviewer would re-open that question.
+
+**Not chosen here.** Option 1 is the cheapest and option 2 is the one that satisfies the condition as
+written; option 3 is a schema change to a control whose ordering was already fixed once. Either way the
+report must exist first, since it is the gate — so this is a question the report's construction will make
+concrete, and it is recorded rather than answered.
+
+**What this says about the plan.** The rollout order treated step 3 as nineteen repetitions of one worked
+example. Eighteen of them are. The nineteenth is the pair the owner's own condition names, and it needs a
+decision rather than a repetition — which is the argument for wiring a pair END TO END early, because the
+shape of the other eighteen is what made this one visible.
+
 ---
 
 ## Decided — `dpoAlternateApproverUserId` is SUPERSEDED
