@@ -2814,6 +2814,47 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
+### 1.53 — RENAMING A ROLE AND RE-GRANTING IT ARE ONE PERMISSION
+
+Four-action Phase 1 split `role.manage` into `role.create` / `role.update` / `role.deactivate`, and
+`role.update` gates three routes that are not the same kind of act:
+
+    PATCH /rbac/roles/:id                      rename it, change its description
+    PUT   /rbac/roles/:id/permissions          change WHAT IT GRANTS
+    PATCH /rbac/roles/:id/security-attributes  its MFA requirements (behind a step-up challenge)
+
+The second one can hand a role every permission in the system, including the ones that grant permissions.
+The first changes a label. They arrive together because they arrived together under `role.manage` — the
+split neither widened nor narrowed anything — and that is precisely why it is easy to leave alone.
+
+Not acted on in Phase 1 deliberately: separating them is a CAPABILITY decision (a new boundary the owner has
+not asked for), not a rename, and the four-action scheme's own shape does not produce it —
+"change what a role grants" is not one of view/create/edit/deactivate. If it is taken, the likely shape is
+`role.permissions.manage` alongside `role.update`, and the step-up challenge already on the MFA-attribute
+route is the precedent for what guards it.
+
+The seed's own comment on `role.update` points here, so this entry exists to be pointed at rather than to
+argue for the change.
+
+### 1.54 — THE ARABIC HALF IS THE HALF THAT GETS MISSED
+
+Four-action Phase 1 renamed permissions that appear inside user-facing refusal messages. The English
+message was corrected and the Arabic one was not, twice in one change:
+
+    insNewNoPermission  AR still said insurer.relationship.manage after EN said insurer.create
+    vendNoPermission    AR and EN both said vendor.manage; only venNoPermission had been found
+
+Both were caught by a Playwright assertion on the English text, which is the wrong way round for this
+product: **Arabic is the primary language**, the one the owner reads, and the one no test asserted here.
+The shape to watch for is a code, a route or a field name appearing inside a TRANSLATED string — a rename
+then has to reach two files, and the one a developer greps for is the one in their own language.
+
+Worth knowing that `translations.test.ts` cannot catch this: it enforces AR/EN key PARITY, not that the
+two halves say the same thing. Nothing checks that a permission code inside an Arabic string still exists.
+A guard could: scan every translated string for something shaped like a permission code and assert it is in
+the catalogue. That would have caught both of these, and it is cheap — recorded rather than built, because
+it is a new guard and this entry is a finding.
+
 ### 1.52 — THREE AUDIT FILTERS THE API ACCEPTS AND NO CONTROL OFFERS
 
 `ListAuditTrailQueryDto` accepts `entityType`, `entityId`, `userId`, `action`, `from` and `to`. The
@@ -2889,6 +2930,16 @@ still submits, so a dead form cannot pass for a prevented default.
 The question to ask of every plant, before believing a green suite: **on this surface, what would the
 broken version have done differently?** If the answer is "nothing observable", the plant proved the
 plant, not the guard.
+
+**A GUARD FIRING ON ITS BUILDER.** Worth recording separately, because it is the return on every one of
+these. Four-action Phase 1 declared two new permissions under a module (`sales-crm`) that no other code
+used, when their siblings live in `commercial-front-office`. A permission's module is what groups it on
+the Role matrix screen, so that would have rendered a thirteenth group holding two rows — on the very
+screen the four-action scheme exists for. Nobody reviewed it. The matrix test's module pin went 12 → 13 and
+said so, in the same run as the catalogue-count pin.
+
+The pin was written two commits earlier, by the same hands, for exactly this. That is what a measured pin
+is for: it does not care who is wrong, and it does not get tired the way a reviewer does.
 
 The class, stated once: **a proof is only a proof if its absence is loud.** A plant, a guard file, and a
 CI job all have a silent-absence mode, and all three were in it simultaneously. A fourth was added a week
