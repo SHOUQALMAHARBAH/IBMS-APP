@@ -2814,6 +2814,20 @@ The pattern to reuse: when a check derives its expected set from the FILESYSTEM 
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
 
+### 1.52 — THREE AUDIT FILTERS THE API ACCEPTS AND NO CONTROL OFFERS
+
+`ListAuditTrailQueryDto` accepts `entityType`, `entityId`, `userId`, `action`, `from` and `to`. The
+screen offered the first two. `userId` was closed by the actor picker (Plan B) — the question an audit
+trail exists to answer had no control at all — and `action`, `from` and `to` are still unreachable.
+
+This is § 1.44's class, measured again: an API surface with no caller. It is not the same as a missing
+feature, because the server half is built, tested and gated; what is missing is three form controls. A
+compliance officer who wants "every DELETE last March" has to ask a developer to construct a URL.
+
+Not built here deliberately — the owner's ask was the search component and the audit screen's two named
+halves, and an action/date filter is a different feature. Recorded so the next person does not have to
+re-measure the DTO to find out.
+
 ### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Three ways a proof can be absent while looking present
 
 Three separate mechanisms, found together on 2026-09-24/25, all with the same signature: the evidence
