@@ -230,14 +230,51 @@ pair" — which authorization cannot answer, because it flattens. The pieces:
 
 Each step ships whole and is verifiable on its own.
 
-1. **Bring the three lists to 15.** `maker-checker.util.ts`'s table (11 → 15), the pair→checker-permission
+**Status: steps 1 and 2 have SHIPPED. The mode is not usable yet** — the database can express COMBINED and
+refuses everything that would abuse it, and no code path can set it. That is the intended intermediate state:
+the control exists before anything can rely on it.
+
+1. **[DONE]** **Bring the three lists to 15.** `maker-checker.util.ts`'s table (11 → 15), the pair→checker-permission
    map, and a test that derives the expected set from `pg_constraint` so a sixteenth constraint cannot be
    added without the lists moving. This is worth doing first because everything after it is per-pair work,
    and doing it against a wrong denominator means doing it twice.
-2. **Schema.** The enum, `Organization.dutySegregationMode`, `CombinedDutyAct`, the 15 escape columns, the
-   15 CHECK replacements, the one trigger. Hand-written, applied, `migrate resolve`, with the trigger and
-   every recreated CHECK asserted in the migration's own `DO` block — `db:divergence` sees neither CHECKs
-   nor triggers.
+2. **[DONE — migration `20261028100000`]** **Schema.** The enum, `Organization.dutySegregationMode` plus
+   `dutySegregationModeDeclaredAt`/`DeclaredByUserId` (the report needs the declaration date beside every
+   act, and deriving it from audit rows on every read is a derivation that breaks when the audit row's shape
+   changes), `CombinedDutyAct`, the 15 escape columns, the 15 CHECK replacements, the one trigger. Applied to
+   both databases and `migrate resolve`d; `db:divergence` 20/20 on both, which is what proves the schema
+   declaration matches — including `onDelete: Restrict` on all 15 relations, since Prisma's default for an
+   optional relation is `SetNull` and that is exactly the divergence class this repo has been bitten by.
+
+   **The predicates were generated from the database's own `pg_get_constraintdef` output, not from a
+   template.** The 15 do not share a shape: `DataSharingApproval` guards only the checker side for NULL,
+   `AccessRecertificationItem` guards neither, the rest guard both. Re-deriving them is how one of the
+   fifteen comes back looser than it went in.
+
+   **The escape column names, derived from the constraint name** so a reader can go either way:
+
+       AccessRecertificationItem   combinedDutyActId
+       CommissionLedgerEntry       combinedDutyActId
+       Complaint                   closureCombinedDutyActId
+       DataProcessingAgreement     combinedDutyActId
+       DataSharingApproval         combinedDutyActId
+       DataSubjectRequest          closureCombinedDutyActId
+       DisposalBatch               combinedDutyActId
+       IncidentReport              classificationCombinedDutyActId
+       KYCRecord                   combinedDutyActId
+       NeedsAssessment             approverCombinedDutyActId
+       NeedsAssessment             reviewerCombinedDutyActId
+       PolicyChecking              combinedDutyActId
+       Recommendation              combinedDutyActId
+       Refund                      combinedDutyActId
+       Settlement                  combinedDutyActId
+
+   The migration's own `DO` block asserts, per constraint, that it still exists, is still a CHECK, still
+   names BOTH of its original columns, and now admits its own escape column — plus that there are exactly 15
+   escape columns, that the trigger exists, and that every office reads SEGREGATED. The both-columns half is
+   the one that matters: a predicate loosened to `TRUE OR (escape IS NOT NULL)` would satisfy a check that
+   only looked for the escape column and would refuse nothing. Run against the un-migrated database first,
+   where it failed naming the real predicate.
 3. **The application layer.** `assertDifferentActors` gains the mode and the act: in SEGREGATED it behaves
    exactly as today; in COMBINED it requires a reason, records the act, and returns its id for the write to
    carry. All 19 call sites across 14 files pass through it — and the 15-pair map is what tells each one which constraint
@@ -252,6 +289,28 @@ Each step ships whole and is verifiable on its own.
 ---
 
 ## The plants that decide whether this is real
+
+**Status after step 2: plants 1, 2, 3 and 5 are RUN, and 1, 3 and 5 are now permanent tests rather than
+one-off plants** — `apps/api/test/duty-segregation-schema.e2e-spec.ts`, 7 tests. Plant 4 needs step 3's
+application layer. What was proven:
+
+  - **Plant 1's property, stronger than the plant.** The test writes a self-approving `Refund` with RAW
+    PRISMA — no service, no DTO, no application check in the path at all — and the database refuses it.
+    Removing the application check could not produce a weaker state than the one already asserted.
+  - **Plant 2, run.** `Refund_maker_checker_distinct` dropped on db-test: the undeclared-self-approval test
+    died ("promised resolved instead of rejecting") and the registry-vs-`pg_constraint` test died too,
+    independently, at 14 constraints against 15. Restored verbatim, `db:test:divergence` 20/20, both specs
+    green again. The leaked row the plant let through had to be deleted before the constraint would go back —
+    which is itself the constraint working.
+  - **Plant 3, run and now permanent.** Forging an act for a SEGREGATED office is refused by the trigger,
+    with the office's mode in the message.
+  - **Plant 5, run and now permanent.** A `NeedsAssessment` act declared for the REVIEWER pair does not
+    excuse a self-APPROVAL: the approver constraint still refuses. This is the whole reason there are 15
+    columns and not 14.
+  - **And the three claims together, in one rolled-back transaction**: an undeclared self-approval refused,
+    an act insertable once the office declares COMBINED, and the same previously-refused write accepted
+    because it declares itself — read back inside the transaction, then rolled back so no later spec sees an
+    office that permits self-approval.
 
 The owner named the two that matter, and they are the acceptance criteria rather than a test list:
 
