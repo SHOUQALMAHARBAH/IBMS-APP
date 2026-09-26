@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client';
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client';
 
 /**
  * Office-scoped custom RBAC, PHASE 3 — the Role screen's client.
@@ -10,7 +10,7 @@ import { apiGet, apiPatch, apiPost, apiPut } from '../auth/api-client';
  * their security attributes, their grants, and who holds them.
  *
  * Two permissions, and the names matter. `role.read` reads the catalogue;
- * `role.manage` changes it. They were one badly-named code until the Phase 3 prep
+ * the write codes change it. They were one badly-named code until the Phase 3 prep
  * step split them, precisely so this screen could offer a read-only view to a
  * caller who may look but not edit.
  */
@@ -73,6 +73,17 @@ export interface CreateRoleInput {
 
 export function createRole(input: CreateRoleInput): Promise<RoleAdminEntry> {
   return apiPost('/rbac/roles', input);
+}
+
+/**
+ * Delete a role. 204, nothing returned.
+ *
+ * Soft by mechanism and immediate by behaviour: the API removes the grants, revokes every live
+ * assignment, and stamps the row deleted — the history of who held it survives because
+ * `UserRoleAssignment.roleId` is ON DELETE RESTRICT and that history is the point.
+ */
+export function deleteRole(roleId: string): Promise<void> {
+  return apiDelete(`/rbac/roles/${encodeURIComponent(roleId)}`);
 }
 
 export function updateRole(
@@ -149,4 +160,24 @@ export function violatesSegregationPair(
   selected: ReadonlySet<string>,
 ): boolean {
   return SEGREGATION_WARNING_PAIR.every((code) => selected.has(code));
+}
+
+/**
+ * One operation that needs two people, and whether this office has them.
+ *
+ * `NOBODY` means the operation cannot be completed at all today; `SINGLE_HOLDER` means it can only be
+ * completed when that one person is not also the one who raised it. The API deliberately does not claim
+ * "and therefore you are fine" — whether a specific record can be checked depends on who raised it.
+ */
+export interface DutySegregationReadiness {
+  entityType: string;
+  pairLabel: string;
+  constraint: string | null;
+  checkerPermission: string;
+  holderCount: number;
+  status: 'NOBODY' | 'SINGLE_HOLDER' | 'READY';
+}
+
+export function listDutySegregationReadiness(): Promise<DutySegregationReadiness[]> {
+  return apiGet<DutySegregationReadiness[]>('/rbac/duty-segregation-readiness');
 }

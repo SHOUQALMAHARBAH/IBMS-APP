@@ -118,6 +118,51 @@ export default function InformationAssetsPage() {
         </p>
       ) : null}
 
+      <form onSubmit={onCreate} style={formStyle}>
+        <h2>{t('iassetCreateHeading')}</h2>
+        <label style={labelStyle}>
+          {t('iassetColName')}
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label style={labelStyle}>
+          {t('iassetColType')}
+          <select value={assetType} onChange={(e) => setAssetType(e.target.value as AssetType)}>
+            {ASSET_TYPES.map((opt) => (
+              <option key={opt} value={opt}>
+                {t(ENUM_LABEL.InformationAssetType[opt])}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={labelStyle}>
+          {t('iassetOwnerUserId')}
+          <input
+            value={ownerUserId}
+            onChange={(e) => setOwnerUserId(e.target.value)}
+            required
+          />
+        </label>
+        <label style={labelStyle}>
+          {t('iassetColClassification')}
+          <select
+            value={classification}
+            onChange={(e) => setClassification(e.target.value as DataClassification)}
+          >
+            {DATA_CLASSIFICATIONS.map((c) => (
+              <option key={c} value={c}>
+                {t(ENUM_LABEL.DataClassification[c])}
+              </option>
+            ))}
+          </select>
+        </label>
+        {formError ? (
+          <p role="alert" style={errorStyle}>
+            {formError}
+          </p>
+        ) : null}
+        <button type="submit">{t('iassetSubmitButton')}</button>
+      </form>
+
       {assets ? (
         assets.length === 0 ? (
           <p style={{ color: 'var(--ink-secondary)' }}>{t('iassetNone')}</p>
@@ -168,50 +213,6 @@ export default function InformationAssetsPage() {
         <p>{t('iassetLoading')}</p>
       )}
 
-      <form onSubmit={onCreate} style={formStyle}>
-        <h2>{t('iassetCreateHeading')}</h2>
-        <label style={labelStyle}>
-          {t('iassetColName')}
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label style={labelStyle}>
-          {t('iassetColType')}
-          <select value={assetType} onChange={(e) => setAssetType(e.target.value as AssetType)}>
-            {ASSET_TYPES.map((opt) => (
-              <option key={opt} value={opt}>
-                {t(ENUM_LABEL.InformationAssetType[opt])}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={labelStyle}>
-          {t('iassetOwnerUserId')}
-          <input
-            value={ownerUserId}
-            onChange={(e) => setOwnerUserId(e.target.value)}
-            required
-          />
-        </label>
-        <label style={labelStyle}>
-          {t('iassetColClassification')}
-          <select
-            value={classification}
-            onChange={(e) => setClassification(e.target.value as DataClassification)}
-          >
-            {DATA_CLASSIFICATIONS.map((c) => (
-              <option key={c} value={c}>
-                {t(ENUM_LABEL.DataClassification[c])}
-              </option>
-            ))}
-          </select>
-        </label>
-        {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
-        ) : null}
-        <button type="submit">{t('iassetSubmitButton')}</button>
-      </form>
     </main>
   );
 }

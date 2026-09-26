@@ -298,7 +298,13 @@ describe('Part V auth — the onboarding wizard (items 2, 3, 4)', () => {
       .get('/customers')
       .set(bearer(session))
       .expect(403);
-    expect(JSON.stringify(blocked.body)).toContain('MFA_ENROLLMENT_REQUIRED');
+    // Asserted at `body.code`, not as a substring of the whole serialised body: the web client's
+    // `isMfaEnrolmentError` reads exactly that field to tell this refusal apart from a missing
+    // permission, and a `JSON.stringify(...).toContain(...)` would stay green if the discriminator
+    // moved into `message` and left every screen guessing again.
+    expect((blocked.body as { code?: string }).code).toBe(
+      'MFA_ENROLLMENT_REQUIRED',
+    );
 
     // And the enrolment screen itself is reachable, or the user would be stuck.
     await request(app!.getHttpServer())
@@ -1052,4 +1058,96 @@ describe('Part V auth — tenant resolution (item 12)', () => {
 
     expect(claims.org).toBe(TEST_ORGANIZATION_ID);
   });
+
+  /**
+   * The dead end a real person hit at the front door.
+   *
+   * `mfaEnabled` is a flag; an active credential is the fact. When the flag is set with nothing
+   * behind it, the old `login` answered `mfaRequired: true` — so the screen asked for a six-digit
+   * code from a credential that does not exist. Every code is wrong, no screen offers a way out,
+   * and the account is unusable forever. Reachable without anyone doing anything stupid: enrolment
+   * is two calls (`create` then `activate`), so an interrupted enrolment leaves an INACTIVE
+   * credential, and any cleanup that deletes credentials without clearing the flag lands here.
+   *
+   * The fix lets that user reach a SESSION, never the application — and this test pins both halves,
+   * because letting them in without the second half is an MFA bypass.
+   */
+  it('a user whose MFA flag has no credential behind it is sent to enrolment, not to a code box', async () => {
+    const user = await makeUser('orphan-mfa', ['SALES_RELATIONSHIP_OFFICER']);
+
+    // The state: flag set, nothing behind it. This is what an interrupted enrolment or a half-done
+    // cleanup leaves.
+    await rawPrisma.mfaCredential.deleteMany({ where: { userId: user.id } });
+    await rawPrisma.user.update({
+      where: { id: user.id },
+      data: { mfaEnabled: true },
+    });
+
+    const login = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({ email: user.email, password: PASSWORD })
+      .expect(200);
+    const body = login.body as { mfaRequired?: boolean; accessToken?: string };
+
+    // 1. NOT a challenge. Asking for a code here is the dead end.
+    expect(body.mfaRequired).toBeUndefined();
+    expect(body.accessToken).toBeDefined();
+
+    // 2. The session reaches NOTHING. The guard keys on the same predicate, so the flag alone
+    //    cannot grant what a credential is supposed to grant.
+    const blocked = await request(app!.getHttpServer())
+      .get('/customers')
+      .set(bearer(body.accessToken!))
+      .expect(403);
+    expect((blocked.body as { code?: string }).code).toBe(
+      'MFA_ENROLLMENT_REQUIRED',
+    );
+
+    // 3. And the one route that fixes it is open, or the session would be useless.
+    const enrolled = await request(app!.getHttpServer())
+      .post('/auth/mfa/totp/enroll')
+      .set(bearer(body.accessToken!))
+      .send({})
+      .expect(201);
+    expect(
+      (enrolled.body as { qrCodeDataUrl?: string }).qrCodeDataUrl,
+    ).toBeTruthy();
+  }, 300_000);
+
+  /**
+   * The other half of the same predicate: a credential that was CREATED but never confirmed proves
+   * nothing, so it must not count as enrolment. Without this, an interrupted enrolment would be a
+   * way into the application with no second factor.
+   */
+  it('an unconfirmed credential does not count as enrolment', async () => {
+    const user = await makeUser('inactive-cred', [
+      'SALES_RELATIONSHIP_OFFICER',
+    ]);
+    await rawPrisma.mfaCredential.deleteMany({ where: { userId: user.id } });
+    await rawPrisma.user.update({
+      where: { id: user.id },
+      data: { mfaEnabled: true },
+    });
+
+    const login = await request(app!.getHttpServer())
+      .post('/auth/login')
+      .send({ email: user.email, password: PASSWORD })
+      .expect(200);
+    const token = (login.body as { accessToken: string }).accessToken;
+
+    // Start enrolment and stop there — exactly what a closed tab leaves behind.
+    await request(app!.getHttpServer())
+      .post('/auth/mfa/totp/enroll')
+      .set(bearer(token))
+      .send({})
+      .expect(201);
+
+    const stillBlocked = await request(app!.getHttpServer())
+      .get('/customers')
+      .set(bearer(token))
+      .expect(403);
+    expect((stillBlocked.body as { code?: string }).code).toBe(
+      'MFA_ENROLLMENT_REQUIRED',
+    );
+  }, 300_000);
 });

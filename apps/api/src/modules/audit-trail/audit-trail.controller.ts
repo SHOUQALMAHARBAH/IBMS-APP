@@ -43,6 +43,16 @@ export class AuditTrailController {
     return this.auditTrail.browseAuditLog(query, user.id);
   }
 
+  /**
+   * The actor picker's source. Same permission as the log itself — see `listActors` for why it is not
+   * `GET /admin/users`.
+   */
+  @RequirePermissions('audit-log.read')
+  @Get('actors')
+  listActors(@Query('search') search?: string) {
+    return this.auditTrail.listActors(search?.trim() || undefined);
+  }
+
   @RequirePermissions('workflow-history.read')
   @Get('workflow-history')
   workflowHistory(

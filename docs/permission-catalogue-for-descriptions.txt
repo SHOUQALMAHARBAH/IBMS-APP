@@ -1,0 +1,900 @@
+PERMISSION CATALOGUE — input for the Arabic one-line descriptions
+
+216 permission codes, 12 modules. Generated from the seeded database by
+`npm run db:permission-descriptions`, so this IS what the Role screen renders — not a separate
+list that can drift from it. Regenerate rather than hand-editing the structure: any line you have
+already written after `ar:` is carried forward by code and is never overwritten.
+
+HOW TO READ THIS
+  [5-STATE]  A CRUD-shaped family. The screen shows it as ONE row with its states side by side,
+             and its member codes are indented beneath it here. A description is still wanted per
+             CODE, because each state means something different to a person.
+  [toggle]   A single on/off permission. One description.
+
+WHAT IS WANTED: one short line per code, in Arabic, saying what holding it ALLOWS — what the
+person can then do on screen. Not the code restated.
+
+The "en:" line is the description already stored in the database. It is developer-facing and
+often terse: a hint, not something to translate.
+
+A code whose en: line begins NOT YET ENFORCED needs NO Arabic line. Holding it does nothing today
+and the screen says so — skip those rather than describing a capability that is not there.
+
+================================================================================================
+MODULE: admin   —   الإدارة والنظام   (20 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] branch   (create / deactivate / read / update)
+      branch.create
+          en: Create a branch in this office
+          ar: ................................................................
+      branch.deactivate
+          en: Retire a branch so it is no longer offered for new people (existing records keep it)
+          ar: ................................................................
+      branch.read
+          en: View the office's branches
+          ar: ................................................................
+      branch.update
+          en: Rename a branch
+          ar: ................................................................
+  [5-STATE] department   (create / deactivate / read / update)
+      department.create
+          en: Create a department in this office
+          ar: ................................................................
+      department.deactivate
+          en: Retire a department so it is no longer offered for new people (existing records keep it)
+          ar: ................................................................
+      department.read
+          en: View the office's departments
+          ar: ................................................................
+      department.update
+          en: Rename a department
+          ar: ................................................................
+  [5-STATE] role   (create / deactivate / read / update)
+      role.create
+          en: Define a new role in this office's catalogue
+          ar: ................................................................
+      role.deactivate
+          en: Retire a role, reactivate a retired one, and delete one that was never used
+          ar: ................................................................
+      role.read
+          en: View the office's role catalogue
+          ar: ................................................................
+      role.update
+          en: Rename a role, change what it grants, and set its MFA attributes (behind a step-up challenge)
+          ar: ................................................................
+  [5-STATE] security-config   (manage / read)
+      security-config.manage
+          en: Update the security configuration
+          ar: ................................................................
+      security-config.read
+          en: Read the security configuration (idle timeout, lockout policy, ...)
+          ar: ................................................................
+  [toggle]  access-recertification.cycle.start
+      access-recertification.cycle.start
+          en: Start an access-recertification cycle
+          ar: ................................................................
+  [toggle]  access-recertification.review
+      access-recertification.review
+          en: Review and decide an access-recertification item (never one's own)
+          ar: ................................................................
+  [toggle]  access-recertification.review.routine
+      access-recertification.review.routine
+          en: Be assigned access-recertification items routinely, ahead of fallback reviewers — the assignment preference, not the right to decide (that is access-recertification.review)
+          ar: ................................................................
+  [toggle]  encryption-key.read
+      encryption-key.read
+          en: View encryption key metadata (key id, purpose, active/retired status) — never key material (Part 10.2 key-custodian access)
+          ar: ................................................................
+  [toggle]  permission.read
+      permission.read
+          en: View the global permission catalogue (the codes a role can be granted)
+          ar: ................................................................
+  [toggle]  user.manage
+      user.manage
+          en: Provision/deprovision user accounts and role assignments
+          ar: ................................................................
+
+MODULE: claims   —   المطالبات   (13 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] claim   (delete / read)
+      claim.delete
+          en: NOT YET ENFORCED — no route deletes a claim, and there is no privileged-override path. To withdraw a claim raised in error use claim.discard, which keeps the record
+          ar: ................................................................
+      claim.read
+          en: List/read claims, their status-history trail and the coverage schedule in force at the loss date
+          ar: ................................................................
+  [toggle]  claim.all-owners.read
+      claim.all-owners.read
+          en: See any Claim regardless of who owns its Customer — the Claims Officer works the whole claims book
+          ar: ................................................................
+  [toggle]  claim.assess
+      claim.assess
+          en: Track claim survey/investigation and log status changes
+          ar: ................................................................
+  [toggle]  claim.close
+      claim.close
+          en: Close a claim after the client's receipt of payment is confirmed
+          ar: ................................................................
+  [toggle]  claim.discard
+      claim.discard
+          en: Mark a claim notified in error as discarded, before it is registered with the insurer — terminal, with a mandatory reason
+          ar: ................................................................
+  [toggle]  claim.document
+      claim.document
+          en: Attach mandatory claim documentation
+          ar: ................................................................
+  [toggle]  claim.followup.manage
+      claim.followup.manage
+          en: Manage claim follow-up alerts
+          ar: ................................................................
+  [toggle]  claim.notify
+      claim.notify
+          en: Record a claim notification (loss date/location/cause/estimate)
+          ar: ................................................................
+  [toggle]  claim.register
+      claim.register
+          en: Register a claim with the insurer and assign the adjuster
+          ar: ................................................................
+  [toggle]  claim.settle.approve
+      claim.settle.approve
+          en: Approve a claim settlement (first approver)
+          ar: ................................................................
+  [toggle]  claim.settle.second-approve
+      claim.settle.second-approve
+          en: Second-approve a large claim settlement or any broker-processed claim payment (never the same person as the first approver)
+          ar: ................................................................
+  [toggle]  claims-analytics.view
+      claims-analytics.view
+          en: View Loss Ratio and claims analytics
+          ar: ................................................................
+
+MODULE: commercial-front-office   —   المكتب الأمامي التجاري   (32 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] needs-assessment   (create / read / update)
+      needs-assessment.create
+          en: Capture a Needs Assessment questionnaire
+          ar: ................................................................
+      needs-assessment.read
+          en: List/read Needs Assessments
+          ar: ................................................................
+      needs-assessment.update
+          en: Correct a needs assessment before it is submitted
+          ar: ................................................................
+  [5-STATE] risk-profile   (create / read / update)
+      risk-profile.create
+          en: Capture a detailed risk survey (Risk Profile/Asset)
+          ar: ................................................................
+      risk-profile.read
+          en: List/read Risk Profiles
+          ar: ................................................................
+      risk-profile.update
+          en: Add, correct and remove the insured assets on a risk profile
+          ar: ................................................................
+  [toggle]  cross-sell.convert
+      cross-sell.convert
+          en: Convert or dismiss a system-flagged cross-sell opportunity
+          ar: ................................................................
+  [toggle]  cross-sell.detect
+      cross-sell.detect
+          en: Run an on-demand cross-sell gap scan for a customer
+          ar: ................................................................
+  [toggle]  cross-sell.read
+      cross-sell.read
+          en: List/read cross-sell opportunities
+          ar: ................................................................
+  [toggle]  customer-file.all-owners.read
+      customer-file.all-owners.read
+          en: See any customer's COMMERCIAL file — risk profile, needs assessment, insurance program, opportunity, RFQ, quotation, comparison, client decision — regardless of owner
+          ar: ................................................................
+  [toggle]  customer.360-view.read
+      customer.360-view.read
+          en: Read the aggregated 360° customer view
+          ar: ................................................................
+  [toggle]  customer.create
+      customer.create
+          en: Create a Customer (individual/corporate)
+          ar: ................................................................
+  [toggle]  interaction.log
+      interaction.log
+          en: Log a customer interaction (meeting/call/email/...)
+          ar: ................................................................
+  [toggle]  kyc.approve
+      kyc.approve
+          en: Approve a KYC file and activate the Customer (maker/checker: capturer != approver)
+          ar: ................................................................
+  [toggle]  kyc.capture
+      kyc.capture
+          en: Capture KYC data and supporting documents
+          ar: ................................................................
+  [toggle]  kyc.edd.trigger
+      kyc.edd.trigger
+          en: Trigger the enhanced due-diligence path on a high-risk result
+          ar: ................................................................
+  [toggle]  kyc.review.schedule
+      kyc.review.schedule
+          en: Schedule periodic re-KYC by risk classification
+          ar: ................................................................
+  [toggle]  lead.all-owners.read
+      lead.all-owners.read
+          en: See leads and prospects owned by another Sales/Relationship Officer — the org-wide pipeline view, not one's own
+          ar: ................................................................
+  [toggle]  lead.create
+      lead.create
+          en: Create a Lead
+          ar: ................................................................
+  [toggle]  lead.list.read
+      lead.list.read
+          en: List/filter leads
+          ar: ................................................................
+  [toggle]  lead.transition
+      lead.transition
+          en: Transition LeadStatus
+          ar: ................................................................
+  [toggle]  needs-assessment.approve
+      needs-assessment.approve
+          en: Review and approve a Needs Assessment before linking to an Opportunity/RFQ
+          ar: ................................................................
+  [toggle]  program.assemble
+      program.assemble
+          en: Assemble a multi-line Insurance Program from risk-assessment results
+          ar: ................................................................
+  [toggle]  program.read
+      program.read
+          en: List/read Insurance Programs
+          ar: ................................................................
+  [toggle]  prospect.capture
+      prospect.capture
+          en: Convert/qualify a Lead into a Prospect
+          ar: ................................................................
+  [toggle]  prospect.read
+      prospect.read
+          en: List/read Prospect profiles
+          ar: ................................................................
+  [toggle]  recommendation.all-owners.read
+      recommendation.all-owners.read
+          en: See any broker Recommendation regardless of owner — Compliance must reach any of them to clear a conflict-of-interest disclosure the conflicted officer cannot self-clear
+          ar: ................................................................
+  [toggle]  screening.run
+      screening.run
+          en: Run sanctions/AML screening
+          ar: ................................................................
+  [toggle]  ubo.record
+      ubo.record
+          en: Record Ultimate Beneficial Owners for a corporate customer
+          ar: ................................................................
+  [toggle]  up-sell.convert
+      up-sell.convert
+          en: Convert or dismiss a system-flagged up-sell recommendation
+          ar: ................................................................
+  [toggle]  up-sell.detect
+      up-sell.detect
+          en: Run an on-demand under-insurance scan for a customer
+          ar: ................................................................
+  [toggle]  up-sell.read
+      up-sell.read
+          en: List/read up-sell recommendations
+          ar: ................................................................
+
+MODULE: compliance-risk   —   الالتزام والمخاطر   (20 codes)
+------------------------------------------------------------------------------------------------
+
+  [toggle]  aml.escalate
+      aml.escalate
+          en: Escalate a suspicious-activity alert to the competent authority
+          ar: ................................................................
+  [toggle]  aml.monitor
+      aml.monitor
+          en: Monitor AML/CFT transaction-monitoring alerts
+          ar: ................................................................
+  [toggle]  audit-log.read
+      audit-log.read
+          en: Read the immutable audit log
+          ar: ................................................................
+  [toggle]  compliance-calendar.manage
+      compliance-calendar.manage
+          en: Manage the regulatory compliance calendar
+          ar: ................................................................
+  [toggle]  document-history.read
+      document-history.read
+          en: Read document version/workflow history
+          ar: ................................................................
+  [toggle]  duty-segregation.mode.declare
+      duty-segregation.mode.declare
+          en: Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason
+          ar: ................................................................
+  [toggle]  incident.classification.co-sign
+      incident.classification.co-sign
+          en: Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it
+          ar: ................................................................
+  [toggle]  incident.classify
+      incident.classify
+          en: Classify an incident as Material or Non-Material (the DPO half of the pair; the co-sign is a separate permission)
+          ar: ................................................................
+  [toggle]  incident.contain
+      incident.contain
+          en: Execute incident containment actions
+          ar: ................................................................
+  [toggle]  incident.notify-regulator
+      incident.notify-regulator
+          en: Send a multi-regulator incident notification (CBJ / NCSC / PDPC)
+          ar: ................................................................
+  [toggle]  incident.report
+      incident.report
+          en: Report a security/privacy incident
+          ar: ................................................................
+  [toggle]  incident.senior-management.notify
+      incident.senior-management.notify
+          en: Record that Senior Management was notified of a Material incident (a manual stamp, not part of the classify/co-sign pair)
+          ar: ................................................................
+  [toggle]  internal-audit.close
+      internal-audit.close
+          en: Close an internal audit finding after remediation
+          ar: ................................................................
+  [toggle]  internal-audit.record
+      internal-audit.record
+          en: Record an internal audit finding
+          ar: ................................................................
+  [toggle]  internal-controls.view
+      internal-controls.view
+          en: View the periodic self-approval (maker/checker) audit report
+          ar: ................................................................
+  [toggle]  license.manage
+      license.manage
+          en: Manage the broker's regulatory license record
+          ar: ................................................................
+  [toggle]  pi-policy.manage
+      pi-policy.manage
+          en: Manage the broker's own Professional Indemnity policy record
+          ar: ................................................................
+  [toggle]  risk-register.manage
+      risk-register.manage
+          en: Manage the operational/cyber/financial/compliance/reputational risk register
+          ar: ................................................................
+  [toggle]  sanctions-pep.screen
+      sanctions-pep.screen
+          en: Run recurring sanctions screening batches
+          ar: ................................................................
+  [toggle]  workflow-history.read
+      workflow-history.read
+          en: Read workflow-state transition history for a record
+          ar: ................................................................
+
+MODULE: customer   —   العملاء   (3 codes)
+------------------------------------------------------------------------------------------------
+
+  [toggle]  customer.all-owners.read
+      customer.all-owners.read
+          en: See any Customer file regardless of which Sales/Relationship Officer owns it (Compliance needs it for KYC; the External Auditor reads across the org by design)
+          ar: ................................................................
+  [toggle]  customer.bulk-import
+      customer.bulk-import
+          en: Load an office legacy customer file (Part III §7) — a bulk write path, distinct from creating one customer
+          ar: ................................................................
+  [toggle]  customer.national-id.reveal
+      customer.national-id.reveal
+          en: Reveal a customer's unmasked national ID with a written justification (Part 10.2 Highly Confidential; the contact fields on the same endpoint stay under customer.360-view.read)
+          ar: ................................................................
+
+MODULE: customer-service   —   خدمة العملاء   (8 codes)
+------------------------------------------------------------------------------------------------
+
+  [toggle]  communication.send
+      communication.send
+          en: Send a logged customer communication (channel/consent-checked)
+          ar: ................................................................
+  [toggle]  complaint.close
+      complaint.close
+          en: Close a complaint (mandatory supervisor sign-off)
+          ar: ................................................................
+  [toggle]  complaint.escalate
+      complaint.escalate
+          en: Escalate a complaint to the Insurance Dispute Resolution Committee
+          ar: ................................................................
+  [toggle]  complaint.log
+      complaint.log
+          en: Log a complaint
+          ar: ................................................................
+  [toggle]  feedback.log
+      feedback.log
+          en: Log customer feedback
+          ar: ................................................................
+  [toggle]  retention-case.manage
+      retention-case.manage
+          en: Manage a retention case opened on renewal inactivity/lapse risk
+          ar: ................................................................
+  [toggle]  service-request.manage
+      service-request.manage
+          en: Handle a customer service request (certificate/copy/change)
+          ar: ................................................................
+  [toggle]  sla-dashboard.view
+      sla-dashboard.view
+          en: Monitor the SLA dashboard across modules
+          ar: ................................................................
+
+MODULE: finance   —   المالية   (16 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] payment-channel   (create / deactivate / read)
+      payment-channel.create
+          en: Add a payment channel to the approved list for a customer or insurer
+          ar: ................................................................
+      payment-channel.deactivate
+          en: Disable an approved payment channel so no further money is sent to it
+          ar: ................................................................
+      payment-channel.read
+          en: List the approved payment channels for a customer or insurer, as needed when recording a receipt or a remittance
+          ar: ................................................................
+  [toggle]  client-accounting.read
+      client-accounting.read
+          en: View the client accounts-receivable/ageing report
+          ar: ................................................................
+  [toggle]  commission-override.approve
+      commission-override.approve
+          en: Approve a manual commission override (separately logged from the raiser)
+          ar: ................................................................
+  [toggle]  commission-override.raise
+      commission-override.raise
+          en: Raise a manual commission override with a mandatory reason
+          ar: ................................................................
+  [toggle]  commission-rate.manage
+      commission-rate.manage
+          en: Alter a commission rate agreement/table (Finance may never do this without approval)
+          ar: ................................................................
+  [toggle]  commission.calculate
+      commission.calculate
+          en: Apply the governed commission rate from the agreement table
+          ar: ................................................................
+  [toggle]  commission.reconcile
+      commission.reconcile
+          en: Reconcile a commission ledger entry against the insurer statement and mark it paid
+          ar: ................................................................
+  [toggle]  financial-report.view
+      financial-report.view
+          en: View financial reporting/dashboards
+          ar: ................................................................
+  [toggle]  insurer-accounting.read
+      insurer-accounting.read
+          en: View insurer accounts-payable/remittance obligations
+          ar: ................................................................
+  [toggle]  invoice.create
+      invoice.create
+          en: Raise a premium invoice
+          ar: ................................................................
+  [toggle]  receipt.record
+      receipt.record
+          en: Record a collection receipt
+          ar: ................................................................
+  [toggle]  reconciliation-exception.investigate
+      reconciliation-exception.investigate
+          en: Investigate a bank-reconciliation variance exception
+          ar: ................................................................
+  [toggle]  reconciliation-exception.resolve
+      reconciliation-exception.resolve
+          en: Close a reconciliation exception
+          ar: ................................................................
+  [toggle]  remittance.record
+      remittance.record
+          en: Record a remittance to an insurer
+          ar: ................................................................
+
+MODULE: insurance-operations   —   العمليات التأمينية   (51 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] email.integration   (manage / read)
+      email.integration.manage
+          en: Connect, test or disconnect this office's own outbound mailbox (Part I §6). Holds the OAuth consent that lets the platform send as a real company address, so it is administrator-only.
+          ar: ................................................................
+      email.integration.read
+          en: See which mailbox this office sends from and whether it is working (Part I §6). Never exposes the stored credential.
+          ar: ................................................................
+  [5-STATE] endorsement   (create / read)
+      endorsement.create
+          en: Request a positive/negative endorsement
+          ar: ................................................................
+      endorsement.read
+          en: List/read endorsements, their premium adjustment, the tied commission reversal, the refund approval state and the versioned coverage schedule
+          ar: ................................................................
+  [5-STATE] insurance-line   (create / update)
+      insurance-line.create
+          en: Add a line of business to this office's vocabulary
+          ar: ................................................................
+      insurance-line.update
+          en: Correct a line of business this office added
+          ar: ................................................................
+  [5-STATE] insurer   (create / deactivate / read / update)
+      insurer.create
+          en: Register an insurer for this office, whether it is in the global catalogue or in none
+          ar: ................................................................
+      insurer.deactivate
+          en: Stop and resume dealing with an insurer, and read the live impact of doing so
+          ar: ................................................................
+      insurer.read
+          en: Read this office's own insurer relationships — contacts, credit terms, financial strength and the lines they offer
+          ar: ................................................................
+      insurer.update
+          en: Maintain this office's own record of an insurer and its relationship terms
+          ar: ................................................................
+  [5-STATE] opportunity   (create / read)
+      opportunity.create
+          en: Create an Opportunity from a finalized Insurance Program
+          ar: ................................................................
+      opportunity.read
+          en: List/read Opportunities
+          ar: ................................................................
+  [5-STATE] policy   (create / read)
+      policy.create
+          en: Create a Policy from an accepted Opportunity
+          ar: ................................................................
+      policy.read
+          en: List/read policies, their coverage schedules, electronic-file documents and the quality-control check result
+          ar: ................................................................
+  [5-STATE] renewal   (manage / read)
+      renewal.manage
+          en: Run the renewal lead-time sweep, walk a renewal case through RenewalStatus, and set its re-marketing triggers
+          ar: ................................................................
+      renewal.read
+          en: List/read renewal cases, their lead-time window and loss ratio
+          ar: ................................................................
+  [5-STATE] rfq   (create / read)
+      rfq.create
+          en: Create an RFQ and select an insurer shortlist
+          ar: ................................................................
+      rfq.read
+          en: List/read RFQs and insurer submissions
+          ar: ................................................................
+  [toggle]  cancellation.create
+      cancellation.create
+          en: Raise a cancellation request (short-period/pro-rata)
+          ar: ................................................................
+  [toggle]  client-decision.capture
+      client-decision.capture
+          en: Capture the client's single decision on a sent recommendation (Process 17) — routes the Opportunity to placement / close / renewed negotiation
+          ar: ................................................................
+  [toggle]  client-decision.read
+      client-decision.read
+          en: List/read the client decision and its routing outcome
+          ar: ................................................................
+  [toggle]  commission-reversal.create
+      commission-reversal.create
+          en: NOT YET ENFORCED — a commission reversal is recorded in the same transaction as its refund, under endorsement.apply. Granting or withdrawing this changes nothing today
+          ar: ................................................................
+  [toggle]  comparison.build
+      comparison.build
+          en: Build/rebuild the quote comparison matrix from the current-version quotations
+          ar: ................................................................
+  [toggle]  comparison.read
+      comparison.read
+          en: List/read the quote comparison matrix
+          ar: ................................................................
+  [toggle]  conflict-of-interest.disclose
+      conflict-of-interest.disclose
+          en: Record the mandatory conflict-of-interest disclosure for a flagged recommendation before it can be sent (Process 16). The acknowledger must differ from the drafter (assertDifferentActors).
+          ar: ................................................................
+  [toggle]  endorsement.all-owners.read
+      endorsement.all-owners.read
+          en: See any Endorsement regardless of owner (Finance handles the premium adjustment an endorsement produces)
+          ar: ................................................................
+  [toggle]  endorsement.apply
+      endorsement.apply
+          en: Advance a confirmed endorsement through the financial-adjustment / apply steps and version the policy schedule
+          ar: ................................................................
+  [toggle]  endorsement.discard
+      endorsement.discard
+          en: Mark an endorsement raised in error as discarded, before it is applied — terminal, with a mandatory reason
+          ar: ................................................................
+  [toggle]  insurer.directory.read
+      insurer.directory.read
+          en: Search the cross-office insurer directory — companies any office has registered, with their public contact details and the lines they offer. Never shows which offices deal with a company, or any office's commercial terms.
+          ar: ................................................................
+  [toggle]  insurer.form.map
+      insurer.form.map
+          en: Map an insurer's official submission form for one product line (Part I §5). Platform-wide in effect: the mapping becomes the form every other office submits against, which is why it is not granted to the roles that merely consume it.
+          ar: ................................................................
+  [toggle]  insurer.master.read
+      insurer.master.read
+          en: Read the GLOBAL insurer master registry and the form mappings shared across every Organization (Part I §5). Carries no per-office commercial terms — those are on the tenant-scoped Insurer row.
+          ar: ................................................................
+  [toggle]  insurer.office-form.map
+      insurer.office-form.map
+          en: Map THIS OFFICE's own copy of an insurer's submission form, for a company it deals with directly (Q9). Office-scoped in effect: the mapping is readable only by this office, takes precedence over the shared mapping for this office's own submissions, and never alters the shared one. Unlike insurer.form.map it may point at a line this office added itself.
+          ar: ................................................................
+  [toggle]  opportunity.set-target-threshold
+      opportunity.set-target-threshold
+          en: Set/clear the Opportunity's configurable premium threshold that triggers senior-officer approval of the recommendation (Process 16)
+          ar: ................................................................
+  [toggle]  policy.all-owners.read
+      policy.all-owners.read
+          en: See any Policy regardless of who owns its Customer (the Policy Checking Officer's Process 20 quality control is a cross-book control function)
+          ar: ................................................................
+  [toggle]  policy.check
+      policy.check
+          en: Independently check an issued policy against requested coverage line-by-line (maker/checker: never the officer who placed it) — a discrepancy blocks Delivery and auto-logs a PI risk event
+          ar: ................................................................
+  [toggle]  policy.deliver
+      policy.deliver
+          en: Record policy delivery date/method/recipient/acknowledgement
+          ar: ................................................................
+  [toggle]  policy.discard
+      policy.discard
+          en: Mark a policy raised in error as discarded, before it is issued — terminal, with a mandatory reason
+          ar: ................................................................
+  [toggle]  policy.issue
+      policy.issue
+          en: Record the insurer-issued policy/schedule/certificates/invoice
+          ar: ................................................................
+  [toggle]  quotation.capture
+      quotation.capture
+          en: Capture an insurer's quotation
+          ar: ................................................................
+  [toggle]  quotation.negotiate
+      quotation.negotiate
+          en: Record a negotiation round as a new quotation version (the prior version is never deleted or replaced — Process 15)
+          ar: ................................................................
+  [toggle]  quotation.read
+      quotation.read
+          en: List/read insurer quotations and their version history
+          ar: ................................................................
+  [toggle]  recommendation.approve
+      recommendation.approve
+          en: Approve a recommendation above the configurable premium threshold before it is sent to the client (maker/checker: never the drafter)
+          ar: ................................................................
+  [toggle]  recommendation.discard
+      recommendation.discard
+          en: Mark a recommendation drafted in error as discarded, before it is sent to the client — terminal, with a mandatory reason
+          ar: ................................................................
+  [toggle]  recommendation.draft
+      recommendation.draft
+          en: Draft the broker recommendation with documented rationale (all six factors: coverage/price/financial strength/claims service/deductible/policy conditions)
+          ar: ................................................................
+  [toggle]  recommendation.read
+      recommendation.read
+          en: List/read broker recommendations and their approval / conflict-of-interest state
+          ar: ................................................................
+  [toggle]  recommendation.send
+      recommendation.send
+          en: Send an approved / cleared recommendation to the client
+          ar: ................................................................
+  [toggle]  refund.approve
+      refund.approve
+          en: Approve a refund at or above the configurable value threshold (maker/checker: never the raiser)
+          ar: ................................................................
+  [toggle]  refund.disburse
+      refund.disburse
+          en: Disburse an approved refund (stamp paidAt and book the client-funds out movement)
+          ar: ................................................................
+  [toggle]  refund.raise
+      refund.raise
+          en: NOT YET ENFORCED — reserved for a standalone refund raise (an overpayment not tied to an endorsement). Granting or withdrawing this changes nothing today: an endorsement-driven refund is raised under endorsement.apply
+          ar: ................................................................
+  [toggle]  rfq.communication.log
+      rfq.communication.log
+          en: Record an inbound insurer query or an outbound response / additional-information note on an RFQ (Process 12). Reading the correspondence is covered by rfq.read.
+          ar: ................................................................
+  [toggle]  rfq.insurer.update
+      rfq.insurer.update
+          en: Update an insurer's RFQ response status
+          ar: ................................................................
+
+MODULE: management-reporting   —   management-reporting   (13 codes)
+------------------------------------------------------------------------------------------------
+
+  [toggle]  dashboard.claims.view
+      dashboard.claims.view
+          en: View the Claims dashboard
+          ar: ................................................................
+  [toggle]  dashboard.compliance.view
+      dashboard.compliance.view
+          en: View the Compliance dashboard
+          ar: ................................................................
+  [toggle]  dashboard.executive.view
+      dashboard.executive.view
+          en: View the executive management dashboard
+          ar: ................................................................
+  [toggle]  dashboard.financial.view
+      dashboard.financial.view
+          en: View the Financial dashboard
+          ar: ................................................................
+  [toggle]  dashboard.policy.view
+      dashboard.policy.view
+          en: View the Policy dashboard
+          ar: ................................................................
+  [toggle]  dashboard.sales.view
+      dashboard.sales.view
+          en: View the Sales KPI dashboard
+          ar: ................................................................
+  [toggle]  employee-performance.view
+      employee-performance.view
+          en: View employee performance KPIs
+          ar: ................................................................
+  [toggle]  insurer-performance.view
+      insurer-performance.view
+          en: View insurer performance scores
+          ar: ................................................................
+  [toggle]  kpi-dashboard.view
+      kpi-dashboard.view
+          en: View the general KPI dashboard across every module
+          ar: ................................................................
+  [toggle]  planning-export.generate
+      planning-export.generate
+          en: Export portfolio/market data for strategic planning
+          ar: ................................................................
+  [toggle]  portfolio-analysis.view
+      portfolio-analysis.view
+          en: View portfolio analysis by line/insurer/segment/geography
+          ar: ................................................................
+  [toggle]  profitability-analysis.view
+      profitability-analysis.view
+          en: View profitability analysis (commission income vs. cost-to-serve)
+          ar: ................................................................
+  [toggle]  sales-target.manage
+      sales-target.manage
+          en: Set and revise sales targets per employee/team
+          ar: ................................................................
+
+MODULE: pdpl   —   حماية البيانات   (16 codes)
+------------------------------------------------------------------------------------------------
+
+  [toggle]  consent.manage
+      consent.manage
+          en: Capture/withdraw consent at a defined touchpoint
+          ar: ................................................................
+  [toggle]  cross-border-transfer.approve
+      cross-border-transfer.approve
+          en: Approve a cross-border personal-data transfer
+          ar: ................................................................
+  [toggle]  data-sharing.approve
+      data-sharing.approve
+          en: Approve a third-party data-sharing request
+          ar: ................................................................
+  [toggle]  data-sharing.request
+      data-sharing.request
+          en: Request a one-off data share with a third party
+          ar: ................................................................
+  [toggle]  dpia.review
+      dpia.review
+          en: Review a DPIA screening result / escalate to a Full DPIA
+          ar: ................................................................
+  [toggle]  dpo-workspace.view
+      dpo-workspace.view
+          en: View the DPO Workspace aggregate screen (consent, DSR, incident, DPIA, Legal Hold, cross-border transfer registers)
+          ar: ................................................................
+  [toggle]  dsr.close
+      dsr.close
+          en: Close a Data Subject Request (never closeable while a retention flag is open)
+          ar: ................................................................
+  [toggle]  dsr.handle
+      dsr.handle
+          en: Work a DSR as its assigned DPO handler
+          ar: ................................................................
+  [toggle]  dsr.log
+      dsr.log
+          en: Log a Data Subject Request the same business day it is received
+          ar: ................................................................
+  [toggle]  legal-hold.manage
+      legal-hold.manage
+          en: Place/review a Legal Hold
+          ar: ................................................................
+  [toggle]  privacy-notice.publish
+      privacy-notice.publish
+          en: Publish a version-controlled bilingual privacy notice
+          ar: ................................................................
+  [toggle]  privacy-notice.read
+      privacy-notice.read
+          en: Read the privacy notice applicable to a touchpoint (read-only; publishing is a separate permission)
+          ar: ................................................................
+  [toggle]  retention-schedule.manage
+      retention-schedule.manage
+          en: Maintain the retention-period table (record categories, months, Legal Counsel confirmation)
+          ar: ................................................................
+  [toggle]  retention.dispose.approve
+      retention.dispose.approve
+          en: Give final DPO approval on a disposal batch (checker side of dual control)
+          ar: ................................................................
+  [toggle]  retention.dispose.nominate
+      retention.dispose.nominate
+          en: Nominate a disposal batch (maker side of dual control)
+          ar: ................................................................
+  [toggle]  ropa.manage
+      ropa.manage
+          en: Maintain the Records of Processing Activities register
+          ar: ................................................................
+
+MODULE: sla   —   مستويات الخدمة   (7 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] sla.policy   (create / deactivate / read / update)
+      sla.policy.create
+          en: Create an SLA policy — its duration, calendar and escalation stages
+          ar: ................................................................
+      sla.policy.deactivate
+          en: Switch an SLA policy off so it stops applying, and switch a dormant one back on
+          ar: ................................................................
+      sla.policy.read
+          en: View configured SLA policies and their source/provenance
+          ar: ................................................................
+      sla.policy.update
+          en: Correct an SLA policy's duration, calendar or escalation stages
+          ar: ................................................................
+  [toggle]  sla.holiday.create
+      sla.holiday.create
+          en: Add a public holiday to the business-day calendar every SLA deadline is counted against
+          ar: ................................................................
+  [toggle]  sla.policy.regulatory
+      sla.policy.regulatory
+          en: Change an SLA policy's source type and regulatory citation — i.e. whether the system claims the deadline is legally required
+          ar: ................................................................
+  [toggle]  sla.timer.pause
+      sla.timer.pause
+          en: Pause and resume a running SLA clock, with a recorded reason
+          ar: ................................................................
+
+MODULE: supporting-operations   —   العمليات المساندة   (17 codes)
+------------------------------------------------------------------------------------------------
+
+  [5-STATE] document   (create / read)
+      document.create
+          en: Upload a document and add a new version of one
+          ar: ................................................................
+      document.read
+          en: View the document register, a document, and the classification summary
+          ar: ................................................................
+  [5-STATE] employee   (create / read / update)
+      employee.create
+          en: Create an employee (HR) record
+          ar: ................................................................
+      employee.read
+          en: View employee records and their licensing/training history
+          ar: ................................................................
+      employee.update
+          en: Correct an existing employee record
+          ar: ................................................................
+  [5-STATE] vendor   (create / deactivate / read / update)
+      vendor.create
+          en: Register a vendor
+          ar: ................................................................
+      vendor.deactivate
+          en: Terminate a vendor and revoke its access
+          ar: ................................................................
+      vendor.read
+          en: View the vendor register, a vendor's record, and its data-share readiness
+          ar: ................................................................
+      vendor.update
+          en: Correct a vendor record, set its risk tier, record an annual review, raise and sign a data-processing agreement
+          ar: ................................................................
+  [toggle]  bcp-dr.manage
+      bcp-dr.manage
+          en: Manage Business Continuity / Disaster Recovery plans
+          ar: ................................................................
+  [toggle]  deprovisioning.execute
+      deprovisioning.execute
+          en: Execute the access de-provisioning checklist on an employment-status change
+          ar: ................................................................
+  [toggle]  document.delete-override
+      document.delete-override
+          en: Logged privileged override to delete a document (deletion is disabled by default)
+          ar: ................................................................
+  [toggle]  dpa.approve
+      dpa.approve
+          en: Give High-tier DPO approval on a Data Processing Agreement
+          ar: ................................................................
+  [toggle]  employee.national-id.reveal
+      employee.national-id.reveal
+          en: Reveal an employee's unmasked national ID with a written justification (Part 10.2 Highly Confidential; every reveal is an audited sensitive read)
+          ar: ................................................................
+  [toggle]  information-asset.manage
+      information-asset.manage
+          en: Manage the ISO 27001 information asset inventory
+          ar: ................................................................
+  [toggle]  kb.publish
+      kb.publish
+          en: Publish a knowledge-base article
+          ar: ................................................................
+  [toggle]  training.record
+      training.record
+          en: Record security-awareness training completion
+          ar: ................................................................
+================================================================================================
+TOTALS: 20 five-state families covering 56 codes, 160 toggles, 216 codes in all.

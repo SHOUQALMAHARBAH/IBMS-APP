@@ -26,8 +26,8 @@ export interface Customer {
   familyName: string | null;
   // Part B §11 screening discriminators. The api has always returned these in
   // the clear - deliberately, so a reviewer can tell two people of the same
-  // name apart - but the web type never declared them. CustomerPicker is the
-  // first thing to need exactly that.
+  // name apart - but the web type never declared them. The customer source of
+  // EntitySearch is what needs exactly that, for its disambiguation line.
   dateOfBirth: string | null;
   nationality: string | null;
   registrationNumber: string | null;

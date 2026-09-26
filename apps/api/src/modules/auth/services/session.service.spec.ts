@@ -52,6 +52,9 @@ function makeUser(overrides: Partial<User> = {}): User {
     id: 'user-1',
     organizationId: 'org-1',
     fullName: 'Test User',
+    // Recorded only — no external authentication sits behind `WINDOWS`. Named here rather than cast
+    // away so that a future value cannot slip into a fixture without a decision.
+    registrationType: 'DEFAULT',
     mustChangePassword: false,
     mfaMethod: null,
     mfaEnrolledAt: null,

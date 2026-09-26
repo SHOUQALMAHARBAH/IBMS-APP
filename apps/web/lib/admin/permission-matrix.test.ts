@@ -1,0 +1,165 @@
+import { describe, expect, it } from 'vitest';
+import { buildMatrix, codesOfRow, familyOf, grantedInModule, verbOf } from './permission-matrix';
+import { machineNameProblem, toMachineName } from './role-name';
+import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
+
+/**
+ * The catalogue fixture is generated from the seeded database (`npm run db:fixture:permissions`),
+ * so these assertions run against the REAL catalogue rather than a hand-written sample — the count is
+ * pinned in the test below rather than quoted here, because a figure in a comment is the half that
+ * rots. That is
+ * deliberate: the owner asked for the rule to be checkable rather than the number trusted, and
+ * pinning the counts here means ADDING A PERMISSION FAILS THIS TEST instead of quietly changing
+ * what the screen shows.
+ */
+describe('the permission matrix is derived from the catalogue, not hard-coded', () => {
+  const matrix = buildMatrix(PERMISSION_CATALOGUE);
+
+  it('covers every code exactly once', () => {
+    const covered = matrix.flatMap((m) => m.rows.flatMap(codesOfRow)).sort();
+    const all = PERMISSION_CATALOGUE.map((p) => p.code).sort();
+    expect(covered).toEqual(all);
+    // No code may appear in two rows: a permission granted from two controls is a permission whose
+    // state the screen cannot show honestly.
+    expect(new Set(covered).size).toBe(covered.length);
+  });
+
+  it('groups into the 12 modules the catalogue declares', () => {
+    expect(matrix.length).toBe(12);
+    expect(matrix.map((m) => m.module)).toEqual([...matrix.map((m) => m.module)].sort());
+  });
+
+  it('applies five states to exactly the CRUD-shaped families, and a toggle to the rest', () => {
+    const crud = matrix.flatMap((m) => m.rows.filter((r) => r.kind === 'crud'));
+    const toggles = matrix.flatMap((m) => m.rows.filter((r) => r.kind === 'toggle'));
+
+    // THE MEASURED SHAPE. If a permission is added, one of these numbers changes and this test
+    // fails — which is the alarm, not an inconvenience. Re-measure and update deliberately.
+    // Recomputed after four-action Phase 1: four umbrellas became 14 successors and two ride-along
+    // actions got their own codes. 194 -> 206. The previous pins were 194 / 15 / 35 / 159 and this test
+    // FAILED on them, which is the alarm working — twice now, for the same reason. Not loosened, not a
+    // range, not read from the source it checks.
+    //
+    // The interesting movement is 35 -> 51 five-state codes against 159 -> 155 toggles: splitting an
+    // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
+    // scheme becoming visible on the screen, which is the point of it.
+    //
+    // 213 -> 216 (four-action Phase 4, second umbrella, owner-ruled: `sla.policy.manage` becomes
+    // `.create` / `.update` / `.deactivate` PLUS `sla.holiday.create`). Four successors for one umbrella
+    // because it gated two ENTITIES — SLA policies and the business-day holiday calendar — which is
+    // `insurer.relationship.manage`'s case, not `payment-channel.manage`'s.
+    //
+    // The families count does NOT move: `sla.policy` was ALREADY a family, because `.read` and `.manage`
+    // are both CRUD verbs and two is the threshold. It grows from 2 members to 4. And `sla.holiday.create`
+    // is a lone CRUD verb in its own family, so it lands in the TOGGLE list — the mirror of what
+    // `payment-channel` did one commit ago, where a toggle became a family. Same rule, opposite direction,
+    // which is why the four numbers are pinned separately rather than as one total.
+    //
+    // 211 -> 213 (four-action Phase 4: `payment-channel.manage` becomes `.read` / `.create` /
+    // `.deactivate`). This one MOVES A ROW BETWEEN THE TWO LISTS, which is the movement worth reading:
+    // the umbrella was a TOGGLE, because `familyOf` gave it the family `payment-channel` with exactly one
+    // member and one CRUD verb is not a family. Three members with three CRUD verbs qualifies, so
+    // families go 19 -> 20, family codes 51 -> 54, and toggles go 160 -> 159 — one fewer toggle out of a
+    // split that added two codes. That arithmetic is the scheme working, and it is why these four numbers
+    // are pinned separately rather than as one total.
+    //
+    // 210 -> 211 (Part 4 step 4: `duty-segregation.mode.declare` — the office administrator declaring
+    // whether this office separates the two halves of a maker/checker pair). A TOGGLE, like the four
+    // discard codes below: declaring a governance posture is not a point on the
+    // none/read/write/delete/full scale.
+    //
+    // 206 -> 210 (Class B piece 1: `policy.discard`, `claim.discard`, `endorsement.discard`,
+    // `recommendation.discard`). All four land in the TOGGLE list, 155 -> 159, and the five-state rows do
+    // not move: `discard` is not one of the seven CRUD verbs a family row is built from, and it should not
+    // become one. A five-state control offers none / read / read+write / +delete / full, and a discard is not
+    // a point on that scale — it is a separate act with its own terminal semantics. An office granting
+    // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
+    // rendering it as its own checkbox.
+    expect(PERMISSION_CATALOGUE.length).toBe(216);
+    expect(crud.length).toBe(20);
+    expect(crud.flatMap(codesOfRow).length).toBe(56);
+    expect(toggles.length).toBe(160);
+    expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
+  });
+
+  it('every five-state row really has two or more CRUD verbs — the rule, not the count', () => {
+    const VERBS = ['read', 'create', 'update', 'delete', 'deactivate', 'view', 'manage'];
+    for (const row of matrix.flatMap((m) => m.rows)) {
+      if (row.kind !== 'crud') continue;
+      const verbs = Object.keys(row.codes);
+      expect(verbs.length, `${row.family} qualified with ${verbs.length} verb(s)`).toBeGreaterThanOrEqual(2);
+      for (const verb of verbs) expect(VERBS).toContain(verb);
+    }
+  });
+
+  it('never invents a state a family does not have', () => {
+    // A family with read/create/update and no delete must show four controls, not five with one
+    // that would grant a code the catalogue does not contain.
+    for (const row of matrix.flatMap((m) => m.rows)) {
+      if (row.kind !== 'crud') continue;
+      for (const [verb, code] of Object.entries(row.codes)) {
+        expect(code).toBe(`${row.family}.${verb}`);
+        expect(PERMISSION_CATALOGUE.map((p) => p.code)).toContain(code);
+      }
+    }
+  });
+
+  it('counts a module the way the collapsed view shows it', () => {
+    const picked = matrix.find((m) => m.codes.length > 3)!;
+    const granted = new Set(picked.codes.slice(0, 3));
+    expect(grantedInModule(picked, granted)).toBe(3);
+    expect(grantedInModule(picked, new Set())).toBe(0);
+    expect(grantedInModule(picked, new Set(picked.codes))).toBe(picked.codes.length);
+  });
+
+  it('splits a code into family and verb', () => {
+    expect(familyOf('customer.360-view.read')).toBe('customer.360-view');
+    expect(verbOf('customer.360-view.read')).toBe('read');
+    // A single-segment code is its own family rather than throwing.
+    expect(familyOf('audit')).toBe('audit');
+  });
+});
+
+describe('the machine name is generated, and refused when it would be unreadable', () => {
+  it('reads back to the role it names', () => {
+    expect(toMachineName('Claims Triage Desk')).toBe('CLAIMS_TRIAGE_DESK');
+    expect(toMachineName('  Senior   Underwriter  ')).toBe('SENIOR_UNDERWRITER');
+    expect(toMachineName('Finance / Collections')).toBe('FINANCE_COLLECTIONS');
+    expect(toMachineName('Café Manager')).toBe('CAFE_MANAGER');
+    expect(toMachineName('HR')).toBe('HR');
+  });
+
+  it('never leaves a dangling or doubled underscore', () => {
+    expect(toMachineName('!!Claims!!')).toBe('CLAIMS');
+    expect(toMachineName('a---b')).toBe('A_B');
+    expect(toMachineName('_lead_')).toBe('LEAD');
+  });
+
+  it('caps at the 100 characters the API accepts', () => {
+    const generated = toMachineName('x'.repeat(250));
+    expect(generated.length).toBeLessThanOrEqual(100);
+    expect(generated.endsWith('_')).toBe(false);
+  });
+
+  it('REFUSES the cases that would store an identifier nobody can read', () => {
+    // Arabic in the English-name field folds away entirely — the measured real-world failure.
+    expect(machineNameProblem('دور جديد')).toBe('unreadable');
+    expect(toMachineName('دور جديد')).toBe('');
+    // Digits say nothing about which role this is.
+    expect(machineNameProblem('2024')).toBe('unreadable');
+    // Punctuation collapses to nothing.
+    expect(machineNameProblem('!!!')).toBe('unreadable');
+    // A single letter is not a name.
+    expect(machineNameProblem('A')).toBe('unreadable');
+    // Empty is its own case, so the screen can say "required" rather than "unreadable".
+    expect(machineNameProblem('   ')).toBe('empty');
+  });
+
+  it('accepts the shortest name that is still readable', () => {
+    expect(machineNameProblem('HR')).toBeNull();
+    expect(machineNameProblem('Claims Triage Desk')).toBeNull();
+    // Letters plus digits is fine — the letters carry the meaning.
+    expect(machineNameProblem('Tier 2 Support')).toBeNull();
+    expect(toMachineName('Tier 2 Support')).toBe('TIER_2_SUPPORT');
+  });
+});

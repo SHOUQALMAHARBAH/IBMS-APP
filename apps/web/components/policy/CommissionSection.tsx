@@ -16,6 +16,12 @@ import {
 import { ApiError } from '../../lib/auth/api-client';
 import { buttonStyle, errorStyle } from '../auth/auth-form.styles';
 import { quoteChainCardStyle, quoteFieldStyle } from '../quotation/quotation.styles';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -40,6 +46,11 @@ export function CommissionSection({
   canCalculate,
   canApproveOverride,
 }: Props) {
+  // Part 4 — read from the session rather than taken as a prop: the office's mode and the viewer's id are not
+  // facts about this opportunity, and threading them through would make every caller carry them.
+  const { user } = useAuth();
+  // The combined-duty reason, keyed by ledger entry so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
   const { language, t } = useLanguage();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [entry, setEntry] = useState<CommissionEntry | null>(null);
@@ -167,16 +178,53 @@ export function CommissionSection({
             </>
           ) : null}
 
-          {canApproveOverride && entry.overridePending ? (
-            <button
-              type="button"
-              style={buttonStyle}
-              disabled={busy}
-              onClick={() => void run(() => approveCommissionOverride(entry.id))}
-            >
-              {t('commissionApproveButton')}
-            </button>
-          ) : null}
+          {canApproveOverride && entry.overridePending
+            ? (() => {
+                // Part 4 — the person who raised the override may approve it in an office that has declared
+                // COMBINED, only by saying why. This is the pair where the money moves furthest from the
+                // governed rate, which is why it has a second signature at all.
+                const needs = needsCombinedDutyDeclaration({
+                  mode: user?.dutySegregationMode,
+                  makerUserId: entry.overrideRequestedByUserId,
+                  currentUserId: user?.id ?? '',
+                  alreadyDecided: entry.overrideApprovedByUserId != null,
+                });
+                const declaration = declarations[entry.id] ?? '';
+                return (
+                  <>
+                    {needs ? (
+                      <CombinedDutyReasonField
+                        id={entry.id}
+                        value={declaration}
+                        onChange={(next) =>
+                          setDeclarations((prev) => ({
+                            ...prev,
+                            [entry.id]: next,
+                          }))
+                        }
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      style={buttonStyle}
+                      disabled={
+                        busy || (needs && combinedDutyTooShort(declaration))
+                      }
+                      onClick={() =>
+                        void run(() =>
+                          approveCommissionOverride(
+                            entry.id,
+                            needs ? declaration.trim() : undefined,
+                          ),
+                        )
+                      }
+                    >
+                      {t('commissionApproveButton')}
+                    </button>
+                  </>
+                );
+              })()
+            : null}
 
           {canCalculate &&
           entry.status === 'outstanding' &&

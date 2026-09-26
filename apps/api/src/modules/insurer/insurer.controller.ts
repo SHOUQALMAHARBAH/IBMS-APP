@@ -33,10 +33,10 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  *
  * ## The permission split
  *
- * `insurer.read` renders the list and one record; `insurer.relationship.manage`
+ * `insurer.read` renders the list and one record; the `insurer.create`/`.update`/`.deactivate` codes
  * registers and edits. The office administrator holds BOTH — you cannot manage
  * records you cannot list — which is the same pairing the Role screen is built on
- * (`role.read` alongside `role.manage`).
+ * (`role.read` alongside the role write codes).
  *
  * `isActive` is not writable through the edit route. Deactivating an insurer is its
  * own act — `POST :id/deactivate`, with a reason, answering with what was outstanding
@@ -68,7 +68,7 @@ export class InsurerController {
 
   /** Registers an insurer by EITHER path — a link to the shared catalogue, or a
    *  company this office names itself. One endpoint, because it is one act. */
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurer.create')
   @Post()
   register(
     @Body() dto: RegisterInsurerDto,
@@ -77,7 +77,7 @@ export class InsurerController {
     return this.insurers.register(dto, user.id);
   }
 
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurer.update')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -95,7 +95,7 @@ export class InsurerController {
    * A GET that changes nothing, and the same count the deactivation writes to the audit
    * trail — so the screen and the record cannot drift apart.
    */
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurer.deactivate')
   @Get(':id/status-impact')
   statusImpact(@Param('id', ParseUUIDPipe) id: string) {
     return this.insurers.statusImpact(id);
@@ -110,7 +110,7 @@ export class InsurerController {
    * change — in-force policies, open renewal cases, unanswered RFQ submissions and
    * unsettled invoices — which are also written to the audit trail.
    */
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurer.deactivate')
   @Post(':id/deactivate')
   @HttpCode(200)
   deactivate(
@@ -124,7 +124,7 @@ export class InsurerController {
   /** Puts them back in play. A reason is optional here — refusing to let an office undo
    *  a deactivation for want of a sentence would be worse than an unexplained
    *  reactivation. */
-  @RequirePermissions('insurer.relationship.manage')
+  @RequirePermissions('insurer.deactivate')
   @Post(':id/reactivate')
   @HttpCode(200)
   reactivate(

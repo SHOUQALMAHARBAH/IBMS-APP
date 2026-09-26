@@ -128,6 +128,42 @@ export default function KnowledgeBasePage() {
         </p>
       ) : null}
 
+      <form onSubmit={onCreate} style={formStyle}>
+        <h2>{t('kbPublishSection')}</h2>
+        <label style={labelStyle}>
+          {t('kbTitleEn')}
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </label>
+        <label style={labelStyle}>
+          العنوان (Arabic, optional)
+          <input dir="rtl" value={titleAr} onChange={(e) => setTitleAr(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          Category
+          <select value={category} onChange={(e) => setCategory(e.target.value as KbCategory)}>
+            {KB_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {t(ENUM_LABEL.KbCategory[c])}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={labelStyle}>
+          {t('kbBodyEn')}
+          <textarea value={bodyEn} onChange={(e) => setBodyEn(e.target.value)} rows={4} />
+        </label>
+        <label style={labelStyle}>
+          النص (Arabic, optional)
+          <textarea dir="rtl" value={bodyAr} onChange={(e) => setBodyAr(e.target.value)} rows={4} />
+        </label>
+        {formError ? (
+          <p role="alert" style={errorStyle}>
+            {formError}
+          </p>
+        ) : null}
+        <button type="submit">{t('kbPublishButton')}</button>
+      </form>
+
       {articles ? (
         articles.length === 0 ? (
           <p style={{ color: 'var(--ink-secondary)' }}>{t('kbNone')}</p>
@@ -188,41 +224,6 @@ export default function KnowledgeBasePage() {
         <p>{t('kbLoading')}</p>
       )}
 
-      <form onSubmit={onCreate} style={formStyle}>
-        <h2>{t('kbPublishSection')}</h2>
-        <label style={labelStyle}>
-          {t('kbTitleEn')}
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <label style={labelStyle}>
-          العنوان (Arabic, optional)
-          <input dir="rtl" value={titleAr} onChange={(e) => setTitleAr(e.target.value)} />
-        </label>
-        <label style={labelStyle}>
-          Category
-          <select value={category} onChange={(e) => setCategory(e.target.value as KbCategory)}>
-            {KB_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {t(ENUM_LABEL.KbCategory[c])}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={labelStyle}>
-          {t('kbBodyEn')}
-          <textarea value={bodyEn} onChange={(e) => setBodyEn(e.target.value)} rows={4} />
-        </label>
-        <label style={labelStyle}>
-          النص (Arabic, optional)
-          <textarea dir="rtl" value={bodyAr} onChange={(e) => setBodyAr(e.target.value)} rows={4} />
-        </label>
-        {formError ? (
-          <p role="alert" style={errorStyle}>
-            {formError}
-          </p>
-        ) : null}
-        <button type="submit">{t('kbPublishButton')}</button>
-      </form>
     </main>
   );
 }

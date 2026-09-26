@@ -209,6 +209,36 @@ export class AuthService {
     // Resolved from the roles' own security attributes, not their names: a name
     // list could not recognise a role an office defined, so a custom role
     // silently qualified for the skip (see `RoleSecurityAttributes`).
+    // `mfaEnabled` is a FLAG; an active credential is the FACT. When they disagree — the flag set
+    // with nothing behind it — challenging the user is a dead end, not a control: there is no
+    // credential to check a code against, so every code they type is wrong and no screen offers a
+    // way out. Measured: a fresh account planted into that state answered `mfaRequired: true` with a
+    // challenge token, which the web renders as a six-digit box with no QR and nothing to pair.
+    //
+    // That state is reachable without anyone doing something stupid. Enrolment is TWO calls
+    // (`create` then `activate`), so an interrupted enrolment leaves an INACTIVE credential; a
+    // cleanup that deletes credentials without clearing the flag lands here; and so does any future
+    // "reset this user's MFA" action that forgets one of the two writes.
+    //
+    // So the honest reading of flag-without-credential is "enrolment owed", and the user is let
+    // through to a session — NOT to the application. `MfaRequiredGuard` keys on the same predicate
+    // and still refuses every route but enrolment itself, which is why this cannot be a bypass:
+    // both sides now ask the same question.
+    const activeCredentials = user.mfaEnabled
+      ? await this.mfaCredentials.findActiveByUser(user.id)
+      : [];
+
+    if (user.mfaEnabled && activeCredentials.length === 0) {
+      await this.audit.record({
+        userId: user.id,
+        action: 'LOGIN',
+        entityType: 'User',
+        entityId: user.id,
+        afterValue: { outcome: 'MFA_ENROLLMENT_OWED_FLAG_WITHOUT_CREDENTIAL' },
+      });
+      return this.issueSession(user, meta);
+    }
+
     if (user.mfaEnabled) {
       const security = roleSecurityAttributes(
         await this.users.getRoleRefs(user.id),
@@ -758,6 +788,10 @@ export class AuthService {
     const roles = roleRefs.map((r) => r.name);
     const config = await this.securityConfig.get();
     const stepUpFresh = await this.sessions.isStepUpFresh(sessionId);
+    // Part 4 — read alongside the rest rather than lazily: `me()` is the one response every screen already
+    // waits for, so folding this in costs one query on a path that already makes several, and saves every
+    // approve screen a second round trip to learn whether it must ask for a reason.
+    const office = await this.organizations.findById(user.organizationId);
     // Part IV §10.4 — the single source the frontend drives every conditional
     // render from. Roles alone are not enough: the permission grid is what
     // actually decides what an action requires, and a UI branching on role
@@ -800,6 +834,12 @@ export class AuthService {
       idleTimeoutMinutes: config.idleTimeoutMinutes,
       hardLogoutAfterIdleMinutes: config.hardLogoutAfterIdleMinutes,
       stepUpFresh,
+      // Part 4 — whether this office has declared that one person may perform both halves of a maker/checker
+      // pair. Here rather than behind its own permission because EVERY approve control needs it: in COMBINED
+      // mode a screen must offer a reason field when the actor is also the maker, and a screen that cannot
+      // know the mode either asks everybody for a reason or asks nobody and then 422s. Not sensitive — a
+      // governance posture, and anybody who can approve anything needs to know it.
+      dutySegregationMode: office?.dutySegregationMode ?? 'SEGREGATED',
     };
   }
 

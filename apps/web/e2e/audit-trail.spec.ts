@@ -96,6 +96,58 @@ test("browses the audit log, looks up workflow history, and looks up document hi
   await expect(page.getByText("v1 (requested)")).toBeVisible();
 });
 
+test("an action-and-date browse sends all three filters, and `to` covers the WHOLE last day", async ({
+  page,
+}) => {
+  // IMPROVEMENTS § 1.52 — "every DELETE last March" was unaskable from this screen while the API had
+  // accepted `action`, `from` and `to` all along.
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  const urls: string[] = [];
+  await page.route("http://localhost:4000/audit-trail?**", (route) => {
+    urls.push(route.request().url());
+    return route.fulfill({ status: 200, json: paged(AUDIT_ROWS) });
+  });
+
+  await page.goto("/audit-trail");
+  await expect(page.getByRole("heading", { name: "Audit Trail" })).toBeVisible();
+
+  await page.getByLabel("Action").selectOption("DELETE");
+  await page.getByLabel("From").fill("2026-03-01");
+  await page.getByLabel("To").fill("2026-03-31");
+  await page.getByRole("button", { name: "Browse" }).click();
+  await expect(page.getByRole("cell", { name: "Status change" }).first()).toBeVisible();
+
+  await expect.poll(() => urls.length, { message: "no browse request was sent" }).toBeGreaterThan(0);
+  const sent = new URL(urls[urls.length - 1]!);
+  expect(sent.searchParams.get("action")).toBe("DELETE");
+  expect(sent.searchParams.get("from")).toBe("2026-03-01T00:00:00.000Z");
+  // THE ASSERTION THAT MATTERS. `2026-03-31` as an instant is midnight at the START of the 31st, so a
+  // naive conversion drops the last day of every range a person enters — a wrong answer that looks
+  // complete. Asserting the date alone would pass against exactly that bug.
+  expect(sent.searchParams.get("to")).toBe("2026-03-31T23:59:59.999Z");
+});
+
+test("the WITHDRAWN action is offered, which is the one the discard exists to make findable", async ({
+  page,
+}) => {
+  // The web's `AuditAction` union was three values short — `DISCARD`, `SLA_ESCALATED` and
+  // `ENCRYPTION_KEY_USED` — and this dropdown is built from it, so those three would have been the
+  // actions nobody could filter for. `packages/db/prisma/audit-action-parity.spec.ts` guards the union
+  // against the database enum; this asserts the SCREEN actually offers one of the recovered values.
+  await mockAuth(page, ["EXTERNAL_AUDITOR"]);
+  await page.route("http://localhost:4000/audit-trail?**", (route) =>
+    route.fulfill({ status: 200, json: paged(AUDIT_ROWS) }),
+  );
+
+  await page.goto("/audit-trail");
+  const action = page.getByLabel("Action");
+  await expect(action).toBeVisible();
+  await action.selectOption("DISCARD");
+  await expect(action).toHaveValue("DISCARD");
+  await action.selectOption("SLA_ESCALATED");
+  await expect(action).toHaveValue("SLA_ESCALATED");
+});
+
 test("a user without any of the three permissions sees a friendly message per section", async ({
   page,
 }) => {

@@ -9,11 +9,11 @@ import { DataProcessingAgreementRepository } from '../../repositories/data-proce
 import { VendorRepository } from '../../repositories/vendor.repository';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** Process 71 (backlog Part C #71, Domain H) — `DataProcessingAgreement`'s
  * first real writer. The maker (`assessedByUserId`, this module's own
- * `vendor.manage`) and checker (`dpoApprovedByUserId`, `dpa.approve`)
+ * `vendor.update`) and checker (`dpoApprovedByUserId`, `dpa.approve`)
  * are two DISTINCT pre-seeded permission codes — the maker-checker
  * default, already anticipated by the DB `CHECK` constraint added in the
  * A.5 foundational work. */
@@ -25,6 +25,7 @@ export class DataProcessingAgreementService {
     private readonly dpas: DataProcessingAgreementRepository,
     private readonly vendors: VendorRepository,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   async create(
@@ -89,18 +90,28 @@ export class DataProcessingAgreementService {
   async dpoApprove(
     id: string,
     actorUserId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<DataProcessingAgreement> {
     const existing = await this.dpas.findById(id);
     if (!existing)
       throw new NotFoundException('Data Processing Agreement not found');
 
-    assertDifferentActors(
-      existing.assessedByUserId ?? '',
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'DataProcessingAgreement_maker_checker_distinct',
+      makerId: existing.assessedByUserId ?? '',
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'DataProcessingAgreement.dpoApprove',
       actorUserId,
-      'DataProcessingAgreement.dpoApprove',
-    );
+      reason: combinedDutyReason,
+    });
 
-    const approved = await this.dpas.dpoApprove(id, actorUserId);
+    const approved = await this.dpas.dpoApprove(
+      id,
+      actorUserId,
+      combinedDutyActId,
+    );
     if (!approved) {
       throw new ConflictException(
         `Data Processing Agreement ${id} has already been DPO-approved.`,

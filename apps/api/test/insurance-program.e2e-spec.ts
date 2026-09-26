@@ -588,13 +588,26 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
       // this pair ever changes `status` away from DRAFT concurrently, so it
       // always succeeds regardless of interleaving.
       expect(finalizeRes.status).toBe(201);
-      // reassemble() either committed its rewrite before finalize() locked
-      // the program (201), or lost the race and was cleanly rejected (409,
-      // InsuranceProgramRepository#reassembleLines returned null) — what
-      // must NEVER happen is a reassemble that "succeeds" after finalize()
-      // already committed FINALIZED, silently rewriting a finalized
-      // program's lines out from under the lock.
-      expect([201, 409]).toContain(reassembleRes.status);
+      // THREE legitimate outcomes, one per interleaving, and this list used to name only two — which
+      // made the test fail in CI on a real run for the one thing it is not about:
+      //
+      //   201 — reassemble committed its rewrite while the program was still DRAFT.
+      //   409 — it reached the status-conditional UPDATE and lost (`reassembleLines` returned null).
+      //   422 — finalize committed FIRST, so reassemble's own pre-check (`status !== 'DRAFT'`) saw
+      //         FINALIZED and refused before attempting anything.
+      //
+      // All three PROTECT the invariant; only the moment of refusal differs. What must NEVER happen
+      // is a reassemble that "succeeds" after finalize() committed FINALIZED, silently rewriting a
+      // finalized program's lines out from under the lock — and that is asserted below, on the
+      // stored basis, for every outcome rather than on the status alone.
+      expect([201, 409, 422]).toContain(reassembleRes.status);
+      if (reassembleRes.status === 422) {
+        // Make sure it is THAT 422 — the pre-check refusing a non-DRAFT program — and not some
+        // unrelated validation failure that would mean the race never happened at all.
+        expect((reassembleRes.body as { message: string }).message).toContain(
+          'DRAFT',
+        );
+      }
 
       const final = await request(app.getHttpServer())
         .get(`/insurance-programs/${programId}`)
@@ -611,8 +624,8 @@ describe('Product Recommendation / Program Design (e2e) — backlog Part C #7', 
         // locked in the freshly reassembled basis.
         expect(Number(property?.sumInsuredBasis)).toBe(9500000);
       } else {
-        // finalize() won: reassemble()'s guard found the program no longer
-        // DRAFT and touched nothing — the original basis survives untouched.
+        // finalize() won, whether reassemble found out at its pre-check (422) or at the conditional
+        // update (409): either way it touched nothing and the original basis survives untouched.
         expect(Number(property?.sumInsuredBasis)).toBe(500000);
       }
     });

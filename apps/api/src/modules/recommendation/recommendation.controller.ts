@@ -8,6 +8,7 @@ import {
   Query,
   StreamableFile,
 } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { RecommendationService } from './recommendation.service';
 import { RecommendationReportDocumentService } from './recommendation-report-document.service';
@@ -17,6 +18,7 @@ import { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dt
 import { DocumentLanguageQueryDto } from '../document-generation/dto/document-language-query.dto';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { DiscardDto } from '../../common/dto/discard.dto';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
 /** Process 16 — Broker Recommendation (backlog Part C #16, Domain B). Draft
@@ -86,8 +88,12 @@ export class RecommendationController {
    * when the recommendation is above the Opportunity's target threshold. */
   @RequirePermissions('recommendation.approve')
   @Post(':id/approve')
-  approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.recommendations.approve(id, user);
+  approve(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.recommendations.approve(id, dto, user);
   }
 
   /** Record the mandatory conflict-of-interest disclosure (acknowledger
@@ -109,5 +115,22 @@ export class RecommendationController {
   @Post(':id/send')
   send(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.recommendations.send(id, user);
+  }
+  /**
+   * Mark this recommendation as raised in error. Terminal, reason mandatory, and refused once the recommendation has been
+   * sent to the client — the record stays either way.
+   *
+   * ONE permission code, not two. `PermissionsGuard` ORs what it is given, so
+   * `@RequirePermissions('recommendation.discard', 'recommendation.create')` would let a holder of EITHER through alone,
+   * which is the opposite of the intent.
+   */
+  @RequirePermissions('recommendation.discard')
+  @Post(':id/discard')
+  discard(
+    @Param('id') id: string,
+    @Body() dto: DiscardDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.recommendations.discard(id, dto, user);
   }
 }

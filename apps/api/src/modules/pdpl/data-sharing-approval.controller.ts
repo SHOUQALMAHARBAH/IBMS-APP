@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { DataSharingApprovalService } from './data-sharing-approval.service';
 import { CreateDataSharingApprovalDto } from './dto/create-data-sharing-approval.dto';
@@ -39,8 +40,12 @@ export class DataSharingApprovalController {
 
   @RequirePermissions('data-sharing.approve')
   @Post(':id/approve')
-  approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.dataSharing.approve(id, user.id);
+  approve(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.dataSharing.approve(id, user.id, dto.combinedDutyReason);
   }
 
   @RequirePermissions('data-sharing.approve')

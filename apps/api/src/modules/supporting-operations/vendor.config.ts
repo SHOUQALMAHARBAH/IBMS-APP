@@ -31,7 +31,7 @@
  *      `common/maker-checker.util.ts`'s own covered-pairs table — this
  *      process is that pair's first real writer. `dpa.approve` (DPO only)
  *      was already pre-seeded as a DISTINCT permission code from
- *      `vendor.manage` — the maker-checker default (two codes), not the
+ *      `vendor.update` — the maker-checker default (two codes), not the
  *      `incident.classify` shared-permission exception.
  *   3. Mandatory annual review + confirmation of data return/destruction on
  *      termination + access revocation within 2 business days.
@@ -45,7 +45,7 @@
  *      withdrawal precedent for sourcing an SLA value straight from the
  *      backlog rather than inventing one).
  *
- * No new permission, no migration — `vendor.manage` and `dpa.approve` were
+ * No new permission, no migration at the time — `vendor.manage` (since split into four) and `dpa.approve` were
  * both already pre-seeded (Domain H's "seed before code" pattern, broken
  * once by #69, holding again here).
  */

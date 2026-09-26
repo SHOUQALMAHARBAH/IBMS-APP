@@ -250,7 +250,7 @@ describe('RBAC / access recertification (e2e)', () => {
   });
 
   describe('GET /rbac/roles, /rbac/permissions', () => {
-    it('is forbidden for a user without role.manage/permission.manage', async () => {
+    it('is forbidden for a user without the role write codes or permission.read', async () => {
       const app = await boot();
       const plain = await makeUser(app, 'rbac-plain');
       await request(app.getHttpServer())

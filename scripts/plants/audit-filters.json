@@ -1,0 +1,17 @@
+{
+  "to-date-taken-as-start-of-day": {
+    "file": "apps/web/app/(app)/audit-trail/page.tsx",
+    "from": "  return new Date(`${day}T23:59:59.999Z`).toISOString();",
+    "to": "  return new Date(`${day}T00:00:00.000Z`).toISOString();"
+  },
+  "action-filter-never-sent": {
+    "file": "apps/web/app/(app)/audit-trail/page.tsx",
+    "from": "      action: browseAction || undefined,",
+    "to": "      action: undefined,"
+  },
+  "discard-dropped-from-the-union-again": {
+    "file": "apps/web/lib/audit-trail/audit-trail-api.ts",
+    "from": "  | 'DISCARD'\n  | 'SLA_ESCALATED'",
+    "to": "  | 'SLA_ESCALATED'"
+  }
+}

@@ -4,6 +4,7 @@
 // mandatory conflict-of-interest disclosure, then send it to the client.
 
 import { apiFetchBlob, apiGet, apiPost } from '../auth/api-client';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export interface RecommendationInsurer {
   id: string;
@@ -77,6 +78,11 @@ export interface Recommendation {
   draftedByUserId: string;
   createdAt: string;
   blockedFromSend: string[];
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface DraftRecommendationInput {
@@ -100,8 +106,15 @@ export function draftRecommendation(
   return apiPost('/recommendations', input);
 }
 
-export function approveRecommendation(id: string): Promise<Recommendation> {
-  return apiPost(`/recommendations/${id}/approve`);
+export function approveRecommendation(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<Recommendation> {
+  return apiPost(`/recommendations/${id}/approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 export function discloseConflictOfInterest(

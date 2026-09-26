@@ -353,6 +353,12 @@ export class CommissionRepository {
        * race surface. */
       vatAmount: Prisma.Decimal;
     },
+    /**
+     * Part 4 — the declared combined-duty act, when the checker IS the maker in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person act. The column is what this pair's CHECK constraint
+     * reads: with it null, a self-approval is refused by the database whatever the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Prisma.BatchPayload> {
     return this.prisma.client.commissionLedgerEntry.updateMany({
       where: {
@@ -367,6 +373,7 @@ export class CommissionRepository {
         overrideApprovedByUserId: approverUserId,
         amount: expected.overrideAmount,
         vatAmount: expected.vatAmount,
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
       },
     });
   }

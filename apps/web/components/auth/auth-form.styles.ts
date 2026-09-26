@@ -152,3 +152,24 @@ export const helperLinkStyle: CSSProperties = {
   textAlign: 'center',
   color: 'var(--ink-brand)',
 };
+
+/**
+ * The manual-entry MFA key on `/settings/security` — the secret the QR encodes, shown as text for
+ * anyone whose authenticator is on this device or who cannot scan. Monospace and selectable,
+ * because it exists to be read and copied.
+ */
+export const manualKeyStyle: CSSProperties = {
+  display: 'block',
+  margin: '0.35rem 0',
+  padding: '0.5rem 0.6rem',
+  background: 'var(--surface-sunken)',
+  border: '1px solid var(--border-default)',
+  borderRadius: '0.35rem',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  fontSize: '0.95rem',
+  letterSpacing: '0.06em',
+  userSelect: 'all',
+  // A long key must wrap rather than widen the card.
+  overflowWrap: 'anywhere',
+  direction: 'ltr',
+};

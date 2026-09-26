@@ -6,6 +6,7 @@ import type {
   User,
 } from '@ibms/db';
 import { PrismaService } from '../prisma/prisma.service';
+import type { TenantTransactionClient } from '../prisma/tenant-scope.extension';
 
 export interface CreateEmployeeInput {
   id: string;
@@ -16,12 +17,22 @@ export interface CreateEmployeeInput {
   fatherName?: string;
   grandfatherName?: string;
   familyName: string;
+  /** The same four in English, and `fullNameEn` composed from them. Every one is optional and every
+   *  one is NULL on all 133 rows that predate migration 20261024100000: transliterating a real
+   *  person's name is a judgement, and nothing here guesses one. */
+  givenNameEn?: string;
+  fatherNameEn?: string;
+  grandfatherNameEn?: string;
+  familyNameEn?: string;
+  fullNameEn?: string;
   nationalIdEnc: string;
   position?: string;
   /** Spec §4.1.2 — the org-chart department. Optional: an employee can be
    * recorded before HR has placed them, and a linked account's own
    * `departmentId` is adopted by `linkUser` when this is left unset. */
   departmentId?: string;
+  /** §4.2.2's location axis. First written by the unified person form; see `CreateEmployeeDto`. */
+  branchId?: string;
   hireDate: Date;
   licensedRole?: string;
   confidentialityAgreementSignedAt?: Date;
@@ -81,8 +92,19 @@ export interface DeprovisioningChecklistUpdate {
 export class EmployeeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(input: CreateEmployeeInput): Promise<Employee> {
-    return this.prisma.client.employee.create({ data: input });
+  /**
+   * `tx` is how this write joins someone else's transaction.
+   *
+   * `UserAdminService.provision` creates a person and their account together, and the two rows must
+   * exist together or not at all — a failed second write would otherwise leave a person who half
+   * exists, with no way for whoever pressed Save to tell which half. Defaults to the ordinary client,
+   * so the person-only route is unchanged.
+   */
+  create(
+    input: CreateEmployeeInput,
+    tx?: TenantTransactionClient,
+  ): Promise<Employee> {
+    return (tx ?? this.prisma.client).employee.create({ data: input });
   }
 
   /** Correct an existing record. Deliberately narrow — see `UpdateEmployeeDto`

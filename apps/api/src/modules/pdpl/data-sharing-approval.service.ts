@@ -7,7 +7,6 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { assertSecureChannel } from '../security/secure-channel.util';
 import { DataSharingApprovalRepository } from '../../repositories/data-sharing-approval.repository';
 import { VendorRepository } from '../../repositories/vendor.repository';
@@ -21,6 +20,7 @@ import {
 } from './data-sharing-approval.config';
 import type { CreateDataSharingApprovalDto } from './dto/create-data-sharing-approval.dto';
 import type { ListDataSharingApprovalsQueryDto } from './dto/list-data-sharing-approvals-query.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 const DEFAULT_LIST_TAKE = 200;
 
@@ -41,6 +41,7 @@ export class DataSharingApprovalService {
     private readonly dpas: DataProcessingAgreementRepository,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   async create(
@@ -138,16 +139,27 @@ export class DataSharingApprovalService {
   async approve(
     id: string,
     actorUserId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<DataSharingApprovalView> {
     const existing = await this.load(id);
-    assertDifferentActors(
-      existing.requestedByUserId,
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'DataSharingApproval_maker_checker_distinct',
+      makerId: existing.requestedByUserId,
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'DataSharingApproval.approve',
       actorUserId,
-      'DataSharingApproval.approve',
-    );
+      reason: combinedDutyReason,
+    });
 
     const decidedAt = new Date();
-    const res = await this.repo.approve(id, actorUserId, decidedAt);
+    const res = await this.repo.approve(
+      id,
+      actorUserId,
+      decidedAt,
+      combinedDutyActId,
+    );
     if (res.count === 0) {
       throw new UnprocessableEntityException(
         `Data sharing request ${id} has already been decided.`,

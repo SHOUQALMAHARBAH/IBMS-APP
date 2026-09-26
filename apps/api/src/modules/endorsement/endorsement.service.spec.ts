@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
+import { assertDifferentActors } from '../../common/maker-checker.util';
 import { EndorsementService } from './endorsement.service';
 import type { EndorsementRepository } from '../../repositories/endorsement.repository';
 import type { PolicyRepository } from '../../repositories/policy.repository';
@@ -294,6 +295,35 @@ function makeDeps(opts: DepsOpts = {}) {
     });
   const workflow = { transition } as unknown as WorkflowTransitionService;
 
+  // Part 4 — the mode engine. Resolving to `null` is a SEGREGATED office with two different people, which is
+  // every case in this file: the unit tests here are about the endorsement lifecycle, and the combined path
+  // has its own tests where the office's mode is real (`duty-segregation.service.spec.ts` and
+  // `duty-segregation-combined.e2e-spec.ts`). A mock that silently returned an act id would make every
+  // self-approval assertion below pass for the wrong reason, so it returns what a segregated office returns.
+  const resolveDutySegregation = vi
+    .fn()
+    .mockImplementation(
+      ({
+        makerId,
+        checkerId,
+        context,
+      }: {
+        makerId: string;
+        checkerId: string | null;
+        context: string;
+      }) => {
+        if (checkerId != null && checkerId === makerId) {
+          assertDifferentActors(makerId, checkerId, context);
+        }
+        // A resolved promise, because the real engine is async: a synchronous mock would let a missing
+        // `await` at a call site pass here and fail in production.
+        return Promise.resolve(null);
+      },
+    );
+  const dutySegregation = {
+    resolve: resolveDutySegregation,
+  } as unknown as import('../duty-segregation/duty-segregation.service').DutySegregationService;
+
   const reconcileReversalForPolicy = vi.fn().mockResolvedValue(undefined);
   const commissionLedger = {
     reconcileReversalForPolicy,
@@ -308,6 +338,7 @@ function makeDeps(opts: DepsOpts = {}) {
       audit,
       workflow,
       commissionLedger,
+      dutySegregation,
     ),
     endo,
     policyState,
@@ -873,9 +904,9 @@ describe('EndorsementService', () => {
     it('403 when the approver is the officer who raised the refund (maker/checker)', async () => {
       const { service } = makeDeps({ commissionRate: '10' });
       await toApprovalPending(service);
-      await expect(service.approveRefund('ref-1', placement())).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.approveRefund('ref-1', undefined, placement()),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('a distinct approver clears it, audits APPROVE, then applies + versions the schedule', async () => {
@@ -883,11 +914,16 @@ describe('EndorsementService', () => {
       await toApprovalPending(service);
       const view = await service.approveRefund(
         'ref-1',
+        undefined,
         placement({ id: 'manager-1', roles: ['BRANCH_DEPARTMENT_MANAGER'] }),
       );
+      // The third argument is the combined-duty escape column, and `null` is what a two-person approval must
+      // pass: asserting it explicitly is what would catch a call site that started sending an act id on the
+      // ordinary path, which would make a self-approval writable through a constraint that admits one.
       expect(mocks.recordRefundApproval).toHaveBeenCalledWith(
         'ref-1',
         'manager-1',
+        null,
       );
       expect(mocks.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'APPROVE', entityType: 'Refund' }),
@@ -906,6 +942,7 @@ describe('EndorsementService', () => {
       await expect(
         service.approveRefund(
           'ref-1',
+          undefined,
           placement({ id: 'manager-1', roles: ['BRANCH_DEPARTMENT_MANAGER'] }),
         ),
       ).rejects.toThrow(ConflictException);
@@ -938,6 +975,7 @@ describe('EndorsementService', () => {
       await expect(
         service.approveRefund(
           'ref-1',
+          undefined,
           placement({ id: 'manager-1', roles: ['BRANCH_DEPARTMENT_MANAGER'] }),
         ),
       ).rejects.toThrow(ConflictException);
@@ -965,6 +1003,7 @@ describe('EndorsementService', () => {
       await expect(
         service.approveRefund(
           'ref-x',
+          undefined,
           placement({ id: 'manager-1', roles: ['BRANCH_DEPARTMENT_MANAGER'] }),
         ),
       ).rejects.toThrow(UnprocessableEntityException);

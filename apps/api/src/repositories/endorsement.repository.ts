@@ -11,7 +11,9 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const ENDORSEMENT_INCLUDE = {
   cancellation: true,
-  refund: true,
+  // Part 4 step 5 — the declared combined-duty act, so a reader looking at the refund sees on the record
+  // itself that nobody else signed it. Null on every ordinary approval, which is every one today.
+  refund: { include: { combinedDutyAct: true } },
   commissionReversal: true,
   schedule: true,
   policy: {
@@ -138,6 +140,13 @@ export class EndorsementRepository {
       where: {
         policyId,
         changeType: 'cancellation',
+        // A DISCARDED CANCELLATION MUST FREE THE POLICY. Without this clause a cancellation raised in error
+        // and withdrawn would block every future cancellation of that policy — permanently, since a
+        // discarded record cannot advance to CLIENT_NOTIFIED. That is the trap this feature exists to
+        // remove, reappearing one level down. The partial UNIQUE index behind this pre-check carries the
+        // same predicate (migration `20261027120000`), because the index is the real backstop and a
+        // friendlier application check in front of a refusing constraint helps nobody.
+        discardedAt: null,
         status: { not: 'CLIENT_NOTIFIED' },
       },
     });
@@ -191,12 +200,22 @@ export class EndorsementRepository {
   async recordRefundApproval(
     id: string,
     approvedByUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the approver IS the raiser in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person approval, which is every approval until an office
+     * declares the mode.
+     *
+     * The column is what `Refund_maker_checker_distinct` reads: with it null, a self-approval is refused by
+     * the constraint no matter what the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Refund | null> {
     const { count } = await this.prisma.client.refund.updateMany({
       where: { id, approvedByUserId: null },
       data: {
         approvedByUserId,
         approvalThresholdMatrixLevel: 'approved_above_threshold',
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
       },
     });
     if (count === 0) return null;
@@ -256,5 +275,30 @@ export class EndorsementRepository {
       });
       return { refund, ledgerEntry };
     });
+  }
+  /**
+   * Mark this record discarded — raised in error, never took effect.
+   *
+   * `updateMany` re-asserting `discardedAt: null` in its own `where`, not `update`: two people discarding
+   * the same record at once must not have the second silently overwrite the first one's reason. A count of
+   * 0 means somebody else got there, and the service turns that into a 409 naming it
+   * (`race-safe-invariants.md`).
+   *
+   * The three columns are written together because a CHECK constraint refuses them apart — a discard
+   * carrying no reason is the one shape nobody can read later.
+   */
+  async discard(
+    id: string,
+    input: { discardedByUserId: string; discardedReason: string },
+  ): Promise<{ discarded: boolean }> {
+    const { count } = await this.prisma.client.endorsement.updateMany({
+      where: { id, discardedAt: null },
+      data: {
+        discardedAt: new Date(),
+        discardedByUserId: input.discardedByUserId,
+        discardedReason: input.discardedReason.trim(),
+      },
+    });
+    return { discarded: count > 0 };
   }
 }

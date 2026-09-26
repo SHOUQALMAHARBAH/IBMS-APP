@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { anchoredAttributes, anchoredTexts } from "./support/anchored";
 
 /*
  * The Executive half of the sidebar restructure.
@@ -60,20 +61,17 @@ async function openCustomers(page: Page, language: "AR" | "EN" = "EN") {
  *  Read as attributes, not innerText: a collapsed group's links have no
  *  rendered text, and this has to work whether the group is open or not. */
 async function dashboardHrefs(page: Page): Promise<(string | null)[]> {
-  return nav(page)
-    .locator('details:has(a[href="/dashboards/executive"]) a')
-    .evaluateAll((els) => els.map((el) => el.getAttribute("href")));
+  const group = nav(page).locator('details:has(a[href="/dashboards/executive"])');
+  // Anchored on the GROUP, never on its links: a collapsed group's links have no bounding box, so
+  // they cannot vouch for their own presence — and reading them while collapsed is the point.
+  return anchoredAttributes(group.locator("a"), "href", group);
 }
 
 test("the Executive's order leads with the numbers, not the pipeline", async ({ page }) => {
   await openCustomers(page);
 
   const sidebar = nav(page);
-  // Groups render only once /auth/me resolves, and allInnerTexts() does not
-  // auto-wait — read it too early and the assertions below mean nothing.
-  await expect(sidebar.getByRole("link", { name: "Customers", exact: true })).toBeVisible();
-
-  const order = (await sidebar.locator("summary").allInnerTexts()).map((h) => h.trim().toLowerCase());
+  const order = (await anchoredTexts(sidebar.locator("summary"))).map((h) => h.trim().toLowerCase());
 
   // The mirror image of the Manager, whose first group is Clients.
   expect(order[0]).toBe("dashboards");
@@ -127,7 +125,7 @@ test("an Executive sees no Privacy or Operations group at all", async ({ page })
 
   // Not collapsed — absent. The role holds none of those permissions, and an
   // empty group must never render a header with nothing behind it.
-  const order = (await sidebar.locator("summary").allInnerTexts()).map((h) => h.trim().toLowerCase());
+  const order = (await anchoredTexts(sidebar.locator("summary"))).map((h) => h.trim().toLowerCase());
   expect(order).not.toContain("privacy & data protection");
   expect(order).not.toContain("operations");
   expect(order).toHaveLength(9);
@@ -153,7 +151,7 @@ test("the Executive sidebar works in Arabic", async ({ page }) => {
   const sidebar = nav(page);
   await expect(sidebar.getByRole("link", { name: "العملاء", exact: true })).toBeVisible();
 
-  const order = (await sidebar.locator("summary").allInnerTexts()).map((h) => h.trim());
+  const order = (await anchoredTexts(sidebar.locator("summary"))).map((h) => h.trim());
   expect(order[0]).toBe("اللوحات");
   expect(order[1]).toBe("الأداء والتحليل");
 });

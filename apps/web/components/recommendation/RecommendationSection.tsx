@@ -21,6 +21,16 @@ import {
   type OpportunityWithContext,
 } from '../../lib/opportunity/opportunity-api';
 import { ApiError } from '../../lib/auth/api-client';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -43,6 +53,8 @@ interface Props {
   isPlacement: boolean;
   isManager: boolean;
   isCompliance: boolean;
+  /** `recommendation.discard` — its own code, not implied by the ability to draft one. */
+  canDiscard: boolean;
   onOpportunityChanged: () => void;
 }
 
@@ -59,15 +71,26 @@ export function RecommendationSection({
   opportunity,
   isPlacement,
   isManager,
+  canDiscard,
   isCompliance,
   onOpportunityChanged,
 }: Props) {
   const { language, t } = useLanguage();
+  const { user } = useAuth();
   const [rec, setRec] = useState<Recommendation | null | undefined>(undefined);
+  // Part 4 — computed once here rather than inside the action row: `rec` is this component's own state, and
+  // the condition is about the office and the viewer, neither of which changes per render branch.
+  const needsDeclaration = needsCombinedDutyDeclaration({
+    mode: user?.dutySegregationMode,
+    makerUserId: rec?.draftedByUserId,
+    currentUserId: user?.id ?? '',
+    alreadyDecided: rec?.approvedByUserId != null,
+  });
   const [chains, setChains] = useState<QuotationChain[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dutyReason, setDutyReason] = useState('');
 
   const [quotationId, setQuotationId] = useState('');
   const [rationale, setRationale] = useState('');
@@ -306,11 +329,13 @@ export function RecommendationSection({
               isActive={rec.recommendedQuotation.insurer.isActive}
             />
             <span style={rfqBadgeStyle}>
-              {rec.sentToClientAt
-                ? t('recSentToClientBadge')
-                : rec.blockedFromSend.length === 0
-                  ? t('recReadyToSendBadge')
-                  : t('recBlockedBadge')}
+              {rec.discard
+                ? t('discardedBadge')
+                : rec.sentToClientAt
+                  ? t('recSentToClientBadge')
+                  : rec.blockedFromSend.length === 0
+                    ? t('recReadyToSendBadge')
+                    : t('recBlockedBadge')}
             </span>
           </div>
           <p style={{ margin: '0.4rem 0' }}>
@@ -374,21 +399,44 @@ export function RecommendationSection({
             {isManager &&
             rec.approvalRequired &&
             !rec.approvedByUserId &&
-            !rec.sentToClientAt ? (
-              <button
-                type="button"
-                disabled={busy}
-                style={{ ...buttonStyle, width: 'auto' }}
-                onClick={() =>
-                  void run(() => approveRecommendation(rec.id))
-                }
-              >
-                {t('recApproveButton')}
-              </button>
+            !rec.sentToClientAt &&
+            !rec.discard ? (
+              <>
+                {/*
+                  Part 4 — the officer who drafted the recommendation may approve it in an office that has
+                  declared COMBINED, only by saying why. The approval exists because this recommendation is
+                  above the client's target premium, so it is the case a second reader most wants explained.
+                */}
+                {needsDeclaration ? (
+                  <CombinedDutyReasonField
+                    id={rec.id}
+                    value={dutyReason}
+                    onChange={setDutyReason}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={
+                    busy || (needsDeclaration && combinedDutyTooShort(dutyReason))
+                  }
+                  style={{ ...buttonStyle, width: 'auto' }}
+                  onClick={() =>
+                    void run(() =>
+                      approveRecommendation(
+                        rec.id,
+                        needsDeclaration ? dutyReason.trim() : undefined,
+                      ),
+                    )
+                  }
+                >
+                  {t('recApproveButton')}
+                </button>
+              </>
             ) : null}
             {isPlacement &&
             !rec.sentToClientAt &&
-            rec.blockedFromSend.length === 0 ? (
+            rec.blockedFromSend.length === 0 &&
+            !rec.discard ? (
               <button
                 type="button"
                 disabled={busy}
@@ -412,12 +460,23 @@ export function RecommendationSection({
                 {t('recDownloadReportButton')}
               </button>
             ) : null}
+            <DiscardControl
+              collection="recommendations"
+              id={rec.id}
+              canDiscard={canDiscard}
+              // Sent to the client IS the commitment — after that the client decision records what happened
+              // to it, and a different recommendation is a new one.
+              discardable={!rec.discard && !rec.sentToClientAt}
+              onDiscarded={load}
+            />
           </div>
+          <DiscardedNotice discard={rec.discard} />
 
           {(isPlacement || isCompliance) &&
           rec.conflictOfInterestFlagged &&
           !rec.conflictOfInterestDisclosure &&
-          !rec.sentToClientAt ? (
+          !rec.sentToClientAt &&
+          !rec.discard ? (
             <div style={{ ...quoteFieldStyle, marginTop: '0.8rem' }}>
               <label htmlFor="rec-coi">{t('recCoiDisclosureLabel')}</label>
               <textarea

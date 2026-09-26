@@ -81,10 +81,16 @@ export function approveKyc(
   kycId: string,
   reason?: string,
   screeningHoldReason?: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
 ): Promise<KycRecord> {
   return apiPost(`/kyc-records/${kycId}/approve`, {
     reason,
     screeningHoldReason,
+    ...(combinedDutyReason ? { combinedDutyReason } : {}),
   });
 }
 

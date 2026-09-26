@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { DsrService } from './dsr.service';
 import { CreateDsrDto } from './dto/create-dsr.dto';
@@ -112,7 +113,11 @@ export class DsrController {
 
   @RequirePermissions('dsr.close')
   @Post(':id/close')
-  close(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.dsr.close(id, user.id);
+  close(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.dsr.close(id, user.id, dto.combinedDutyReason);
   }
 }

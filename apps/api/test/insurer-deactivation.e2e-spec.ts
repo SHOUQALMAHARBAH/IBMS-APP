@@ -811,7 +811,7 @@ describe('deactivating is an ACT, with a reason and a record of what was outstan
     const admin = await makeUser(`deact-404-${tag}`, 'OFFICE_ADMINISTRATOR');
 
     // `insurer.read` renders the record; changing whether the office deals with the
-    // company is `insurer.relationship.manage`.
+    // company is `insurer.deactivate`.
     await request(app!.getHttpServer())
       .post(`/insurers/${insurer.id}/deactivate`)
       .set(bearer(reader.accessToken))

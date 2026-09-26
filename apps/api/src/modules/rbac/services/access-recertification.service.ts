@@ -247,6 +247,7 @@ export class AccessRecertificationService {
       item.subjectUserId,
       reviewerUserId,
       'AccessRecertificationItem.decide',
+      'AccessRecertificationItem_maker_checker_distinct',
     );
     if (item.decision) {
       throw new ConflictException('This item has already been decided');

@@ -14,6 +14,7 @@
 
 import { apiGet, apiPost } from '../auth/api-client';
 import type { Paginated } from '../api/paginated';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export const CLAIM_DOC_TYPE_OPTIONS = [
   'claim_form',
@@ -146,6 +147,11 @@ export interface Claim {
   statusHistory: ClaimStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RecordSettlementInput {
@@ -328,10 +334,17 @@ export function recordClaimSettlement(
 }
 
 /** Process 28 — the mandatory second approval (never the first approver). */
-export function secondApproveClaimSettlement(claimId: string): Promise<Claim> {
+export function secondApproveClaimSettlement(
+  claimId: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<Claim> {
   return apiPost(
     `/claims/${encodeURIComponent(claimId)}/settlement/second-approve`,
-    {},
+    combinedDutyReason ? { combinedDutyReason } : {},
   );
 }
 

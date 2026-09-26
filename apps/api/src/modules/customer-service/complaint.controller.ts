@@ -8,6 +8,7 @@ import {
   Query,
   StreamableFile,
 } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { ComplaintService } from './complaint.service';
 import { ComplaintAcknowledgementService } from './complaint-acknowledgement.service';
@@ -136,7 +137,11 @@ export class ComplaintController {
 
   @RequirePermissions('complaint.close')
   @Post(':id/close')
-  close(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.complaints.close(id, user.id);
+  close(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.complaints.close(id, user.id, dto.combinedDutyReason);
   }
 }

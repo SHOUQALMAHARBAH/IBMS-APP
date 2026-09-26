@@ -1,10 +1,15 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
 import {
   applyDsrExtension,
   assignDsr,
@@ -60,6 +65,8 @@ export default function DsrPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [customerId, setCustomerId] = useState('');
   const [type, setType] = useState<string>(DSR_TYPES[0]!);
@@ -136,7 +143,8 @@ export default function DsrPage() {
           onSubmit={submit}
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '30rem' }}
         >
-          <CustomerPicker
+          <EntitySearch
+            kind="customer"
             value={customerId}
             onChange={setCustomerId}
             label={t('dsrCustomerIdLabel')}
@@ -320,13 +328,41 @@ export default function DsrPage() {
                             ['FULFILLED', 'PARTIALLY_FULFILLED', 'REJECTED'].includes(
                               d.status,
                             ) ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => closeDsr(d.id))}
-                              >
-                                {t('dsrCloseButton')}
-                              </button>
+                              (() => {
+                                // Part 4 — the person who performed the first half may complete it themselves in an office
+                                // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                                const needs = needsCombinedDutyDeclaration({
+                                  mode: user.dutySegregationMode,
+                                  makerUserId: d.processedByUserId,
+                                  currentUserId: user.id,
+                                  alreadyDecided: d.closedByUserId != null,
+                                });
+                                const declaration = declarations[d.id] ?? '';
+                                return (
+                                  <>
+                                    {needs ? (
+                                      <CombinedDutyReasonField
+                                        id={d.id}
+                                        value={declaration}
+                                        onChange={(next) =>
+                                          setDeclarations((prev) => ({ ...prev, [d.id]: next }))
+                                        }
+                                      />
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                      onClick={() =>
+                                        void run(() =>
+                                          closeDsr(d.id, needs ? declaration.trim() : undefined),
+                                        )
+                                      }
+                                    >
+                                      {t('dsrCloseButton')}
+                                    </button>
+                                  </>
+                                );
+                              })()
                             ) : null}
                           </div>
                         </div>

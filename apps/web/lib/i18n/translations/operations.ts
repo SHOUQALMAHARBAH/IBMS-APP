@@ -13,6 +13,11 @@ export const OPERATIONS = {
     // ---- Account security -------------------------------------------------
     secHeading: 'الأمان',
     secMfaHeading: 'المصادقة متعدّدة العوامل',
+    // A QR is unusable to anyone whose authenticator is on the SAME device as the screen, or who
+    // has no camera, or whose camera cannot focus on it. The key is the same secret in a form a
+    // person can type, which is why every authenticator offers manual entry.
+    secManualKeyLabel: 'أو أدخل هذا المفتاح يدوياً في التطبيق:',
+    secManualKeyHint: 'استخدم هذا إن كان تطبيق المصادقة على نفس الجهاز، أو إن لم تتمكن من مسح الرمز.',
     secScanInstruction:
       'امسح رمز الاستجابة السريعة بتطبيق المصادقة لديك، ثم أدخل الرمز المكوّن من ستة أرقام الذي يعرضه.',
     secSession: 'الجلسة',
@@ -55,6 +60,47 @@ export const OPERATIONS = {
     empGivenName: 'الاسم الأول',
     empCreateHeading: 'تسجيل موظف جديد',
 
+    // ---- The unified person form: one screen, one Save ----------------------
+    empPersonHeading: 'بيانات الشخص',
+    empEnglishNameHeading: 'الاسم بالإنجليزية (اختياري)',
+    empEnglishNameHint:
+      'لا يُترجم النظام الاسم العربي تلقائياً — إن تُرك فارغاً يبقى فارغاً، ويظهر الاسم العربي في كل الشاشات.',
+    empGivenNameEn: 'الاسم الأول بالإنجليزية',
+    empFatherNameEn: 'اسم الأب بالإنجليزية',
+    empGrandfatherNameEn: 'اسم الجد بالإنجليزية',
+    empFamilyNameEn: 'اسم العائلة بالإنجليزية',
+    empPlacementHeading: 'الموقع في المنظمة',
+    empDepartment: 'القسم',
+    empBranch: 'الفرع',
+    empUnset: '— غير محدَّد —',
+    empOrgUnitsMissing:
+      'لا توجد أقسام أو فروع بعد. أنشئها من شاشة الأقسام والفروع أولاً.',
+    empOrgUnitsLink: 'الأقسام والفروع',
+    empAccountHeading: 'حساب الدخول',
+    empGiveLogin: 'منح هذا الشخص حساب دخول',
+    empGiveLoginHint:
+      'حفظ واحد يُنشئ الشخص وحسابه معاً. الاسم يُبنى من أجزاء الاسم أعلاه، والقسم والفرع يُستخدمان للاثنين.',
+    empAccountNeedsOrgUnits:
+      'حساب الدخول يحتاج قسماً وفرعاً. أنشئ واحداً من كل منهما من شاشة الأقسام والفروع، ثم عد إلى هنا.',
+    empAccountEmail: 'البريد الإلكتروني',
+    empTempPassword: 'كلمة مرور مؤقتة',
+    empTempPasswordHint:
+      'سيُطلب من الشخص تغييرها وتسجيل عامل مصادقة ثانٍ عند أول دخول.',
+    empRolesHeading: 'الأدوار',
+    empRolesHint: 'دور واحد على الأقل — الحساب بلا أدوار لا يملك أي صلاحية.',
+    empRolesNone: 'لا توجد أدوار فعّالة لمنحها.',
+    empRoleRequired: 'اختر دوراً واحداً على الأقل.',
+    empRegistrationType: 'طريقة الدخول',
+    empRegistrationDefault: 'كلمة مرور في هذا النظام',
+    empRegistrationWindows: 'حساب ويندوز (مُسجَّل فقط)',
+    empRegistrationHint:
+      'مُسجَّل للتوثيق فقط — لا يوجد ربط مع مجال ويندوز بعد، وكل حساب يحتاج كلمة مرور هنا.',
+    empSubmitWithLogin: 'تسجيل الشخص وإنشاء الحساب',
+    empCreatedPerson: 'تم تسجيل الشخص.',
+    empCreatedWithLogin: 'تم تسجيل الشخص وإنشاء حساب الدخول.',
+    empNoLoginPermission:
+      'لا تملك صلاحية user.manage، لذا يمكنك تسجيل الأشخاص دون إنشاء حسابات دخول لهم.',
+
     // ---- Vendors (#67 / #71) ------------------------------------------------
     venHeading: 'المورّدون',
     venIntro:
@@ -72,7 +118,7 @@ export const OPERATIONS = {
     venSubmitButton: 'تسجيل المورّد',
     venCreateHeading: 'تسجيل مورّد جديد',
     venUpdateError: 'تعذّر تحديث المورّد.',
-    venNoPermission: 'لا تملك صلاحية vendor.manage اللازمة لعرض المورّدين.',
+    venNoPermission: 'لا تملك صلاحية vendor.read اللازمة لعرض المورّدين.',
 
     // ---- Documents (#70) -----------------------------------------------------
     docHeading: 'المستندات',
@@ -104,7 +150,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'معرّف الوثيقة',
     docPolicyNotFound: 'الوثيقة غير موجودة.',
     docComputeError: 'تعذّر احتساب ملخّص التصنيف.',
-    docNoPermission: 'لا تملك صلاحية document.manage اللازمة لعرض المستندات.',
+    docNoPermission: 'لا تملك صلاحية document.read اللازمة لعرض المستندات.',
     docsHighestClassification: '— أعلى تصنيف:',
     docsClassificationNone: 'لا يوجد',
 
@@ -281,6 +327,15 @@ export const OPERATIONS = {
     homeKycQueueBlurb: 'راجع سجلات «اعرف عميلك» المعلّقة واعتمدها قبل تفعيل العميل.',
     homeAccessRecertBlurb: 'نفّذ دورة مراجعة الصلاحيات الدورية وأكملها.',
     homeSecurityBlurb: 'أدر المصادقة متعدّدة العوامل وراجع سياسة جلستك.',
+    // The three destinations an office administrator holds and had no card for, plus the heading the
+    // launcher needs now that it groups what it shows.
+    homeRolesBlurb: 'أنشئ أدوار مكتبك وحدّد صلاحيات كل دور من مصفوفة الصلاحيات الكاملة.',
+    homeUsersBlurb: 'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
+    homeEmployeesBlurb: 'سجلات الموظفين والتراخيص والشهادات والتدريب.',
+    homeOrgUnitsBlurb: 'أسماء أقسام مكتبك وفروعه — تُنشأ قبل تسجيل أول موظف.',
+    navGroupAccount: 'حسابك',
+    homeNoDestinations:
+      'لا توجد شاشة متاحة لحسابك حالياً — لم تُسند إليك أي صلاحية بعد. راجع مسؤول النظام في مكتبك.',
     homeWelcome: 'مرحباً، {name}',
     homeSignedInAs: 'نظام إدارة وساطة التأمين. تسجيل الدخول باسم {roles}.',
     homeNoRole: 'لم يتم تعيين دور',
@@ -349,8 +404,6 @@ export const OPERATIONS = {
     renRequired: 'مطلوبة',
     renInsurerTermsWorsened: 'شروط المؤمِّن ساءت',
     renRiskChanged: 'تغيّر الخطر',
-    usrEmployeeRecord: 'سجل الموظف',
-    usrNoEmployeeLink: 'بدون ربط',
     secDevicesHeading: 'الأجهزة الموثوقة',
     secDevicesIntro:
       'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
@@ -393,6 +446,67 @@ export const OPERATIONS = {
     roleHeading: 'الأدوار والصلاحيات',
     roleIntro:
       'كل دور هنا يخصّ مكتبك وحده. تُحدَّد الصلاحيات لكل دور، ولا يمنح أي دور شيئاً لم يُعطَ له صراحةً.',
+    // --- Role screen: the permission matrix, the generated machine name, and delete ---
+    // --- Departments and branches (the four-action pilot) ---
+    orgUnitHeading: 'الأقسام والفروع',
+    orgUnitIntro:
+      'أسماء أقسام مكتبك وفروعه. تُسند كل موظفة إلى قسم وفرع، ولهذا يجب إنشاؤها قبل تسجيل أول شخص. لا تمنح هذه الأسماء أي صلاحية ولا تحدّد من يرى ماذا.',
+    orgUnitDepartments: 'الأقسام',
+    orgUnitBranches: 'الفروع',
+    orgUnitNameEn: 'الاسم بالإنجليزية',
+    orgUnitNameAr: 'الاسم بالعربية (اختياري)',
+    orgUnitCreateButton: 'إضافة',
+    orgUnitRename: 'إعادة تسمية',
+    orgUnitRetire: 'إيقاف',
+    orgUnitCreated: 'تمت الإضافة.',
+    orgUnitRenamed: 'تم تغيير الاسم.',
+    orgUnitRetired: 'تم الإيقاف — تبقى الإسنادات القائمة كما هي.',
+    orgUnitNone: 'لا يوجد شيء بعد — أضِف الأول.',
+    orgUnitLoadError: 'تعذّر تحميل الأقسام والفروع — حاول مرة أخرى.',
+    orgUnitNoPermission:
+      'يتطلب هذا القسم صلاحية department.read أو branch.read. راجع مسؤول مكتبك.',
+    roleMatrixSummary: 'هذا الدور يملك {granted} من {total} صلاحية.',
+    roleMatrixNeedsCatalogue:
+      'لا يمكن عرض مصفوفة الصلاحيات — حسابك لا يملك صلاحية permission.read. يمكنك إنشاء الدور ثم يضبط صلاحياته من يملكها.',
+    roleMatrixSearchLabel: 'ابحث في الصلاحيات',
+    roleMatrixNoMatch: 'لا توجد صلاحية مطابقة لهذا البحث.',
+    roleVerbFull: 'الكل',
+    roleSelectAllInSection: 'تحديد كل صلاحيات هذا القسم',
+    roleVerbView: 'عرض',
+    roleVerbCreate: 'إنشاء',
+    roleVerbEdit: 'تعديل',
+    roleVerbDelete: 'حذف',
+    roleVerbDeactivate: 'إيقاف',
+    roleVerbManage: 'إدارة',
+    roleVerbOther: 'أخرى',
+    roleModuleAdmin: 'الإدارة والنظام',
+    roleModuleClaims: 'المطالبات',
+    roleModuleCommercial: 'المكتب الأمامي التجاري',
+    roleModuleCompliance: 'الالتزام والمخاطر',
+    roleModuleCustomer: 'العملاء',
+    roleModuleCustomerService: 'خدمة العملاء',
+    roleModuleFinance: 'المالية',
+    roleModuleInsuranceOps: 'العمليات التأمينية',
+    roleModuleReporting: 'التقارير الإدارية',
+    roleModulePdpl: 'حماية البيانات',
+    roleModuleSla: 'مستويات الخدمة',
+    roleModuleSupporting: 'العمليات المساندة',
+    roleModuleOther: 'أخرى',
+    roleMachineNameLabel: 'الاسم البرمجي (يُنشأ تلقائياً)',
+    roleMachineNameHint:
+      'يُشتق من الاسم بالإنجليزية، ولا يمكن تغييره بعد الإنشاء — وهو ما يظهر في سجلّ التدقيق.',
+    roleMachineNameUnreadable:
+      'لا يمكن اشتقاق اسم برمجي مقروء من هذا الاسم. اكتب الاسم بالإنجليزية بحروف لاتينية (مثال: Claims Triage Desk).',
+    roleEnglishNameRequired: 'الاسم بالإنجليزية مطلوب — منه يُشتق الاسم البرمجي الدائم.',
+    roleCreatePermissionsHeading: 'صلاحيات هذا الدور',
+    roleCreatePermissionsIntro:
+      'اختر ما يستطيع هذا الدور عمله. يمكن تعديل الصلاحيات لاحقاً، ويسري التعديل فوراً على كل من يحمل الدور.',
+    roleDeleteButton: 'حذف',
+    roleDeleteConfirmHeading: 'حذف الدور «{role}»؟',
+    roleDeleteConfirmBody:
+      'سيُحذف الدور فوراً ويُسحب من كل من يحمله — بلا إعادة إسناد. من يبقى بلا أدوار يبقى بلا صلاحيات، وهذا مقبول. ويبقى سجلّ من حمل الدور ومتى محفوظاً.',
+    roleDeleteConfirmButton: 'أكّد الحذف',
+    roleDeleted: 'تم حذف الدور.',
     roleNoPermission:
       'يتطلّب عرض الأدوار صلاحية role.read. راجع مدير مكتبك.',
     roleCouldNotLoad: 'تعذّر تحميل الأدوار — حاول مرة أخرى.',
@@ -408,6 +522,18 @@ export const OPERATIONS = {
     roleSystemExplain:
       'دور يحدّده النظام لا يحدّده المكتب: لا يمكن تغيير اسمه ولا تقاعده ولا تعديل صلاحياته. هذه العلامة لا تمنح أي صلاحية بحد ذاتها.',
     roleNoRoles: 'لا توجد أدوار بعد.',
+    dutySegHeading: 'عمليات تحتاج شخصين مختلفين',
+    dutySegIntro:
+      'خمس عشرة عملية في هذا النظام لا يمكن أن ينفّذها شخص واحد: من يسجّل الإجراء لا يمكن أن يكون من يعتمده. هذه قائمة بها، ومعها ما إذا كان مكتبك يملك شخصاً ثانياً لكل منها اليوم.',
+    dutySegColOperation: 'العملية',
+    dutySegColPermission: 'صلاحية المعتمِد',
+    dutySegColHolders: 'عدد من يملكها',
+    dutySegColStatus: 'الحالة',
+    dutySegStatusNobody: 'لا يمكن إتمامها — لا أحد يملك الصلاحية',
+    dutySegStatusSingle: 'شخص واحد فقط — تتعطّل إن كان هو من سجّل الإجراء',
+    dutySegStatusReady: 'جاهزة',
+    dutySegNoPermission: 'لا تملك صلاحية role.read اللازمة لعرض هذه القائمة.',
+    dutySegLoadError: 'تعذّر تحميل قائمة العمليات التي تحتاج شخصين.',
     roleCreateHeading: 'إنشاء دور',
     roleFieldName: 'الاسم البرمجي',
     roleFieldNameHint: 'ثابت، ويُكتب في سجلّ التدقيق. لا يمكن تغييره بعد الإنشاء.',
@@ -450,6 +576,8 @@ export const OPERATIONS = {
   EN: {
     secHeading: 'Security',
     secMfaHeading: 'Multi-factor authentication',
+    secManualKeyLabel: 'Or type this key into the app by hand:',
+    secManualKeyHint: 'Use this if your authenticator is on the same device as this screen, or you cannot scan the code.',
     secScanInstruction:
       'Scan this QR code with your authenticator app, then enter the 6-digit code it shows.',
     secSession: 'Session',
@@ -491,6 +619,47 @@ export const OPERATIONS = {
     empGivenName: 'Given name',
     empCreateHeading: 'Record a new employee',
 
+    // ---- The unified person form: one screen, one Save ----------------------
+    empPersonHeading: 'The person',
+    empEnglishNameHeading: 'Name in English (optional)',
+    empEnglishNameHint:
+      'Nothing is transliterated for you — left empty it stays empty, and the Arabic name is what every screen shows.',
+    empGivenNameEn: 'Given name in English',
+    empFatherNameEn: "Father's name in English",
+    empGrandfatherNameEn: "Grandfather's name in English",
+    empFamilyNameEn: 'Family name in English',
+    empPlacementHeading: 'Where they sit',
+    empDepartment: 'Department',
+    empBranch: 'Branch',
+    empUnset: '— not set —',
+    empOrgUnitsMissing:
+      'No departments or branches yet. Create them on the Departments & branches screen first.',
+    empOrgUnitsLink: 'Departments & branches',
+    empAccountHeading: 'Login',
+    empGiveLogin: 'Give this person a login',
+    empGiveLoginHint:
+      'One Save creates the person and their account together. The name comes from the parts above, and the department and branch are used for both.',
+    empAccountNeedsOrgUnits:
+      'A login needs a department and a branch. Create one of each on the Departments & branches screen, then come back.',
+    empAccountEmail: 'Email',
+    empTempPassword: 'Temporary password',
+    empTempPasswordHint:
+      'They will be asked to change it and to enrol a second factor on first sign-in.',
+    empRolesHeading: 'Roles',
+    empRolesHint: 'At least one — an account with no roles holds no permissions at all.',
+    empRolesNone: 'No active roles to grant.',
+    empRoleRequired: 'Pick at least one role.',
+    empRegistrationType: 'How they sign in',
+    empRegistrationDefault: 'A password held here',
+    empRegistrationWindows: 'Windows account (recorded only)',
+    empRegistrationHint:
+      'Recorded for the record only — there is no domain integration yet, and every account still needs a password here.',
+    empSubmitWithLogin: 'Record the person and create the login',
+    empCreatedPerson: 'The person was recorded.',
+    empCreatedWithLogin: 'The person was recorded and their login created.',
+    empNoLoginPermission:
+      'You do not hold user.manage, so you can record people without creating logins for them.',
+
     venHeading: 'Vendors',
     venIntro:
       'The shared vendor register — Procurement’s general (“other”) vendors alongside Vendor Management’s risk-tiered ones (insurer, reinsurer, loss adjuster, IT/cloud, printing/archiving, marketing/call-centre). Open a vendor for risk tiering, Data Processing Agreements, and termination.',
@@ -507,7 +676,7 @@ export const OPERATIONS = {
     venSubmitButton: 'Record vendor',
     venCreateHeading: 'Record a new vendor',
     venUpdateError: 'Could not update the vendor.',
-    venNoPermission: "You don't hold the vendor.manage permission.",
+    venNoPermission: "You don't hold the vendor.read permission.",
 
     docHeading: 'Documents',
     docIntro:
@@ -538,7 +707,7 @@ export const OPERATIONS = {
     docPolicyIdLabel: 'Policy ID',
     docPolicyNotFound: 'Policy not found.',
     docComputeError: 'Could not compute the classification summary.',
-    docNoPermission: "You don't hold the document.manage permission.",
+    docNoPermission: "You don't hold the document.read permission.",
     docsHighestClassification: '— highest classification:',
     docsClassificationNone: 'none',
 
@@ -708,6 +877,13 @@ export const OPERATIONS = {
     homeKycQueueBlurb: 'Review and approve pending KYC records before a customer is activated.',
     homeAccessRecertBlurb: 'Run and complete the periodic access-review cycle.',
     homeSecurityBlurb: 'Manage multi-factor authentication and review your session policy.',
+    homeRolesBlurb: "Define your office's roles and set each one's permissions from the full matrix.",
+    homeUsersBlurb: 'Create user accounts, grant or revoke roles, activate or deactivate access.',
+    homeEmployeesBlurb: 'Employee records, licences, certifications and training.',
+    homeOrgUnitsBlurb: "Your office's department and branch names — created before the first employee.",
+    navGroupAccount: 'Your account',
+    homeNoDestinations:
+      'No screen is available to your account yet — no permissions have been granted to it. Ask your office administrator.',
     homeWelcome: 'Welcome, {name}',
     homeSignedInAs: 'Insurance Brokerage Management System. Signed in as {roles}.',
     homeNoRole: 'no role assigned',
@@ -774,8 +950,6 @@ export const OPERATIONS = {
     renRequired: 'Required',
     renInsurerTermsWorsened: 'Insurer terms worsened',
     renRiskChanged: 'Risk changed',
-    usrEmployeeRecord: 'Employee record',
-    usrNoEmployeeLink: 'Not linked',
     secDevicesHeading: 'Trusted devices',
     secDevicesIntro:
       'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
@@ -820,6 +994,67 @@ export const OPERATIONS = {
     roleHeading: 'Roles and permissions',
     roleIntro:
       'Every role here belongs to your office alone. Permissions are set per role, and a role grants nothing it has not explicitly been given.',
+    // --- Role screen: the permission matrix, the generated machine name, and delete ---
+    // --- Departments and branches (the four-action pilot) ---
+    orgUnitHeading: 'Departments and branches',
+    orgUnitIntro:
+      "Your office's department and branch names. Every employee is assigned to one of each, which is why these must exist before the first person is registered. These names grant no permission and decide nothing about who sees what.",
+    orgUnitDepartments: 'Departments',
+    orgUnitBranches: 'Branches',
+    orgUnitNameEn: 'Name (English)',
+    orgUnitNameAr: 'Name (Arabic) — optional',
+    orgUnitCreateButton: 'Add',
+    orgUnitRename: 'Rename',
+    orgUnitRetire: 'Retire',
+    orgUnitCreated: 'Added.',
+    orgUnitRenamed: 'Renamed.',
+    orgUnitRetired: 'Retired — existing assignments are unchanged.',
+    orgUnitNone: 'Nothing here yet — add the first one.',
+    orgUnitLoadError: 'Could not load departments and branches — try again.',
+    orgUnitNoPermission:
+      'This screen needs department.read or branch.read. Ask your office administrator.',
+    roleMatrixSummary: 'This role has {granted} of {total} permissions.',
+    roleMatrixNeedsCatalogue:
+      'The permission matrix cannot be shown — your account does not hold permission.read. You can still create the role, and someone who holds it can set its permissions.',
+    roleMatrixSearchLabel: 'Search permissions',
+    roleMatrixNoMatch: 'No permission matches that search.',
+    roleVerbFull: 'Full',
+    roleSelectAllInSection: 'Select every permission in this section',
+    roleVerbView: 'View',
+    roleVerbCreate: 'Create',
+    roleVerbEdit: 'Edit',
+    roleVerbDelete: 'Delete',
+    roleVerbDeactivate: 'Retire',
+    roleVerbManage: 'Manage',
+    roleVerbOther: 'Other',
+    roleModuleAdmin: 'Administration and system',
+    roleModuleClaims: 'Claims',
+    roleModuleCommercial: 'Commercial front office',
+    roleModuleCompliance: 'Compliance and risk',
+    roleModuleCustomer: 'Customers',
+    roleModuleCustomerService: 'Customer service',
+    roleModuleFinance: 'Finance',
+    roleModuleInsuranceOps: 'Insurance operations',
+    roleModuleReporting: 'Management reporting',
+    roleModulePdpl: 'Data protection',
+    roleModuleSla: 'Service levels',
+    roleModuleSupporting: 'Supporting operations',
+    roleModuleOther: 'Other',
+    roleMachineNameLabel: 'Machine name (generated)',
+    roleMachineNameHint:
+      'Derived from the English name and permanent once saved — this is what appears in the audit log.',
+    roleMachineNameUnreadable:
+      'No readable machine name can be derived from this. Enter the English name in Latin letters — for example, Claims Triage Desk.',
+    roleEnglishNameRequired: 'The English name is required — the permanent machine name is derived from it.',
+    roleCreatePermissionsHeading: 'What this role can do',
+    roleCreatePermissionsIntro:
+      'Choose what this role may do. Permissions can be changed later, and a change applies immediately to everyone holding the role.',
+    roleDeleteButton: 'Delete',
+    roleDeleteConfirmHeading: 'Delete the role "{role}"?',
+    roleDeleteConfirmBody:
+      'The role goes immediately and is withdrawn from everyone holding it — with no reassignment. Anyone left with no roles has no permissions, which is an accepted outcome. The record of who held it, and when, is kept.',
+    roleDeleteConfirmButton: 'Confirm delete',
+    roleDeleted: 'The role was deleted.',
     roleNoPermission:
       'Viewing roles needs the role.read permission. Ask your office administrator.',
     roleCouldNotLoad: 'Could not load roles — try again.',
@@ -835,6 +1070,18 @@ export const OPERATIONS = {
     roleSystemExplain:
       'A role the platform defines rather than your office: it cannot be renamed, retired, or re-granted. The flag itself grants nothing.',
     roleNoRoles: 'No roles yet.',
+    dutySegHeading: 'Operations that need two different people',
+    dutySegIntro:
+      'Fifteen operations in this system cannot be done by one person: whoever records the action cannot be the one who approves it. This is the list, with whether your office has a second person for each of them today.',
+    dutySegColOperation: 'Operation',
+    dutySegColPermission: "Approver's permission",
+    dutySegColHolders: 'People who hold it',
+    dutySegColStatus: 'Status',
+    dutySegStatusNobody: 'Cannot be completed — nobody holds the permission',
+    dutySegStatusSingle: 'Only one person — blocked whenever they are the one who recorded it',
+    dutySegStatusReady: 'Ready',
+    dutySegNoPermission: 'You do not hold the role.read permission needed to see this list.',
+    dutySegLoadError: 'The list of operations needing two people could not be loaded.',
     roleCreateHeading: 'Create a role',
     roleFieldName: 'Machine name',
     roleFieldNameHint:

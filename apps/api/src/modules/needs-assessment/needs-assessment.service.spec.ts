@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import { NeedsAssessmentService } from './needs-assessment.service';
 import { NEEDS_ASSESSMENT_QUESTIONS } from './needs-assessment.config';
 import type { NeedsAssessmentRepository } from '../../repositories/needs-assessment.repository';
@@ -91,6 +92,9 @@ function makeDeps() {
     .fn()
     .mockResolvedValue({ id: 'na-1', status: 'PENDING_REVIEW' });
   const workflow = { transition } as unknown as WorkflowTransitionService;
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make the
+  // self-approval tests below pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
 
   return {
     service: new NeedsAssessmentService(
@@ -99,6 +103,7 @@ function makeDeps() {
       customers,
       audit,
       workflow,
+      dutySegregation,
     ),
     mocks: {
       createAssessment,
@@ -266,7 +271,7 @@ describe('NeedsAssessmentService', () => {
         status: 'PENDING_REVIEW',
         createdByUserId: 'manager-1',
       });
-      await expect(service.review('na-1', MANAGER)).rejects.toThrow(
+      await expect(service.review('na-1', undefined, MANAGER)).rejects.toThrow(
         ForbiddenException,
       );
       expect(mocks.transition).not.toHaveBeenCalled();
@@ -279,11 +284,14 @@ describe('NeedsAssessmentService', () => {
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
       });
-      await service.review('na-1', MANAGER);
+      await service.review('na-1', undefined, MANAGER);
       expect(mocks.transition).toHaveBeenCalledWith(
         expect.objectContaining({
           toStatus: 'REVIEWED',
-          data: { reviewedByUserId: 'manager-1' },
+          data: {
+            reviewedByUserId: 'manager-1',
+            reviewerCombinedDutyActId: null,
+          },
         }),
       );
     });
@@ -295,7 +303,7 @@ describe('NeedsAssessmentService', () => {
         status: 'REVIEWED',
         createdByUserId: 'manager-1',
       });
-      await expect(service.approve('na-1', MANAGER)).rejects.toThrow(
+      await expect(service.approve('na-1', undefined, MANAGER)).rejects.toThrow(
         ForbiddenException,
       );
 
@@ -304,11 +312,14 @@ describe('NeedsAssessmentService', () => {
         status: 'REVIEWED',
         createdByUserId: 'sales-1',
       });
-      await service.approve('na-1', MANAGER);
+      await service.approve('na-1', undefined, MANAGER);
       expect(mocks.transition).toHaveBeenCalledWith(
         expect.objectContaining({
           toStatus: 'APPROVED',
-          data: { approvedByUserId: 'manager-1' },
+          data: {
+            approvedByUserId: 'manager-1',
+            approverCombinedDutyActId: null,
+          },
         }),
       );
       expect(mocks.record).toHaveBeenCalledWith(
@@ -346,7 +357,7 @@ describe('NeedsAssessmentService', () => {
         createdByUserId: 'manager-1',
       });
       await expect(
-        service.reject('na-1', 'not proceeding', MANAGER),
+        service.reject('na-1', { reason: 'not proceeding' }, MANAGER),
       ).rejects.toThrow(ForbiddenException);
 
       mocks.findAssessmentById.mockResolvedValue({
@@ -354,11 +365,15 @@ describe('NeedsAssessmentService', () => {
         status: 'PENDING_REVIEW',
         createdByUserId: 'sales-1',
       });
-      await expect(service.reject('na-1', '', MANAGER)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.reject('na-1', { reason: '' }, MANAGER),
+      ).rejects.toThrow(BadRequestException);
 
-      await service.reject('na-1', 'client not proceeding', MANAGER);
+      await service.reject(
+        'na-1',
+        { reason: 'client not proceeding' },
+        MANAGER,
+      );
       expect(mocks.transition).toHaveBeenCalledWith(
         expect.objectContaining({ toStatus: 'REJECTED' }),
       );

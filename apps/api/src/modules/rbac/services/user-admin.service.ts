@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,11 +12,23 @@ import { Prisma, type User } from '@ibms/db';
 import { UserRepository } from '../../../repositories/user.repository';
 import { PasswordService } from '../../auth/services/password.service';
 import { EmployeeRepository } from '../../../repositories/employee.repository';
+import type { CreateEmployeeInput } from '../../../repositories/employee.repository';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { resolveDisplayName } from '../../../common/display-name.util';
 import { AuditService } from '../../audit/audit.service';
 import type { RecordAuditEntryInput } from '../../audit/audit.service';
 import { PermissionsService } from './permissions.service';
-import type { ProvisionUserDto } from '../dto/provision-user.dto';
+import { EncryptionService } from '../../security/encryption.service';
+import { encryptEntityFields } from '../../security/encrypted-fields';
+import { parseHistoricalInstant } from '../../../common/historical-instant.util';
+import {
+  composeFullName,
+  composeOptionalFullName,
+} from '../../../common/person-name.util';
+import type {
+  ProvisionEmployeeDto,
+  ProvisionUserDto,
+} from '../dto/provision-user.dto';
 import {
   segregationSignal,
   type GrantedRole,
@@ -42,6 +56,16 @@ export const USER_ADMIN_PAGE_SIZE = 200;
  * several roles at once, which is what the lock below had to be redesigned for.
  */
 const USER_ADMIN_PERMISSION = 'user.manage';
+
+/**
+ * The second permission the paired create needs.
+ *
+ * `user.manage` issues logins; this one creates the record of a person. An office administrator holds
+ * both, a Branch/Department Manager holds only this one — measured against the grid, not assumed — so
+ * "a Manager can register a person but cannot give them a login" is a real state the screen has to
+ * render rather than an edge case to reason about.
+ */
+const EMPLOYEE_CREATE_PERMISSION = 'employee.create';
 
 export interface AdminUserView {
   id: string;
@@ -96,6 +120,10 @@ export class UserAdminService {
     private readonly passwords: PasswordService,
     private readonly permissions: PermissionsService,
     private readonly audit: AuditService,
+    private readonly encryption: EncryptionService,
+    /** Only for `$transaction` — the person-and-account pair. Every read and write still goes
+     *  through a repository. */
+    private readonly prisma: PrismaService,
   ) {}
 
   async list(page = 0): Promise<{ users: AdminUserView[]; total: number }> {
@@ -112,9 +140,43 @@ export class UserAdminService {
   async provision(
     dto: ProvisionUserDto,
     actorUserId: string,
+    /**
+     * The actor's active role ids — required only when `dto.employee` is present, because creating
+     * a person needs `employee.create` ON TOP OF the `user.manage` that gates this route.
+     *
+     * It cannot be declared with `@RequirePermissions('user.manage', 'employee.create')`:
+     * `PermissionsGuard` ORs its codes (`required.some`), so that would let either one through
+     * alone — the opposite of the intent. Checked here instead, and a caller that sends a person
+     * without passing roles gets a loud programming error rather than a silent bypass.
+     */
+    actorRoleIds?: string[],
   ): Promise<AdminUserView> {
     const violations = this.passwords.validatePolicy(dto.password);
     if (violations.length > 0) throw new BadRequestException(violations);
+
+    if (dto.employee) {
+      if (!actorRoleIds) {
+        throw new Error(
+          'provision() was called with a person block but no actor role ids, so employee.create could not be checked. Pass the role ids of the caller.',
+        );
+      }
+      const granted = await this.permissions.getCodesForRoles(actorRoleIds);
+      if (!granted.has(EMPLOYEE_CREATE_PERMISSION)) {
+        throw new ForbiddenException(
+          'Creating a person record needs employee.create as well as user.manage. Your role can issue a login for someone who already has an HR record, but not create the record itself.',
+        );
+      }
+      if (dto.employeeId) {
+        throw new UnprocessableEntityException(
+          'Send either employee (create the person here) or employeeId (link an HR record that already exists), not both.',
+        );
+      }
+      if (dto.fullName) {
+        throw new UnprocessableEntityException(
+          "Do not send fullName with a person block: the account's display name is composed from the person's own name parts, and two spellings of one person leave nothing to say which is right.",
+        );
+      }
+    }
 
     const accessValidFrom = dto.accessValidFrom
       ? new Date(dto.accessValidFrom)
@@ -208,19 +270,41 @@ export class UserAdminService {
     }
 
     const passwordHash = await this.passwords.hash(dto.password);
+
+    // The person, prepared BEFORE the transaction opens: encryption is a KMS round trip and a
+    // transaction held open across it is a transaction held open across the network.
+    const person = dto.employee
+      ? await this.preparePerson(dto.employee, actorUserId)
+      : null;
+
+    // `fullName` is optional on the DTO because `@ValidateIf` makes it so — required with no
+    // person, refused with one. This re-derives it rather than trusting that decorator: a
+    // `User.fullName` of undefined would hit a NOT NULL column as a 500, and the column stays NOT
+    // NULL because an audit row holds a userId and nothing else.
+    const displayName = person ? person.fullName : dto.fullName;
+    if (!displayName) {
+      throw new UnprocessableEntityException(
+        'fullName is required for an account with no person record — it is what every audit row of this account will be read by.',
+      );
+    }
+
     let user: User;
     try {
-      user = await this.users.provision({
-        fullName: dto.fullName,
-        email: dto.email,
-        passwordHash,
-        languagePreference: dto.languagePreference,
-        departmentId: department.id,
-        branchId: branch.id,
-        employeeId: dto.employeeId,
-        roleIds: roles.map((r) => r.id),
-        accessValidFrom,
-        accessValidUntil,
+      user = await this.writeAccount({
+        person,
+        account: {
+          fullName: displayName,
+          email: dto.email,
+          passwordHash,
+          languagePreference: dto.languagePreference,
+          departmentId: department.id,
+          branchId: branch.id,
+          employeeId: dto.employeeId,
+          registrationType: dto.registrationType,
+          roleIds: roles.map((r) => r.id),
+          accessValidFrom,
+          accessValidUntil,
+        },
       });
     } catch (err) {
       // `User.email @unique` is the real invariant; this only turns the P2002
@@ -262,6 +346,35 @@ export class UserAdminService {
         accessValidUntil: accessValidUntil?.toISOString() ?? null,
       },
     });
+
+    // The person gets its OWN audit row. One row saying "a User was created" would leave the creation
+    // of an HR record — a different entity, under a different permission — recorded nowhere, and
+    // `POST /employees` writes this same row for the same act.
+    if (person) {
+      await this.safeAudit({
+        userId: actorUserId,
+        action: 'CREATE',
+        entityType: 'Employee',
+        entityId: person.input.id,
+        afterValue: {
+          employeeId: person.input.id,
+          // Names only. The national ID is Highly Confidential (Part 10.2) and never appears in an
+          // audit value — not even encrypted, which is still the datum.
+          fullName: person.input.fullName,
+          fullNameEn: person.input.fullNameEn ?? null,
+          position: person.input.position ?? null,
+          // The account's, because that is what was written on the person too — one pair of values
+          // used twice is the whole point of the unified form.
+          departmentId: department.id,
+          departmentName: department.name,
+          branchId: branch.id,
+          branchName: branch.name,
+          hireDate: person.input.hireDate.toISOString(),
+          // The account created in the same breath, so the pair is recoverable from either row.
+          linkedUserId: user.id,
+        },
+      });
+    }
 
     await this.recordSegregationSignal(
       segregationSignal({
@@ -533,6 +646,111 @@ export class UserAdminService {
    * Never throws — a grant that has already committed must not be reported as
    * a failure because its signal could not be written.
    */
+  /**
+   * Everything about the person that can be computed BEFORE the transaction opens.
+   *
+   * Two things happen here and neither may happen inside a transaction: parsing the caller's dates
+   * (which can throw a 422, and a transaction opened only to be rolled back by a validation error is
+   * a lock held for nothing), and encrypting the national ID, which is a KMS round trip.
+   */
+  private async preparePerson(
+    dto: ProvisionEmployeeDto,
+    actorUserId: string,
+  ): Promise<{ input: CreateEmployeeInput; fullName: string }> {
+    const hireDate = parseHistoricalInstant(dto.hireDate, 'hireDate');
+    const confidentialityAgreementSignedAt =
+      dto.confidentialityAgreementSignedAt
+        ? parseHistoricalInstant(
+            dto.confidentialityAgreementSignedAt,
+            'confidentialityAgreementSignedAt',
+          )
+        : undefined;
+    const backgroundCheckCompletedAt = dto.backgroundCheckCompletedAt
+      ? parseHistoricalInstant(
+          dto.backgroundCheckCompletedAt,
+          'backgroundCheckCompletedAt',
+        )
+      : undefined;
+
+    const id = randomUUID();
+    const encrypted = await encryptEntityFields(
+      this.encryption,
+      'Employee',
+      { nationalIdEnc: dto.nationalId },
+      { userId: actorUserId, entityType: 'Employee', entityId: id },
+    );
+
+    const fullName = composeFullName({
+      givenName: dto.givenName,
+      fatherName: dto.fatherName,
+      grandfatherName: dto.grandfatherName,
+      familyName: dto.familyName,
+    });
+
+    return {
+      fullName,
+      input: {
+        id,
+        fullName,
+        givenName: dto.givenName,
+        fatherName: dto.fatherName,
+        grandfatherName: dto.grandfatherName,
+        familyName: dto.familyName,
+        givenNameEn: dto.givenNameEn,
+        fatherNameEn: dto.fatherNameEn,
+        grandfatherNameEn: dto.grandfatherNameEn,
+        familyNameEn: dto.familyNameEn,
+        fullNameEn: composeOptionalFullName({
+          givenName: dto.givenNameEn,
+          fatherName: dto.fatherNameEn,
+          grandfatherName: dto.grandfatherNameEn,
+          familyName: dto.familyNameEn,
+        }),
+        nationalIdEnc: encrypted.nationalIdEnc,
+        position: dto.position,
+        hireDate,
+        licensedRole: dto.licensedRole,
+        confidentialityAgreementSignedAt,
+        backgroundCheckCompletedAt,
+      },
+    };
+  }
+
+  /**
+   * ONE ACT, ONE TRANSACTION.
+   *
+   * With no person there is one write and no transaction is opened — the account-only path is exactly
+   * what it was. With a person there are two rows that must exist together: a second write that fails
+   * would otherwise leave a person who half exists, and whoever pressed Save would have no way to tell
+   * which half. The `Employee` is written first because `User.employeeId` points at it.
+   *
+   * `$transaction` is a deliberate local exception to this codebase's convention of avoiding it
+   * (`EmployeeRepository.linkUser` and `terminate` are the precedents, each with the same
+   * justification): the atomicity IS the feature here, not an optimisation.
+   *
+   * The department and branch the person gets are the ACCOUNT's, resolved and validated above. That is
+   * what makes the old department-disagreement conflict unreachable on this path rather than merely
+   * refused: there is one pair of values, used twice.
+   */
+  private writeAccount(args: {
+    person: { input: CreateEmployeeInput; fullName: string } | null;
+    account: Parameters<UserRepository['provision']>[0];
+  }): Promise<User> {
+    const { person, account } = args;
+    if (!person) return this.users.provision(account);
+    return this.prisma.client.$transaction(async (tx) => {
+      const employee = await this.employees.create(
+        {
+          ...person.input,
+          departmentId: account.departmentId,
+          branchId: account.branchId,
+        },
+        tx,
+      );
+      return this.users.provision({ ...account, employeeId: employee.id }, tx);
+    });
+  }
+
   private async recordSegregationSignal(
     signal: SegregationSignal | null,
     context: { subjectUserId: string; actorUserId: string; via: string },

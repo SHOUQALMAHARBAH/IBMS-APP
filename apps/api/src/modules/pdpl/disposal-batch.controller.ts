@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { DisposalBatchService } from './disposal-batch.service';
 import { CreateDisposalBatchDto } from './dto/create-disposal-batch.dto';
@@ -52,8 +53,12 @@ export class DisposalBatchController {
 
   @RequirePermissions('retention.dispose.approve')
   @Post(':id/dpo-approve')
-  dpoApprove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.disposalBatches.dpoApprove(id, user.id);
+  dpoApprove(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.disposalBatches.dpoApprove(id, user.id, dto.combinedDutyReason);
   }
 
   @RequirePermissions('retention.dispose.approve')

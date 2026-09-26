@@ -91,9 +91,15 @@ export function raiseCommissionOverride(
 }
 
 export function approveCommissionOverride(
+
   entryId: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
 ): Promise<CommissionEntry> {
-  return apiPost(`/commission/entries/${entryId}/override/approve`, {});
+  return apiPost(`/commission/entries/${entryId}/override/approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 /** Process 36 — reconcile the entry against an insurer statement and mark it

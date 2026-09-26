@@ -1,0 +1,22 @@
+{
+  "unenforced-list-drops-an-entry": {
+    "file": "packages/db/prisma/seed-data/permission-enforcement.inventory.spec.ts",
+    "from": "  \"refund.raise\":\n    \"A refund is created inside",
+    "to": "  \"refund.raise.nope\":\n    \"A refund is created inside"
+  },
+  "unenforced-list-keeps-a-wired-code": {
+    "file": "packages/db/prisma/seed-data/permission-enforcement.inventory.spec.ts",
+    "from": "const UNENFORCED: Record<string, string> = {",
+    "to": "const UNENFORCED: Record<string, string> = {\n  \"insurer.read\": \"planted — this code is read on many routes, so the both-directions check must refuse it outright.\",\n"
+  },
+  "description-goes-back-to-promising-the-capability": {
+    "file": "packages/db/prisma/seed-data/permissions.ts",
+    "from": "      \"NOT YET ENFORCED — reserved for a standalone refund raise (an overpayment not tied to an endorsement). Granting or withdrawing this changes nothing today: an endorsement-driven refund is raised under endorsement.apply\",",
+    "to": "      \"Raise a refund (maker side)\","
+  },
+  "harvest-drops-what-she-wrote": {
+    "file": "apps/web/lib/admin/permission-descriptions-input.ts",
+    "from": "    if (trimmed.startsWith('ar:') && code !== null) {",
+    "to": "    if (false) {"
+  }
+}

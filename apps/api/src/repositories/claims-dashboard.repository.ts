@@ -56,6 +56,9 @@ export class ClaimsDashboardRepository {
     const rows = await this.prisma.client.claim.findMany({
       where: {
         status: { not: 'CLOSED' },
+        // A discarded claim is NOTIFIED forever and would age here without limit — the one row in an ageing
+        // report guaranteed to look worst is the one that was withdrawn.
+        discardedAt: null,
         createdAt: { lt: createdBefore },
         policy: this.policyFilterWhere(filters),
       },

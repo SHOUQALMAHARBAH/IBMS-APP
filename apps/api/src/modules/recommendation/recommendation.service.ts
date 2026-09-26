@@ -18,6 +18,15 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllRecommendationOwners } from '../../common/rbac-visibility.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
+import { discardedRefusal } from '../../common/discard.config';
+import {
+  assertDiscardWon,
+  assertDiscardable,
+  discardView,
+  type DiscardView,
+} from '../../common/discard.util';
+import { DiscardDto } from '../../common/dto/discard.dto';
 import {
   approvalRequired,
   commissionDiffAgainst,
@@ -32,6 +41,7 @@ import type { DraftRecommendationDto } from './dto/draft-recommendation.dto';
 import type { DiscloseConflictOfInterestDto } from './dto/disclose-conflict-of-interest.dto';
 import type { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dto';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** The recommendation as the API returns it. `blockedFromSend` lists the
  * gates that still stand between the current state and `send` — empty means
@@ -72,6 +82,12 @@ export interface RecommendationView {
   draftedByUserId: string;
   createdAt: Date;
   blockedFromSend: string[];
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. Carries the actor, the
+   * timestamp and the mandatory reason, because a record that vanished and a record marked withdrawn tell a
+   * reader two different things and only one of them is true here.
+   */
+  discard: DiscardView | null;
 }
 
 const P2002 = 'P2002';
@@ -122,6 +138,7 @@ export class RecommendationService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   /** Placement / Manager / Executive work the whole commercial book
@@ -202,6 +219,30 @@ export class RecommendationService {
   }
 
   /** Loads a recommendation + resolves visibility through its Opportunity. */
+  /**
+   * A DISCARDED RECOMMENDATION CANNOT ADVANCE.
+   *
+   * The other three discardable entities get this from `WorkflowTransitionService`, which every forward move
+   * of a Policy, Claim or Endorsement passes through. A Recommendation has no `status` column and drives the
+   * Opportunity's transitions instead of its own, so there is no single chokepoint to guard — which is
+   * exactly why `discard.config.ts` records `advancesViaWorkflowEngine: false` against it rather than
+   * leaving a reader to assume the engine covers all four.
+   *
+   * Called by `approve`, `discloseConflictOfInterest` and `send` — every move that takes a recommendation
+   * closer to the client. NOT called by `loadVisible` itself: reading a discarded recommendation has to keep
+   * working, because seeing that one was raised and withdrawn is the point of keeping the row.
+   */
+  private assertNotDiscarded(
+    id: string,
+    rec: { discardedAt: Date | null },
+  ): void {
+    if (rec.discardedAt !== null) {
+      throw new UnprocessableEntityException(
+        discardedRefusal('Recommendation', id),
+      );
+    }
+  }
+
   private async loadVisible(
     id: string,
     actor: AuthenticatedUser,
@@ -373,6 +414,7 @@ export class RecommendationService {
     return {
       id: rec.id,
       opportunityId: rec.opportunityId,
+      discard: discardView(rec),
       customerId: rec.opportunity.customerId,
       recommendedQuotation: {
         id: q.id,
@@ -535,9 +577,11 @@ export class RecommendationService {
 
   async approve(
     id: string,
+    dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
   ): Promise<RecommendationView> {
     const rec = await this.loadVisible(id, actor);
+    this.assertNotDiscarded(id, rec);
     const gates = await this.effectiveGates(rec);
 
     if (!gates.approvalRequired) {
@@ -550,13 +594,21 @@ export class RecommendationService {
         `Recommendation ${id} has already been approved.`,
       );
     }
-    assertDifferentActors(
-      rec.draftedByUserId,
-      actor.id,
-      'Recommendation.approve',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'Recommendation_maker_checker_distinct',
+      makerId: rec.draftedByUserId,
+      checkerId: actor.id,
+      entityId: id,
+      context: 'Recommendation.approve',
+      actorUserId: actor.id,
+      reason: dto?.combinedDutyReason,
+    });
 
-    const updated = await this.recommendations.recordApproval(id, actor.id);
+    const updated = await this.recommendations.recordApproval(
+      id,
+      actor.id,
+      combinedDutyActId,
+    );
     if (updated === null) {
       throw new ConflictException(
         `Recommendation ${id} was approved concurrently.`,
@@ -583,6 +635,7 @@ export class RecommendationService {
     actor: AuthenticatedUser,
   ): Promise<RecommendationView> {
     const rec = await this.loadVisible(id, actor);
+    this.assertNotDiscarded(id, rec);
     const gates = await this.effectiveGates(rec);
 
     if (!gates.conflictOfInterestFlagged) {
@@ -599,6 +652,11 @@ export class RecommendationService {
       rec.draftedByUserId,
       actor.id,
       'ConflictOfInterestDisclosure.acknowledge',
+      // DELIBERATELY no constraint name. This compares against Recommendation.draftedByUserId, but the
+      // act is a conflict-of-interest disclosure gated by conflict-of-interest.disclose, not by
+      // recommendation.approve — and NO check constraint covers this pair at all. Naming the
+      // Recommendation constraint would put the wrong permission in the remedy, which is worse than no
+      // remedy. Recorded in IMPROVEMENTS as one of the two application-only pairs.
     );
 
     // Resolve which competing quote this disclosure is against. Default to
@@ -685,6 +743,7 @@ export class RecommendationService {
     actor: AuthenticatedUser,
   ): Promise<RecommendationView> {
     const rec = await this.loadVisible(id, actor);
+    this.assertNotDiscarded(id, rec);
 
     if (rec.sentToClientAt !== null) {
       throw new ConflictException(
@@ -805,5 +864,48 @@ export class RecommendationService {
     // the same raw-Decimal-in pattern the quotation-comparison document
     // already uses (`@code-reviewer` MINOR, this slice's own first pass).
     return { view, customer, recommendation };
+  }
+  /**
+   * DISCARD — this recommendation was raised in error and never took effect.
+   *
+   * The record STAYS. It is marked discarded, carrying who withdrew it, when, and a mandatory reason, which
+   * is the whole difference between this and a delete: somebody reading the file next year needs to see that
+   * a recommendation was raised before it was sent to the client and withdrawn, not a gap where one used to be.
+   *
+   * Three properties are not decided here, deliberately:
+   *  - WHETHER IT MAY BE DISCARDED is `assertDiscardable`, shared by all four entities, so the commitment
+   *    rule and the reason's floor cannot drift between them.
+   *  - THE PERMISSION is `@RequirePermissions('recommendation.discard')` on the route — one code, because
+   *    `PermissionsGuard` ORs what it is given and a second code there would weaken rather than tighten it.
+   *  - WHETHER IT MAY STILL ADVANCE afterwards is the engine's guard, not this method's problem.
+   *
+   * VISIBILITY comes from the same `loadVisible` every other read of this entity uses, so a discard reaches
+   * exactly the records the caller could already see — a permission to discard is not a permission to
+   * discover.
+   */
+  async discard(
+    id: string,
+    dto: DiscardDto,
+    actor: AuthenticatedUser,
+  ): Promise<RecommendationView> {
+    const row = await this.loadVisible(id, actor);
+    assertDiscardable('Recommendation', id, row, dto.reason);
+
+    const { discarded } = await this.recommendations.discard(id, {
+      discardedByUserId: actor.id,
+      discardedReason: dto.reason,
+    });
+    assertDiscardWon('Recommendation', id, discarded);
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'DISCARD',
+      entityType: 'Recommendation',
+      entityId: id,
+      beforeValue: { sentToClientAt: null },
+      afterValue: { discardedReason: dto.reason.trim() },
+    });
+
+    return await this.toView(await this.loadVisible(id, actor));
   }
 }

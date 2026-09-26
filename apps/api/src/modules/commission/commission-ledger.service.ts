@@ -11,7 +11,6 @@ import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { CommissionRepository } from '../../repositories/commission.repository';
 import { PolicyRepository } from '../../repositories/policy.repository';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import {
   compareMoney,
   formatMoney,
@@ -38,6 +37,7 @@ import type { CalculateCommissionDto } from './dto/calculate-commission.dto';
 import type { ListCommissionEntriesQueryDto } from './dto/list-commission-entries-query.dto';
 import type { RaiseCommissionOverrideDto } from './dto/raise-commission-override.dto';
 import type { SettleCommissionDto } from './dto/settle-commission.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** Cap on a book-wide commission-ledger read (the #30 / #33 precedent). */
 export const COMMISSION_LEDGER_READ_LIMIT = 5000;
@@ -72,6 +72,7 @@ export class CommissionLedgerService {
     private readonly commission: CommissionRepository,
     private readonly policies: PolicyRepository,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   // --- 1. calculate (governed) ------------------------------------------
@@ -300,6 +301,8 @@ export class CommissionLedgerService {
   async approveOverride(
     entryId: string,
     actorId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<CommissionLedgerEntryView> {
     const entry = await this.loadEntry(entryId);
     if (!entry.isManualOverride || entry.overrideAmount === null) {
@@ -323,11 +326,15 @@ export class CommissionLedgerService {
         `Commission entry ${entryId}'s override has no recorded requester — it cannot be approved.`,
       );
     }
-    assertDifferentActors(
-      entry.overrideRequestedByUserId,
-      actorId,
-      'CommissionLedgerEntry.approveOverride',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'CommissionLedgerEntry_maker_checker_distinct',
+      makerId: entry.overrideRequestedByUserId,
+      checkerId: actorId,
+      entityId: entryId,
+      context: 'CommissionLedgerEntry.approveOverride',
+      actorUserId: actorId,
+      reason: combinedDutyReason,
+    });
 
     // The `where` re-asserts the exact requester `assertDifferentActors` was
     // checked against and the exact amount being copied in, so a concurrent
@@ -336,14 +343,19 @@ export class CommissionLedgerService {
     // is recomputed from `overrideAmount × the entry's frozen vatRatePercent`
     // so the `vatAmount == amount × vatRatePercent%` invariant survives the
     // override (Process 36).
-    const res = await this.commission.recordOverrideApproval(entryId, actorId, {
-      requestedByUserId: entry.overrideRequestedByUserId,
-      overrideAmount: entry.overrideAmount,
-      vatAmount: computeCommissionVat(
-        entry.overrideAmount,
-        entry.vatRatePercent,
-      ),
-    });
+    const res = await this.commission.recordOverrideApproval(
+      entryId,
+      actorId,
+      {
+        requestedByUserId: entry.overrideRequestedByUserId,
+        overrideAmount: entry.overrideAmount,
+        vatAmount: computeCommissionVat(
+          entry.overrideAmount,
+          entry.vatRatePercent,
+        ),
+      },
+      combinedDutyActId,
+    );
     if (res.count === 0) {
       const now = await this.loadEntry(entryId);
       if (now.overrideApprovedByUserId === actorId) {

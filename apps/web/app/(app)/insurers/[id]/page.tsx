@@ -12,7 +12,7 @@ import {
   type Insurer,
   type InsurerStatusImpact,
 } from '../../../../lib/insurer/insurer-api';
-import { ApiError } from '../../../../lib/auth/api-client';
+import { ApiError, isMfaEnrolmentError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, sectionStyle } from '../../../../components/lead/lead.styles';
 import {
@@ -59,7 +59,10 @@ export default function InsurerDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? '';
   const { user, isLoading } = useAuth();
-  const canManage = !!user && hasPermission(user, 'insurer.relationship.manage');
+  // Deactivating and reactivating are one capability pointed two ways, and this section is the only
+  // thing on the page behind it. `insurer.deactivate` also gates the impact read the dialog performs,
+  // so the button and the request it makes ask for the same code.
+  const canDeactivate = !!user && hasPermission(user, 'insurer.deactivate');
 
   const [insurer, setInsurer] = useState<Insurer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -80,8 +83,10 @@ export default function InsurerDetailPage() {
       setLoadError(
         err instanceof ApiError && err.status === 404
           ? t('insDetailNotFound')
-          : err instanceof ApiError && err.status === 403
-            ? t('insListNoPermission')
+          : isMfaEnrolmentError(err)
+            ? t('insMfaRequired')
+            : err instanceof ApiError && err.status === 403
+              ? t('insListNoPermission')
             : t('insListLoadError'),
       );
     }
@@ -230,7 +235,7 @@ export default function InsurerDetailPage() {
         </div>
       </section>
 
-      {canManage ? (
+      {canDeactivate ? (
         <section style={sectionStyle}>
           {confirming === null ? (
             insurer.isActive ? (

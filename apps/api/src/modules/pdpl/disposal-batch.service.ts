@@ -11,7 +11,6 @@ import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { DisposalBatchRepository } from '../../repositories/disposal-batch.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
@@ -23,6 +22,7 @@ import {
 import type { CreateDisposalBatchDto } from './dto/create-disposal-batch.dto';
 import type { RecordDisposalExecutionDto } from './dto/record-disposal-execution.dto';
 import type { ListDisposalBatchesQueryDto } from './dto/list-disposal-batches-query.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 const P2002 = 'P2002';
 
@@ -72,6 +72,7 @@ export class DisposalBatchService {
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   async nominate(
@@ -155,16 +156,22 @@ export class DisposalBatchService {
   async dpoApprove(
     id: string,
     actorUserId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<DisposalBatchView> {
     const batch = await this.load(id);
     if (batch.status === 'DPO_APPROVED') {
       return this.toView(batch); // idempotent
     }
-    assertDifferentActors(
-      batch.nominatedByUserId,
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'DisposalBatch_maker_checker_distinct',
+      makerId: batch.nominatedByUserId,
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'DisposalBatch.dpoApprove',
       actorUserId,
-      'DisposalBatch.dpoApprove',
-    );
+      reason: combinedDutyReason,
+    });
     await this.assertNoActiveLegalHold(batch.retentionScheduleItemId);
 
     const dpoApprovedAt = new Date();
@@ -183,6 +190,7 @@ export class DisposalBatchService {
           dpoApprovedByUserId: actorUserId,
           dpoApprovedAt,
           slaDueAt,
+          combinedDutyActId,
         },
         sideEffect: () =>
           this.startSlaTimerBestEffort(id, slaDueAt, actorUserId),

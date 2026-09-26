@@ -18,7 +18,12 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { canReadAllEndorsementOwners } from '../../common/rbac-visibility.util';
-import { assertDifferentActors } from '../../common/maker-checker.util';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
+import { ApproveRefundDto } from './dto/approve-refund.dto';
 import {
   compareMoney,
   formatMoney,
@@ -29,6 +34,13 @@ import {
   parseCalendarDate,
 } from '../policy/policy.config';
 import { parseHistoricalInstant } from '../../common/historical-instant.util';
+import {
+  assertDiscardWon,
+  assertDiscardable,
+  discardView,
+  type DiscardView,
+} from '../../common/discard.util';
+import { DiscardDto } from '../../common/dto/discard.dto';
 import {
   CANCELLATION_CHANGE_TYPE,
   cancellationAuditSnapshot,
@@ -70,6 +82,7 @@ export interface EndorsementView {
   } | null;
   refund: {
     id: string;
+    combinedDutyAct: CombinedDutyActView | null;
     amount: string;
     reason: string;
     raisedByUserId: string;
@@ -81,6 +94,12 @@ export interface EndorsementView {
   commissionReversal: { amount: string } | null;
   scheduleVersioned: boolean;
   createdAt: Date;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. Carries the actor, the
+   * timestamp and the mandatory reason, because a record that vanished and a record marked withdrawn tell a
+   * reader two different things and only one of them is true here.
+   */
+  discard: DiscardView | null;
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -97,7 +116,8 @@ function isUniqueViolation(err: unknown): boolean {
  * → FINANCIAL_ADJUSTMENT_CALCULATED → (REFUND_APPROVAL_PENDING →) APPLIED →
  * CLIENT_NOTIFIED`. The child `Cancellation` / `Refund` / `CommissionReversal`
  * have no `status` (their lifecycle is the parent endorsement's). `Refund`
- * approval is maker/checker (`assertDifferentActors` + the
+ * approval is maker/checker (`DutySegregationService`, which still refuses through
+ * `assertDifferentActors` in a SEGREGATED office, + the
  * `Refund_maker_checker_distinct` CHECK). The commission reversal is created
  * **automatically** in the same step as the refund from the same return
  * premium — never a separate hand calculation (`policy-lifecycle.md`).
@@ -114,6 +134,7 @@ export class EndorsementService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly commissionLedger: CommissionLedgerService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   private canReachAnyPolicy(actor: AuthenticatedUser): boolean {
@@ -238,6 +259,7 @@ export class EndorsementService {
   private toView(e: EndorsementWithContext): EndorsementView {
     return {
       id: e.id,
+      discard: discardView(e),
       policyId: e.policyId,
       customerId: e.policy.customerId,
       type: e.type,
@@ -268,6 +290,8 @@ export class EndorsementService {
             approvalThresholdMatrixLevel: e.refund.approvalThresholdMatrixLevel,
             paidAt: e.refund.paidAt,
             needsApproval: refundNeedsApproval(e.refund.amount),
+            // Part 4 step 5 — on the record, not only in a report.
+            combinedDutyAct: combinedDutyActView(e.refund.combinedDutyAct),
           }
         : null,
       commissionReversal: e.commissionReversal
@@ -750,6 +774,8 @@ export class EndorsementService {
 
   async approveRefund(
     refundId: string,
+    /** Present only when the approver is also the raiser and the office has declared COMBINED mode. */
+    dto: ApproveRefundDto | undefined,
     actor: AuthenticatedUser,
   ): Promise<EndorsementView> {
     const refund = await this.endorsements.findRefundById(refundId);
@@ -775,11 +801,24 @@ export class EndorsementService {
         `Refund ${refundId} has already been approved.`,
       );
     }
-    assertDifferentActors(refund.raisedByUserId, actor.id, 'Refund.approve');
+    // Part 4 — in a SEGREGATED office this throws exactly as `assertDifferentActors` did and returns
+    // nothing; in a COMBINED one it requires a reason, records the act with the hat the approver wore, and
+    // returns the id the write below has to carry. The CHECK constraint refuses the write either way if the
+    // id is null, so a caller that dropped the value on the floor would be refused by the database.
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'Refund_maker_checker_distinct',
+      makerId: refund.raisedByUserId,
+      checkerId: actor.id,
+      entityId: refundId,
+      context: 'Refund.approve',
+      actorUserId: actor.id,
+      reason: dto?.combinedDutyReason,
+    });
 
     const updated = await this.endorsements.recordRefundApproval(
       refundId,
       actor.id,
+      combinedDutyActId,
     );
     if (updated === null) {
       throw new ConflictException(
@@ -843,6 +882,49 @@ export class EndorsementService {
   }
 
   async get(id: string, actor: AuthenticatedUser): Promise<EndorsementView> {
+    return this.toView(await this.loadVisibleEndorsement(id, actor));
+  }
+  /**
+   * DISCARD — this endorsement was raised in error and never took effect.
+   *
+   * The record STAYS. It is marked discarded, carrying who withdrew it, when, and a mandatory reason, which
+   * is the whole difference between this and a delete: somebody reading the file next year needs to see that
+   * a endorsement was raised before it was applied to the policy and withdrawn, not a gap where one used to be.
+   *
+   * Three properties are not decided here, deliberately:
+   *  - WHETHER IT MAY BE DISCARDED is `assertDiscardable`, shared by all four entities, so the commitment
+   *    rule and the reason's floor cannot drift between them.
+   *  - THE PERMISSION is `@RequirePermissions('endorsement.discard')` on the route — one code, because
+   *    `PermissionsGuard` ORs what it is given and a second code there would weaken rather than tighten it.
+   *  - WHETHER IT MAY STILL ADVANCE afterwards is the engine's guard, not this method's problem.
+   *
+   * VISIBILITY comes from the same `loadVisibleEndorsement` every other read of this entity uses, so a discard reaches
+   * exactly the records the caller could already see — a permission to discard is not a permission to
+   * discover.
+   */
+  async discard(
+    id: string,
+    dto: DiscardDto,
+    actor: AuthenticatedUser,
+  ): Promise<EndorsementView> {
+    const row = await this.loadVisibleEndorsement(id, actor);
+    assertDiscardable('Endorsement', id, row, dto.reason);
+
+    const { discarded } = await this.endorsements.discard(id, {
+      discardedByUserId: actor.id,
+      discardedReason: dto.reason,
+    });
+    assertDiscardWon('Endorsement', id, discarded);
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'DISCARD',
+      entityType: 'Endorsement',
+      entityId: id,
+      beforeValue: { status: row.status },
+      afterValue: { discardedReason: dto.reason.trim() },
+    });
+
     return this.toView(await this.loadVisibleEndorsement(id, actor));
   }
 }

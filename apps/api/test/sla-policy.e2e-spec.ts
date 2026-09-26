@@ -213,8 +213,16 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     // And it is audited, before AND after.
     const audits = await prisma.auditLogEntry.findMany({
       where: { entityType: 'SlaPolicy', entityId: policy.id, action: 'UPDATE' },
+      // Unordered `findMany` + `[0]` imposes an ordering requirement nothing typechecks, and the answer
+      // then comes from the query PLAN — the same defect that once decided which reviewer an
+      // access-recertification subject got. A total order, so `[0]` means something.
+      orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
     });
-    expect(audits.length).toBeGreaterThan(0);
+    // Was `toBeGreaterThan(0)` followed by assertions on `audits[0]`: it tolerated any number of rows
+    // and then generalised from an arbitrary one. This test causes exactly ONE update of this policy, so
+    // one row is the honest expectation — and a second UPDATE appearing here becomes a visible failure
+    // rather than a coin flip about which row gets read.
+    expect(audits).toHaveLength(1);
     expect(JSON.stringify(audits[0].beforeValue)).toContain(
       '"durationValue":3',
     );
@@ -289,10 +297,14 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
   });
 
   it('separates "change the duration" from "declare it legally required"', async () => {
-    // BRANCH_DEPARTMENT_MANAGER holds sla.policy.manage but NOT
+    // BRANCH_DEPARTMENT_MANAGER holds sla.policy.update but NOT
     // sla.policy.regulatory. Shortening a deadline is a normal governance
     // edit; asserting the deadline is the law is not, and the split is a ROUTE
     // boundary rather than a branch inside one handler.
+    //
+    // This distinction is WHY the owner ruled that splitting `sla.policy.manage` was routine: the
+    // decision that carries the regulatory weight on this surface already stood apart, so splitting
+    // the CRUD verbs around it takes nothing away from it (IMPROVEMENTS § 3.15).
     const manager = await makeUser('sla-manager', 'BRANCH_DEPARTMENT_MANAGER');
 
     const listed = await request(app.getHttpServer())

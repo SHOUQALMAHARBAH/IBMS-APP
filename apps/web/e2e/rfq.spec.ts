@@ -1437,6 +1437,48 @@ async function mockRfqApi(
  * stamp the adjuster survey + investigation -> submit -> record the verdict).
  * The Process 28 settlement controls only appear once the claim is APPROVED /
  * PARTIALLY_APPROVED. */
+/**
+ * File the three mandatory claim documents, waiting for each one to LAND before starting the next.
+ *
+ * IMPROVEMENTS § 1.47. Four tests in this file were chronically flaky in CI — reported as `4 flaky` in a
+ * run that still concluded SUCCESS, with the count growing 2 → 2 → 4 across three runs while no code
+ * changed. They shared a shape rather than any state: roughly sixteen sequential interactions with ONE
+ * assertion at the end, against a 30s per-test budget that is marginal on a single-core runner.
+ *
+ * The defect was not the budget. It was that a loop of unsynchronised clicks and a single final assertion
+ * reports "slow" and "broken" identically: `waiting for element to be visible, enabled and stable` on
+ * `Documentation · complete` says nothing about WHICH of the twelve interactions did not land.
+ *
+ * So each iteration now waits on the state the NEXT one depends on — the filed-document count, which only
+ * advances once the request completed AND the parent refetched, which is also exactly when the form is
+ * ready to be typed into again. Three intermediate assertions instead of one final one, so a step that
+ * genuinely fails names itself, and no `fill` races a re-render.
+ *
+ * The timeout is deliberately NOT raised. That would be § 1.1's mistake: a mitigation that buys time and
+ * hides the next crossing.
+ */
+async function fileMandatoryClaimDocuments(page: Page) {
+  const documents = [
+    ["claim_form", "cf.pdf"],
+    ["photo", "ph.jpg"],
+    ["repair_estimate", "re.pdf"],
+  ] as const;
+
+  for (const [index, [docType, fileName]] of documents.entries()) {
+    await page.getByLabel("Document type").selectOption(docType);
+    await page.getByLabel("File name").fill(fileName);
+    await page.getByLabel("Storage reference").fill(`s3://claims/${docType}`);
+    await page.getByRole("button", { name: "File document" }).click();
+    // The count is the settled-state signal: it only moves once the attach returned and the card
+    // refetched. Singular on the first one, because the screen says "1 file on record."
+    const filed = index + 1;
+    await expect(
+      page.getByText(`${filed} file${filed === 1 ? "" : "s"} on record.`),
+    ).toBeVisible();
+  }
+  await expect(page.getByText("Documentation · complete")).toBeVisible();
+}
+
 async function driveClaimToVerdict(
   page: Page,
   opts: {
@@ -1458,17 +1500,7 @@ async function driveClaimToVerdict(
     .click();
   await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
-  for (const [docType, fileName] of [
-    ["claim_form", "cf.pdf"],
-    ["photo", "ph.jpg"],
-    ["repair_estimate", "re.pdf"],
-  ] as const) {
-    await page.getByLabel("Document type").selectOption(docType);
-    await page.getByLabel("File name").fill(fileName);
-    await page.getByLabel("Storage reference").fill(`s3://claims/${docType}`);
-    await page.getByRole("button", { name: "File document" }).click();
-  }
-  await expect(page.getByText("Documentation · complete")).toBeVisible();
+  await fileMandatoryClaimDocuments(page);
 
   await page
     .getByLabel("Completion date (adjuster survey / investigation)")
@@ -2484,17 +2516,7 @@ test("tracks the adjuster survey, submits for assessment once the checklist is c
   await expect(page.getByText("Registered", { exact: true })).toBeVisible();
 
   // file every mandatory document
-  for (const [docType, fileName] of [
-    ["claim_form", "cf.pdf"],
-    ["photo", "ph.jpg"],
-    ["repair_estimate", "re.pdf"],
-  ] as const) {
-    await page.getByLabel("Document type").selectOption(docType);
-    await page.getByLabel("File name").fill(fileName);
-    await page.getByLabel("Storage reference").fill(`s3://claims/${docType}`);
-    await page.getByRole("button", { name: "File document" }).click();
-  }
-  await expect(page.getByText("Documentation · complete")).toBeVisible();
+  await fileMandatoryClaimDocuments(page);
 
   // record the adjuster's survey + investigation
   await page

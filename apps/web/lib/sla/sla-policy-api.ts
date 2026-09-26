@@ -69,7 +69,7 @@ export function getSlaPolicy(id: string): Promise<SlaPolicy> {
   return apiGet(`/sla/policies/${encodeURIComponent(id)}`);
 }
 
-/** Duration/calendar/escalation edits. Needs `sla.policy.manage`.
+/** Duration/calendar/escalation edits. Needs `sla.policy.update`.
  *
  * Deliberately CANNOT change the source/citation — that is a different route
  * behind `sla.policy.regulatory` (see `updateSlaPolicySource`), because
@@ -112,7 +112,7 @@ export function durationUnitKey(unit: SlaDurationUnit): string {
 }
 
 /** Change what the system CLAIMS about an SLA's legal force. Needs
- * `sla.policy.regulatory` on top of `sla.policy.manage`. `REGULATORY` still
+ * `sla.policy.regulatory` on top of `sla.policy.update`. `REGULATORY` still
  * requires a named instrument — a 422, not a silent downgrade. */
 export function updateSlaPolicySource(
   id: string,

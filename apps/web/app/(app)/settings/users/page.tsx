@@ -16,14 +16,12 @@ import {
   type AdminUser,
   type OrgUnit,
   type RoleCatalogueEntry,
-  type RoleName,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
 import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
-import { listEmployees, type EmployeeListRow } from '../../../../lib/supporting-operations/employee-api';
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the eleven seeded names. A role
  *  an office defines is deliberately NOT one of these. */
@@ -65,7 +63,6 @@ export default function UserAdminPage() {
   const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const isAdmin = hasPermission(user, 'user.manage');
-  const canLinkEmployee = hasPermission(user, 'employee.read');
   const canReadRoles = hasPermission(user, 'role.read');
 
   /**
@@ -110,19 +107,34 @@ export default function UserAdminPage() {
   const [password, setPassword] = useState('');
   // Role IDS, not names — what the API now addresses.
   const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [grantChoice, setGrantChoice] = useState<string>('');
+  /**
+   * The role chosen to grant, PER USER.
+   *
+   * It was one shared value rendered inside every row's `<select>`: picking a role in one row
+   * changed what every other row displayed. The grant itself always went to the right user, so the
+   * screen was the only thing lying — which is the hardest kind of bug to trust a screenshot about.
+   */
+  const [grantChoice, setGrantChoice] = useState<Record<string, string>>({});
   // The office's OWN catalogue, fetched rather than hard-coded — a custom role
   // has to be offerable here or Phase 3 could create one this screen cannot
   // grant.
   const [roleCatalogue, setRoleCatalogue] = useState<RoleCatalogueEntry[]>([]);
+
+  /**
+   * The roles a grant may actually use: ACTIVE only.
+   *
+   * A retired role grants nothing — permission resolution filters on `role.status = 'ACTIVE'` — so
+   * an administrator who granted one would hand a person a row that reads as access and confers
+   * none. Retired roles remain visible where someone ALREADY holds one, with a marker and a revoke
+   * control, because hiding a live assignment would be the screen lying in the other direction.
+   */
+  const grantableRoles = roleCatalogue.filter((r) => r.status === 'ACTIVE');
   // Part II §4.2.2 — Department and Branch are required, and are deliberately
   // rendered as their own labelled dropdowns rather than folded in with Roles.
   const [departments, setDepartments] = useState<OrgUnit[]>([]);
   const [branches, setBranches] = useState<OrgUnit[]>([]);
   const [departmentId, setDepartmentId] = useState('');
   const [branchId, setBranchId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [employees, setEmployees] = useState<EmployeeListRow[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -156,28 +168,25 @@ export default function UserAdminPage() {
     if (!user || !isAdmin) return;
     void (async () => {
       try {
-        const [depts, brs, emps, cat] = await Promise.all([
+        const [depts, brs, cat] = await Promise.all([
           listDepartments(),
           listBranches(),
-          // Only when the caller can read it — GET /employees needs
-          // employee.read, and a 403 here would blank the other two.
-          canLinkEmployee ? listEmployees() : Promise.resolve([]),
-          // Same shape of guard: GET /rbac/roles needs `role.read`, which a
-          // holder of `user.manage` does not necessarily have.
+          // GET /rbac/roles needs `role.read`, which a holder of `user.manage`
+          // does not necessarily have.
           canReadRoles ? listRoles() : Promise.resolve([]),
         ]);
         setDepartments(depts);
         setBranches(brs);
-        setEmployees(emps);
         setRoleCatalogue(cat);
         // The grant dropdown's default is whatever the office actually has.
-        setGrantChoice((current) => current || (cat[0]?.id ?? ''));
+        // No shared default any more: each row falls back to the first ACTIVE role at render time,
+        // so one row's choice cannot become another row's displayed value.
       } catch {
         // The form's own error line covers a failed submit; an empty dropdown
         // is self-explanatory and must not blank the user list beside it.
       }
     })();
-  }, [user, isAdmin, canLinkEmployee, canReadRoles, t]);
+  }, [user, isAdmin, canReadRoles, t]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -206,9 +215,8 @@ export default function UserAdminPage() {
         departmentId,
         branchId,
         roleIds,
-        // Omitted rather than sent empty: the DTO treats absence as "no link",
-        // and an empty string would fail validation as a malformed id.
-        employeeId: employeeId || undefined,
+        // No employeeId: this form is for an account with no person behind it. Linking one happens on
+        // that person's own page, where the person is already on screen.
       });
       setFullName('');
       setEmail('');
@@ -216,7 +224,6 @@ export default function UserAdminPage() {
       setRoleIds([]);
       setDepartmentId('');
       setBranchId('');
-      setEmployeeId('');
     });
   }
 
@@ -294,31 +301,20 @@ export default function UserAdminPage() {
             </select>
           </label>
           {/*
-            Optional, and rendered only for someone who can actually read the
-            employee list — `GET /employees` needs `employee.read`, and a
-            select that 403s on load is worse than no select.
+            THE EMPLOYEE PICKER IS GONE, DELIBERATELY.
 
-            Link-only by design: an Employee cannot be created from here
-            because it requires a national ID, which is Highly Confidential
-            and has no business being typed into an account-creation form.
+            It listed existing HR records so a new account could name one — and the person being
+            registered was, by definition, never in it. That is what made "record the person, then
+            create their account" two screens in a fixed order, and it reached the owner as a broken
+            button.
+
+            Both of its cases moved to where the person is:
+              - a NEW person who needs a login: one form on /employees, one Save, one transaction;
+              - a person recorded EARLIER who now needs one: their own page, /employees/[id].
+
+            What is left here is the account with NO person behind it — the external auditor — which is
+            the only case this screen was ever the right place for.
           */}
-          {canLinkEmployee ? (
-            <label>
-              {t('usrEmployeeRecord')}
-              <select
-                aria-label={t('usrEmployeeRecord')}
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-              >
-                <option value="">{t('usrNoEmployeeLink')}</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.fullName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
             {t('usrBranch')}
             <select
@@ -337,7 +333,9 @@ export default function UserAdminPage() {
           </label>
           <fieldset style={{ border: '1px solid var(--border-subtle)', padding: '0.5rem' }}>
             <legend>{t('usrRoles')}</legend>
-            {roleCatalogue.map((entry) => (
+            {/* ACTIVE only here too: provisioning a new account with a retired role would create a
+                person whose access is empty on their first sign-in. */}
+            {grantableRoles.map((entry) => (
               <label
                 key={entry.id}
                 style={{
@@ -479,9 +477,13 @@ export default function UserAdminPage() {
                           >
                             <select
                               aria-label={t('usrRoleToGrantAria', { email: u.email })}
-                              value={grantChoice}
+                              data-grant-select={u.id}
+                              value={grantChoice[u.id] ?? grantableRoles[0]?.id ?? ''}
                               onChange={(e) =>
-                                setGrantChoice(e.target.value as RoleName)
+                                setGrantChoice((current) => ({
+                                  ...current,
+                                  [u.id]: e.target.value,
+                                }))
                               }
                             >
                               {/* value is the ID, not the name. `grantRole`
@@ -490,7 +492,9 @@ export default function UserAdminPage() {
                                   every grant from this dropdown a 400, while the
                                   default (set from `cat[0].id`) matched no option
                                   at all. */}
-                              {roleCatalogue.map((entry) => (
+                              {/* ACTIVE only. A retired role grants nothing, so offering it here
+                                  produces an assignment that looks like access and is not. */}
+                              {grantableRoles.map((entry) => (
                                 <option key={entry.id} value={entry.id}>
                                   {roleLabel(entry)}
                                 </option>
@@ -500,7 +504,12 @@ export default function UserAdminPage() {
                               type="button"
                               disabled={busy}
                               onClick={() =>
-                                void run(() => grantRole(u.id, grantChoice))
+                                void run(() =>
+                                  grantRole(
+                                    u.id,
+                                    grantChoice[u.id] ?? grantableRoles[0]?.id ?? '',
+                                  ),
+                                )
                               }
                             >
                               {t('usrGrant')}

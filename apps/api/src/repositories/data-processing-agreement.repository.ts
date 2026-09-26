@@ -73,10 +73,20 @@ export class DataProcessingAgreementRepository {
   async dpoApprove(
     id: string,
     dpoApprovedByUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the checker IS the maker in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person act, which is every one until an office declares it.
+     * The column is what this pair's CHECK constraint reads: with it null, a self-approval is refused by the
+     * database whatever the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<DataProcessingAgreement | null> {
     const result = await this.prisma.client.dataProcessingAgreement.updateMany({
       where: { id, dpoApprovedByUserId: null },
-      data: { dpoApprovedByUserId },
+      data: {
+        dpoApprovedByUserId,
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
+      },
     });
     if (result.count === 0) return null;
     return this.findById(id);

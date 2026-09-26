@@ -1,4 +1,5 @@
 import { it } from 'vitest';
+import { lineCodeForProgrammeLine } from '../src/modules/insurance-program/insurance-program.config';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -106,7 +107,35 @@ const NUM = {
   vendorsPerOrg: envInt('DEMO_VENDORS_PER_ORG', 6),
 };
 
-const DEMO_PASSWORD = 'DemoPass#2026!';
+/**
+ * The password every demo account gets, from the environment — with NO default.
+ *
+ * It used to be a literal string right here. That string is deliberately not repeated even in this
+ * comment: a password in a source file is a password in every clone, every diff and every search
+ * result, and the accounts on existing dev databases are still hashed with it. It had additionally
+ * been copied into a requirements document, which is how it stopped being a secret at all.
+ * Requiring it from the environment means the only place it exists is the shell that ran the seed.
+ *
+ * Refusing to run without it is deliberate rather than defaulting to something generated: a
+ * generated password nobody recorded strands sixteen accounts, and this script has already
+ * stranded sixteen accounts once (see README-SEED-DEMO.md). The operator chooses it, so the
+ * operator has it.
+ */
+const DEMO_PASSWORD = (() => {
+  const fromEnv = process.env.DEMO_PASSWORD?.trim();
+  if (!fromEnv) {
+    throw new Error(
+      [
+        'DEMO_PASSWORD is not set. This script no longer carries a password in its source.',
+        'Set one for this run and keep it:',
+        '  PowerShell:  $env:DEMO_PASSWORD = "<choose a password>"',
+        '  bash:        export DEMO_PASSWORD="<choose a password>"',
+        'It must satisfy the same policy a real sign-up does: at least 12 characters with upper case, lower case, a digit and a symbol. Every demo login this script prints will use it.',
+      ].join('\n'),
+    );
+  }
+  return fromEnv;
+})();
 
 /** Matches `packages/db/prisma/seed.ts`'s `DEFAULT_ORGANIZATION_ID` — kept as
  * a literal (not imported) because that module opens its own PrismaClient
@@ -303,6 +332,86 @@ interface InsurerSeed {
   legalNameAr: string;
   lines: string[];
 }
+/**
+ * Companies an office registered ITSELF — no row in the global catalogue.
+ *
+ * This is the case the whole insurer feature exists for (`Insurer.insurerMasterId` is nullable),
+ * and until now the demo data had none: every seeded insurer was catalogue-linked, so the
+ * "registered locally" badge and the local-name-editing path were invisible.
+ *
+ * The LAST entry of each office is the same real company under two different spellings — extra
+ * spaces and the Arabic definite article moved. `canonical_name_key()` folds both to one key, so
+ * the cross-office DIRECTORY shows them as ONE entry while each office keeps its own row. That is
+ * the directory's headline behaviour and it cannot be demonstrated with one office.
+ *
+ * Registering the second spelling into the SAME office is refused with a 409 — deliberately NOT
+ * seeded, because a refusal is worth seeing happen rather than reading about. `docs/first-run.md`
+ * walks it.
+ */
+/**
+ * Locally registered insurers — no `InsurerMaster` row behind them, which is the second of the two
+ * registration paths and the one a real office reaches for when a company the catalogue never heard
+ * of turns up.
+ *
+ * The Yarmouk entry appears in BOTH offices, spelled differently, and the exact spellings are
+ * load-bearing rather than decorative. The directory groups on `canonicalName`, which the database
+ * generates from `legalName` alone — the Arabic name does not participate — so the strings below
+ * were measured against `canonical_name_key()` on the dev database rather than reasoned about:
+ *
+ *   'Yarmouk Insurance (demo)'   -> 'demo insurance yarmouk'
+ *   'YARMOUK   insurance (demo)' -> 'demo insurance yarmouk'   same key, so ONE directory entry
+ *
+ * The first draft of this pair used 'al-yarmouk   insurance' against 'Yarmouk Insurance' and would
+ * have produced TWO entries under a comment claiming one: the key is token-SORTED and strips the
+ * Arabic article 'ال' but keeps a Latin 'al' as a token of its own ('al insurance yarmouk'). The
+ * walkthrough makes a promise about what this looks like on screen, so the promise is measured.
+ *
+ * The Arabic names differ the way a second typist would actually differ — 'شركة' against 'شركه',
+ * 'للتأمين' against 'للتامين' — so the merged directory entry visibly covers two spellings.
+ */
+const LOCAL_INSURER_SEEDS: Record<'a' | 'b', { legalName: string; legalNameAr: string; lines: string[] }[]> = {
+  a: [
+    { legalName: 'Petra Takaful (demo)', legalNameAr: 'بترا للتكافل', lines: ['Group Medical', 'Group Life'] },
+    { legalName: 'Yarmouk Insurance (demo)', legalNameAr: 'شركة اليرموك للتأمين', lines: ['Motor Fleet', 'Property All Risks'] },
+  ],
+  b: [
+    { legalName: 'Zarqa Mutual (demo)', legalNameAr: 'الزرقاء التعاونية', lines: ['Public Liability'] },
+    // The same company as office A's second entry. Same canonical key, different spelling — which
+    // is what makes the cross-office directory show one company rather than two.
+    { legalName: 'YARMOUK   insurance (demo)', legalNameAr: 'شركه اليرموك للتامين', lines: ['Motor Fleet'] },
+  ],
+};
+
+/**
+ * The duplicate the walkthrough asks her to type, and the office it must be refused in.
+ *
+ * `docs/first-run.md` tells her to register this name in office A and watch it refused. That is a
+ * promise about a running system, so the seed makes the attempt itself and fails if the refusal
+ * does not come — an instruction nobody re-checks is exactly the kind that rots into "it just let
+ * me save it".
+ */
+/**
+ * Promises `docs/first-run.md` makes that this run could not confirm.
+ *
+ * Collected rather than thrown at the point of discovery, and the difference is not stylistic.
+ * The first version threw, the throw reached `seedOrganization`'s caller, and the console read
+ * "Default Brokerage Office FAILED entirely" — one wrong assertion about a documentation step had
+ * skipped that office's employees, customers, pipelines and claims. A check on the DOCS must not
+ * be able to cost the DATA; the run still fails at the end, where failing is free.
+ */
+const brokenPromises: string[] = [];
+
+function recordBrokenPromise(detail: string): void {
+  brokenPromises.push(detail);
+  console.log(`  !!! walkthrough promise NOT confirmed: ${detail}`);
+}
+
+const DUPLICATE_SPELLING_DEMO = {
+  attempt: 'yarmouk insurance (Demo)',
+  attemptAr: 'شركة اليرموك للتامين',
+  collidesWith: 'Yarmouk Insurance (demo)',
+} as const;
+
 const INSURER_SEEDS: InsurerSeed[] = [
   { legalName: 'Jordan Insurance Company (demo)', legalNameAr: 'الشركة الأردنية للتأمين', lines: ['Motor Fleet', 'Property All Risks', 'Marine Cargo / Goods in Transit'] },
   { legalName: 'Middle East Insurance Company (demo)', legalNameAr: 'الشركة الشرق أوسطية للتأمين', lines: ['Motor Fleet', 'Public Liability', 'Group Medical'] },
@@ -408,7 +517,7 @@ function secretFromOtpAuthUri(uri: string): string {
  * grants permissions to the DEFAULT organization's roles only, so every code
  * added after the demo office was created never reached it. It was measured, not
  * theorised — Office B's `SYSTEM_SECURITY_ADMINISTRATOR` was three codes behind
- * the grid (`employee.create`, `employee.update`, `role.manage`), so the demo
+ * the grid (`employee.create`, `employee.update`, `role.update`), so the demo
  * office's administrator silently could not do things the default office's could.
  *
  * The default office is the right source because `preflight()` already refuses to
@@ -548,10 +657,23 @@ async function ensureActor(
   // Idempotent reset — see this function's header. Also re-asserts
   // `mustChangePassword: false` in case an earlier run (or an administrator)
   // left the account owing a password change.
+  //
+  // AND re-hashes the password, which the create branch above cannot do for an account that
+  // already exists. Accounts are looked up by a FIXED email and reused, so without this a run with
+  // a different `DEMO_PASSWORD` would print credentials that do not work — the script would be
+  // claiming something untrue about sixteen accounts, and the person reading the output has no way
+  // to tell. Rehashing every run costs one bcrypt per actor and makes the printed password the
+  // real one by construction.
   await rawPrisma.mfaCredential.deleteMany({ where: { userId: user.id } });
   user = await rawPrisma.user.update({
     where: { id: user.id },
-    data: { mfaEnabled: false, mustChangePassword: false, lockedUntil: null, failedLoginAttempts: 0 },
+    data: {
+      passwordHash: await bcrypt.hash(DEMO_PASSWORD, 12),
+      mfaEnabled: false,
+      mustChangePassword: false,
+      lockedUntil: null,
+      failedLoginAttempts: 0,
+    },
   });
 
   const role = await ensureRoleMirroringDefaultOffice(orgId, def.role);
@@ -730,7 +852,9 @@ async function ensureActors(
 
 interface OrgInsurer {
   id: string;
-  insurerMasterId: string;
+  /** NULL for a company this office registered itself — the case the insurer feature exists for.
+   *  Widened from `string` when local insurers were added to the demo data. */
+  insurerMasterId: string | null;
   name: string;
   lines: string[];
 }
@@ -742,7 +866,187 @@ interface OrgInsurer {
  * so they are upserted once and then given one `Insurer` relationship row
  * PER Organization, exactly like `tenant-isolation.e2e-spec.ts`'s "an
  * insurer form mapped once serves every office" test. */
-async function ensureInsurersForOrg(orgId: string): Promise<OrgInsurer[]> {
+/**
+ * Attaches the MANAGED lines an insurer writes, and the company-level facts the directory shows.
+ *
+ * Both were missing until now, and their absence was visible on screen: every insurer card read
+ * "no lines recorded yet", and the cross-office directory had nothing to display but a name —
+ * no structure, no switchboard, no mailbox. The line strings are resolved to catalogue ids
+ * through `lineCodeForProgrammeLine`, so this script does not carry a second copy of "which
+ * catalogue line is `Motor Fleet`".
+ *
+ * A line string with no mapping is SKIPPED and counted, never guessed: an insurer described
+ * against a line the catalogue does not have would be invisible to the directory's line filter,
+ * which is the one question that screen exists to answer.
+ */
+async function attachCompanyFactsAndLines(
+  insurerId: string,
+  orgId: string,
+  lines: string[],
+  tally: Tally,
+): Promise<void> {
+  const codes = lines
+    .map((l) => ({ line: l, code: lineCodeForProgrammeLine(l) }))
+    .filter((x) => {
+      if (x.code === null) {
+        tally.errors.push(`insurer line "${x.line}" has no catalogue code — skipped`);
+        return false;
+      }
+      return true;
+    });
+  const catalogue = await rawPrisma.insuranceLine.findMany({
+    where: { code: { in: codes.map((c) => c.code as string) } },
+    select: { id: true, code: true },
+  });
+  const idByCode = new Map(catalogue.map((l) => [l.code, l.id]));
+
+  await rawPrisma.insurer.update({
+    where: { id: insurerId },
+    data: {
+      // COMPANY-level only — these are the fields the directory is allowed to show. The
+      // relationship-level terms (credit days, rating, named contacts) are set separately and
+      // never cross an office boundary.
+      structure: pick(['CONVENTIONAL', 'TAKAFUL', 'TAKAFUL_WINDOW'] as const),
+      companyPhone: `+962 6 5${String(100000 + Math.floor(Math.random() * 899999)).slice(0, 6)}`,
+      companyEmail: `info@${insurerId.slice(0, 8)}.demo.test`,
+      companyWebsite: `${insurerId.slice(0, 8)}.demo.test`,
+      companyCorrespondenceAddress: pick(['عمان - شارع الملكة رانيا', 'عمان - العبدلي', 'إربد - شارع الجامعة']),
+    },
+  });
+
+  for (const { code } of codes) {
+    const lineId = idByCode.get(code as string);
+    if (!lineId) continue;
+    const already = await rawPrisma.insurerOfferedLine.findFirst({
+      where: { insurerId, insuranceLineId: lineId },
+    });
+    if (already) continue;
+    await rawPrisma.insurerOfferedLine.create({
+      data: { organizationId: orgId, insurerId, insuranceLineId: lineId },
+    });
+    bump(tally, 'created', 'insurerOfferedLine');
+  }
+}
+
+/**
+ * Stops the office dealing with ONE insurer that has live commitments behind it.
+ *
+ * Without this the deactivation screen is demonstrable but meaningless: an insurer with nothing
+ * outstanding shows five zeroes, and the whole point of that screen is the two policy counts —
+ * cover still running, versus work the INSURER still owes. Both need real rows.
+ *
+ * Chosen AFTER the pipeline, and chosen as an insurer that actually holds policies, because
+ * deactivating an unused one proves nothing. Driven through the real endpoint rather than an
+ * `isActive = false` write: that endpoint records the act with its impact counts in the audit
+ * trail, and a direct write would produce a deactivated insurer with no record of who or why —
+ * which is exactly the difference the feature is built around.
+ */
+/**
+ * Proves the sentence `docs/first-run.md` puts in front of a person: register this spelling in this
+ * office and the system refuses it.
+ *
+ * Asserted here rather than trusted because the refusal depends on a chain no reader can see — a
+ * database-side `canonical_name_key()`, a STORED generated column, and a per-office unique index —
+ * and any link in it could change without the instruction changing. A walkthrough step that has
+ * quietly stopped being true is worse than a missing one: she would conclude the name matching does
+ * not work, when what broke was the sentence.
+ *
+ * Runs in office A only, which is where the doc sends her.
+ */
+async function proveDuplicateSpellingIsRefused(
+  app: INestApplication<App>,
+  adminToken: string,
+): Promise<void> {
+  const res = await request(app.getHttpServer())
+    .post('/insurers')
+    .set(bearer(adminToken))
+    .send({
+      legalName: DUPLICATE_SPELLING_DEMO.attempt,
+      legalNameAr: DUPLICATE_SPELLING_DEMO.attemptAr,
+      // `structure`, `companyPhone` and `companyEmail` are REQUIRED by `RegisterInsurerDto` on
+      // both registration paths. Sending only the two names — which is what the first version of
+      // this function did — is a 400 from the ValidationPipe, and the collision check never runs:
+      // the assertion then reports "the refusal did not come" about a request the endpoint never
+      // considered. Found by running the seed, which is the only way it could have been found.
+      structure: 'CONVENTIONAL',
+      companyPhone: '+962 6 000 0000',
+      companyEmail: 'duplicate.check@example.invalid',
+    });
+
+  if (res.status !== 409) {
+    recordBrokenPromise(
+      [
+        `The walkthrough promises that registering ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} in office A is refused`,
+        `because ${JSON.stringify(DUPLICATE_SPELLING_DEMO.collidesWith)} is already registered there, but POST /insurers answered`,
+        `${res.status}, not 409: ${JSON.stringify(res.body)}.`,
+        'Either the canonical name key changed, or the office A seed no longer holds the colliding',
+        'name, or this request never reached the collision check at all — a 400 means the payload',
+        'itself was refused by the DTO.',
+        'Fix the step in docs/first-run.md (§ the duplicate she is asked to try) before this seed is used for a demo.',
+      ].join(' '),
+    );
+    return;
+  }
+
+  // A 409 is the right status for several distinct collisions on this endpoint, so check it is THIS
+  // one: the message names the spelling that was attempted, and points at reactivation because an
+  // insurer is never deleted and the existing row may be one the office deactivated. Both
+  // properties are pinned independently by `insurer-crud.e2e-spec.ts`, so this stays a check on the
+  // demo rather than a second copy of that test.
+  const message = String((res.body as { message?: unknown }).message ?? '');
+  const namesTheAttempt = message.toLowerCase().includes(DUPLICATE_SPELLING_DEMO.attempt.toLowerCase());
+  if (!namesTheAttempt || !message.includes('reactivate')) {
+    recordBrokenPromise(
+      [
+        'POST /insurers refused with 409, but not recognisably for the name collision the walkthrough',
+        `describes — the message neither quotes ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} nor mentions reactivation:`,
+        JSON.stringify(res.body),
+      ].join(' '),
+    );
+    return;
+  }
+  console.log(
+    `  - duplicate-spelling demo verified: ${JSON.stringify(DUPLICATE_SPELLING_DEMO.attempt)} -> 409`,
+  );
+}
+
+async function deactivateOneInsurerWithCommitments(
+  app: INestApplication<App>,
+  orgId: string,
+  adminToken: string,
+  tally: Tally,
+): Promise<string | null> {
+  const withPolicies = await rawPrisma.policy.groupBy({
+    by: ['insurerId'],
+    where: { organizationId: orgId },
+    _count: { _all: true },
+    orderBy: { _count: { id: 'desc' } },
+    take: 1,
+  });
+  const insurerId = withPolicies[0]?.insurerId;
+  if (!insurerId) {
+    tally.errors.push('no insurer in this office holds a policy — nothing deactivated, so the impact counts would all read zero');
+    return null;
+  }
+  const already = await rawPrisma.insurer.findUnique({
+    where: { id: insurerId },
+    select: { isActive: true },
+  });
+  if (already?.isActive === false) return insurerId;
+
+  try {
+    await postAs(app, adminToken, `/insurers/${insurerId}/deactivate`, {
+      reason: 'إيقاف تجريبي للتعامل — لبيان أثر الإيقاف على الالتزامات القائمة',
+    });
+    bump(tally, 'created', 'insurerDeactivation');
+    return insurerId;
+  } catch (err) {
+    tally.errors.push(`could not deactivate insurer ${insurerId}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+async function ensureInsurersForOrg(orgId: string, tally: Tally): Promise<OrgInsurer[]> {
   const out: OrgInsurer[] = [];
   for (const seed of INSURER_SEEDS) {
     const master = await rawPrisma.insurerMaster.upsert({
@@ -770,9 +1074,63 @@ async function ensureInsurersForOrg(orgId: string): Promise<OrgInsurer[]> {
         },
       });
     }
+    await attachCompanyFactsAndLines(relationship.id, orgId, seed.lines, tally);
     out.push({ id: relationship.id, insurerMasterId: master.id, name: seed.legalName, lines: seed.lines });
   }
-  return out;
+
+  // Companies this office registered ITSELF — no catalogue row. The case the feature exists for,
+  // and the only way the "registered locally" badge and the local-name path appear on screen.
+  const localSeeds = LOCAL_INSURER_SEEDS[orgId === ORG_A_ID ? 'a' : 'b'];
+  for (const seed of localSeeds) {
+    let local = await rawPrisma.insurer.findFirst({
+      where: { organizationId: orgId, legalName: seed.legalName },
+    });
+    if (!local) {
+      local = await rawPrisma.insurer.create({
+        data: {
+          organizationId: orgId,
+          // NULL master link, named explicitly rather than omitted: the column is nullable now and
+          // a seed that relied on the default would stop proving anything the day one appeared.
+          insurerMasterId: null,
+          legalName: seed.legalName,
+          legalNameAr: seed.legalNameAr,
+          rfqContactName: 'قسم الاكتتاب',
+          creditTermsDays: pick([30, 45, 60]),
+        },
+      });
+      bump(tally, 'created', 'insurerLocal');
+    }
+    await attachCompanyFactsAndLines(local.id, orgId, seed.lines, tally);
+    out.push({ id: local.id, insurerMasterId: null, name: seed.legalName, lines: seed.lines });
+  }
+
+  /**
+   * Deactivated insurers are dropped from the list the PIPELINES use, and only from that list.
+   *
+   * This run deactivates one insurer on purpose, at the end, so the deactivation screen has real
+   * impact counts. The next run then picked that same company for an RFQ shortlist and `POST /rfqs`
+   * refused it — correctly, with a 422 naming the company. Measured: three such failures in one
+   * run, all the same insurer, and they will recur on every run after a deactivation.
+   *
+   * The refusal is right and the seed was wrong to ask. The rows stay in the database and on the
+   * screens, which is the point of showing a deactivated insurer in the list at all — they are just
+   * not offered to code that is about to place NEW business with them.
+   */
+  const activeIds = new Set(
+    (
+      await rawPrisma.insurer.findMany({
+        where: { organizationId: orgId, id: { in: out.map((i) => i.id) }, isActive: true },
+        select: { id: true },
+      })
+    ).map((i) => i.id),
+  );
+  const placeable = out.filter((i) => activeIds.has(i.id));
+  if (placeable.length < out.length) {
+    console.log(
+      `  - ${out.length - placeable.length} deactivated insurer(s) held back from placement (still registered, still on the screens)`,
+    );
+  }
+  return placeable;
 }
 
 /** `CommissionAgreement` also has no HTTP create endpoint exercised anywhere
@@ -787,22 +1145,80 @@ async function ensureCommissionAgreements(
   tally: Tally,
 ): Promise<void> {
   for (const insurer of insurers) {
+    // The lines an insurer offers can be two DIFFERENT strings resolving to ONE catalogue line —
+    // "Property All Risks" and "Property All Risks (Fire)" are the real pair that motivated the
+    // variant axis. Only one open agreement may exist per (insurer, line, variant), so the second
+    // is skipped deliberately rather than attempted and failed.
+    const claimedLineIds = new Set<string>();
     for (const line of insurer.lines) {
       await attempt(tally, 'commissionAgreement', async () => {
+        // Resolve the managed line, because the live constraint is keyed on the FK and NOT on the
+        // free-text column beside it: UNIQUE (insurerId, insuranceLineId, variantKey) NULLS NOT
+        // DISTINCT WHERE effectiveTo IS NULL. Writing NULL there — which this function did until it
+        // was actually RUN — means every agreement for one insurer is the tuple (insurer, NULL,
+        // NULL), so the FIRST line got an agreement and every later one failed the constraint.
+        // Measured on the dev database: two such failures in one run, silent in a green exit.
+        // This is § 1.40's lesson landing on one more writer: the column was added, the rows were
+        // backfilled, and this writer was never changed.
+        const code = lineCodeForProgrammeLine(line);
+        const managed = code
+          ? await rawPrisma.insuranceLine.findUnique({ where: { code }, select: { id: true } })
+          : null;
+
+        if (managed && claimedLineIds.has(managed.id)) {
+          // Not an error: the invariant is correct and this is the second string for a line that
+          // already has an open agreement. Saying so beats a constraint violation in the tally.
+          console.log(
+            `  - skipping a second open agreement for ${insurer.id} on "${line}" — the same managed line is already covered`,
+          );
+          return null;
+        }
+
+        // Matched on EITHER key, because this table now has two live partial unique indexes and a
+        // row can be caught by the one the lookup did not check:
+        //   (insurerId, insuranceLine)                        WHERE effectiveTo IS NULL
+        //   (insurerId, insuranceLineId, variantKey) NULLS NOT DISTINCT, same predicate
+        // A row written before the FK existed carries the STRING and a NULL FK. Looking it up by
+        // FK alone misses it, the create then collides on the string index, and the failure reads
+        // as a duplicate when the real problem is that the lookup and the constraints disagree.
         const existing = await rawPrisma.commissionAgreement.findFirst({
-          where: { organizationId: orgId, insurerId: insurer.id, insuranceLine: line },
+          where: {
+            organizationId: orgId,
+            insurerId: insurer.id,
+            effectiveTo: null,
+            OR: managed
+              ? [{ insuranceLineId: managed.id }, { insuranceLine: line }]
+              : [{ insuranceLine: line }],
+          },
         });
-        if (existing) return existing;
-        return rawPrisma.commissionAgreement.create({
+        if (existing) {
+          if (managed) claimedLineIds.add(managed.id);
+          // Backfill rather than leave it: this is the writer, and a row it can see with a
+          // resolvable line and a NULL FK is exactly the decay § 1.40 is about. The money crossing
+          // (policy -> governing rate) matches on the FK, so a NULL here is a rate that cannot be
+          // found by the code that pays the broker.
+          if (managed && existing.insuranceLineId === null) {
+            return rawPrisma.commissionAgreement.update({
+              where: { id: existing.id },
+              data: { insuranceLineId: managed.id },
+            });
+          }
+          return existing;
+        }
+
+        const created = await rawPrisma.commissionAgreement.create({
           data: {
             organizationId: orgId,
             insurerId: insurer.id,
             insuranceLine: line,
+            insuranceLineId: managed?.id ?? null,
             ratePercent: money(randomInt(10, 20)).replace(/\.000$/, '.00'),
             vatRatePercent: '16.00',
             effectiveFrom: new Date(isoDateDaysAgo(365)),
           },
         });
+        if (managed) claimedLineIds.add(managed.id);
+        return created;
       });
     }
   }
@@ -1364,8 +1780,11 @@ async function seedOrganization(
   }
 
   console.log('- insurers...');
-  const insurers = await ensureInsurersForOrg(orgId);
+  const insurers = await ensureInsurersForOrg(orgId, tally);
   await ensureCommissionAgreements(orgId, insurers, tally);
+  if (orgId === ORG_A_ID && actors.admin) {
+    await proveDuplicateSpellingIsRefused(app, actors.admin.token);
+  }
 
   console.log(`- ${NUM.employeesPerOrg} employees...`);
   await seedEmployees(app, actors, NUM.employeesPerOrg, tally);
@@ -1421,6 +1840,13 @@ async function seedOrganization(
   await seedIncidents(app, actors, NUM.incidentsPerOrg, tally);
   await seedVendors(app, actors, NUM.vendorsPerOrg, tally);
 
+  // LAST, because it has to pick an insurer that already holds policies — the deactivation screen
+  // is only worth looking at when its five impact counts are not all zero.
+  if (actors.admin) {
+    console.log('- deactivating one insurer that has live commitments...');
+    await deactivateOneInsurerWithCommitments(app, orgId, actors.admin.token, tally);
+  }
+
   return {
     orgId,
     orgSlug,
@@ -1440,7 +1866,11 @@ async function seedOrganization(
 
 it('seeds demo data for two Organizations through the real API', async () => {
   const tally = newTally();
-  const app = await createTestApp();
+  // Two offices are the POINT of this script, so the one-Organization guard in
+  // `createTestApp` does not apply to it — see `CreateTestAppOptions`. Passing this is what
+  // makes the run repeatable: before it, the first run created Office B and every later run
+  // was refused before reaching a single line of seeding logic.
+  const app = await createTestApp({ multipleOrganizationsAreExpected: true });
   // Captured rather than allowed to propagate, so the release below still runs
   // and can never replace the error that actually caused it.
   let fatal: Error | undefined;
@@ -1519,7 +1949,12 @@ it('seeds demo data for two Organizations through the real API', async () => {
         {
           generatedAt: new Date().toISOString(),
           config: NUM,
-          password: DEMO_PASSWORD,
+          // The password is deliberately NOT written here. This file is gitignored, but "not
+          // committed" is not the same as "not on disk": the whole point of taking the password
+          // from the environment is that it stops existing in a file anybody can open, and a
+          // report that helpfully records it puts it straight back. Whoever set DEMO_PASSWORD for
+          // the run is the one who knows it.
+          passwordRecorded: false,
           totals: { created: tally.created, failed: tally.failed },
           errors: tally.errors,
           organizations: summaries.map((s) => ({
@@ -1563,6 +1998,14 @@ it('seeds demo data for two Organizations through the real API', async () => {
   await rawPrisma.$disconnect();
 
   if (fatal) throw fatal;
+  if (brokenPromises.length > 0) {
+    throw new Error(
+      `Seeding finished and the data is in place, but ${brokenPromises.length} promise(s) that ` +
+        `docs/first-run.md makes to its reader could NOT be confirmed against this run:\n  - ` +
+        `${brokenPromises.join('\n  - ')}\n` +
+        'The environment is usable; the DOCUMENT is wrong until that is fixed.',
+    );
+  }
   if (stillLocked.length > 0) {
     throw new Error(
       `Seeding finished, but ${stillLocked.length} demo account(s) are still ` +

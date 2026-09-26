@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
   ForbiddenException,
@@ -377,6 +378,10 @@ function makeDeps(opts: Opts = {}) {
       ),
   };
 
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   const service = new ClaimService(
     claimRepo as unknown as ClaimRepository,
     policyRepo as unknown as PolicyRepository,
@@ -385,6 +390,7 @@ function makeDeps(opts: Opts = {}) {
     workflow as unknown as WorkflowTransitionService,
     encryption as unknown as EncryptionService,
     lossRatio as unknown as LossRatioService,
+    dutySegregation,
   );
 
   return {

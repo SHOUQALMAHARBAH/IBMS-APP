@@ -69,21 +69,32 @@ async function removeHollowRoles(): Promise<void> {
 /** The 25, from `seed-data/roles.ts`. Duplicated deliberately: a test that read
  *  the same list the seed writes would pass whatever that list said.
  *
- *  22 at the Phase 3 migration; `insurer.read` and `insurer.relationship.manage`
+ *  22 at the Phase 3 migration; `insurer.read` and the insurer relationship codes
  *  are the 23rd and 24th, added by insurer management and deferred to there
  *  precisely so they would land after that migration rather than invalidate its
  *  empty-diff property. They arrive as a PAIR for the same reason `role.read` and
- *  `role.manage` did: the write permission is useless on a screen the holder
+ *  the role write codes do: a write permission is useless on a screen the holder
  *  cannot render. `insurer.office-form.map` is the 25th, from Q9. */
 const OFFICE_ADMINISTRATOR_CODES = [
   'user.manage',
+  // Part 4 step 4 — declaring whether this office separates the two halves of a maker/checker pair. This role
+  // ALONE: whoever declares the mode must not be whoever reviews the acts it permits, and Compliance,
+  // Executive Management and the external auditor are the ones holding `internal-controls.view`.
+  //
+  // This list is an INDEPENDENT COPY of the grid's, on purpose — and the grid's own comment says the two have
+  // to move together. They did not, and CI caught it here after the grid spec had already caught it in
+  // `packages/db`: one omission, two guards, which is what a deliberate duplicate is for.
+  'duty-segregation.mode.declare',
   'employee.read',
   'employee.create',
   'employee.update',
   'deprovisioning.execute',
   'training.record',
   'role.read',
-  'role.manage',
+  // `role.manage` split in four-action Phase 1. Three successors; `role.read` above is the fourth.
+  'role.create',
+  'role.update',
+  'role.deactivate',
   'permission.read',
   'security-config.read',
   'security-config.manage',
@@ -97,12 +108,34 @@ const OFFICE_ADMINISTRATOR_CODES = [
   'incident.contain',
   'information-asset.manage',
   'bcp-dr.manage',
-  'vendor.manage',
+  // `vendor.manage` split in four-action Phase 1 — all four, because this role held the umbrella.
+  'vendor.create',
+  'vendor.deactivate',
+  'vendor.read',
+  'vendor.update',
+  // The department/branch four-action pilot. Eight codes rather than one `.manage` each, because
+  // separability is the decision: a role can be given view without edit. Declared here as well as in
+  // `permissions.spec.ts` because the two copies are deliberately independent — if only one moved,
+  // the other fails, which is the point of keeping both.
+  'department.read',
+  'department.create',
+  'department.update',
+  'department.deactivate',
+  'branch.read',
+  'branch.create',
+  'branch.update',
+  'branch.deactivate',
   // Insurer management — office-scoped, and a PAIR. Reading the office's own
   // insurer list, and registering/maintaining those records. NOT writing the
   // global catalogue.
   'insurer.read',
-  'insurer.relationship.manage',
+  // `insurer.relationship.manage` split in four-action Phase 1. FIVE successors: it gated two
+  // entities, and an insurance LINE is not an insurer.
+  'insurance-line.create',
+  'insurance-line.update',
+  'insurer.create',
+  'insurer.deactivate',
+  'insurer.update',
   // The cross-office directory, added with it. The administrator registers
   // insurers, and registration is where a duplicate has to be caught — the
   // match-at-registration suggestion reads this same list. Somebody who can

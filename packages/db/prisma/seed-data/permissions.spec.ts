@@ -85,7 +85,11 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     // their authority is bounded, not unlimited — they can't escalate
     // their own access (not ADMIN) or act as the DPO's final sign-off.
     expect(granted).not.toContain("security-config.manage");
-    expect(granted).not.toContain("role.manage");
+    // `role.manage` split in four-action Phase 1. An assertion naming a code that no longer exists
+    // passes because nothing can contain it — so all three successors are named instead.
+    expect(granted).not.toContain("role.create");
+    expect(granted).not.toContain("role.update");
+    expect(granted).not.toContain("role.deactivate");
     expect(granted).not.toContain("permission.manage");
     expect(granted).not.toContain("dsr.close");
     expect(granted).not.toContain("retention.dispose.approve");
@@ -118,8 +122,13 @@ describe('permission grid — Part 5.1 "Cannot" constraints', () => {
     // Finance DOES reconcile the commission ledger against insurer statements
     // (Process 36) — applying/settling the governed figure, not altering it.
     expect(granted).toContain("commission.reconcile");
-    // Finance maintains the approved payment-channel list (Process 38).
-    expect(granted).toContain("payment-channel.manage");
+    // Finance maintains the approved payment-channel list (Process 38). Four-action Phase 4 split that
+    // umbrella into three: all three assertions, because holding the LIST without the ability to add or
+    // disable is now a real state and the grid must say Finance holds all of it.
+    expect(granted).toContain("payment-channel.read");
+    expect(granted).toContain("payment-channel.create");
+    expect(granted).toContain("payment-channel.deactivate");
+    expect(granted).not.toContain("payment-channel.manage");
   });
 
   it("Compliance Officer cannot originate sales transactions or close a DSR (DPO-only)", () => {
@@ -239,22 +248,41 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 25 codes", () => {
+  it("holds exactly 44 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
     // to move together.
     //
-    // 22 at the Phase 3 migration, 24 with insurer management, 25 with the
-    // cross-office directory. Every code that moved the number is declared in
-    // ADDED_AFTER_THE_MIGRATION below, so the facts cannot drift apart.
+    // 22 at the Phase 3 migration, 24 with insurer management, 26 with the cross-office directory
+    // and Q9's office form mapping, 34 with the department/branch four-action pilot (8 codes),
+    // 44 with Part 4 step 4's `duty-segregation.mode.declare` — which DOES add a capability, deliberately,
+    // and is therefore declared in ADDED_AFTER_THE_MIGRATION below.
+    // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
+    // became their successors (insurer.relationship.manage into five, role.manage into three,
+    // vendor.manage into four), so the count moved by nine while what the role can do did not.
+    // Every code that moved the number is declared in ADDED_AFTER_THE_MIGRATION below, so the facts
+    // cannot drift apart.
+    //
+    // The TITLE said 25 while the assertion held 26 — stale by one, and harmless only because the
+    // list is what actually runs. Corrected while adding to it: a title that disagrees with its own
+    // assertion is the thing a reader trusts and the thing nothing checks.
     expect(codesGrantedTo(OFFICE_ADMIN).sort()).toEqual(
       [
         "access-recertification.cycle.start",
         "audit-log.read",
         "bcp-dr.manage",
+        "branch.create",
+        "branch.deactivate",
+        "branch.read",
+        "branch.update",
         "customer.bulk-import",
+        "department.create",
+        "department.deactivate",
+        "department.read",
+        "department.update",
         "deprovisioning.execute",
+        "duty-segregation.mode.declare",
         "email.integration.manage",
         "email.integration.read",
         "employee.create",
@@ -264,18 +292,27 @@ describe("permission grid — the office administrator", () => {
         "incident.contain",
         "incident.report",
         "information-asset.manage",
+        "insurance-line.create",
+        "insurance-line.update",
+        "insurer.create",
+        "insurer.deactivate",
         "insurer.directory.read",
         "insurer.office-form.map",
         "insurer.read",
-        "insurer.relationship.manage",
+        "insurer.update",
         "permission.read",
-        "role.manage",
+        "role.create",
+        "role.deactivate",
         "role.read",
+        "role.update",
         "security-config.manage",
         "security-config.read",
         "training.record",
         "user.manage",
-        "vendor.manage",
+        "vendor.create",
+        "vendor.deactivate",
+        "vendor.read",
+        "vendor.update",
       ].sort(),
     );
   });
@@ -306,11 +343,18 @@ describe("permission grid — the office administrator", () => {
       // writes act on. The legacy administrator has no insurer capability at all,
       // which is why these are not subset violations but a deliberate divergence.
       //
-      // The pair is deliberate and mirrors `role.read` + `role.manage`: an
+      // The pair is deliberate and mirrors `role.read` + `role.update`: an
       // administrator holding only the write would get the controls on a screen
       // that renders nothing, because you cannot manage records you cannot list.
       "insurer.read",
-      "insurer.relationship.manage",
+      // `insurer.relationship.manage` split in four-action Phase 1. Five successors, not four: it gated
+      // two entities — the office's insurer records and the insurance LINES they carry — and mapping a
+      // line onto "update an insurer" would have been a lie about what the code gates.
+      "insurer.create",
+      "insurer.update",
+      "insurer.deactivate",
+      "insurance-line.create",
+      "insurance-line.update",
       // The cross-office directory. The administrator is the one who REGISTERS an
       // insurer, and registration is where a duplicate has to be caught — the
       // match-at-registration suggestion reads this same list to ask "did you mean
@@ -328,6 +372,34 @@ describe("permission grid — the office administrator", () => {
       // holding this and not that is the distinction, so a grid edit that collapsed them
       // breaks a test rather than quietly widening an administrator to a platform-wide write.
       "insurer.office-form.map",
+      // Departments and branches — the FIRST CLEAN INSTANCE of the owner's four-action scheme
+      // (view / create / edit / delete-as-deactivate as four separate codes, so a role can be given
+      // view without edit). Eight codes, not two: that separability IS the decision.
+      //
+      // They are granted to the administrator rather than withheld because the administrator is the
+      // only role that registers a person, and `ProvisionUserDto` REQUIRES `departmentId` and
+      // `branchId` — measured: the users screen submitted two empty strings and got a 400, which the
+      // owner read as "the create button is broken". An administrator who may register people but
+      // cannot create the two things a person must be assigned to is that same defect with a
+      // permission error instead of a validation error.
+      //
+      // `.deactivate` and not `.delete`, by the owner's rule that delete means deactivate: a
+      // department a person was once assigned to is part of that person's record.
+      "department.read",
+      // Part 4 step 4 — declaring whether this office separates the two halves of a maker/checker pair.
+      //
+      // A genuine addition, not a rename: the legacy administrator has no such capability because the mode
+      // did not exist. It goes to THIS role alone because whoever declares the mode must not be whoever
+      // reviews the acts it permits — Compliance, Executive Management and the external auditor hold
+      // `internal-controls.view`, which is the self-approval report, and the office administrator does not.
+      "duty-segregation.mode.declare",
+      "department.create",
+      "department.update",
+      "department.deactivate",
+      "branch.read",
+      "branch.create",
+      "branch.update",
+      "branch.deactivate",
     ];
 
     const legacy = new Set(

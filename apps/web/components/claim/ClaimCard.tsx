@@ -27,6 +27,16 @@ import {
   quoteChainCardStyle,
   quoteFieldStyle,
 } from '../quotation/quotation.styles';
+import {
+  DiscardControl,
+  DiscardedNotice,
+} from '../ui/DiscardControl';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../lib/i18n/translations';
@@ -51,6 +61,8 @@ import type { Language, TranslationKey } from '../../lib/i18n/translations';
 /** What a claim card may offer, per the caller's own permissions. The page
  *  decides; this component only renders what it is told is allowed. */
 export interface ClaimCardAbilities {
+  /** `claim.discard` — its own code, not implied by the ability to notify one. */
+  canDiscard: boolean;
   canRegister: boolean;
   canDocument: boolean;
   canAssess: boolean;
@@ -585,6 +597,10 @@ function ClaimSettlement({
   canSecondApproveSettlement: boolean;
   onDone: () => Promise<void>;
 }) {
+  // Part 4 — one box, because this sub-component renders ONE settlement. The queue components key theirs by
+  // record id; here there is nothing to key by.
+  const [dutyReason, setDutyReason] = useState('');
+  const { user } = useAuth();
   const { t } = useLanguage();
   const { language } = useLanguage();
   const [approvedAmount, setApprovedAmount] = useState('');
@@ -695,16 +711,46 @@ function ClaimSettlement({
       {s &&
       s.secondApproverRequired &&
       !s.secondApproverUserId &&
-      canSecondApproveSettlement ? (
-        <button
-          type="button"
-          disabled={busy}
-          style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
-          onClick={() =>
-            void run(() => secondApproveClaimSettlement(claim.id))
-          }
-        >{t('claimSecondApproveButton')}</button>
-      ) : null}
+      canSecondApproveSettlement
+        ? (() => {
+            // Part 4 — the person who recorded the settlement may give the mandatory second approval
+            // themselves in an office that has declared COMBINED, only by saying why. This is the largest sum
+            // in the product that one signature can release, which is why the second one exists.
+            //
+            // Computed once, like the other eleven approve controls: the field and the button must agree, and
+            // two copies of the same condition are two places for them to stop agreeing.
+            const needs = needsCombinedDutyDeclaration({
+              mode: user?.dutySegregationMode,
+              makerUserId: s.approvedByUserId,
+              currentUserId: user?.id ?? '',
+              alreadyDecided: s.secondApproverUserId != null,
+            });
+            return (
+              <>
+                {needs ? (
+                  <CombinedDutyReasonField
+                    id={claim.id}
+                    value={dutyReason}
+                    onChange={setDutyReason}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy || (needs && combinedDutyTooShort(dutyReason))}
+                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                  onClick={() =>
+                    void run(() =>
+                      secondApproveClaimSettlement(
+                        claim.id,
+                        needs ? dutyReason.trim() : undefined,
+                      ),
+                    )
+                  }
+                >{t('claimSecondApproveButton')}</button>
+              </>
+            );
+          })()
+        : null}
     </div>
   );
 }
@@ -839,6 +885,7 @@ export function ClaimCard({
 }) {
   const { language, t } = useLanguage();
   const {
+    canDiscard,
     canRegister,
     canDocument,
     canAssess,
@@ -862,8 +909,22 @@ export function ClaimCard({
           {t('claimLossOnLabel')} {formatDate(claim.lossDate, language)}
           {claim.isLargeClaim ? ` · ${t('claimLargeClaimSuffix')}` : ''}
         </strong>
-        <span style={rfqBadgeStyle}>{t(ENUM_LABEL.ClaimStatus[claim.status])}</span>
+        <span style={rfqBadgeStyle}>
+          {claim.discard
+            ? t('discardedBadge')
+            : t(ENUM_LABEL.ClaimStatus[claim.status])}
+        </span>
       </div>
+      <DiscardedNotice discard={claim.discard} />
+      <DiscardControl
+        collection="claims"
+        id={claim.id}
+        canDiscard={canDiscard}
+        // NOTIFIED means the client told us; REGISTERED means we told the insurer, and after that there is a
+        // claim number in somebody else's system.
+        discardable={!claim.discard && claim.status === 'NOTIFIED'}
+        onDiscarded={onChanged}
+      />
       <p style={{ margin: '0.4rem 0' }}>
         {t('claimEstimatedLossLabel')} {formatMoney(claim.estimatedLoss, language)}
         {claim.claimNumber ? (
@@ -934,7 +995,10 @@ export function ClaimCard({
       <p style={{ color: 'var(--ink-secondary)', fontSize: '0.8rem', margin: '0.4rem 0' }}>
         {coverageLabel(claim, language, t)}
       </p>
-      {canRegister && claim.status === 'NOTIFIED' ? (
+      {/* Registration is the only forward move from NOTIFIED, and a withdrawn claim is not making it. The
+          other sub-blocks below all require a status past NOTIFIED, which a discarded claim can never
+          reach — the engine refuses the transition — so this is the one place the flag is needed. */}
+      {canRegister && claim.status === 'NOTIFIED' && !claim.discard ? (
         <ClaimRegistrationForm claimId={claim.id} onDone={onChanged} />
       ) : null}
       {claim.status !== 'NOTIFIED' ? (

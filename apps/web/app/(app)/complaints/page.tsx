@@ -1,10 +1,15 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
 import {
   addComplaintAction,
   assignComplaint,
@@ -90,6 +95,8 @@ export default function ComplaintsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [customerId, setCustomerId] = useState('');
   const [issue, setIssue] = useState('');
@@ -197,7 +204,8 @@ export default function ComplaintsPage() {
           onSubmit={submit}
           style={{ margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '32rem' }}
         >
-          <CustomerPicker
+          <EntitySearch
+            kind="customer"
             value={customerId}
             onChange={setCustomerId}
             label={t('complaintsCustomerIdLabel')}
@@ -366,13 +374,44 @@ export default function ComplaintsPage() {
                               </button>
                             ) : null}
                             {canClose && c.status === 'RESOLVED' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => closeComplaint(c.id))}
-                              >
-                                {t('complaintsCloseButton')}
-                              </button>
+                              (() => {
+                                // Part 4 — the person who performed the first half may complete it themselves in an office
+                                // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                                const needs = needsCombinedDutyDeclaration({
+                                  mode: user.dutySegregationMode,
+                                  makerUserId: c.resolvedByUserId,
+                                  currentUserId: user.id,
+                                  // `c.status === 'CLOSED'` is provably false here — this branch already
+                                  // narrowed it to RESOLVED, and TypeScript said so. The column the write
+                                  // sets is the honest test.
+                                  alreadyDecided: c.closureApprovedByUserId != null,
+                                });
+                                const declaration = declarations[c.id] ?? '';
+                                return (
+                                  <>
+                                    {needs ? (
+                                      <CombinedDutyReasonField
+                                        id={c.id}
+                                        value={declaration}
+                                        onChange={(next) =>
+                                          setDeclarations((prev) => ({ ...prev, [c.id]: next }))
+                                        }
+                                      />
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                      onClick={() =>
+                                        void run(() =>
+                                          closeComplaint(c.id, needs ? declaration.trim() : undefined),
+                                        )
+                                      }
+                                    >
+                                      {t('complaintsCloseButton')}
+                                    </button>
+                                  </>
+                                );
+                              })()
                             ) : null}
                           </div>
                         </div>

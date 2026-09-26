@@ -1,12 +1,12 @@
 // Process 67 — Procurement (backlog Part C #67, Domain H). Calls apps/api's
-// /vendors routes. vendor.manage (already pre-seeded). The backlog names no
+// /vendors routes. The four vendor.* codes (vendor.manage, since split). The backlog names no
 // purchase-request model — this is a general Vendor record, `vendorType:
 // 'other'` for the non-insurance procurement use case #67 covers.
 //
 // Process 71 — Vendor Management (backlog Part C #71) extends the SAME
 // routes with risk tiering, the annual-review action, termination + access
 // revocation, and Data Processing Agreements. `dpa.approve` (DPO only)
-// gates the DPO-approval step; everything else stays under `vendor.manage`.
+// gates the DPO-approval step; everything else is under the `vendor.*` code for its action.
 
 import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 
@@ -112,6 +112,13 @@ export function signDpa(id: string): Promise<DataProcessingAgreement> {
   return apiPost(`/data-processing-agreements/${id}/sign`);
 }
 
-export function dpoApproveDpa(id: string): Promise<DataProcessingAgreement> {
-  return apiPost(`/data-processing-agreements/${id}/dpo-approve`);
+export function dpoApproveDpa(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<DataProcessingAgreement> {
+  return apiPost(`/data-processing-agreements/${id}/dpo-approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }

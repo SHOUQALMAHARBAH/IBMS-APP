@@ -72,8 +72,18 @@ export function createDataSharingApproval(body: {
   return apiPost('/data-sharing-approvals', body);
 }
 
-export function approveDataSharingApproval(id: string): Promise<DataSharingApproval> {
-  return apiPost(`/data-sharing-approvals/${id}/approve`, {});
+export function approveDataSharingApproval(
+  id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<DataSharingApproval> {
+  return apiPost(
+    `/data-sharing-approvals/${id}/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function declineDataSharingApproval(id: string): Promise<DataSharingApproval> {

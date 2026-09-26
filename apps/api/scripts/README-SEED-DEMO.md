@@ -123,7 +123,9 @@ the report read `0 failures`. Three things now make that hard to repeat:
   the damage is silent, which is exactly how it shipped.
 
 The report (and the console output) lists one login per RBAC role per
-office, all sharing the password `DemoPass#2026!` — for example
+office, all sharing **the password you set in `DEMO_PASSWORD` for that run**.
+The script has no default and refuses to start without one; the report does
+not record it, because a gitignored file is still a file. For example
 `demo.sales@office-a.ibms.internal` / `demo.placement@office-a.ibms.internal`
 / `demo.manager@office-b.ibms.internal`, etc. Log in as whichever role's
 screens you want to demo; a Sales officer's login will show the leads,

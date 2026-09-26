@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { listInsurers, type Insurer } from '../../../lib/insurer/insurer-api';
-import { ApiError } from '../../../lib/auth/api-client';
+import { ApiError, isMfaEnrolmentError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import {
   cardMetaStyle,
@@ -37,7 +37,10 @@ export default function InsurersPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
-  const canManage = !!user && hasPermission(user, 'insurer.relationship.manage');
+  // The only control this screen gates is the register link, so it asks for the CREATE code and not a
+  // blanket "can manage insurers". A reader who may edit an insurer but not register one should not be
+  // offered a register button they would be refused.
+  const canRegister = !!user && hasPermission(user, 'insurer.create');
 
   const [insurers, setInsurers] = useState<Insurer[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -59,8 +62,10 @@ export default function InsurersPage() {
       } catch (err) {
         setInsurers(null);
         setLoadError(
-          err instanceof ApiError && err.status === 403
-            ? t('insListNoPermission')
+          isMfaEnrolmentError(err)
+            ? t('insMfaRequired')
+            : err instanceof ApiError && err.status === 403
+              ? t('insListNoPermission')
             : err instanceof ApiError
               ? err.message
               : t('insListLoadError'),
@@ -120,7 +125,7 @@ export default function InsurersPage() {
             <option value="inactive">{t('insFilterInactive')}</option>
           </select>
         </label>
-        {canManage ? (
+        {canRegister ? (
           <Link href="/insurers/new" style={{ alignSelf: 'end' }}>
             {t('insRegisterButton')}
           </Link>

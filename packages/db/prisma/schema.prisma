@@ -82,11 +82,25 @@ enum RoleName {
   EXTERNAL_AUDITOR
 }
 
+/// Part 4 — whether this office separates the two halves of a maker/checker pair.
+///
+/// SEGREGATED is the default and every existing office reads it. COMBINED does not grant anything: the actor
+/// must still hold both permissions. It makes a one-person office's self-approval DECLARABLE — recorded as a
+/// `CombinedDutyAct` with a reason and the hat worn — instead of impossible. See `docs/duty-segregation-mode.md`.
+enum DutySegregationMode {
+  SEGREGATED
+  COMBINED
+}
+
 enum AuditAction {
   CREATE
   READ
   UPDATE
   DELETE
+  // Class B piece 1 — a record raised in error, withdrawn before it took effect. NOT a DELETE (the row
+  // stays, carrying actor/timestamp/reason) and deliberately not an UPDATE, which would make withdrawing a
+  // wrongly raised endorsement indistinguishable from correcting its premium in a filtered audit list.
+  DISCARD
   APPROVE
   REJECT
   TRANSITION
@@ -205,6 +219,12 @@ model Organization {
   /// Nothing consumes it yet; `GET /orgs/resolve` arrives in Phase 4.
   subdomain                  String    @unique
   status                     OrgStatus @default(ACTIVE)
+  /// SUPERSEDED by the per-office duty-segregation MODE — see
+  /// `docs/duty-segregation-mode.md`. Kept until the deferred cleanup track removes it, and
+  /// deliberately NOT given a consumer in the meantime: two live mechanisms for one problem is how the
+  /// next person implements the wrong one. Measured when it was marked: six references in the whole
+  /// repository, none of them a reader.
+  ///
   /// Spec §10.5 — OPTIONAL edge-case fallback only. In the normal org chart the
   /// DPO (Office Manager) and a Branch/Department Manager are structurally
   /// different people, so maker/checker on a disposal batch already resolves to
@@ -217,131 +237,139 @@ model Organization {
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
-  accessAnomalyAlerts             AccessAnomalyAlert[]
-  accessDeprovisioningChecklists  AccessDeprovisioningChecklist[]
-  accessRecertificationCycles     AccessRecertificationCycle[]
-  accessRecertificationItems      AccessRecertificationItem[]
-  adjusters                       Adjuster[]
-  assets                          Asset[]
-  auditLogEntries                 AuditLogEntry[]
-  emailIntegration                OrganizationEmailIntegration?
-  bcpDrPlans                      BcpDrPlan[]
-  branches                        Branch[]
-  brokerLicenses                  BrokerLicense[]
-  cancellations                   Cancellation[]
-  certificateOfDestructions       CertificateOfDestruction[]
-  claims                          Claim[]
-  claimDocuments                  ClaimDocument[]
-  claimFollowUpAlerts             ClaimFollowUpAlert[]
-  claimStatusHistories            ClaimStatusHistory[]
-  clientDecisions                 ClientDecision[]
-  clientFundsLedgerEntries        ClientFundsLedgerEntry[]
-  commissionAgreements            CommissionAgreement[]
-  commissionLedgerEntries         CommissionLedgerEntry[]
-  commissionReversals             CommissionReversal[]
-  communicationLogs               CommunicationLog[]
-  comparisonMatrixes              ComparisonMatrix[]
-  comparisonMatrixRows            ComparisonMatrixRow[]
-  complaints                      Complaint[]
-  complaintActions                ComplaintAction[]
-  complianceCalendarItems         ComplianceCalendarItem[]
-  conflictOfInterestDisclosures   ConflictOfInterestDisclosure[]
-  consentRecords                  ConsentRecord[]
-  coverNotes                      CoverNote[]
-  crossBorderTransferRecords      CrossBorderTransferRecord[]
-  crossSellOpportunities          CrossSellOpportunity[]
-  customers                       Customer[]
-  customerFeedbacks               CustomerFeedback[]
-  dataProcessingAgreements        DataProcessingAgreement[]
-  dataSharingApprovals            DataSharingApproval[]
-  dataSubjectRequests             DataSubjectRequest[]
-  deliveryRecords                 DeliveryRecord[]
-  departments                     Department[]
-  disposalBatches                 DisposalBatch[]
-  documents                       Document[]
-  documentTemplates               DocumentTemplate[]
-  dpiaScreenings                  DpiaScreening[]
-  employees                       Employee[]
-  employeePerformanceRecords      EmployeePerformanceRecord[]
-  endorsements                    Endorsement[]
-  escalationRecords               EscalationRecord[]
-  incidentReports                 IncidentReport[]
-  informationAssets               InformationAsset[]
-  insurancePrograms               InsuranceProgram[]
-  insuranceProgramLines           InsuranceProgramLine[]
-  insuredPersons                  InsuredPerson[]
-  insurers                        Insurer[]
-  insurerPerformanceScores        InsurerPerformanceScore[]
-  insurerProducts                 InsurerProduct[]
-  insurerSlaAgreements            InsurerSlaAgreement[]
-  interactions                    Interaction[]
-  internalAuditFindings           InternalAuditFinding[]
-  invoices                        Invoice[]
-  knowledgeBaseArticles           KnowledgeBaseArticle[]
-  kyCRecords                      KYCRecord[]
-  leads                           Lead[]
-  legalHolds                      LegalHold[]
-  lossRatios                      LossRatio[]
-  mfaCredentials                  MfaCredential[]
-  needsAssessments                NeedsAssessment[]
-  opportunities                   Opportunity[]
-  passwordHistoryEntries          PasswordHistoryEntry[]
-  passwordResetTokens             PasswordResetToken[]
-  paymentChannels                 PaymentChannel[]
-  policies                        Policy[]
-  policyCheckings                 PolicyChecking[]
-  policySchedules                 PolicySchedule[]
-  premiumTransactions             PremiumTransaction[]
-  privacyNotices                  PrivacyNotice[]
-  professionalIndemnityPolicies   ProfessionalIndemnityPolicy[]
-  professionalIndemnityRiskEvents ProfessionalIndemnityRiskEvent[]
-  prospects                       Prospect[]
-  quotations                      Quotation[]
-  receipts                        Receipt[]
-  recommendations                 Recommendation[]
-  reconciliationExceptions        ReconciliationException[]
-  refreshTokens                   RefreshToken[]
-  refunds                         Refund[]
-  remittances                     Remittance[]
-  renewalCases                    RenewalCase[]
-  renewalRecommendations          RenewalRecommendation[]
-  retentionCases                  RetentionCase[]
-  roles                           Role[]
-  rolePermissions                 RolePermission[]
-  retentionScheduleItems          RetentionScheduleItem[]
-  rfqs                            RFQ[]
-  rfQInsurers                     RFQInsurer[]
-  riskProfiles                    RiskProfile[]
-  riskRatings                     RiskRating[]
-  riskRegisterItems               RiskRegisterItem[]
-  ropaEntries                     RopaEntry[]
-  salesTargets                    SalesTarget[]
-  screeningCaseNotes              ScreeningCaseNote[]
-  screeningHoldReleases           ScreeningHoldRelease[]
-  screeningMatches                ScreeningMatch[]
-  screeningRequests               ScreeningRequest[]
-  screeningResults                ScreeningResult[]
-  securityAwarenessTrainings      SecurityAwarenessTraining[]
-  securityConfigs                 SecurityConfig[]
-  serviceRequests                 ServiceRequest[]
-  settlements                     Settlement[]
-  slaTimers                       SlaTimer[]
-  thirdPartyClaimants             ThirdPartyClaimant[]
-  transactionMonitoringAlerts     TransactionMonitoringAlert[]
-  trustedDevices                  TrustedDevice[]
-  ultimateBeneficialOwners        UltimateBeneficialOwner[]
-  upSellRecommendations           UpSellRecommendation[]
-  slaHolidays                     SlaHoliday[]
-  slaPolicies                     SlaPolicy[]
-  slaPolicyEscalations            SlaPolicyEscalation[]
-  users                           User[]
-  userRoleAssignments             UserRoleAssignment[]
-  userSessions                    UserSession[]
-  vendors                         Vendor[]
-  officeInsuranceLines            OfficeInsuranceLine[]
-  officeInsurerFormTemplates      OfficeInsurerFormTemplate[]
-  officeInsurerFormFields         OfficeInsurerFormField[]
-  insurerOfferedLines             InsurerOfferedLine[]
+  accessAnomalyAlerts                 AccessAnomalyAlert[]
+  accessDeprovisioningChecklists      AccessDeprovisioningChecklist[]
+  accessRecertificationCycles         AccessRecertificationCycle[]
+  accessRecertificationItems          AccessRecertificationItem[]
+  adjusters                           Adjuster[]
+  assets                              Asset[]
+  auditLogEntries                     AuditLogEntry[]
+  emailIntegration                    OrganizationEmailIntegration?
+  bcpDrPlans                          BcpDrPlan[]
+  branches                            Branch[]
+  brokerLicenses                      BrokerLicense[]
+  cancellations                       Cancellation[]
+  certificateOfDestructions           CertificateOfDestruction[]
+  claims                              Claim[]
+  claimDocuments                      ClaimDocument[]
+  claimFollowUpAlerts                 ClaimFollowUpAlert[]
+  claimStatusHistories                ClaimStatusHistory[]
+  clientDecisions                     ClientDecision[]
+  clientFundsLedgerEntries            ClientFundsLedgerEntry[]
+  commissionAgreements                CommissionAgreement[]
+  commissionLedgerEntries             CommissionLedgerEntry[]
+  commissionReversals                 CommissionReversal[]
+  communicationLogs                   CommunicationLog[]
+  comparisonMatrixes                  ComparisonMatrix[]
+  comparisonMatrixRows                ComparisonMatrixRow[]
+  complaints                          Complaint[]
+  complaintActions                    ComplaintAction[]
+  complianceCalendarItems             ComplianceCalendarItem[]
+  conflictOfInterestDisclosures       ConflictOfInterestDisclosure[]
+  consentRecords                      ConsentRecord[]
+  coverNotes                          CoverNote[]
+  crossBorderTransferRecords          CrossBorderTransferRecord[]
+  crossSellOpportunities              CrossSellOpportunity[]
+  customers                           Customer[]
+  customerFeedbacks                   CustomerFeedback[]
+  dataProcessingAgreements            DataProcessingAgreement[]
+  dataSharingApprovals                DataSharingApproval[]
+  dataSubjectRequests                 DataSubjectRequest[]
+  deliveryRecords                     DeliveryRecord[]
+  departments                         Department[]
+  disposalBatches                     DisposalBatch[]
+  documents                           Document[]
+  documentTemplates                   DocumentTemplate[]
+  dpiaScreenings                      DpiaScreening[]
+  employees                           Employee[]
+  employeePerformanceRecords          EmployeePerformanceRecord[]
+  endorsements                        Endorsement[]
+  escalationRecords                   EscalationRecord[]
+  incidentReports                     IncidentReport[]
+  informationAssets                   InformationAsset[]
+  insurancePrograms                   InsuranceProgram[]
+  insuranceProgramLines               InsuranceProgramLine[]
+  insuredPersons                      InsuredPerson[]
+  insurers                            Insurer[]
+  insurerPerformanceScores            InsurerPerformanceScore[]
+  insurerProducts                     InsurerProduct[]
+  insurerSlaAgreements                InsurerSlaAgreement[]
+  interactions                        Interaction[]
+  internalAuditFindings               InternalAuditFinding[]
+  invoices                            Invoice[]
+  knowledgeBaseArticles               KnowledgeBaseArticle[]
+  kyCRecords                          KYCRecord[]
+  leads                               Lead[]
+  legalHolds                          LegalHold[]
+  lossRatios                          LossRatio[]
+  mfaCredentials                      MfaCredential[]
+  needsAssessments                    NeedsAssessment[]
+  opportunities                       Opportunity[]
+  passwordHistoryEntries              PasswordHistoryEntry[]
+  passwordResetTokens                 PasswordResetToken[]
+  paymentChannels                     PaymentChannel[]
+  policies                            Policy[]
+  policyCheckings                     PolicyChecking[]
+  policySchedules                     PolicySchedule[]
+  premiumTransactions                 PremiumTransaction[]
+  privacyNotices                      PrivacyNotice[]
+  professionalIndemnityPolicies       ProfessionalIndemnityPolicy[]
+  professionalIndemnityRiskEvents     ProfessionalIndemnityRiskEvent[]
+  prospects                           Prospect[]
+  quotations                          Quotation[]
+  receipts                            Receipt[]
+  recommendations                     Recommendation[]
+  reconciliationExceptions            ReconciliationException[]
+  refreshTokens                       RefreshToken[]
+  refunds                             Refund[]
+  remittances                         Remittance[]
+  renewalCases                        RenewalCase[]
+  renewalRecommendations              RenewalRecommendation[]
+  retentionCases                      RetentionCase[]
+  roles                               Role[]
+  rolePermissions                     RolePermission[]
+  retentionScheduleItems              RetentionScheduleItem[]
+  rfqs                                RFQ[]
+  rfQInsurers                         RFQInsurer[]
+  riskProfiles                        RiskProfile[]
+  riskRatings                         RiskRating[]
+  riskRegisterItems                   RiskRegisterItem[]
+  ropaEntries                         RopaEntry[]
+  salesTargets                        SalesTarget[]
+  screeningCaseNotes                  ScreeningCaseNote[]
+  screeningHoldReleases               ScreeningHoldRelease[]
+  screeningMatches                    ScreeningMatch[]
+  screeningRequests                   ScreeningRequest[]
+  screeningResults                    ScreeningResult[]
+  securityAwarenessTrainings          SecurityAwarenessTraining[]
+  securityConfigs                     SecurityConfig[]
+  serviceRequests                     ServiceRequest[]
+  settlements                         Settlement[]
+  slaTimers                           SlaTimer[]
+  thirdPartyClaimants                 ThirdPartyClaimant[]
+  transactionMonitoringAlerts         TransactionMonitoringAlert[]
+  trustedDevices                      TrustedDevice[]
+  ultimateBeneficialOwners            UltimateBeneficialOwner[]
+  upSellRecommendations               UpSellRecommendation[]
+  slaHolidays                         SlaHoliday[]
+  slaPolicies                         SlaPolicy[]
+  slaPolicyEscalations                SlaPolicyEscalation[]
+  users                               User[]
+  userRoleAssignments                 UserRoleAssignment[]
+  userSessions                        UserSession[]
+  vendors                             Vendor[]
+  officeInsuranceLines                OfficeInsuranceLine[]
+  officeInsurerFormTemplates          OfficeInsurerFormTemplate[]
+  officeInsurerFormFields             OfficeInsurerFormField[]
+  insurerOfferedLines                 InsurerOfferedLine[]
+  /// Part 4 — SEGREGATED (the default, and what every office read at migration time) or COMBINED. The
+  /// trigger on `CombinedDutyAct` is the only place this is read by the database.
+  dutySegregationMode                 DutySegregationMode              @default(SEGREGATED)
+  /// When the office declared its CURRENT mode, and who declared it. NULL means never declared — segregated
+  /// because that is the default, not because anybody chose it.
+  dutySegregationModeDeclaredAt       DateTime?
+  dutySegregationModeDeclaredByUserId String?
+  combinedDutyActs                    CombinedDutyAct[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -376,6 +404,11 @@ model Department {
   name           String
   /// Arabic department name — the org chart renders in Arabic by default.
   nameAr         String?
+  /// Set when the office RETIRES this unit. Not deleted: `User.departmentId` and
+  /// `Employee.departmentId` point here, and a unit a person was once assigned to is
+  /// part of that person's record. A retired unit stops being offered for new people
+  /// and keeps every existing assignment. See migration `20261023100000`.
+  deactivatedAt  DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -440,6 +473,11 @@ model User {
   organizationId       String             @default(dbgenerated())
   organization         Organization       @relation(fields: [organizationId], references: [id])
   fullName             String
+  /// How this ACCOUNT signs in. RECORDED ONLY — `WINDOWS` states the office's intent and grants
+  /// nothing: there is no external authentication behind it, and the password path is the only one
+  /// that works. On `User` and not `Employee` because it describes the account: an employee with no
+  /// login has nothing to register, and the external-auditor account has no employee.
+  registrationType     RegistrationType   @default(DEFAULT)
   /// Spec §3.2 / §4.1.3 — email is unique WITHIN an Organization, not across
   /// the platform. The global `@unique` was dropped: two brokerage offices may
   /// legitimately employ people whose addresses follow the same pattern, or in
@@ -514,6 +552,7 @@ model User {
   passwordHistory            PasswordHistoryEntry[]
   officeInsuranceLines       OfficeInsuranceLine[]
   officeInsurerFormTemplates OfficeInsurerFormTemplate[]
+  combinedDutyActs           CombinedDutyAct[]
 
   @@unique([organizationId, email])
   @@index([email])
@@ -745,6 +784,15 @@ model Role {
   /// only job is to prove a user holding an isSystem role with no permissions
   /// reaches nothing.
   isSystem              Boolean      @default(false)
+  /// Set when the office DELETES the role. The row survives because
+  /// `UserRoleAssignment.roleId` is ON DELETE RESTRICT and the historical
+  /// assignment rows must keep naming which role they were — see migration
+  /// `20261022100000_role_soft_delete` for why this is a soft delete and not the
+  /// hard one it looks like from the screen. Deletion also REMOVES the
+  /// `RolePermission` rows, so a deleted role cannot grant anything through any
+  /// read path, filtered or not. Never reactivated: a CHECK constraint holds it
+  /// INACTIVE, and delete is deliberately one-way.
+  deletedAt             DateTime?
   createdAt             DateTime     @default(now())
 
   users       UserRoleAssignment[]
@@ -855,25 +903,37 @@ model AccessRecertificationCycle {
 }
 
 model AccessRecertificationItem {
-  id             String                     @id @default(uuid())
+  id                String                     @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId String                     @default(dbgenerated())
-  organization   Organization               @relation(fields: [organizationId], references: [id])
-  cycleId        String
-  cycle          AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
-  subjectUserId  String
-  reviewerUserId String
-  reviewer       User                       @relation("RecertificationReviewer", fields: [reviewerUserId], references: [id])
-  decision       String? // confirmed | revoked | changed
-  reviewedAt     DateTime?
-  createdAt      DateTime                   @default(now())
+  organizationId    String                     @default(dbgenerated())
+  organization      Organization               @relation(fields: [organizationId], references: [id])
+  cycleId           String
+  cycle             AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
+  subjectUserId     String
+  reviewerUserId    String
+  reviewer          User                       @relation("RecertificationReviewer", fields: [reviewerUserId], references: [id])
+  decision          String? // confirmed | revoked | changed
+  reviewedAt        DateTime?
+  createdAt         DateTime                   @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `AccessRecertificationItem_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId String?
+  combinedDutyAct   CombinedDutyAct?           @relation("AccessRecertificationItemCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
 
 /// Supporting structure referenced by "filterable by branch" dashboards
 /// (Part 13) and Branch/Department Manager role (Part 5.1).
+/// How an account signs in. RECORDED ONLY — see `User.registrationType`.
+enum RegistrationType {
+  DEFAULT
+  WINDOWS
+}
+
 model Branch {
   id             String       @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
@@ -882,7 +942,13 @@ model Branch {
   organization   Organization @relation(fields: [organizationId], references: [id])
   name           String
   nameAr         String?
+  /// Set when the office RETIRES this unit. Not deleted: `User.departmentId` and
+  /// `Employee.departmentId` point here, and a unit a person was once assigned to is
+  /// part of that person's record. A retired unit stops being offered for new people
+  /// and keeps every existing assignment. See migration `20261023100000`.
+  deactivatedAt  DateTime?
   users          User[]
+  employees      Employee[]
 
   @@index([organizationId])
 }
@@ -900,6 +966,20 @@ model Employee {
   fatherName                       String?
   grandfatherName                  String?
   familyName                       String?
+  /// The same four parts in ENGLISH, and a composed `fullNameEn` beside them.
+  ///
+  /// The owner's requirement is a four-part name in both scripts, and the name belongs to the PERSON
+  /// and the compliance record — documents render from here. All five are nullable and start NULL on
+  /// every existing employee: a transliterated Arabic name is a guess about someone's own spelling of
+  /// their name, and a guess stored in a compliance record cannot be told apart from a fact.
+  givenNameEn                      String?
+  fatherNameEn                     String?
+  grandfatherNameEn                String?
+  familyNameEn                     String?
+  /// Composed from the four English parts by `composeFullName`, the same one helper that composes
+  /// `fullName` from the Arabic ones. Denormalised for the same reason: one column for every
+  /// consumer that sorts, searches or prints a name.
+  fullNameEn                       String?
   nationalIdEnc                    String // -- ENCRYPT (Part 10.2 field-level encryption)
   position                         String?
   hireDate                         DateTime?
@@ -916,6 +996,11 @@ model Employee {
   /// NOT a Role, and NOT a Branch — see the Department model.
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
+  /// A person belongs to a branch as well as a department. `Employee` carried only the department
+  /// while `ProvisionUserDto` REQUIRED both, which is part of why the person and the account could
+  /// not be registered in one act.
+  branchId     String?
+  branch       Branch?     @relation(fields: [branchId], references: [id])
 
   user                    User?
   trainings               SecurityAwarenessTraining[]
@@ -923,6 +1008,9 @@ model Employee {
   performanceRecords      EmployeePerformanceRecord[]
 
   @@index([departmentId])
+  // Declared because the migration CREATES it. Left undeclared, the next `migrate dev` would emit
+  // `DROP INDEX "Employee_branchId_idx"` — which is exactly what db:divergence caught in CI.
+  @@index([branchId])
   @@index([organizationId])
 }
 
@@ -1241,6 +1329,12 @@ model KYCRecord {
   riskRating        RiskRating?
   screeningRequests ScreeningRequest[]
   holdReleases      ScreeningHoldRelease[]
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `KYCRecord_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId String?
+  combinedDutyAct   CombinedDutyAct?       @relation("KYCRecordCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([customerId])
   @@index([status])
@@ -1639,21 +1733,34 @@ enum NeedsAssessmentStatus {
 /// here: linking an approved assessment to an Opportunity/RFQ is Process
 /// 11+, not built yet.
 model NeedsAssessment {
-  id                       String                @id @default(uuid())
+  id                        String                @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId           String                @default(dbgenerated())
-  organization             Organization          @relation(fields: [organizationId], references: [id])
-  riskProfileId            String
-  riskProfile              RiskProfile           @relation(fields: [riskProfileId], references: [id])
-  questionnaireAnswers     Json
-  recommendedCoverageLines String[] // Fire, Machinery Breakdown, BI, Workers Comp, Product Liability, Burglary, Public Liability, Motor, Cyber, Group Life...
-  status                   NeedsAssessmentStatus @default(DRAFT)
-  createdByUserId          String
-  reviewedByUserId         String?
-  approvedByUserId         String?
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
+  organizationId            String                @default(dbgenerated())
+  organization              Organization          @relation(fields: [organizationId], references: [id])
+  riskProfileId             String
+  riskProfile               RiskProfile           @relation(fields: [riskProfileId], references: [id])
+  questionnaireAnswers      Json
+  recommendedCoverageLines  String[] // Fire, Machinery Breakdown, BI, Workers Comp, Product Liability, Burglary, Public Liability, Motor, Cyber, Group Life...
+  status                    NeedsAssessmentStatus @default(DRAFT)
+  createdByUserId           String
+  reviewedByUserId          String?
+  approvedByUserId          String?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `NeedsAssessment_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  approverCombinedDutyActId String?
+  approverCombinedDutyAct   CombinedDutyAct?      @relation("NeedsAssessmentApproverCombinedDuty", fields: [approverCombinedDutyActId], references: [id], onDelete: Restrict)
+
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `NeedsAssessment_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  reviewerCombinedDutyActId String?
+  reviewerCombinedDutyAct   CombinedDutyAct? @relation("NeedsAssessmentReviewerCombinedDuty", fields: [reviewerCombinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([riskProfileId])
   @@index([status])
@@ -1776,10 +1883,13 @@ model Opportunity {
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
-  rfqs           RFQ[]
-  recommendation Recommendation?
-  clientDecision ClientDecision?
-  policy         Policy?
+  rfqs            RFQ[]
+  /// One-to-MANY since the discard: an opportunity can carry one LIVE recommendation and any number of
+  /// discarded ones. A partial unique index (live rows only) is what keeps "one live" true; the relation
+  /// can no longer claim at most one row, because that is no longer the case.
+  recommendations Recommendation[]
+  clientDecision  ClientDecision?
+  policy          Policy?
 
   // "At most one live Opportunity per InsuranceProgram" is enforced by a
   // partial UNIQUE index (insuranceProgramId WHERE status <> 'CLOSED_LOST')
@@ -1937,8 +2047,10 @@ model Quotation {
   /// same "metadata not body" shape as exclusions / conditions).
   negotiationNotes      String?
 
-  comparisonRows ComparisonMatrixRow[]
-  recommendation Recommendation?       @relation("RecommendedQuotation")
+  comparisonRows  ComparisonMatrixRow[]
+  /// One-to-MANY for the same reason: a quotation may have been recommended by a recommendation that was
+  /// then discarded, and by the live one that replaced it.
+  recommendations Recommendation[]      @relation("RecommendedQuotation")
 
   @@index([rfqId])
   @@index([insurerId])
@@ -2035,9 +2147,15 @@ model Recommendation {
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
   organizationId            String       @default(dbgenerated())
   organization              Organization @relation(fields: [organizationId], references: [id])
-  opportunityId             String       @unique
+  /// NOT `@unique`: a PARTIAL unique index, live rows only — `WHERE "discardedAt" IS NULL`. Prisma
+  /// cannot express a partial index, so it lives in migration 20261027100000 and asserts itself there.
+  /// One LIVE recommendation per opportunity is the invariant that matters; discarded ones stay beside it
+  /// with their author, timestamp and reason.
+  opportunityId             String
   opportunity               Opportunity  @relation(fields: [opportunityId], references: [id])
-  recommendedQuotationId    String       @unique
+  /// Partial unique for the same reason, in the same migration: discarding a recommendation must not
+  /// block re-recommending the quotation it named.
+  recommendedQuotationId    String
   recommendedQuotation      Quotation    @relation("RecommendedQuotation", fields: [recommendedQuotationId], references: [id])
   rationale                 String // free-text overall summary
   rationaleFactors          Json // { coverage, price, financialStrength, claimsService, deductible, policyConditions } — a non-empty note each
@@ -2053,11 +2171,36 @@ model Recommendation {
   approvedAt                DateTime?
   sentToClientAt            DateTime?
   sentByUserId              String?
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  ///
+  /// This model is also where the discard forced a constraint change. `opportunityId` and
+  /// `recommendedQuotationId` were plain `@unique`, which would have made a discarded recommendation
+  /// block its own replacement for ever — a broker unable to write a second recommendation because the
+  /// first was a typo. Both are now PARTIAL unique indexes, live rows only; see the migration.
+  discardedAt               DateTime?
+  discardedByUserId         String?
+  discardedReason           String?
   createdAt                 DateTime     @default(now())
 
   conflictOfInterestDisclosure ConflictOfInterestDisclosure?
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `Recommendation_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId            String?
+  combinedDutyAct              CombinedDutyAct?              @relation("RecommendationCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([draftedByUserId])
+  /// Declared because migration 20261027100000 CREATES them — the partial unique indexes cover live rows
+  /// only, so reading a recommendation history by opportunity or by quotation needs its own index. Left
+  /// undeclared, the next migrate dev would emit DROP INDEX, which is what db:divergence caught.
+  @@index([opportunityId])
+  @@index([recommendedQuotationId])
   @@index([organizationId])
 }
 
@@ -2198,6 +2341,15 @@ model Policy {
   // RFQ.issuedByUserId).
   placedByUserId        String?
   issuedByUserId        String?
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  discardedAt           DateTime?
+  discardedByUserId     String?
+  discardedReason       String?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
@@ -2274,22 +2426,28 @@ model CoverNote {
 /// Requested Coverage vs Issued Policy. The single largest source of PI
 /// claims per the source model if skipped.
 model PolicyChecking {
-  id                             String       @id @default(uuid())
+  id                             String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                 String       @default(dbgenerated())
-  organization                   Organization @relation(fields: [organizationId], references: [id])
-  policyId                       String       @unique
-  policy                         Policy       @relation(fields: [policyId], references: [id])
+  organizationId                 String           @default(dbgenerated())
+  organization                   Organization     @relation(fields: [organizationId], references: [id])
+  policyId                       String           @unique
+  policy                         Policy           @relation(fields: [policyId], references: [id])
   placedByUserId                 String // maker — the officer who placed the cover
   checkedByUserId                String? // checker — MUST differ from placedByUserId (app-enforced)
   checklistResult                Json? // structured field-by-field comparison
-  discrepancyFound               Boolean      @default(false)
+  discrepancyFound               Boolean          @default(false)
   discrepancyDetail              String?
-  discrepancyLoggedAsPiRiskEvent Boolean      @default(false)
+  discrepancyLoggedAsPiRiskEvent Boolean          @default(false)
   complianceOverrideByUserId     String? // discrepancy cannot be bypassed without logged override
   checkedAt                      DateTime?
-  createdAt                      DateTime     @default(now())
+  createdAt                      DateTime         @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `PolicyChecking_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId              String?
+  combinedDutyAct                CombinedDutyAct? @relation("PolicyCheckingCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
@@ -2365,6 +2523,15 @@ model Endorsement {
   // version). `{ limits, sumsInsured, namedPerils, extensions }`; null means
   // "carry the current coverage forward, just mark the new version boundary".
   targetCoverage                  Json?
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  discardedAt                     DateTime?
+  discardedByUserId               String?
+  discardedReason                 String?
   createdAt                       DateTime          @default(now())
 
   schedule           PolicySchedule?
@@ -2398,20 +2565,26 @@ model Cancellation {
 /// Process 37 — refund workflow. Maker/checker: raiser != Finance approver,
 /// gated by a configurable value threshold.
 model Refund {
-  id                           String       @id @default(uuid())
+  id                           String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId               String       @default(dbgenerated())
-  organization                 Organization @relation(fields: [organizationId], references: [id])
-  endorsementId                String       @unique
-  endorsement                  Endorsement  @relation(fields: [endorsementId], references: [id])
-  amount                       Decimal      @db.Decimal(18, 3)
+  organizationId               String           @default(dbgenerated())
+  organization                 Organization     @relation(fields: [organizationId], references: [id])
+  endorsementId                String           @unique
+  endorsement                  Endorsement      @relation(fields: [endorsementId], references: [id])
+  amount                       Decimal          @db.Decimal(18, 3)
   reason                       String // cancellation | premium_reduction | coverage_change | overpayment
   raisedByUserId               String
   approvedByUserId             String? // MUST differ from raisedByUserId (app-enforced)
   approvalThresholdMatrixLevel String?
   paidAt                       DateTime?
-  createdAt                    DateTime     @default(now())
+  createdAt                    DateTime         @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `Refund_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId            String?
+  combinedDutyAct              CombinedDutyAct? @relation("RefundCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
@@ -2477,6 +2650,15 @@ model Claim {
   insurerClaimReference      String?
   followUpAlertThresholdDays Int                @default(9)
   classification             DataClassification @default(HIGHLY_CONFIDENTIAL) // medical/health claim data
+  /// DISCARD (Class B piece 1) — raised in error, never took effect, cannot advance.
+  ///
+  /// Three columns that are set together or not at all, enforced by a CHECK: a discarded row with no
+  /// reason is the shape every other retirement in this system refuses, and the mandatory reason is the
+  /// only part a person cannot reconstruct later. Nothing is deleted and nothing is rewritten — the row
+  /// stays visible, marked.
+  discardedAt                DateTime?
+  discardedByUserId          String?
+  discardedReason            String?
   createdAt                  DateTime           @default(now())
   updatedAt                  DateTime           @updatedAt
 
@@ -2552,25 +2734,31 @@ model ClaimStatusHistory {
 /// NOT Claim.isLargeClaim) OR brokerProcessedPayment is true; `settleCore`
 /// refuses `Claim -> SETTLED` structurally while that is unmet.
 model Settlement {
-  id                       String       @id @default(uuid())
+  id                       String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId           String       @default(dbgenerated())
-  organization             Organization @relation(fields: [organizationId], references: [id])
-  claimId                  String       @unique
-  claim                    Claim        @relation(fields: [claimId], references: [id])
-  estimatedLoss            Decimal      @db.Decimal(18, 3)
-  approvedAmount           Decimal?     @db.Decimal(18, 3)
-  deductible               Decimal?     @db.Decimal(18, 3)
-  netSettlement            Decimal?     @db.Decimal(18, 3)
+  organizationId           String           @default(dbgenerated())
+  organization             Organization     @relation(fields: [organizationId], references: [id])
+  claimId                  String           @unique
+  claim                    Claim            @relation(fields: [claimId], references: [id])
+  estimatedLoss            Decimal          @db.Decimal(18, 3)
+  approvedAmount           Decimal?         @db.Decimal(18, 3)
+  deductible               Decimal?         @db.Decimal(18, 3)
+  netSettlement            Decimal?         @db.Decimal(18, 3)
   // true when the broker (not the insurer direct) processes the payout —
   // forces a second approver regardless of amount (Process 28).
-  brokerProcessedPayment   Boolean      @default(false)
+  brokerProcessedPayment   Boolean          @default(false)
   // large claims / broker-processed payments require a second approver
   approvedByUserId         String?
   secondApproverUserId     String?
   clientPaymentConfirmedAt DateTime?
-  createdAt                DateTime     @default(now())
+  createdAt                DateTime         @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `Settlement_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId        String?
+  combinedDutyAct          CombinedDutyAct? @relation("SettlementCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
@@ -2981,6 +3169,12 @@ model CommissionLedgerEntry {
   reversedAt                DateTime?
   reversalReason            String? // why the commission was reversed — logged (a business justification)
   createdAt                 DateTime             @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `CommissionLedgerEntry_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId         String?
+  combinedDutyAct           CombinedDutyAct?     @relation("CommissionLedgerEntryCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@unique([policyId])
   @@index([organizationId])
@@ -3150,8 +3344,14 @@ model Complaint {
   closedAt                  DateTime?
   createdAt                 DateTime        @default(now())
 
-  actions     ComplaintAction[]
-  escalations EscalationRecord[]
+  actions                  ComplaintAction[]
+  escalations              EscalationRecord[]
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `Complaint_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  closureCombinedDutyActId String?
+  closureCombinedDutyAct   CombinedDutyAct?   @relation("ComplaintClosureCombinedDuty", fields: [closureCombinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([customerId])
   // the "open queue" read (status filter + newest-first order)
@@ -3877,33 +4077,39 @@ enum IncidentClassification {
 /// critical) -> Impact Assessed -> Classified (Material needs DPO + Senior
 /// Management co-sign) -> Notified -> Recovered -> Closed (RCA mandatory).
 model IncidentReport {
-  id                             String                 @id @default(uuid())
+  id                              String                 @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                 String                 @default(dbgenerated())
-  organization                   Organization           @relation(fields: [organizationId], references: [id])
-  title                          String
-  description                    String
-  severity                       String // low | medium | high | critical
-  status                         IncidentStatus         @default(REPORTED)
-  reportedAt                     DateTime               @default(now())
-  containedAt                    DateTime? // 4-hour target for critical severity
-  impactAssessedAt               DateTime?
-  classification                 IncidentClassification @default(NOT_YET_CLASSIFIED)
-  classifiedByDpoUserId          String?
+  organizationId                  String                 @default(dbgenerated())
+  organization                    Organization           @relation(fields: [organizationId], references: [id])
+  title                           String
+  description                     String
+  severity                        String // low | medium | high | critical
+  status                          IncidentStatus         @default(REPORTED)
+  reportedAt                      DateTime               @default(now())
+  containedAt                     DateTime? // 4-hour target for critical severity
+  impactAssessedAt                DateTime?
+  classification                  IncidentClassification @default(NOT_YET_CLASSIFIED)
+  classifiedByDpoUserId           String?
   // Material classification irreversible without this — `assertDifferentActors`
   // (app-level) + `IncidentReport_classification_maker_checker_distinct` CHECK
   // (migration 20260906120000, Process 55) both enforce that this is a
   // DIFFERENT officer than classifiedByDpoUserId.
-  seniorManagementCoSignUserId   String?
-  seniorManagementNotifiedAt     DateTime? // within 1 hour of Material classification
-  notifiedRegulators             String[] // CBJ | NCSC | Personal_Data_Protection_Council
-  notifiedAt                     DateTime?
-  affectedDataSubjectsNotifiedAt DateTime?
-  rootCauseAnalysis              String? // mandatory before Closed
-  recoveredAt                    DateTime?
-  closedAt                       DateTime?
-  createdAt                      DateTime               @default(now())
+  seniorManagementCoSignUserId    String?
+  seniorManagementNotifiedAt      DateTime? // within 1 hour of Material classification
+  notifiedRegulators              String[] // CBJ | NCSC | Personal_Data_Protection_Council
+  notifiedAt                      DateTime?
+  affectedDataSubjectsNotifiedAt  DateTime?
+  rootCauseAnalysis               String? // mandatory before Closed
+  recoveredAt                     DateTime?
+  closedAt                        DateTime?
+  createdAt                       DateTime               @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `IncidentReport_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  classificationCombinedDutyActId String?
+  classificationCombinedDutyAct   CombinedDutyAct?       @relation("IncidentReportClassificationCombinedDuty", fields: [classificationCombinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
@@ -3980,18 +4186,18 @@ enum DsrStatus {
 /// closed "fully fulfilled" — must force PARTIALLY_FULFILLED with a
 /// retentionScheduleReference.
 model DataSubjectRequest {
-  id                             String         @id @default(uuid())
+  id                             String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                 String         @default(dbgenerated())
-  organization                   Organization   @relation(fields: [organizationId], references: [id])
+  organizationId                 String           @default(dbgenerated())
+  organization                   Organization     @relation(fields: [organizationId], references: [id])
   customerId                     String?
-  customer                       Customer?      @relation("DsrCustomer", fields: [customerId], references: [id])
+  customer                       Customer?        @relation("DsrCustomer", fields: [customerId], references: [id])
   insuredPersonId                String?
-  insuredPerson                  InsuredPerson? @relation("DsrInsuredPerson", fields: [insuredPersonId], references: [id])
+  insuredPerson                  InsuredPerson?   @relation("DsrInsuredPerson", fields: [insuredPersonId], references: [id])
   type                           DsrType
-  status                         DsrStatus      @default(RECEIVED)
-  receivedAt                     DateTime       @default(now()) // logged same business day regardless of channel
+  status                         DsrStatus        @default(RECEIVED)
+  receivedAt                     DateTime         @default(now()) // logged same business day regardless of channel
   identityVerifiedAt             DateTime?
   slaDueAt                       DateTime
   accessExtensionAppliedAt       DateTime? // Access-only, +15 business days
@@ -4000,7 +4206,7 @@ model DataSubjectRequest {
   partialFulfilmentJustification String?
   closedAt                       DateTime?
   dpoHandlerUserId               String?
-  createdAt                      DateTime       @default(now())
+  createdAt                      DateTime         @default(now())
   // Process 52/M04 (backlog Part D) widening — maker/checker segregation for
   // closure (Part 5.2 / maker-checker-segregation.md): processedByUserId is
   // stamped by whichever of verify->fulfil/partially-fulfil/reject actually
@@ -4021,6 +4227,12 @@ model DataSubjectRequest {
   // automated check against RetentionScheduleItem/LegalHold — see
   // dsr.config.ts's header comment.
   noOpenRetentionHoldConfirmedAt DateTime?
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `DataSubjectRequest_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  closureCombinedDutyActId       String?
+  closureCombinedDutyAct         CombinedDutyAct? @relation("DataSubjectRequestClosureCombinedDuty", fields: [closureCombinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([status])
   @@index([slaDueAt])
@@ -4126,6 +4338,12 @@ model DisposalBatch {
   createdAt               DateTime               @default(now())
 
   certificateOfDestruction CertificateOfDestruction?
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `DisposalBatch_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId        String?
+  combinedDutyAct          CombinedDutyAct?          @relation("DisposalBatchCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([retentionScheduleItemId])
   @@index([status])
@@ -4195,13 +4413,13 @@ model Vendor {
 /// Part 7.5 — mandatory for Medium/High tier before go-live; High tier
 /// additionally requires DPO approval before first data share.
 model DataProcessingAgreement {
-  id                  String       @id @default(uuid())
+  id                  String           @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId      String       @default(dbgenerated())
-  organization        Organization @relation(fields: [organizationId], references: [id])
+  organizationId      String           @default(dbgenerated())
+  organization        Organization     @relation(fields: [organizationId], references: [id])
   vendorId            String
-  vendor              Vendor       @relation(fields: [vendorId], references: [id])
+  vendor              Vendor           @relation(fields: [vendorId], references: [id])
   signedAt            DateTime?
   // Maker/checker (Part 5.2): the Relationship Owner who assessed this
   // vendor and prepared the agreement — MUST differ from dpoApprovedByUserId
@@ -4209,6 +4427,12 @@ model DataProcessingAgreement {
   assessedByUserId    String?
   dpoApprovedByUserId String? // required for High tier
   expiresAt           DateTime?
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `DataProcessingAgreement_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId   String?
+  combinedDutyAct     CombinedDutyAct? @relation("DataProcessingAgreementCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
 }
@@ -4250,6 +4474,12 @@ model DataSharingApproval {
   slaDueAt            DateTime
   decidedAt           DateTime?
   createdAt           DateTime           @default(now())
+  /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
+  /// has declared COMBINED mode. The `DataSharingApproval_maker_checker_distinct` family of CHECK constraints
+  /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
+  /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
+  combinedDutyActId   String?
+  combinedDutyAct     CombinedDutyAct?   @relation("DataSharingApprovalCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([classification])
   @@index([organizationId])
@@ -5700,4 +5930,62 @@ enum DatasetVersionStatus {
   PUBLISHED
   SUPERSEDED
   REJECTED
+}
+
+/// Part 4 — ONE declared combined-duty act: the two halves of a maker/checker pair performed by one person,
+/// in an office that has declared COMBINED mode.
+///
+/// Immutable by convention (nothing updates or deletes one) and by consequence: every escape column points
+/// here with `onDelete: Restrict`, so an act that excused a write cannot be removed from under it.
+///
+/// The trigger `combined_duty_act_requires_combined_mode` (migration `20261028100000`) refuses an INSERT
+/// whose office is not COMBINED. That trigger is invisible to `db:divergence`, so it asserts itself in that
+/// migration's own DO block.
+model CombinedDutyAct {
+  id                    String       @id @default(uuid())
+  /// The office whose declared mode permits this — the column the trigger reads.
+  organizationId        String       @default(dbgenerated())
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  /// Which record, so the act can be shown ON the record and not only in the report.
+  entity                String
+  entityId              String
+  /// Which of the 15 pairs, named by the CHECK constraint it excuses so the two cannot drift apart.
+  /// `maker-checker-pairs.e2e-spec.ts` asserts the set against `pg_constraint`.
+  constraintName        String
+  /// The one person who performed both halves.
+  actorUserId           String
+  actor                 User         @relation(fields: [actorUserId], references: [id])
+  /// NOT NULL with a floor (CHECK `length(btrim(reason)) >= 10`): who and when are recoverable from an audit
+  /// row, "why one person did both halves" is not.
+  reason                String
+  actedAt               DateTime     @default(now())
+  /// Every role the actor held at that moment, then THE HAT — the subset that actually grant the checker
+  /// permission for this pair. Names beside ids for the same reason the audit row keeps `actorRoleNames`: a
+  /// role renamed or retired years later is unrecoverable from an id alone.
+  actorRoleIds          String[]     @default([])
+  grantingRoleIds       String[]     @default([])
+  grantingRoleNames     String[]     @default([])
+  /// True when the hat is genuinely ambiguous — two of the actor's roles grant the same checker code. The
+  /// record says so rather than picking one and looking certain.
+  multipleGrantingRoles Boolean      @default(false)
+
+  kycRecords                    KYCRecord[]                 @relation("KYCRecordCombinedDuty")
+  policyCheckings               PolicyChecking[]            @relation("PolicyCheckingCombinedDuty")
+  refunds                       Refund[]                    @relation("RefundCombinedDuty")
+  disposalBatches               DisposalBatch[]             @relation("DisposalBatchCombinedDuty")
+  dataSharingApprovals          DataSharingApproval[]       @relation("DataSharingApprovalCombinedDuty")
+  dataProcessingAgreements      DataProcessingAgreement[]   @relation("DataProcessingAgreementCombinedDuty")
+  settlements                   Settlement[]                @relation("SettlementCombinedDuty")
+  commissionLedgerEntries       CommissionLedgerEntry[]     @relation("CommissionLedgerEntryCombinedDuty")
+  recommendations               Recommendation[]            @relation("RecommendationCombinedDuty")
+  accessRecertificationItems    AccessRecertificationItem[] @relation("AccessRecertificationItemCombinedDuty")
+  complaintClosures             Complaint[]                 @relation("ComplaintClosureCombinedDuty")
+  dataSubjectRequestClosures    DataSubjectRequest[]        @relation("DataSubjectRequestClosureCombinedDuty")
+  incidentReportClassifications IncidentReport[]            @relation("IncidentReportClassificationCombinedDuty")
+  needsAssessmentApprovals      NeedsAssessment[]           @relation("NeedsAssessmentApproverCombinedDuty")
+  needsAssessmentReviews        NeedsAssessment[]           @relation("NeedsAssessmentReviewerCombinedDuty")
+
+  @@index([organizationId, actedAt(sort: Desc)])
+  @@index([entity, entityId])
+  @@index([actorUserId])
 }

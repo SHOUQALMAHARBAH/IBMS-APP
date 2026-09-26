@@ -1,7 +1,7 @@
 import { IsIn } from 'class-validator';
 import { RISK_TIERS, type RiskTier } from '../vendor.config';
 
-/** Process 71 — `PATCH /vendors/:id/risk-tier` (`vendor.manage`). A
+/** Process 71 — `PATCH /vendors/:id/risk-tier` (`vendor.update`). A
  * dedicated action, not folded into the generic `PATCH /vendors/:id` —
  * tiering a vendor Medium/High has a real side effect (auto-scheduling the
  * annual-review SLA), which deserves its own auditable entry point. */

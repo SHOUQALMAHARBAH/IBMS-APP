@@ -397,6 +397,23 @@ never created, never resolved, or deleted outright.
   the `?.`, so an empty result fails. The `sla-policy` one becomes
   `toHaveLength(1)`, which also makes a second UPDATE on that policy a visible
   failure rather than a coin flip.
+- **FIXED 2026-09-26, and each fix PROVEN by the same method that proved the
+  originals vacuous.** All three now assert `toHaveLength(1)` before indexing,
+  `?.` is gone, and the `sla-policy` query gained a total `orderBy`
+  (`occurredAt`, then `id`) so `[0]` means something rather than being whatever
+  the query plan returned. Three plants — `containment-timer-query-finds-nothing`,
+  `senior-management-timer-query-finds-nothing`,
+  `sla-audit-query-finds-nothing` — point each query at a name that cannot match,
+  which is the exact state the old assertions tolerated. Each now fails with
+  `expected [] to have a length of 1 but got +0`, and each kills one test.
+- **The plant tool refused the first two attempts, correctly.**
+  `workflowName: 'incident_containment',` appears TWICE in that file (the timer is
+  asserted before containment and after) and the senior-management one three
+  times, so the anchors were ambiguous: *"a plant that hits several sites cannot
+  say which guard it is testing."* Worth recording because the refusal was nearly
+  missed — the runs printed no `PLANTED` line and the suite went green, which
+  reads exactly like a guard that works (§ 1.51(a)). What caught it was checking
+  the tool's own output instead of the suite's.
 - **The pattern to ban is not "unordered query"** — it is `?.` on an indexed
   result, and `length > 0` followed by `[0]`. Both make an assertion
   unfalsifiable, and neither looks wrong on the page.
@@ -2774,6 +2791,62 @@ still be reachable by a link from another page — `/insurers/[id]` is, from the
 narrower question "does any web code call this API at all", which is the one that catches a surface
 built and then forgotten.
 
+**RE-MEASURED 2026-09-26 AT ROUTE LEVEL, AND THE FINER GRAIN FOUND THREE TIMES AS MUCH.**
+
+The measurement above is by CONTROLLER PREFIX and says so. Its blind spot is a controller whose OTHER
+routes are called: `/sla` looked reachable because the policy routes are, while `POST /sla/holidays`
+had no caller at all — which is § 1.57, found by hand rather than by this method.
+
+**480 api routes against 345 distinct web path shapes: 33 routes across 14 controllers are addressed
+by no web code.** Method and script: `scripts/` was deliberately NOT given this (see the closing note).
+
+**FOUR FALSE-POSITIVE CLASSES HAD TO BE CLOSED BEFORE THE NUMBER MEANT ANYTHING**, and they are the
+reason this is a measurement rather than a gate. The first run said **153**:
+
+1. **Auth routes** do not go through `apiGet` and friends. Every one read as unreachable.
+2. **A concatenated querystring** — `/audit-trail${qs}` — normalises with a trailing wildcard the route
+   does not have, so every filtered list read as uncalled.
+3. **A variable LEADING segment.** The discard client posts to `/${collection}/${id}/discard`, which
+   compared literally never matches `claims/*/discard`. All four discard routes read as unreachable.
+   Fixed by comparing segment-by-segment with a wildcard matching anything on either side — the
+   generalisation the original entry named as the method's blind spot without closing.
+4. **A NESTED template literal.** `/dashboards/claims${qs ? `?${qs}` : ''}` — the path capture stops at
+   the inner backtick and the collapse cannot touch an incomplete template, so what survives is
+   `dashboards/claims$`. All six dashboards, every one a live screen, read as unreachable.
+
+Class 4 is the one worth remembering: **a measurement that puts six working screens in a findings list
+is not a slightly noisy measurement, it is an unusable one**, and the only reason it was caught is that
+the output was read rather than counted.
+
+**STILL UNREACHABLE — the four already recorded above, plus these, which the prefix method could not
+see. Ordered by consequence:**
+
+| Surface | Routes | Why it matters |
+|---|---|---|
+| `POST /refunds/:id/disburse` | 1 | **Money leaves the office through this route and nothing can call it.** `refund.disburse` is granted to FINANCE; the route stamps `paidAt` and books the client-funds out movement in one transaction. An approved refund cannot be paid from the application. |
+| `screening/matches/:id/{assign,escalate,notes,start-review,case}` | 5 | The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case to someone, escalate one, add a note, or open the case view. On an AML control, the workflow around the decision is the part that evidences it. |
+| `sla/timers/:id/{pause,resume,status}` | 3 | `sla.timer.pause` exists as a permission. **Pausing a statutory clock is exactly the act that must be visible and audited**, and it can only be done by constructing a request by hand. |
+| `sla/holidays` (GET + POST) | 2 | § 1.57 — the calendar every business-day deadline is counted against. Found by hand first; this method finds it too. |
+| `insurer-masters/:id` and its form templates | 4 | The GLOBAL catalogue: view one, list/add its form templates. |
+| `insurers/:id/form-templates` | 3 | Already recorded above (Q9's UI). |
+| `PATCH /insurance-lines/:id` | 1 | An office cannot correct a line of business it added. Also recorded in `docs/b7-consistency-record.md`. |
+| `GET /cross-border-transfers/:id` | 1 | The list is reachable; the single-transfer detail read is not. |
+| `GET /access-recertification/cycles/:id/admin-items` | 1 | The administrator's view of a recertification cycle. |
+| `GET /security/encryption-keys` | 1 | The key inventory. |
+
+Every one of those was confirmed by hand as having zero web mentions, not taken from the script's word.
+
+**NOT MADE A GATE, deliberately.** A guard here would need a maintained allow-list of 33 entries that
+rots, and — more importantly — the matcher needed four corrections to stop libelling working screens.
+A brittle matcher in a red gate is a liability, not a control: the first false red teaches everyone to
+ignore it. The honest form is what this is: a measurement re-run deliberately, with its own failure
+modes written down so the next run starts from four fewer mistakes.
+
+**What it still does NOT measure:** whether a reachable route is reachable by the RIGHT person, and
+whether a called route is called from a screen anyone can navigate to. It answers "does any web code
+address this path", which is the question that catches a surface built and then forgotten.
+
+
 ### 1.45 — A CAST THAT SILENCES THE COMPILER USUALLY MEANS THE QUESTION WAS GOOD
 
 ``t(`enumInsurerStructure${s}` as never)`` — a translation key built by template concatenation,
@@ -2813,6 +2886,613 @@ problem — and this one has now fired on its own stated scenario.
 The pattern to reuse: when a check derives its expected set from the FILESYSTEM rather than from a
 list a human maintains, it cannot be under-covered by someone adding a file. Every "assert the whole
 set" guard in this repo has that shape, and this is why.
+
+### 1.53 — RENAMING A ROLE AND RE-GRANTING IT ARE ONE PERMISSION
+
+Four-action Phase 1 split `role.manage` into `role.create` / `role.update` / `role.deactivate`, and
+`role.update` gates three routes that are not the same kind of act:
+
+    PATCH /rbac/roles/:id                      rename it, change its description
+    PUT   /rbac/roles/:id/permissions          change WHAT IT GRANTS
+    PATCH /rbac/roles/:id/security-attributes  its MFA requirements (behind a step-up challenge)
+
+The second one can hand a role every permission in the system, including the ones that grant permissions.
+The first changes a label. They arrive together because they arrived together under `role.manage` — the
+split neither widened nor narrowed anything — and that is precisely why it is easy to leave alone.
+
+Not acted on in Phase 1 deliberately: separating them is a CAPABILITY decision (a new boundary the owner has
+not asked for), not a rename, and the four-action scheme's own shape does not produce it —
+"change what a role grants" is not one of view/create/edit/deactivate. If it is taken, the likely shape is
+`role.permissions.manage` alongside `role.update`, and the step-up challenge already on the MFA-attribute
+route is the precedent for what guards it.
+
+The seed's own comment on `role.update` points here, so this entry exists to be pointed at rather than to
+argue for the change.
+
+**MEASURED 2026-09-26 — the security question this entry leaves implicit, answered so nobody re-derives
+it.** "Can hand a role every permission in the system" invites one obvious question: is that an escalation
+path? Traced through the code rather than reasoned about.
+
+`RoleAdminService.setPermissions` has **no check that the actor holds the codes they are granting.** So a
+holder of `role.update` can put any catalogue code on a custom role, and a holder of `user.manage` can
+assign that role — and `OFFICE_ADMINISTRATOR` holds both. An office administrator can therefore grant
+themselves any capability in the product.
+
+**And the obvious tightening would be WRONG, which is the finding.** A rule of "you cannot grant what you
+do not hold" breaks the COMMON case: an access administrator routinely configures a Finance role holding
+codes they will never hold themselves. That is the job. A rule that forbids it would make the Role screen
+unusable for the thing it exists for, and would push offices toward granting the administrator everything
+so they can configure anything — strictly worse.
+
+**What actually controls this, all four verified present:**
+
+- **The audit row is specific and it names the direction.** `UPDATE` on `RolePermission`, with
+  `beforeValue.permissionCodes`, `afterValue.permissionCodes`, and explicit `added` / `removed` arrays —
+  so a self-grant is not merely visible, it is enumerable. It goes through `safeAudit`, which is
+  best-effort, but a failure is a `logger.error` naming the role rather than a silence.
+- **`assertNotSystem`** refuses re-granting an `isSystem` role, so the platform's own roles cannot be
+  edited into anything.
+- **The last-administrator lockout guard** fires on this exact route when the write removes
+  `user.manage`.
+- **No permission grant can reach the money controls.** `assertDifferentActors` plus the fifteen CHECK
+  constraints refuse a self-approval regardless of what the actor holds; the only way past them is an
+  office DECLARING combined duties, which is audited and surfaces in the self-approval report.
+
+**So this is a segregation-of-duties boundary question, not an open exploit** — which is what the entry
+already implied and now states with the evidence. If the owner takes the split, `role.permissions.manage`
+alongside `role.update` remains the likely shape, and the step-up challenge already on the MFA-attribute
+route is the precedent for guarding it.
+
+### 1.54 — THE ARABIC HALF IS THE HALF THAT GETS MISSED
+
+Four-action Phase 1 renamed permissions that appear inside user-facing refusal messages. The English
+message was corrected and the Arabic one was not, twice in one change:
+
+    insNewNoPermission  AR still said insurer.relationship.manage after EN said insurer.create
+    vendNoPermission    AR and EN both said vendor.manage; only venNoPermission had been found
+
+Both were caught by a Playwright assertion on the English text, which is the wrong way round for this
+product: **Arabic is the primary language**, the one the owner reads, and the one no test asserted here.
+The shape to watch for is a code, a route or a field name appearing inside a TRANSLATED string — a rename
+then has to reach two files, and the one a developer greps for is the one in their own language.
+
+Worth knowing that `translations.test.ts` cannot catch this: it enforces AR/EN key PARITY, not that the
+two halves say the same thing.
+
+## The check the owner asked for, and the answer
+
+**Asked**: a check that fails when an English string changes in a commit and its Arabic counterpart does
+not. **Answer: it is expressible, it is not the right check, and there is a sharper one that is.**
+
+### It is expressible — here is exactly how
+
+For each dictionary file, build `key -> value` for the `AR` and `EN` halves at the merge base and in the
+working tree. Then `changedEN = { k : EN_before[k] !== EN_after[k] }`, the same for AR, and require the two
+key SETS to be equal. No parsing ambiguity: the dictionaries are plain object literals and both halves are
+in one file, so one `git show <base>:<file>` plus one read of the working tree is the whole input.
+
+### Why it is not the right check
+
+**It fires on legitimate single-language edits.** Fixing an English typo, tightening English phrasing, or
+improving an Arabic sentence are all normal and all asymmetric by nature. An escape hatch — a marker in the
+commit message or the file — turns the gate into a reminder, and a reminder is what we already had.
+
+**And it cannot catch the worse version of the same bug.** If a permission is renamed and NEITHER language
+is updated, nothing changed, so there is no asymmetry to detect: the check passes on a dictionary where
+both languages now name a code that does not exist. That is a strictly worse state than the one we hit, and
+the co-change check is blind to it.
+
+### The sharper check, measured
+
+Scan the VALUES in every dictionary for tokens shaped like a machine identifier
+(`[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+`) and assert that any token which looks like a permission code
+IS in the catalogue.
+
+Measured on today's dictionaries before proposing it:
+
+    99 distinct dotted tokens, 286 occurrences
+    82 of them ARE permission codes  (customer.360-view.read appears 8 times, user.manage 6, …)
+    17 are not, and are trivially separable: page.tsx, enums.ts, e.g, privacy-notice-v1.2
+
+So the check has real teeth — 82 codes are quoted at users in refusal messages, in both languages — and its
+allow-list is small enough to enumerate and defend. Properties the co-change check does not have:
+
+- **Language-symmetric by construction.** It reads both halves the same way, so the Arabic half cannot be
+  the one nobody asserts.
+- **Catches the stale-in-both case**, which is the worse one.
+- **No false-positive class for prose edits**, so it can be a hard gate rather than an advisory.
+- **No git plumbing**: works on a fresh clone, in the fast gate, and cannot be fooled by a squash.
+
+### The sibling worth building at the same time
+
+The same shape catches the `docs/first-run.md` class — a translated string naming a ROUTE
+(`/settings/users`) that no longer does what the sentence says. Assert every `/route` mentioned in a
+dictionary value exists in the destination catalogue (`components/app/destinations.ts`). That is the
+"two rows would have sent her to the wrong screen" defect as a test.
+
+### Recommendation
+
+Build the sharp check as a gate. Do NOT build the co-change check: it cannot be a gate without an escape
+hatch, and with one it is a reminder that costs a false alarm on every wording fix. If the owner wants the
+co-change signal anyway, it belongs in review as a printed diff summary, never as a pass/fail.
+
+**BUILT (2026-09-25, commit `c1fbc0c`).** The owner's instruction was to build the one recommended here and
+not the co-change check. It lives in `apps/web/lib/i18n/translations.test.ts` — inside the existing merged-
+dictionary describe, so it reuses that file's own file list rather than re-deriving one — with the allow-list
+enumerated (`e.g`, `i.e`, `privacy-notice-v1.2`) and a non-vacuity assertion beside it: both languages must
+quote more than 50 real codes and their AR/EN ratio must exceed 0.8, so the check cannot pass by finding
+nothing to check. The sibling (`/route` tokens against the destination catalogue) is NOT built.
+
+**AND IT HAS NOW FIRED ON ITS OWN STATED SCENARIO (2026-09-26).** Four-action Phase 4 removed
+`payment-channel.manage` from the catalogue, and `/payment-channels`'s load-failure message named it — in
+BOTH languages, which is this entry's whole subject. Proven rather than asserted: the plants
+`refusal-still-names-the-removed-umbrella` and `arabic-refusal-still-names-the-removed-umbrella`
+(`scripts/plants/four-action-phase-four.json`) restore each half in turn, and each kills its OWN test,
+naming the file, the language, the key and the stale token:
+
+    × EN: every permission-code-shaped token names a code that exists
+        + "finance.ts EN.pcNoPermission: \"payment-channel.manage\""
+    × AR: every permission-code-shaped token names a code that exists
+        + "finance.ts AR.pcNoPermission: \"payment-channel.manage\""
+
+Two properties this establishes that the earlier build could only claim. **The Arabic half is asserted by
+its own test** — the exact gap that made Phase 1's two misses invisible, where a Playwright assertion on the
+English text was the only thing looking. And the two assertions are INDEPENDENT: fixing one language does
+not quiet the other, so the failure mode "corrected the English and stopped" cannot recur silently. This is
+the second guard in this repo to fire on the scenario it was written for (§ 1.46 was the first), which is
+the evidence the class earns its cost rather than an argument that it should.
+
+### 1.56 — THE DEV AND TEST DATABASES SWAPPED PORTS, AND ONLY THEIR NAMES MADE IT LOUD
+
+On 2026-09-26 both Postgres containers restarted unprompted and came back with their published ports
+**crossed**: host 5433 answered the db-test instance, 5434 answered the dev one. Every gate and every
+application connection goes through those ports; `docker exec <container> psql` does not, which is why the
+containers looked healthy while `npm run db:checksums` said `Database "ibms" does not exist`. `docker inspect`
+reported the mapping as correct the whole time, so inspecting the container is not a check either.
+`docker compose restart db db-test` re-bound them.
+
+**What stopped this from being serious is a naming choice nobody made for this reason.** The dev database is
+`ibms`, the test one is `ibms_test`. A crossed mapping therefore lands on an instance that does not have the
+requested database and fails immediately. Had both been called `ibms`, an api e2e run — 105 spec files that
+create, mutate and delete — would have executed against the DEV database, and every one of them would have
+passed. The suite has no way to notice which database it is on.
+
+So the property is load-bearing and should be written down as one: **the two databases must never share a
+name.** It is the only thing between a crossed port mapping and a test suite silently rewriting development
+data. "Simplify the config so both are just `ibms`" is a change that would look like tidying.
+
+**What this says about a verification run.** Every gate and suite in this session ran BEFORE the restart and
+is unaffected — the failure appeared on the first command after it, and the timeline is in the session record.
+But the general form is worth stating: a green run is evidence about the database the run actually reached,
+and nothing in the output says which one that was. A cheap gate would fix that — have each db script print
+`current_database()` and the instance's database list beside its result, so "which database was this" is in
+the evidence rather than assumed. Not built here; recorded with the answer.
+
+Host-specific companions already recorded in project memory: Docker Desktop's stuck backend after a GUI
+relaunch, and the VHDX that fills the C: drive. This is the third failure mode on this host whose symptom
+points somewhere other than its cause.
+
+### 1.55 — § 1.40'S SHAPE, CAUGHT BEFORE SHIPPING: adding a STATE and leaving the READERS
+
+§ 1.40 is about a migration that converted rows and left the writers. Class B piece 1 is the same shape with
+the halves swapped, and it was found by asking § 1.40's question in advance rather than discovering it on a
+later baseline: **a discarded record keeps its status, so which existing readers now answer with withdrawn
+records?**
+
+Measured across all 31 read sites over the four models. A discarded record's state is pinned — a discarded
+Policy is `PLACEMENT_CONFIRMED` forever, a Claim `NOTIFIED`, a Recommendation unsent — because a discarded
+record cannot advance, so the question is decidable per query rather than a guess. Seven answers were wrong:
+
+    insurer.repository.ts        open-obligation count   PLACEMENT_CONFIRMED is in the set — and this
+                                                         number is written into a deactivation AUDIT ROW
+    claims-dashboard.repository  open-claims ageing      `status != CLOSED` holds forever, so a withdrawn
+                                                         claim ages without limit in the one report built
+                                                         to surface claims nobody is progressing
+    endorsement.repository       findLiveCancellation    see below — the sharp one
+    insurer-performance (x2)     responsiveness ratio    an insurer answerable for a claim we withdrew;
+                                                         filtered in BOTH halves or the score moves
+    interaction.repository (x2)  the 360° timeline       a withdrawn policy reading "in placement" to
+                                                         whoever is on the phone with the client
+
+The other 24 were already correct, and for a reason worth keeping: the analytics reads deliberately start
+PAST the pre-commitment statuses (`ANALYTICS_WRITTEN_POLICY_STATUSES`, `AWAITING_INSURER_STATUSES`), so the
+new state cannot reach them. An entity's OWN list and its matching count are excluded deliberately, not
+overlooked — a withdrawn record stays in its own register, the way a deactivated insurer stays in the
+insurer list, because hiding it reads as deletion. That is the rule the seven fixes implement: **a discarded
+record stays in its own register and leaves every derived view.**
+
+**THE SHARP ONE: the trap reappeared one level down, in the database.** `Endorsement_one_live_cancellation_per_policy`
+is a partial UNIQUE index predicated on `changeType = 'cancellation' AND status <> 'CLIENT_NOTIFIED'`. A
+discarded endorsement can never reach `CLIENT_NOTIFIED` — a discard is terminal. So the moment the discard
+columns existed, withdrawing a wrongly raised cancellation would have blocked every future cancellation of
+that policy, permanently, at the database level, and the only exit would have been to APPLY the cancellation
+nobody wanted. That is precisely the trap this feature was built to remove, rebuilt by the feature itself.
+
+Two things about how it was caught. It came from the measurement, not from hitting it — no test would have
+failed until somebody discarded a cancellation and then needed a second one, which is a Tuesday in a
+brokerage and never in a test suite. And it sits in `db:divergence`'s measured blind spot (partial indexes),
+so the assertion lives in the migration's own `DO` block, per the rule already recorded for that gate; the
+assertion was run against the un-widened index first and printed the real predicate in its refusal.
+
+**The generalisation, for the next time a state is added to an existing model:** enumerate every read of
+that model and answer, per read, "can a row in the new state reach this, and is the answer it gives still
+true?" The cost here was one measurement pass over 31 sites. The cost of not doing it is § 1.40's — a number
+that drifts from correct to wrong with use, while every gate stays green.
+
+### 1.52 — THREE AUDIT FILTERS THE API ACCEPTS AND NO CONTROL OFFERS
+
+`ListAuditTrailQueryDto` accepts `entityType`, `entityId`, `userId`, `action`, `from` and `to`. The
+screen offered the first two. `userId` was closed by the actor picker (Plan B) — the question an audit
+trail exists to answer had no control at all — and `action`, `from` and `to` are still unreachable.
+
+This is § 1.44's class, measured again: an API surface with no caller. It is not the same as a missing
+feature, because the server half is built, tested and gated; what is missing is three form controls. A
+compliance officer who wants "every DELETE last March" has to ask a developer to construct a URL.
+
+~~Not built here deliberately~~ — **BUILT 2026-09-26.** A `<select>` for the action and two date inputs.
+The action is a select rather than a text box because the server validates it against a closed
+vocabulary: typing it would make a `400` the normal way to discover the spelling.
+
+**`to` DOES DOUBLE DUTY, and the two uses turned out to be compatible.** Its original job on this screen is
+the pagination pin — this is the one list whose own reads APPEND to the table they read, so each browse
+writes a PDPL access row that sorts to the top and shifts every later page down by one. A user-supplied
+upper bound serves that purpose at least as well, because a date in the past cannot admit new rows at all.
+So an explicit `to` REPLACES the pin and the pin remains the default when the field is blank.
+
+**THE END-OF-DAY DETAIL IS THE PART WORTH THE TEST.** `2026-03-31` as an instant is midnight at the START
+of the 31st, so a naive conversion silently drops the last day of every range anybody enters — a wrong
+answer that looks like a complete one. `to` is stretched to `23:59:59.999Z` and `from` is not, and the
+Playwright assertion is on the full instant rather than the date, because asserting the date alone would
+pass against exactly that bug. Planted, and it kills that test alone.
+
+**AND BUILDING THE DROPDOWN FOUND A DRIFT IN THE LIST IT IS BUILT FROM.** The web's `AuditAction` union
+was **three values short** of the database enum — `DISCARD`, `SLA_ESCALATED` and `ENCRYPTION_KEY_USED`.
+Harmless while nothing rendered a list of actions, because TypeScript does not check a value arriving over
+HTTP against a union; the rows simply flowed through. They would have been the three actions nobody could
+filter for — including the one the discard feature exists to make findable.
+
+Two things about how that was found are worth keeping:
+
+- **A truncated grep said ONE value was missing.** `grep -A26` on the schema cut the enum short. The guard
+  reading the GENERATED client found all three. A measurement with a line limit is a measurement that can
+  be wrong in the safe-looking direction.
+- **The compiler catches only one direction.** `ENUM_LABEL.AuditAction` is a total `satisfies` map, so
+  ADDING a union member without a label is a type error — which is how the missing labels surfaced the
+  instant the union was corrected (§ 1.45). REMOVING one is not: the map simply holds an extra key, `tsc`
+  reports 0 errors, and the dropdown silently loses an option. Measured by planting it.
+
+So `packages/db/prisma/audit-action-parity.spec.ts` now asserts the union equals the enum in BOTH
+directions, with a non-vacuity floor — which immediately earned itself by catching a semicolon in this
+author's own comment that had truncated the guard's own parser to 4 of 20 values.
+
+**Still unreachable on this screen**: nothing. All six filters the DTO accepts now have a control.
+
+### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Six ways a guard can fail to be worth its cost
+
+Five separate mechanisms, found between 2026-09-24 and 2026-09-25, all with the same signature: the
+evidence LOOKED like evidence. A sixth, on a different axis, was added on 2026-09-26: the proof was real
+and the person it fired on could not act on it.
+
+**(a) A plant that never applied.** Three plants reported PASSING and had not touched a file.
+`process.argv[2]` is empty when node runs with `-e` — no script path occupies argv[1] — so the
+selector was `undefined`, no branch matched, and the suite was green for the only reason a suite is
+ever green: nothing was wrong with it. A plant that silently does nothing is INDISTINGUISHABLE from a
+guard that works; both print a green suite, and the output is then used to justify "this guard is
+proven". Audited across the whole week from the session record: 121 plant runs, 67 showing a test
+dying, 52 setup/revert steps, and **exactly 3 that reported everything passing** — 2026-09-21T19:48,
+2026-09-22T06:38 and 2026-09-24T20:43. All three were noticed and re-run within a minute, which is the
+only reason this was survivable.
+
+**(b) A plant DEFINED and never invoked.** A fourth failure mode the "all passed" signal cannot catch,
+because nothing ran at all: `plant-ua.mjs` defined four named plants and the loop listed three. The
+commit message claimed four. The missing one (`encrypt-inside`, proving no KMS round trip happens
+inside the person-and-account transaction) was run afterwards and the guard SURVIVES — but it was
+unproven for the whole time it was described as proven.
+
+**(c) A guard file that CI ran, failed on, and nobody read.** `permission-only-gates.e2e-spec.ts`
+caught four wrong route gates on `477965d` immediately, naming them:
+`expected [ 'GET /admin/departments', …(3) ] to deeply equal []`. It caught them again on
+`a7a977d`. Then `395a0a3` introduced an undeclared index, `db:divergence` went red EARLIER in the
+same job, the job short-circuited, and **the api e2e suite stopped running at all for three commits** —
+so the original failure vanished behind a newer red while local gates stayed green.
+
+The fixes are all structural, because none of these is a thing to be more careful about:
+
+- `scripts/plant.mjs` is the only plant mechanism now. It refuses a missing name, an unknown name, a
+  `from` that is absent (the code moved, so the plant is stale), a `from` that occurs more than once
+  (ambiguous site), a replacement identical to the original, and it RE-READS the file from disk to
+  confirm the edit landed before printing `PLANTED`. Revert restores from a backup written at apply
+  time, byte for byte, so a half-reverted plant is not a state you can reach. `--self-test` plants on
+  the plant mechanism itself — eleven cases, including the original bug as a test (invoked with no name,
+  it must exit non-zero) — and is a gate in `verify.sh`.
+- `scripts/check-ci.sh` is the LAST gate in `verify.sh`: it reads the CI conclusion for HEAD and
+  fails when a run is red, unfinished, or absent-though-pushed, printing the `gh run view` command for
+  each failing run. Being unable to check (no `gh`) is also a failure, because "I could not check" is
+  the state that produced this. It passes quietly when HEAD is not pushed yet.
+- `ci.yml`'s seed, integration and contract steps carry `if: ${{ !cancelled() }}`, so a red
+  verification step no longer hides every test behind it. The job still fails; it stops being a
+  one-signal job.
+
+**(d) A plant that APPLIED, and nothing died — because the test could not observe the thing it
+guards.** One week after (a), `scripts/plant.mjs` removed the `preventDefault` from EntitySearch's Enter
+handler, reported `PLANTED … 10327 -> 10291 bytes, verified on disk`, and all seven tests stayed GREEN.
+The tool was right: the bytes changed. The test was wrong: it asserted "no POST happened" on a form whose
+required fields make the browser block submission regardless, so both worlds look identical from where it
+was standing.
+
+**The standard is "bytes changed AND a test died". "Bytes changed" alone is not.** The plant tool cannot
+catch this one — it can only prove the edit landed. Choosing a surface where the two worlds differ
+observably is the part no tool does: the rewritten test runs on the audit browse form, which has no
+required fields and whose submit is an observable request, and it additionally asserts that the button
+still submits, so a dead form cannot pass for a prevented default.
+
+The question to ask of every plant, before believing a green suite: **on this surface, what would the
+broken version have done differently?** If the answer is "nothing observable", the plant proved the
+plant, not the guard.
+
+**(e) A plant that APPLIED, and the tool said it had NOT — leaving the plant live.** The mirror image of
+(a), and the more dangerous half of the pair. `plant.mjs` verified the wrong invariant after writing:
+"the text this plant replaces is gone". That is right for a substitution and wrong for an INSERTION — a
+plant whose replacement keeps the line it anchors on and adds a write above it, which is how you prove a
+test observes a SIDE EFFECT rather than a changed branch. The endorsement plant ("the discard also touches
+the policy") is exactly that shape. The tool wrote the file, re-read it, saw the anchor text still present,
+and exited non-zero saying the plant had not applied — with the plant in the working tree and a backup
+nobody had been told to revert. The suite then failed for the planted reason while the tool's own output
+said nothing had been planted.
+
+Worth stating plainly because the first instinct is to read a loud failure as safe: **a loud failure that
+misdescribes what happened is not safer than a quiet success — it is the same defect with the halves
+swapped.** (a) reported success over no change; (e) reported no change over a real one. Both end with the
+operator believing something false about the tree.
+
+The invariant is now "the file on disk is EXACTLY what this plant intended to write", which is the thing
+actually being claimed, and it admits insertions. `--self-test` gained a case that applies an inserting
+plant and compares the whole file; restoring the old condition makes exactly that case fail, which is how
+the fix was shown to be non-vacuous.
+
+**A GUARD FIRING ON ITS BUILDER.** Worth recording separately, because it is the return on every one of
+these. Four-action Phase 1 declared two new permissions under a module (`sales-crm`) that no other code
+used, when their siblings live in `commercial-front-office`. A permission's module is what groups it on
+the Role matrix screen, so that would have rendered a thirteenth group holding two rows — on the very
+screen the four-action scheme exists for. Nobody reviewed it. The matrix test's module pin went 12 → 13 and
+said so, in the same run as the catalogue-count pin.
+
+The pin was written two commits earlier, by the same hands, for exactly this. That is what a measured pin
+is for: it does not care who is wrong, and it does not get tired the way a reviewer does.
+
+The class, stated once: **a proof is only a proof if its absence is loud, AND its report has to describe
+what actually happened.** A plant, a guard file, and a CI job all have a silent-absence mode, and all three
+were in it simultaneously. A fourth was added by the same reasoning applied one level deeper: a plant that
+lands on a surface where nothing can observe it is silent absence wearing a green suite. The fifth is the
+one that says loudness is not sufficient — a tool can fail loudly about the wrong thing, and then the
+operator is misinformed with a non-zero exit code to back it up.
+
+**(f) A GUARD WHOSE FAILURE MODE PUNISHES THE NON-ENGINEER.** Added 2026-09-26, and it is a different
+axis from (a)-(e): those are about whether a proof exists. This one is about who pays when it fires.
+
+`docs/permission-catalogue-for-descriptions.txt` is the file the OWNER writes Arabic permission
+descriptions into. Its generator counted the lines she had written and put that count INTO the file. So
+the file's contents depended on how much of her work was done — and writing a single Arabic sentence made
+`--check` report STALE, turning `verify.sh` red until a developer regenerated it.
+
+Trace what that does. She types one sentence into the file she was asked to fill in. A gate she has never
+heard of goes red, for a reason she cannot diagnose, about a file she is the author of. The most likely
+outcomes are that she stops touching the file, or a developer "fixes" it by deleting her line. **A guard
+that turns red because the owner did the work the guard exists to support is worse than no guard**, because
+no guard merely fails to help, while this one actively obstructs.
+
+Found before she hit it, by writing a real Arabic line into the real file and running the gate — not by
+reading the code, which looked reasonable. The fix is a property, not a warning in a comment: the file's
+bytes depend only on the catalogue and on her own lines, so `render(catalogue, harvest(file))` equals
+`file` and the gate stays quiet while she works. The count went to stdout, where it informs the developer
+running the tool and reaches nobody else.
+
+**The question this adds to the checklist, and it is not about correctness:** *when this gate fires, who
+sees it, and can that person act on it?* A gate whose audience is a developer may be as strict as it
+likes. A gate that can fire on a non-engineer's ordinary work has to be satisfiable BY that work — or it
+must not be able to observe that work at all, which is what was chosen here.
+
+Two consequences worth stating, because both were live in this repo:
+
+- **A file a non-engineer authors must not have machine-derived content interleaved with theirs.** The
+  count was the interleaving. Anything derived belongs where only the tool looks.
+- **Check the same property on any gate that reads a hand-maintained file.** The permission-description
+  input file was the one; `docs/` holds others she is the intended author or reader of, and the test to
+  apply is the one above.
+
+### 1.57 `P2` — THE HOLIDAY CALENDAR IS EMPTY AND UNREACHABLE, SO EVERY BUSINESS-DAY DEADLINE IS A LOWER BOUND
+
+Found while splitting `sla.policy.manage` (four-action Phase 4): the umbrella's fifth route is
+`POST /sla/holidays`, which turned out to be the only writer of a table nothing can reach.
+
+**Measured, not inferred:**
+
+- `SlaHoliday` holds **0 rows on dev and 0 on db-test**. Nothing seeds it — no `slaHoliday`
+  reference exists anywhere in `seed.ts` or `seed-data/`.
+- `POST /sla/holidays` has **no web caller**: `apps/web/lib/sla/sla-policy-api.ts` exports
+  `listSlaPolicies`, `getSlaPolicy`, `updateSlaPolicy`, `activateSlaPolicy`,
+  `deactivateSlaPolicy` and `updateSlaPolicySource`, and there is no `createSlaPolicy` and no
+  holiday client at all. `GET /sla/holidays` has no caller either.
+- The arithmetic DOES consult it: `sla-status.config.ts` turns `SlaHoliday` rows into the set
+  `business-days.util.ts` expects, and that util excludes them from its day count.
+
+So the mechanism is built and correct, and the data is absent with no way to supply it. **An office
+cannot enter Eid.** `POST /sla-policies` is unreachable from the web for the same reason, which is the
+smaller half of this finding.
+
+**THE FAILURE DIRECTION IS SAFE, AND THAT IS WHY THIS IS P2 RATHER THAN P1.** `business-days.util.ts`
+says so in its own header: without a holiday calendar a computed deadline is *"a lower bound (i.e.
+never later than the true legal deadline)"*. Skipping only weekends means the system counts to its
+deadline sooner than the law does, so it chases staff EARLY. It never reports a deadline as further
+away than it legally is.
+
+**The real cost is a false breach, and it points the wrong way.** An SLA the system marks breached may
+not be breached in law — if two public holidays fall inside a ten-working-day window, the true deadline
+is two days later than the one computed. The breach reports, the SLA dashboard, and any PDPL evidence
+drawn from them therefore over-report lateness. For a compliance artefact that is the worse direction:
+the brokerage's own records would show it missing statutory deadlines it actually met.
+
+**Fix, in the order that matters:**
+
+1. **Seed the calendar.** Jordan's public holidays are gazetted annually and several are lunar, so
+   they cannot be computed — they have to be entered. Until they are, the two routes below have nothing
+   to maintain.
+2. **Give `POST /sla/holidays` a screen.** It now has its own permission (`sla.holiday.create`,
+   split out in migration `20261030100000` precisely because maintaining the calendar is a different
+   job from configuring a policy), and that code currently gates a route no screen calls — which is
+   § 1.44's shape, recorded here rather than left to be discovered.
+3. **Then decide whether a deadline computed without a calendar should be LABELLED as approximate**
+   wherever it is shown. The util is honest in a comment; the SLA dashboard is not, and the dashboard
+   is what a person reads.
+
+**Not built.** Item 1 needs a source (the gazette, or the owner's list), which makes it the same class
+as the drafted/unsourced values in § 4 rather than something to invent.
+
+### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
+
+Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
+API on the dev database. **Sanctions screening works. PEP screening is a label on a sanctions result.**
+
+**What happens today, from the screen.** A corporate customer named `'ABBAS, Yasir` — a name taken
+FROM the live synced list rather than invented — created, KYC submitted, screening run:
+
+    RESULT SANCTIONS  HIT    list=OFAC_SDN (PAARSSR-EO13894)  provider=built_in  escalated=yes
+    RESULT PEP        HIT    list=OFAC_SDN (PAARSSR-EO13894)  provider=built_in  escalated=yes
+    RESULT AML        HIT    list=OFAC_SDN (PAARSSR-EO13894)  provider=built_in  escalated=yes
+    ScreeningMatch queued for human review: 1   (status `pending`)
+    KYC status after screening: SCREENING       (not auto-approved)
+
+An invented name came back CLEAR on all three, escalated nothing, queued nothing. So the machinery —
+match, store, escalate, queue for review, hold the KYC record — works, and the queue is reachable by
+`COMPLIANCE_OFFICER` (3 live grants) at `/screening-matches`, gated on `sanctions-pep.screen`.
+
+**THE DEFECT.** A "PEP HIT" cites an OFAC SDN sanctions programme as its source. The three types are
+one computation stored under three labels, which the whole-database distribution confirms exactly:
+27 CLEAR / 11 HIT / 6 PENDING_INVESTIGATION for EACH of SANCTIONS, PEP and AML — identical because it
+is one result written three times.
+
+**There is no PEP data to screen against.** `WatchlistEntry` has no list-type column at all; its only
+classifier is `source`, and the only sources are `OFAC_SDN` (58,172 rows) and `UN_CONSOLIDATED`
+(3,033). Both are sanctions lists. So a politically exposed person who is NOT sanctioned returns
+**PEP: CLEAR** — a false negative on the check a regulator asks about, reported with the same
+confidence as a true one — and a sanctioned person returns PEP: HIT, a true answer to a question
+nobody asked.
+
+`ScreeningService`'s own header says as much ("a real integration would call three distinct
+lists/providers per type; this is a deliberate simplification"). The simplification has become a
+false claim on screen, because the screen shows a PEP result and names no caveat.
+
+**Specified and NOT implemented, named exactly.** `ScreeningMatch` already carries `listType`,
+`pepPosition`, `providerEntityId`, `provider`, `reviewThreshold` and `algorithmVersion`; the schema
+anticipates a commercial PEP provider with positions and per-provider thresholds. `ScreeningResult`
+carries `provider` and `attemptOutcome`. Nothing sits behind any of it — every stored row is
+`provider=built_in`.
+
+**Two smaller measurements.** Every HIT predating this test came from the dev-only FIXTURE
+(`listSource` = "Sample OFAC SDN List (fixture)", 33 rows), not from the 61,205 real entries; and
+`ScreeningMatch` was **0** across the whole database, so the human-review queue had never held a row.
+Both are explained by seeded customers having randomly generated names that match nothing — the first
+real match appeared the moment a real listed name was used. Neither is a fault; both would have been
+easy to mistake for one.
+
+**Nothing changed in this area, per instruction.** The options are not equivalent: buy a PEP data
+source, or remove the PEP and AML labels until there is one. The second is free and honest; the first
+is the actual requirement. What must not continue is a screen reporting PEP: CLEAR to a compliance
+officer on the strength of a sanctions list.
+
+
+### 1.49 — ONE screen could render a heading and nothing else. My first count of FOURTEEN was wrong, and the correction is the useful part
+
+Found while diagnosing a blank `/settings/roles`. The screen was not broken — it renders 12 role
+rows against a healthy API, and it shows an explicit error when the response cannot be parsed
+(both measured). What WAS broken is narrower and worth naming, because it is a pattern rather
+than a bug:
+
+```ts
+useEffect(() => {
+  if (!user || !canRead) return;   // <- the client already knows; it never asks
+  void load();                      // <- and the no-permission message lives in load()'s catch
+}, [user, canRead, load]);
+```
+
+A caller the CLIENT knows cannot read never reaches `load()`, so the message that explains the
+refusal — which exists, and is correctly worded — never renders. Measured on the roles screen: the
+`main` element held **157 characters**, a heading and one sentence of intro. No table, no empty
+state, no reason.
+
+Fixed on `/settings/roles` (a `!canRead` branch, plus a loading line for the window before the
+first response, which also rendered nothing).
+
+**I then reported fourteen other screens with the same shape. That was wrong, and the mistake is
+worth more than the list was.** My grep matched every screen whose load effect returns early —
+`if (!user) return;` — and that is NOT this defect. A screen gated only on `!user` still calls the
+API, still receives the 403, and still renders `loadError`; the message is reachable. The defect
+needs a CAPABILITY inside the early return, because that is what stops the request from being made
+at all and therefore stops the message that lives in the catch.
+
+Re-measured with the right pattern (`!can…` inside the guard) across all 96 screens:
+
+    apps/web/app/(app)/settings/roles/page.tsx:221   if (!user || !canRead) return;
+    apps/web/app/(app)/settings/roles/page.tsx:228   if (!canReadCatalogue) return;
+
+**One file — the one already fixed.** The three I named as worth doing first
+(`screening-health`, `screening-matches`, `sla-policies`) were then read individually, and each
+renders `loadError` on a 403. They were false positives, and folding them into this work would have
+meant changing screens that were not broken.
+
+The class, which is the part to keep: **a grep for a SHAPE is not a measurement of a DEFECT.** I
+searched for the pattern I had just fixed rather than the one that caused the symptom, and fourteen
+files matched it innocently. Reading three of them took two minutes and removed thirteen from the
+list — verify a sample before quoting a count.
+
+**And the test lesson, which is the reason this survived 454 green Playwright tests.** My first
+version of the proving test asserted a page-wide `getByRole("status").or(getByRole("alert"))` and
+**PASSED on the broken build** — satisfied by an empty-text live region OUTSIDE the content area
+while `main` held nothing but the heading. A test that can be satisfied from outside the screen is
+not testing the screen. Scoped to `main` and to the sentence itself, it fails on `cb24c60` and
+passes after the fix.
+
+The general form: **a navigation test that stops at the href shares the assumption it should be
+checking.** Assert content — a row, a named value, or an explicit empty-state message.
+
+### 1.48 — A PARTIAL VERDICT REPORTED AS COMPLETE: "screens hidden, not denied" was true of the nav and false of the launcher
+
+**Corrects an earlier audit verdict of my own.** Audit item 5 — *screens are hidden rather than
+shown-then-denied* — came back **BUILT**, evidenced by `AppNav` assembling the sidebar from the
+resolved permission set. That evidence was real and the verdict was wrong, because the sidebar is
+not the only surface that offers routes.
+
+`app/(app)/page.tsx` — the FIRST screen after login, and the most prominent surface in the product —
+carried its own hard-coded list of six cards with **no permission check at all**. Measured on the
+office administrator's 29 codes: four of the six answered 403 for her (`/leads`, `/prospects`,
+`/customers`, `/customers/kyc-queue`) and the three screens she could actually use — `/settings/roles`,
+`/settings/users`, `/employees` — had **no card at all**.
+
+The consequence was not cosmetic. She reported that there was **no page to create a role**. There
+is: `/settings/roles` is 642 lines, it creates, renames, sets the permission matrix, retires and
+reactivates, and `CLAUDE.md`'s claim about it is accurate. It sits in the `الإدارة` group, which is
+collapsed unless it holds the current route, and nothing else pointed at it. **A working feature was
+indistinguishable from a missing one for the person it was built for.**
+
+**The class.** I measured the mechanism I knew to look at. The verdict should have been *"true of
+AppNav; every other surface that renders a destination is unchecked"*, which is a different
+sentence and would have sent someone to the launcher. The same shape as the seed: the walkthrough
+was written from the code, and the one step never executed was the one that broke.
+
+**The fix is structural rather than repeated.** `components/app/destinations.ts` now holds the
+single destination catalogue and the single predicate (`canReach`); `AppNav` and the launcher both
+read it. The rule to keep: **if a destination is rendered anywhere, its gating permission decides
+whether it renders — one mechanism, not one per surface.** A second hard-coded list cannot satisfy
+`e2e/home-launcher.spec.ts`, whose third test enumerates what the launcher offers and asserts every
+entry is reachable; planting the unfiltered version kills all four tests.
+
+**Two things the fix had to get right, both found by the tests rather than by reasoning.**
+`/settings/security` is ungated on purpose, so it is appended unconditionally — which made the
+"nothing to show" message unreachable when it keyed on the full group list; it keys on the MODULE
+groups now, and a zero-permission account sees both the explanation and its one route. And the
+enumerating test read the DOM before hydration and got zero cards, which would have passed every
+"must not contain" assertion for entirely the wrong reason — it anchors on a card that must be
+present first.
 
 ### 1.47 `P2` — FOUR web Playwright tests are chronically flaky in CI, and a green run has been hiding them
 
@@ -2857,14 +3537,59 @@ for a NEW reason without anyone noticing the change. It also cost real time here
 appeared in one red run and two of them were noise, so the diagnosis started by ruling out a
 connection to a nav change that had none.
 
-**Not fixed here** — it is a claims-test concern in a file this session has no other business in,
-and the queue has docs next. Named so it can be picked up deliberately:
+~~**Not fixed here**~~ — **STEP 1 DONE 2026-09-26. Step 2 deliberately not taken.**
 
-1. The four tests share one helper-shaped loop. Extract it, and have it wait on the state each
-   click depends on rather than on the final label — sixteen interactions with one assertion at the
-   end reports "slow" and "broken" identically.
-2. Then decide the timeout on evidence. Raising it first would be the § 1.1 mistake again: a
-   mitigation that buys time and hides the next crossing.
+1. ~~The four tests share one helper-shaped loop. Extract it~~ — **done, and the extraction was less
+   complete than this entry assumed.** Three of the four went through `driveClaimToVerdict`; the
+   fourth ("tracks the adjuster survey…") carried its own COPY of the document loop. So the loop is
+   now its own helper, `fileMandatoryClaimDocuments`, with both sites calling it.
+
+   **And it waits on the state each click depends on**: the filed-document count, which only advances
+   once the attach request returned AND the parent card refetched — which is also exactly when the
+   form is ready to be typed into again. Three intermediate assertions replace one final one, so no
+   `fill` races a re-render.
+
+   **PROVEN BY WHAT THE FAILURE NOW SAYS, which is the only claim a local green run can support.** A
+   flakiness fix cannot be demonstrated by passing locally — the tests passed locally before. What
+   IS demonstrable is the diagnostic: planting a missing refetch (`attach-never-refetches-the-card`,
+   dropping `await onDone()` from the component) now fails as
+
+       Error: expect(locator).toBeVisible() failed
+       Locator: getByText('1 file on record.')
+
+   naming the FIRST of three documents. The same break before this change could only surface as a
+   30-second timeout on `Documentation · complete`, with nothing to say which of twelve interactions
+   did not land — which is exactly the report that made the original diagnosis start by ruling out an
+   unrelated nav change.
+
+   Local run after the change: `rfq.spec.ts` 31/31 in **55s**, against 1.1m immediately before, on the
+   same machine. Suggestive, not evidence — CI's runner is the environment that matters and its flaky
+   count is where this has to be read.
+
+2. **Timeout NOT raised**, deliberately, and this is the part to hold to. Raising it would be § 1.1's
+   mistake: a mitigation that buys time and hides the next crossing.
+
+   **THE CI READING IS IN, AND IT IS ZERO.** Run `36265914655`, the first full CI run after the fix:
+
+       frontend  E2E tests (Playwright)    508 passed (2.4m)
+
+   No flaky line at all. Playwright prints `N flaky` only when there are flakes, so this is an absence —
+   **and the absence was anchored before it was believed**, because an absence is worth nothing until
+   something proves it observable. Run `35827299885`, one of the three recorded above, prints in exactly
+   that log position:
+
+       frontend  E2E tests (Playwright)    442 passed (2.7m)
+       frontend  E2E tests (Playwright)    ##[notice]  4 flaky
+
+   So the line is emitted in the place this grep looks, and its absence means zero rather than a missed
+   match. **2 → 2 → 4 → 0.**
+
+   One run is not proof: the flake was load-dependent, so a quiet runner could produce a zero on its own.
+   **The honest claim is that the first reading after the fix is clean, and the count should be read again
+   over the next few runs** — a single zero is the evidence this entry asked for, not the end of it.
+
+   One correction while reading those logs: run `35784578362` prints `4 flaky`, where the table above
+   records it as 2. The table's figures were not re-verified here and should not be restated as measured.
 
 **The rule worth taking from it now:** `4 flaky` in a green run is a finding. Read the flaky count,
 not only the conclusion — and read whether it CHANGED, because a growing count is a different
@@ -3099,6 +3824,163 @@ entry follows, for the record.
 - **Fix:** a `ServiceRequest` → `Document` attach on fulfil; a "convert to
   endorsement / payment-channel" action for `change` requests; per-`requestType`
   SLA figures once a service charter supplies them.
+
+### 3.14 `P1` — A customer record cannot be CORRECTED, and a PDPL correction request is closed by attestation alone
+
+Measured while scoping four-action Phase 3 ("update codes where a real update scenario
+exists, customer first"). The scope turned out to be larger than a permission code.
+
+**There is no update path for a `Customer` anywhere.** Not a narrow one — none.
+
+- `customer.controller.ts` has `POST /` (create), three `GET`s, `POST /:id/reveal-field`,
+  `POST /:id/ubos`, `POST /:id/documents`. No `PATCH`, no `PUT`.
+- `customer.repository.ts` contains no `update` of any kind, and no `prisma.customer.update`
+  call exists in `apps/api/src` outside the create path.
+- There is no `customer.update` permission code, and the web has no edit control —
+  `updateCustomer` does not exist in `apps/web/lib`.
+
+So a misspelled name, a changed phone number, a new registered address, a corrected date
+of birth: none can be fixed through the application. The only recorded route is to create
+a second customer, which is worse than the typo.
+
+**AND THAT IS THE BACK HALF OF A PDPL OBLIGATION.** `DsrType` includes `CORRECTION`
+(`schema.prisma`), with its own 10-day SLA (`dsr.config.ts`), its own workflow, and a
+DPO/DPO maker-checker closure. `DsrService.fulfil()` stamps `FULFILLED` on a staff
+member's **attestation** — there is no mechanism anywhere in the module that edits the
+subject's data. So the system asks an officer to certify a correction it gives them no way
+to perform. That is § 1.40's shape and the endorsement trap's shape again: the workflow
+exists, the capability does not.
+
+Compare 3.13, which is the same defect one size smaller: a `change` service request
+"records intent but executes nothing". This one carries a statutory deadline.
+
+**THE FIX IS NOT A PLAIN `PATCH`, AND THE MEASUREMENT IS WHY.** Three sub-decisions, each
+of which changes what gets built:
+
+1. **Which fields may be corrected at all.** Safe: `registeredAddress`,
+   `natureOfBusiness`, `contactPhoneEnc`, `contactEmailEnc`, `languagePreference`,
+   `preferredContactChannel`, `taxRegistrationNumber`, `registrationNumber`, and the name
+   fields. Must NOT be a casual edit: `customerType` (corporate↔individual is a different
+   entity, not a correction), `status` (a workflow position — `WorkflowTransitionService`
+   owns it), `source` (provenance — the `LEGACY_IMPORT` flag exists precisely so a row
+   cannot be read as having passed this system's KYC), `classification` (a PCMS
+   determination), `ownerUserId` (reassignment is its own act), `organizationId`.
+
+2. **`dateOfBirth` and `nationality` are SCREENING DISCRIMINATORS, and the schema says so
+   in a 10-line comment**: they are stored in the clear, unlike `nationalIdEnc`, because
+   their whole purpose is to separate a true sanctions match from a coincidence of names
+   against ~19,000 entries. Editing one silently can clear a real hit or manufacture a
+   false one. Screening IS re-runnable — `ScreeningService.run(kycId, actorUserId)` is what
+   the recurring batch calls per customer — so a correction to either field can trigger a
+   rescreen rather than being refused. It must do one or the other, deliberately.
+
+3. **`KYCRecord` DOES NOT SNAPSHOT THE IDENTITY IT APPROVED.** It carries `customerId`,
+   `status`, `approvedByUserId`, `approvedAt` — and nothing about *what* was approved. That
+   is latent today because nothing can change the data. The moment a correction route
+   exists it goes live: correcting a name leaves an `APPROVED` KYC record attesting to a
+   name nobody approved, with no way to tell from the record that it happened.
+   `nationalIdEnc` is the sharpest case and is Highly Confidential besides.
+
+   **And the evidence side is thinner than expected, which makes this worse rather than
+   better.** There is no KYC document-TYPE vocabulary anywhere:
+   `CreateCustomerDocumentDto` accepts `fileName`, `storageRef` and `classification`, with
+   `category` fixed to `APPLICATION_PROPOSAL` by the service. So nothing records WHICH
+   identity document was examined — no "national ID card", no "commercial registration
+   certificate", no proof of address. The system records that KYC was approved and not what
+   evidence was seen. A useful consequence for scoping: `registeredAddress` is therefore
+   tied to no verified document and carries no KYC coupling, so it belongs in the safe
+   subset below rather than with the identity fields.
+
+**Fix — three shapes, smallest first:**
+
+- **(a) Contact, preference and description only.** `customer.update` gating a `PATCH` over
+  exactly the fields MEASURED to drive no control decision: `contactPhoneEnc`,
+  `contactEmailEnc`, `languagePreference`, `preferredContactChannel`, `registeredAddress`,
+  `natureOfBusiness`. The last two are free text that the codebase explicitly declines to
+  key anything off — cross-sell's own header says a sector benchmark "has nothing reliable
+  to key off" because `natureOfBusiness` is free text, and portfolio analysis uses
+  `User.branchId` for geography rather than the address for the same reason. Ships small and
+  fixes the common case. **Deliberately excludes `registrationNumber` and
+  `taxRegistrationNumber`** — nothing reads them for a decision either, but they are
+  government identifiers for a corporate customer and belong with the identity question.
+  Does NOT satisfy a `CORRECTION` DSR about a name or a date of birth, which is most of the
+  reason the gap matters.
+- **(b) (a) plus identity fields, with consequences wired.** Correcting a screening
+  discriminator re-runs screening; correcting an identity field moves the KYC record out
+  of `APPROVED` into a review state. Satisfies the DSR properly. Costs a rescreen path, a
+  KYC status transition, and a decision about what an in-flight policy does meanwhile.
+- **(c) (b) plus an approved-identity snapshot on `KYCRecord`**, so the record says what it
+  attested to and a later correction is visible as a divergence rather than invisible.
+  The only shape where an approved KYC cannot silently come to mean something else.
+
+**Also owed either way:** a correction made in service of a DSR should carry that request's
+id, so the attestation has evidence behind it — the same argument as `CombinedDutyAct`
+being written before the write it excuses. And the audit row must record that a field
+changed WITHOUT its value where the field is encrypted or Highly Confidential
+(`sensitive-data-handling.md`: metadata not body).
+
+**Not built.** The sub-decisions in 2 and 3 are AML and KYC control decisions, not
+implementation details, and (a) versus (b) versus (c) is a question about what the
+brokerage owes a data subject — so it is recorded here rather than answered by whoever
+happened to be writing the endpoint.
+
+**WRITTEN FOR THE OWNER: `docs/decision-correcting-a-customers-details.md`** (bilingual, Arabic first, no
+schema vocabulary). It separates the two kinds of question explicitly, because they are not the same kind
+and only one of them is hers:
+
+- **What the brokerage owes the customer — hers to decide.** Which details may be corrected on request,
+  and whether a correction request may be closed before a change is recorded.
+- **What may be altered and under what record — needs a SOURCE, not our judgement.** The three AML/identity
+  questions above (does an approved identity check survive a name correction; must a changed screening
+  discriminator re-run the check; must the approval record what it approved). Same treatment as the
+  duty-segregation citations: the Central Bank's AML instructions, the office's own approved policy, or the
+  compliance officer's determination — put in a form that can be answered yes or no.
+
+**One part of this is recommended REGARDLESS of which option is chosen, and it is the part not to defer:**
+while correcting a name is impossible, staff must not be able to mark such a request "done". There has to be
+a way to record "we could not complete this, and why". A closed request with nothing behind it is worse than
+an open one — the open one is visible and the falsely closed one is not.
+
+### 3.15 — DECIDED (2026-09-26): `sla.policy.manage` splits, `user.manage` DOES NOT
+
+Four-action Phase 4 measured six `*.manage` umbrellas that gate a deactivation alongside a
+create. Four were disposed of on the measurement (see the Phase 4 migration's own header).
+The remaining two were put to the owner as a decision rather than answered by whoever was
+writing the migration. **Both are now ruled on. This is a decision record, not a backlog
+item.**
+
+#### `sla.policy.manage` — SPLIT. Routine.
+
+Owner's ruling: split it. The reasoning given: it is routine, and `sla.policy.regulatory`
+already stands apart for the decision that actually matters on that surface — which is
+*whether an SLA is a statutory deadline or an internal target*, not *who may switch one
+off*. Splitting the CRUD verbs therefore takes nothing away from the distinction that
+carries the regulatory weight.
+
+#### `user.manage` — DO NOT SPLIT. Not now, and not as part of Phase 4.
+
+Owner's ruling, with the reasoning recorded because it is the part that must survive:
+
+`user.manage` anchors the **last-administrator lockout guard** at four separate routes —
+revoking a grant, deactivating a user, retiring a role, and unchecking a box on the Role
+matrix. That guard exists because **an office that loses every administrator cannot repair
+itself from inside the system**; the owner decided explicitly to keep it. Splitting the
+umbrella means re-deriving that safety control across four routes, and the benefit on the
+other side of the ledger is view-without-edit on one screen.
+
+That is a bad trade, and it is a bad trade in a specific way worth naming: the cost is
+borne by a control whose failure mode is an office locked out of its own administration,
+while the benefit is a convenience on a settings page.
+
+**THE ORDER IF THIS IS EVER REVISITED, AND IT IS NOT NEGOTIABLE:** the lockout guard is
+**re-proven first** — all four routes, each with a plant that shows the guard firing — and
+the split follows. Never the reverse. A split that lands first and leaves the guard to be
+re-verified afterwards is the shape where a safety control is quietly weakened by a
+tidy-up, which is exactly what this ruling refuses.
+
+Anyone picking this up should also know that `user.manage` is read by the duty-segregation
+signal as well as by the four lockout routes, so "four routes" is the floor on the work,
+not the whole of it.
 
 ---
 

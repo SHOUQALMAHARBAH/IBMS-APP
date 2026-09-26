@@ -96,6 +96,7 @@ export default function ClaimDetailPage() {
           <ClaimCard
             claim={claim}
             abilities={{
+              canDiscard: hasPermission(user, 'claim.discard'),
               canRegister: hasPermission(user, 'claim.register'),
               canDocument: hasPermission(user, 'claim.document'),
               canAssess: hasPermission(user, 'claim.assess'),

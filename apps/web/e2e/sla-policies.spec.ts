@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 // Configurable SLA policies (task Part A).
 //
@@ -33,6 +34,26 @@ async function mockAuth(
     route.fulfill({
       status: 200,
       json: { ...ME_BASE, roles, languagePreference, permissions: permissionsForRoles(roles) },
+    }),
+  );
+}
+
+/**
+ * An EXACT permission set rather than a role's.
+ *
+ * `sla.policy.manage` became `.create` / `.update` / `.deactivate` plus `sla.holiday.create`, and every
+ * seeded role holding the umbrella received all four. So the states where the split is observable at all
+ * are ones no role name describes — which is precisely what an office creates the first time it uses the
+ * Role screen. The api-side equivalent is `four-action-separability.e2e-spec.ts`.
+ */
+async function mockAuthWithCodes(page: Page, permissions: string[]) {
+  await page.route("**/auth/refresh", (route) =>
+    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  );
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      json: { ...ME_BASE, roles: ["COMPLIANCE_OFFICER"], permissions },
     }),
   );
 }
@@ -156,6 +177,43 @@ test("a read-only role sees the policies but cannot edit them", async ({
   await expect(page.getByText("DSR — Access / Deletion")).toBeVisible();
   await expect(page.getByText("Read only")).toBeVisible();
   await expect(page.getByRole("button", { name: "Deactivate" })).toHaveCount(0);
+});
+
+test("the update code alone offers Save and NOT the off switch", async ({
+  page,
+}) => {
+  // Four-action Phase 4, owner-ruled. No ROLE NAME can express "may correct a deadline, may not switch
+  // the SLA off" — every seeded role that held the umbrella received all four successors — so this mocks
+  // an exact permission set, the same reason `payment-channels.spec.ts` does.
+  await mockAuthWithCodes(page, ["sla.policy.read", "sla.policy.update"]);
+  await mockPolicies(page, [policy()]);
+
+  await page.goto("/sla-policies");
+
+  // The anchor, asserted first: the write control this role DOES hold rendered. Without it the absence
+  // below is satisfied by a page that never hydrated.
+  await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+  await expectNone(
+    page.getByRole("button", { name: "Deactivate" }),
+    page.getByRole("button", { name: "Save" }),
+  );
+});
+
+test("the deactivate code alone offers the off switch and NOT Save", async ({
+  page,
+}) => {
+  // The inverse, and the direction that would go unnoticed: a deactivate code quietly carrying the edit
+  // is the umbrella surviving under a narrower name.
+  await mockAuthWithCodes(page, ["sla.policy.read", "sla.policy.deactivate"]);
+  await mockPolicies(page, [policy()]);
+
+  await page.goto("/sla-policies");
+
+  await expect(page.getByRole("button", { name: "Deactivate" })).toBeVisible();
+  await expectNone(
+    page.getByRole("button", { name: "Save" }),
+    page.getByRole("button", { name: "Deactivate" }),
+  );
 });
 
 test("surfaces a permission failure rather than an empty list", async ({

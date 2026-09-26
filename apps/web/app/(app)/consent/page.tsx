@@ -1,7 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
-import { CustomerPicker } from '../../../components/ui/CustomerPicker';
+import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
@@ -190,7 +190,8 @@ export default function ConsentPage() {
               those two keep the id field rather than get a picker that cannot
               search anything. */}
           {ownerKind === 'customer' ? (
-            <CustomerPicker
+            <EntitySearch
+            kind="customer"
               value={ownerId}
               onChange={setOwnerId}
               label={t('consCustomerIdLabel')}

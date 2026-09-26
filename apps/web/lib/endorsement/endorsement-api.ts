@@ -7,6 +7,7 @@
 // notify the client.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { DiscardBlock } from '../discard/discard-api';
 
 export type EndorsementStatus =
   | 'REQUESTED'
@@ -60,6 +61,19 @@ export interface Endorsement {
   } | null;
   refund: {
     id: string;
+    /**
+     * Part 4 step 5 — the declared combined-duty act, when one person raised AND approved this refund in an
+     * office that has declared COMBINED mode. Null on every ordinary approval, which is every one today.
+     */
+    combinedDutyAct: {
+      id: string;
+      at: string;
+      actorUserId: string;
+      reason: string;
+      pair: string;
+      roles: string[];
+      hatAmbiguous: boolean;
+    } | null;
     amount: string;
     reason: string;
     raisedByUserId: string;
@@ -71,6 +85,11 @@ export interface Endorsement {
   commissionReversal: { amount: string } | null;
   scheduleVersioned: boolean;
   createdAt: string;
+  /**
+   * Set once this record was withdrawn as raised in error — null on every live one. The record STAYS in every
+   * list; a surface that showed one without this block would read as a live record.
+   */
+  discard: DiscardBlock | null;
 }
 
 export interface RequestEndorsementInput {
@@ -138,8 +157,16 @@ export function applyEndorsement(id: string): Promise<Endorsement> {
 
 export function approveEndorsementRefund(
   refundId: string,
+  /**
+   * Part 4 — required only when the approver IS the raiser and the office has declared COMBINED mode. Omitted
+   * on every ordinary two-person approval, which sends no body at all and behaves exactly as before.
+   */
+  combinedDutyReason?: string,
 ): Promise<Endorsement> {
-  return apiPost(`/refunds/${encodeURIComponent(refundId)}/approve`, {});
+  return apiPost(
+    `/refunds/${encodeURIComponent(refundId)}/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function notifyEndorsementClient(id: string): Promise<Endorsement> {

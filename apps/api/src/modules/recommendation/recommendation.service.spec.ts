@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
   ForbiddenException,
@@ -120,6 +121,13 @@ function disclosureRow(over: Record<string, unknown> = {}) {
 function recommendationRow(over: Record<string, unknown> = {}) {
   return {
     id: 'rec-1',
+    // A LIVE record. Present rather than omitted because the model has the column: `assertNotDiscarded`
+    // refuses to advance anything whose discard state is not exactly `null`, deliberately — a row loaded
+    // without it is a row whose state nobody knows, and the safe answer to "may this advance" is no. A
+    // fixture missing it therefore fails, which is the fixture being wrong about the model, not the guard.
+    discardedAt: null,
+    discardedByUserId: null,
+    discardedReason: null,
     opportunityId: 'opp-1',
     recommendedQuotationId: 'q-rec',
     rationale: DRAFT_DTO.rationale,
@@ -208,6 +216,10 @@ function makeDeps() {
     .mockResolvedValue({ id: 'opp-1', status: 'RECOMMENDATION_DRAFTED' });
   const workflow = { transition } as unknown as WorkflowTransitionService;
 
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
+
   return {
     service: new RecommendationService(
       recommendations,
@@ -216,6 +228,7 @@ function makeDeps() {
       customers,
       audit,
       workflow,
+      dutySegregation,
     ),
     mocks: {
       create,
@@ -360,9 +373,9 @@ describe('RecommendationService', () => {
   describe('approve', () => {
     it('422 when the recommendation needs no approval', async () => {
       const { service } = makeDeps();
-      await expect(service.approve('rec-1', manager)).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+      await expect(
+        service.approve('rec-1', undefined, manager),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
 
     it('403 when the approver is the drafter (maker/checker)', async () => {
@@ -370,9 +383,9 @@ describe('RecommendationService', () => {
       mocks.findById.mockResolvedValue(
         recommendationRow({ approvalRequired: true, draftedByUserId: 'mgr-1' }),
       );
-      await expect(service.approve('rec-1', manager)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.approve('rec-1', undefined, manager),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('stamps the approval and audits UPDATE', async () => {
@@ -380,8 +393,8 @@ describe('RecommendationService', () => {
       mocks.findById.mockResolvedValue(
         recommendationRow({ approvalRequired: true }),
       );
-      await service.approve('rec-1', manager);
-      expect(mocks.recordApproval).toHaveBeenCalledWith('rec-1', 'mgr-1');
+      await service.approve('rec-1', undefined, manager);
+      expect(mocks.recordApproval).toHaveBeenCalledWith('rec-1', 'mgr-1', null);
       expect(mocks.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'UPDATE' }),
       );
@@ -396,9 +409,9 @@ describe('RecommendationService', () => {
           approvedAt: new Date(),
         }),
       );
-      await expect(service.approve('rec-1', manager)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.approve('rec-1', undefined, manager),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('409 when the conditional write matched nothing (concurrent approve)', async () => {
@@ -407,9 +420,9 @@ describe('RecommendationService', () => {
         recommendationRow({ approvalRequired: true }),
       );
       mocks.recordApproval.mockResolvedValue(null);
-      await expect(service.approve('rec-1', manager)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.approve('rec-1', undefined, manager),
+      ).rejects.toThrow(ConflictException);
     });
   });
 

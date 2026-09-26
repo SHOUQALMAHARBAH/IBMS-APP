@@ -44,10 +44,19 @@ const ADMIN_ROUTE_PERMISSIONS = [
   // `role.read` / `permission.read`, not `.manage`. Those two codes gated
   // read-only GETs while being named "manage"; the Phase 3 prep step renamed
   // them in place before the permission-matrix screen is built against them, and
-  // the new `role.manage` means CHANGING a role (nothing gates on it yet).
+  // the write side means CHANGING a role, and split into role.create/update/deactivate in Phase 1.
   'role.read',
   'permission.read',
   'encryption-key.read',
+  // The four-action pilot. These four routes were gated by `user.manage` until departments and
+  // branches got their own read/create/update/deactivate codes; this list is what has to move with
+  // them, and it did not — the pilot commit left this file red and nothing ran it. The rename and
+  // deactivate routes are deliberately NOT here: this file's scope is the nineteen routes that used to
+  // carry a role NAME gate, and `org-units.e2e-spec.ts` proves view-without-edit on the new ones.
+  'department.read',
+  'department.create',
+  'branch.read',
+  'branch.create',
 ];
 
 interface Route {
@@ -91,10 +100,14 @@ const ROUTES: Route[] = [
     path: '/admin/email-integration/revoke',
     permission: 'email.integration.manage',
   },
-  { method: 'get', path: '/admin/departments', permission: 'user.manage' },
-  { method: 'post', path: '/admin/departments', permission: 'user.manage' },
-  { method: 'get', path: '/admin/branches', permission: 'user.manage' },
-  { method: 'post', path: '/admin/branches', permission: 'user.manage' },
+  { method: 'get', path: '/admin/departments', permission: 'department.read' },
+  {
+    method: 'post',
+    path: '/admin/departments',
+    permission: 'department.create',
+  },
+  { method: 'get', path: '/admin/branches', permission: 'branch.read' },
+  { method: 'post', path: '/admin/branches', permission: 'branch.create' },
   { method: 'get', path: '/rbac/roles', permission: 'role.read' },
   { method: 'get', path: '/rbac/permissions', permission: 'permission.read' },
   { method: 'get', path: '/admin/users', permission: 'user.manage' },
@@ -253,8 +266,13 @@ describe('the nineteen former role-gated routes are gated on permissions alone',
     const refused: string[] = [];
     for (const route of ROUTES) {
       const res = await call(route, user.accessToken);
-      if (res.status === 403) {
-        refused.push(`${route.method.toUpperCase()} ${route.path}`);
+      // A 5xx is collected too. It means the request got PAST the guard, which is what this test is
+      // about, but a route that reaches its handler and then dies is not evidence that the gate works
+      // — and collecting only 403 made that outcome silently green.
+      if (res.status === 403 || res.status >= 500) {
+        refused.push(
+          `${route.method.toUpperCase()} ${route.path} -> ${res.status}`,
+        );
       }
     }
     // Named rather than counted, so a failure says which route regressed.
@@ -281,10 +299,12 @@ describe('the nineteen former role-gated routes are gated on permissions alone',
     expect(allowed).toEqual([]);
   }, 300_000);
 
-  it('covers all nineteen routes and names the seven permissions they use', () => {
+  it('covers all nineteen routes and names the eleven permissions they use', () => {
     // A guard on the guard: if a route is added to a controller that used to
     // carry the role gate, this list should grow with it.
     expect(ROUTES).toHaveLength(19);
+    // 11 permissions now, not 7: the four-action pilot split two of them into eight. The title of this
+    // test said "seven" while asserting a set — kept honest by naming the count here.
     expect([...new Set(ROUTES.map((r) => r.permission))].sort()).toEqual(
       [...ADMIN_ROUTE_PERMISSIONS].sort(),
     );

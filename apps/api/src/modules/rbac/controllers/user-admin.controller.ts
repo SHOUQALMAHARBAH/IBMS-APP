@@ -73,7 +73,7 @@ export class UserAdminController {
     @Body() dto: ProvisionUserDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.userAdmin.provision(dto, user.id);
+    return this.userAdmin.provision(dto, user.id, user.roleIds);
   }
 
   @RequirePermissions('user.manage')

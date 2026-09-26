@@ -82,12 +82,26 @@ export function submitNeedsAssessment(id: string): Promise<NeedsAssessment> {
   return apiPost(`/needs-assessments/${id}/submit`);
 }
 
-export function reviewNeedsAssessment(id: string): Promise<NeedsAssessment> {
-  return apiPost(`/needs-assessments/${id}/review`);
+export function reviewNeedsAssessment(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<NeedsAssessment> {
+  return apiPost(`/needs-assessments/${id}/review`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
-export function approveNeedsAssessment(id: string): Promise<NeedsAssessment> {
-  return apiPost(`/needs-assessments/${id}/approve`);
+export function approveNeedsAssessment(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<NeedsAssessment> {
+  return apiPost(`/needs-assessments/${id}/approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 export function returnNeedsAssessment(

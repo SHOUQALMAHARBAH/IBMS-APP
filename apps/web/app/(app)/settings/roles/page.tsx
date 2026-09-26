@@ -5,7 +5,6 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,9 +13,13 @@ import { useLanguage } from '../../../../lib/i18n/language-context';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { ApiError } from '../../../../lib/auth/api-client';
+import { PermissionMatrix } from '../../../../components/admin/PermissionMatrix';
+import { createMatrixStyle, generatedNameStyle } from '../../../../components/admin/admin.styles';
+import { machineNameProblem, toMachineName } from '../../../../lib/admin/role-name';
 import { stepUp } from '../../../../lib/auth/auth-api';
 import {
   createRole,
+  deleteRole,
   getRoleWithGrants,
   listPermissionCatalogue,
   listRolesForAdmin,
@@ -31,6 +34,17 @@ import {
 } from '../../../../lib/admin/role-admin-api';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
+import {
+  listDutySegregationReadiness,
+  type DutySegregationReadiness,
+} from '../../../../lib/admin/role-admin-api';
+
+/** Worst first: the row that says nobody can complete an operation is why the list exists. */
+const STATUS_ORDER: Record<DutySegregationReadiness['status'], number> = {
+  NOBODY: 0,
+  SINGLE_HOLDER: 1,
+  READY: 2,
+};
 
 /** The keys `ENUM_LABEL.RoleName` actually has — the legacy names. A role an
  *  office defines is deliberately NOT one of these. */
@@ -70,7 +84,6 @@ const warningStyle: CSSProperties = {
   margin: '0.75rem 0',
   maxWidth: '48rem',
 };
-const moduleStyle: CSSProperties = { margin: '1rem 0' };
 const codeRowStyle: CSSProperties = {
   display: 'flex',
   gap: '0.5rem',
@@ -88,7 +101,7 @@ const codeRowStyle: CSSProperties = {
  * an advisory lock. What was missing was the screen to create one.
  *
  * Two permissions, and the split matters. `role.read` renders everything here;
- * `role.manage` is what turns the controls on. A caller with only the first sees
+ * the role write codes are what turn the controls on. A caller with only the first sees
  * the catalogue and no buttons, which is why the prep step separated those names
  * before this screen was written.
  */
@@ -98,8 +111,19 @@ export default function RoleAdminPage() {
   const { language, t } = useLanguage();
   const isArabic = language === 'AR';
   const canRead = hasPermission(user, 'role.read');
-  const canManage = hasPermission(user, 'role.manage');
+  // The umbrella became three codes, and this screen is where that has to be visible: an office can
+  // now give someone the ability to define roles without the ability to retire them, or to adjust what
+  // an existing role grants without being able to add new ones. Each control asks for its own.
+  const canCreate = hasPermission(user, 'role.create');
+  /** Part 5: the operations that need two people, and whether this office has them. */
+  const [readiness, setReadiness] = useState<DutySegregationReadiness[] | null>(null);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
+  const canUpdate = hasPermission(user, 'role.update');
+  const canRetire = hasPermission(user, 'role.deactivate');
+  /** The actions column exists if ANY row action does. */
+  const canActOnRow = canUpdate || canRetire;
   const canReadCatalogue = hasPermission(user, 'permission.read');
+
 
   const [roles, setRoles] = useState<RoleAdminEntry[] | null>(null);
   const [catalogue, setCatalogue] = useState<PermissionCatalogueEntry[]>([]);
@@ -110,6 +134,9 @@ export default function RoleAdminPage() {
 
   // The role whose matrix is open, with the grants it currently holds.
   const [editing, setEditing] = useState<RoleWithGrants | null>(null);
+  /** The grant set being chosen for a role that does not exist yet. */
+  const [newCodes, setNewCodes] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<RoleAdminEntry | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [nameEn, setNameEn] = useState('');
   const [nameAr, setNameAr] = useState('');
@@ -118,8 +145,11 @@ export default function RoleAdminPage() {
   const [hardwareToken, setHardwareToken] = useState(true);
 
   // Create form.
-  const [newName, setNewName] = useState('');
   const [newNameEn, setNewNameEn] = useState('');
+  // Derived on every keystroke so the permanent identifier is visible before it is written, and so
+  // the refusal appears while there is still something to fix.
+  const generatedName = toMachineName(newNameEn);
+  const nameProblem = machineNameProblem(newNameEn);
   const [newNameAr, setNewNameAr] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
@@ -172,9 +202,53 @@ export default function RoleAdminPage() {
     }
   }, [t]);
 
+  /**
+   * Delete a role. The confirmation is a step, not a gate: it exists because the act is one-way, and
+   * it explains the two consequences the owner explicitly accepted — the role is withdrawn from
+   * everyone with no reassignment, and a user left with nothing keeps nothing.
+   */
+  const onDelete = useCallback(
+    async (role: RoleAdminEntry) => {
+      setBusy(true);
+      setActionError(null);
+      try {
+        await deleteRole(role.id);
+        setDeleting(null);
+        // Close the matrix if it was open on the role that no longer exists.
+        setEditing((current) => (current && current.id === role.id ? null : current));
+        setSavedMessage(t('roleDeleted'));
+        await load();
+      } catch (err) {
+        setActionError(err instanceof ApiError ? err.message : t('roleCouldNotLoad'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [t, load],
+  );
+
   useEffect(() => {
     if (!isLoading && !user) router.push('/login');
   }, [isLoading, user, router]);
+
+  // The readiness list. Its own effect and its own error line: a failure here must not blank the role
+  // catalogue beside it, which is what this screen is actually for.
+  useEffect(() => {
+    if (!user || !canRead) return;
+    void (async () => {
+      try {
+        setReadiness(await listDutySegregationReadiness());
+        setReadinessError(null);
+      } catch (err) {
+        setReadiness(null);
+        setReadinessError(
+          err instanceof ApiError && err.status === 403
+            ? t('dutySegNoPermission')
+            : t('dutySegLoadError'),
+        );
+      }
+    })();
+  }, [user, canRead, t]);
 
   // The async IIFE is the house pattern here, and it is also what the
   // cascading-render lint rule wants: everything this effect does has to settle
@@ -196,20 +270,6 @@ export default function RoleAdminPage() {
     })();
   }, [user, canRead, canReadCatalogue, load]);
 
-  const byModule = useMemo(() => {
-    const groups = new Map<string, PermissionCatalogueEntry[]>();
-    for (const entry of [...catalogue].sort((a, b) =>
-      a.module === b.module
-        ? a.code.localeCompare(b.code)
-        : a.module.localeCompare(b.module),
-    )) {
-      const list = groups.get(entry.module) ?? [];
-      list.push(entry);
-      groups.set(entry.module, list);
-    }
-    return [...groups.entries()];
-  }, [catalogue]);
-
   const segregationWarning = violatesSegregationPair(selected);
 
   async function openMatrix(roleId: string) {
@@ -218,6 +278,14 @@ export default function RoleAdminPage() {
     try {
       const role = await getRoleWithGrants(roleId);
       setEditing(role);
+      // The editor now renders above the table, so it is already in view for most of the page — but
+      // not for someone who scrolled down a long list of roles to reach the row they clicked. A
+      // deliberate scroll is what makes the click's effect unmissable rather than merely present.
+      requestAnimationFrame(() => {
+        document
+          .querySelector('[data-matrix-for]')
+          ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
       setSelected(new Set(role.permissionCodes));
       setNameEn(role.nameEn);
       setNameAr(role.nameAr);
@@ -233,19 +301,26 @@ export default function RoleAdminPage() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
+    // The form refuses rather than storing an identifier nobody can read back to a role. Checked
+    // here as well as on the button, because a form can be submitted with Enter.
+    if (machineNameProblem(newNameEn)) return;
     setBusy(true);
     setActionError(null);
     try {
       await createRole({
-        name: newName,
+        // The GENERATED name, not a typed one.
+        name: generatedName,
         nameEn: newNameEn,
         nameAr: newNameAr,
         description: newDescription || undefined,
+        // Required by the API, and the whole point of the flow: the role arrives with its
+        // permissions rather than existing for a while able to do nothing.
+        permissionCodes: [...newCodes],
       });
-      setNewName('');
       setNewNameEn('');
       setNewNameAr('');
       setNewDescription('');
+      setNewCodes(new Set());
       await load();
     } catch (err) {
       setActionError(
@@ -363,106 +438,124 @@ export default function RoleAdminPage() {
       {loadError ? <p style={errorStyle}>{loadError}</p> : null}
       {actionError ? <p style={errorStyle}>{actionError}</p> : null}
 
+      {/* A caller the CLIENT already knows cannot read roles never reaches `load()`, so the
+          no-permission message — which lived only in that function's catch — never rendered. The
+          screen showed a heading, one sentence of intro, and nothing else: no table, no empty state,
+          no reason. Measured at 157 characters inside `main`.
+
+          Stated as its own branch rather than by making the effect fire a request it knows will be
+          refused: asking the API in order to be told what we already know is a round trip for a
+          sentence, and it would put a guaranteed 403 in everyone's network log. */}
+      {!canRead ? (
+        <p role="status" style={errorStyle}>
+          {t('roleNoPermission')}
+        </p>
+      ) : null}
+
+      {/* And the window before the first response: `roles` is null and there is no error yet, which
+          used to render nothing at all. A person who opens this screen on a slow connection must see
+          that something is happening. */}
+      {canRead && roles === null && !loadError ? <p role="status">{t('commonLoading')}</p> : null}
+
       {roles && roles.length === 0 ? <p>{t('roleNoRoles')}</p> : null}
 
-      {roles && roles.length > 0 ? (
-        <section style={sectionStyle}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+      {/* ORDER MATTERS, and it was wrong. The create form sat BELOW the table, so adding a role
+          meant scrolling past every existing one — and the permissions editor sat below that, so
+          clicking a row's permissions button appeared to do nothing at all. Both were the same
+          defect: the thing a person just asked for was rendered last. Create, then the open
+          editor, then the table — which is also the users screen's arrangement. */}
+
+      {readinessError ? (
+        <p role="alert" style={errorStyle}>
+          {readinessError}
+        </p>
+      ) : null}
+      {readiness ? (
+        <section style={sectionStyle} data-duty-segregation>
+          <h2>{t('dutySegHeading')}</h2>
+          <p style={{ color: 'var(--ink-secondary)', maxWidth: '46rem' }}>{t('dutySegIntro')}</p>
+          <table style={{ borderCollapse: 'collapse', minWidth: '44rem' }}>
             <thead>
               <tr>
-                <th style={head}>{t('roleTableName')}</th>
-                <th style={head}>{t('roleTableStatus')}</th>
-                <th style={head}>{t('roleTableHolders')}</th>
-                <th style={head}>{t('roleTablePermissions')}</th>
-                <th style={head}>{t('roleTableMfa')}</th>
-                {canManage ? (
-                  <th style={head}>{t('roleTableActions')}</th>
-                ) : null}
+                <th style={head}>{t('dutySegColOperation')}</th>
+                <th style={head}>{t('dutySegColPermission')}</th>
+                <th style={head}>{t('dutySegColHolders')}</th>
+                <th style={head}>{t('dutySegColStatus')}</th>
               </tr>
             </thead>
             <tbody>
-              {roles.map((role) => (
-                <tr key={role.id} data-role={role.name}>
-                  <td style={cell}>
-                    <bdi>{roleLabel(role)}</bdi>
-                    {role.isSystem ? (
-                      <span
-                        style={badgeStyle}
-                        title={t('roleSystemExplain')}
-                        data-system-badge=""
-                      >
-                        {t('roleSystemBadge')}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td style={cell} data-status={role.status}>
-                    {role.status === 'ACTIVE'
-                      ? t('roleStatusActive')
-                      : t('roleStatusInactive')}
-                  </td>
-                  <td style={cell}>{role.holderCount}</td>
-                  <td style={cell}>{role.permissionCount}</td>
-                  <td style={cell}>
-                    {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
-                  </td>
-                  {canManage ? (
+              {/* WORST FIRST. Sorted by how badly the office is missing a second person, not
+                  alphabetically and not by entity: a row saying "nobody can complete this" is the reason
+                  the list exists, and it must not be below fourteen rows saying "ready". */}
+              {[...readiness]
+                .sort(
+                  (a, b) =>
+                    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+                    a.entityType.localeCompare(b.entityType),
+                )
+                .map((row) => (
+                  <tr key={row.constraint ?? row.entityType + row.pairLabel} data-duty-row={row.status}>
+                    <td style={cell}>{row.entityType}</td>
                     <td style={cell}>
-                      <button
-                        type="button"
-                        onClick={() => void openMatrix(role.id)}
-                      >
-                        {t('roleEditButton')}
-                      </button>
-                      {/* A system role is protected from retirement, so the
-                          control is absent rather than present-and-refused. */}
-                      {role.isSystem ? null : (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void onToggleStatus(role)}
-                          style={{ marginInlineStart: '0.4rem' }}
-                        >
-                          {role.status === 'ACTIVE'
-                            ? t('roleRetireButton')
-                            : t('roleReactivateButton')}
-                        </button>
-                      )}
+                      <code>{row.checkerPermission}</code>
                     </td>
-                  ) : null}
-                </tr>
-              ))}
+                    <td style={cell}>{row.holderCount}</td>
+                    <td style={cell}>
+                      {row.status === 'NOBODY'
+                        ? t('dutySegStatusNobody')
+                        : row.status === 'SINGLE_HOLDER'
+                          ? t('dutySegStatusSingle')
+                          : t('dutySegStatusReady')}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </section>
       ) : null}
 
-      {canManage ? (
+      {canCreate ? (
         <section style={sectionStyle}>
           <h2>{t('roleCreateHeading')}</h2>
           <form onSubmit={onCreate} style={formStyle}>
-            <label style={labelStyle}>
-              {t('roleFieldName')}
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                required
-              />
-              <small>{t('roleFieldNameHint')}</small>
-            </label>
+            {/* English name FIRST, because the machine name is derived from it and a person should
+                see the cause before the effect. Required — owner decision, 2026-09-24 — precisely
+                because it is the source of a permanent identifier. */}
             <label style={labelStyle}>
               {t('roleFieldNameEn')}
               <input
                 value={newNameEn}
                 onChange={(e) => setNewNameEn(e.target.value)}
                 required
+                /* An explicit hook. The edit panel carries fields with the same labels, and a test
+                   that reaches for a label here has to guess which form it landed in. */
+                data-create-name-en
               />
             </label>
+            {/* GENERATED, shown, and never typed. An office administrator is a broker, not a
+                programmer, and this string is immutable and lands in every audit row that mentions
+                the role. Shown read-only as she types so nothing is written that she never saw. */}
+            <label style={labelStyle}>
+              {t('roleMachineNameLabel')}
+              <output data-generated-machine-name style={generatedNameStyle}>
+                {generatedName || '—'}
+              </output>
+              <small>{t('roleMachineNameHint')}</small>
+            </label>
+            {nameProblem ? (
+              <p role="alert" style={errorStyle} data-machine-name-problem>
+                {nameProblem === 'empty'
+                  ? t('roleEnglishNameRequired')
+                  : t('roleMachineNameUnreadable')}
+              </p>
+            ) : null}
             <label style={labelStyle}>
               {t('roleFieldNameAr')}
               <input
                 value={newNameAr}
                 onChange={(e) => setNewNameAr(e.target.value)}
                 required
+                data-create-name-ar
               />
             </label>
             <label style={labelStyle}>
@@ -472,10 +565,50 @@ export default function RoleAdminPage() {
                 onChange={(e) => setNewDescription(e.target.value)}
               />
             </label>
-            <button type="submit" disabled={busy}>
+            {/* Permissions belong to CREATION. Choosing what a role can do is part of making it,
+                not an errand to be found later — and the API has always accepted the whole set in
+                the same POST (`CreateRoleDto.permissionCodes` is required, which is why the old
+                four-field form could not create a role at all: it omitted the field and got a 400
+                about it). */}
+            <fieldset style={createMatrixStyle}>
+              <legend>{t('roleCreatePermissionsHeading')}</legend>
+              <p>{t('roleCreatePermissionsIntro')}</p>
+              {catalogue.length > 0 ? (
+                <PermissionMatrix
+                  catalogue={catalogue}
+                  selected={newCodes}
+                  onChange={setNewCodes}
+                />
+              ) : (
+                <p role="status">{t('roleMatrixNeedsCatalogue')}</p>
+              )}
+            </fieldset>
+            <button type="submit" disabled={busy || nameProblem !== null}>
               {busy ? t('roleCreating') : t('roleCreateButton')}
             </button>
           </form>
+        </section>
+      ) : null}
+
+      {deleting ? (
+        <section style={sectionStyle} data-delete-confirm={deleting.name}>
+          <h2>{t('roleDeleteConfirmHeading', { role: roleLabel(deleting) })}</h2>
+          <p>{t('roleDeleteConfirmBody')}</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onDelete(deleting)}
+            data-confirm-delete
+          >
+            {t('roleDeleteConfirmButton')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleting(null)}
+            style={{ marginInlineStart: '0.4rem' }}
+          >
+            {t('commonCancel')}
+          </button>
         </section>
       ) : null}
 
@@ -499,35 +632,16 @@ export default function RoleAdminPage() {
 
           {savedMessage ? <p role="status">{savedMessage}</p> : null}
 
-          {byModule.map(([module, entries]) => (
-            <div key={module} style={moduleStyle}>
-              <h3>{module}</h3>
-              {entries.map((entry) => (
-                <label key={entry.code} style={codeRowStyle}>
-                  <input
-                    type="checkbox"
-                    /* An untranslated hook per code. Every box's visible label is
-                       the code plus its description, and a test that selected one
-                       by index would silently follow the catalogue's sort order —
-                       which is by module, then by code, so it moves whenever a
-                       code is added. */
-                    data-code={entry.code}
-                    checked={selected.has(entry.code)}
-                    disabled={editing.isSystem}
-                    onChange={(e) => {
-                      const next = new Set(selected);
-                      if (e.target.checked) next.add(entry.code);
-                      else next.delete(entry.code);
-                      setSelected(next);
-                    }}
-                  />
-                  <span>
-                    <code>{entry.code}</code> — {entry.description}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ))}
+          {/* The SAME component the creation form uses. It was two implementations for about an
+              hour, and that hour produced two matrices on one page with the same `data-code` hooks —
+              which broke three pre-existing tests with a strict-mode ambiguity and would have let
+              the two drift. One matrix, used twice. */}
+          <PermissionMatrix
+            catalogue={catalogue}
+            selected={selected}
+            onChange={setSelected}
+            disabled={editing.isSystem}
+          />
 
           {editing.isSystem ? null : (
             <>
@@ -606,6 +720,91 @@ export default function RoleAdminPage() {
           </button>
         </section>
       ) : null}
+
+      {roles && roles.length > 0 ? (
+        <section style={sectionStyle}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={head}>{t('roleTableName')}</th>
+                <th style={head}>{t('roleTableStatus')}</th>
+                <th style={head}>{t('roleTableHolders')}</th>
+                <th style={head}>{t('roleTablePermissions')}</th>
+                <th style={head}>{t('roleTableMfa')}</th>
+                {canActOnRow ? (
+                  <th style={head}>{t('roleTableActions')}</th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {roles.map((role) => (
+                <tr key={role.id} data-role={role.name}>
+                  <td style={cell}>
+                    <bdi>{roleLabel(role)}</bdi>
+                    {role.isSystem ? (
+                      <span
+                        style={badgeStyle}
+                        title={t('roleSystemExplain')}
+                        data-system-badge=""
+                      >
+                        {t('roleSystemBadge')}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td style={cell} data-status={role.status}>
+                    {role.status === 'ACTIVE'
+                      ? t('roleStatusActive')
+                      : t('roleStatusInactive')}
+                  </td>
+                  <td style={cell}>{role.holderCount}</td>
+                  <td style={cell}>{role.permissionCount}</td>
+                  <td style={cell}>
+                    {role.requiresMfaAlways ? t('roleMfaAlwaysLabel') : '—'}
+                  </td>
+                  {canActOnRow ? (
+                    <td style={cell}>
+                      <button
+                        type="button"
+                        onClick={() => void openMatrix(role.id)}
+                      >
+                        {t('roleEditButton')}
+                      </button>
+                      {/* A system role is protected from retirement, so the
+                          control is absent rather than present-and-refused. */}
+                      {role.isSystem ? null : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onToggleStatus(role)}
+                          style={{ marginInlineStart: '0.4rem' }}
+                        >
+                          {role.status === 'ACTIVE'
+                            ? t('roleRetireButton')
+                            : t('roleReactivateButton')}
+                        </button>
+                      )}
+                      {/* Absent on a system role, like the retire control beside it — the platform
+                          defined those rows and the office's screen does not get to remove them. */}
+                      {!role.isSystem ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setDeleting(role)}
+                          data-delete-role={role.name}
+                          style={{ marginInlineStart: '0.4rem' }}
+                        >
+                          {t('roleDeleteButton')}
+                        </button>
+                      ) : null}
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
 
       {stepUpPending ? (
         <section style={sectionStyle} data-step-up="">

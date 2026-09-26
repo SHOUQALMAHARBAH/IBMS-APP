@@ -26,6 +26,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * True when a 403 came from the forced-MFA-enrolment guard rather than from a missing permission.
+ *
+ * Both arrive as a bare 403 and a screen that guesses picks wrong roughly half the time: a measured
+ * first sign-in showed every insurer screen reporting "you do not hold insurer.read" to an
+ * administrator who held it and simply had no authenticator paired yet. The API has always said
+ * which is which in its `code` field; nothing on the web side was reading it.
+ */
+export function isMfaEnrolmentError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 403 && err.code === 'MFA_ENROLLMENT_REQUIRED';
+}
+
 async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);

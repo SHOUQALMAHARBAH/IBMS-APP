@@ -1,6 +1,7 @@
 import { IsIn, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { emptyStringToUndefined } from '../../../common/dto.util';
+import { PersonRecordDto } from '../../../common/person-record.dto';
 
 /** Process 66 — `POST /employees` (`employee.create`). `hireDate` and the
  * two Part 8.2 dates are parsed via `parseHistoricalInstant` in the service
@@ -9,60 +10,17 @@ import { emptyStringToUndefined } from '../../../common/dto.util';
  * OPTIONAL link to an existing login account, finally giving #61 (Employee
  * Performance)'s dormant `User.employeeId` FK a real writer.
  *
- * Part F item #4 — the Jordanian national-ID-convention name parts
- * (given/father's/grandfather's/family name) always apply here (an Employee
- * is always a real individual); the flat `fullName` is computed
- * server-side from them (see `composeFullName()`), not accepted directly. */
-export class CreateEmployeeDto {
-  @IsString()
-  @Length(1, 150)
-  givenName!: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  @Length(1, 150)
-  fatherName?: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  @Length(1, 150)
-  grandfatherName?: string;
-
-  @IsString()
-  @Length(1, 150)
-  familyName!: string;
-
-  @IsString()
-  @Length(1, 100)
-  nationalId!: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  @Length(1, 200)
-  position?: string;
-
-  @IsString()
-  hireDate!: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  @Length(1, 200)
-  licensedRole?: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  confidentialityAgreementSignedAt?: string;
-
-  @IsOptional()
-  @Transform(emptyStringToUndefined)
-  @IsString()
-  backgroundCheckCompletedAt?: string;
-
+ * The person's own fields — both name sets, national ID, position, hire date — live on
+ * `PersonRecordDto` in `src/common/`, shared with the `employee` block of `ProvisionUserDto` so
+ * that one route cannot accept a person the other refuses. What remains here is what only the
+ * person-ONLY route has: the link to an existing account, and the two org-unit ids. */
+export class CreateEmployeeDto extends PersonRecordDto {
+  /**
+   * An OPTIONAL link to an existing login account, for the case the unified form does not cover:
+   * an account that already exists (provisioned before its HR record, or an auditor who later
+   * became staff). Creating the pair in one act goes through `POST /admin/users`, which owns the
+   * account rules — see `PersonRecordDto`.
+   */
   @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsUUID()
@@ -71,18 +29,34 @@ export class CreateEmployeeDto {
   /**
    * Spec §4.1.2 — the employee's functional grouping on the org chart.
    *
-   * Optional, and distinct from the `departmentId` an admin sets on the
-   * ACCOUNT at provisioning (§4.2.2): this is the HR record of a person, that
-   * is a field on a login. When this is left unset and `userId` names an
-   * account that has one, the employee adopts the account's — see
-   * `EmployeeRepository.linkUser`. When both are set and they disagree, the
-   * request is refused rather than silently resolved.
+   * Optional, and distinct from the `departmentId` an admin sets on the ACCOUNT at provisioning
+   * (§4.2.2): this is the HR record of a person, that is a field on a login. When this is left unset
+   * and `userId` names an account that has one, the employee adopts the account's — see
+   * `EmployeeRepository.linkUser`. When both are set and they disagree, the request is refused
+   * rather than silently resolved.
+   *
+   * The unified form makes that disagreement UNREACHABLE for a person and account created together:
+   * there is one department field on the screen and it feeds both rows.
    */
   @IsOptional()
   @Transform(emptyStringToUndefined)
   @IsString()
   @Length(1, 100)
   departmentId?: string;
+
+  /**
+   * §4.2.2's third axis — the organizational LOCATION.
+   *
+   * `Employee.branchId` arrived with nothing writing it (migration 20261024100000). This is its
+   * first writer, and its absence was part of why a person and an account could not be registered in
+   * one act: `ProvisionUserDto` REQUIRES a branch and the HR record had nowhere to keep one, so the
+   * two halves of one person could never carry the same facts.
+   */
+  @IsOptional()
+  @Transform(emptyStringToUndefined)
+  @IsString()
+  @Length(1, 100)
+  branchId?: string;
 }
 
 /**

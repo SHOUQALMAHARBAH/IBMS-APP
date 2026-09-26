@@ -68,6 +68,17 @@ export interface EmployeeListRow {
 export interface EmployeeDetail extends MaskedEmployee {
   trainings: SecurityAwarenessTraining[];
   deprovisioningChecklist: AccessDeprovisioningChecklist | null;
+  /**
+   * The login this person holds, when they hold one.
+   *
+   * Here so the screen does not have to ask. Giving a login to someone recorded EARLIER happens on
+   * this person's own page — there is no employee picker on the account screen any more, because a
+   * picker of existing people is exactly what could never contain the person being registered — and a
+   * form offering to create a login for someone who already has one would be a 409 the screen could
+   * have known about. Identifiers only; never the credential, never the roles (`/admin/users` is
+   * where access is read and changed, behind `user.manage`).
+   */
+  account: { id: string; email: string } | null;
 }
 
 export function toEmployeeListRow(employee: Employee): EmployeeListRow {

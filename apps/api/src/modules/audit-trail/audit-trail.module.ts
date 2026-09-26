@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditTrailController } from './audit-trail.controller';
 import { AuditTrailService } from './audit-trail.service';
 import { AuditTrailRepository } from '../../repositories/audit-trail.repository';
+import { UserRepository } from '../../repositories/user.repository';
 import { AuditModule } from '../audit/audit.module';
 
 /**
@@ -27,6 +28,6 @@ import { AuditModule } from '../audit/audit.module';
 @Module({
   imports: [AuditModule],
   controllers: [AuditTrailController],
-  providers: [AuditTrailService, AuditTrailRepository],
+  providers: [AuditTrailService, AuditTrailRepository, UserRepository],
 })
 export class AuditTrailModule {}

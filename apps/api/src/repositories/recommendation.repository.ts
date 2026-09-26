@@ -103,12 +103,36 @@ export class RecommendationRepository {
     });
   }
 
+  /**
+   * The LIVE recommendation for an opportunity, or null.
+   *
+   * `findFirst` with an explicit `discardedAt: null`, not `findUnique` — because since the discard landed,
+   * `opportunityId` is no longer unique across the table. It is unique among LIVE rows, enforced by a partial
+   * unique index, and that is exactly what this filter selects. Dropping the filter would return whichever
+   * row the query plan reached first, which could be a recommendation somebody discarded as raised in error.
+   */
   findByOpportunityId(
     opportunityId: string,
   ): Promise<RecommendationWithContext | null> {
-    return this.prisma.client.recommendation.findUnique({
+    return this.prisma.client.recommendation.findFirst({
+      where: { opportunityId, discardedAt: null },
+      include: RECOMMENDATION_INCLUDE,
+    });
+  }
+
+  /**
+   * Every recommendation for an opportunity, discarded ones included, newest first.
+   *
+   * The reason discarded rows are kept rather than deleted: this is the history of what was recommended and
+   * withdrawn, with who and why on each row.
+   */
+  findAllByOpportunityId(
+    opportunityId: string,
+  ): Promise<RecommendationWithContext[]> {
+    return this.prisma.client.recommendation.findMany({
       where: { opportunityId },
       include: RECOMMENDATION_INCLUDE,
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -128,10 +152,21 @@ export class RecommendationRepository {
   async recordApproval(
     id: string,
     approvedByUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the checker IS the maker in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person act, which is every one until an office declares it.
+     * The column is what this pair's CHECK constraint reads: with it null, a self-approval is refused by the
+     * database whatever the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Recommendation | null> {
     const { count } = await this.prisma.client.recommendation.updateMany({
       where: { id, approvedByUserId: null },
-      data: { approvedByUserId, approvedAt: new Date() },
+      data: {
+        approvedByUserId,
+        approvedAt: new Date(),
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
+      },
     });
     if (count === 0) return null;
     return this.prisma.client.recommendation.findUniqueOrThrow({
@@ -167,5 +202,30 @@ export class RecommendationRepository {
         acknowledgedByUserId: input.acknowledgedByUserId,
       },
     });
+  }
+  /**
+   * Mark this record discarded — raised in error, never took effect.
+   *
+   * `updateMany` re-asserting `discardedAt: null` in its own `where`, not `update`: two people discarding
+   * the same record at once must not have the second silently overwrite the first one's reason. A count of
+   * 0 means somebody else got there, and the service turns that into a 409 naming it
+   * (`race-safe-invariants.md`).
+   *
+   * The three columns are written together because a CHECK constraint refuses them apart — a discard
+   * carrying no reason is the one shape nobody can read later.
+   */
+  async discard(
+    id: string,
+    input: { discardedByUserId: string; discardedReason: string },
+  ): Promise<{ discarded: boolean }> {
+    const { count } = await this.prisma.client.recommendation.updateMany({
+      where: { id, discardedAt: null },
+      data: {
+        discardedAt: new Date(),
+        discardedByUserId: input.discardedByUserId,
+        discardedReason: input.discardedReason.trim(),
+      },
+    });
+    return { discarded: count > 0 };
   }
 }
