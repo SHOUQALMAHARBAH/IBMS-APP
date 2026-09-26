@@ -129,6 +129,29 @@ export default function BcpDrPlansPage() {
         </p>
       ) : null}
 
+      <form onSubmit={onCreate} style={formStyle}>
+        <h2>{t('bcpCreateHeading')}</h2>
+        <label style={labelStyle}>
+          {t('bcpScenario')}
+          <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
+            {BCP_DR_SCENARIOS.map((s) => (
+              <option key={s} value={s}>
+                {t(ENUM_LABEL.BcpDrScenario[s])}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={labelStyle}>
+          {t('bcpRtoHours')}
+          <input type="number" min={0} value={rtoHours} onChange={(e) => setRtoHours(e.target.value)} />
+        </label>
+        <label style={labelStyle}>
+          {t('bcpRpoHours')}
+          <input type="number" min={0} value={rpoHours} onChange={(e) => setRpoHours(e.target.value)} />
+        </label>
+        <button type="submit">{t('bcpSubmitButton')}</button>
+      </form>
+
       {coverage ? (
         coverage.map((entry) => (
           <section key={entry.scenario} style={sectionStyle}>
@@ -194,28 +217,6 @@ export default function BcpDrPlansPage() {
         <p>{t('bcpLoading')}</p>
       )}
 
-      <form onSubmit={onCreate} style={formStyle}>
-        <h2>{t('bcpCreateHeading')}</h2>
-        <label style={labelStyle}>
-          {t('bcpScenario')}
-          <select value={scenario} onChange={(e) => setScenario(e.target.value as BcpDrScenario)}>
-            {BCP_DR_SCENARIOS.map((s) => (
-              <option key={s} value={s}>
-                {t(ENUM_LABEL.BcpDrScenario[s])}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label style={labelStyle}>
-          {t('bcpRtoHours')}
-          <input type="number" min={0} value={rtoHours} onChange={(e) => setRtoHours(e.target.value)} />
-        </label>
-        <label style={labelStyle}>
-          {t('bcpRpoHours')}
-          <input type="number" min={0} value={rpoHours} onChange={(e) => setRpoHours(e.target.value)} />
-        </label>
-        <button type="submit">{t('bcpSubmitButton')}</button>
-      </form>
     </main>
   );
 }

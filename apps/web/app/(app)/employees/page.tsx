@@ -263,43 +263,6 @@ export default function EmployeesPage() {
         </p>
       ) : null}
 
-      {rows ? (
-        rows.length === 0 ? (
-          <p style={{ color: 'var(--ink-secondary)' }}>{t('empNone')}</p>
-        ) : (
-          <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
-            <thead>
-              <tr>
-                <th style={head}>{t('empColName')}</th>
-                <th style={head}>{t('empColPosition')}</th>
-                <th style={head}>{t('empColLicensedRole')}</th>
-                <th style={head}>{t('empColHireDate')}</th>
-                <th style={head}>{t('empColTerminated')}</th>
-                <th style={head} />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} data-employee-row={row.id}>
-                  <td style={cell}>
-                    <bdi>{row.fullName}</bdi>
-                  </td>
-                  <td style={cell}>{row.position ?? '—'}</td>
-                  <td style={cell}>{row.licensedRole ?? '—'}</td>
-                  <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
-                  <td style={cell}>{row.terminationDate ? 'Yes' : 'No'}</td>
-                  <td style={cell}>
-                    <Link href={`/employees/${row.id}`}>{t('empViewButton')}</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      ) : loadError ? null : (
-        <p>{t('empLoading')}</p>
-      )}
-
       <form onSubmit={onCreate} style={formStyle}>
         <h2>{t('empCreateHeading')}</h2>
 
@@ -567,6 +530,44 @@ export default function EmployeesPage() {
           {withLogin ? t('empSubmitWithLogin') : t('empSubmitButton')}
         </button>
       </form>
+
+      {rows ? (
+        rows.length === 0 ? (
+          <p style={{ color: 'var(--ink-secondary)' }}>{t('empNone')}</p>
+        ) : (
+          <table style={{ borderCollapse: 'collapse', minWidth: '36rem' }}>
+            <thead>
+              <tr>
+                <th style={head}>{t('empColName')}</th>
+                <th style={head}>{t('empColPosition')}</th>
+                <th style={head}>{t('empColLicensedRole')}</th>
+                <th style={head}>{t('empColHireDate')}</th>
+                <th style={head}>{t('empColTerminated')}</th>
+                <th style={head} />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} data-employee-row={row.id}>
+                  <td style={cell}>
+                    <bdi>{row.fullName}</bdi>
+                  </td>
+                  <td style={cell}>{row.position ?? '—'}</td>
+                  <td style={cell}>{row.licensedRole ?? '—'}</td>
+                  <td style={cell}>{row.hireDate?.slice(0, 10) ?? '—'}</td>
+                  <td style={cell}>{row.terminationDate ? 'Yes' : 'No'}</td>
+                  <td style={cell}>
+                    <Link href={`/employees/${row.id}`}>{t('empViewButton')}</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      ) : loadError ? null : (
+        <p>{t('empLoading')}</p>
+      )}
+
     </main>
   );
 }

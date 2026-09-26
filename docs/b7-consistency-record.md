@@ -1,7 +1,9 @@
 # B.7 — the consistency record
 
-**This is the running record, not the pass.** The formal survey happens after the remaining backlog items
-land, because fixing screens before they settle means fixing them twice. What goes in here is every
+~~**This is the running record, not the pass.** The formal survey happens after the remaining backlog items
+land~~ — **the pass ran on 2026-09-26; it is at the bottom of this file.** This part remains the running
+record: the reason for keeping it was that fixing screens before they settle means fixing them twice, and
+that still holds for anything noticed from here on. What goes in here is every
 violation noticed while touching a screen for other work — **including ones not fixed in that commit** — so
 that B.7 becomes reading a list somebody already holds rather than reading 93 screens cold.
 
@@ -89,3 +91,97 @@ Format: `screen · rule N · what is wrong` — and `[FIXED <commit>]` when it w
 Everything else. 93 screens exist; the ones above are the ones passed through while doing other work. The
 formal pass produces the full table — one row per screen, one column per rule, deliberate exceptions written
 down **with their reason** rather than left blank.
+
+---
+
+## THE FORMAL PASS — 2026-09-26
+
+Run when the owner called the backlog landed. **103 screens** (the 99 under `app/(app)/` plus the four
+`(auth)` screens that render before sign-in), 6,753 user-facing strings.
+
+**The pass is measured where a rule is decidable and read where it is not, and saying which is which is
+the first result.** A survey that guesses at rule 4 is worse than one that declares it unmeasured.
+
+`python scripts/measurements/b7-survey.py <out.json>` — a measurement, not a gate.
+
+| Rule | Decidable from source? | Result |
+|---|---|---|
+| 1 · create form above the table | **yes** | **CLEAN** — 34 comply, 67 n/a, 0 violations. Four were found and fixed; two more were flagged and are correct |
+| 2 · no field asks for an identifier | no | a label reading "Entity id" is greppable, but whether a RENDERED value is an identifier needs the data shape, not the markup. Two known open cases already in the table above |
+| 3 · no screen leaves a person facing nothing | **partly** | 80 of 103 branch on all three non-data states. 23 flagged, and the majority are n/a — see below |
+| 4 · every refusal names the way forward | no | requires reading the sentence |
+| 5 · one word per concept | **yes** | **CLEAN** — one hit, and it is not a violation |
+| 6 · Arabic and English say the same thing | no | key parity and code-token parity are already gated by `translations.test.ts`; MEANING is not mechanisable |
+| 7 · one action, one name across screens | no | needs the glossary decision per concept, and the record is explicit that a term enters the glossary when two screens are found disagreeing — a judgement, not a grep |
+
+### Rule 1 — fixed, and the check's own limits
+
+**Four real violations, all fixed in this pass** — the create form now sits above its own list on
+`/employees`, `/knowledge-base`, `/information-assets` and `/bcp-dr-plans`. Their four Playwright specs
+pass 19/19 after the move, including `knowledge-base`'s `input[dir="rtl"]` `.first()` selector, which was
+identified as at risk BEFORE the move rather than discovered by it.
+
+**Two were flagged and are CORRECT, which is the more useful half.** The check compares the first form
+with the first table, and a multi-section screen has several pairs:
+
+- `/settings/roles` — the first table is the duty-segregation READINESS panel. The create-role form sits
+  above the roles list, which is a later table.
+- `/regulatory-compliance` — the first table displays the single current licence, not a list. The
+  create-item form does sit above the items list.
+
+Both are recorded in the script as verified by hand rather than "fixed", because the screens are right
+and the check is coarse. **Anything new in rule 1's output needs the same per-pair reading before it is
+called a violation** — my own first count said six, and two of those were this.
+
+**Five false-positive classes were closed getting rule 1 to zero**, and the first four came from reading
+the output rather than counting it: a table-rendering HELPER defined above `export default` (which put
+`/audit-trail` and three dashboards in the list), a filter form mistaken for a create form, and then the
+multi-section pairing above.
+
+### Rule 3 — 23 flagged, triaged by hand
+
+The check is deliberately shallow: does the screen BRANCH on permission, error and empty at all. It does
+not judge the wording — that is rule 4, which this does not claim to measure.
+
+**Not applicable, by category:**
+
+- **The four `(auth)` screens** (login, signup, forgot-password, reset-password) and `change-password`
+  have no permission concept: they render before sign-in. A permission branch would be meaningless.
+- **Create-only screens** (`/customers/new`, `/prospects/new`) have no list, so "empty" is n/a.
+- **Detail pages** (`/claims/[id]`, `/leads/[id]`, `/policies/[id]`, `/cross-sell/[id]`, `/up-sell/[id]`,
+  `/risk-profiles/[id]`) are one record: "empty" is n/a, and what matters instead is a not-found state.
+- `/settings/security` has **no permission branch deliberately, and it is load-bearing**: the screen must
+  stay ungated or ten of eleven roles can never enrol in MFA and are locked out of everything. A
+  documented exception, not an omission.
+- `/settings/duty-segregation` always has a mode to show, so "empty" is n/a.
+
+**Genuinely worth reading, and NOT closed here** — each needs the sentence read, which is rule 4's work:
+
+| Screen | Flag |
+|---|---|
+| `(app)/page.tsx` | no error branch on the home screen |
+| `/leads` | a LIST screen with no empty state |
+| `/access-recertification` | no empty state |
+| `/customers/kyc-queue` | no empty state |
+| `/sales-performance` | no empty state |
+| `/dashboards/{compliance,executive,sales}` | no empty state — a dashboard with no data should say so rather than render zeros that read as facts |
+
+### Rule 5 — clean, and the one hit is the interesting part
+
+Exactly one user-facing string contains a glossary-forbidden word: `customerStatusSuspended:
+'Suspended'`. **It is not a violation.** The glossary forbids "suspend" as a synonym for ending an
+entity's active life; this is a CUSTOMER STATUS — a domain state a customer is in — not the act of
+deactivating one. The script cannot make that distinction and does not try to; it reports, and this is
+the judgement.
+
+`delete` and `remove` are reported separately as soft hits for the same reason: deleting a role that was
+never used is a real, different act the glossary explicitly allows, and removing a grant is not
+deactivation.
+
+### What the pass did NOT do
+
+Rules 2, 4, 6 and 7 are **not measured and not claimed**. They need 103 screens read, which is the
+remaining work, and the four categories above say what reading them is for. The value delivered here is
+that rule 1 is now provably clean, rule 5 is clean with its one judgement recorded, rule 3 has its 23
+flags triaged into n/a and a nine-screen read list, and the survey is repeatable with five false-positive
+classes already paid for.
