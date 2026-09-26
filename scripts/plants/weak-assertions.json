@@ -1,0 +1,17 @@
+{
+  "containment-timer-query-finds-nothing": {
+    "file": "apps/api/test/incident.e2e-spec.ts",
+    "from": "    // containment timer resolved by the transition's side effect\n    const containmentAfter = await prisma.slaTimer.findMany({\n      where: {\n        entityType: 'IncidentReport',\n        entityId: incident.id,\n        workflowName: 'incident_containment',",
+    "to": "    // containment timer resolved by the transition's side effect\n    const containmentAfter = await prisma.slaTimer.findMany({\n      where: {\n        entityType: 'IncidentReport',\n        entityId: incident.id,\n        workflowName: 'incident_containment_DOES_NOT_EXIST',"
+  },
+  "senior-management-timer-query-finds-nothing": {
+    "file": "apps/api/test/incident.e2e-spec.ts",
+    "from": "    const seniorMgmtAfter = await prisma.slaTimer.findMany({\n      where: {\n        entityType: 'IncidentReport',\n        entityId: incident.id,\n        workflowName: 'incident_senior_management_notification',",
+    "to": "    const seniorMgmtAfter = await prisma.slaTimer.findMany({\n      where: {\n        entityType: 'IncidentReport',\n        entityId: incident.id,\n        workflowName: 'incident_senior_mgmt_DOES_NOT_EXIST',"
+  },
+  "sla-audit-query-finds-nothing": {
+    "file": "apps/api/test/sla-policy.e2e-spec.ts",
+    "from": "      where: { entityType: 'SlaPolicy', entityId: policy.id, action: 'UPDATE' },",
+    "to": "      where: { entityType: 'SlaPolicyDOESNOTEXIST', entityId: policy.id, action: 'UPDATE' },"
+  }
+}

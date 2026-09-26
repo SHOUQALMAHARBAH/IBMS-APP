@@ -397,6 +397,23 @@ never created, never resolved, or deleted outright.
   the `?.`, so an empty result fails. The `sla-policy` one becomes
   `toHaveLength(1)`, which also makes a second UPDATE on that policy a visible
   failure rather than a coin flip.
+- **FIXED 2026-09-26, and each fix PROVEN by the same method that proved the
+  originals vacuous.** All three now assert `toHaveLength(1)` before indexing,
+  `?.` is gone, and the `sla-policy` query gained a total `orderBy`
+  (`occurredAt`, then `id`) so `[0]` means something rather than being whatever
+  the query plan returned. Three plants — `containment-timer-query-finds-nothing`,
+  `senior-management-timer-query-finds-nothing`,
+  `sla-audit-query-finds-nothing` — point each query at a name that cannot match,
+  which is the exact state the old assertions tolerated. Each now fails with
+  `expected [] to have a length of 1 but got +0`, and each kills one test.
+- **The plant tool refused the first two attempts, correctly.**
+  `workflowName: 'incident_containment',` appears TWICE in that file (the timer is
+  asserted before containment and after) and the senior-management one three
+  times, so the anchors were ambiguous: *"a plant that hits several sites cannot
+  say which guard it is testing."* Worth recording because the refusal was nearly
+  missed — the runs printed no `PLANTED` line and the suite went green, which
+  reads exactly like a guard that works (§ 1.51(a)). What caught it was checking
+  the tool's own output instead of the suite's.
 - **The pattern to ban is not "unordered query"** — it is `?.` on an indexed
   result, and `length > 0` followed by `[0]`. Both make an assertion
   unfalsifiable, and neither looks wrong on the page.

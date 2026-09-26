@@ -213,12 +213,20 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     // And it is audited, before AND after.
     const audits = await prisma.auditLogEntry.findMany({
       where: { entityType: 'SlaPolicy', entityId: policy.id, action: 'UPDATE' },
+      // Unordered `findMany` + `[0]` imposes an ordering requirement nothing typechecks, and the answer
+      // then comes from the query PLAN — the same defect that once decided which reviewer an
+      // access-recertification subject got. A total order, so `[0]` means something.
+      orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
     });
-    expect(audits.length).toBeGreaterThan(0);
-    expect(JSON.stringify(audits[0].beforeValue)).toContain(
+    // Was `toBeGreaterThan(0)` followed by assertions on `audits[0]`: it tolerated any number of rows
+    // and then generalised from an arbitrary one. This test causes exactly ONE update of this policy, so
+    // one row is the honest expectation — and a second UPDATE appearing here becomes a visible failure
+    // rather than a coin flip about which row gets read.
+    expect(audits).toHaveLength(1);
+    expect(JSON.stringify(audits[0]!.beforeValue)).toContain(
       '"durationValue":3',
     );
-    expect(JSON.stringify(audits[0].afterValue)).toContain('"durationValue":9');
+    expect(JSON.stringify(audits[0]!.afterValue)).toContain('"durationValue":9');
   });
 
   it('activates a policy, retiring whatever it replaces, and refuses a rival ACTIVE row', async () => {
