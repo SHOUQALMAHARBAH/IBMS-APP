@@ -3594,12 +3594,30 @@ of which changes what gets built:
    name nobody approved, with no way to tell from the record that it happened.
    `nationalIdEnc` is the sharpest case and is Highly Confidential besides.
 
+   **And the evidence side is thinner than expected, which makes this worse rather than
+   better.** There is no KYC document-TYPE vocabulary anywhere:
+   `CreateCustomerDocumentDto` accepts `fileName`, `storageRef` and `classification`, with
+   `category` fixed to `APPLICATION_PROPOSAL` by the service. So nothing records WHICH
+   identity document was examined — no "national ID card", no "commercial registration
+   certificate", no proof of address. The system records that KYC was approved and not what
+   evidence was seen. A useful consequence for scoping: `registeredAddress` is therefore
+   tied to no verified document and carries no KYC coupling, so it belongs in the safe
+   subset below rather than with the identity fields.
+
 **Fix — three shapes, smallest first:**
 
-- **(a) Contact-and-address only.** `customer.update` gating a `PATCH` over the fields with
-  no KYC or screening consequence. Ships small, fixes the common case (phone, email,
-  address, language, channel), and does NOT satisfy a `CORRECTION` DSR about a name or a
-  date of birth.
+- **(a) Contact, preference and description only.** `customer.update` gating a `PATCH` over
+  exactly the fields MEASURED to drive no control decision: `contactPhoneEnc`,
+  `contactEmailEnc`, `languagePreference`, `preferredContactChannel`, `registeredAddress`,
+  `natureOfBusiness`. The last two are free text that the codebase explicitly declines to
+  key anything off — cross-sell's own header says a sector benchmark "has nothing reliable
+  to key off" because `natureOfBusiness` is free text, and portfolio analysis uses
+  `User.branchId` for geography rather than the address for the same reason. Ships small and
+  fixes the common case. **Deliberately excludes `registrationNumber` and
+  `taxRegistrationNumber`** — nothing reads them for a decision either, but they are
+  government identifiers for a corporate customer and belong with the identity question.
+  Does NOT satisfy a `CORRECTION` DSR about a name or a date of birth, which is most of the
+  reason the gap matters.
 - **(b) (a) plus identity fields, with consequences wired.** Correcting a screening
   discriminator re-runs screening; correcting an identity field moves the KYC record out
   of `APPROVED` into a review state. Satisfies the DSR properly. Costs a rescreen path, a
