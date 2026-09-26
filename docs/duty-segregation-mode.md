@@ -310,6 +310,14 @@ fourteen decisions.
    authorization read flattens role provenance away, deliberately, so the hat cannot be derived from it.
 4. **The mode screen**, its permission, and the audited change.
 5. **The record screens** — a combined act is visible where the record is read.
+
+   **And the half step 3a created, which belongs here**: `POST /refunds/:id/approve` now accepts a
+   `combinedDutyReason` that NO web control sends. Today that is unreachable (no office can be COMBINED), but
+   the moment step 4 ships the mode screen, an office that declares COMBINED would find its "Approve refund"
+   button returning 422 "give a reason" with nowhere to type one — § 1.44's unreachable-surface shape, arriving
+   from the other direction. So step 4 and step 5 are coupled: **the mode must not become settable before the
+   screens can carry a declaration.** The screen also has to know the office's mode to decide whether to ask,
+   which means `/auth/me` or an office-settings read has to carry it.
 6. **The self-approval report** — THE SHIPPING GATE above. It does not exist today, and the mode cannot be
    released without it. Its first ordering rule is the owner's condition: a self-review of ACCESS at the
    top, flagged, never mixed into the list.
