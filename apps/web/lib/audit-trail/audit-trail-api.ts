@@ -11,6 +11,19 @@ export type AuditAction =
   | 'READ'
   | 'UPDATE'
   | 'DELETE'
+  // THREE values were missing from this union, not one, and a truncated grep said one.
+  //
+  // `DISCARD` came with Class B piece 1; `SLA_ESCALATED` and `ENCRYPTION_KEY_USED` are older. All three
+  // were harmless while nothing rendered a list of actions — TypeScript does not check a value arriving
+  // over HTTP against a union, so rows simply flowed through. They stopped being harmless the moment the
+  // audit screen gained an action FILTER built from this list: a compliance officer could not have
+  // searched for a withdrawn record, an SLA escalation, or a use of the encryption key.
+  //
+  // `packages/db/prisma/audit-action-parity.spec.ts` reads the GENERATED enum and refuses the drift in
+  // both directions. It is what found the two beyond `DISCARD`.
+  | 'DISCARD'
+  | 'SLA_ESCALATED'
+  | 'ENCRYPTION_KEY_USED'
   | 'APPROVE'
   | 'REJECT'
   | 'TRANSITION'

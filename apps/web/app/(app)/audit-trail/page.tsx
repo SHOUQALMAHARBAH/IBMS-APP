@@ -9,6 +9,7 @@ import {
   browseAuditTrail,
   getDocumentHistory,
   getWorkflowHistory,
+  type AuditAction,
   type AuditLogEntry,
   type DocumentHistory,
 } from '../../../lib/audit-trail/audit-trail-api';
@@ -17,6 +18,39 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
+
+/**
+ * Every action, ordered as the label map declares them rather than alphabetically.
+ *
+ * That order is roughly "what happened to a record" before "what happened to a session", which is how
+ * somebody scanning the list thinks about it; sorting it would interleave `LOGIN_FAILED` with `EXPORT`.
+ */
+const AUDIT_ACTION_OPTIONS = Object.keys(ENUM_LABEL.AuditAction) as AuditAction[];
+
+interface BrowseFilters {
+  userId?: string;
+  entityType?: string;
+  entityId?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+}
+
+/**
+ * A `<input type="date">` gives `YYYY-MM-DD`; the API wants an instant.
+ *
+ * The END of the day matters and is easy to get wrong. A compliance officer asking for "March" types
+ * 1 March to 31 March and means the whole of the 31st — but `2026-03-31` as an instant is midnight at the
+ * START of it, which silently drops the last day of every range anybody enters. That is a wrong answer
+ * that looks like a complete one, so `to` is stretched to the final millisecond and `from` is not.
+ */
+function startOfDayIso(day: string): string {
+  return new Date(`${day}T00:00:00.000Z`).toISOString();
+}
+
+function endOfDayIso(day: string): string {
+  return new Date(`${day}T23:59:59.999Z`).toISOString();
+}
 
 const cell: CSSProperties = {
   padding: '0.35rem 0.75rem',
@@ -97,17 +131,17 @@ export default function AuditTrailPage() {
   const [browseUserId, setBrowseUserId] = useState('');
   const [browseEntityType, setBrowseEntityType] = useState('');
   const [browseEntityId, setBrowseEntityId] = useState('');
+  // IMPROVEMENTS § 1.52 — the API has accepted these three all along and no control offered them, so
+  // "every DELETE last March" meant asking a developer to build a URL.
+  const [browseAction, setBrowseAction] = useState('');
+  const [browseFrom, setBrowseFrom] = useState('');
+  const [browseToDate, setBrowseToDate] = useState('');
   const [browseRows, setBrowseRows] = useState<AuditLogEntry[] | null>(null);
   // The filters that produced the rows currently on screen — NOT the live
   // input values. Paging has to re-send the query that produced the set being
   // paged, or typing a new filter and then clicking Next would ask for page 2
   // of a search that was never run.
-  const [browseApplied, setBrowseApplied] = useState<{
-    userId?: string;
-    entityType?: string;
-    entityId?: string;
-    to?: string;
-  }>({});
+  const [browseApplied, setBrowseApplied] = useState<BrowseFilters>({});
   const [browsePage, setBrowsePage] = useState(0);
   const [browseTotal, setBrowseTotal] = useState(0);
   const [browsePageSize, setBrowsePageSize] = useState(0);
@@ -131,20 +165,24 @@ export default function AuditTrailPage() {
 
   async function runBrowse(ev: React.FormEvent) {
     ev.preventDefault();
-    const filters = {
+    const filters: BrowseFilters = {
       userId: browseUserId || undefined,
       entityType: browseEntityType || undefined,
       entityId: browseEntityId || undefined,
-      // Pinned to the instant this browse was submitted, and reused for every
-      // page of it.
+      action: browseAction || undefined,
+      from: browseFrom ? startOfDayIso(browseFrom) : undefined,
+      // `to` DOES DOUBLE DUTY, and the two uses are compatible rather than in conflict.
       //
-      // This is the one list whose own reads APPEND to the table they read:
-      // each browse records a PDPL access row, which sorts to the top and
-      // shifts every later page down by one. Without the pin, clicking Next
-      // shows a row the previous page already showed, and hides one entirely.
-      // An audit browse reading "as at the moment you searched" is also the
-      // more honest thing for it to mean.
-      to: new Date().toISOString(),
+      // Its original job is the pagination pin: this is the one list whose own reads APPEND to the table
+      // they read — each browse records a PDPL access row, which sorts to the top and shifts every later
+      // page down by one. Without a pin, clicking Next shows a row the previous page already showed and
+      // hides one entirely.
+      //
+      // A user-supplied upper bound serves that purpose at least as well, because a date in the past
+      // cannot admit new rows at all. So an explicit `to` REPLACES the pin, and the pin remains the
+      // default when the field is blank. An audit browse reading "as at the moment you searched" is also
+      // the more honest thing for it to mean.
+      to: browseToDate ? endOfDayIso(browseToDate) : new Date().toISOString(),
     };
     setBrowseApplied(filters);
     await browseTo(0, filters);
@@ -155,12 +193,7 @@ export default function AuditTrailPage() {
   // re-sends the filters that produced the set, never the live inputs.
   async function browseTo(
     nextPage: number,
-    filters: {
-      userId?: string;
-      entityType?: string;
-      entityId?: string;
-      to?: string;
-    } = browseApplied,
+    filters: BrowseFilters = browseApplied,
   ) {
     setBrowseBusy(true);
     setBrowseError(null);
@@ -247,6 +280,46 @@ export default function AuditTrailPage() {
               aria-label={t('atEntityIdLabel')}
               value={browseEntityId}
               onChange={(e) => setBrowseEntityId(e.target.value)}
+            />
+          </label>
+          {/*
+            IMPROVEMENTS § 1.52 — the three filters the API accepted with nothing to drive them. A SELECT
+            rather than a text box, because `action` is validated against a closed vocabulary server-side:
+            typing it would make a 400 the normal way to discover the spelling. The options are built from
+            `ENUM_LABEL.AuditAction`, which is a total map over the union, so a new action appears here
+            without an edit — and `audit-action-parity.spec.ts` keeps that union equal to the database's.
+          */}
+          <label>
+            {t('atActionLabel')}{' '}
+            <select
+              aria-label={t('atActionLabel')}
+              value={browseAction}
+              onChange={(e) => setBrowseAction(e.target.value)}
+            >
+              <option value="">{t('atActionAny')}</option>
+              {AUDIT_ACTION_OPTIONS.map((action) => (
+                <option key={action} value={action}>
+                  {t(ENUM_LABEL.AuditAction[action])}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t('atFromLabel')}{' '}
+            <input
+              type="date"
+              aria-label={t('atFromLabel')}
+              value={browseFrom}
+              onChange={(e) => setBrowseFrom(e.target.value)}
+            />
+          </label>
+          <label>
+            {t('atToLabel')}{' '}
+            <input
+              type="date"
+              aria-label={t('atToLabel')}
+              value={browseToDate}
+              onChange={(e) => setBrowseToDate(e.target.value)}
             />
           </label>
           <button type="submit" disabled={browseBusy}>

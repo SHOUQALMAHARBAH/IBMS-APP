@@ -2836,6 +2836,40 @@ route is the precedent for what guards it.
 The seed's own comment on `role.update` points here, so this entry exists to be pointed at rather than to
 argue for the change.
 
+**MEASURED 2026-09-26 — the security question this entry leaves implicit, answered so nobody re-derives
+it.** "Can hand a role every permission in the system" invites one obvious question: is that an escalation
+path? Traced through the code rather than reasoned about.
+
+`RoleAdminService.setPermissions` has **no check that the actor holds the codes they are granting.** So a
+holder of `role.update` can put any catalogue code on a custom role, and a holder of `user.manage` can
+assign that role — and `OFFICE_ADMINISTRATOR` holds both. An office administrator can therefore grant
+themselves any capability in the product.
+
+**And the obvious tightening would be WRONG, which is the finding.** A rule of "you cannot grant what you
+do not hold" breaks the COMMON case: an access administrator routinely configures a Finance role holding
+codes they will never hold themselves. That is the job. A rule that forbids it would make the Role screen
+unusable for the thing it exists for, and would push offices toward granting the administrator everything
+so they can configure anything — strictly worse.
+
+**What actually controls this, all four verified present:**
+
+- **The audit row is specific and it names the direction.** `UPDATE` on `RolePermission`, with
+  `beforeValue.permissionCodes`, `afterValue.permissionCodes`, and explicit `added` / `removed` arrays —
+  so a self-grant is not merely visible, it is enumerable. It goes through `safeAudit`, which is
+  best-effort, but a failure is a `logger.error` naming the role rather than a silence.
+- **`assertNotSystem`** refuses re-granting an `isSystem` role, so the platform's own roles cannot be
+  edited into anything.
+- **The last-administrator lockout guard** fires on this exact route when the write removes
+  `user.manage`.
+- **No permission grant can reach the money controls.** `assertDifferentActors` plus the fifteen CHECK
+  constraints refuse a self-approval regardless of what the actor holds; the only way past them is an
+  office DECLARING combined duties, which is audited and surfaces in the self-approval report.
+
+**So this is a segregation-of-duties boundary question, not an open exploit** — which is what the entry
+already implied and now states with the evidence. If the owner takes the split, `role.permissions.manage`
+alongside `role.update` remains the likely shape, and the step-up challenge already on the MFA-attribute
+route is the precedent for guarding it.
+
 ### 1.54 — THE ARABIC HALF IS THE HALF THAT GETS MISSED
 
 Four-action Phase 1 renamed permissions that appear inside user-facing refusal messages. The English
@@ -3022,9 +3056,43 @@ This is § 1.44's class, measured again: an API surface with no caller. It is no
 feature, because the server half is built, tested and gated; what is missing is three form controls. A
 compliance officer who wants "every DELETE last March" has to ask a developer to construct a URL.
 
-Not built here deliberately — the owner's ask was the search component and the audit screen's two named
-halves, and an action/date filter is a different feature. Recorded so the next person does not have to
-re-measure the DTO to find out.
+~~Not built here deliberately~~ — **BUILT 2026-09-26.** A `<select>` for the action and two date inputs.
+The action is a select rather than a text box because the server validates it against a closed
+vocabulary: typing it would make a `400` the normal way to discover the spelling.
+
+**`to` DOES DOUBLE DUTY, and the two uses turned out to be compatible.** Its original job on this screen is
+the pagination pin — this is the one list whose own reads APPEND to the table they read, so each browse
+writes a PDPL access row that sorts to the top and shifts every later page down by one. A user-supplied
+upper bound serves that purpose at least as well, because a date in the past cannot admit new rows at all.
+So an explicit `to` REPLACES the pin and the pin remains the default when the field is blank.
+
+**THE END-OF-DAY DETAIL IS THE PART WORTH THE TEST.** `2026-03-31` as an instant is midnight at the START
+of the 31st, so a naive conversion silently drops the last day of every range anybody enters — a wrong
+answer that looks like a complete one. `to` is stretched to `23:59:59.999Z` and `from` is not, and the
+Playwright assertion is on the full instant rather than the date, because asserting the date alone would
+pass against exactly that bug. Planted, and it kills that test alone.
+
+**AND BUILDING THE DROPDOWN FOUND A DRIFT IN THE LIST IT IS BUILT FROM.** The web's `AuditAction` union
+was **three values short** of the database enum — `DISCARD`, `SLA_ESCALATED` and `ENCRYPTION_KEY_USED`.
+Harmless while nothing rendered a list of actions, because TypeScript does not check a value arriving over
+HTTP against a union; the rows simply flowed through. They would have been the three actions nobody could
+filter for — including the one the discard feature exists to make findable.
+
+Two things about how that was found are worth keeping:
+
+- **A truncated grep said ONE value was missing.** `grep -A26` on the schema cut the enum short. The guard
+  reading the GENERATED client found all three. A measurement with a line limit is a measurement that can
+  be wrong in the safe-looking direction.
+- **The compiler catches only one direction.** `ENUM_LABEL.AuditAction` is a total `satisfies` map, so
+  ADDING a union member without a label is a type error — which is how the missing labels surfaced the
+  instant the union was corrected (§ 1.45). REMOVING one is not: the map simply holds an extra key, `tsc`
+  reports 0 errors, and the dropdown silently loses an option. Measured by planting it.
+
+So `packages/db/prisma/audit-action-parity.spec.ts` now asserts the union equals the enum in BOTH
+directions, with a non-vacuity floor — which immediately earned itself by catching a semicolon in this
+author's own comment that had truncated the guard's own parser to 4 of 20 values.
+
+**Still unreachable on this screen**: nothing. All six filters the DTO accepts now have a control.
 
 ### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Six ways a guard can fail to be worth its cost
 

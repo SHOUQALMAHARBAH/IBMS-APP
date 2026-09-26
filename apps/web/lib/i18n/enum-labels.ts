@@ -14,6 +14,12 @@ export const ENUM_LABEL = {
     READ: 'auditActionRead',
     UPDATE: 'auditActionUpdate',
     DELETE: 'auditActionDelete',
+    // Three actions the database has stored all along with no label here. The compiler found them the
+    // moment the web's `AuditAction` union was corrected — this map is a total `satisfies`, which is
+    // IMPROVEMENTS § 1.45's form-that-cannot-express-the-mistake doing its job.
+    DISCARD: 'auditActionDiscard',
+    SLA_ESCALATED: 'auditActionSlaEscalated',
+    ENCRYPTION_KEY_USED: 'auditActionEncryptionKeyUsed',
     APPROVE: 'auditActionApprove',
     REJECT: 'auditActionReject',
     TRANSITION: 'auditActionTransition',
