@@ -18,6 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { canReadAllRecommendationOwners } from '../../common/rbac-visibility.util';
 import { assertDifferentActors } from '../../common/maker-checker.util';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { discardedRefusal } from '../../common/discard.config';
 import {
   assertDiscardWon,
@@ -40,6 +41,7 @@ import type { DraftRecommendationDto } from './dto/draft-recommendation.dto';
 import type { DiscloseConflictOfInterestDto } from './dto/disclose-conflict-of-interest.dto';
 import type { ListRecommendationsQueryDto } from './dto/list-recommendations-query.dto';
 import { insurerIdentity } from '../../repositories/insurer-identity';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** The recommendation as the API returns it. `blockedFromSend` lists the
  * gates that still stand between the current state and `send` — empty means
@@ -136,6 +138,7 @@ export class RecommendationService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   /** Placement / Manager / Executive work the whole commercial book
@@ -574,6 +577,7 @@ export class RecommendationService {
 
   async approve(
     id: string,
+    dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
   ): Promise<RecommendationView> {
     const rec = await this.loadVisible(id, actor);
@@ -590,14 +594,21 @@ export class RecommendationService {
         `Recommendation ${id} has already been approved.`,
       );
     }
-    assertDifferentActors(
-      rec.draftedByUserId,
-      actor.id,
-      'Recommendation.approve',
-      'Recommendation_maker_checker_distinct',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'Recommendation_maker_checker_distinct',
+      makerId: rec.draftedByUserId,
+      checkerId: actor.id,
+      entityId: id,
+      context: 'Recommendation.approve',
+      actorUserId: actor.id,
+      reason: dto?.combinedDutyReason,
+    });
 
-    const updated = await this.recommendations.recordApproval(id, actor.id);
+    const updated = await this.recommendations.recordApproval(
+      id,
+      actor.id,
+      combinedDutyActId,
+    );
     if (updated === null) {
       throw new ConflictException(
         `Recommendation ${id} was approved concurrently.`,

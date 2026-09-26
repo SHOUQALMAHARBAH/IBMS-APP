@@ -4,7 +4,6 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { DutySegregationService } from './duty-segregation.service';
-import type { AuthenticatedUser } from '../auth/auth.types';
 
 /**
  * PART 4 — the engine, in the two modes and on the path that pays nothing.
@@ -15,24 +14,14 @@ import type { AuthenticatedUser } from '../auth/auth.types';
  */
 
 const ORG = 'org-1';
-
-function actor(over: Partial<AuthenticatedUser> = {}): AuthenticatedUser {
-  return {
-    id: 'user-1',
-    organizationId: ORG,
-    email: 'one@ibms.test',
-    roleIds: ['role-a'],
-    roles: [],
-    permissions: new Set<string>(),
-    fullName: 'One Person',
-    ...over,
-  } as unknown as AuthenticatedUser;
-}
+const ACTOR = 'user-1';
 
 function makeDeps(
   opts: {
     mode?: 'SEGREGATED' | 'COMBINED' | null;
     granting?: { id: string; name: string }[];
+    /** The roles the actor holds, as the session read would return them. */
+    held?: { id: string; name: string }[];
   } = {},
 ) {
   const findById = vi
@@ -49,12 +38,29 @@ function makeDeps(
       Promise.resolve({ id: 'act-1', ...data }),
     );
 
+  // The user read the engine does for itself, rather than being handed a session object — see the note on
+  // `ResolveDutySegregationInput.actorUserId`.
+  const findUserById = vi
+    .fn()
+    .mockResolvedValue({ id: ACTOR, organizationId: ORG });
+  const getRoleRefs = vi
+    .fn()
+    .mockResolvedValue(opts.held ?? [{ id: 'role-a', name: 'ROLE_A' }]);
+
   const service = new DutySegregationService(
     { findById } as never,
     { findRolesGrantingCode } as never,
     { create } as never,
+    { findById: findUserById, getRoleRefs } as never,
   );
-  return { service, findById, findRolesGrantingCode, create };
+  return {
+    service,
+    findById,
+    findRolesGrantingCode,
+    create,
+    findUserById,
+    getRoleRefs,
+  };
 }
 
 const BASE = {
@@ -71,7 +77,7 @@ describe('DutySegregationService', () => {
       ...BASE,
       makerId: 'maker-1',
       checkerId: 'checker-2',
-      actor: actor(),
+      actorUserId: ACTOR,
     });
 
     expect(result).toBeNull();
@@ -89,7 +95,7 @@ describe('DutySegregationService', () => {
         ...BASE,
         makerId: 'maker-1',
         checkerId: null,
-        actor: actor(),
+        actorUserId: ACTOR,
       }),
     ).toBeNull();
     expect(findById).not.toHaveBeenCalled();
@@ -103,7 +109,7 @@ describe('DutySegregationService', () => {
         ...BASE,
         makerId: 'user-1',
         checkerId: 'user-1',
-        actor: actor(),
+        actorUserId: ACTOR,
       }),
     ).rejects.toThrow(ForbiddenException);
     expect(create).not.toHaveBeenCalled();
@@ -114,7 +120,7 @@ describe('DutySegregationService', () => {
         ...BASE,
         makerId: 'user-1',
         checkerId: 'user-1',
-        actor: actor(),
+        actorUserId: ACTOR,
       })
       .catch((err: Error) => {
         expect(err.message).toContain('refund.approve');
@@ -131,7 +137,7 @@ describe('DutySegregationService', () => {
         ...BASE,
         makerId: 'user-1',
         checkerId: 'user-1',
-        actor: actor(),
+        actorUserId: ACTOR,
       }),
     ).rejects.toThrow(ForbiddenException);
     expect(create).not.toHaveBeenCalled();
@@ -144,7 +150,7 @@ describe('DutySegregationService', () => {
         ...BASE,
         makerId: 'user-1',
         checkerId: 'user-1',
-        actor: actor(),
+        actorUserId: ACTOR,
       }),
     ).rejects.toThrow(UnprocessableEntityException);
     await expect(
@@ -152,7 +158,7 @@ describe('DutySegregationService', () => {
         ...BASE,
         makerId: 'user-1',
         checkerId: 'user-1',
-        actor: actor(),
+        actorUserId: ACTOR,
         reason: '   short   ',
       }),
     ).rejects.toThrow(UnprocessableEntityException);
@@ -162,6 +168,10 @@ describe('DutySegregationService', () => {
   it('COMBINED with a reason: records the act, the pair, the actor and the HAT', async () => {
     const { service, create, findRolesGrantingCode } = makeDeps({
       mode: 'COMBINED',
+      held: [
+        { id: 'role-a', name: 'OFFICE_ADMINISTRATOR' },
+        { id: 'role-b', name: 'PLACEMENT_TECHNICAL_OFFICER' },
+      ],
       granting: [{ id: 'role-a', name: 'OFFICE_ADMINISTRATOR' }],
     });
 
@@ -169,7 +179,7 @@ describe('DutySegregationService', () => {
       ...BASE,
       makerId: 'user-1',
       checkerId: 'user-1',
-      actor: actor({ roleIds: ['role-a', 'role-b'] }),
+      actorUserId: ACTOR,
       reason: '  The owner is the only person in this office.  ',
     });
 
@@ -197,6 +207,10 @@ describe('DutySegregationService', () => {
   it('two roles granting the same code: the act says the hat is ambiguous', async () => {
     const { service, create } = makeDeps({
       mode: 'COMBINED',
+      held: [
+        { id: 'role-a', name: 'OFFICE_ADMINISTRATOR' },
+        { id: 'role-b', name: 'FINANCE_COLLECTIONS_OFFICER' },
+      ],
       granting: [
         { id: 'role-a', name: 'OFFICE_ADMINISTRATOR' },
         { id: 'role-b', name: 'FINANCE_COLLECTIONS_OFFICER' },
@@ -207,7 +221,7 @@ describe('DutySegregationService', () => {
       ...BASE,
       makerId: 'user-1',
       checkerId: 'user-1',
-      actor: actor({ roleIds: ['role-a', 'role-b'] }),
+      actorUserId: ACTOR,
       reason: 'One person, two roles that both allow this.',
     });
 
@@ -235,7 +249,7 @@ describe('DutySegregationService', () => {
       ...BASE,
       makerId: 'user-1',
       checkerId: 'user-1',
-      actor: actor(),
+      actorUserId: ACTOR,
       reason: 'Recorded even though the hat could not be resolved.',
     });
 

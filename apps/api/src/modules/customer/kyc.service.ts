@@ -17,11 +17,11 @@ import { ScreeningService } from './screening.service';
 import { ScreeningHoldService } from './screening-hold.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { applyDuration } from '../../common/business-days.util';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { canReadAllCustomerOwners } from '../../common/rbac-visibility.util';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { ScheduleReviewDto } from './dto/schedule-review.dto';
 import type { ListKycRecordsQueryDto } from './dto/list-kyc-records-query.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 // Re-KYC cadence by risk level — DRAFT, UNSOURCED, same caveat as the SLA
 // durations in sla-registry.config.ts. See
@@ -81,6 +81,7 @@ export class KycService {
     private readonly screening: ScreeningService,
     private readonly holds: ScreeningHoldService,
     private readonly sla: SlaTimerService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   /** The same reach as any other read of a Customer file, so it is the same
@@ -275,14 +276,19 @@ export class KycService {
      * hold. Ignored on a rejection — refusing a customer never needs a
      * screening finding waived. */
     screeningHoldReason?: string,
+    /** Part 4 — present only when the approver is also the capturer in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<KYCRecord> {
     const kyc = await this.mustFind(id);
-    assertDifferentActors(
-      kyc.createdByUserId,
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'KYCRecord_maker_checker_distinct',
+      makerId: kyc.createdByUserId,
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'KYCRecord.approve',
       actorUserId,
-      'KYCRecord.approve',
-      'KYCRecord_maker_checker_distinct',
-    );
+      reason: combinedDutyReason,
+    });
 
     if (decision === 'REJECTED' && !reason?.trim()) {
       throw new BadRequestException(
@@ -404,7 +410,13 @@ export class KycService {
       actorUserId,
       data:
         decision === 'APPROVED'
-          ? { approvedByUserId: actorUserId, approvedAt: new Date() }
+          ? {
+              approvedByUserId: actorUserId,
+              approvedAt: new Date(),
+              // Only on the APPROVED branch: a rejection writes no approver, so the CHECK's first disjunct
+              // is satisfied and there is nothing for an escape column to excuse.
+              combinedDutyActId,
+            }
           : undefined,
     });
 

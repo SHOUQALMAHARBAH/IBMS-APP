@@ -7,7 +7,7 @@ import { assertDifferentActors } from '../../common/maker-checker.util';
 import { CombinedDutyActRepository } from '../../repositories/combined-duty-act.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
 import { PermissionRepository } from '../../repositories/permission.repository';
-import type { AuthenticatedUser } from '../auth/auth.types';
+import { UserRepository } from '../../repositories/user.repository';
 
 /** Matching the discard reason and the national-ID reveal justification. */
 export const COMBINED_DUTY_REASON_MIN_LENGTH = 10;
@@ -22,7 +22,18 @@ export interface ResolveDutySegregationInput {
   entityId: string;
   /** A short call-site label for the refusal, e.g. `Refund.approve`. */
   context: string;
-  actor: AuthenticatedUser;
+  /**
+   * The CHECKER's user id — nothing more.
+   *
+   * Deliberately not an `AuthenticatedUser`. Of the nineteen call sites, most take a bare `actorUserId`
+   * (`KYCRecord.decide`, `Complaint.close`, `DataSharingApproval.approve`, …) and threading a session object
+   * down to all of them would mean changing seventeen service signatures and every controller and test that
+   * calls them — a large diff whose only purpose is to carry two fields this service can read for itself.
+   *
+   * It also reads MORE truthfully: the office and the roles are resolved from the database at the moment the
+   * act is recorded, so a role revoked earlier in the same request cannot be recorded as the hat.
+   */
+  actorUserId: string;
   /** The declaration. Required only on the combined path — see `resolve`. */
   reason?: string | null;
 }
@@ -57,6 +68,7 @@ export class DutySegregationService {
     private readonly organizations: OrganizationRepository,
     private readonly permissions: PermissionRepository,
     private readonly acts: CombinedDutyActRepository,
+    private readonly users: UserRepository,
   ) {}
 
   /**
@@ -80,12 +92,15 @@ export class DutySegregationService {
    * has one person.
    */
   async resolve(input: ResolveDutySegregationInput): Promise<string | null> {
-    const { makerId, checkerId, constraint, context, actor } = input;
+    const { makerId, checkerId, constraint, context, actorUserId } = input;
 
     // The ordinary path: two different people, or no checker yet. No read, no write, no cost.
     if (checkerId == null || checkerId !== makerId) return null;
 
-    const office = await this.organizations.findById(actor.organizationId);
+    const actor = await this.users.findById(actorUserId);
+    const office = actor
+      ? await this.organizations.findById(actor.organizationId)
+      : null;
     if (office?.dutySegregationMode !== 'COMBINED') {
       // Unchanged behaviour, unchanged message — including the remedy naming the checker permission and
       // where to see who holds it (Part 5's honesty fix).
@@ -115,8 +130,13 @@ export class DutySegregationService {
 
     // THE HAT. Which of the actor's roles actually grant the checker permission for this pair — a question
     // authorization cannot answer, because `getCodesForRoles` flattens the set and erases provenance.
+    //
+    // `getRoleRefs` is the same read the session itself is built from, so "the roles she held" here means
+    // exactly what it means everywhere else in the system: active assignments of active roles.
+    const held = await this.users.getRoleRefs(actorUserId);
+    const roleIds = held.map((r) => r.id);
     const granting = await this.permissions.findRolesGrantingCode(
-      actor.roleIds,
+      roleIds,
       pair.checkerPermission,
     );
 
@@ -124,9 +144,9 @@ export class DutySegregationService {
       entity: pair.entityType,
       entityId: input.entityId,
       constraintName: constraint,
-      actorUserId: actor.id,
+      actorUserId,
       reason,
-      actorRoleIds: [...actor.roleIds],
+      actorRoleIds: roleIds,
       grantingRoleIds: granting.map((r) => r.id),
       grantingRoleNames: granting.map((r) => r.name),
       // The honest answer is sometimes "we cannot tell": two roles granting the same code means the hat is

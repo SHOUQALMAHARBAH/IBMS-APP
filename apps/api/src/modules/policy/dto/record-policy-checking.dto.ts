@@ -1,3 +1,4 @@
+import { CombinedDutyDeclarationDto } from '../../../common/dto/combined-duty-declaration.dto';
 import {
   ArrayMaxSize,
   IsArray,
@@ -40,7 +41,7 @@ export class RequestedCoverageDto {
  * (or re-checked DISCREPANCY) policy. The checker must not be the officer who
  * placed the cover; the system diffs this Requested Coverage against the
  * issued `PolicySchedule` and derives `discrepancyFound`. */
-export class RecordPolicyCheckingDto {
+export class RecordPolicyCheckingDto extends CombinedDutyDeclarationDto {
   @IsDefined()
   @IsObject()
   @ValidateNested()

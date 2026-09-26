@@ -22,6 +22,7 @@ import {
 import { PolicyService, type PolicyView } from './policy.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { RecordPolicyCheckingDto } from './dto/record-policy-checking.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** Statuses a check can start from: the first check off `ISSUED`, a re-check
  * off `DISCREPANCY`, or a resumed walk that stalled at `CHECKING_IN_PROGRESS`
@@ -67,6 +68,7 @@ export class PolicyCheckingService {
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
     private readonly policyService: PolicyService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   /** Logged, not thrown — the real write already committed. */
@@ -169,13 +171,25 @@ export class PolicyCheckingService {
     // check compares against; `maker-checker-segregation.md` maps only the
     // placer today, so this is a stricter-than-lex belt (`/brain-gap` filed to
     // decide whether the DB CHECK should extend to `issuedByUserId` too).
-    assertDifferentActors(
-      policy.placedByUserId,
-      actor.id,
-      'PolicyChecking.check (placing officer)',
-      'PolicyChecking_maker_checker_distinct',
-    );
-    if (policy.issuedByUserId !== null) {
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'PolicyChecking_maker_checker_distinct',
+      makerId: policy.placedByUserId,
+      checkerId: actor.id,
+      entityId: policyId,
+      context: 'PolicyChecking.check (placing officer)',
+      actorUserId: actor.id,
+      reason: dto.combinedDutyReason,
+    });
+
+    // THE ISSUER BELT, which is application-only: the database constraint compares the checker with the
+    // PLACER and nothing else. Skipped when an act was declared above, because one declaration covers one
+    // person doing every half of one policy — and leaving it strict would dead-end a one-person office that
+    // placed, issued, and now has to check.
+    //
+    // The residual gap, stated rather than hidden: somebody who ISSUED but did not PLACE still cannot check,
+    // even in a COMBINED office, because there is no constraint for that pair to hang an act on. Narrow, and
+    // recorded with the other application-only pairs in `docs/duty-segregation-mode.md`.
+    if (combinedDutyActId === null && policy.issuedByUserId !== null) {
       assertDifferentActors(
         policy.issuedByUserId,
         actor.id,
@@ -233,6 +247,7 @@ export class PolicyCheckingService {
         policyId,
         placedByUserId: policy.placedByUserId,
         checkedByUserId: actor.id,
+        combinedDutyActId,
         checklist: diff.checklist,
         discrepancyFound: diff.discrepancyFound,
         discrepancyDetail: diff.discrepancyFound ? diff.summary : null,

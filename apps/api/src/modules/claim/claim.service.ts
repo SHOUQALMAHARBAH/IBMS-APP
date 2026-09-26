@@ -55,7 +55,6 @@ import {
   type ClaimFollowUpView,
   type SettlementView,
 } from './claim.config';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { compareMoney } from '../../common/money.util';
 import {
   assertDiscardWon,
@@ -74,6 +73,7 @@ import type { RecordSettlementDto } from './dto/record-settlement.dto';
 import type { CloseClaimDto } from './dto/close-claim.dto';
 import type { ListClaimsQueryDto } from './dto/list-claims-query.dto';
 import { LossRatioService } from '../loss-ratio/loss-ratio.service';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 function isUniqueViolation(err: unknown): boolean {
   return (
@@ -274,6 +274,7 @@ export class ClaimService {
     private readonly workflow: WorkflowTransitionService,
     private readonly encryption: EncryptionService,
     private readonly lossRatio: LossRatioService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   private canReachAnyClaim(actor: AuthenticatedUser): boolean {
@@ -1618,6 +1619,8 @@ export class ClaimService {
   async secondApproveSettlement(
     id: string,
     actor: AuthenticatedUser,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<ClaimView> {
     const claim = await this.loadVisibleClaim(id, actor);
     const s = claim.settlement;
@@ -1656,16 +1659,20 @@ export class ClaimService {
         `Claim ${id}: the settlement has no recorded first approver and cannot be second-approved.`,
       );
     }
-    assertDifferentActors(
-      s.approvedByUserId,
-      actor.id,
-      'Settlement.secondApprove',
-      'Settlement_maker_checker_distinct',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'Settlement_maker_checker_distinct',
+      makerId: s.approvedByUserId,
+      checkerId: actor.id,
+      entityId: s.id,
+      context: 'Settlement.secondApprove',
+      actorUserId: actor.id,
+      reason: combinedDutyReason,
+    });
 
     const updated = await this.claims.recordSettlementSecondApproval(
       s.id,
       actor.id,
+      combinedDutyActId,
     );
     if (updated === null) {
       throw new ConflictException(

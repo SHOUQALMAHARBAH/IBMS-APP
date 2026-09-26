@@ -10,7 +10,6 @@ import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
 import { hasExactlyOneOwner } from '../../common/dto.util';
 import { DsrRepository } from '../../repositories/dsr.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
@@ -32,6 +31,7 @@ import type { FulfilDsrDto } from './dto/fulfil-dsr.dto';
 import type { PartiallyFulfilDsrDto } from './dto/partially-fulfil-dsr.dto';
 import type { RejectDsrDto } from './dto/reject-dsr.dto';
 import type { ListDsrQueryDto } from './dto/list-dsr-query.dto';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
 
 /** Cap on a book-wide `DataSubjectRequest` list. */
 const DSR_READ_LIMIT = 5000;
@@ -86,6 +86,7 @@ export class DsrService {
     private readonly workflow: WorkflowTransitionService,
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   // --- 1. create (RECEIVED, "logged the same business day") ---------
@@ -525,6 +526,8 @@ export class DsrService {
   async close(
     id: string,
     actorUserId: string,
+    /** Part 4 — present only when the checker is also the maker in an office that declared COMBINED. */
+    combinedDutyReason?: string,
   ): Promise<DataSubjectRequestView> {
     const dsr = await this.load(id);
     if (isDsrClosed(dsr.status)) {
@@ -547,12 +550,15 @@ export class DsrService {
         `Data Subject Request ${id} is ${dsr.status} but has no recorded processor — closure sign-off cannot be verified.`,
       );
     }
-    assertDifferentActors(
-      dsr.processedByUserId,
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'DataSubjectRequest_closure_maker_checker_distinct',
+      makerId: dsr.processedByUserId,
+      checkerId: actorUserId,
+      entityId: id,
+      context: 'DataSubjectRequest.close',
       actorUserId,
-      'DataSubjectRequest.close',
-      'DataSubjectRequest_closure_maker_checker_distinct',
-    );
+      reason: combinedDutyReason,
+    });
 
     try {
       await this.workflow.transition({
@@ -560,7 +566,11 @@ export class DsrService {
         entityId: id,
         toStatus: 'CLOSED',
         actorUserId,
-        data: { closedByUserId: actorUserId, closedAt: new Date() },
+        data: {
+          closedByUserId: actorUserId,
+          closedAt: new Date(),
+          closureCombinedDutyActId: combinedDutyActId,
+        },
       });
     } catch (err) {
       if (err instanceof ConflictException) {

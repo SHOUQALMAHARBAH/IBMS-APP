@@ -78,6 +78,12 @@ export class IncidentRepository {
   recordCoSign(
     id: string,
     seniorManagementCoSignUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the checker IS the maker in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person act. The column is what this pair's CHECK constraint
+     * reads: with it null, a self-approval is refused by the database whatever the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Prisma.BatchPayload> {
     return this.prisma.client.incidentReport.updateMany({
       where: {
@@ -85,7 +91,12 @@ export class IncidentRepository {
         classification: 'MATERIAL',
         seniorManagementCoSignUserId: null,
       },
-      data: { seniorManagementCoSignUserId },
+      data: {
+        seniorManagementCoSignUserId,
+        ...(combinedDutyActId === null
+          ? {}
+          : { classificationCombinedDutyActId: combinedDutyActId }),
+      },
     });
   }
 

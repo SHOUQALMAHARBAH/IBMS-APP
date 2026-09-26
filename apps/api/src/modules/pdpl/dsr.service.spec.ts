@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
   ForbiddenException,
@@ -83,12 +84,16 @@ function makeService(
     ...over.slaTimer,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
+  // own self-approval assertions pass on the mock rather than on the code.
+  const dutySegregation = segregatedOfficeDutySegregation();
   const service = new DsrService(
     repo as unknown as DsrRepository,
     legalHolds as unknown as LegalHoldRepository,
     workflow as unknown as WorkflowTransitionService,
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
+    dutySegregation,
   );
   return { service, repo, legalHolds, workflow, slaTimer, audit };
 }

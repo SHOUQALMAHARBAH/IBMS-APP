@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { CombinedDutyActRepository } from '../../repositories/combined-duty-act.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
 import { PermissionRepository } from '../../repositories/permission.repository';
+import { UserRepository } from '../../repositories/user.repository';
 import { DutySegregationService } from './duty-segregation.service';
 
 /**
@@ -18,6 +19,7 @@ import { DutySegregationService } from './duty-segregation.service';
     OrganizationRepository,
     PermissionRepository,
     CombinedDutyActRepository,
+    UserRepository,
   ],
   exports: [DutySegregationService],
 })

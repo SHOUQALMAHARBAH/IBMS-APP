@@ -16,6 +16,13 @@ export interface RecordCheckingInput {
    * unless one has already been logged for this checking row (a re-check that
    * still finds the same discrepancy does not double-log). */
   piRiskEvent: { description: string; piPolicyId: string | null } | null;
+  /**
+   * Part 4 — the declared combined-duty act, when the checker IS the placing officer in an office that has
+   * declared COMBINED mode. Null on every ordinary two-person check. `PolicyChecking_maker_checker_distinct`
+   * reads this column, so with it null a self-check is refused by the database whatever the application
+   * decided.
+   */
+  combinedDutyActId?: string | null;
 }
 
 /**
@@ -85,6 +92,7 @@ export class PolicyCheckingRepository {
           discrepancyFound: input.discrepancyFound,
           discrepancyDetail: input.discrepancyDetail,
           checkedAt: new Date(),
+          combinedDutyActId: input.combinedDutyActId ?? null,
         },
         update: {
           checkedByUserId: input.checkedByUserId,
@@ -92,6 +100,10 @@ export class PolicyCheckingRepository {
           discrepancyFound: input.discrepancyFound,
           discrepancyDetail: input.discrepancyDetail,
           checkedAt: new Date(),
+          // On a RE-check the escape column is rewritten from what this call resolved. A re-check by a
+          // different person must not inherit the previous declaration, and a re-check by the same person in
+          // a COMBINED office declares itself again.
+          combinedDutyActId: input.combinedDutyActId ?? null,
         },
       });
 

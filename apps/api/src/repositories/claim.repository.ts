@@ -584,10 +584,20 @@ export class ClaimRepository {
   async recordSettlementSecondApproval(
     settlementId: string,
     secondApproverUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the checker IS the maker in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person act, which is every one until an office declares it.
+     * The column is what this pair's CHECK constraint reads: with it null, a self-approval is refused by the
+     * database whatever the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Settlement | null> {
     const { count } = await this.prisma.client.settlement.updateMany({
       where: { id: settlementId, secondApproverUserId: null },
-      data: { secondApproverUserId },
+      data: {
+        secondApproverUserId,
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
+      },
     });
     if (count === 0) return null;
     return this.prisma.client.settlement.findUniqueOrThrow({

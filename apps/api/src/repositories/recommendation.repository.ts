@@ -152,10 +152,21 @@ export class RecommendationRepository {
   async recordApproval(
     id: string,
     approvedByUserId: string,
+    /**
+     * Part 4 — the declared combined-duty act, when the checker IS the maker in an office that has declared
+     * COMBINED mode. Null on every ordinary two-person act, which is every one until an office declares it.
+     * The column is what this pair's CHECK constraint reads: with it null, a self-approval is refused by the
+     * database whatever the application decided.
+     */
+    combinedDutyActId: string | null = null,
   ): Promise<Recommendation | null> {
     const { count } = await this.prisma.client.recommendation.updateMany({
       where: { id, approvedByUserId: null },
-      data: { approvedByUserId, approvedAt: new Date() },
+      data: {
+        approvedByUserId,
+        approvedAt: new Date(),
+        ...(combinedDutyActId === null ? {} : { combinedDutyActId }),
+      },
     });
     if (count === 0) return null;
     return this.prisma.client.recommendation.findUniqueOrThrow({

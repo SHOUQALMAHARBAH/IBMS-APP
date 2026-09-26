@@ -4105,6 +4105,15 @@ else.
   APPLIED so a retry of `apply` is re-entrant and just re-attempts the policy transition.
   `422` while `REFUND_APPROVAL_PENDING`
   ("apply via `POST /refunds/:id/approve`").
+**Part 4 step 3 (2026-09-26): every route that records a checker decision now accepts an optional
+`combinedDutyReason`, and all fifteen database-backed maker/checker pairs resolve through
+`DutySegregationService`.** In a SEGREGATED office — every office today — behaviour and messages are unchanged.
+The field is required only when the actor is also the maker AND the office has declared COMBINED mode, which no
+endpoint can set yet. Three pairs are enforced in application code with no database backstop
+(`PolicyChecking`'s issuing-officer belt, `ConflictOfInterestDisclosure.acknowledge`, and
+`NeedsAssessment.reject`), and `AccessRecertificationItem` is deliberately unwired pending an owner decision —
+all four stated in `docs/duty-segregation-mode.md`.
+
 - **`POST /refunds/:id/approve`** (`refund.approve`/**Manager or Finance** — seed row
   widened to `[MANAGER, FINANCE_COLLECTIONS_OFFICER]` per a `@code-reviewer` MINOR, since
   `maker-checker-segregation.md` maps the refund checker to a "Finance approver"; the

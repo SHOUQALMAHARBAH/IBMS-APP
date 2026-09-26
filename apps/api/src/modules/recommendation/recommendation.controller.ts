@@ -8,6 +8,7 @@ import {
   Query,
   StreamableFile,
 } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { RecommendationService } from './recommendation.service';
 import { RecommendationReportDocumentService } from './recommendation-report-document.service';
@@ -87,8 +88,12 @@ export class RecommendationController {
    * when the recommendation is above the Opportunity's target threshold. */
   @RequirePermissions('recommendation.approve')
   @Post(':id/approve')
-  approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.recommendations.approve(id, user);
+  approve(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.recommendations.approve(id, dto, user);
   }
 
   /** Record the mandatory conflict-of-interest disclosure (acknowledger

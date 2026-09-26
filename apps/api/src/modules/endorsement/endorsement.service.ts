@@ -804,7 +804,7 @@ export class EndorsementService {
       checkerId: actor.id,
       entityId: refundId,
       context: 'Refund.approve',
-      actor,
+      actorUserId: actor.id,
       reason: dto?.combinedDutyReason,
     });
 

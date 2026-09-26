@@ -12,6 +12,7 @@ import { NeedsAssessmentService } from './needs-assessment.service';
 import { CreateNeedsAssessmentDto } from './dto/create-needs-assessment.dto';
 import { UpdateNeedsAssessmentDto } from './dto/update-needs-assessment.dto';
 import { ListNeedsAssessmentsQueryDto } from './dto/list-needs-assessments-query.dto';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { NeedsAssessmentDecisionDto } from './dto/needs-assessment-decision.dto';
 import {
   COVERAGE_LINES,
@@ -84,14 +85,22 @@ export class NeedsAssessmentController {
 
   @RequirePermissions('needs-assessment.approve')
   @Post(':id/review')
-  review(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.assessments.review(id, user);
+  review(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.assessments.review(id, dto, user);
   }
 
   @RequirePermissions('needs-assessment.approve')
   @Post(':id/approve')
-  approve(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.assessments.approve(id, user);
+  approve(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.assessments.approve(id, dto, user);
   }
 
   @RequirePermissions('needs-assessment.approve')
@@ -111,6 +120,6 @@ export class NeedsAssessmentController {
     @Body() dto: NeedsAssessmentDecisionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.assessments.reject(id, dto.reason, user);
+    return this.assessments.reject(id, dto, user);
   }
 }

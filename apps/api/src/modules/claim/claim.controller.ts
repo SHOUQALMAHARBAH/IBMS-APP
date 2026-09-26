@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { ClaimService } from './claim.service';
 import { NotifyClaimDto } from './dto/notify-claim.dto';
@@ -148,9 +149,14 @@ export class ClaimController {
   @Post(':id/settlement/second-approve')
   secondApproveSettlement(
     @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.claims.secondApproveSettlement(id, user);
+    return this.claims.secondApproveSettlement(
+      id,
+      user,
+      dto.combinedDutyReason,
+    );
   }
 
   /** Process 29 — formal closure. `SETTLED → CLOSED` once the client's receipt

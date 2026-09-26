@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { DataProcessingAgreementService } from './data-processing-agreement.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
@@ -40,7 +41,11 @@ export class DataProcessingAgreementController {
 
   @RequirePermissions('dpa.approve')
   @Post('data-processing-agreements/:id/dpo-approve')
-  dpoApprove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.dpas.dpoApprove(id, user.id);
+  dpoApprove(
+    @Param('id') id: string,
+    @Body() dto: CombinedDutyDeclarationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.dpas.dpoApprove(id, user.id, dto.combinedDutyReason);
   }
 }

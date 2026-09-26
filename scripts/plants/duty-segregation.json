@@ -8,5 +8,10 @@
     "file": "apps/api/src/modules/duty-segregation/duty-segregation.service.ts",
     "from": "    if (office?.dutySegregationMode !== 'COMBINED') {",
     "to": "    if (false) {"
+  },
+  "needs-assessment-drops-the-act": {
+    "file": "apps/api/src/modules/needs-assessment/needs-assessment.service.ts",
+    "from": "      data: {\n        reviewedByUserId: actor.id,\n        reviewerCombinedDutyActId: combinedDutyActId,\n      },",
+    "to": "      data: {\n        reviewedByUserId: actor.id,\n      },"
   }
 }

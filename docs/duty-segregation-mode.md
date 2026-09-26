@@ -230,11 +230,15 @@ pair" — which authorization cannot answer, because it flattens. The pieces:
 
 Each step ships whole and is verifiable on its own.
 
-**Status: steps 1 and 2 have SHIPPED, and step 3 is PART-WIRED — the engine exists and ONE of the fifteen
-pairs goes through it (`Refund.approve`). The mode is still not settable** by any endpoint, screen or service,
-so nothing in production can reach any of it. That is the intended order: the control exists before anything
-can rely on it, and the remaining fourteen pairs are a mechanical repeat of one worked example rather than
-fourteen decisions.
+**Status: steps 1, 2 and 3 have SHIPPED. All fifteen database-backed pairs route through the engine**, plus
+one application-only pair that records an act with no column to carry it. **The mode is still not settable** by
+any endpoint, screen or service, so nothing in production can reach any of it — the control exists before
+anything can rely on it, which is the intended order.
+
+**One pair is deliberately NOT wired**: `AccessRecertificationItem`, because its constraint fires on an INSERT
+rather than an update, so wiring it changes nothing for the single-operator office the owner's condition is
+about. That is a decision, not a task — see the section below and `docs/decision-reviewing-your-own-access.md`,
+which puts the three options to her in plain language.
 
 1. **[DONE]** **Bring the three lists to 15.** `maker-checker.util.ts`'s table (11 → 15), the pair→checker-permission
    map, and a test that derives the expected set from `pg_constraint` so a sixteenth constraint cannot be
@@ -277,7 +281,8 @@ fourteen decisions.
    the one that matters: a predicate loosened to `TRUE OR (escape IS NOT NULL)` would satisfy a check that
    only looked for the escape column and would refuse nothing. Run against the un-migrated database first,
    where it failed naming the real predicate.
-3. **[PART-WIRED — the engine plus 1 of 19 call sites]** **The application layer.**
+3. **[DONE — 15 of the 19 call sites route through the engine; 1 blocked on a decision; 3 are
+   application-only]** **The application layer.**
 
    `assertDifferentActors` stayed a pure function and is still the refusal. What gained the mode is a new
    `DutySegregationService.resolve()`, which returns the escape-column value the caller's write must carry:
@@ -301,10 +306,46 @@ fourteen decisions.
    not land. Deliberate: the alternatives are making the evidence table mutable or threading a transaction
    client through nineteen repositories, and over-recording a control event beats under-recording one.
 
-   **Wired: `Refund.approve`** — the sharpest of the fifteen, because the refund exists to move money back to
-   a client and the second signature is what stands between that and a broker refunding themselves. The route
-   takes an OPTIONAL `combinedDutyReason`; optional is the point, since an ordinary approval sends nothing and
-   behaves exactly as before. Fourteen pairs and eighteen call sites remain.
+   **THE ACTOR IS A USER ID, NOT A SESSION OBJECT.** Most of the nineteen call sites take a bare
+   `actorUserId` (`KYCRecord.decide`, `Complaint.close`, `DataSharingApproval.approve`, …), and threading an
+   `AuthenticatedUser` down to all of them would have meant changing seventeen service signatures plus every
+   controller and test that calls them — a large diff carrying two fields the engine can read for itself. It
+   also reads more truthfully: the office and the roles are resolved from the database at the moment the act is
+   recorded, through the same `getRoleRefs` the session is built from, so a role revoked earlier in the same
+   request cannot be recorded as the hat.
+
+   **Every route takes an OPTIONAL `combinedDutyReason`**, from one shared
+   `CombinedDutyDeclarationDto` that the module's existing body DTO extends. Optional is the point: an ordinary
+   two-person approval sends nothing and behaves exactly as before, and a DTO cannot see the office's mode, so
+   the requirement is decided in the service.
+
+   **THREE APPLICATION-ONLY PAIRS, not the two the plan recorded.** The third was found while wiring:
+
+       PolicyChecking.check (issuing officer)   the DB constraint compares the checker with the PLACER only
+       ConflictOfInterestDisclosure.acknowledge no constraint covers this pair at all
+       NeedsAssessment.reject                   rejecting writes NO approver, so the constraint's first
+                                                disjunct (`approvedByUserId IS NULL`) is always satisfied
+
+   `NeedsAssessment.reject` still goes through the engine and its returned id is DISCARDED: in a COMBINED
+   office the act is recorded and appears in the report, and there is no column to carry it because the
+   database is not enforcing that pair. Leaving it strict would have dead-ended a one-person office on
+   rejection — she could neither approve nor reject an assessment she captured, which is the trap Part 4 exists
+   to remove.
+
+   The issuer belt on `PolicyChecking` is skipped when an act was declared, because one declaration covers one
+   person doing every half of one policy. **The residual gap, stated rather than hidden**: somebody who ISSUED
+   but did not PLACE still cannot check, even in a COMBINED office, because there is no constraint for that
+   pair to hang an act on.
+
+   **A SHARED TEST DOUBLE, because fifteen hand-written mocks would have broken fifteen tests silently.**
+   Every one of those service specs contains a test asserting that a self-approval is refused. A local
+   `{ resolve: vi.fn().mockResolvedValue(null) }` in each would have made all fifteen of those tests pass on
+   the mock rather than on the code — § 1.51(d) with the guard and the double swapped.
+   `duty-segregation.double.ts` refuses exactly as a segregated office does, through the same
+   `assertDifferentActors`.
+
+   **And every ordinary-path assertion now pins the escape column as `null`** where the write is asserted, which
+   is what would catch a call site that started sending an act id when two different people are involved.
 
    `PermissionRepository.findRolesGrantingCode` is new and is what makes the hat recordable: the cached
    authorization read flattens role provenance away, deliberately, so the hat cannot be derived from it.
@@ -332,6 +373,23 @@ withholding the checker permission in a COMBINED office — is `duty-segregation
 test: a Placement officer who does not hold `refund.approve` declares a reason and is still refused 403, and
 the refusal must NOT mention segregation (otherwise it would tell somebody to find a second signature when
 what they need is the permission).
+
+**A plant on the FIFTEENTH pair, because fourteen of them had no combined-path proof.** The unit tests pin the
+escape column as null on the ordinary path, which catches a spurious act id but says nothing about the column
+being filled when one is declared. So `duty-segregation-combined.e2e-spec.ts` gained a SECOND pair end to end —
+`NeedsAssessment.review`, chosen because that table carries TWO escape columns and the test asserts the review
+fills the reviewer one and leaves the approver one null, which is the reason there are fifteen columns and not
+fourteen. Dropping the column from that write turned the 201 into a **500**: the CHECK refusing it, with the
+engine's own `updateMany` named in the trace.
+
+That plant was also **refused as STALE on its first attempt** — `prettier` had reformatted the line the plant
+named, and `plant.mjs` said so and exited non-zero rather than silently matching nothing. Re-derived against
+what was actually there.
+
+**Thirteen pairs still have no combined-path e2e**, and that is the honest state: they have the ordinary-path
+assertion, the shared double, and a database constraint that refuses a missing escape column with a 500 rather
+than accepting a silent self-approval. The 500 is the backstop that makes the gap survivable, not a reason to
+leave it.
 
 **Two further plants on step 3a's own code**, each stated before running:
 
@@ -500,7 +558,12 @@ closes that, which makes this column superseded by design rather than merely unu
 
 ---
 
-## A LIMIT, NOT A GAP: two pairs have no database backstop
+## A LIMIT, NOT A GAP: THREE pairs have no database backstop
+
+**Corrected during step 3 — it is three, not two.** `NeedsAssessment.reject` is the third: rejecting
+writes no `approvedByUserId`, so `NeedsAssessment_approver_maker_checker_distinct` can never fire on that
+path. The rule "the rejecter is not the capturer" is enforced in application code and nowhere else, the
+same as the other two. Found by reading the write rather than the guard.
 
 **In COMBINED mode, two of the seventeen maker/checker rules this system enforces are protected by
 application code alone.** Written here in plain words because a known limit and a hidden gap are different

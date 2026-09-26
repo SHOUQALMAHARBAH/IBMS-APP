@@ -305,6 +305,57 @@ async function refundAwaitingApproval(
   };
 }
 
+/** Every question answered, so the assessment is complete enough to submit. */
+const FULL_ANSWERS: Record<string, boolean | number> = {
+  ownsOrLeasesPremises: false,
+  holdsPhysicalStock: false,
+  revenueDependsOnPremises: false,
+  operatesSpecialisedMachinery: false,
+  employeeCount: 0,
+  publicVisitsPremises: false,
+  manufacturesOrSuppliesProducts: false,
+  providesProfessionalAdvice: false,
+  operatesVehicleFleet: false,
+  movesGoodsByTransport: false,
+  handlesPersonalOrPaymentData: false,
+  wantsStaffMedicalCover: false,
+  wantsStaffLifeCover: false,
+};
+
+/** A PENDING_REVIEW needs assessment, captured by `token`'s own user. */
+async function assessmentAwaitingReview(
+  app: INestApplication<App>,
+  token: string,
+  ownerUserId: string,
+  tag: string,
+): Promise<string> {
+  const rand = Math.random().toString(36).slice(2, 8);
+  const customer = await prisma.customer.create({
+    data: {
+      customerType: 'CORPORATE',
+      legalName: `Combined Duty ${tag} ${rand}`,
+      ownerUserId,
+    },
+  });
+  const riskProfile = await prisma.riskProfile.create({
+    data: { customerId: customer.id, siteLabel: 'HQ' },
+  });
+  const created = await request(app.getHttpServer())
+    .post('/needs-assessments')
+    .set(bearer(token))
+    .send({
+      riskProfileId: riskProfile.id,
+      questionnaireAnswers: FULL_ANSWERS,
+    })
+    .expect(201);
+  const id = (created.body as { id: string }).id;
+  await request(app.getHttpServer())
+    .post(`/needs-assessments/${id}/submit`)
+    .set(bearer(token))
+    .expect(201);
+  return id;
+}
+
 describe('duty segregation — a declared combined act through the API (e2e)', () => {
   beforeAll(async () => {
     // Before anything asserts on it: whatever a killed run left behind.
@@ -485,6 +536,77 @@ describe('duty segregation — a declared combined act through the API (e2e)', (
     });
     expect(stored.approvedByUserId).toBeNull();
     expect(stored.combinedDutyActId).toBeNull();
+  }, 600_000);
+
+  it('a SECOND pair, on a different table and a different escape column: the capturer reviews her own assessment', async () => {
+    const app = sharedApp as INestApplication<App>;
+    // One person who captures assessments AND holds the reviewer's permission — the Manager's
+    // `needs-assessment.approve`, which gates both review and approve.
+    const one = await makeUser(
+      app,
+      'cd-na',
+      'SALES_RELATIONSHIP_OFFICER',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
+    const assessmentId = await assessmentAwaitingReview(
+      app,
+      one.accessToken,
+      one.userId,
+      'na',
+    );
+
+    // SEGREGATED: refused, exactly as before Part 4.
+    const refused = await request(app.getHttpServer())
+      .post(`/needs-assessments/${assessmentId}/review`)
+      .set(bearer(one.accessToken))
+      .send({})
+      .expect(403);
+    expect(JSON.stringify(refused.body)).toContain('segregation of duties');
+
+    const REASON =
+      'One person in this office captured the assessment and reviews it herself.';
+    await inCombinedMode(async () => {
+      await request(app.getHttpServer())
+        .post(`/needs-assessments/${assessmentId}/review`)
+        .set(bearer(one.accessToken))
+        .send({})
+        .expect(422);
+      await request(app.getHttpServer())
+        .post(`/needs-assessments/${assessmentId}/review`)
+        .set(bearer(one.accessToken))
+        .send({ combinedDutyReason: REASON })
+        .expect(201);
+    });
+
+    // THIS IS WHAT THE SECOND PAIR PROVES: the act id reaches THAT PAIR'S OWN column. `NeedsAssessment`
+    // carries two escape columns, and a declared REVIEW must fill the reviewer one and leave the approver one
+    // alone — otherwise a declared review would excuse a later self-approval, which is the reason there are
+    // fifteen columns and not fourteen.
+    const stored = await rawPrisma.needsAssessment.findUniqueOrThrow({
+      where: { id: assessmentId },
+      select: {
+        createdByUserId: true,
+        reviewedByUserId: true,
+        reviewerCombinedDutyActId: true,
+        approverCombinedDutyActId: true,
+      },
+    });
+    expect(stored.createdByUserId).toBe(one.userId);
+    expect(stored.reviewedByUserId).toBe(one.userId);
+    expect(stored.reviewerCombinedDutyActId).not.toBeNull();
+    expect(stored.approverCombinedDutyActId).toBeNull();
+
+    const act = await rawPrisma.combinedDutyAct.findUniqueOrThrow({
+      where: { id: stored.reviewerCombinedDutyActId as string },
+    });
+    expect(act.entity).toBe('NeedsAssessment');
+    expect(act.constraintName).toBe(
+      'NeedsAssessment_reviewer_maker_checker_distinct',
+    );
+    expect(act.reason).toBe(REASON);
+    // The hat for THIS pair is `needs-assessment.approve`, which the Manager role grants and Sales does not.
+    expect(act.grantingRoleNames).toContain('BRANCH_DEPARTMENT_MANAGER');
+    expect(act.grantingRoleNames).not.toContain('SALES_RELATIONSHIP_OFFICER');
   }, 600_000);
 
   it('the office is SEGREGATED again once this file is done', async () => {

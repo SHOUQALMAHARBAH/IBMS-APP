@@ -100,6 +100,7 @@ export class KycController {
       dto.reason,
       user.id,
       dto.screeningHoldReason,
+      dto.combinedDutyReason,
     );
   }
 

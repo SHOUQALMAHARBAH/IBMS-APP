@@ -14,7 +14,9 @@ import { RiskProfileRepository } from '../../repositories/risk-profile.repositor
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { AuditService } from '../audit/audit.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { assertDifferentActors } from '../../common/maker-checker.util';
+import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import { CombinedDutyDeclarationDto } from '../../common/dto/combined-duty-declaration.dto';
+import { NeedsAssessmentDecisionDto } from './dto/needs-assessment-decision.dto';
 import { canReadAllCustomerFileOwners } from '../../common/rbac-visibility.util';
 import {
   deriveRecommendedCoverageLines,
@@ -67,6 +69,7 @@ export class NeedsAssessmentService {
     private readonly customers: CustomerRepository,
     private readonly audit: AuditService,
     private readonly workflow: WorkflowTransitionService,
+    private readonly dutySegregation: DutySegregationService,
   ) {}
 
   private canViewAll(actor: AuthenticatedUser): boolean {
@@ -219,20 +222,34 @@ export class NeedsAssessmentService {
 
   /** PENDING_REVIEW -> REVIEWED, stamping reviewedByUserId. Manager-only
    * (needs-assessment.approve), maker/checker-gated against the capturer. */
-  async review(id: string, actor: AuthenticatedUser): Promise<NeedsAssessment> {
+  async review(
+    id: string,
+    dto: CombinedDutyDeclarationDto | undefined,
+    actor: AuthenticatedUser,
+  ): Promise<NeedsAssessment> {
     const assessment = await this.mustFind(id);
-    assertDifferentActors(
-      assessment.createdByUserId,
-      actor.id,
-      'NeedsAssessment.review',
-      'NeedsAssessment_reviewer_maker_checker_distinct',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'NeedsAssessment_reviewer_maker_checker_distinct',
+      makerId: assessment.createdByUserId,
+      checkerId: actor.id,
+      entityId: id,
+      context: 'NeedsAssessment.review',
+      actorUserId: actor.id,
+      reason: dto?.combinedDutyReason,
+    });
     await this.workflow.transition({
       entityType: 'NeedsAssessment',
       entityId: id,
       toStatus: 'REVIEWED',
       actorUserId: actor.id,
-      data: { reviewedByUserId: actor.id },
+      // Part 4 — null on every ordinary two-person act, so `data` is byte-identical to what it was
+      // before this existed. When an office has declared COMBINED mode and one person is doing both
+      // halves, this carries the declared act's id in the SAME statement as the status flip, which is
+      // the write the CHECK constraint is evaluated against.
+      data: {
+        reviewedByUserId: actor.id,
+        reviewerCombinedDutyActId: combinedDutyActId,
+      },
     });
     return this.mustFind(id);
   }
@@ -242,21 +259,32 @@ export class NeedsAssessmentService {
    * APPROVED is terminal — linking to an Opportunity/RFQ is Process 11+. */
   async approve(
     id: string,
+    dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
   ): Promise<NeedsAssessment> {
     const assessment = await this.mustFind(id);
-    assertDifferentActors(
-      assessment.createdByUserId,
-      actor.id,
-      'NeedsAssessment.approve',
-      'NeedsAssessment_approver_maker_checker_distinct',
-    );
+    const combinedDutyActId = await this.dutySegregation.resolve({
+      constraint: 'NeedsAssessment_approver_maker_checker_distinct',
+      makerId: assessment.createdByUserId,
+      checkerId: actor.id,
+      entityId: id,
+      context: 'NeedsAssessment.approve',
+      actorUserId: actor.id,
+      reason: dto?.combinedDutyReason,
+    });
     await this.workflow.transition({
       entityType: 'NeedsAssessment',
       entityId: id,
       toStatus: 'APPROVED',
       actorUserId: actor.id,
-      data: { approvedByUserId: actor.id },
+      // Part 4 — null on every ordinary two-person act, so `data` is byte-identical to what it was
+      // before this existed. When an office has declared COMBINED mode and one person is doing both
+      // halves, this carries the declared act's id in the SAME statement as the status flip, which is
+      // the write the CHECK constraint is evaluated against.
+      data: {
+        approvedByUserId: actor.id,
+        approverCombinedDutyActId: combinedDutyActId,
+      },
     });
     await this.safeAudit({
       userId: actor.id,
@@ -303,17 +331,32 @@ export class NeedsAssessmentService {
    * Maker/checker-gated against the capturer. */
   async reject(
     id: string,
-    reason: string | undefined,
+    dto: NeedsAssessmentDecisionDto,
     actor: AuthenticatedUser,
   ): Promise<NeedsAssessment> {
+    const reason = dto.reason;
     const assessment = await this.mustFind(id);
-    assertDifferentActors(
-      assessment.createdByUserId,
-      actor.id,
-      'NeedsAssessment.reject',
-      // Rejecting is the approver's act, so the remedy names the approver's permission.
-      'NeedsAssessment_approver_maker_checker_distinct',
-    );
+    // A THIRD APPLICATION-ONLY PAIR, found while wiring Part 4 and not in the two the plan recorded.
+    //
+    // Rejecting writes no `approvedByUserId` — the transition below sets the status and nothing else — so
+    // `NeedsAssessment_approver_maker_checker_distinct` cannot fire on this path at all: its first disjunct
+    // (`approvedByUserId IS NULL`) is satisfied. The rule "the rejecter is not the capturer" is enforced
+    // here and nowhere else.
+    //
+    // It still goes through the engine, and the returned id is deliberately DISCARDED. In a SEGREGATED
+    // office the behaviour and message are unchanged; in a COMBINED one the act is recorded and appears in
+    // the self-approval report, and there is no column to carry it because the database is not enforcing
+    // this pair. Leaving it strict instead would dead-end a one-person office on rejection — she could
+    // neither approve nor reject an assessment she captured, which is the trap Part 4 exists to remove.
+    await this.dutySegregation.resolve({
+      constraint: 'NeedsAssessment_approver_maker_checker_distinct',
+      makerId: assessment.createdByUserId,
+      checkerId: actor.id,
+      entityId: id,
+      context: 'NeedsAssessment.reject',
+      actorUserId: actor.id,
+      reason: dto.combinedDutyReason,
+    });
     if (!reason?.trim()) {
       throw new BadRequestException(
         'Rejecting a Needs Assessment requires a stated reason.',
