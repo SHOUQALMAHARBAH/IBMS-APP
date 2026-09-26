@@ -3567,9 +3567,29 @@ connection to a nav change that had none.
    count is where this has to be read.
 
 2. **Timeout NOT raised**, deliberately, and this is the part to hold to. Raising it would be § 1.1's
-   mistake: a mitigation that buys time and hides the next crossing. **The next reading of this entry
-   should be the CI flaky COUNT across a few runs**, not a local pass — and if it is still non-zero,
-   the fix was insufficient rather than the budget being too small.
+   mistake: a mitigation that buys time and hides the next crossing.
+
+   **THE CI READING IS IN, AND IT IS ZERO.** Run `36265914655`, the first full CI run after the fix:
+
+       frontend  E2E tests (Playwright)    508 passed (2.4m)
+
+   No flaky line at all. Playwright prints `N flaky` only when there are flakes, so this is an absence —
+   **and the absence was anchored before it was believed**, because an absence is worth nothing until
+   something proves it observable. Run `35827299885`, one of the three recorded above, prints in exactly
+   that log position:
+
+       frontend  E2E tests (Playwright)    442 passed (2.7m)
+       frontend  E2E tests (Playwright)    ##[notice]  4 flaky
+
+   So the line is emitted in the place this grep looks, and its absence means zero rather than a missed
+   match. **2 → 2 → 4 → 0.**
+
+   One run is not proof: the flake was load-dependent, so a quiet runner could produce a zero on its own.
+   **The honest claim is that the first reading after the fix is clean, and the count should be read again
+   over the next few runs** — a single zero is the evidence this entry asked for, not the end of it.
+
+   One correction while reading those logs: run `35784578362` prints `4 flaky`, where the table above
+   records it as 2. The table's figures were not re-verified here and should not be restated as measured.
 
 **The rule worth taking from it now:** `4 flaky` in a green run is a finding. Read the flaky count,
 not only the conclusion — and read whether it CHANGED, because a growing count is a different
