@@ -74,6 +74,7 @@ ON CONFLICT ("roleId", "permissionId") DO NOTHING;
 DO $$
 DECLARE
   missing integer;
+  sources integer;
   expanded integer;
 BEGIN
   CREATE TEMP TABLE expansion("source" text, "successor" text) ON COMMIT DROP;
@@ -102,18 +103,35 @@ BEGIN
       missing;
   END IF;
 
-  -- And it did something. Zero successor grants on a seeded database means the join matched nothing —
-  -- a re-run, or a rename upstream — and a silent no-op is how a migration gets trusted for work it
-  -- never did.
+  -- And it did something WHEN THERE WAS SOMETHING TO DO — which is not the same claim, and getting that
+  -- wrong is what broke this migration on the only path a real deployment takes.
+  --
+  -- The first version raised whenever `expanded = 0`. On an EMPTY database that is the normal case:
+  -- `migrate deploy` runs before `seed.ts`, so there are no `RolePermission` rows at all, the umbrella has
+  -- no grants to expand, and the successors arrive later from the seeded catalogue. Both local databases
+  -- were already seeded, so the exception never fired here; CI builds from nothing and it failed on the
+  -- first try with `P0001 ... a silent no-op is refused`. Phase 1 used a NOTICE for exactly this check and
+  -- turning it into an exception looked like tightening.
+  --
+  -- So the guard compares against the SOURCE count, which is still readable because the umbrella is not
+  -- deleted until step 4: grants that were owed and not written is a failure, an empty database is not.
+  SELECT count(*) INTO sources
+  FROM "RolePermission" rp
+  JOIN "Permission" p ON p."id" = rp."permissionId"
+  JOIN expansion e ON e."source" = p."code";
+
   SELECT count(*) INTO expanded
   FROM "RolePermission" rp
   JOIN "Permission" p ON p."id" = rp."permissionId"
   JOIN expansion e ON e."successor" = p."code";
-  IF expanded = 0 THEN
+
+  IF sources > 0 AND expanded = 0 THEN
     RAISE EXCEPTION
-      'four-action phase 4: no successor grants exist after the expansion. Either the umbrella was already gone or the join matched nothing; a silent no-op is refused.';
+      'four-action phase 4: % umbrella grant(s) exist and NO successor grant was written. The expansion matched nothing; a silent no-op is refused.',
+      sources;
   END IF;
-  RAISE NOTICE 'four-action phase 4: % successor grants now held', expanded;
+  RAISE NOTICE
+    'four-action phase 4: % umbrella grant(s) seen, % successor grants now held', sources, expanded;
 END $$;
 
 -- ---------------------------------------------------------------------------
