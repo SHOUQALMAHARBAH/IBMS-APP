@@ -2791,6 +2791,62 @@ still be reachable by a link from another page — `/insurers/[id]` is, from the
 narrower question "does any web code call this API at all", which is the one that catches a surface
 built and then forgotten.
 
+**RE-MEASURED 2026-09-26 AT ROUTE LEVEL, AND THE FINER GRAIN FOUND THREE TIMES AS MUCH.**
+
+The measurement above is by CONTROLLER PREFIX and says so. Its blind spot is a controller whose OTHER
+routes are called: `/sla` looked reachable because the policy routes are, while `POST /sla/holidays`
+had no caller at all — which is § 1.57, found by hand rather than by this method.
+
+**480 api routes against 345 distinct web path shapes: 33 routes across 14 controllers are addressed
+by no web code.** Method and script: `scripts/` was deliberately NOT given this (see the closing note).
+
+**FOUR FALSE-POSITIVE CLASSES HAD TO BE CLOSED BEFORE THE NUMBER MEANT ANYTHING**, and they are the
+reason this is a measurement rather than a gate. The first run said **153**:
+
+1. **Auth routes** do not go through `apiGet` and friends. Every one read as unreachable.
+2. **A concatenated querystring** — `/audit-trail${qs}` — normalises with a trailing wildcard the route
+   does not have, so every filtered list read as uncalled.
+3. **A variable LEADING segment.** The discard client posts to `/${collection}/${id}/discard`, which
+   compared literally never matches `claims/*/discard`. All four discard routes read as unreachable.
+   Fixed by comparing segment-by-segment with a wildcard matching anything on either side — the
+   generalisation the original entry named as the method's blind spot without closing.
+4. **A NESTED template literal.** `/dashboards/claims${qs ? `?${qs}` : ''}` — the path capture stops at
+   the inner backtick and the collapse cannot touch an incomplete template, so what survives is
+   `dashboards/claims$`. All six dashboards, every one a live screen, read as unreachable.
+
+Class 4 is the one worth remembering: **a measurement that puts six working screens in a findings list
+is not a slightly noisy measurement, it is an unusable one**, and the only reason it was caught is that
+the output was read rather than counted.
+
+**STILL UNREACHABLE — the four already recorded above, plus these, which the prefix method could not
+see. Ordered by consequence:**
+
+| Surface | Routes | Why it matters |
+|---|---|---|
+| `POST /refunds/:id/disburse` | 1 | **Money leaves the office through this route and nothing can call it.** `refund.disburse` is granted to FINANCE; the route stamps `paidAt` and books the client-funds out movement in one transaction. An approved refund cannot be paid from the application. |
+| `screening/matches/:id/{assign,escalate,notes,start-review,case}` | 5 | The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case to someone, escalate one, add a note, or open the case view. On an AML control, the workflow around the decision is the part that evidences it. |
+| `sla/timers/:id/{pause,resume,status}` | 3 | `sla.timer.pause` exists as a permission. **Pausing a statutory clock is exactly the act that must be visible and audited**, and it can only be done by constructing a request by hand. |
+| `sla/holidays` (GET + POST) | 2 | § 1.57 — the calendar every business-day deadline is counted against. Found by hand first; this method finds it too. |
+| `insurer-masters/:id` and its form templates | 4 | The GLOBAL catalogue: view one, list/add its form templates. |
+| `insurers/:id/form-templates` | 3 | Already recorded above (Q9's UI). |
+| `PATCH /insurance-lines/:id` | 1 | An office cannot correct a line of business it added. Also recorded in `docs/b7-consistency-record.md`. |
+| `GET /cross-border-transfers/:id` | 1 | The list is reachable; the single-transfer detail read is not. |
+| `GET /access-recertification/cycles/:id/admin-items` | 1 | The administrator's view of a recertification cycle. |
+| `GET /security/encryption-keys` | 1 | The key inventory. |
+
+Every one of those was confirmed by hand as having zero web mentions, not taken from the script's word.
+
+**NOT MADE A GATE, deliberately.** A guard here would need a maintained allow-list of 33 entries that
+rots, and — more importantly — the matcher needed four corrections to stop libelling working screens.
+A brittle matcher in a red gate is a liability, not a control: the first false red teaches everyone to
+ignore it. The honest form is what this is: a measurement re-run deliberately, with its own failure
+modes written down so the next run starts from four fewer mistakes.
+
+**What it still does NOT measure:** whether a reachable route is reachable by the RIGHT person, and
+whether a called route is called from a screen anyone can navigate to. It answers "does any web code
+address this path", which is the question that catches a surface built and then forgotten.
+
+
 ### 1.45 — A CAST THAT SILENCES THE COMPILER USUALLY MEANS THE QUESTION WAS GOOD
 
 ``t(`enumInsurerStructure${s}` as never)`` — a translation key built by template concatenation,
