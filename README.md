@@ -4105,13 +4105,21 @@ else.
   APPLIED so a retry of `apply` is re-entrant and just re-attempts the policy transition.
   `422` while `REFUND_APPROVAL_PENDING`
   ("apply via `POST /refunds/:id/approve`").
+**Part 4 step 6 (2026-09-26): the self-approval report exists, so COMBINED mode can be declared.**
+`GET /internal-controls/combined-duty-acts` (`internal-controls.view`) lists every declared combined-duty act —
+the actor by name, the pair named by its CHECK constraint, the reason, the roles that granted the approval, and
+the office's own mode and declaration date — on `/internal-controls`, above the silent-self-approval scan.
+Access self-reviews sort first and render flagged, which is the owner's condition and is proven by content
+rather than by a status code. Reading it is audited (counts only, never a name). **Fourteen of the fifteen
+approve screens still cannot carry a combined-duty reason** — the refund one can; see
+`docs/duty-segregation-mode.md` step 6.
+
 **Part 4 steps 4-5 (2026-09-26): `/settings/duty-segregation` is where an office declares whether it separates
 the two halves of an approval.** `duty-segregation.mode.declare` (OFFICE_ADMINISTRATOR alone) declares it;
 `internal-controls.view` (Compliance, Executive, external auditor) opens the same screen read-only — whoever
 declares the mode is deliberately not whoever reviews the acts it permits. Every declaration is audited with a
-mandatory reason and stamps who and when. **COMBINED is refused by the service** while
-`SELF_APPROVAL_REPORT_EXISTS` is false: the self-approval report is the shipping gate, and that flag, its
-refusal and its test are removed together when the report ships. `/auth/me` carries `dutySegregationMode` so an
+mandatory reason and stamps who and when. **COMBINED was refused by the service** until the self-approval report shipped — the gate, and that flag, its
+refusal and its test were removed together in the commit that met it (step 6 above). `/auth/me` carries `dutySegregationMode` so an
 approve screen knows whether to ask for a reason.
 
 **Part 4 step 3 (2026-09-26): every route that records a checker decision now accepts an optional

@@ -66,6 +66,13 @@ export interface MeResponse {
   idleTimeoutMinutes: number;
   hardLogoutAfterIdleMinutes: number;
   stepUpFresh: boolean;
+  /**
+   * Part 4 — whether this office has declared that one person may perform both halves of a maker/checker
+   * pair. Optional on the type rather than required, because ~80 spec files build a `MeResponse` mock and a
+   * required field would make every one of them fail to compile for a value none of them are about. Every
+   * reader defaults to SEGREGATED, which is what a caller that does not know must assume.
+   */
+  dutySegregationMode?: 'SEGREGATED' | 'COMBINED';
 }
 
 export interface MfaEnrollResponse {

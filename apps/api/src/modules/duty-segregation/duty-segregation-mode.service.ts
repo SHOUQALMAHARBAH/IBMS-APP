@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -12,20 +11,6 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 
 /** Matching every other mandatory reason in this system. */
 export const MODE_DECLARATION_REASON_MIN_LENGTH = 10;
-
-/**
- * THE SHIPPING GATE, AS CODE RATHER THAN A PROMISE.
- *
- * `docs/duty-segregation-mode.md` states it at the top: COMBINED mode may not ship before the self-approval
- * report exists and works. The reason is a commitment — the owner accepted uniform application, including a
- * person reviewing their own access, on the stated mitigation that every such act would surface in that
- * report, flagged. That mitigation was offered against a report which, measured, had no reader.
- *
- * A gate written only in a document is a gate somebody ships past. So while this is `false`, declaring
- * COMBINED is refused by the service with a message naming the reason. The flag and its refusal are deleted
- * in the same commit that ships the report — together, or the gate was theatre.
- */
-export const SELF_APPROVAL_REPORT_EXISTS = false;
 
 export interface DutySegregationModeView {
   mode: DutySegregationMode;
@@ -84,13 +69,19 @@ export class DutySegregationModeService {
       );
     }
 
-    if (mode === 'COMBINED' && !SELF_APPROVAL_REPORT_EXISTS) {
-      // The gate. Not a validation error and not a permission problem — the control this mode relies on does
-      // not exist yet, so the mode cannot be declared.
-      throw new ForbiddenException(
-        'COMBINED mode cannot be declared yet: the self-approval report it depends on does not exist. Every combined-duty act has to be visible to whoever reviews this office, and until that report can be opened there is nowhere for those acts to surface. See docs/duty-segregation-mode.md.',
-      );
-    }
+    // THE SHIPPING GATE IS LIFTED, and this comment is what replaces it.
+    //
+    // Until the commit that shipped `GET /internal-controls/combined-duty-acts`, this method refused COMBINED
+    // outright: a constant, a 403 naming the missing report, and an e2e test asserting that refusal. The gate
+    // existed because the owner accepted applying the mode uniformly — including to a person reviewing their
+    // own access — on the stated mitigation that every such act would surface in a report, flagged at the top.
+    // That report had no reader, so the mitigation was owed rather than met.
+    //
+    // It is met now: the report lists every declared act with its reason and the roles worn, access
+    // self-reviews sort above everything else and render flagged, and `self-approval-report.e2e-spec.ts`
+    // proves the ordering by content against two acts where the transaction one is NEWER. The flag, the
+    // refusal and the test that asserted it were removed in the same commit that shipped the report —
+    // together, or the gate would have been theatre.
 
     // NO idempotent short-circuit, deliberately — and the first version of this had one.
     //

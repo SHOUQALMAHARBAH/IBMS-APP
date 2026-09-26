@@ -288,6 +288,9 @@ export default function OpportunityDetailPage() {
             canManage={canManageEndorsement}
             canApproveRefund={canApproveRefund}
             canDiscard={canDiscardEndorsement}
+            // Part 4 — from `/auth/me`, so the section can decide whether to ask the approver for a reason.
+            dutySegregationMode={user.dutySegregationMode ?? 'SEGREGATED'}
+            currentUserId={user.id}
           />
 
           <FinanceSection

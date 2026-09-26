@@ -157,8 +157,16 @@ export function applyEndorsement(id: string): Promise<Endorsement> {
 
 export function approveEndorsementRefund(
   refundId: string,
+  /**
+   * Part 4 — required only when the approver IS the raiser and the office has declared COMBINED mode. Omitted
+   * on every ordinary two-person approval, which sends no body at all and behaves exactly as before.
+   */
+  combinedDutyReason?: string,
 ): Promise<Endorsement> {
-  return apiPost(`/refunds/${encodeURIComponent(refundId)}/approve`, {});
+  return apiPost(
+    `/refunds/${encodeURIComponent(refundId)}/approve`,
+    combinedDutyReason ? { combinedDutyReason } : {},
+  );
 }
 
 export function notifyEndorsementClient(id: string): Promise<Endorsement> {

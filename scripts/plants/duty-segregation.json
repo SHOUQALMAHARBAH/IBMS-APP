@@ -28,5 +28,15 @@
     "file": "apps/web/app/(app)/settings/duty-segregation/page.tsx",
     "from": "  const canDeclare = hasPermission(user, 'duty-segregation.mode.declare');",
     "to": "  const canDeclare = true;"
+  },
+  "report-sorts-by-date-only": {
+    "file": "apps/api/src/modules/internal-controls/combined-duty-report.service.ts",
+    "from": "      if (a.accessSelfReview !== b.accessSelfReview) {\n        return a.accessSelfReview ? -1 : 1;\n      }\n      return b.at.getTime() - a.at.getTime();",
+    "to": "      return b.at.getTime() - a.at.getTime();"
+  },
+  "report-flag-always-false": {
+    "file": "apps/api/src/modules/internal-controls/combined-duty-report.service.ts",
+    "from": "      accessSelfReview: act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT,",
+    "to": "      accessSelfReview: false,"
   }
 }

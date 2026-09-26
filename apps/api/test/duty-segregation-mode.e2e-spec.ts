@@ -146,32 +146,35 @@ afterAll(async () => {
 });
 
 describe('duty segregation mode — declaring it (e2e)', () => {
-  it('THE SHIPPING GATE: COMBINED is refused while the self-approval report does not exist', async () => {
+  it('COMBINED can now be declared, because the report the gate demanded exists', async () => {
     const server = (app as INestApplication<App>).getHttpServer();
     const admin = await actorHolding('mode-declarer', [
       'duty-segregation.mode.declare',
     ]);
 
-    const refused = await request(server)
-      .patch('/duty-segregation/mode')
-      .set(bearer(admin.accessToken))
-      .send({ mode: 'COMBINED', reason: REASON })
-      .expect(403);
-    const message = JSON.stringify(refused.body);
-    // The refusal has to say WHY, and the why is the missing report — not a permission and not a validation
-    // problem. Somebody holding this is entitled to know what has to exist before they can proceed.
-    expect(message).toContain('self-approval report');
+    // THE GATE THAT USED TO BE HERE. Until the self-approval report shipped, this request was a 403 naming the
+    // missing report, and a test asserted that refusal. Both were removed in the commit that shipped the
+    // report — together, or the gate would have been theatre. This test is what replaced them: the same
+    // request, now succeeding, with the office left as it was found.
+    try {
+      const declared = await request(server)
+        .patch('/duty-segregation/mode')
+        .set(bearer(admin.accessToken))
+        .send({ mode: 'COMBINED', reason: REASON })
+        .expect(200);
+      expect((declared.body as ModeBody).mode).toBe('COMBINED');
+      expect((declared.body as ModeBody).declaredByUserId).toBe(admin.userId);
 
-    // And nothing moved.
-    const office = await rawPrisma.organization.findUniqueOrThrow({
-      where: { id: TEST_ORGANIZATION_ID },
-      select: {
-        dutySegregationMode: true,
-        dutySegregationModeDeclaredAt: true,
-      },
-    });
-    expect(office.dutySegregationMode).toBe('SEGREGATED');
-    expect(office.dutySegregationModeDeclaredAt).toBeNull();
+      const office = await rawPrisma.organization.findUniqueOrThrow({
+        where: { id: TEST_ORGANIZATION_ID },
+        select: { dutySegregationMode: true },
+      });
+      expect(office.dutySegregationMode).toBe('COMBINED');
+    } finally {
+      // Back to SEGREGATED whatever happened above: db-test is shared, and an office left COMBINED makes a
+      // self-approval legitimate for every later spec in the run.
+      await resetOffice();
+    }
   }, 300_000);
 
   it('declaring SEGREGATED explicitly is recorded, audited, and reads back with who and when', async () => {

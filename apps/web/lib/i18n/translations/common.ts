@@ -94,6 +94,9 @@ export const COMMON = {
     dutyModeSaved: 'تم إعلان الوضع وتسجيله في سجل التدقيق.',
     // The act ON the record (step 5). «الشخص نفسه» — names what happened, not a euphemism for it.
     combinedDutyOnRecord: 'نفّذ الشخص نفسه طرفي هذه العملية بصفته ({roles})، والسبب المسجّل:',
+    combinedDutyReasonLabel: 'سبب تنفيذك لطرفي العملية',
+    combinedDutyReasonHint:
+      'أنت من سجّل هذا الطلب، ومكتبك أعلن السماح لك باعتماده أيضاً. اذكر السبب — يُحفَظ بشكل دائم ويظهر في تقرير الاعتمادات الذاتية.',
   },
   EN: {
     commonLoading: 'Loading…',
@@ -174,5 +177,8 @@ export const COMMON = {
     dutyModeSaved: 'Declared, and recorded in the audit trail.',
     combinedDutyOnRecord:
       'One person performed both halves of this, acting as {roles}. Recorded reason:',
+    combinedDutyReasonLabel: 'Why you are doing both halves',
+    combinedDutyReasonHint:
+      'You raised this, and your office has declared that you may also approve it. Say why — it is kept permanently and appears in the self-approval report.',
   },
 } as const;

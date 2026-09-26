@@ -16,7 +16,23 @@ The owner's instruction, restated as the five rules this design has to satisfy:
 
 ---
 
-## THE SHIPPING GATE
+## THE SHIPPING GATE — MET (2026-09-26)
+
+**The gate is lifted, and this section is kept rather than deleted because the reason it existed is the reason
+the report has the shape it has.**
+
+What met it: `GET /internal-controls/combined-duty-acts` and a section on `/internal-controls`, above the
+silent-self-approval scan. Access self-reviews sort first and render FLAGGED.
+`apps/api/test/self-approval-report.e2e-spec.ts` proves the ordering by CONTENT — two acts where the
+transaction one is deliberately NEWER — and `apps/web/e2e/self-approval-report.spec.ts` proves the flag and the
+empty state on screen.
+
+The gate was real while it lasted: `SELF_APPROVAL_REPORT_EXISTS = false` in the mode service, a 403 naming the
+missing report, and an e2e asserting that refusal. All three were removed in the same commit that shipped the
+report — together, or the gate would have been theatre. What replaced the test is its opposite: COMBINED is now
+declarable, and the test says why.
+
+The original statement, unchanged below because it is the argument, not the status:
 
 **COMBINED mode may not ship before the self-approval report exists and works.**
 
@@ -230,8 +246,17 @@ pair" — which authorization cannot answer, because it flattens. The pieces:
 
 Each step ships whole and is verifiable on its own.
 
-**Status: steps 1–5 have SHIPPED. The mode is now SETTABLE — and COMBINED is refused in code until the report
-exists.** That refusal is the shipping gate made real rather than promised: `SELF_APPROVAL_REPORT_EXISTS` is
+**Status: ALL SEVEN STEPS have shipped, and the gate is MET. COMBINED can be declared.**
+
+Two things remain, both stated as limits rather than left to be found: **fourteen of the fifteen approve
+screens cannot yet carry a combined-duty reason** (the refund one can), and
+**`AccessRecertificationItem` is unwired pending the owner's answer** in
+`docs/decision-reviewing-your-own-access.md` — its constraint fires on an INSERT, so wiring it would change
+nothing for the single-operator office the condition is about.
+
+The superseded status line, for the record:
+
+**Steps 1–5 shipped with the mode SETTABLE and COMBINED refused in code until the report existed.** That refusal is the shipping gate made real rather than promised: `SELF_APPROVAL_REPORT_EXISTS` is
 `false` in `duty-segregation-mode.service.ts`, declaring COMBINED returns 403 with the reason, and an e2e test
 asserts it. **The flag, the refusal and that test are deleted in ONE commit when step 6 ships** — together, or
 the gate was theatre.
@@ -397,9 +422,36 @@ which puts the three options to her in plain language.
    from the other direction. So step 4 and step 5 are coupled: **the mode must not become settable before the
    screens can carry a declaration.** The screen also has to know the office's mode to decide whether to ask,
    which means `/auth/me` or an office-settings read has to carry it.
-6. **The self-approval report** — THE SHIPPING GATE above. It does not exist today, and the mode cannot be
-   released without it. Its first ordering rule is the owner's condition: a self-review of ACCESS at the
-   top, flagged, never mixed into the list.
+6. **[DONE — the gate is met]** **The self-approval report.**
+
+   `GET /internal-controls/combined-duty-acts`, gated on `internal-controls.view`, on the screen that already
+   holds the silent-self-approval scan. The two belong together and neither is the other: the scan looks for
+   rows where the two ids MATCH and nothing explains it (which should find none, because the CHECK constraints
+   refuse them), while this lists the acts that were DECLARED, with their reasons.
+
+   **Rendered ABOVE the scan**, because the scan should always be a table of zeroes and anything in this report
+   is a real act somebody performed.
+
+   **The first ordering rule, and how it is proven.** Access self-reviews sort ahead of every transaction act
+   whatever their dates, and render FLAGGED — a position alone is something a reader re-sorts away. The proof
+   puts a self-review of ACCESS and a self-approved REFUND in the office with the refund deliberately NEWER,
+   and asserts both present AND the access one first. A report sorted by date would pass a test that only
+   checked the access row was in there somewhere; this one dies on it, which was confirmed by planting exactly
+   that (`report-sorts-by-date-only` → "expected 15 to be less than 14").
+
+   Reading the report is itself audited — counts only, never a name: a lookup that copied the report's contents
+   into the log the report is about would pollute what is being searched.
+
+   **The empty state is asserted on the SCREEN, not in the api e2e**, and deliberately: db-test is cumulative
+   and `duty-segregation-combined` leaves its acts behind as legitimate history, so "no acts in this office" is
+   a state that database cannot be in. An assertion on it there would be a cross-spec coupling that breaks on
+   run order.
+
+   **And the approve screen can now carry a declaration.** Lifting the gate made the missing reason field a
+   live wall rather than a future one, so `EndorsementSection` asks for a reason when — and only when — the
+   office has declared COMBINED and the approver is the person who raised it. **The other fourteen pairs still
+   cannot carry one**, which is the remaining work and is stated here rather than discovered by an office that
+   declares the mode and finds its claim settlement blocked.
 7. **Tests and plants**, below.
 
 ---

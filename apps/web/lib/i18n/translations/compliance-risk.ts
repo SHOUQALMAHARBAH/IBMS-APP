@@ -220,6 +220,26 @@ export const COMPLIANCE_RISK = {
     icPairsScanned: 'الثنائيات المفحوصة',
     icLoading: 'جارٍ التحميل…',
     icRunError: 'تعذّر تشغيل التدقيق — حاول مرة أخرى.',
+    // Part 4 step 6 — the self-approval report. «الاعتماد الذاتي» names what it is; the access row is
+    // flagged «مراجعة صلاحيات نفسه» because "reviewed their own access" is the phrase that has to stand out,
+    // not a generic warning glyph.
+    icDeclaredHeading: 'اعتمادات ذاتية معلنة',
+    icDeclaredIntro:
+      'الحالات التي نفّذ فيها شخص واحد طرفي عملية تتطلب شخصين، في مكتب أعلن السماح بذلك. كل حالة مسجّلة بسببها وبالأدوار التي كان يحملها. أي مراجعة لصلاحيات الشخص نفسه تظهر في الأعلى ومُعلَّمة.',
+    icDeclaredOfficeSegregated: 'هذا المكتب يفصل بين المهام.',
+    icDeclaredOfficeCombined: 'هذا المكتب أعلن السماح بتنفيذ الشخص نفسه لطرفي العملية.',
+    icDeclaredOfficeDeclaredBy: 'أعلنه {who}.',
+    icDeclaredOfficeNeverDeclared: 'لم يُعلَن هذا صراحةً — هو الوضع الافتراضي.',
+    icDeclaredEmpty: 'لا توجد اعتمادات ذاتية معلنة.',
+    icDeclaredColWhen: 'التاريخ',
+    icDeclaredColWho: 'الشخص',
+    icDeclaredColPair: 'العملية',
+    icDeclaredColRoles: 'الأدوار التي تمنح الاعتماد',
+    icDeclaredColReason: 'السبب المسجّل',
+    icDeclaredAccessFlag: 'مراجعة صلاحيات نفسه —',
+    icDeclaredHatAmbiguous: 'أكثر من دور يمنح الاعتماد',
+    icDeclaredTruncated: 'تُعرض أحدث الحالات فقط.',
+    icDeclaredLoadError: 'تعذّر تحميل الاعتمادات الذاتية المعلنة. حاول مرة أخرى.',
     icNoPermission: 'لا تملك صلاحية internal-controls.view اللازمة لعرض هذه الشاشة.',
 
     // ---- Internal audit findings (#57) ---------------------------------------
@@ -474,6 +494,27 @@ export const COMPLIANCE_RISK = {
     icRunningButton: 'Running…',
     icPairsScanned: 'Pairs scanned',
     icLoading: 'Loading…',
+    // Part 4 step 6 — the self-approval report.
+    icDeclaredHeading: 'Declared self-approvals',
+    icDeclaredIntro:
+      'Occasions where one person performed both halves of an operation that needs two, in an office that has declared this is allowed. Each one carries its reason and the roles the person was acting under. A review of somebody\u2019s own access appears at the top, flagged.',
+    icDeclaredOfficeSegregated: 'This office separates duties.',
+    icDeclaredOfficeCombined:
+      'This office has declared that one person may perform both halves.',
+    icDeclaredOfficeDeclaredBy: 'Declared by {who}.',
+    icDeclaredOfficeNeverDeclared:
+      'Nobody has declared this explicitly — it is the default.',
+    icDeclaredEmpty: 'No declared self-approvals.',
+    icDeclaredColWhen: 'When',
+    icDeclaredColWho: 'Who',
+    icDeclaredColPair: 'Operation',
+    icDeclaredColRoles: 'Roles granting the approval',
+    icDeclaredColReason: 'Recorded reason',
+    icDeclaredAccessFlag: 'Reviewed their own access —',
+    icDeclaredHatAmbiguous: 'more than one role grants this',
+    icDeclaredTruncated: 'Showing the most recent only.',
+    icDeclaredLoadError:
+      'Could not load the declared self-approvals. Try again.',
     icRunError: 'Could not run the audit — try again.',
     icNoPermission: "You don't hold the internal-controls.view permission.",
 
