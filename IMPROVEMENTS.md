@@ -3537,14 +3537,39 @@ for a NEW reason without anyone noticing the change. It also cost real time here
 appeared in one red run and two of them were noise, so the diagnosis started by ruling out a
 connection to a nav change that had none.
 
-**Not fixed here** — it is a claims-test concern in a file this session has no other business in,
-and the queue has docs next. Named so it can be picked up deliberately:
+~~**Not fixed here**~~ — **STEP 1 DONE 2026-09-26. Step 2 deliberately not taken.**
 
-1. The four tests share one helper-shaped loop. Extract it, and have it wait on the state each
-   click depends on rather than on the final label — sixteen interactions with one assertion at the
-   end reports "slow" and "broken" identically.
-2. Then decide the timeout on evidence. Raising it first would be the § 1.1 mistake again: a
-   mitigation that buys time and hides the next crossing.
+1. ~~The four tests share one helper-shaped loop. Extract it~~ — **done, and the extraction was less
+   complete than this entry assumed.** Three of the four went through `driveClaimToVerdict`; the
+   fourth ("tracks the adjuster survey…") carried its own COPY of the document loop. So the loop is
+   now its own helper, `fileMandatoryClaimDocuments`, with both sites calling it.
+
+   **And it waits on the state each click depends on**: the filed-document count, which only advances
+   once the attach request returned AND the parent card refetched — which is also exactly when the
+   form is ready to be typed into again. Three intermediate assertions replace one final one, so no
+   `fill` races a re-render.
+
+   **PROVEN BY WHAT THE FAILURE NOW SAYS, which is the only claim a local green run can support.** A
+   flakiness fix cannot be demonstrated by passing locally — the tests passed locally before. What
+   IS demonstrable is the diagnostic: planting a missing refetch (`attach-never-refetches-the-card`,
+   dropping `await onDone()` from the component) now fails as
+
+       Error: expect(locator).toBeVisible() failed
+       Locator: getByText('1 file on record.')
+
+   naming the FIRST of three documents. The same break before this change could only surface as a
+   30-second timeout on `Documentation · complete`, with nothing to say which of twelve interactions
+   did not land — which is exactly the report that made the original diagnosis start by ruling out an
+   unrelated nav change.
+
+   Local run after the change: `rfq.spec.ts` 31/31 in **55s**, against 1.1m immediately before, on the
+   same machine. Suggestive, not evidence — CI's runner is the environment that matters and its flaky
+   count is where this has to be read.
+
+2. **Timeout NOT raised**, deliberately, and this is the part to hold to. Raising it would be § 1.1's
+   mistake: a mitigation that buys time and hides the next crossing. **The next reading of this entry
+   should be the CI flaky COUNT across a few runs**, not a local pass — and if it is still non-zero,
+   the fix was insufficient rather than the budget being too small.
 
 **The rule worth taking from it now:** `4 flaky` in a green run is a finding. Read the flaky count,
 not only the conclusion — and read whether it CHANGED, because a growing count is a different

@@ -178,15 +178,15 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
         workflowName: 'incident_containment',
       },
     });
-    // IMPROVEMENTS § 1.x weak-assertion sweep. This was
-     // `expect(containmentAfter[0]?.resolvedAt).not.toBeNull()`, which PASSES on an empty array:
-     // `?.` yields `undefined` and `undefined` is not null. Proven vacuous by pointing the query at a
-     // workflow name that does not exist — the file still passed 4/4 — so the assertion held equally
-     // well if the timer were never created, never resolved, or deleted outright.
-     //
-     // The length check is the fix: exactly one containment timer is what this test causes.
+    // IMPROVEMENTS § 1.8 — the weak-assertion sweep. This was
+    // `expect(containmentAfter[0]?.resolvedAt).not.toBeNull()`, which PASSES on an empty array:
+    // `?.` yields `undefined` and `undefined` is not null. Proven vacuous by pointing the query at a
+    // workflow name that does not exist — the file still passed 4/4 — so the assertion held equally
+    // well if the timer were never created, never resolved, or deleted outright.
+    //
+    // The length check is the fix: exactly one containment timer is what this test causes.
     expect(containmentAfter).toHaveLength(1);
-    expect(containmentAfter[0]!.resolvedAt).not.toBeNull();
+    expect(containmentAfter[0].resolvedAt).not.toBeNull();
 
     await request(app.getHttpServer())
       .post(`/incidents/${incident.id}/assess-impact`)
@@ -269,7 +269,7 @@ describe('Incident Management (e2e) — backlog Part C #55', () => {
     });
     // Same shape as the containment assertion above, and vacuous for the same reason.
     expect(seniorMgmtAfter).toHaveLength(1);
-    expect(seniorMgmtAfter[0]!.resolvedAt).not.toBeNull();
+    expect(seniorMgmtAfter[0].resolvedAt).not.toBeNull();
 
     // one incident, two regulators — the backlog's own third checkbox
     const notified = await request(app.getHttpServer())

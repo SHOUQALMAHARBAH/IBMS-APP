@@ -223,10 +223,10 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     // one row is the honest expectation — and a second UPDATE appearing here becomes a visible failure
     // rather than a coin flip about which row gets read.
     expect(audits).toHaveLength(1);
-    expect(JSON.stringify(audits[0]!.beforeValue)).toContain(
+    expect(JSON.stringify(audits[0].beforeValue)).toContain(
       '"durationValue":3',
     );
-    expect(JSON.stringify(audits[0]!.afterValue)).toContain('"durationValue":9');
+    expect(JSON.stringify(audits[0].afterValue)).toContain('"durationValue":9');
   });
 
   it('activates a policy, retiring whatever it replaces, and refuses a rival ACTIVE row', async () => {

@@ -1,0 +1,7 @@
+{
+  "attach-never-refetches-the-card": {
+    "file": "apps/web/components/claim/ClaimCard.tsx",
+    "from": "      setFileName('');\n      setStorageRef('');\n      await onDone();",
+    "to": "      setFileName('');\n      setStorageRef('');"
+  }
+}
