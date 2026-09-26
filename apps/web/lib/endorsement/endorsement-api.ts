@@ -61,6 +61,19 @@ export interface Endorsement {
   } | null;
   refund: {
     id: string;
+    /**
+     * Part 4 step 5 — the declared combined-duty act, when one person raised AND approved this refund in an
+     * office that has declared COMBINED mode. Null on every ordinary approval, which is every one today.
+     */
+    combinedDutyAct: {
+      id: string;
+      at: string;
+      actorUserId: string;
+      reason: string;
+      pair: string;
+      roles: string[];
+      hatAmbiguous: boolean;
+    } | null;
     amount: string;
     reason: string;
     raisedByUserId: string;

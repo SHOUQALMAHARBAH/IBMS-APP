@@ -260,6 +260,15 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       // at all. That is the whole reason the prep step split those two names.
       { href: '/settings/roles', labelKey: 'navRoleAdmin', permissions: ['role.read'] },
       {
+        href: '/settings/duty-segregation',
+        labelKey: 'navDutySegregation',
+        // BOTH codes, and the two see different screens: the office administrator can declare the mode,
+        // while Compliance / Executive / the external auditor can only read it — which is the separation the
+        // API enforces and the reason the read is deliberately open to the second group. A single gate here
+        // would hide the office's own posture from the people who review the acts it permits.
+        permissions: ['duty-segregation.mode.declare', 'internal-controls.view'],
+      },
+      {
         href: '/settings/org-units',
         labelKey: 'navOrgUnits',
         // Either code opens the screen; each column renders only for the one that gates it. A single

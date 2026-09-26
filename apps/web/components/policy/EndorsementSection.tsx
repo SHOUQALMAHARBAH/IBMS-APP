@@ -214,6 +214,19 @@ export function EndorsementSection({
                   {formatMoney(e.cancellation.returnPremium, language)}
                 </p>
               ) : null}
+              {e.refund?.combinedDutyAct ? (
+                // Part 4 step 5 — ON THE RECORD, not only in a report. Somebody reading this refund has to see
+                // that nobody else signed it without going to find the self-approval report.
+                <p
+                  data-testid={`combined-duty-${e.refund.id}`}
+                  style={{ margin: '0.4rem 0', fontSize: '0.85rem' }}
+                >
+                  {t('combinedDutyOnRecord', {
+                    roles: e.refund.combinedDutyAct.roles.join(', ') || '—',
+                  })}{' '}
+                  {e.refund.combinedDutyAct.reason}
+                </p>
+              ) : null}
               {e.refund ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
                   {t('endorsementRefundLabel')} {formatMoney(e.refund.amount, language)} ·{' '}

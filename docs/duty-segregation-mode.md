@@ -230,10 +230,15 @@ pair" — which authorization cannot answer, because it flattens. The pieces:
 
 Each step ships whole and is verifiable on its own.
 
-**Status: steps 1, 2 and 3 have SHIPPED. All fifteen database-backed pairs route through the engine**, plus
-one application-only pair that records an act with no column to carry it. **The mode is still not settable** by
-any endpoint, screen or service, so nothing in production can reach any of it — the control exists before
-anything can rely on it, which is the intended order.
+**Status: steps 1–5 have SHIPPED. The mode is now SETTABLE — and COMBINED is refused in code until the report
+exists.** That refusal is the shipping gate made real rather than promised: `SELF_APPROVAL_REPORT_EXISTS` is
+`false` in `duty-segregation-mode.service.ts`, declaring COMBINED returns 403 with the reason, and an e2e test
+asserts it. **The flag, the refusal and that test are deleted in ONE commit when step 6 ships** — together, or
+the gate was theatre.
+
+So an office can declare SEGREGATED explicitly today (which is a real act: "segregated because nobody ever
+chose" and "segregated because the administrator confirmed it on this date" are different facts, and the report
+needs the second), and cannot declare COMBINED at all.
 
 **One pair is deliberately NOT wired**: `AccessRecertificationItem`, because its constraint fires on an INSERT
 rather than an update, so wiring it changes nothing for the single-operator office the owner's condition is
@@ -349,11 +354,44 @@ which puts the three options to her in plain language.
 
    `PermissionRepository.findRolesGrantingCode` is new and is what makes the hat recordable: the cached
    authorization read flattens role provenance away, deliberately, so the hat cannot be derived from it.
-4. **The mode screen**, its permission, and the audited change.
-5. **The record screens** — a combined act is visible where the record is read.
+4. **[DONE]** **The mode screen**, its permission, and the audited change.
 
-   **And the half step 3a created, which belongs here**: `POST /refunds/:id/approve` now accepts a
-   `combinedDutyReason` that NO web control sends. Today that is unreachable (no office can be COMBINED), but
+   `duty-segregation.mode.declare`, granted to **OFFICE_ADMINISTRATOR alone**, and the omissions are the
+   design: COMPLIANCE, EXECUTIVE_MANAGEMENT and EXTERNAL_AUDITOR hold `internal-controls.view`, which is the
+   self-approval report. **Whoever DECLARES the mode must not be whoever REVIEWS the acts it permits** — the
+   same segregation principle one level up, applied to the control that weakens a control. Asserted by a test,
+   not left as a comment.
+
+   `GET /duty-segregation/mode` accepts EITHER code, which is the one place `PermissionsGuard`'s OR semantics
+   are what you want: the reviewers must see the office's posture beside the acts, and hiding it from them
+   would be the wrong half to close. `PATCH` names one code.
+
+   **The reason is MANDATORY here**, unlike the per-act one. Declaring how an office separates duties is never
+   incidental to another action — it is the whole request — so there is no ordinary path that breaks by
+   requiring it. Audited with before AND after: "it was already segregated" is what distinguishes a
+   confirmation from a change.
+
+   **NO idempotent short-circuit, and the first version had one.** Declaring SEGREGATED in an office that is
+   already SEGREGATED looks like a no-op and is not — skipping the write threw away the first explicit
+   declaration an office ever makes, which is the one most worth having. Caught by a test that asserted the
+   declaration stamps who and when.
+
+   `/auth/me` carries `dutySegregationMode` for every authenticated caller, because every approve control needs
+   it: a screen that cannot know the mode either asks everybody for a reason or asks nobody and then 422s.
+5. **[DONE for the pair that is proven end to end]** **The record screens** — a combined act is visible where
+   the record is read.
+
+   `combinedDutyActView` is one shape for all fifteen pairs (the actor, when, the reason, the pair named by its
+   constraint, the HAT, and whether the hat was ambiguous), and the endorsement's refund block projects it. A
+   reader looking at a refund sees on the record itself that nobody else signed it, without going to find a
+   report — which is Rule 4's requirement.
+
+   **The other fourteen views do not project it yet**, and that is a real limit rather than an oversight: each
+   needs its own `include` and its own projection, and the pair with an end-to-end proof is the one worth
+   wiring first. They are reachable through the report.
+
+   **[CLOSED for the mode screen, OPEN for the approve screens]** The half step 3a created:
+   `POST /refunds/:id/approve` and fourteen siblings accept a `combinedDutyReason` that NO web control sends. Today that is unreachable (no office can be COMBINED), but
    the moment step 4 ships the mode screen, an office that declares COMBINED would find its "Approve refund"
    button returning 422 "give a reason" with nowhere to type one — § 1.44's unreachable-surface shape, arriving
    from the other direction. So step 4 and step 5 are coupled: **the mode must not become settable before the

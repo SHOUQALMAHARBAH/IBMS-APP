@@ -4105,6 +4105,15 @@ else.
   APPLIED so a retry of `apply` is re-entrant and just re-attempts the policy transition.
   `422` while `REFUND_APPROVAL_PENDING`
   ("apply via `POST /refunds/:id/approve`").
+**Part 4 steps 4-5 (2026-09-26): `/settings/duty-segregation` is where an office declares whether it separates
+the two halves of an approval.** `duty-segregation.mode.declare` (OFFICE_ADMINISTRATOR alone) declares it;
+`internal-controls.view` (Compliance, Executive, external auditor) opens the same screen read-only — whoever
+declares the mode is deliberately not whoever reviews the acts it permits. Every declaration is audited with a
+mandatory reason and stamps who and when. **COMBINED is refused by the service** while
+`SELF_APPROVAL_REPORT_EXISTS` is false: the self-approval report is the shipping gate, and that flag, its
+refusal and its test are removed together when the report ships. `/auth/me` carries `dutySegregationMode` so an
+approve screen knows whether to ask for a reason.
+
 **Part 4 step 3 (2026-09-26): every route that records a checker decision now accepts an optional
 `combinedDutyReason`, and all fifteen database-backed maker/checker pairs resolve through
 `DutySegregationService`.** In a SEGREGATED office — every office today — behaviour and messages are unchanged.

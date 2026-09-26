@@ -788,6 +788,10 @@ export class AuthService {
     const roles = roleRefs.map((r) => r.name);
     const config = await this.securityConfig.get();
     const stepUpFresh = await this.sessions.isStepUpFresh(sessionId);
+    // Part 4 — read alongside the rest rather than lazily: `me()` is the one response every screen already
+    // waits for, so folding this in costs one query on a path that already makes several, and saves every
+    // approve screen a second round trip to learn whether it must ask for a reason.
+    const office = await this.organizations.findById(user.organizationId);
     // Part IV §10.4 — the single source the frontend drives every conditional
     // render from. Roles alone are not enough: the permission grid is what
     // actually decides what an action requires, and a UI branching on role
@@ -830,6 +834,12 @@ export class AuthService {
       idleTimeoutMinutes: config.idleTimeoutMinutes,
       hardLogoutAfterIdleMinutes: config.hardLogoutAfterIdleMinutes,
       stepUpFresh,
+      // Part 4 — whether this office has declared that one person may perform both halves of a maker/checker
+      // pair. Here rather than behind its own permission because EVERY approve control needs it: in COMBINED
+      // mode a screen must offer a reason field when the actor is also the maker, and a screen that cannot
+      // know the mode either asks everybody for a reason or asks nobody and then 422s. Not sensitive — a
+      // governance posture, and anybody who can approve anything needs to know it.
+      dutySegregationMode: office?.dutySegregationMode ?? 'SEGREGATED',
     };
   }
 

@@ -42,6 +42,11 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
     // scheme becoming visible on the screen, which is the point of it.
     //
+    // 210 -> 211 (Part 4 step 4: `duty-segregation.mode.declare` — the office administrator declaring
+    // whether this office separates the two halves of a maker/checker pair). A TOGGLE, like the four
+    // discard codes below: declaring a governance posture is not a point on the
+    // none/read/write/delete/full scale.
+    //
     // 206 -> 210 (Class B piece 1: `policy.discard`, `claim.discard`, `endorsement.discard`,
     // `recommendation.discard`). All four land in the TOGGLE list, 155 -> 159, and the five-state rows do
     // not move: `discard` is not one of the seven CRUD verbs a family row is built from, and it should not
@@ -49,10 +54,10 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // a point on that scale — it is a separate act with its own terminal semantics. An office granting
     // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
     // rendering it as its own checkbox.
-    expect(PERMISSION_CATALOGUE.length).toBe(210);
+    expect(PERMISSION_CATALOGUE.length).toBe(211);
     expect(crud.length).toBe(19);
     expect(crud.flatMap(codesOfRow).length).toBe(51);
-    expect(toggles.length).toBe(159);
+    expect(toggles.length).toBe(160);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

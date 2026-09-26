@@ -4,6 +4,9 @@ import { OrganizationRepository } from '../../repositories/organization.reposito
 import { PermissionRepository } from '../../repositories/permission.repository';
 import { UserRepository } from '../../repositories/user.repository';
 import { DutySegregationService } from './duty-segregation.service';
+import { DutySegregationModeService } from './duty-segregation-mode.service';
+import { DutySegregationController } from './duty-segregation.controller';
+import { AuditModule } from '../audit/audit.module';
 
 /**
  * `@Global()`, for the same reason `WorkflowModule` is: nineteen call sites in fourteen modules record a
@@ -14,7 +17,10 @@ import { DutySegregationService } from './duty-segregation.service';
  */
 @Global()
 @Module({
+  imports: [AuditModule],
+  controllers: [DutySegregationController],
   providers: [
+    DutySegregationModeService,
     DutySegregationService,
     OrganizationRepository,
     PermissionRepository,

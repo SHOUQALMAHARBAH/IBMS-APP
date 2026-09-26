@@ -67,6 +67,33 @@ export const COMMON = {
     discardedBadge: 'مسحوب — أُنشئ بالخطأ',
     discardedOn: 'سُحب في {when}',
     discardedReasonLabel: 'السبب:',
+    // /settings/duty-segregation — Part 4 step 4. Prefixed `dutyMode*`, NOT `dutySeg*`: the readiness list
+    // on /settings/roles already owns that prefix (Part 5), and the i18n guard refused the collision — which
+    // is the guard doing exactly what it exists for. Two adjacent features, two prefixes. NOT «إلغاء» and NOT «دمج المهام» loosely: «الفصل بين
+    // المهام» is the control's own name in Arabic governance language, and the COMBINED mode is described as
+    // «تنفيذ الشخص نفسه لطرفي العملية» — what actually happens — rather than a euphemism.
+    dutyModeHeading: 'الفصل بين المهام',
+    dutyModeIntro:
+      'بعض العمليات تتطلب شخصين: من ينفّذها ومن يعتمدها. يحدّد هذا الإعداد ما إذا كان مكتبك يفصل بين الطرفين، أو يسمح للشخص نفسه بتنفيذهما مع تسجيل السبب في كل مرة.',
+    dutyModeCurrentLabel: 'الوضع الحالي',
+    dutyModeSegregated: 'مفصول — يلزم شخصان',
+    dutyModeCombined: 'مدمج — يجوز للشخص نفسه تنفيذ الطرفين، مع تسجيل السبب',
+    dutyModeNeverDeclared: 'لم يُعلَن هذا الوضع صراحةً — هو الوضع الافتراضي.',
+    dutyModeDeclaredBy: 'أعلنه {who} في {when}',
+    dutyModeReasonLabel: 'سبب الإعلان',
+    dutyModeReasonHint:
+      '{min} أحرف على الأقل. يُحفَظ في سجل التدقيق بشكل دائم، وهو ما يُجيب عن سؤال «من قرّر هذا ومتى».',
+    dutyModeDeclareButton: 'إعلان الوضع',
+    dutyModeWorkingButton: 'جارٍ الحفظ…',
+    dutyModeLoadError: 'تعذّر تحميل وضع الفصل بين المهام. حاول مرة أخرى.',
+    dutyModeSaveError: 'تعذّر إعلان الوضع. حاول مرة أخرى.',
+    dutyModeReadOnly:
+      'لديك صلاحية الاطلاع على هذا الوضع دون تغييره. من يعلن الوضع ليس من يراجع الأعمال التي يسمح بها.',
+    dutyModeCombinedBlocked:
+      'لا يمكن إعلان الوضع المدمج بعد: تقرير الاعتمادات الذاتية الذي يعتمد عليه غير موجود حتى الآن.',
+    dutyModeSaved: 'تم إعلان الوضع وتسجيله في سجل التدقيق.',
+    // The act ON the record (step 5). «الشخص نفسه» — names what happened, not a euphemism for it.
+    combinedDutyOnRecord: 'نفّذ الشخص نفسه طرفي هذه العملية بصفته ({roles})، والسبب المسجّل:',
   },
   EN: {
     commonLoading: 'Loading…',
@@ -122,5 +149,30 @@ export const COMMON = {
     discardedBadge: 'Withdrawn — raised in error',
     discardedOn: 'Withdrawn on {when}',
     discardedReasonLabel: 'Reason:',
+    // /settings/duty-segregation — Part 4 step 4.
+    dutyModeHeading: 'Separation of duties',
+    dutyModeIntro:
+      'Some operations need two people: one to perform them and one to approve them. This setting decides whether your office separates those halves, or allows one person to do both with a recorded reason each time.',
+    dutyModeCurrentLabel: 'Current setting',
+    dutyModeSegregated: 'Separated — two people required',
+    dutyModeCombined:
+      'Combined — one person may do both halves, with a recorded reason',
+    dutyModeNeverDeclared:
+      'Nobody has declared this explicitly — it is the default.',
+    dutyModeDeclaredBy: 'Declared by {who} on {when}',
+    dutyModeReasonLabel: 'Reason for this declaration',
+    dutyModeReasonHint:
+      'At least {min} characters. Kept permanently in the audit trail, and it is what answers "who decided this, and when".',
+    dutyModeDeclareButton: 'Declare setting',
+    dutyModeWorkingButton: 'Saving…',
+    dutyModeLoadError: 'Could not load the separation-of-duties setting. Try again.',
+    dutyModeSaveError: 'Could not declare the setting. Try again.',
+    dutyModeReadOnly:
+      'You can see this setting but not change it. Whoever declares it is not whoever reviews the acts it permits.',
+    dutyModeCombinedBlocked:
+      'Combined cannot be declared yet: the self-approval report it depends on does not exist.',
+    dutyModeSaved: 'Declared, and recorded in the audit trail.',
+    combinedDutyOnRecord:
+      'One person performed both halves of this, acting as {roles}. Recorded reason:',
   },
 } as const;

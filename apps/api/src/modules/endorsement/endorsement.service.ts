@@ -19,6 +19,10 @@ import { WorkflowTransitionService } from '../workflow/workflow-transition.servi
 import { CommissionLedgerService } from '../commission/commission-ledger.service';
 import { canReadAllEndorsementOwners } from '../../common/rbac-visibility.util';
 import { DutySegregationService } from '../duty-segregation/duty-segregation.service';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import { ApproveRefundDto } from './dto/approve-refund.dto';
 import {
   compareMoney,
@@ -78,6 +82,7 @@ export interface EndorsementView {
   } | null;
   refund: {
     id: string;
+    combinedDutyAct: CombinedDutyActView | null;
     amount: string;
     reason: string;
     raisedByUserId: string;
@@ -285,6 +290,8 @@ export class EndorsementService {
             approvalThresholdMatrixLevel: e.refund.approvalThresholdMatrixLevel,
             paidAt: e.refund.paidAt,
             needsApproval: refundNeedsApproval(e.refund.amount),
+            // Part 4 step 5 — on the record, not only in a report.
+            combinedDutyAct: combinedDutyActView(e.refund.combinedDutyAct),
           }
         : null,
       commissionReversal: e.commissionReversal

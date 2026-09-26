@@ -11,7 +11,9 @@ import { PrismaService } from '../prisma/prisma.service';
 
 const ENDORSEMENT_INCLUDE = {
   cancellation: true,
-  refund: true,
+  // Part 4 step 5 — the declared combined-duty act, so a reader looking at the refund sees on the record
+  // itself that nobody else signed it. Null on every ordinary approval, which is every one today.
+  refund: { include: { combinedDutyAct: true } },
   commissionReversal: true,
   schedule: true,
   policy: {

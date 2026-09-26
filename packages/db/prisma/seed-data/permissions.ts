@@ -1093,6 +1093,20 @@ const complianceRisk: PermissionSeed[] = [
     roles: [DPO, COMPLIANCE],
   },
   {
+    // Part 4 step 4 — DECLARING that this office combines the two halves of a maker/checker pair.
+    //
+    // OFFICE_ADMINISTRATOR alone, and the omissions are the design. COMPLIANCE, EXECUTIVE_MANAGEMENT and
+    // EXTERNAL_AUDITOR hold `internal-controls.view`, which is the self-approval report — whoever DECLARES
+    // the mode must not be whoever REVIEWS the acts it permits. That is the same segregation principle one
+    // level up, applied to the control that weakens a control, and it is asserted by a test rather than left
+    // as a comment.
+    code: "duty-segregation.mode.declare",
+    module: "compliance-risk",
+    description:
+      "Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason",
+    roles: [OFFICE_ADMIN],
+  },
+  {
     code: "internal-controls.view",
     module: "compliance-risk",
     description: "View the periodic self-approval (maker/checker) audit report",

@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 478 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 479 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -329,6 +329,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'department.read',
     'department.update',
     'deprovisioning.execute',
+    'duty-segregation.mode.declare',
     'email.integration.manage',
     'email.integration.read',
     'employee.create',
@@ -537,7 +538,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 210 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 211 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -614,6 +615,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'audit-log.read', module: 'compliance-risk', description: "Read the immutable audit log" },
   { code: 'compliance-calendar.manage', module: 'compliance-risk', description: "Manage the regulatory compliance calendar" },
   { code: 'document-history.read', module: 'compliance-risk', description: "Read document version/workflow history" },
+  { code: 'duty-segregation.mode.declare', module: 'compliance-risk', description: "Declare whether this office separates the two halves of a maker/checker pair, with a recorded reason" },
   { code: 'incident.classification.co-sign', module: 'compliance-risk', description: "Co-sign a Material incident classification as Senior Management — the independent second actor, never the one who classified it" },
   { code: 'incident.classify', module: 'compliance-risk', description: "Classify an incident as Material or Non-Material (the DPO half of the pair; the co-sign is a separate permission)" },
   { code: 'incident.contain', module: 'compliance-risk', description: "Execute incident containment actions" },

@@ -13,5 +13,20 @@
     "file": "apps/api/src/modules/needs-assessment/needs-assessment.service.ts",
     "from": "      data: {\n        reviewedByUserId: actor.id,\n        reviewerCombinedDutyActId: combinedDutyActId,\n      },",
     "to": "      data: {\n        reviewedByUserId: actor.id,\n      },"
+  },
+  "gate-lifted-early": {
+    "file": "apps/api/src/modules/duty-segregation/duty-segregation-mode.service.ts",
+    "from": "export const SELF_APPROVAL_REPORT_EXISTS = false;",
+    "to": "export const SELF_APPROVAL_REPORT_EXISTS = true;"
+  },
+  "mode-change-not-audited": {
+    "file": "apps/api/src/modules/duty-segregation/duty-segregation-mode.service.ts",
+    "from": "    await this.audit.record({\n      userId: actor.id,\n      action: 'UPDATE',\n      entityType: 'Organization',",
+    "to": "    await Promise.resolve({\n      userId: actor.id,\n      action: 'UPDATE',\n      entityType: 'Organization',"
+  },
+  "mode-screen-ignores-the-permission": {
+    "file": "apps/web/app/(app)/settings/duty-segregation/page.tsx",
+    "from": "  const canDeclare = hasPermission(user, 'duty-segregation.mode.declare');",
+    "to": "  const canDeclare = true;"
   }
 }
