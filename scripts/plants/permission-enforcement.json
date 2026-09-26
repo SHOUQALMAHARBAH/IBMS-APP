@@ -15,7 +15,7 @@
     "to": "      \"Raise a refund (maker side)\","
   },
   "harvest-drops-what-she-wrote": {
-    "file": "scripts/generate-permission-descriptions-input.ts",
+    "file": "apps/web/lib/admin/permission-descriptions-input.ts",
     "from": "    if (trimmed.startsWith('ar:') && code !== null) {",
     "to": "    if (false) {"
   }

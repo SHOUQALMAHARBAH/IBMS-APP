@@ -3538,6 +3538,87 @@ entry follows, for the record.
   endorsement / payment-channel" action for `change` requests; per-`requestType`
   SLA figures once a service charter supplies them.
 
+### 3.14 `P1` — A customer record cannot be CORRECTED, and a PDPL correction request is closed by attestation alone
+
+Measured while scoping four-action Phase 3 ("update codes where a real update scenario
+exists, customer first"). The scope turned out to be larger than a permission code.
+
+**There is no update path for a `Customer` anywhere.** Not a narrow one — none.
+
+- `customer.controller.ts` has `POST /` (create), three `GET`s, `POST /:id/reveal-field`,
+  `POST /:id/ubos`, `POST /:id/documents`. No `PATCH`, no `PUT`.
+- `customer.repository.ts` contains no `update` of any kind, and no `prisma.customer.update`
+  call exists in `apps/api/src` outside the create path.
+- There is no `customer.update` permission code, and the web has no edit control —
+  `updateCustomer` does not exist in `apps/web/lib`.
+
+So a misspelled name, a changed phone number, a new registered address, a corrected date
+of birth: none can be fixed through the application. The only recorded route is to create
+a second customer, which is worse than the typo.
+
+**AND THAT IS THE BACK HALF OF A PDPL OBLIGATION.** `DsrType` includes `CORRECTION`
+(`schema.prisma`), with its own 10-day SLA (`dsr.config.ts`), its own workflow, and a
+DPO/DPO maker-checker closure. `DsrService.fulfil()` stamps `FULFILLED` on a staff
+member's **attestation** — there is no mechanism anywhere in the module that edits the
+subject's data. So the system asks an officer to certify a correction it gives them no way
+to perform. That is § 1.40's shape and the endorsement trap's shape again: the workflow
+exists, the capability does not.
+
+Compare 3.13, which is the same defect one size smaller: a `change` service request
+"records intent but executes nothing". This one carries a statutory deadline.
+
+**THE FIX IS NOT A PLAIN `PATCH`, AND THE MEASUREMENT IS WHY.** Three sub-decisions, each
+of which changes what gets built:
+
+1. **Which fields may be corrected at all.** Safe: `registeredAddress`,
+   `natureOfBusiness`, `contactPhoneEnc`, `contactEmailEnc`, `languagePreference`,
+   `preferredContactChannel`, `taxRegistrationNumber`, `registrationNumber`, and the name
+   fields. Must NOT be a casual edit: `customerType` (corporate↔individual is a different
+   entity, not a correction), `status` (a workflow position — `WorkflowTransitionService`
+   owns it), `source` (provenance — the `LEGACY_IMPORT` flag exists precisely so a row
+   cannot be read as having passed this system's KYC), `classification` (a PCMS
+   determination), `ownerUserId` (reassignment is its own act), `organizationId`.
+
+2. **`dateOfBirth` and `nationality` are SCREENING DISCRIMINATORS, and the schema says so
+   in a 10-line comment**: they are stored in the clear, unlike `nationalIdEnc`, because
+   their whole purpose is to separate a true sanctions match from a coincidence of names
+   against ~19,000 entries. Editing one silently can clear a real hit or manufacture a
+   false one. Screening IS re-runnable — `ScreeningService.run(kycId, actorUserId)` is what
+   the recurring batch calls per customer — so a correction to either field can trigger a
+   rescreen rather than being refused. It must do one or the other, deliberately.
+
+3. **`KYCRecord` DOES NOT SNAPSHOT THE IDENTITY IT APPROVED.** It carries `customerId`,
+   `status`, `approvedByUserId`, `approvedAt` — and nothing about *what* was approved. That
+   is latent today because nothing can change the data. The moment a correction route
+   exists it goes live: correcting a name leaves an `APPROVED` KYC record attesting to a
+   name nobody approved, with no way to tell from the record that it happened.
+   `nationalIdEnc` is the sharpest case and is Highly Confidential besides.
+
+**Fix — three shapes, smallest first:**
+
+- **(a) Contact-and-address only.** `customer.update` gating a `PATCH` over the fields with
+  no KYC or screening consequence. Ships small, fixes the common case (phone, email,
+  address, language, channel), and does NOT satisfy a `CORRECTION` DSR about a name or a
+  date of birth.
+- **(b) (a) plus identity fields, with consequences wired.** Correcting a screening
+  discriminator re-runs screening; correcting an identity field moves the KYC record out
+  of `APPROVED` into a review state. Satisfies the DSR properly. Costs a rescreen path, a
+  KYC status transition, and a decision about what an in-flight policy does meanwhile.
+- **(c) (b) plus an approved-identity snapshot on `KYCRecord`**, so the record says what it
+  attested to and a later correction is visible as a divergence rather than invisible.
+  The only shape where an approved KYC cannot silently come to mean something else.
+
+**Also owed either way:** a correction made in service of a DSR should carry that request's
+id, so the attestation has evidence behind it — the same argument as `CombinedDutyAct`
+being written before the write it excuses. And the audit row must record that a field
+changed WITHOUT its value where the field is encrypted or Highly Confidential
+(`sensitive-data-handling.md`: metadata not body).
+
+**Not built.** The sub-decisions in 2 and 3 are AML and KYC control decisions, not
+implementation details, and (a) versus (b) versus (c) is a question about what the
+brokerage owes a data subject — so it is recorded here rather than answered by whoever
+happened to be writing the endpoint.
+
 ---
 
 ## 4. Drafted / unsourced values (need a real regulatory citation)

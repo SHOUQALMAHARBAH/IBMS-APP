@@ -3,15 +3,20 @@ import {
   harvestExistingArabic,
   render,
   writtenLinesIn,
-} from '../../../scripts/generate-permission-descriptions-input';
+} from '../lib/admin/permission-descriptions-input';
 
 /*
- * Why a `scripts/` spec lives under `apps/web/test/`: `turbo run test` runs each package's own test
- * script and there is no root vitest project, so a `scripts/*.spec.ts` would be a guard that is
- * DEFINED AND NEVER INVOKED — the § 1.51(b) defect this repo has already recorded once, where a plant
- * was listed in a commit message as proven and had never run. This runner exists, it already hosts a
- * spec that checks e2e source files rather than web runtime code (`e2e-anchored-reads.test.ts`), and
- * the generator's heaviest dependency (`lib/admin/permission-matrix.ts`) is web code.
+ * TWO REASONS THIS FILE IS HERE AND NOT UNDER `scripts/`, both of them mistakes I made first.
+ *
+ * (1) `turbo run test` runs each package's own test script and there is no root vitest project, so a
+ * `scripts/*.spec.ts` is a guard DEFINED AND NEVER INVOKED — § 1.51(b), which this repo has already
+ * been bitten by once.
+ *
+ * (2) Moving it here while the code it tests stayed in `scripts/` made the import cross the repo
+ * root, and the DOCKER BUILD failed on it: `turbo prune web --docker` keeps only web's workspace
+ * dependencies, so `scripts/` does not exist inside the image. Every local gate passed. CI is the only
+ * environment that starts from nothing. The code under test now lives in `lib/admin/` beside the
+ * matrix it already depended on.
  *
  * THE GENERATOR'S ONE DANGEROUS PROPERTY, TESTED RATHER THAN DESCRIBED.
  *
