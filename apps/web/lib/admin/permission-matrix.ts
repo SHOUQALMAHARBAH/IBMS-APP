@@ -13,8 +13,8 @@ import type { PermissionCatalogueEntry } from './role-admin-api';
  *   end in a CRUD verb from {read, create, update, delete, view, manage}. Everything else is a
  *   toggle.
  *
- * Measured on the live catalogue: 213 codes, 12 modules, 20 qualifying families covering 54 codes,
- * 159 toggles — up from 186 / 13 / 27 / 159, mostly because four-action Phase 1 split four umbrellas
+ * Measured on the live catalogue: 216 codes, 12 modules, 20 qualifying families covering 56 codes,
+ * 160 toggles — up from 186 / 13 / 27 / 159, mostly because four-action Phase 1 split four umbrellas
  * into sets that then QUALIFIED as families. Those numbers are asserted by a test against the real
  * catalogue, so ADDING A PERMISSION FAILS THE TEST rather than silently drifting the screen — which
  * is the point of deriving this at render time. The owner's notes said ~58 of 167; the proportions

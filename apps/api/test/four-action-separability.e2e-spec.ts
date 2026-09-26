@@ -325,4 +325,85 @@ describe('four-action Phases 1 and 4 — each successor can be held alone (e2e)'
       'the deactivate code must reach the handler',
     ).not.toBe(403);
   }, 180_000);
+
+  /*
+   * PHASE 4, SECOND UMBRELLA — `sla.policy.manage`, split on the owner's ruling.
+   *
+   * Two things are worth observing separately here and neither is visible to a seeded account, because
+   * COMPLIANCE, MANAGER and EXEC each received all four successors:
+   *
+   *   1. Editing an SLA's duration and switching the SLA off are now separate capabilities.
+   *   2. The HOLIDAY calendar came out from under the same umbrella with its own code, because the
+   *      umbrella gated two entities. A role that can configure a policy cannot thereby add a public
+   *      holiday, and that is the assertion that would silently stop holding if someone re-gated
+   *      `POST /sla/holidays` back onto a policy code.
+   */
+  it('sla.policy.update alone corrects a policy and cannot create, switch off, or add a holiday', async () => {
+    const token = await actorHolding(app, 'sla-updater', [
+      'sla.policy.read',
+      'sla.policy.update',
+    ]);
+
+    // The half it holds. A 200 on the list is the anchor that makes every 403 below about a permission.
+    await request(app.getHttpServer())
+      .get('/sla/policies')
+      .set(bearer(token))
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/sla/policies')
+      .set(bearer(token))
+      .send({
+        policyCode: `SLA-SEP-${RUN}`.toUpperCase().slice(0, 60),
+        policyName: 'Refused by separation',
+        processType: `separability_${RUN}`,
+        durationValue: 3,
+        durationUnit: 'BUSINESS_DAYS',
+        sourceType: 'INTERNAL_TARGET',
+      })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/sla/policies/00000000-0000-4000-8000-000000000000/deactivate')
+      .set(bearer(token))
+      .send({})
+      .expect(403);
+    // The holiday calendar is a DIFFERENT entity, and this is the assertion that says so.
+    await request(app.getHttpServer())
+      .post('/sla/holidays')
+      .set(bearer(token))
+      .send({ observedOn: '2027-01-01', name: `Refused ${RUN}` })
+      .expect(403);
+  }, 180_000);
+
+  it('sla.holiday.create alone adds a holiday and cannot touch a policy', async () => {
+    // The inverse, and the reason this code exists rather than riding on `sla.policy.create`: maintaining
+    // the business-day calendar is clerical, while an SLA duration is a policy decision with regulatory
+    // weight. An office can now grant one without the other.
+    const token = await actorHolding(app, 'sla-holidays', [
+      'sla.holiday.create',
+    ]);
+
+    await request(app.getHttpServer())
+      .post('/sla/holidays')
+      .set(bearer(token))
+      .send({ observedOn: '2027-01-02', name: `Separability ${RUN}` })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/sla/policies')
+      .set(bearer(token))
+      .send({
+        policyCode: `SLA-HOL-${RUN}`.toUpperCase().slice(0, 60),
+        policyName: 'Refused by separation',
+        processType: `separability_${RUN}`,
+        durationValue: 3,
+        durationUnit: 'BUSINESS_DAYS',
+        sourceType: 'INTERNAL_TARGET',
+      })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/sla/policies')
+      .set(bearer(token))
+      .expect(403);
+  }, 180_000);
 });

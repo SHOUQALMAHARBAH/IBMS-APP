@@ -289,10 +289,14 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
   });
 
   it('separates "change the duration" from "declare it legally required"', async () => {
-    // BRANCH_DEPARTMENT_MANAGER holds sla.policy.manage but NOT
+    // BRANCH_DEPARTMENT_MANAGER holds sla.policy.update but NOT
     // sla.policy.regulatory. Shortening a deadline is a normal governance
     // edit; asserting the deadline is the law is not, and the split is a ROUTE
     // boundary rather than a branch inside one handler.
+    //
+    // This distinction is WHY the owner ruled that splitting `sla.policy.manage` was routine: the
+    // decision that carries the regulatory weight on this surface already stood apart, so splitting
+    // the CRUD verbs around it takes nothing away from it (IMPROVEMENTS § 3.15).
     const manager = await makeUser('sla-manager', 'BRANCH_DEPARTMENT_MANAGER');
 
     const listed = await request(app.getHttpServer())

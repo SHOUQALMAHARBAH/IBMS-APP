@@ -57,7 +57,10 @@ export default function SlaPoliciesPage() {
   const { user, isLoading } = useAuth();
   const { language, t } = useLanguage();
   const isArabic = language === "AR";
-  const canManage = hasPermission(user, 'sla.policy.manage');
+  // Four-action Phase 4 (owner-ruled) — editing an SLA's duration and switching it off are separate
+  // capabilities. There is no create control on this screen to gate; see IMPROVEMENTS § 1.57.
+  const canUpdate = hasPermission(user, 'sla.policy.update');
+  const canDeactivate = hasPermission(user, 'sla.policy.deactivate');
 
   const [status, setStatus] = useState<SlaPolicyStatus | "ALL">("ACTIVE");
   const [rows, setRows] = useState<SlaPolicy[] | null>(null);
@@ -215,7 +218,7 @@ export default function SlaPoliciesPage() {
                       </div>
                     </td>
                     <td style={cell}>
-                      {canManage ? (
+                      {canUpdate ? (
                         <div style={{ display: "flex", gap: "0.3rem" }}>
                           <input
                             aria-label={t('slapDurationAria', { name: p.policyName })}
@@ -260,8 +263,9 @@ export default function SlaPoliciesPage() {
                     </td>
                     <td style={cell}>{t(ENUM_LABEL.SlaPolicyStatus[p.status])}</td>
                     <td style={cell}>
-                      {canManage ? (
+                      {canUpdate || canDeactivate ? (
                         <div style={{ display: "flex", gap: "0.3rem" }}>
+                          {canUpdate ? (
                           <button
                             type="button"
                             disabled={
@@ -284,7 +288,8 @@ export default function SlaPoliciesPage() {
                           >
                             {t('slapSave')}
                           </button>
-                          {p.status === "ACTIVE" ? (
+                          ) : null}
+                          {!canDeactivate ? null : p.status === "ACTIVE" ? (
                             <button
                               type="button"
                               disabled={busy}

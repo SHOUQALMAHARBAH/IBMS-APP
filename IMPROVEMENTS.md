@@ -3026,10 +3026,11 @@ Not built here deliberately — the owner's ask was the search component and the
 halves, and an action/date filter is a different feature. Recorded so the next person does not have to
 re-measure the DTO to find out.
 
-### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Five ways a proof can be absent while looking present
+### 1.51 — A GUARD THAT RUNS, FAILS, AND IS NOT READ. Six ways a guard can fail to be worth its cost
 
 Five separate mechanisms, found between 2026-09-24 and 2026-09-25, all with the same signature: the
-evidence LOOKED like evidence.
+evidence LOOKED like evidence. A sixth, on a different axis, was added on 2026-09-26: the proof was real
+and the person it fired on could not act on it.
 
 **(a) A plant that never applied.** Three plants reported PASSING and had not touched a file.
 `process.argv[2]` is empty when node runs with `-e` — no script path occupies argv[1] — so the
@@ -3124,6 +3125,87 @@ were in it simultaneously. A fourth was added by the same reasoning applied one 
 lands on a surface where nothing can observe it is silent absence wearing a green suite. The fifth is the
 one that says loudness is not sufficient — a tool can fail loudly about the wrong thing, and then the
 operator is misinformed with a non-zero exit code to back it up.
+
+**(f) A GUARD WHOSE FAILURE MODE PUNISHES THE NON-ENGINEER.** Added 2026-09-26, and it is a different
+axis from (a)-(e): those are about whether a proof exists. This one is about who pays when it fires.
+
+`docs/permission-catalogue-for-descriptions.txt` is the file the OWNER writes Arabic permission
+descriptions into. Its generator counted the lines she had written and put that count INTO the file. So
+the file's contents depended on how much of her work was done — and writing a single Arabic sentence made
+`--check` report STALE, turning `verify.sh` red until a developer regenerated it.
+
+Trace what that does. She types one sentence into the file she was asked to fill in. A gate she has never
+heard of goes red, for a reason she cannot diagnose, about a file she is the author of. The most likely
+outcomes are that she stops touching the file, or a developer "fixes" it by deleting her line. **A guard
+that turns red because the owner did the work the guard exists to support is worse than no guard**, because
+no guard merely fails to help, while this one actively obstructs.
+
+Found before she hit it, by writing a real Arabic line into the real file and running the gate — not by
+reading the code, which looked reasonable. The fix is a property, not a warning in a comment: the file's
+bytes depend only on the catalogue and on her own lines, so `render(catalogue, harvest(file))` equals
+`file` and the gate stays quiet while she works. The count went to stdout, where it informs the developer
+running the tool and reaches nobody else.
+
+**The question this adds to the checklist, and it is not about correctness:** *when this gate fires, who
+sees it, and can that person act on it?* A gate whose audience is a developer may be as strict as it
+likes. A gate that can fire on a non-engineer's ordinary work has to be satisfiable BY that work — or it
+must not be able to observe that work at all, which is what was chosen here.
+
+Two consequences worth stating, because both were live in this repo:
+
+- **A file a non-engineer authors must not have machine-derived content interleaved with theirs.** The
+  count was the interleaving. Anything derived belongs where only the tool looks.
+- **Check the same property on any gate that reads a hand-maintained file.** The permission-description
+  input file was the one; `docs/` holds others she is the intended author or reader of, and the test to
+  apply is the one above.
+
+### 1.57 `P2` — THE HOLIDAY CALENDAR IS EMPTY AND UNREACHABLE, SO EVERY BUSINESS-DAY DEADLINE IS A LOWER BOUND
+
+Found while splitting `sla.policy.manage` (four-action Phase 4): the umbrella's fifth route is
+`POST /sla/holidays`, which turned out to be the only writer of a table nothing can reach.
+
+**Measured, not inferred:**
+
+- `SlaHoliday` holds **0 rows on dev and 0 on db-test**. Nothing seeds it — no `slaHoliday`
+  reference exists anywhere in `seed.ts` or `seed-data/`.
+- `POST /sla/holidays` has **no web caller**: `apps/web/lib/sla/sla-policy-api.ts` exports
+  `listSlaPolicies`, `getSlaPolicy`, `updateSlaPolicy`, `activateSlaPolicy`,
+  `deactivateSlaPolicy` and `updateSlaPolicySource`, and there is no `createSlaPolicy` and no
+  holiday client at all. `GET /sla/holidays` has no caller either.
+- The arithmetic DOES consult it: `sla-status.config.ts` turns `SlaHoliday` rows into the set
+  `business-days.util.ts` expects, and that util excludes them from its day count.
+
+So the mechanism is built and correct, and the data is absent with no way to supply it. **An office
+cannot enter Eid.** `POST /sla-policies` is unreachable from the web for the same reason, which is the
+smaller half of this finding.
+
+**THE FAILURE DIRECTION IS SAFE, AND THAT IS WHY THIS IS P2 RATHER THAN P1.** `business-days.util.ts`
+says so in its own header: without a holiday calendar a computed deadline is *"a lower bound (i.e.
+never later than the true legal deadline)"*. Skipping only weekends means the system counts to its
+deadline sooner than the law does, so it chases staff EARLY. It never reports a deadline as further
+away than it legally is.
+
+**The real cost is a false breach, and it points the wrong way.** An SLA the system marks breached may
+not be breached in law — if two public holidays fall inside a ten-working-day window, the true deadline
+is two days later than the one computed. The breach reports, the SLA dashboard, and any PDPL evidence
+drawn from them therefore over-report lateness. For a compliance artefact that is the worse direction:
+the brokerage's own records would show it missing statutory deadlines it actually met.
+
+**Fix, in the order that matters:**
+
+1. **Seed the calendar.** Jordan's public holidays are gazetted annually and several are lunar, so
+   they cannot be computed — they have to be entered. Until they are, the two routes below have nothing
+   to maintain.
+2. **Give `POST /sla/holidays` a screen.** It now has its own permission (`sla.holiday.create`,
+   split out in migration `20261030100000` precisely because maintaining the calendar is a different
+   job from configuring a policy), and that code currently gates a route no screen calls — which is
+   § 1.44's shape, recorded here rather than left to be discovered.
+3. **Then decide whether a deadline computed without a calendar should be LABELLED as approximate**
+   wherever it is shown. The util is honest in a comment; the SLA dashboard is not, and the dashboard
+   is what a person reads.
+
+**Not built.** Item 1 needs a source (the gazette, or the owner's list), which makes it the same class
+as the drafted/unsourced values in § 4 rather than something to invent.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
@@ -3655,6 +3737,64 @@ changed WITHOUT its value where the field is encrypted or Highly Confidential
 implementation details, and (a) versus (b) versus (c) is a question about what the
 brokerage owes a data subject — so it is recorded here rather than answered by whoever
 happened to be writing the endpoint.
+
+**WRITTEN FOR THE OWNER: `docs/decision-correcting-a-customers-details.md`** (bilingual, Arabic first, no
+schema vocabulary). It separates the two kinds of question explicitly, because they are not the same kind
+and only one of them is hers:
+
+- **What the brokerage owes the customer — hers to decide.** Which details may be corrected on request,
+  and whether a correction request may be closed before a change is recorded.
+- **What may be altered and under what record — needs a SOURCE, not our judgement.** The three AML/identity
+  questions above (does an approved identity check survive a name correction; must a changed screening
+  discriminator re-run the check; must the approval record what it approved). Same treatment as the
+  duty-segregation citations: the Central Bank's AML instructions, the office's own approved policy, or the
+  compliance officer's determination — put in a form that can be answered yes or no.
+
+**One part of this is recommended REGARDLESS of which option is chosen, and it is the part not to defer:**
+while correcting a name is impossible, staff must not be able to mark such a request "done". There has to be
+a way to record "we could not complete this, and why". A closed request with nothing behind it is worse than
+an open one — the open one is visible and the falsely closed one is not.
+
+### 3.15 — DECIDED (2026-09-26): `sla.policy.manage` splits, `user.manage` DOES NOT
+
+Four-action Phase 4 measured six `*.manage` umbrellas that gate a deactivation alongside a
+create. Four were disposed of on the measurement (see the Phase 4 migration's own header).
+The remaining two were put to the owner as a decision rather than answered by whoever was
+writing the migration. **Both are now ruled on. This is a decision record, not a backlog
+item.**
+
+#### `sla.policy.manage` — SPLIT. Routine.
+
+Owner's ruling: split it. The reasoning given: it is routine, and `sla.policy.regulatory`
+already stands apart for the decision that actually matters on that surface — which is
+*whether an SLA is a statutory deadline or an internal target*, not *who may switch one
+off*. Splitting the CRUD verbs therefore takes nothing away from the distinction that
+carries the regulatory weight.
+
+#### `user.manage` — DO NOT SPLIT. Not now, and not as part of Phase 4.
+
+Owner's ruling, with the reasoning recorded because it is the part that must survive:
+
+`user.manage` anchors the **last-administrator lockout guard** at four separate routes —
+revoking a grant, deactivating a user, retiring a role, and unchecking a box on the Role
+matrix. That guard exists because **an office that loses every administrator cannot repair
+itself from inside the system**; the owner decided explicitly to keep it. Splitting the
+umbrella means re-deriving that safety control across four routes, and the benefit on the
+other side of the ledger is view-without-edit on one screen.
+
+That is a bad trade, and it is a bad trade in a specific way worth naming: the cost is
+borne by a control whose failure mode is an office locked out of its own administration,
+while the benefit is a convenience on a settings page.
+
+**THE ORDER IF THIS IS EVER REVISITED, AND IT IS NOT NEGOTIABLE:** the lockout guard is
+**re-proven first** — all four routes, each with a plant that shows the guard firing — and
+the split follows. Never the reverse. A split that lands first and leaves the guard to be
+re-verified afterwards is the shape where a safety control is quietly weakened by a
+tidy-up, which is exactly what this ruling refuses.
+
+Anyone picking this up should also know that `user.manage` is read by the duty-segregation
+signal as well as by the four lockout routes, so "four routes" is the floor on the work,
+not the whole of it.
 
 ---
 

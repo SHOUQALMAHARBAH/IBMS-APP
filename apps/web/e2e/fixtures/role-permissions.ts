@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 481 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 490 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -93,8 +93,11 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'sales-target.manage',
     'service-request.manage',
     'sla-dashboard.view',
-    'sla.policy.manage',
+    'sla.holiday.create',
+    'sla.policy.create',
+    'sla.policy.deactivate',
     'sla.policy.read',
+    'sla.policy.update',
     'sla.timer.pause',
     'training.record',
     'up-sell.detect',
@@ -175,9 +178,12 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'sanctions-pep.screen',
     'screening.run',
     'sla-dashboard.view',
-    'sla.policy.manage',
+    'sla.holiday.create',
+    'sla.policy.create',
+    'sla.policy.deactivate',
     'sla.policy.read',
     'sla.policy.regulatory',
+    'sla.policy.update',
     'sla.timer.pause',
     'ubo.record',
     'vendor.create',
@@ -264,8 +270,11 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'risk-profile.read',
     'sales-target.manage',
     'sla-dashboard.view',
-    'sla.policy.manage',
+    'sla.holiday.create',
+    'sla.policy.create',
+    'sla.policy.deactivate',
     'sla.policy.read',
+    'sla.policy.update',
     'up-sell.read',
   ],
   "EXTERNAL_AUDITOR": [
@@ -540,7 +549,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 213 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 216 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -739,9 +748,12 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'retention.dispose.approve', module: 'pdpl', description: "Give final DPO approval on a disposal batch (checker side of dual control)" },
   { code: 'retention.dispose.nominate', module: 'pdpl', description: "Nominate a disposal batch (maker side of dual control)" },
   { code: 'ropa.manage', module: 'pdpl', description: "Maintain the Records of Processing Activities register" },
-  { code: 'sla.policy.manage', module: 'sla', description: "Create, edit, activate and deactivate SLA policies (duration, calendar, escalation)" },
+  { code: 'sla.holiday.create', module: 'sla', description: "Add a public holiday to the business-day calendar every SLA deadline is counted against" },
+  { code: 'sla.policy.create', module: 'sla', description: "Create an SLA policy — its duration, calendar and escalation stages" },
+  { code: 'sla.policy.deactivate', module: 'sla', description: "Switch an SLA policy off so it stops applying, and switch a dormant one back on" },
   { code: 'sla.policy.read', module: 'sla', description: "View configured SLA policies and their source/provenance" },
   { code: 'sla.policy.regulatory', module: 'sla', description: "Change an SLA policy's source type and regulatory citation — i.e. whether the system claims the deadline is legally required" },
+  { code: 'sla.policy.update', module: 'sla', description: "Correct an SLA policy's duration, calendar or escalation stages" },
   { code: 'sla.timer.pause', module: 'sla', description: "Pause and resume a running SLA clock, with a recorded reason" },
   { code: 'bcp-dr.manage', module: 'supporting-operations', description: "Manage Business Continuity / Disaster Recovery plans" },
   { code: 'deprovisioning.execute', module: 'supporting-operations', description: "Execute the access de-provisioning checklist on an employment-status change" },

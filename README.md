@@ -4112,6 +4112,27 @@ the office's own mode and declaration date — on `/internal-controls`, above th
 Access self-reviews sort first and render flagged, which is the owner's condition and is proven by content
 rather than by a status code. Reading it is audited (counts only, never a name).
 
+**Four-action Phase 4, second umbrella (2026-09-26): `sla.policy.manage` becomes `sla.policy.create` /
+`.update` / `.deactivate` — plus `sla.holiday.create`** (migration `20261030100000`). Four successors for
+one umbrella because it gated two different entities: SLA policies, and the business-day holiday calendar
+(`POST /sla/holidays`). Mapping "add a public holiday" onto "create an SLA policy" would be a lie about
+what the code gates. `sla.policy.read` already existed as the fourth action, is held by five roles rather
+than the umbrella's three, and is untouched; the holiday READ stays on it. Activate and deactivate share
+one code, the same pattern as `insurer.deactivate` and `role.deactivate`.
+
+**The owner's rulings on Phase 4's two open candidates**, recorded in `IMPROVEMENTS.md` § 3.15:
+`sla.policy.manage` splits (routine — `sla.policy.regulatory` already carries the decision that matters
+on that surface). **`user.manage` does NOT split**, because it anchors the last-administrator lockout
+guard at four routes and that guard is what stops an office which loses every administrator from being
+unable to repair itself. If it is ever revisited, the lockout guard is re-proven first and the split
+follows — never the reverse.
+
+**That split found a real defect: `IMPROVEMENTS.md` § 1.57.** The holiday calendar every business-day
+deadline is counted against is empty on both databases, nothing seeds it, and its only writer had no web
+caller — so an office cannot enter Eid. The failure direction is safe (without holidays a deadline is a
+lower bound, never later than the law), but breach reports therefore over-report lateness, which for a
+compliance artefact is the wrong direction.
+
 **Four-action Phase 4 (2026-09-26): `payment-channel.manage` becomes `payment-channel.read` /
 `.create` / `.deactivate`** (migration `20261029100000`). A payment channel is where client money is
 sent, and one checkbox gated adding a destination, listing them, and disabling one — its own
@@ -4130,10 +4151,11 @@ three successors and therefore cannot tell them apart:
 see the list, cannot add a bank account", which is the state an office creates the first time it uses
 the Role screen. Four plants, each killing only its own test.
 
-**Phase 4 is not finished**: `sla.policy.manage` and `user.manage` also gate a deactivation and are
-deliberately deferred — `user.manage` anchors the last-administrator lockout guard, so splitting it is
-a decision about a safety control. `email.integration.manage`, `retention-case.manage` and
-`risk-register.manage` are measured NOT to need splitting; see `CLAUDE.md` for why.
+~~**Phase 4 is not finished**: `sla.policy.manage` and `user.manage` also gate a deactivation and are
+deliberately deferred.~~ **RESOLVED by the owner's rulings above** — `sla.policy.manage` split, and
+`user.manage` is deliberately CLOSED rather than pending (§ 3.15). `email.integration.manage`,
+`retention-case.manage` and `risk-register.manage` are measured NOT to need splitting; see `CLAUDE.md`
+for why. **Four-action has nothing open.**
 
 **Part 4 step 5 completed (2026-09-26): all twelve approve screens can carry a combined-duty reason.**
 `components/ui/CombinedDutyReasonField.tsx` is ONE control for every pair — the field, the ten-character floor,

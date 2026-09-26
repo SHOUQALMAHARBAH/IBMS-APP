@@ -1,6 +1,6 @@
 PERMISSION CATALOGUE — input for the Arabic one-line descriptions
 
-213 permission codes, 12 modules. Generated from the seeded database by
+216 permission codes, 12 modules. Generated from the seeded database by
 `npm run db:permission-descriptions`, so this IS what the Role screen renders — not a separate
 list that can drift from it. Regenerate rather than hand-editing the structure: any line you have
 already written after `ar:` is carried forward by code and is never overwritten.
@@ -802,15 +802,25 @@ MODULE: pdpl   —   حماية البيانات   (16 codes)
           en: Maintain the Records of Processing Activities register
           ar: ................................................................
 
-MODULE: sla   —   مستويات الخدمة   (4 codes)
+MODULE: sla   —   مستويات الخدمة   (7 codes)
 ------------------------------------------------------------------------------------------------
 
-  [5-STATE] sla.policy   (manage / read)
-      sla.policy.manage
-          en: Create, edit, activate and deactivate SLA policies (duration, calendar, escalation)
+  [5-STATE] sla.policy   (create / deactivate / read / update)
+      sla.policy.create
+          en: Create an SLA policy — its duration, calendar and escalation stages
+          ar: ................................................................
+      sla.policy.deactivate
+          en: Switch an SLA policy off so it stops applying, and switch a dormant one back on
           ar: ................................................................
       sla.policy.read
           en: View configured SLA policies and their source/provenance
+          ar: ................................................................
+      sla.policy.update
+          en: Correct an SLA policy's duration, calendar or escalation stages
+          ar: ................................................................
+  [toggle]  sla.holiday.create
+      sla.holiday.create
+          en: Add a public holiday to the business-day calendar every SLA deadline is counted against
           ar: ................................................................
   [toggle]  sla.policy.regulatory
       sla.policy.regulatory
@@ -887,4 +897,4 @@ MODULE: supporting-operations   —   العمليات المساندة   (17 co
           en: Record security-awareness training completion
           ar: ................................................................
 ================================================================================================
-TOTALS: 20 five-state families covering 54 codes, 159 toggles, 213 codes in all.
+TOTALS: 20 five-state families covering 56 codes, 160 toggles, 216 codes in all.

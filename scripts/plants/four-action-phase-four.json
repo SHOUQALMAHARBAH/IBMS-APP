@@ -28,5 +28,25 @@
     "file": "apps/web/lib/i18n/translations/finance.ts",
     "from": "pcNoPermission: 'لا تملك صلاحية payment-channel.read اللازمة لعرض قنوات الدفع.',",
     "to": "pcNoPermission: 'لا تملك صلاحية payment-channel.manage اللازمة لعرض قنوات الدفع.',"
+  },
+  "holiday-regated-onto-a-policy-code": {
+    "file": "apps/api/src/modules/sla/sla-timer.controller.ts",
+    "from": "@RequirePermissions('sla.holiday.create')",
+    "to": "@RequirePermissions('sla.policy.update')"
+  },
+  "deactivate-regated-onto-the-update": {
+    "file": "apps/api/src/modules/sla/sla-policy.controller.ts",
+    "from": "@RequirePermissions('sla.policy.deactivate')\n  @Post(':id/deactivate')",
+    "to": "@RequirePermissions('sla.policy.update')\n  @Post(':id/deactivate')"
+  },
+  "sla-save-gated-on-the-deactivate": {
+    "file": "apps/web/app/(app)/sla-policies/page.tsx",
+    "from": "const canUpdate = hasPermission(user, 'sla.policy.update');",
+    "to": "const canUpdate = hasPermission(user, 'sla.policy.deactivate');"
+  },
+  "sla-offswitch-gated-on-the-update": {
+    "file": "apps/web/app/(app)/sla-policies/page.tsx",
+    "from": "const canDeactivate = hasPermission(user, 'sla.policy.deactivate');",
+    "to": "const canDeactivate = hasPermission(user, 'sla.policy.update');"
   }
 }

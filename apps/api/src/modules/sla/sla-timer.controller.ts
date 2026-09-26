@@ -61,7 +61,7 @@ export class SlaTimerController {
     return this.policies.findHolidays();
   }
 
-  @RequirePermissions('sla.policy.manage')
+  @RequirePermissions('sla.holiday.create')
   @Post('holidays')
   createHoliday(
     @Body() dto: CreateSlaHolidayDto,

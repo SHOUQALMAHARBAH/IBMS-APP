@@ -4,19 +4,19 @@ import type { Language } from '../i18n/translations';
  * One short line per permission, saying what holding it ALLOWS.
  *
  * The owner's finding, from using the screen: **a code is not an explanation.** `claim.delete` tells
- * a broker nothing about what she is granting, and a matrix of 213 codes she cannot read is a matrix
+ * a broker nothing about what she is granting, and a matrix of 216 codes she cannot read is a matrix
  * she cannot use safely.
  *
  * ## Why this file is nearly empty, deliberately
  *
  * The Arabic text is being written by the person who knows the business, for the owner's review —
- * not by me. Inventing 213 Arabic descriptions of regulatory permissions would produce confident,
+ * not by me. Inventing 216 Arabic descriptions of regulatory permissions would produce confident,
  * plausible, wrong sentences about who may approve a refund or reveal a national ID, and nobody
  * downstream could tell which ones were guesses.
  *
  * So this is the SLOT and the wiring. `docs/permission-catalogue-for-descriptions.txt` is the input
  * that was handed over, and it is now GENERATED (`npm run db:permission-descriptions`) rather than
- * hand-written: all 213 codes grouped by their 12 modules, with the five-state families marked, and
+ * hand-written: all 216 codes grouped by their 12 modules, with the five-state families marked, and
  * any line already written carried forward. As lines arrive they are added here and appear on the
  * screen with no further work.
  *

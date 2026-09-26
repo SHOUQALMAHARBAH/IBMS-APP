@@ -1786,11 +1786,44 @@ const slaGovernance: PermissionSeed[] = [
     description: "View configured SLA policies and their source/provenance",
     roles: [COMPLIANCE, MANAGER, EXEC, DPO, AUDITOR],
   },
+  // Four-action Phase 4 (second umbrella, owner-ruled). FOUR successors, not three, because the umbrella
+  // gated two ENTITIES: SLA policies and the business-day holiday calendar. Mapping "add a public holiday"
+  // onto `sla.policy.create` would be a lie about what the code gates — the reason Phase 1 split
+  // `insurer.relationship.manage` into five rather than pretend an insurance line was an insurer. A holiday
+  // is clerical and factual; an SLA duration is a policy decision with regulatory weight.
+  //
+  // `sla.policy.read` already exists above and is the fourth action of the policy set — held by five roles
+  // rather than these three, deliberately. The holiday READ stays on it: viewing the calendar is part of
+  // understanding how a deadline is counted, and a code nothing needs is worse than a shared one.
   {
-    code: "sla.policy.manage",
+    code: "sla.policy.create",
     module: "sla",
     description:
-      "Create, edit, activate and deactivate SLA policies (duration, calendar, escalation)",
+      "Create an SLA policy — its duration, calendar and escalation stages",
+    roles: [COMPLIANCE, MANAGER, EXEC],
+  },
+  {
+    code: "sla.policy.update",
+    module: "sla",
+    description:
+      "Correct an SLA policy's duration, calendar or escalation stages",
+    roles: [COMPLIANCE, MANAGER, EXEC],
+  },
+  // Activate and deactivate are ONE code, the house pattern: `insurer.deactivate` is "stop and resume
+  // dealing with an insurer", `role.deactivate` is "retire a role, reactivate a retired one". Turning a
+  // switch off and back on is one capability.
+  {
+    code: "sla.policy.deactivate",
+    module: "sla",
+    description:
+      "Switch an SLA policy off so it stops applying, and switch a dormant one back on",
+    roles: [COMPLIANCE, MANAGER, EXEC],
+  },
+  {
+    code: "sla.holiday.create",
+    module: "sla",
+    description:
+      "Add a public holiday to the business-day calendar every SLA deadline is counted against",
     roles: [COMPLIANCE, MANAGER, EXEC],
   },
   {

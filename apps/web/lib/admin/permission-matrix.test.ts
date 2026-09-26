@@ -44,6 +44,17 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
     // scheme becoming visible on the screen, which is the point of it.
     //
+    // 213 -> 216 (four-action Phase 4, second umbrella, owner-ruled: `sla.policy.manage` becomes
+    // `.create` / `.update` / `.deactivate` PLUS `sla.holiday.create`). Four successors for one umbrella
+    // because it gated two ENTITIES — SLA policies and the business-day holiday calendar — which is
+    // `insurer.relationship.manage`'s case, not `payment-channel.manage`'s.
+    //
+    // The families count does NOT move: `sla.policy` was ALREADY a family, because `.read` and `.manage`
+    // are both CRUD verbs and two is the threshold. It grows from 2 members to 4. And `sla.holiday.create`
+    // is a lone CRUD verb in its own family, so it lands in the TOGGLE list — the mirror of what
+    // `payment-channel` did one commit ago, where a toggle became a family. Same rule, opposite direction,
+    // which is why the four numbers are pinned separately rather than as one total.
+    //
     // 211 -> 213 (four-action Phase 4: `payment-channel.manage` becomes `.read` / `.create` /
     // `.deactivate`). This one MOVES A ROW BETWEEN THE TWO LISTS, which is the movement worth reading:
     // the umbrella was a TOGGLE, because `familyOf` gave it the family `payment-channel` with exactly one
@@ -64,10 +75,10 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // a point on that scale — it is a separate act with its own terminal semantics. An office granting
     // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
     // rendering it as its own checkbox.
-    expect(PERMISSION_CATALOGUE.length).toBe(213);
+    expect(PERMISSION_CATALOGUE.length).toBe(216);
     expect(crud.length).toBe(20);
-    expect(crud.flatMap(codesOfRow).length).toBe(54);
-    expect(toggles.length).toBe(159);
+    expect(crud.flatMap(codesOfRow).length).toBe(56);
+    expect(toggles.length).toBe(160);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 
