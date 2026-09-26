@@ -243,7 +243,7 @@ describe("permission grid — a national-ID reveal is its own permission", () =>
 describe("permission grid — the office administrator", () => {
   const OFFICE_ADMIN = OFFICE_ADMINISTRATOR_ROLE.name;
 
-  it("holds exactly 43 codes", () => {
+  it("holds exactly 44 codes", () => {
     // The count is asserted as well as the membership so that adding a code
     // without deciding about it is impossible: both this number and the list in
     // `office-administrator.e2e-spec.ts` (an independent copy, deliberately) have
@@ -251,6 +251,8 @@ describe("permission grid — the office administrator", () => {
     //
     // 22 at the Phase 3 migration, 24 with insurer management, 26 with the cross-office directory
     // and Q9's office form mapping, 34 with the department/branch four-action pilot (8 codes),
+    // 44 with Part 4 step 4's `duty-segregation.mode.declare` — which DOES add a capability, deliberately,
+    // and is therefore declared in ADDED_AFTER_THE_MIGRATION below.
     // 43 with four-action Phase 1 — which ADDED no capability: three umbrellas this role held
     // became their successors (insurer.relationship.manage into five, role.manage into three,
     // vendor.manage into four), so the count moved by nine while what the role can do did not.
@@ -275,6 +277,7 @@ describe("permission grid — the office administrator", () => {
         "department.read",
         "department.update",
         "deprovisioning.execute",
+        "duty-segregation.mode.declare",
         "email.integration.manage",
         "email.integration.read",
         "employee.create",
@@ -378,6 +381,13 @@ describe("permission grid — the office administrator", () => {
       // `.deactivate` and not `.delete`, by the owner's rule that delete means deactivate: a
       // department a person was once assigned to is part of that person's record.
       "department.read",
+      // Part 4 step 4 — declaring whether this office separates the two halves of a maker/checker pair.
+      //
+      // A genuine addition, not a rename: the legacy administrator has no such capability because the mode
+      // did not exist. It goes to THIS role alone because whoever declares the mode must not be whoever
+      // reviews the acts it permits — Compliance, Executive Management and the external auditor hold
+      // `internal-controls.view`, which is the self-approval report, and the office administrator does not.
+      "duty-segregation.mode.declare",
       "department.create",
       "department.update",
       "department.deactivate",

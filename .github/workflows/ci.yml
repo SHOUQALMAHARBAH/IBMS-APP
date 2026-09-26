@@ -104,10 +104,24 @@ jobs:
       - name: Security tests (dependency audit)
         run: npm run test:security
 
+      # `if: ${{ !cancelled() }}` from here to the end of the job.
+      #
+      # WHY IT COVERS THE SETUP AND NOT ONLY THE TESTS. It was added to the three test steps first, so that a
+      # red lint or unit gate could no longer hide the integration suite — the failure mode that let the api
+      # e2e suite stop running for three commits behind a newer red. Applied only there, it made things worse
+      # in a different way: when the unit tests failed, every step between them and the tests was SKIPPED, so
+      # the seed and the suites ran against a database with no schema and reported three extra failures that
+      # were consequences of a skipped migration rather than defects. One real failure read as four.
+      #
+      # So the condition follows the dependency: if the tests are going to run after an earlier failure, the
+      # database they need has to be set up too. Named step by step below rather than applied to the whole
+      # job, so a future step does not inherit a condition nobody chose for it.
       - name: Create .env for CI (matches the postgres service above)
+        if: ${{ !cancelled() }}
         run: cp .env.example .env
 
       - name: Create .env.test for CI
+        if: ${{ !cancelled() }}
         # apps/api's test:e2e/test:contract scripts load .env.test via dotenv (see
         # apps/api/package.json), and those tasks run through `npx turbo run ...`,
         # which strips ambient env vars (including the DATABASE_URL set on this job)
@@ -131,6 +145,7 @@ jobs:
           EOF
 
       - name: Database schema (prisma validate)
+        if: ${{ !cancelled() }}
         run: npm run db:validate
 
       # Part G checklist: `prisma format` has to actually RUN, not just be
@@ -138,6 +153,7 @@ jobs:
       # the committed schema is already formatted is that running it changes
       # nothing.
       - name: Database schema (prisma format leaves no diff)
+        if: ${{ !cancelled() }}
         run: |
           npm run db:format
           git diff --exit-code -- packages/db/prisma/schema.prisma
@@ -148,11 +164,13 @@ jobs:
       # has to exercise the same non-owner connection production uses, or the
       # isolation tests would pass against policies that are silently inert.
       - name: Provision the non-owner application database role
+        if: ${{ !cancelled() }}
         run: npm run db:provision-app-role
         env:
           APP_DB_PASSWORD: ci-only-app-role
 
       - name: Run Prisma migrations
+        if: ${{ !cancelled() }}
         run: npm run db:migrate:deploy
 
       # This step was called "migration history matches schema.prisma (no drift)". It did neither:
@@ -161,15 +179,19 @@ jobs:
       # present it printed "Database schema is up to date!" and exited 0. The three properties are
       # now three steps, each named for what it actually checks.
       - name: Verify migrations — every migration is applied
+        if: ${{ !cancelled() }}
         run: npm run db:migrate:status
 
       - name: Verify migrations — no applied migration's file has been edited
+        if: ${{ !cancelled() }}
         run: npm run db:checksums
 
       - name: Verify schema — schema.prisma still describes what the database enforces
+        if: ${{ !cancelled() }}
         run: npm run db:divergence
 
       - name: Verify privileges — the runtime role cannot read past row-level security
+        if: ${{ !cancelled() }}
         run: npm run db:privileges
 
       # `!cancelled()` so a failed VERIFICATION step above cannot hide this one.
