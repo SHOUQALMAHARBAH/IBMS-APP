@@ -77,6 +77,14 @@ async function removeHollowRoles(): Promise<void> {
  *  cannot render. `insurer.office-form.map` is the 25th, from Q9. */
 const OFFICE_ADMINISTRATOR_CODES = [
   'user.manage',
+  // Part 4 step 4 — declaring whether this office separates the two halves of a maker/checker pair. This role
+  // ALONE: whoever declares the mode must not be whoever reviews the acts it permits, and Compliance,
+  // Executive Management and the external auditor are the ones holding `internal-controls.view`.
+  //
+  // This list is an INDEPENDENT COPY of the grid's, on purpose — and the grid's own comment says the two have
+  // to move together. They did not, and CI caught it here after the grid spec had already caught it in
+  // `packages/db`: one omission, two guards, which is what a deliberate duplicate is for.
+  'duty-segregation.mode.declare',
   'employee.read',
   'employee.create',
   'employee.update',
