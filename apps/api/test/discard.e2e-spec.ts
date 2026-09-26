@@ -591,6 +591,71 @@ describe('Discard — a pre-commitment record raised in error (e2e)', () => {
     expect((afterSecond.body as DiscardableBody).discard?.reason).toBe(REASON);
   }, 300_000);
 
+  it('a withdrawn record STAYS in its own register — the list still returns it, marked', async () => {
+    const app = await boot();
+    const plc = await makeUser(
+      app,
+      'dis-list-plc',
+      'PLACEMENT_TECHNICAL_OFFICER',
+      'SALES_RELATIONSHIP_OFFICER',
+      'CLAIMS_OFFICER',
+    );
+    const chk = await makeUser(app, 'dis-list-chk', 'POLICY_CHECKING_OFFICER');
+    const active = await activePolicy(
+      app,
+      plc.accessToken,
+      chk.accessToken,
+      plc.userId,
+      'list',
+    );
+    const claimId = await notifiedClaim(app, plc.accessToken, active.policyId);
+    await request(app.getHttpServer())
+      .post(`/claims/${claimId}/discard`)
+      .set(bearer(plc.accessToken))
+      .send({ reason: REASON })
+      .expect(201);
+
+    // THE RULE THIS ASSERTS: a discarded record stays in its own register and leaves every DERIVED view.
+    // The register is where somebody looking for the mistake goes — the same argument that keeps a
+    // deactivated insurer in the insurer list, where hiding it would read as deletion. Scoped by this
+    // claim's own policy, never a whole-table read: db-test is cumulative.
+    const listed = await request(app.getHttpServer())
+      .get(`/claims?policyId=${active.policyId}`)
+      .set(bearer(plc.accessToken))
+      .expect(200);
+    const rows = listed.body as
+      { items?: DiscardableBody[] } | DiscardableBody[];
+    const items = Array.isArray(rows) ? rows : (rows.items ?? []);
+    const mine = items.find((c) => c.id === claimId);
+    expect(
+      mine,
+      'the withdrawn claim must still be in its own list',
+    ).toBeDefined();
+    expectDiscarded(mine as DiscardableBody, plc.userId, REASON);
+
+    // And it has LEFT the derived view: the customer's 360° timeline, which exists to tell whoever is on the
+    // phone what this client actually has.
+    const customerId = (
+      await prisma.claim.findUniqueOrThrow({
+        where: { id: claimId },
+        select: { customerId: true },
+      })
+    ).customerId;
+    const timeline = await request(app.getHttpServer())
+      .get(`/customers/${customerId}/360-view`)
+      .set(bearer(plc.accessToken))
+      // 200 asserted, not branched on. This actor holds `customer.360-view.read` through Sales; if that ever
+      // stops being true, the absence assertion below would be satisfied by a 403 body and prove nothing —
+      // the § 1.51(d) shape. (Written once without the bearer header, which produced a 401 and is a reminder
+      // that "the assertion failed" and "the request was never authorised" look identical from the outside.)
+      .expect(200);
+    const body = JSON.stringify(timeline.body);
+    // Something POSITIVE from the same read first, so "the claim is absent" cannot be satisfied by an empty
+    // or error payload.
+    expect(body).toContain(active.policyId);
+    expect(body).not.toContain(claimId);
+  }, 300_000);
+
   // --- 2. A discarded record cannot advance -------------------------------------------------------------
 
   it('every forward move refuses a discarded record, and the refusal names the discard', async () => {

@@ -61,6 +61,13 @@ reads as deletion, and the register is where somebody looking for the mistake go
 views because those answer questions about the business, and a record that never took effect is not part of
 any answer.
 
+**Asserted, not just stated.** `discard.e2e-spec.ts` withdraws a claim and then reads two surfaces with the
+same token: the claim's own list, where the row is still returned and still carries its discard block, and the
+customer's 360° timeline, where its id is absent while the policy's is present. Both halves matter — the
+absence assertion is anchored on a positive read from the same response, so an empty or error payload cannot
+satisfy it. Proven by planting the removal of the timeline's `discardedAt: null`, which put the withdrawn
+claim's id straight back into that response.
+
 **When you add a query over one of these four models, answer one question: can a row in the discarded state
 reach this, and is the answer it gives still true?** The state is pinned per entity (see
 `discard.config.ts`), so this is decidable rather than a guess.

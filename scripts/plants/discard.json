@@ -28,5 +28,10 @@
     "file": "apps/web/components/ui/DiscardControl.tsx",
     "from": "  if (!canDiscard || !discardable) return null;",
     "to": "  if (!discardable) return null;"
+  },
+  "timeline-shows-withdrawn-claims": {
+    "file": "apps/api/src/repositories/interaction.repository.ts",
+    "from": "      // Same rule as the policies above: out of the derived view, still in its own register.\n      where: { customerId, discardedAt: null },",
+    "to": "      where: { customerId },"
   }
 }
