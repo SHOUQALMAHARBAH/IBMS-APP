@@ -18,5 +18,15 @@
     "file": "apps/web/app/(app)/payment-channels/page.tsx",
     "from": "const canDeactivate = hasPermission(user, 'payment-channel.deactivate');",
     "to": "const canDeactivate = hasPermission(user, 'payment-channel.create');"
+  },
+  "refusal-still-names-the-removed-umbrella": {
+    "file": "apps/web/lib/i18n/translations/finance.ts",
+    "from": "pcNoPermission: \"You don't hold the payment-channel.read permission.\",",
+    "to": "pcNoPermission: \"You don't hold the payment-channel.manage permission.\","
+  },
+  "arabic-refusal-still-names-the-removed-umbrella": {
+    "file": "apps/web/lib/i18n/translations/finance.ts",
+    "from": "pcNoPermission: 'لا تملك صلاحية payment-channel.read اللازمة لعرض قنوات الدفع.',",
+    "to": "pcNoPermission: 'لا تملك صلاحية payment-channel.manage اللازمة لعرض قنوات الدفع.',"
   }
 }

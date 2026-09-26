@@ -2916,6 +2916,25 @@ enumerated (`e.g`, `i.e`, `privacy-notice-v1.2`) and a non-vacuity assertion bes
 quote more than 50 real codes and their AR/EN ratio must exceed 0.8, so the check cannot pass by finding
 nothing to check. The sibling (`/route` tokens against the destination catalogue) is NOT built.
 
+**AND IT HAS NOW FIRED ON ITS OWN STATED SCENARIO (2026-09-26).** Four-action Phase 4 removed
+`payment-channel.manage` from the catalogue, and `/payment-channels`'s load-failure message named it — in
+BOTH languages, which is this entry's whole subject. Proven rather than asserted: the plants
+`refusal-still-names-the-removed-umbrella` and `arabic-refusal-still-names-the-removed-umbrella`
+(`scripts/plants/four-action-phase-four.json`) restore each half in turn, and each kills its OWN test,
+naming the file, the language, the key and the stale token:
+
+    × EN: every permission-code-shaped token names a code that exists
+        + "finance.ts EN.pcNoPermission: \"payment-channel.manage\""
+    × AR: every permission-code-shaped token names a code that exists
+        + "finance.ts AR.pcNoPermission: \"payment-channel.manage\""
+
+Two properties this establishes that the earlier build could only claim. **The Arabic half is asserted by
+its own test** — the exact gap that made Phase 1's two misses invisible, where a Playwright assertion on the
+English text was the only thing looking. And the two assertions are INDEPENDENT: fixing one language does
+not quiet the other, so the failure mode "corrected the English and stopped" cannot recur silently. This is
+the second guard in this repo to fire on the scenario it was written for (§ 1.46 was the first), which is
+the evidence the class earns its cost rather than an argument that it should.
+
 ### 1.56 — THE DEV AND TEST DATABASES SWAPPED PORTS, AND ONLY THEIR NAMES MADE IT LOUD
 
 On 2026-09-26 both Postgres containers restarted unprompted and came back with their published ports
