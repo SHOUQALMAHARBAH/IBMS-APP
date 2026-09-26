@@ -6,6 +6,11 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
+import {
   assessIncidentImpact,
   classifyIncident,
   closeIncident,
@@ -82,6 +87,8 @@ export default function IncidentsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by incident so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -266,9 +273,53 @@ export default function IncidentsPage() {
                       inc.status === 'CLASSIFIED' &&
                       inc.classification === 'MATERIAL' &&
                       !inc.seniorManagementCoSignUserId ? (
-                        <button type="button" disabled={busy} onClick={() => void run(() => coSignIncident(inc.id))}>
-                          {t('incCoSignButton')}
-                        </button>
+                        (() => {
+                          // Part 4 — the DPO who classified it may also co-sign, in an office that has
+                          // declared COMBINED, only by saying why. Every other case is unchanged: no field,
+                          // no extra click.
+                          const needs = needsCombinedDutyDeclaration({
+                            mode: user.dutySegregationMode,
+                            makerUserId: inc.classifiedByDpoUserId,
+                            currentUserId: user.id,
+                            alreadyDecided: Boolean(
+                              inc.seniorManagementCoSignUserId,
+                            ),
+                          });
+                          const declaration = declarations[inc.id] ?? '';
+                          return (
+                            <>
+                              {needs ? (
+                                <CombinedDutyReasonField
+                                  id={inc.id}
+                                  value={declaration}
+                                  onChange={(next) =>
+                                    setDeclarations((prev) => ({
+                                      ...prev,
+                                      [inc.id]: next,
+                                    }))
+                                  }
+                                />
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={
+                                  busy ||
+                                  (needs && combinedDutyTooShort(declaration))
+                                }
+                                onClick={() =>
+                                  void run(() =>
+                                    coSignIncident(
+                                      inc.id,
+                                      needs ? declaration.trim() : undefined,
+                                    ),
+                                  )
+                                }
+                              >
+                                {t('incCoSignButton')}
+                              </button>
+                            </>
+                          );
+                        })()
                       ) : null}
                       {canNotifySenior &&
                       inc.classification === 'MATERIAL' &&

@@ -38,5 +38,15 @@
     "file": "apps/api/src/modules/internal-controls/combined-duty-report.service.ts",
     "from": "      accessSelfReview: act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT,",
     "to": "      accessSelfReview: false,"
+  },
+  "always-asks-for-a-declaration": {
+    "file": "apps/web/components/ui/CombinedDutyReasonField.tsx",
+    "from": "  if (input.mode !== 'COMBINED') return false;",
+    "to": "  if (false) return false;"
+  },
+  "never-asks-for-a-declaration": {
+    "file": "apps/web/components/ui/CombinedDutyReasonField.tsx",
+    "from": "  return input.makerUserId === input.currentUserId;",
+    "to": "  return false;"
   }
 }

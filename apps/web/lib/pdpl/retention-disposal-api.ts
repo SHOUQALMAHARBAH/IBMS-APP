@@ -147,8 +147,15 @@ export function managerApproveDisposalBatch(
   return apiPost(`/disposal-batches/${id}/manager-approve`, {});
 }
 
-export function dpoApproveDisposalBatch(id: string): Promise<DisposalBatch> {
-  return apiPost(`/disposal-batches/${id}/dpo-approve`, {});
+export function dpoApproveDisposalBatch(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<DisposalBatch> {
+  return apiPost(`/disposal-batches/${id}/dpo-approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 export function executeDisposalBatch(

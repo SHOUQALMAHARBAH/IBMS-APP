@@ -5,6 +5,11 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
+import {
   DATA_CLASSIFICATIONS,
   DATA_SHARING_CHANNELS,
   approveDataSharingApproval,
@@ -47,6 +52,8 @@ export default function DataSharingApprovalsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [description, setDescription] = useState('');
   const [vendorId, setVendorId] = useState('');
@@ -229,13 +236,41 @@ export default function DataSharingApprovalsPage() {
                     <td style={cell}>
                       {canApprove && r.isPending ? (
                         <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void run(() => approveDataSharingApproval(r.id))}
-                          >
-                            {t('dsaApproveButton')}
-                          </button>
+                          {(() => {
+                            // Part 4 — the person who performed the first half may complete it themselves in an office
+                            // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                            const needs = needsCombinedDutyDeclaration({
+                              mode: user.dutySegregationMode,
+                              makerUserId: r.requestedByUserId,
+                              currentUserId: user.id,
+                              alreadyDecided: r.approvedByUserId != null,
+                            });
+                            const declaration = declarations[r.id] ?? '';
+                            return (
+                              <>
+                                {needs ? (
+                                  <CombinedDutyReasonField
+                                    id={r.id}
+                                    value={declaration}
+                                    onChange={(next) =>
+                                      setDeclarations((prev) => ({ ...prev, [r.id]: next }))
+                                    }
+                                  />
+                                ) : null}
+                                <button
+                                  type="button"
+                                  disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                  onClick={() =>
+                                    void run(() =>
+                                      approveDataSharingApproval(r.id, needs ? declaration.trim() : undefined),
+                                    )
+                                  }
+                                >
+                                  {t('dsaApproveButton')}
+                                </button>
+                              </>
+                            );
+                          })()}
                           <button
                             type="button"
                             disabled={busy}

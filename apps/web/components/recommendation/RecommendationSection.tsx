@@ -25,6 +25,12 @@ import {
   DiscardControl,
   DiscardedNotice,
 } from '../ui/DiscardControl';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatMoney } from '../../lib/i18n/format';
 import type { TranslationKey } from '../../lib/i18n/translations';
@@ -70,11 +76,21 @@ export function RecommendationSection({
   onOpportunityChanged,
 }: Props) {
   const { language, t } = useLanguage();
+  const { user } = useAuth();
   const [rec, setRec] = useState<Recommendation | null | undefined>(undefined);
+  // Part 4 — computed once here rather than inside the action row: `rec` is this component's own state, and
+  // the condition is about the office and the viewer, neither of which changes per render branch.
+  const needsDeclaration = needsCombinedDutyDeclaration({
+    mode: user?.dutySegregationMode,
+    makerUserId: rec?.draftedByUserId,
+    currentUserId: user?.id ?? '',
+    alreadyDecided: rec?.approvedByUserId != null,
+  });
   const [chains, setChains] = useState<QuotationChain[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dutyReason, setDutyReason] = useState('');
 
   const [quotationId, setQuotationId] = useState('');
   const [rationale, setRationale] = useState('');
@@ -385,16 +401,37 @@ export function RecommendationSection({
             !rec.approvedByUserId &&
             !rec.sentToClientAt &&
             !rec.discard ? (
-              <button
-                type="button"
-                disabled={busy}
-                style={{ ...buttonStyle, width: 'auto' }}
-                onClick={() =>
-                  void run(() => approveRecommendation(rec.id))
-                }
-              >
-                {t('recApproveButton')}
-              </button>
+              <>
+                {/*
+                  Part 4 — the officer who drafted the recommendation may approve it in an office that has
+                  declared COMBINED, only by saying why. The approval exists because this recommendation is
+                  above the client's target premium, so it is the case a second reader most wants explained.
+                */}
+                {needsDeclaration ? (
+                  <CombinedDutyReasonField
+                    id={rec.id}
+                    value={dutyReason}
+                    onChange={setDutyReason}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={
+                    busy || (needsDeclaration && combinedDutyTooShort(dutyReason))
+                  }
+                  style={{ ...buttonStyle, width: 'auto' }}
+                  onClick={() =>
+                    void run(() =>
+                      approveRecommendation(
+                        rec.id,
+                        needsDeclaration ? dutyReason.trim() : undefined,
+                      ),
+                    )
+                  }
+                >
+                  {t('recApproveButton')}
+                </button>
+              </>
             ) : null}
             {isPlacement &&
             !rec.sentToClientAt &&

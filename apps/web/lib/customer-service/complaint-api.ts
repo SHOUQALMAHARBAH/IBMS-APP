@@ -122,8 +122,15 @@ export function escalateComplaint(
   return apiPost(`/complaints/${id}/escalate`, body);
 }
 
-export function closeComplaint(id: string): Promise<Complaint> {
-  return apiPost(`/complaints/${id}/close`, {});
+export function closeComplaint(
+  id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<Complaint> {
+  return apiPost(`/complaints/${id}/close`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 // Part F item #7 — bilingual complaint-acknowledgement PDF. Omitting

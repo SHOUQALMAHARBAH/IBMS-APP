@@ -6,6 +6,11 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../components/ui/CombinedDutyReasonField';
+import {
   DISPOSAL_METHODS,
   closeDisposalBatch,
   confirmRetentionScheduleItem,
@@ -70,6 +75,8 @@ export default function RetentionDisposalPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Part 4 — the combined-duty reason, keyed by record so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [category, setCategory] = useState('');
   const [months, setMonths] = useState('');
@@ -490,13 +497,41 @@ export default function RetentionDisposalPage() {
                               </button>
                             ) : null}
                             {canApprove && b.status === 'MANAGER_APPROVED' ? (
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void run(() => dpoApproveDisposalBatch(b.id))}
-                              >
-                                {t('rdDpoApproveButton')}
-                              </button>
+                              (() => {
+                                // Part 4 — the person who performed the first half may complete it themselves in an office
+                                // that has declared COMBINED, only by saying why. Every other case is unchanged.
+                                const needs = needsCombinedDutyDeclaration({
+                                  mode: user.dutySegregationMode,
+                                  makerUserId: b.nominatedByUserId,
+                                  currentUserId: user.id,
+                                  alreadyDecided: b.dpoApprovedByUserId != null,
+                                });
+                                const declaration = declarations[b.id] ?? '';
+                                return (
+                                  <>
+                                    {needs ? (
+                                      <CombinedDutyReasonField
+                                        id={b.id}
+                                        value={declaration}
+                                        onChange={(next) =>
+                                          setDeclarations((prev) => ({ ...prev, [b.id]: next }))
+                                        }
+                                      />
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={busy || (needs && combinedDutyTooShort(declaration))}
+                                      onClick={() =>
+                                        void run(() =>
+                                          dpoApproveDisposalBatch(b.id, needs ? declaration.trim() : undefined),
+                                        )
+                                      }
+                                    >
+                                      {t('rdDpoApproveButton')}
+                                    </button>
+                                  </>
+                                );
+                              })()
                             ) : null}
                             {canApprove && b.status === 'DPO_APPROVED' ? (
                               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>

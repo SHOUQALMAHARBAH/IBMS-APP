@@ -31,6 +31,12 @@ import {
   DiscardControl,
   DiscardedNotice,
 } from '../ui/DiscardControl';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 import { useLanguage } from '../../lib/i18n/language-context';
 import { formatDate, formatMoney } from '../../lib/i18n/format';
 import type { Language, TranslationKey } from '../../lib/i18n/translations';
@@ -591,6 +597,10 @@ function ClaimSettlement({
   canSecondApproveSettlement: boolean;
   onDone: () => Promise<void>;
 }) {
+  // Part 4 — one box, because this sub-component renders ONE settlement. The queue components key theirs by
+  // record id; here there is nothing to key by.
+  const [dutyReason, setDutyReason] = useState('');
+  const { user } = useAuth();
   const { t } = useLanguage();
   const { language } = useLanguage();
   const [approvedAmount, setApprovedAmount] = useState('');
@@ -701,16 +711,46 @@ function ClaimSettlement({
       {s &&
       s.secondApproverRequired &&
       !s.secondApproverUserId &&
-      canSecondApproveSettlement ? (
-        <button
-          type="button"
-          disabled={busy}
-          style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
-          onClick={() =>
-            void run(() => secondApproveClaimSettlement(claim.id))
-          }
-        >{t('claimSecondApproveButton')}</button>
-      ) : null}
+      canSecondApproveSettlement
+        ? (() => {
+            // Part 4 — the person who recorded the settlement may give the mandatory second approval
+            // themselves in an office that has declared COMBINED, only by saying why. This is the largest sum
+            // in the product that one signature can release, which is why the second one exists.
+            //
+            // Computed once, like the other eleven approve controls: the field and the button must agree, and
+            // two copies of the same condition are two places for them to stop agreeing.
+            const needs = needsCombinedDutyDeclaration({
+              mode: user?.dutySegregationMode,
+              makerUserId: s.approvedByUserId,
+              currentUserId: user?.id ?? '',
+              alreadyDecided: s.secondApproverUserId != null,
+            });
+            return (
+              <>
+                {needs ? (
+                  <CombinedDutyReasonField
+                    id={claim.id}
+                    value={dutyReason}
+                    onChange={setDutyReason}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy || (needs && combinedDutyTooShort(dutyReason))}
+                  style={{ ...buttonStyle, width: 'auto', marginTop: 0 }}
+                  onClick={() =>
+                    void run(() =>
+                      secondApproveClaimSettlement(
+                        claim.id,
+                        needs ? dutyReason.trim() : undefined,
+                      ),
+                    )
+                  }
+                >{t('claimSecondApproveButton')}</button>
+              </>
+            );
+          })()
+        : null}
     </div>
   );
 }

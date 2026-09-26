@@ -109,6 +109,13 @@ export function rejectDsr(id: string, reason: string): Promise<DataSubjectReques
   return apiPost(`/dsr/${id}/reject`, { reason });
 }
 
-export function closeDsr(id: string): Promise<DataSubjectRequest> {
-  return apiPost(`/dsr/${id}/close`, {});
+export function closeDsr(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<DataSubjectRequest> {
+  return apiPost(`/dsr/${id}/close`, combinedDutyReason ? { combinedDutyReason } : {});
 }

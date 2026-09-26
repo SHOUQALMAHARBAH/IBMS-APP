@@ -248,11 +248,13 @@ Each step ships whole and is verifiable on its own.
 
 **Status: ALL SEVEN STEPS have shipped, and the gate is MET. COMBINED can be declared.**
 
-Two things remain, both stated as limits rather than left to be found: **fourteen of the fifteen approve
-screens cannot yet carry a combined-duty reason** (the refund one can), and
-**`AccessRecertificationItem` is unwired pending the owner's answer** in
-`docs/decision-reviewing-your-own-access.md` — its constraint fires on an INSERT, so wiring it would change
-nothing for the single-operator office the condition is about.
+**All twelve approve screens carry a combined-duty reason**, through one shared control — see step 5. One thing
+remains, stated as a limit rather than left to be found: **`AccessRecertificationItem` is unwired pending the
+owner's answer** in `docs/decision-reviewing-your-own-access.md` — its constraint fires on an INSERT, so wiring
+it would change nothing for the single-operator office the condition is about.
+
+Superseded, for the record: for one commit the mode was declarable while fourteen of the fifteen approve screens
+could not carry a reason. That window is closed.
 
 The superseded status line, for the record:
 
@@ -415,13 +417,38 @@ which puts the three options to her in plain language.
    needs its own `include` and its own projection, and the pair with an end-to-end proof is the one worth
    wiring first. They are reachable through the report.
 
-   **[CLOSED for the mode screen, OPEN for the approve screens]** The half step 3a created:
-   `POST /refunds/:id/approve` and fourteen siblings accept a `combinedDutyReason` that NO web control sends. Today that is unreachable (no office can be COMBINED), but
-   the moment step 4 ships the mode screen, an office that declares COMBINED would find its "Approve refund"
-   button returning 422 "give a reason" with nowhere to type one — § 1.44's unreachable-surface shape, arriving
-   from the other direction. So step 4 and step 5 are coupled: **the mode must not become settable before the
-   screens can carry a declaration.** The screen also has to know the office's mode to decide whether to ask,
-   which means `/auth/me` or an office-settings read has to carry it.
+   **[CLOSED]** The half step 3a created: `POST /refunds/:id/approve` and fourteen siblings accepted a
+   `combinedDutyReason` that NO web control sent. That was unreachable while no office could be COMBINED, and
+   the moment step 4 shipped the mode screen it became a live wall — an office that declared COMBINED would
+   find its "Approve refund" button returning 422 "give a reason" with nowhere to type one, § 1.44's
+   unreachable-surface shape arriving from the other direction. So step 4 and step 5 were coupled and shipped
+   together: **the mode must not become settable before the screens can carry a declaration.** The screen also
+   has to know the office's mode to decide whether to ask, which is why `/auth/me` carries
+   `dutySegregationMode`.
+
+   **All twelve approve screens now carry one.** `CombinedDutyReasonField` is ONE component for every pair,
+   exporting the field, the length check, and `needsCombinedDutyDeclaration` — the condition that decides
+   whether to ask at all. What differs per screen is only which column names the maker
+   (`resolvedByUserId`, `approvedByUserId`, `overrideRequestedByUserId`, `assessedByUserId`, …); the wording,
+   the ten-character floor and the disabled button live once. Twelve textareas would be twelve places for the
+   wording to drift, and the wording is the load-bearing part: it has to say that the person raised this AND
+   that the office allows them to approve it, or the field reads as an accusation.
+
+   **The condition is narrow, and both halves of it are asserted.** Asking on every approval would put a
+   mandatory box in front of the hundreds of ordinary two-person approvals this product is mostly made of;
+   asking on none is the 422 above. So it asks only when the office has declared COMBINED, the approver is the
+   maker, and the second half is still unrecorded. `combined-duty-declaration.spec.ts` drives the complaint
+   closure — the cheapest of the twelve to put on screen — and asserts the COMBINED office gets a box, cannot
+   approve on nine characters, and sends the trimmed reason; then that a SEGREGATED office on the SAME row gets
+   no box and posts the body it always did. Two plants prove the halves independently:
+   `never-asks-for-a-declaration` kills the COMBINED test only, `always-asks-for-a-declaration` kills the
+   recommendation approval and the claim-settlement second approval in `rfq.spec.ts` and leaves the SEGREGATED
+   test standing.
+
+   **Three of the twelve pairs are still not wired**, deliberately: the two `NeedsAssessment` halves share one
+   box because the status decides which button is on screen, and `AccessRecertificationItem` is waiting on a
+   decision — its row IS the decision, written by an INSERT with no later approval step to intercept, so the
+   condition as drafted does not fit the mechanism. That question is with the owner.
 6. **[DONE — the gate is met]** **The self-approval report.**
 
    `GET /internal-controls/combined-duty-acts`, gated on `internal-controls.view`, on the screen that already
@@ -447,11 +474,10 @@ which puts the three options to her in plain language.
    a state that database cannot be in. An assertion on it there would be a cross-spec coupling that breaks on
    run order.
 
-   **And the approve screen can now carry a declaration.** Lifting the gate made the missing reason field a
-   live wall rather than a future one, so `EndorsementSection` asks for a reason when — and only when — the
-   office has declared COMBINED and the approver is the person who raised it. **The other fourteen pairs still
-   cannot carry one**, which is the remaining work and is stated here rather than discovered by an office that
-   declares the mode and finds its claim settlement blocked.
+   **And the approve screens can now carry a declaration.** Lifting the gate made the missing reason field a
+   live wall rather than a future one, so `EndorsementSection` asked for a reason first and the other eleven
+   followed in the commit after it — see step 5. Nothing is left where an office that declares the mode meets a
+   422 with nowhere to type, except the one pair whose mechanism is still an open question.
 7. **Tests and plants**, below.
 
 ---

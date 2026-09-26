@@ -106,8 +106,15 @@ export function draftRecommendation(
   return apiPost('/recommendations', input);
 }
 
-export function approveRecommendation(id: string): Promise<Recommendation> {
-  return apiPost(`/recommendations/${id}/approve`);
+export function approveRecommendation(
+id: string,
+  /**
+   * Part 4 — sent only when the approver IS the maker and the office has declared COMBINED mode. Omitted on
+   * every ordinary two-person approval, which sends the same body it always did.
+   */
+  combinedDutyReason?: string,
+): Promise<Recommendation> {
+  return apiPost(`/recommendations/${id}/approve`, combinedDutyReason ? { combinedDutyReason } : {});
 }
 
 export function discloseConflictOfInterest(

@@ -5,6 +5,11 @@ import { ENUM_LABEL } from '../../../../lib/i18n/enum-labels';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
 import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../../../../components/ui/CombinedDutyReasonField';
+import {
   createVendorDpa,
   dpoApproveDpa,
   getVendor,
@@ -44,6 +49,8 @@ export default function VendorDetailPage() {
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Part 4 — the combined-duty reason, keyed by agreement so two rows cannot share one box.
+  const [declarations, setDeclarations] = useState<Record<string, string>>({});
 
   const [riskTier, setRiskTierValue] = useState<RiskTier>('low');
   const [readiness, setReadiness] = useState<DataShareReadiness | null>(null);
@@ -152,10 +159,10 @@ export default function VendorDetailPage() {
     }
   }
 
-  async function onDpoApprove(id: string) {
+  async function onDpoApprove(id: string, combinedDutyReason?: string) {
     setActionError(null);
     try {
-      await dpoApproveDpa(id);
+      await dpoApproveDpa(id, combinedDutyReason);
       await loadDpas();
     } catch (err) {
       setActionError(
@@ -280,11 +287,52 @@ export default function VendorDetailPage() {
                             {t('vendSignButton')}
                           </button>
                         ) : null}{' '}
-                        {dpa.signedAt && !dpa.dpoApprovedByUserId ? (
-                          <button type="button" onClick={() => onDpoApprove(dpa.id)}>
-                            {t('vendDpoApproveButton')}
-                          </button>
-                        ) : null}
+                        {dpa.signedAt && !dpa.dpoApprovedByUserId
+                          ? (() => {
+                              // Part 4 — the assessor may DPO-approve their own assessment in an office that
+                              // has declared COMBINED, only by saying why.
+                              const needs = needsCombinedDutyDeclaration({
+                                mode: user.dutySegregationMode,
+                                makerUserId: dpa.assessedByUserId,
+                                currentUserId: user.id,
+                                alreadyDecided: dpa.dpoApprovedByUserId != null,
+                              });
+                              const declaration = declarations[dpa.id] ?? '';
+                              return (
+                                <>
+                                  {needs ? (
+                                    <CombinedDutyReasonField
+                                      id={dpa.id}
+                                      value={declaration}
+                                      onChange={(next) =>
+                                        setDeclarations((prev) => ({
+                                          ...prev,
+                                          [dpa.id]: next,
+                                        }))
+                                      }
+                                    />
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      needs &&
+                                      combinedDutyTooShort(declaration)
+                                    }
+                                    onClick={() =>
+                                      onDpoApprove(
+                                        dpa.id,
+                                        needs
+                                          ? declaration.trim()
+                                          : undefined,
+                                      )
+                                    }
+                                  >
+                                    {t('vendDpoApproveButton')}
+                                  </button>
+                                </>
+                              );
+                            })()
+                          : null}
                       </td>
                     </tr>
                   ))}

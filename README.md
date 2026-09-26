@@ -4110,9 +4110,17 @@ else.
 the actor by name, the pair named by its CHECK constraint, the reason, the roles that granted the approval, and
 the office's own mode and declaration date — on `/internal-controls`, above the silent-self-approval scan.
 Access self-reviews sort first and render flagged, which is the owner's condition and is proven by content
-rather than by a status code. Reading it is audited (counts only, never a name). **Fourteen of the fifteen
-approve screens still cannot carry a combined-duty reason** — the refund one can; see
-`docs/duty-segregation-mode.md` step 6.
+rather than by a status code. Reading it is audited (counts only, never a name).
+
+**Part 4 step 5 completed (2026-09-26): all twelve approve screens can carry a combined-duty reason.**
+`components/ui/CombinedDutyReasonField.tsx` is ONE control for every pair — the field, the ten-character floor,
+and `needsCombinedDutyDeclaration`, the condition that decides whether to ask at all. It asks only when the
+office has declared COMBINED, the approver is the maker, and the second half is still unrecorded; what differs
+per screen is only which column names the maker. An ordinary two-person approval sends the body it always sent.
+`e2e/combined-duty-declaration.spec.ts` asserts both halves on the same row, and two plants
+(`never-asks-for-a-declaration`, `always-asks-for-a-declaration`) kill them independently. **This closes the
+window in which the mode was declarable and the screens could not carry a reason.** The one pair still unwired
+is `AccessRecertificationItem`, pending an owner decision; see `docs/duty-segregation-mode.md` step 5.
 
 **Part 4 steps 4-5 (2026-09-26): `/settings/duty-segregation` is where an office declares whether it separates
 the two halves of an approval.** `duty-segregation.mode.declare` (OFFICE_ADMINISTRATOR alone) declares it;
@@ -4144,8 +4152,9 @@ all four stated in `docs/duty-segregation-mode.md`.
   `CombinedDutyAct` carrying the pair, the reason, and which of the actor's roles actually
   grant `refund.approve`; the refund row then carries that act's id in its
   `combinedDutyActId`, which is the only thing the CHECK constraint will accept a
-  self-approval for. The mode is not settable by any endpoint yet — see
-  `docs/duty-segregation-mode.md`, whose shipping gate is the self-approval report.
+  self-approval for. **CORRECTED:** the mode was not settable by any endpoint when this was written; the gate
+  was met by step 6 and `/settings/duty-segregation` now declares it — see
+  `docs/duty-segregation-mode.md`.
   `422` if the endorsement is not `REFUND_APPROVAL_PENDING`; `409` if the
   refund row already shows an approver; status-conditional `recordRefundApproval`
   `updateMany WHERE approvedByUserId IS NULL` (0 rows → `409`, a concurrent approver won —
