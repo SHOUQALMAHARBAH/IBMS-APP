@@ -5,7 +5,9 @@ import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 
 /**
  * The catalogue fixture is generated from the seeded database (`npm run db:fixture:permissions`),
- * so these assertions run against the REAL 186 codes rather than a hand-written sample. That is
+ * so these assertions run against the REAL catalogue rather than a hand-written sample — the count is
+ * pinned in the test below rather than quoted here, because a figure in a comment is the half that
+ * rots. That is
  * deliberate: the owner asked for the rule to be checkable rather than the number trusted, and
  * pinning the counts here means ADDING A PERMISSION FAILS THIS TEST instead of quietly changing
  * what the screen shows.

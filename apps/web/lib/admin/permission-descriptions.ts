@@ -4,19 +4,25 @@ import type { Language } from '../i18n/translations';
  * One short line per permission, saying what holding it ALLOWS.
  *
  * The owner's finding, from using the screen: **a code is not an explanation.** `claim.delete` tells
- * a broker nothing about what she is granting, and a matrix of 186 codes she cannot read is a matrix
+ * a broker nothing about what she is granting, and a matrix of 211 codes she cannot read is a matrix
  * she cannot use safely.
  *
  * ## Why this file is nearly empty, deliberately
  *
  * The Arabic text is being written by the person who knows the business, for the owner's review —
- * not by me. Inventing 186 Arabic descriptions of regulatory permissions would produce confident,
+ * not by me. Inventing 211 Arabic descriptions of regulatory permissions would produce confident,
  * plausible, wrong sentences about who may approve a refund or reveal a national ID, and nobody
  * downstream could tell which ones were guesses.
  *
  * So this is the SLOT and the wiring. `docs/permission-catalogue-for-descriptions.txt` is the input
- * that was handed over: all 186 codes grouped by their 12 modules, with the five-state families
- * marked. As lines arrive they are added here and appear on the screen with no further work.
+ * that was handed over, and it is now GENERATED (`npm run db:permission-descriptions`) rather than
+ * hand-written: all 211 codes grouped by their 12 modules, with the five-state families marked, and
+ * any line already written carried forward. As lines arrive they are added here and appear on the
+ * screen with no further work.
+ *
+ * A code whose stored description opens `NOT YET ENFORCED` needs no line here — holding it does
+ * nothing today and the screen says so, so an Arabic sentence describing it would describe a
+ * capability that is not there. `permission-enforcement.inventory.spec.ts` keeps that list honest.
  *
  * ## The fallback, and why it is not a translation
  *

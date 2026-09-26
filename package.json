@@ -51,7 +51,9 @@
     "db:fixture:permissions": "dotenv -e .env -- node scripts/generate-role-permissions-fixture.mjs",
     "db:fixture:permissions:check": "dotenv -e .env -- node scripts/generate-role-permissions-fixture.mjs --check",
     "db:test:fixture:permissions": "dotenv -e .env.test -- node scripts/generate-role-permissions-fixture.mjs",
-    "db:test:fixture:permissions:check": "dotenv -e .env.test -- node scripts/generate-role-permissions-fixture.mjs --check"
+    "db:test:fixture:permissions:check": "dotenv -e .env.test -- node scripts/generate-role-permissions-fixture.mjs --check",
+    "db:permission-descriptions": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts",
+    "db:permission-descriptions:check": "dotenv -e .env.test -- tsx scripts/generate-permission-descriptions-input.ts --check"
   },
   "devDependencies": {
     "turbo": "2.10.11"

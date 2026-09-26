@@ -85,6 +85,11 @@ gate "Database Seed"       npm run db:test:seed
 # it compares the fixture against the grid that was just written rather than against dev's.
 # The two are asserted byte-identical elsewhere; this gate should still read the one it seeded.
 gate "Permission Fixture (web e2e mirror)" npm run db:test:fixture:permissions:check
+# The owner's Arabic-description input file. It carried "Generated from the seeded database" with no
+# generator behind it and sat 25 codes behind the catalogue, so the person being asked to describe
+# every permission could not see a quarter of the ones added since. Gated for the same reason as the
+# fixture above: a file that claims to be generated needs something that fails when it is not.
+gate "Permission Descriptions (owner input file)" npm run db:permission-descriptions:check
 gate "Integration Tests"   npm run test:e2e
 gate "Contract Tests"      npm run test:contract
 gate "Smoke Tests"         bash scripts/smoke.sh api

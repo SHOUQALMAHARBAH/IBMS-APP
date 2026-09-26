@@ -687,7 +687,8 @@ const insuranceOperations: PermissionSeed[] = [
   {
     code: "refund.raise",
     module: "insurance-operations",
-    description: "Raise a refund (maker side)",
+    description:
+      "NOT YET ENFORCED — reserved for a standalone refund raise (an overpayment not tied to an endorsement). Granting or withdrawing this changes nothing today: an endorsement-driven refund is raised under endorsement.apply",
     roles: [PLACEMENT, FINANCE],
   },
   // maker-checker-segregation.md maps the refund checker to a "Finance
@@ -713,11 +714,14 @@ const insuranceOperations: PermissionSeed[] = [
       "Disburse an approved refund (stamp paidAt and book the client-funds out movement)",
     roles: [FINANCE],
   },
+  // Same shape as refund.raise above, and for the same reason: the reversal is written in the SAME
+  // transaction as the refund, under endorsement.apply, because the two figures cannot move
+  // independently. There is no route a separate code could gate.
   {
     code: "commission-reversal.create",
     module: "insurance-operations",
     description:
-      "Record a commission reversal tied 1:1 to a negative premium adjustment",
+      "NOT YET ENFORCED — a commission reversal is recorded in the same transaction as its refund, under endorsement.apply. Granting or withdrawing this changes nothing today",
     roles: [FINANCE],
   },
 ];
@@ -793,11 +797,14 @@ const claims: PermissionSeed[] = [
       "Close a claim after the client's receipt of payment is confirmed",
     roles: [CLAIMS],
   },
+  // "Disabled by default, logged privileged override only" described a control mechanism that exists
+  // nowhere: no route deletes a claim and there is no override path to log. The capability this product
+  // actually has is claim.discard — withdraw a claim raised in error and keep the row (docs/discard.md).
   {
     code: "claim.delete",
     module: "claims",
     description:
-      "Delete a claim record — disabled by default, logged privileged override only",
+      "NOT YET ENFORCED — no route deletes a claim, and there is no privileged-override path. To withdraw a claim raised in error use claim.discard, which keeps the record",
     roles: [ADMIN],
   },
   {
