@@ -16,7 +16,7 @@ import type { CreatePaymentChannelDto } from './dto/create-payment-channel.dto';
 import type { ListPaymentChannelsQueryDto } from './dto/list-payment-channels-query.dto';
 
 /**
- * Process 38 — the approved `PaymentChannel` list (`payment-channel.manage` /
+ * Process 38 — the approved `PaymentChannel` list (`payment-channel.read`/`.create`/`.deactivate` /
  * Finance). A governed reference list: Finance adds a channel (it is `active`
  * = approved on creation) and disables one it no longer uses. #32's collection
  * cycle validates a supplied `paymentChannelId` against this list

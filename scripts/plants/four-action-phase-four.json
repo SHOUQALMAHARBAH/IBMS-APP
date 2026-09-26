@@ -1,0 +1,22 @@
+{
+  "list-gated-on-the-create": {
+    "file": "apps/api/src/modules/finance/payment-channel.controller.ts",
+    "from": "@RequirePermissions('payment-channel.read')",
+    "to": "@RequirePermissions('payment-channel.create')"
+  },
+  "disable-gated-on-the-read": {
+    "file": "apps/api/src/modules/finance/payment-channel.controller.ts",
+    "from": "@RequirePermissions('payment-channel.deactivate')",
+    "to": "@RequirePermissions('payment-channel.read')"
+  },
+  "add-form-gated-on-the-read": {
+    "file": "apps/web/app/(app)/payment-channels/page.tsx",
+    "from": "const canCreate = hasPermission(user, 'payment-channel.create');",
+    "to": "const canCreate = hasPermission(user, 'payment-channel.read');"
+  },
+  "disable-button-gated-on-the-create": {
+    "file": "apps/web/app/(app)/payment-channels/page.tsx",
+    "from": "const canDeactivate = hasPermission(user, 'payment-channel.deactivate');",
+    "to": "const canDeactivate = hasPermission(user, 'payment-channel.create');"
+  }
+}

@@ -1,6 +1,6 @@
 PERMISSION CATALOGUE — input for the Arabic one-line descriptions
 
-211 permission codes, 12 modules. Generated from the seeded database by
+213 permission codes, 12 modules. Generated from the seeded database by
 `npm run db:permission-descriptions`, so this IS what the Role screen renders — not a separate
 list that can drift from it. Regenerate rather than hand-editing the structure: any line you have
 already written after `ar:` is carried forward by code and is never overwritten.
@@ -414,9 +414,19 @@ MODULE: customer-service   —   خدمة العملاء   (8 codes)
           en: Monitor the SLA dashboard across modules
           ar: ................................................................
 
-MODULE: finance   —   المالية   (14 codes)
+MODULE: finance   —   المالية   (16 codes)
 ------------------------------------------------------------------------------------------------
 
+  [5-STATE] payment-channel   (create / deactivate / read)
+      payment-channel.create
+          en: Add a payment channel to the approved list for a customer or insurer
+          ar: ................................................................
+      payment-channel.deactivate
+          en: Disable an approved payment channel so no further money is sent to it
+          ar: ................................................................
+      payment-channel.read
+          en: List the approved payment channels for a customer or insurer, as needed when recording a receipt or a remittance
+          ar: ................................................................
   [toggle]  client-accounting.read
       client-accounting.read
           en: View the client accounts-receivable/ageing report
@@ -452,10 +462,6 @@ MODULE: finance   —   المالية   (14 codes)
   [toggle]  invoice.create
       invoice.create
           en: Raise a premium invoice
-          ar: ................................................................
-  [toggle]  payment-channel.manage
-      payment-channel.manage
-          en: Maintain the approved payment-channel list for customers and insurers (add / disable), and list it when recording a receipt or remittance
           ar: ................................................................
   [toggle]  receipt.record
       receipt.record
@@ -881,4 +887,4 @@ MODULE: supporting-operations   —   العمليات المساندة   (17 co
           en: Record security-awareness training completion
           ar: ................................................................
 ================================================================================================
-TOTALS: 19 five-state families covering 51 codes, 160 toggles, 211 codes in all.
+TOTALS: 20 five-state families covering 54 codes, 159 toggles, 213 codes in all.

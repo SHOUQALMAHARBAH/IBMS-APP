@@ -44,6 +44,14 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
     // scheme becoming visible on the screen, which is the point of it.
     //
+    // 211 -> 213 (four-action Phase 4: `payment-channel.manage` becomes `.read` / `.create` /
+    // `.deactivate`). This one MOVES A ROW BETWEEN THE TWO LISTS, which is the movement worth reading:
+    // the umbrella was a TOGGLE, because `familyOf` gave it the family `payment-channel` with exactly one
+    // member and one CRUD verb is not a family. Three members with three CRUD verbs qualifies, so
+    // families go 19 -> 20, family codes 51 -> 54, and toggles go 160 -> 159 — one fewer toggle out of a
+    // split that added two codes. That arithmetic is the scheme working, and it is why these four numbers
+    // are pinned separately rather than as one total.
+    //
     // 210 -> 211 (Part 4 step 4: `duty-segregation.mode.declare` — the office administrator declaring
     // whether this office separates the two halves of a maker/checker pair). A TOGGLE, like the four
     // discard codes below: declaring a governance posture is not a point on the
@@ -56,10 +64,10 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // a point on that scale — it is a separate act with its own terminal semantics. An office granting
     // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
     // rendering it as its own checkbox.
-    expect(PERMISSION_CATALOGUE.length).toBe(211);
-    expect(crud.length).toBe(19);
-    expect(crud.flatMap(codesOfRow).length).toBe(51);
-    expect(toggles.length).toBe(160);
+    expect(PERMISSION_CATALOGUE.length).toBe(213);
+    expect(crud.length).toBe(20);
+    expect(crud.flatMap(codesOfRow).length).toBe(54);
+    expect(toggles.length).toBe(159);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

@@ -110,7 +110,7 @@ export const FINANCE = {
     pcLoadError: 'تعذّر تحميل قائمة قنوات الدفع — حاول مرة أخرى.',
     pcAddError: 'تعذّرت إضافة قناة الدفع — حاول مرة أخرى.',
     pcDisableError: 'تعذّر تعطيلها — حاول مرة أخرى.',
-    pcNoPermission: 'لا تملك صلاحية payment-channel.manage اللازمة لعرض قنوات الدفع.',
+    pcNoPermission: 'لا تملك صلاحية payment-channel.read اللازمة لعرض قنوات الدفع.',
 
     // ---- Bank reconciliation (#39) ---------------------------------------
     brHeading: 'التسوية البنكية',
@@ -280,7 +280,7 @@ export const FINANCE = {
     pcLoadError: 'Could not load the payment-channel list — try again.',
     pcAddError: 'Could not add the payment channel — try again.',
     pcDisableError: 'Could not disable it — try again.',
-    pcNoPermission: "You don't hold the payment-channel.manage permission.",
+    pcNoPermission: "You don't hold the payment-channel.read permission.",
 
     brHeading: 'Bank reconciliation',
     brIntro:

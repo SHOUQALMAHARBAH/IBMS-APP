@@ -882,11 +882,29 @@ const finance: PermissionSeed[] = [
       "Reconcile a commission ledger entry against the insurer statement and mark it paid",
     roles: [FINANCE],
   },
+  // Four-action Phase 4 — the umbrella above gated three things and said so in its own description
+  // ("add / disable ... and list it"). A payment channel is where client money is SENT, so adding one and
+  // disabling one are not one capability. No `.update`: the controller is create, read, disable, and a
+  // fourth code nothing can exercise is what Phase 1 declined three times.
   {
-    code: "payment-channel.manage",
+    code: "payment-channel.read",
     module: "finance",
     description:
-      "Maintain the approved payment-channel list for customers and insurers (add / disable), and list it when recording a receipt or remittance",
+      "List the approved payment channels for a customer or insurer, as needed when recording a receipt or a remittance",
+    roles: [FINANCE],
+  },
+  {
+    code: "payment-channel.create",
+    module: "finance",
+    description:
+      "Add a payment channel to the approved list for a customer or insurer",
+    roles: [FINANCE],
+  },
+  {
+    code: "payment-channel.deactivate",
+    module: "finance",
+    description:
+      "Disable an approved payment channel so no further money is sent to it",
     roles: [FINANCE],
   },
   {

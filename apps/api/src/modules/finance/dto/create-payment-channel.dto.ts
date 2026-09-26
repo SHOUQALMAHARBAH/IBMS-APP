@@ -20,7 +20,7 @@ import {
 } from '../finance.config';
 
 /**
- * Process 38 — `POST /payment-channels` (`payment-channel.manage` / Finance).
+ * Process 38 — `POST /payment-channels` (`payment-channel.create` / Finance).
  * Records an approved payment channel for a customer (money IN) or an insurer
  * (money OUT). Exactly one of `customerId` / `insurerId` is supplied and it
  * must match `ownerType`. **Masked-only** — the DTO has no full account-number

@@ -111,7 +111,7 @@ async function actorHolding(
 
 let app: INestApplication<App>;
 
-describe('four-action Phase 1 — each successor can be held alone (e2e)', () => {
+describe('four-action Phases 1 and 4 — each successor can be held alone (e2e)', () => {
   beforeAll(async () => {
     app = await createTestApp();
   }, 300_000);
@@ -253,5 +253,76 @@ describe('four-action Phase 1 — each successor can be held alone (e2e)', () =>
     expect(patched.status, 'the update code must reach the handler').not.toBe(
       403,
     );
+  }, 180_000);
+
+  /*
+   * PHASE 4 — the same argument, on the umbrella that decides where client money goes.
+   *
+   * `payment-channel.manage` gated adding a channel, listing them, and disabling one. The seeded Finance
+   * role received all three successors, so no seeded account can tell them apart: exactly the condition
+   * that made the Phase 1 plant invisible. These two cases are the only shape that can observe it.
+   */
+  it('payment-channel.read alone lists channels and cannot add or disable one', async () => {
+    const token = await actorHolding(app, 'channel-reader', [
+      'payment-channel.read',
+    ]);
+
+    // The half it holds. A 200 here is what makes both 403s below about the permission rather than about
+    // an unauthenticated request or a broken route.
+    await request(app.getHttpServer())
+      .get('/payment-channels')
+      .set(bearer(token))
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(token))
+      .send({
+        ownerType: 'customer',
+        ownerId: '00000000-0000-4000-8000-000000000000',
+        channelType: 'bank_transfer',
+        label: `Refused ${RUN}`,
+      })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/payment-channels/00000000-0000-4000-8000-000000000000/disable')
+      .set(bearer(token))
+      .send({})
+      .expect(403);
+  }, 180_000);
+
+  it('payment-channel.deactivate alone reaches the disable handler and cannot list or add', async () => {
+    // The direction that matters most on this controller. A deactivate code that quietly carried the read
+    // would let whoever can disable a channel enumerate every destination for client money in the office,
+    // which is the umbrella surviving under a narrower name.
+    const token = await actorHolding(app, 'channel-disabler', [
+      'payment-channel.deactivate',
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/payment-channels')
+      .set(bearer(token))
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/payment-channels')
+      .set(bearer(token))
+      .send({
+        ownerType: 'customer',
+        ownerId: '00000000-0000-4000-8000-000000000000',
+        channelType: 'bank_transfer',
+        label: `Refused ${RUN}`,
+      })
+      .expect(403);
+
+    // NOT 403 — it gets as far as the channel not existing, which is the proof it passed the gate. A 403
+    // here would mean the disable route is still gated on something this role does not hold.
+    const disabled = await request(app.getHttpServer())
+      .post('/payment-channels/00000000-0000-4000-8000-000000000000/disable')
+      .set(bearer(token))
+      .send({});
+    expect(
+      disabled.status,
+      'the deactivate code must reach the handler',
+    ).not.toBe(403);
   }, 180_000);
 });

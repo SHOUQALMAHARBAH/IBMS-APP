@@ -39,7 +39,11 @@ export default function PaymentChannelsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { t } = useLanguage();
-  const canManage = hasPermission(user, 'payment-channel.manage');
+  // Four-action Phase 4 — three codes, because adding a destination for client money and disabling one
+  // are not one capability. A Finance officer can be given the LIST (which recording a receipt needs)
+  // without either.
+  const canCreate = hasPermission(user, 'payment-channel.create');
+  const canDeactivate = hasPermission(user, 'payment-channel.deactivate');
 
   const [rows, setRows] = useState<PaymentChannel[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -135,7 +139,7 @@ export default function PaymentChannelsPage() {
         {t('pcIntro')}
       </p>
 
-      {canManage ? (
+      {canCreate ? (
         <form
           onSubmit={submit}
           style={{
@@ -270,7 +274,7 @@ export default function PaymentChannelsPage() {
                       {r.isActive ? <strong>{t('pcActive')}</strong> : t('pcDisabled')}
                     </td>
                     <td style={cellStyle}>
-                      {canManage && r.isActive ? (
+                      {canDeactivate && r.isActive ? (
                         <button
                           type="button"
                           disabled={busy}

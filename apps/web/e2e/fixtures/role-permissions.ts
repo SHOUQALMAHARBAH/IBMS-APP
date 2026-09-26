@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 479 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 481 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -305,7 +305,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'insurer-accounting.read',
     'interaction.log',
     'invoice.create',
-    'payment-channel.manage',
+    'payment-channel.create',
+    'payment-channel.deactivate',
+    'payment-channel.read',
     'profitability-analysis.view',
     'receipt.record',
     'reconciliation-exception.investigate',
@@ -538,7 +540,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 211 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 213 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -650,7 +652,9 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'financial-report.view', module: 'finance', description: "View financial reporting/dashboards" },
   { code: 'insurer-accounting.read', module: 'finance', description: "View insurer accounts-payable/remittance obligations" },
   { code: 'invoice.create', module: 'finance', description: "Raise a premium invoice" },
-  { code: 'payment-channel.manage', module: 'finance', description: "Maintain the approved payment-channel list for customers and insurers (add / disable), and list it when recording a receipt or remittance" },
+  { code: 'payment-channel.create', module: 'finance', description: "Add a payment channel to the approved list for a customer or insurer" },
+  { code: 'payment-channel.deactivate', module: 'finance', description: "Disable an approved payment channel so no further money is sent to it" },
+  { code: 'payment-channel.read', module: 'finance', description: "List the approved payment channels for a customer or insurer, as needed when recording a receipt or a remittance" },
   { code: 'receipt.record', module: 'finance', description: "Record a collection receipt" },
   { code: 'reconciliation-exception.investigate', module: 'finance', description: "Investigate a bank-reconciliation variance exception" },
   { code: 'reconciliation-exception.resolve', module: 'finance', description: "Close a reconciliation exception" },

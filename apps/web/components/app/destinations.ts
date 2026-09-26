@@ -115,7 +115,7 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         labelKey: 'navCommissionRates',
         permissions: ['commission-rate.manage', 'financial-report.view'],
       },
-      { href: '/payment-channels', labelKey: 'navPaymentChannels', permissions: ['payment-channel.manage'] },
+      { href: '/payment-channels', labelKey: 'navPaymentChannels', permissions: ['payment-channel.read'] },
       {
         href: '/bank-reconciliation',
         labelKey: 'navBankReconciliation',
