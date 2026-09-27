@@ -5,12 +5,19 @@ import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
 import {
+  caseCanBeDecided,
   getPendingMatchCount,
   listScreeningMatches,
+  listScreeningReviewers,
   reviewScreeningMatch,
   type ScreeningMatch,
   type ScreeningMatchStatus,
+  type ScreeningReviewer,
 } from "../../../lib/screening/screening-match-api";
+import {
+  screeningCaseStatusKey,
+  ScreeningCasePanel,
+} from "../../../components/screening/ScreeningCasePanel";
 import { ApiError } from "../../../lib/auth/api-client";
 import { errorStyle } from "../../../components/auth/auth-form.styles";
 import { pageStyle } from "../../../components/lead/lead.styles";
@@ -48,6 +55,10 @@ export default function ScreeningMatchesPage() {
   const [reasons, setReasons] = useState<Record<string, string>>({});
   // null = not yet known. false = the synced sanctions cache is EMPTY.
   const [watchlistReady, setWatchlistReady] = useState<boolean | null>(null);
+  // Who a case may be assigned to. Loaded once: the eligible set does not change
+  // while somebody works a queue, and re-fetching it per row would be one request
+  // per match for an answer that is the same every time.
+  const [reviewers, setReviewers] = useState<ScreeningReviewer[]>([]);
 
   const load = useCallback(
     async (next: ScreeningMatchStatus) => {
@@ -77,6 +88,20 @@ export default function ScreeningMatchesPage() {
       await load(status);
     })();
   }, [user, status, load, t]);
+
+  useEffect(() => {
+    if (!user || !canReview) return;
+    void (async () => {
+      try {
+        setReviewers(await listScreeningReviewers());
+      } catch {
+        // A picker that cannot load is a picker that offers nobody, and the
+        // panel says so. Deliberately not surfaced as a page-level error: the
+        // queue itself is still readable and the decision still recordable.
+        setReviewers([]);
+      }
+    })();
+  }, [user, canReview]);
 
   // An EMPTY queue is ambiguous: "nothing matched" and "nothing was ever
   // checked" look identical on this screen, and the second is the state every
@@ -185,6 +210,7 @@ export default function ScreeningMatchesPage() {
                   </th>
                   <th style={head}>{t('smType')}</th>
                   <th style={head}>{t('smDetected')}</th>
+                  <th style={head}>{t('smCaseColumn')}</th>
                   <th style={head}>
                     {status === "pending"
                       ? t('smDecision')
@@ -218,6 +244,17 @@ export default function ScreeningMatchesPage() {
                     <td style={cell}>{r.matchType}</td>
                     <td style={cell}>{r.detectedAt.slice(0, 10)}</td>
                     <td style={cell}>
+                      {canReview && r.status === "pending" ? (
+                        <ScreeningCasePanel
+                          match={r}
+                          reviewers={reviewers}
+                          onChanged={() => load(status)}
+                        />
+                      ) : (
+                        t(screeningCaseStatusKey(r.caseStatus))
+                      )}
+                    </td>
+                    <td style={cell}>
                       {r.status !== "pending" ? (
                         <div style={{ fontSize: "0.85rem" }}>
                           <strong>{t(ENUM_LABEL.ScreeningMatchStatus[r.status])}</strong>
@@ -245,6 +282,7 @@ export default function ScreeningMatchesPage() {
                               type="button"
                               disabled={
                                 busy ||
+                                !caseCanBeDecided(r.caseStatus) ||
                                 (reasons[r.id]?.trim().length ?? 0) < MIN_REASON
                               }
                               onClick={() => void decide(r.id, "cleared")}
@@ -255,6 +293,7 @@ export default function ScreeningMatchesPage() {
                               type="button"
                               disabled={
                                 busy ||
+                                !caseCanBeDecided(r.caseStatus) ||
                                 (reasons[r.id]?.trim().length ?? 0) < MIN_REASON
                               }
                               onClick={() => void decide(r.id, "confirmed")}

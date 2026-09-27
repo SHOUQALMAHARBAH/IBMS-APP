@@ -434,6 +434,103 @@ describe('Part B §16 — invalid transitions are refused', () => {
   });
 });
 
+/*
+ * THE ASSIGNEE PICKER'S SOURCE.
+ *
+ * `GET /screening/reviewers` exists because the five case routes had no web
+ * caller and could not get one without it: `assigneeUserId` is a uuid, and a
+ * screen that asks a Compliance Officer to type one is the same defect the audit
+ * trail had when it rendered raw uuids at the person reviewing who did what.
+ *
+ * Its own endpoint rather than `GET /admin/users`, measured not preferred:
+ * `user.manage` is held by the administrator roles and NOT by a Compliance
+ * Officer, so sourcing the picker from the admin user list would 403 for the only
+ * people who assign screening work.
+ */
+describe('Part B §16 — who a case may be assigned to', () => {
+  it('lists active holders of the screening permission, and nobody else', async () => {
+    const application = await boot();
+    const officer = await makeUser(
+      application,
+      'reviewers-officer',
+      'COMPLIANCE_OFFICER',
+    );
+    const colleague = await makeUser(
+      application,
+      'reviewers-colleague',
+      'COMPLIANCE_OFFICER',
+    );
+    // Holds no screening permission — a case assigned to this person would
+    // stall silently, which is what `assign`'s own comment is about.
+    const outsider = await makeUser(
+      application,
+      'reviewers-outsider',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    const deactivated = await makeUser(
+      application,
+      'reviewers-deactivated',
+      'COMPLIANCE_OFFICER',
+    );
+    await prisma.user.update({
+      where: { id: deactivated.id },
+      data: { isActive: false },
+    });
+    // A time-boxed account whose window has CLOSED. The access-window half is
+    // the part that is easy to omit, and omitting it once let an unusable
+    // administrator satisfy the lockout guard.
+    const expired = await makeUser(
+      application,
+      'reviewers-expired',
+      'COMPLIANCE_OFFICER',
+    );
+    await prisma.user.update({
+      where: { id: expired.id },
+      data: { accessValidUntil: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    });
+
+    const res = await request(application.getHttpServer())
+      .get('/screening/reviewers')
+      .set(bearer(officer.accessToken))
+      .expect(200);
+    const body = res.body as { id: string; fullName: string }[];
+    const ids = new Set(body.map((r) => r.id));
+
+    // POSITIVE ANCHOR FIRST: the list really is populated for this caller, so
+    // the absences below cannot pass on an empty response.
+    expect(ids.has(officer.id)).toBe(true);
+    expect(ids.has(colleague.id)).toBe(true);
+
+    expect(ids.has(outsider.id)).toBe(false);
+    expect(ids.has(deactivated.id)).toBe(false);
+    expect(ids.has(expired.id)).toBe(false);
+
+    // A NAME, never a bare id — the whole reason this endpoint exists.
+    const me = body.find((r) => r.id === officer.id);
+    expect(me?.fullName).toBeTruthy();
+
+    // A lookup feeding a control writes NO audit row: one row per keystroke
+    // would be noise in the log a screening case is reviewed from.
+    const audit = await prisma.auditLogEntry.findMany({
+      where: { userId: officer.id, entityType: 'ScreeningReviewer' },
+    });
+    expect(audit).toHaveLength(0);
+  });
+
+  it('is gated on the screening permission', async () => {
+    const application = await boot();
+    const sales = await makeUser(
+      application,
+      'reviewers-sales',
+      'SALES_RELATIONSHIP_OFFICER',
+    );
+    await request(application.getHttpServer())
+      .get('/screening/reviewers')
+      .set(bearer(sales.accessToken))
+      .expect(403);
+  });
+});
+
 describe('Part B §16 — RBAC', () => {
   it('a Sales Officer cannot touch any part of a case', async () => {
     const application = await boot();

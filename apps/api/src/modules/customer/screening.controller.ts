@@ -101,6 +101,19 @@ export class ScreeningController {
    * here is part of one person's work on one case, and splitting them would
    * produce a reviewer who can start a case but not finish it.
    */
+  /**
+   * The assignee/escalation picker's source.
+   *
+   * Declared ABOVE `matches/:id/*` and on its own path segment deliberately: a
+   * literal that could be read as an `:id` is how a picker route starts
+   * answering as a case lookup.
+   */
+  @RequirePermissions('sanctions-pep.screen')
+  @Get('reviewers')
+  listReviewers() {
+    return this.cases.listReviewers();
+  }
+
   @RequirePermissions('sanctions-pep.screen')
   @Get('matches/:id/case')
   getCase(@Param('id') id: string) {

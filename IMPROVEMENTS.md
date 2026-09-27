@@ -2824,7 +2824,7 @@ see. Ordered by consequence:**
 | Surface | Routes | Why it matters |
 |---|---|---|
 | ~~`POST /refunds/:id/disburse`~~ | 1 | ~~**Money leaves the office through this route and nothing can call it.**~~ **CLOSED 2026-09-27**, the first of the 33 on the owner's instruction, because it is the one with a balance attached. A "Pay refund" action on the endorsement's APPLIED state, gated on `refund.disburse` (FINANCE) — deliberately a different grant from `refund.approve` (Manager or Finance), so approving and paying are not one capability. The condition is `refundIsPayable`, exported and unit-tested rather than written inside the button, because three facts must agree and **the below-threshold branch is the one a reasonable condition gets wrong**: a refund under the value threshold is auto-cleared with `approvedByUserId` left NULL, so testing only for an approver would make every small refund permanently unpayable — and no endorsement fixture in the web e2e carries a refund at all, so nothing would have caught it. Planted both ways. |
-| `screening/matches/:id/{assign,escalate,notes,start-review,case}` | 5 | The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case to someone, escalate one, add a note, or open the case view. On an AML control, the workflow around the decision is the part that evidences it. |
+| ~~`screening/matches/:id/{assign,escalate,notes,start-review,case}`~~ | 5 | ~~The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case, escalate one, add a note, or open the case view.~~ **CLOSED 2026-09-27, and the sentence above was WRONG about the consequence in the direction that matters: a match could not be decided either.** See § 1.62 — `decide()` refuses unless the case is UNDER_REVIEW or ESCALATED, and every route to those states was one of these five. |
 | ~~`sla/timers/:id/{pause,resume}`~~ | 2 | ~~`sla.timer.pause` exists as a permission and can only be exercised by constructing a request by hand.~~ **CLOSED 2026-09-27**, second of the 33, and closing it found § 1.60: the dashboard was PAUSE-BLIND, so shipping the button without that fix would have introduced a false breach rather than found one. Pause/resume controls on `/sla-dashboard`, gated on `sla.timer.pause`, mandatory ten-character reason sent trimmed. The routes had no api e2e either — two now exist. |
 | `GET /sla/timers/:id/status` | 1 | **REDUNDANT SURFACE, NOT A MISSING CAPABILITY — and the distinction is a correction to this measurement.** It answers "where does this one timer stand, and is its deadline the law?", which is exactly the six fields `GET /sla-dashboard/timers` now carries per row (§ 1.60). Wiring a caller would add a request that duplicates one already made. **This list conflates two kinds of unreachable route**: a capability nobody can exercise (the refund disbursement, pause/resume, the screening queue) and a read whose answer another called route already returns. Only the first kind is a gap; the count is actionable only once they are separated, and the remaining rows have NOT been re-classified this way. |
 | `sla/holidays` (GET + POST) | 2 | § 1.57 — the calendar every business-day deadline is counted against. Found by hand first; this method finds it too. |
@@ -3595,6 +3595,94 @@ only the PDPL ones. Putting a pause control on the DSR screen instead is the nar
 probably the right one, but it is a second control for the same act, and this repo's own rule from the
 combined-duty field is that a second copy is where the wording drifts. **Put to the owner as: should the
 Data Protection Officer stop a clock from the DSR record, or read the whole SLA dashboard?**
+
+
+### 1.62 `P1` — THE SANCTIONS REVIEW QUEUE COULD NOT DECIDE A SINGLE MATCH, AND A FULL API E2E IS WHAT MADE IT INVISIBLE
+
+Found while closing the five uncalled `screening/matches/:id/*` routes (§ 1.44). **My own entry
+understated this**: it said the queue could decide a match but not manage the case around it. It could
+not decide one either.
+
+    ScreeningMatch.caseStatus  @default(OPEN)
+    decide()                   refuses unless UNDER_REVIEW or ESCALATED
+    routes to those states     assign -> start-review, or escalate
+    web callers for those      NONE
+
+So **every match sat at OPEN forever, and the one control the screen did offer — the decision — returned
+422 every single time**, with the message "Assign it and start the review before recording a decision" and
+nothing in the application able to do either. A Compliance Officer looking at a pending sanctions hit
+could not clear a false positive and could not confirm a true match. On an AML control that is not a
+missing convenience.
+
+#### Two test suites, both green, both blind — from opposite directions
+
+**`screening-case-lifecycle.e2e-spec.ts` walks the entire workflow through HTTP** — assign, note,
+start-review, escalate, decide, plus the refusals — 12 tests, all passing. The API is correct and
+complete. **That is precisely why this survived**: every gate was green on a workflow no user could
+reach, so the evidence of correctness was also the thing hiding the defect. § 1.44's whole thesis, in its
+sharpest form yet.
+
+**And the web tests asserted a decision the real API refuses.** `screening-matches.spec.ts` mocked
+`POST /screening/matches/:id/review` and checked the button sent the right body. The mock answered 200
+where the server answers 422, so the screen's only live control was verified against a fiction. When the
+case fields were added to the fixture, those two tests failed immediately — which is the gate working, a
+year late.
+
+**The class: a mocked endpoint cannot refuse you.** A Playwright mock proves the request the screen
+builds; it can say nothing about whether the server would accept it. Where a route has a PRECONDITION the
+screen must satisfy, only an api e2e — or a mock that returns the real refusal — can see it.
+
+#### The list view did not carry the workflow either
+
+`ScreeningMatchView` omitted `caseStatus`, `assignedToUserId`, `assignedAt`, `reviewStartedAt`,
+`escalatedToUserId`, `escalatedAt` and `escalationReason`. So the queue could not show who owned a case
+or whether anybody had started — the same silent-drop shape as § 1.60's six SLA fields, except here the
+API never returned them at all. Added.
+
+**Still dropped, deliberately and recorded rather than fixed:** `matchScore`, `reviewThreshold`,
+`algorithmVersion`, `matchedAttributes`, `pepPosition`, `listType` and `provider` are on the model and
+absent from the view. `matchedAttributes` is the interesting one — the AMLU text the owner verified says
+*"further search should be made with the other identifiers (full name, date of birth, nationality)"*, and
+`matchedAttributes` records which identifiers actually matched, which is exactly what a reviewer needs to
+resolve a potential match. It sits next to the § 1.50 PEP area, which is out of scope by instruction, so
+it is named here and left alone.
+
+#### A new endpoint, on the `/audit-trail/actors` precedent
+
+`assigneeUserId` is a uuid, and a screen that asks a Compliance Officer to type one is the defect the
+audit trail had when it rendered raw uuids at the person reviewing who did what. So
+**`GET /screening/reviewers`** returns active holders of `sanctions-pep.screen` with their names.
+
+Its own endpoint rather than `GET /admin/users`, measured not preferred: `user.manage` is held by the
+administrator roles and **not** by a Compliance Officer, so sourcing the picker from the admin list would
+403 for the only people who assign screening work — the same measurement that put the audit-trail actor
+picker on its own route.
+
+`canActToday` — active, and inside the access window — is now **extracted and shared** with
+`findActiveHoldersOfPermission`, which feeds the last-administrator lockout guard. Two copies of an
+access-window predicate is two chances for a picker to offer a reviewer whose account expired last night,
+and omitting that half once already let an unusable administrator satisfy the lockout guard. Proven: a
+plant swapping the shared predicate for `{ isActive: true }` puts the time-boxed account back in the list
+and kills the test.
+
+#### `assign`'s own comment still claims more than its check does
+
+    // A case assigned to somebody who cannot act on it is a case that stalls
+    // silently. Checked here rather than trusted from the request body.
+
+It checks the assignee EXISTS and is ACTIVE. It does not check they hold `sanctions-pep.screen`, so
+assigning a sanctions case to a Sales officer succeeds and the case stalls exactly as the comment
+describes. **The picker now makes that unrepresentable from the screen** (it only offers eligible
+holders), and the service is deliberately unchanged: tightening it is a behaviour change to a route with a
+passing e2e, and a reviewer may legitimately be granted the permission after assignment. Recorded so the
+comment and the code can be reconciled by a decision rather than by accident.
+
+**Proven by seven plants**, and **one of them initially killed nothing** — § 1.51(d) on my own test. The
+plant removed `caseCanBeDecided` from the decision button and all 13 tests stayed green, because the
+button is ALSO disabled while the reason is too short: asserting `toBeDisabled()` on an empty form cannot
+tell the two causes apart. The test now types a valid reason first, so the only remaining cause is the
+case state, and the re-planted gate kills it. **The same shape as "nine characters, not zero": an
+assertion has to isolate the one cause it claims to be about.**
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

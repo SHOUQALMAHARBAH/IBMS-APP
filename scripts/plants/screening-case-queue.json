@@ -1,0 +1,37 @@
+{
+  "reviewers-ignore-the-access-window": {
+    "file": "apps/api/src/repositories/user.repository.ts",
+    "from": "        user: canActToday(now),\n      },\n      select: { user: { select: { id: true, fullName: true } } },",
+    "to": "        user: { isActive: true },\n      },\n      select: { user: { select: { id: true, fullName: true } } },"
+  },
+  "reviewers-ignore-the-permission": {
+    "file": "apps/api/src/repositories/user.repository.ts",
+    "from": "    const grants = await this.prisma.client.rolePermission.findMany({\n      where: { permission: { code }, role: { status: 'ACTIVE' } },\n      select: { roleId: true },\n    });\n    if (grants.length === 0) return [];\n\n    const assignments = await this.prisma.client.userRoleAssignment.findMany({",
+    "to": "    const grants = await this.prisma.client.rolePermission.findMany({\n      where: { role: { status: 'ACTIVE' } },\n      select: { roleId: true },\n    });\n    if (grants.length === 0) return [];\n\n    const assignments = await this.prisma.client.userRoleAssignment.findMany({"
+  },
+  "decision-not-gated-on-the-case-state": {
+    "file": "apps/web/app/(app)/screening-matches/page.tsx",
+    "from": "                                !caseCanBeDecided(r.caseStatus) ||\n                                (reasons[r.id]?.trim().length ?? 0) < MIN_REASON\n                              }\n                              onClick={() => void decide(r.id, \"cleared\")}",
+    "to": "                                (reasons[r.id]?.trim().length ?? 0) < MIN_REASON\n                              }\n                              onClick={() => void decide(r.id, \"cleared\")}"
+  },
+  "escalation-reason-floor-ignored": {
+    "file": "apps/web/components/screening/ScreeningCasePanel.tsx",
+    "from": "                      escalateTo === '' ||\n                      !escalationReasonIsValid(escalateReason)",
+    "to": "                      escalateTo === ''"
+  },
+  "note-sent-untrimmed": {
+    "file": "apps/web/lib/screening/screening-match-api.ts",
+    "from": "    note: note.trim(),",
+    "to": "    note,"
+  },
+  "assignee-rendered-as-a-raw-id": {
+    "file": "apps/web/components/screening/ScreeningCasePanel.tsx",
+    "from": "            {assigneeName ?? t('smCaseUnknownReviewer')}",
+    "to": "            {match.assignedToUserId}"
+  },
+  "empty-reviewer-list-still-renders-the-picker": {
+    "file": "apps/web/components/screening/ScreeningCasePanel.tsx",
+    "from": "          {nobodyToAssignTo ? (",
+    "to": "          {false ? ("
+  }
+}
