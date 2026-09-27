@@ -919,12 +919,12 @@ model AccessRecertificationCycle {
 /// measured. Adding them is a data-model decision about what identity evidence this product holds; see
 /// IMPROVEMENTS § 3.14.
 model CustomerIdentifierCorrection {
-  id                               String           @id @default(uuid())
+  id                               String              @id @default(uuid())
   /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
-  organizationId                   String           @default(dbgenerated())
-  organization                     Organization     @relation(fields: [organizationId], references: [id])
+  organizationId                   String              @default(dbgenerated())
+  organization                     Organization        @relation(fields: [organizationId], references: [id])
   customerId                       String
-  customer                         Customer         @relation(fields: [customerId], references: [id])
+  customer                         Customer            @relation(fields: [customerId], references: [id])
   /// Which identifier changed. Pinned by a CHECK in the migration so a typo cannot become a new category.
   field                            String
   /// ENCRYPT. A corrected national ID is Highly Confidential and `Customer.nationalIdEnc` exists so it is
@@ -935,20 +935,27 @@ model CustomerIdentifierCorrection {
   /// Mandatory, unlike a contact-detail correction: this is part of the record the AMLU requires retained.
   reason                           String
   correctedByUserId                String
-  correctedAt                      DateTime         @default(now())
+  correctedAt                      DateTime            @default(now())
   /// The screening either side of the change. The prior one is the evidence; RESTRICT keeps it.
   priorScreeningResultId           String?
-  priorScreeningResult             ScreeningResult? @relation("IdentifierCorrectionPriorScreening", fields: [priorScreeningResultId], references: [id], onDelete: Restrict)
+  priorScreeningResult             ScreeningResult?    @relation("IdentifierCorrectionPriorScreening", fields: [priorScreeningResultId], references: [id], onDelete: Restrict)
   newScreeningResultId             String?
-  newScreeningResult               ScreeningResult? @relation("IdentifierCorrectionNewScreening", fields: [newScreeningResultId], references: [id], onDelete: Restrict)
+  newScreeningResult               ScreeningResult?    @relation("IdentifierCorrectionNewScreening", fields: [newScreeningResultId], references: [id], onDelete: Restrict)
   /// What the KYC file's status was before this correction undid it.
   kycStatusBefore                  String?
   kycRecordId                      String?
-  kycRecord                        KYCRecord?       @relation(fields: [kycRecordId], references: [id], onDelete: Restrict)
+  kycRecord                        KYCRecord?          @relation(fields: [kycRecordId], references: [id], onDelete: Restrict)
   /// The NOT-ADOPTED-AS-AUTOMATIC path. A documented clerical correction may leave the prior identity
   /// verification standing ONLY with evidence, with the decision recorded against the person who made it,
   /// and appearing in the compliance report. Nothing writes these yet: re-verification is unconditional.
   /// All three or none — enforced by a CHECK, so "documented as clerical" cannot mean a ticked box.
+  /// The Data Subject Request this correction answers, when it answers one. NULL on an ordinary
+  /// correction an officer makes unprompted, which is most of them — a placeholder would make "answered a
+  /// request" unusable as a filter, and requiring one would make the common case impossible.
+  ///
+  /// This is what `DsrService.fulfil` reads to refuse closing a CORRECTION request that nothing answered.
+  dsrId                            String?
+  dsr                              DataSubjectRequest? @relation(fields: [dsrId], references: [id], onDelete: Restrict)
   clericalRetentionEvidence        String?
   clericalRetentionDecidedByUserId String?
   clericalRetentionDecidedAt       DateTime?
@@ -956,6 +963,10 @@ model CustomerIdentifierCorrection {
   @@index([organizationId])
   @@index([customerId])
   @@index([correctedAt])
+  /// Declared because the migration creates it: `db:divergence` failed on exactly this and printed
+  /// `DROP INDEX "CustomerIdentifierCorrection_dsrId_idx"` — the statement the next `migrate dev` would
+  /// have generated. An index created in SQL and not declared here is an index a later migration removes.
+  @@index([dsrId])
 }
 
 model AccessRecertificationItem {
@@ -4261,18 +4272,18 @@ enum DsrStatus {
 /// closed "fully fulfilled" — must force PARTIALLY_FULFILLED with a
 /// retentionScheduleReference.
 model DataSubjectRequest {
-  id                             String           @id @default(uuid())
+  id                             String                         @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId                 String           @default(dbgenerated())
-  organization                   Organization     @relation(fields: [organizationId], references: [id])
+  organizationId                 String                         @default(dbgenerated())
+  organization                   Organization                   @relation(fields: [organizationId], references: [id])
   customerId                     String?
-  customer                       Customer?        @relation("DsrCustomer", fields: [customerId], references: [id])
+  customer                       Customer?                      @relation("DsrCustomer", fields: [customerId], references: [id])
   insuredPersonId                String?
-  insuredPerson                  InsuredPerson?   @relation("DsrInsuredPerson", fields: [insuredPersonId], references: [id])
+  insuredPerson                  InsuredPerson?                 @relation("DsrInsuredPerson", fields: [insuredPersonId], references: [id])
   type                           DsrType
-  status                         DsrStatus        @default(RECEIVED)
-  receivedAt                     DateTime         @default(now()) // logged same business day regardless of channel
+  status                         DsrStatus                      @default(RECEIVED)
+  receivedAt                     DateTime                       @default(now()) // logged same business day regardless of channel
   identityVerifiedAt             DateTime?
   slaDueAt                       DateTime
   accessExtensionAppliedAt       DateTime? // Access-only, +15 business days
@@ -4281,7 +4292,7 @@ model DataSubjectRequest {
   partialFulfilmentJustification String?
   closedAt                       DateTime?
   dpoHandlerUserId               String?
-  createdAt                      DateTime         @default(now())
+  createdAt                      DateTime                       @default(now())
   // Process 52/M04 (backlog Part D) widening — maker/checker segregation for
   // closure (Part 5.2 / maker-checker-segregation.md): processedByUserId is
   // stamped by whichever of verify->fulfil/partially-fulfil/reject actually
@@ -4307,7 +4318,10 @@ model DataSubjectRequest {
   /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
   /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
   closureCombinedDutyActId       String?
-  closureCombinedDutyAct         CombinedDutyAct? @relation("DataSubjectRequestClosureCombinedDuty", fields: [closureCombinedDutyActId], references: [id], onDelete: Restrict)
+  closureCombinedDutyAct         CombinedDutyAct?               @relation("DataSubjectRequestClosureCombinedDuty", fields: [closureCombinedDutyActId], references: [id], onDelete: Restrict)
+  /// Corrections recorded in answer to this request. `fulfil` refuses to close a CORRECTION request
+  /// with none: an attestation with nothing behind it is the falsely closed record a regulator reads.
+  corrections                    CustomerIdentifierCorrection[]
 
   @@index([status])
   @@index([slaDueAt])

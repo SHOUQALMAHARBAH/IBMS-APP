@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CustomerRepository } from '../../repositories/customer.repository';
 import { segregatedOfficeDutySegregation } from '../duty-segregation/duty-segregation.double';
 import {
   ConflictException,
@@ -41,6 +42,7 @@ function makeService(
     repo?: Record<string, unknown>;
     legalHolds?: Record<string, unknown>;
     slaTimer?: Record<string, unknown>;
+    customers?: Record<string, unknown>;
   } = {},
 ) {
   const repo = {
@@ -84,6 +86,14 @@ function makeService(
     ...over.slaTimer,
   };
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
+  // The correction count the CORRECTION closure gate reads. Defaults to ONE, so every existing test in
+  // this file — none of which is about corrections — keeps asserting what it always did. A default of
+  // zero would make the new gate refuse every CORRECTION fulfilment here and the failures would look like
+  // the gate working rather than the fixture being wrong.
+  const customers = {
+    countCorrectionsForDsr: vi.fn().mockResolvedValue(1),
+    ...over.customers,
+  };
   // The SHARED double, not a local `mockResolvedValue(null)`: a permissive mock would make this file's
   // own self-approval assertions pass on the mock rather than on the code.
   const dutySegregation = segregatedOfficeDutySegregation();
@@ -94,8 +104,9 @@ function makeService(
     slaTimer as unknown as SlaTimerService,
     audit as unknown as AuditService,
     dutySegregation,
+    customers as unknown as CustomerRepository,
   );
-  return { service, repo, legalHolds, workflow, slaTimer, audit };
+  return { service, repo, legalHolds, workflow, slaTimer, audit, customers };
 }
 
 describe('DsrService.create (M04)', () => {
@@ -431,6 +442,53 @@ describe('DsrService.applyExtension (M04)', () => {
 });
 
 describe('DsrService.fulfil (M04)', () => {
+  it('422s a CORRECTION fulfil when NO correction was recorded against it — no false closure', async () => {
+    // The owner's requirement 4. A CORRECTION request is a statutory right with a ten-working-day clock
+    // and a two-person closure, and it could be marked FULFILLED on a staff member's word with nothing
+    // able to verify the data changed — and until this week nothing COULD change it (§ 3.14).
+    //
+    // A closed request with nothing behind it is worse than an open one: the open one is visible, and the
+    // falsely closed one is the record a regulator reads.
+    const { service, workflow, customers } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(
+            row({ type: 'CORRECTION', status: 'IN_PROGRESS' }),
+          ),
+      },
+      customers: { countCorrectionsForDsr: vi.fn().mockResolvedValue(0) },
+    });
+
+    await expect(service.fulfil('dsr-1', {}, 'u-dpo')).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(customers.countCorrectionsForDsr).toHaveBeenCalledWith('dsr-1');
+    // Nothing moved. Asserted because a refusal that still transitioned would leave the request closed
+    // and the refusal cosmetic.
+    expect(workflow.transition).not.toHaveBeenCalled();
+  });
+
+  it('allows a CORRECTION fulfil once a correction exists, and asks for no attestation', async () => {
+    // A LIVE check rather than a confirmation flag. The DELETION branch uses both, because a hold can
+    // exist that the officer must acknowledge; here there is nothing to acknowledge — either a correction
+    // was recorded or it was not — and asking for a confirmation would reintroduce the attestation this
+    // replaces.
+    const { service, workflow } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockResolvedValue(
+            row({ type: 'CORRECTION', status: 'IN_PROGRESS' }),
+          ),
+      },
+      customers: { countCorrectionsForDsr: vi.fn().mockResolvedValue(1) },
+    });
+
+    await expect(service.fulfil('dsr-1', {}, 'u-dpo')).resolves.toBeDefined();
+    expect(workflow.transition).toHaveBeenCalled();
+  });
+
   it('422s a DELETION fulfil with no confirmNoOpenRetentionHold', async () => {
     const { service } = makeService({
       repo: {

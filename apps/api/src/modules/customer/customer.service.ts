@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import {
   Prisma,
@@ -72,6 +73,8 @@ export interface MaskedCustomer extends Omit<
  * a customer to work its KYC file, not just their own pipeline). */
 @Injectable()
 export class CustomerService {
+  private readonly logger = new Logger(CustomerService.name);
+
   constructor(
     private readonly customers: CustomerRepository,
     private readonly prospects: ProspectRepository,
@@ -521,6 +524,54 @@ export class CustomerService {
       contactEmailEnc: encrypted.contactEmailEnc,
       registeredAddress: dto.registeredAddress,
     });
+
+    // ONE CORRECTION ROW PER FIELD CHANGED, and it is what lets a statutory request be shown to have been
+    // ANSWERED rather than merely attested to.
+    //
+    // `DsrService.fulfil` refuses to close a CORRECTION request with no correction recorded against it
+    // (the owner's requirement 4), and the only link it can read is `dsrId` here. An audit row cannot
+    // serve: it is not queryable as "was this request answered", which is why this table covers the
+    // contact fields as well as the screening identifiers.
+    //
+    // Best-effort, like the audit call below and for the same reason: the customer's details are already
+    // corrected and the client believes so. A failure here costs the DSR link, which surfaces as the
+    // closure gate refusing — the safe direction, because it asks somebody to look rather than closing a
+    // request on a record that is not there.
+    const dsrId =
+      dto.answersRequestType === 'dsr' ? dto.answersRequestId : undefined;
+    for (const field of changed) {
+      try {
+        const values = await encryptEntityFields(
+          this.encryption,
+          'CustomerIdentifierCorrection',
+          {
+            // The BEFORE value is not read back for the contact fields: they are encrypted at rest and
+            // decrypting the old one to re-encrypt it into the correction would put the plaintext through
+            // a second round trip for no gain. The AFTER value is what the officer just typed.
+            afterValueEnc:
+              field === 'registeredAddress' ? undefined : dto[field],
+          },
+          {
+            userId: actor.id,
+            entityType: 'CustomerIdentifierCorrection',
+            entityId: customerId,
+          },
+        );
+        await this.customers.recordCorrection({
+          id: randomUUID(),
+          customerId,
+          field,
+          afterValueEnc: values.afterValueEnc,
+          reason: dto.reason ?? 'Contact detail corrected',
+          correctedByUserId: actor.id,
+          dsrId,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Customer ${customerId}: failed to record the ${field} correction${dsrId ? ` against DSR ${dsrId}` : ''}: ${(err as Error).message}`,
+        );
+      }
+    }
 
     try {
       await this.audit.record({

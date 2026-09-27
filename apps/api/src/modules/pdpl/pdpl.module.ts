@@ -10,6 +10,7 @@ import { RetentionScheduleService } from './retention-schedule.service';
 import { RetentionScheduleRepository } from '../../repositories/retention-schedule.repository';
 import { LegalHoldController } from './legal-hold.controller';
 import { LegalHoldService } from './legal-hold.service';
+import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import { DisposalBatchController } from './disposal-batch.controller';
 import { DisposalBatchService } from './disposal-batch.service';
@@ -117,6 +118,9 @@ import { SlaModule } from '../sla/sla.module';
     RetentionScheduleRepository,
     LegalHoldService,
     LegalHoldRepository,
+    // The DSR closure gate reads one fact from it: whether a correction was recorded against a CORRECTION
+    // request. A shared repository, never a service — see the module's own header.
+    CustomerRepository,
     DisposalBatchService,
     DisposalBatchRepository,
     CrossBorderTransferService,

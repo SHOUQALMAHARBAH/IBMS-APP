@@ -119,6 +119,37 @@ export class CustomerRepository {
     return this.prisma.client.customer.update({ where: { id }, data });
   }
 
+  /**
+   * Record a correction. The evidence the AMLU requires kept — "the verification mechanism and actions
+   * taken … in internal records" — and, when `dsrId` is set, the evidence that a statutory request was
+   * actually answered rather than attested to.
+   */
+  recordCorrection(input: {
+    id: string;
+    customerId: string;
+    field: string;
+    beforeValueEnc?: string;
+    afterValueEnc?: string;
+    reason: string;
+    correctedByUserId: string;
+    dsrId?: string;
+    kycRecordId?: string;
+    kycStatusBefore?: string;
+    priorScreeningResultId?: string;
+  }): Promise<{ id: string }> {
+    return this.prisma.client.customerIdentifierCorrection.create({
+      data: input,
+      select: { id: true },
+    });
+  }
+
+  /** How many corrections were recorded in answer to this request. The DSR closure gate's one query. */
+  countCorrectionsForDsr(dsrId: string): Promise<number> {
+    return this.prisma.client.customerIdentifierCorrection.count({
+      where: { dsrId },
+    });
+  }
+
   findById(id: string): Promise<Customer | null> {
     return this.prisma.client.customer.findUnique({ where: { id } });
   }

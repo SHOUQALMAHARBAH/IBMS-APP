@@ -12,6 +12,7 @@ import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { hasExactlyOneOwner } from '../../common/dto.util';
 import { DsrRepository } from '../../repositories/dsr.repository';
+import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
   applyDsrExtension,
@@ -87,6 +88,9 @@ export class DsrService {
     private readonly slaTimer: SlaTimerService,
     private readonly audit: AuditService,
     private readonly dutySegregation: DutySegregationService,
+    // A shared REPOSITORY across modules, which is this codebase's rule — never a service. The gate needs
+    // one fact: whether a correction was recorded against this request.
+    private readonly customers: CustomerRepository,
   ) {}
 
   // --- 1. create (RECEIVED, "logged the same business day") ---------
@@ -389,6 +393,26 @@ export class DsrService {
       if (dto.confirmNoOpenRetentionHold !== true) {
         throw new UnprocessableEntityException(
           `Data Subject Request ${id} is a DELETION request — it cannot be marked fully fulfilled without confirming no retention hold applies (confirmNoOpenRetentionHold: true). Use partially-fulfil if one does.`,
+        );
+      }
+    }
+    if (dsr.type === 'CORRECTION') {
+      // NO FALSE CLOSURE. The owner's requirement 4.
+      //
+      // A CORRECTION request could be marked FULFILLED on a staff member's word alone, with nothing in
+      // the system able to verify the data changed — and until this week nothing COULD change it
+      // (IMPROVEMENTS § 3.14). A closed request with nothing behind it is worse than an open one: the
+      // open one is visible, and the falsely closed one is the record a regulator reads.
+      //
+      // A LIVE check, deliberately, and not a confirmation flag. The DELETION branch above uses both — a
+      // live Legal Hold read AND an attestation — because a hold can exist that the officer must
+      // acknowledge. Here there is nothing to acknowledge: either a correction was recorded against this
+      // request or it was not, and asking the officer to confirm it would reintroduce exactly the
+      // attestation this replaces.
+      const corrections = await this.customers.countCorrectionsForDsr(id);
+      if (corrections === 0) {
+        throw new UnprocessableEntityException(
+          `Data Subject Request ${id} is a CORRECTION request and no correction has been recorded against it. Correct the customer's details first (the correction records this request's id), or use partially-fulfil to say what was done and why the rest could not be.`,
         );
       }
     }

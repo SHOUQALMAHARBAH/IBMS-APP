@@ -4098,10 +4098,25 @@ evidence, with the decision recorded against the person who made it, and appeari
 report. A CHECK enforces all-three-or-none so "documented as clerical" cannot mean a ticked box.
 Re-verification is unconditional today.
 
-**One part of this is recommended REGARDLESS of which option is chosen, and it is the part not to defer:**
-while correcting a name is impossible, staff must not be able to mark such a request "done". There has to be
-a way to record "we could not complete this, and why". A closed request with nothing behind it is worse than
-an open one — the open one is visible and the falsely closed one is not.
+**BUILT 2026-09-27 — the part not to defer, and the owner adopted it.** `DsrService.fulfil` now refuses to
+close a CORRECTION request with no correction recorded against it, and the refusal names the way forward:
+correct the customer's details first, or use partially-fulfil to say what was done and why the rest could
+not be.
+
+**A LIVE check, not a confirmation flag.** The DELETION branch beside it uses both — a live Legal Hold read
+AND an attestation — because a hold can exist that the officer must acknowledge. Here there is nothing to
+acknowledge: either a correction was recorded against the request or it was not, and asking the officer to
+confirm it would reintroduce exactly the attestation this replaces.
+
+**The link had to be made queryable first.** A correction was recorded only in an audit row, which cannot
+answer "was this request answered". So `CustomerIdentifierCorrection` gained `dsrId` (migration
+`20261103100000`, `onDelete: Restrict` because the row is the evidence) and its field vocabulary widened to
+cover the three CONTACT fields as well as the nine identifiers — one table so the gate is ONE query. Two
+tables would mean asking twice and passing if either question were forgotten.
+
+Proven end to end against the real database rather than only in a unit spec, because the gate IS one query
+and a mocked query would be asserting the mock: a CORRECTION request is refused at `fulfil`, the customer's
+phone is corrected naming that request, and the same `fulfil` then succeeds.
 
 ### 3.15 — DECIDED (2026-09-26): `sla.policy.manage` splits, `user.manage` DOES NOT
 

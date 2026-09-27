@@ -4131,6 +4131,13 @@ of two unrelated cron expressions. And no transaction path consults screening at
 gates KYC approval ("prior to onboarding"), which is a different obligation from "before processing any
 transaction". Both are with the owner; nothing in either area was changed.
 
+**No false closure of a correction request (2026-09-27).** `DsrService.fulfil` refuses a `CORRECTION`
+request with no correction recorded against it — a LIVE check, not a confirmation flag, because either a
+correction exists or it does not and an attestation is what this replaces. `CustomerIdentifierCorrection`
+carries `dsrId` (migration `20261103100000`) and covers the contact fields as well as the screening
+identifiers, so the gate is one query. A closed request with nothing behind it is worse than an open one:
+the open one is visible, and the falsely closed one is the record a regulator reads.
+
 **Correcting a customer's contact details (2026-09-27): `PATCH /customers/:id`, `customer.update`**
 (migration `20261101100000`). The first write to a `Customer` row other than its creation — see
 `IMPROVEMENTS.md` § 3.14 for what that absence meant, including a PDPL CORRECTION request closeable only

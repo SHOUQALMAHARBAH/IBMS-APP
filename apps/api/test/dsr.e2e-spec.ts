@@ -538,6 +538,68 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
         .expect(201)
     ).body as DsrBody;
 
+    // NO FALSE CLOSURE, end to end against the real database. The owner's requirement 4.
+    //
+    // A CORRECTION request could be marked FULFILLED on the DPO's word alone, with nothing able to verify
+    // the data changed — and until this week nothing COULD change it (IMPROVEMENTS § 3.14). Proven here
+    // rather than only in the unit spec because the gate is one query against a real table, and a unit
+    // mock of that query would be asserting the mock.
+    // Its OWN customer, deliberately. The list assertion further down counts this test's requests for
+    // `customer` and expects exactly one; adding a second request there would have made a correct
+    // assertion fail, and weakening it to accommodate a new fixture is how a count stops meaning
+    // anything. (It did fail, once, which is how this comment came to be here.)
+    const gatedCustomer = await prisma.customer.create({
+      data: {
+        customerType: 'INDIVIDUAL',
+        legalName: `DSR Correction Gate E2E ${Math.random().toString(36).slice(2, 8)}`,
+        ownerUserId: sales.userId,
+      },
+    });
+    const gated = (
+      await request(app.getHttpServer())
+        .post('/dsr')
+        .set(bearer(sales.accessToken))
+        .send({ customerId: gatedCustomer.id, type: 'CORRECTION' })
+        .expect(201)
+    ).body as DsrBody;
+    await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/verify-identity`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/start`)
+      .set(bearer(dpo.accessToken))
+      .expect(201);
+
+    // Nothing has been corrected against it: refused.
+    await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({})
+      .expect(422);
+
+    // Correct the customer's phone, naming this request. `PATCH /customers/:id` records the correction
+    // with the request's id, which is the only link the gate can read — an audit row is not queryable as
+    // "was this request answered".
+    await request(app.getHttpServer())
+      .patch(`/customers/${gatedCustomer.id}`)
+      .set(bearer(sales.accessToken))
+      .send({
+        contactPhone: '+962-7-9444-4444',
+        reason: 'Data subject asked for the number on file to be corrected.',
+        answersRequestType: 'dsr',
+        answersRequestId: gated.id,
+      })
+      .expect(200);
+
+    // Now it closes.
+    const nowFulfilled = await request(app.getHttpServer())
+      .post(`/dsr/${gated.id}/fulfil`)
+      .set(bearer(dpo.accessToken))
+      .send({})
+      .expect(201);
+    expect((nowFulfilled.body as DsrBody).status).toBe('FULFILLED');
+
     // reject straight from RECEIVED — legal per WORKFLOW_TRANSITIONS
     const rejected = await request(app.getHttpServer())
       .post(`/dsr/${correction.id}/reject`)
