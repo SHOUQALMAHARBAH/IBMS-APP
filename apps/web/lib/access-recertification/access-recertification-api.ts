@@ -58,6 +58,14 @@ export function listMyRecertificationItems(): Promise<RecertificationItem[]> {
 export function startRecertificationCycle(input: {
   cycleLabel: string;
   dueAt?: string;
+  /**
+   * Needed only when somebody in the office has nobody but themselves to review their access.
+   *
+   * Sent on the CYCLE rather than per subject because that is where this pair's self-review is decided:
+   * the reviewer is assigned when the cycle opens. Every other office sends nothing and the cycle behaves
+   * exactly as before — a subject with no other reviewer is skipped, as it always was.
+   */
+  combinedDutyReason?: string;
 }): Promise<RecertificationCycle> {
   return apiPost('/access-recertification/cycles', input);
 }
@@ -65,8 +73,13 @@ export function startRecertificationCycle(input: {
 export function decideRecertificationItem(
   itemId: string,
   decision: RecertificationDecision,
+  /** Required only when the reviewer IS the subject — the self-review the cycle already declared. Asked
+   *  again here rather than carried forward, so the flagged line in the self-approval report is dated to
+   *  the review instead of the arrangement. */
+  combinedDutyReason?: string,
 ): Promise<RecertificationDecisionResult> {
   return apiPost(`/access-recertification/items/${itemId}/decision`, {
     decision,
+    ...(combinedDutyReason ? { combinedDutyReason } : {}),
   });
 }

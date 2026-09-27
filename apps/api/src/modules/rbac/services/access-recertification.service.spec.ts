@@ -1,5 +1,10 @@
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  combinedOfficeDutySegregation,
+  segregatedOfficeDutySegregation,
+} from '../../duty-segregation/duty-segregation.double';
+import type { DutySegregationService } from '../../duty-segregation/duty-segregation.service';
 import { AccessRecertificationService } from './access-recertification.service';
 import type { AccessRecertificationRepository } from '../../../repositories/access-recertification.repository';
 import type { RoleRepository } from '../../../repositories/role.repository';
@@ -25,6 +30,8 @@ function makeDeps(overrides?: {
   managers?: string[];
   executives?: string[];
   admins?: string[];
+  /** Defaults to a SEGREGATED office, which is what every other test in this file is about. */
+  dutySegregation?: DutySegregationService;
 }): {
   service: AccessRecertificationService;
   mocks: Mocks;
@@ -116,6 +123,11 @@ function makeDeps(overrides?: {
       users,
       audit,
       slaTimer,
+      // The SHARED double, never a local `mockResolvedValue(null)`. Every self-review assertion in this
+      // file would otherwise pass on the mock rather than on the code — the trap
+      // `duty-segregation.double.ts` exists for. It refuses exactly as a SEGREGATED office does, through
+      // the same `assertDifferentActors`.
+      overrides?.dutySegregation ?? segregatedOfficeDutySegregation(),
     ),
     mocks: {
       createManyItems,
@@ -246,6 +258,10 @@ describe('AccessRecertificationService', () => {
     });
 
     it('skips (never self-assigns) a subject with no eligible reviewer, without blocking the rest of the cycle', async () => {
+      // IN A SEGREGATED OFFICE, which is what the default double models — and that condition is the whole
+      // content of this test now. Since the owner chose Option 2, a self-review is POSSIBLE, so "skips" is
+      // no longer unconditional: it is what an office that has not declared COMBINED still gets, unchanged.
+      // The combined counterpart is the test below.
       const { service, mocks } = makeDeps({
         // "compliance-1" is the only person in the reviewer pool — as a
         // subject, nobody is left to review them. "sales-1" still gets
@@ -264,9 +280,127 @@ describe('AccessRecertificationService', () => {
         { subjectUserId: 'sales-1', reviewerUserId: 'compliance-1' },
       ]);
     });
+
+    it('records a DECLARED self-review in a COMBINED office, instead of skipping the subject', async () => {
+      // The owner's Option 2, first half: she may review her own access, and she says why at the moment the
+      // cycle arranges it — which for this pair is the only moment available, because the reviewer is
+      // assigned by the INSERT and `reviewerUserId` is NOT NULL.
+      const { service, mocks } = makeDeps({
+        activeSubjectUserIds: ['compliance-1', 'sales-1'],
+        complianceOfficers: ['compliance-1'],
+        dutySegregation: combinedOfficeDutySegregation('act-self-review-1'),
+      });
+
+      await expect(
+        service.startCycle(
+          'Q1',
+          new Date(),
+          'compliance-1',
+          'I am the only person in this office.',
+        ),
+      ).resolves.toBeDefined();
+
+      const pairs = mocks.createManyItems.mock.calls[0]?.[1] as {
+        id?: string;
+        subjectUserId: string;
+        reviewerUserId: string;
+        combinedDutyActId?: string | null;
+      }[];
+      // BOTH subjects get an item now: sales-1 reviewed by compliance-1 as always, and compliance-1
+      // reviewing herself with the act attached. Before this change the second one was silently absent,
+      // which is the trap the decision exists to remove — a one-person office recertified nobody while the
+      // cycle reported success.
+      expect(pairs).toHaveLength(2);
+      const selfReview = pairs.find((p) => p.subjectUserId === 'compliance-1');
+      expect(selfReview?.reviewerUserId).toBe('compliance-1');
+      // The act id is what the CHECK constraint accepts on INSERT. Asserted explicitly because a pair with
+      // reviewer === subject and no act is refused by the database, so dropping it here would surface as a
+      // 500 rather than as a wrong value.
+      expect(selfReview?.combinedDutyActId).toBe('act-self-review-1');
+      // And the item's id was generated up front, because the act has to name the record it excuses.
+      expect(selfReview?.id).toMatch(/^[0-9a-f-]{36}$/);
+      // sales-1 is untouched: an ordinary two-person review carries no act.
+      const ordinary = pairs.find((p) => p.subjectUserId === 'sales-1');
+      expect(ordinary?.combinedDutyActId ?? null).toBeNull();
+    });
+
+    it('still skips the subject in a COMBINED office when no reason is given', async () => {
+      // The mode makes a self-review possible, not automatic. Without a declaration the engine refuses and
+      // the subject is skipped exactly as in a segregated office — so a cycle started by a script that
+      // knows nothing about this cannot quietly create self-reviews.
+      const { service, mocks } = makeDeps({
+        activeSubjectUserIds: ['compliance-1', 'sales-1'],
+        complianceOfficers: ['compliance-1'],
+        dutySegregation: combinedOfficeDutySegregation(),
+      });
+
+      await expect(
+        service.startCycle('Q1', new Date(), 'compliance-1'),
+      ).resolves.toBeDefined();
+      expect(mocks.createManyItems).toHaveBeenCalledWith('cycle-1', [
+        { subjectUserId: 'sales-1', reviewerUserId: 'compliance-1' },
+      ]);
+    });
   });
 
   describe('decide', () => {
+    it('records the act on the REVIEW, which is the half Option 2 exists for', async () => {
+      // THE LOAD-BEARING TEST OF THE OWNER'S DECISION, and it was missing.
+      //
+      // A plant that replaced this act with null killed NOTHING — 18/18 green — which means the second act
+      // was being written and observed by nobody. That is § 1.51(d): a plant landing on a surface no test
+      // can see. And it was the half the decision was actually about, because act 1 can only say she was
+      // SET TO review her own access, while this one says she DID, dated to the review.
+      const { service, mocks } = makeDeps({
+        dutySegregation: combinedOfficeDutySegregation('act-decision-1'),
+      });
+      mocks.findItemById.mockResolvedValue({
+        id: 'item-1',
+        // Reviewer IS the subject: the self-review this cycle already declared.
+        subjectUserId: 'compliance-1',
+        reviewerUserId: 'compliance-1',
+        decision: null,
+      });
+      mocks.recordDecision.mockResolvedValue({
+        id: 'item-1',
+        decision: 'confirmed',
+      });
+
+      await service.decide(
+        'item-1',
+        'compliance-1',
+        'confirmed',
+        'Still the only person here.',
+      );
+
+      expect(mocks.recordDecision).toHaveBeenCalledWith(
+        'item-1',
+        'compliance-1',
+        'confirmed',
+        'act-decision-1',
+      );
+    });
+
+    it('refuses a self-review decision with no reason, even in a COMBINED office', async () => {
+      // Being asked a SECOND time is the cost of Option 2 and also its point: carrying the first answer
+      // forward would date the flagged report line to the arrangement, which is what Option 1 did and why
+      // it was rejected. So the reason is required again here, and nothing is written without it.
+      const { service, mocks } = makeDeps({
+        dutySegregation: combinedOfficeDutySegregation(),
+      });
+      mocks.findItemById.mockResolvedValue({
+        id: 'item-1',
+        subjectUserId: 'compliance-1',
+        reviewerUserId: 'compliance-1',
+        decision: null,
+      });
+
+      await expect(
+        service.decide('item-1', 'compliance-1', 'confirmed'),
+      ).rejects.toThrow(/at least 10 characters/);
+      expect(mocks.recordDecision).not.toHaveBeenCalled();
+    });
+
     it('revokes all of the subject\'s active role assignments on a "revoked" decision', async () => {
       const { service, mocks } = makeDeps();
       mocks.findItemById.mockResolvedValue({
@@ -350,6 +484,10 @@ describe('AccessRecertificationService', () => {
         'item-1',
         'manager-1',
         'confirmed',
+        // The act on the REVIEW, null here and on every ordinary two-person review. Asserted rather than
+        // left off: a spurious act id reaching this write would mean the engine had declared a combined
+        // act for a review by a different person, and the ordinary path is the one that must stay free.
+        null,
       );
       // The race was lost before any decision was recorded — role
       // assignments must not have been touched.

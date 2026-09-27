@@ -4116,6 +4116,23 @@ the office's own mode and declaration date — on `/internal-controls`, above th
 Access self-reviews sort first and render flagged, which is the owner's condition and is proven by content
 rather than by a status code. Reading it is audited (counts only, never a name).
 
+**Reviewing your own access (2026-09-27): a one-person office can recertify itself, and the
+self-approval report is dated to the REVIEW.** Migration `20261031100000` adds
+`AccessRecertificationItem.decisionCombinedDutyActId` beside the existing `combinedDutyActId`: two acts
+for one arrangement, because this is the only maker/checker pair decided by an INSERT — the reviewer is
+assigned when the cycle opens, so "she is checking herself" happens before anything has been reviewed.
+Act 1 records that she was SET TO; act 2 records that she DID. The owner chose that over recording only
+the arrangement, because "was set to review" is silent about whether the review took place; the options
+and the reasoning are in `docs/decision-reviewing-your-own-access.md`.
+
+Before this, `startCycle` SKIPPED a subject with nobody else to review them — so a one-person office
+opened a cycle, recertified nobody, and reported success. An office that has not declared COMBINED still
+behaves exactly that way, which is what the refusal path preserves.
+
+The report flags an access act unless it can positively identify it as the arrangement, so an act it
+cannot classify stays flagged — the safe direction, since the owner's condition is that self-reviews are
+always at the top.
+
 **Four-action Phase 4, second umbrella (2026-09-26): `sla.policy.manage` becomes `sla.policy.create` /
 `.update` / `.deactivate` — plus `sla.holiday.create`** (migration `20261030100000`). Four successors for
 one umbrella because it gated two different entities: SLA policies, and the business-day holiday calendar

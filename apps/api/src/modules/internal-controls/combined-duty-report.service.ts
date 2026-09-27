@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { CombinedDutyActRepository } from '../../repositories/combined-duty-act.repository';
+import { AccessRecertificationRepository } from '../../repositories/access-recertification.repository';
 import { OrganizationRepository } from '../../repositories/organization.repository';
 import { UserRepository } from '../../repositories/user.repository';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -40,6 +41,10 @@ export interface CombinedDutyReportRow {
    * their dates.
    */
   accessSelfReview: boolean;
+  /** The act on the ARRANGEMENT — she was set to review her own access — as opposed to the review itself.
+   *  Present so a reader sees both halves of one story; not flagged and not sorted to the top, because the
+   *  arrangement is silent about whether the review happened. */
+  accessSelfReviewArrangement: boolean;
 }
 
 export interface CombinedDutyReport {
@@ -89,6 +94,9 @@ export class CombinedDutyReportService {
     private readonly organizations: OrganizationRepository,
     private readonly users: UserRepository,
     private readonly audit: AuditService,
+    // A REPOSITORY across modules, which is this codebase's rule — never a service. The report needs one
+    // fact from the recertification tables (which act is the review) and nothing else.
+    private readonly recertification: AccessRecertificationRepository,
   ) {}
 
   async run(actor: AuthenticatedUser): Promise<CombinedDutyReport> {
@@ -109,6 +117,31 @@ export class CombinedDutyReportService {
       ]),
     );
 
+    // WHICH access acts are the REVIEW, and which only the arrangement.
+    //
+    // Reviewing your own access produces TWO acts for one arrangement (the owner's Option 2): one when the
+    // cycle assigns her to herself, one when she actually signs it off. Both carry the same constraint
+    // name, so the constraint cannot tell them apart — but the ITEM points at each through a different
+    // column, so the database can.
+    //
+    // Only the REVIEW is flagged. Flagging both would put two lines at the top of the report for one thing
+    // that happened, and the arrangement is the weaker fact: "was set to review" is silent about whether
+    // the review took place, which is precisely why Option 1 was rejected.
+    //
+    // One query, scoped to the access acts on this page, so an office with none pays nothing.
+    const accessActIds = page
+      .filter((a) => a.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT)
+      .map((a) => a.id);
+    // The ARRANGEMENT acts, so everything else with the access constraint flags. Asked in this direction
+    // because an act we cannot classify must stay flagged — see the repository method for why the other
+    // direction was wrong and what caught it.
+    const arrangementActIds =
+      accessActIds.length > 0
+        ? new Set(
+            await this.recertification.findArrangementActIds(accessActIds),
+          )
+        : new Set<string>();
+
     const rows: CombinedDutyReportRow[] = page.map((act) => ({
       id: act.id,
       actorUserId: act.actorUserId,
@@ -120,7 +153,13 @@ export class CombinedDutyReportService {
       reason: act.reason,
       roles: act.grantingRoleNames,
       hatAmbiguous: act.multipleGrantingRoles,
-      accessSelfReview: act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT,
+      // The flag drives BOTH the ordering and the ⚑ on screen, so it names the act that happened.
+      accessSelfReview:
+        act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT &&
+        !arrangementActIds.has(act.id),
+      // The arrangement still appears in the report — it is a real declared act — and says what it is, so
+      // a reader sees the pair rather than wondering why a review has no beginning.
+      accessSelfReviewArrangement: arrangementActIds.has(act.id),
     }));
 
     // THE FIRST ORDERING RULE. Access self-reviews first, whatever their dates; within each group, newest

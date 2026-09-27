@@ -21,6 +21,12 @@ import {
   thStyle,
 } from './access-recertification.styles';
 import { useLanguage } from '../../lib/i18n/language-context';
+import { useAuth } from '../../lib/auth/auth-context';
+import {
+  CombinedDutyReasonField,
+  combinedDutyTooShort,
+  needsCombinedDutyDeclaration,
+} from '../ui/CombinedDutyReasonField';
 
 const DECISION_LABEL: Record<RecertificationDecision, string> = {
   confirmed: 'Confirmed',
@@ -37,6 +43,34 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
   const { t } = useLanguage();
   const [decidingItemId, setDecidingItemId] = useState<string | null>(null);
   const [decideErrors, setDecideErrors] = useState<Record<string, string>>({});
+  const { user } = useAuth();
+  /** The declaration, keyed by item so two rows cannot share one box. */
+  const [dutyReasons, setDutyReasons] = useState<Record<string, string>>({});
+
+  /**
+   * Is this the reviewer's OWN access?
+   *
+   * The thirteenth use of the shared condition, and the one the owner's decision added. The maker for this
+   * pair is the SUBJECT — the person whose access is being confirmed — and the checker is the reviewer,
+   * who is always the viewer here because this list is the items assigned to them.
+   */
+  function needsDeclaration(item: RecertificationItem): boolean {
+    return needsCombinedDutyDeclaration({
+      mode: user?.dutySegregationMode,
+      makerUserId: item.subjectUserId,
+      currentUserId: user?.id ?? '',
+      alreadyDecided: item.decision != null,
+    });
+  }
+
+  /** All three decision buttons refuse below the floor: a screen must not send a request it knows will
+   *  422, and the three buttons are three ways to make the same mistake. */
+  function blockedByDeclaration(item: RecertificationItem): boolean {
+    return (
+      needsDeclaration(item) &&
+      combinedDutyTooShort(dutyReasons[item.id] ?? '')
+    );
+  }
 
   if (items.length === 0) {
     return <p style={emptyStateStyle}>{t('acrNone')}</p>;
@@ -46,7 +80,11 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
     setDecidingItemId(item.id);
     setDecideErrors((prev) => ({ ...prev, [item.id]: '' }));
     try {
-      const updated = await decideRecertificationItem(item.id, decision);
+      const updated = await decideRecertificationItem(
+        item.id,
+        decision,
+        needsDeclaration(item) ? dutyReasons[item.id]?.trim() : undefined,
+      );
       onItemDecided(updated);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : t('acrDecisionError');
@@ -104,10 +142,19 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                   <span style={decidedTagStyle}>{DECISION_LABEL[item.decision]}</span>
                 ) : (
                   <div style={decisionButtonRowStyle}>
+                    {needsDeclaration(item) ? (
+                      <CombinedDutyReasonField
+                        id={item.id}
+                        value={dutyReasons[item.id] ?? ''}
+                        onChange={(next) =>
+                          setDutyReasons((prev) => ({ ...prev, [item.id]: next }))
+                        }
+                      />
+                    ) : null}
                     <button
                       type="button"
                       style={inlineButtonStyle}
-                      disabled={isDeciding}
+                      disabled={isDeciding || blockedByDeclaration(item)}
                       aria-label={t('acrConfirmAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'confirmed')}
                     >
@@ -116,7 +163,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                     <button
                       type="button"
                       style={inlineButtonStyle}
-                      disabled={isDeciding}
+                      disabled={isDeciding || blockedByDeclaration(item)}
                       aria-label={t('acrRevokeAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'revoked')}
                     >
@@ -125,7 +172,7 @@ export function RecertificationItemsTable({ items, onItemDecided }: Recertificat
                     <button
                       type="button"
                       style={inlineButtonStyle}
-                      disabled={isDeciding}
+                      disabled={isDeciding || blockedByDeclaration(item)}
                       aria-label={t('acrFlagAccessAria', { name: item.subjectFullName })}
                       onClick={() => void handleDecide(item, 'changed')}
                     >{t('acrFlagForChange')}</button>

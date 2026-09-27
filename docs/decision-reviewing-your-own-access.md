@@ -3,7 +3,13 @@
 > **What this is.** One decision, three answers, for the owner — not for a developer. Written for
 > someone who does not read code. Arabic first, English second; the two halves say the same thing.
 >
-> Nothing is built on this. It is waiting on the answer.
+> **DECIDED: OPTION 2, and it is built** (2026-09-27). The owner accepted it for the reason the brief
+> gave — Option 1 records an arrangement rather than an act, carries the wrong date, and says nothing
+> about whether the review happened. What follows is kept as written, because the options that were
+> rejected are what explain the one that was chosen.
+>
+> **القرار: الخيار الثاني، وقد تم تنفيذه.** للسبب نفسه الوارد أدناه: الخيار الأول يسجّل ترتيباً لا فعلاً،
+> بتاريخ خطأ، ولا يقول إن كانت المراجعة قد حدثت.
 
 ---
 

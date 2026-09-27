@@ -1,0 +1,32 @@
+{
+  "self-review-created-without-its-act": {
+    "file": "apps/api/src/modules/rbac/services/access-recertification.service.ts",
+    "from": "          combinedDutyActId: act,",
+    "to": "          combinedDutyActId: null,"
+  },
+  "refusal-aborts-the-whole-cycle": {
+    "file": "apps/api/src/modules/rbac/services/access-recertification.service.ts",
+    "from": "      } catch (err) {\n        // A SEGREGATED office, or a COMBINED one with no reason given: the engine refuses, and this subject",
+    "to": "      } catch (err) {\n        throw err;\n        // A SEGREGATED office, or a COMBINED one with no reason given: the engine refuses, and this subject"
+  },
+  "decision-act-never-recorded": {
+    "file": "apps/api/src/modules/rbac/services/access-recertification.service.ts",
+    "from": "      decision,\n      decisionAct,\n    );",
+    "to": "      decision,\n      null,\n    );"
+  },
+  "decide-control-never-asks": {
+    "file": "apps/web/components/access-recertification/RecertificationItemsTable.tsx",
+    "from": "      makerUserId: item.subjectUserId,",
+    "to": "      makerUserId: null,"
+  },
+  "decide-buttons-not-gated-on-the-floor": {
+    "file": "apps/web/components/access-recertification/RecertificationItemsTable.tsx",
+    "from": "      combinedDutyTooShort(dutyReasons[item.id] ?? '')",
+    "to": "      false"
+  },
+  "report-flags-only-what-it-can-classify": {
+    "file": "apps/api/src/modules/internal-controls/combined-duty-report.service.ts",
+    "from": "      accessSelfReview:\n        act.constraintName === ACCESS_SELF_REVIEW_CONSTRAINT &&\n        !arrangementActIds.has(act.id),",
+    "to": "      accessSelfReview: arrangementActIds.has(act.id),"
+  }
+}

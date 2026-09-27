@@ -903,27 +903,37 @@ model AccessRecertificationCycle {
 }
 
 model AccessRecertificationItem {
-  id                String                     @id @default(uuid())
+  id                        String                     @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
   /// row belongs to. Supplied by `tenantScopeExtension`, never by hand.
-  organizationId    String                     @default(dbgenerated())
-  organization      Organization               @relation(fields: [organizationId], references: [id])
-  cycleId           String
-  cycle             AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
-  subjectUserId     String
-  reviewerUserId    String
-  reviewer          User                       @relation("RecertificationReviewer", fields: [reviewerUserId], references: [id])
-  decision          String? // confirmed | revoked | changed
-  reviewedAt        DateTime?
-  createdAt         DateTime                   @default(now())
+  organizationId            String                     @default(dbgenerated())
+  organization              Organization               @relation(fields: [organizationId], references: [id])
+  cycleId                   String
+  cycle                     AccessRecertificationCycle @relation(fields: [cycleId], references: [id])
+  subjectUserId             String
+  reviewerUserId            String
+  reviewer                  User                       @relation("RecertificationReviewer", fields: [reviewerUserId], references: [id])
+  decision                  String? // confirmed | revoked | changed
+  reviewedAt                DateTime?
+  createdAt                 DateTime                   @default(now())
   /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
   /// has declared COMBINED mode. The `AccessRecertificationItem_maker_checker_distinct` family of CHECK constraints
   /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
   /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
-  combinedDutyActId String?
-  combinedDutyAct   CombinedDutyAct?           @relation("AccessRecertificationItemCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
+  combinedDutyActId         String?
+  combinedDutyAct           CombinedDutyAct?           @relation("AccessRecertificationItemCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
+  /// The act on the REVIEW, where `combinedDutyActId` above is the act on the ARRANGEMENT.
+  ///
+  /// Two columns for two facts. This pair is decided by an INSERT — the reviewer is assigned when the
+  /// cycle opens — so in a one-person office "she is checking herself" happens before she has reviewed
+  /// anything. `combinedDutyActId` records that she was SET TO review her own access and is what the
+  /// CHECK accepts; this records that she DID, dated to the review. The owner chose that over recording
+  /// only the arrangement, because "was set to review" is silent about whether the review happened.
+  decisionCombinedDutyActId String?
+  decisionCombinedDutyAct   CombinedDutyAct?           @relation("AccessRecertificationItemDecisionCombinedDuty", fields: [decisionCombinedDutyActId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
+  @@index([decisionCombinedDutyActId])
 }
 
 /// Supporting structure referenced by "filterable by branch" dashboards
@@ -5979,6 +5989,9 @@ model CombinedDutyAct {
   commissionLedgerEntries       CommissionLedgerEntry[]     @relation("CommissionLedgerEntryCombinedDuty")
   recommendations               Recommendation[]            @relation("RecommendationCombinedDuty")
   accessRecertificationItems    AccessRecertificationItem[] @relation("AccessRecertificationItemCombinedDuty")
+  /// The back-relation for the act on the REVIEW. Separate from the one above because the same item can
+  /// carry two acts — the arrangement and the review — and Prisma needs a named relation per pair.
+  recertificationDecisions      AccessRecertificationItem[] @relation("AccessRecertificationItemDecisionCombinedDuty")
   complaintClosures             Complaint[]                 @relation("ComplaintClosureCombinedDuty")
   dataSubjectRequestClosures    DataSubjectRequest[]        @relation("DataSubjectRequestClosureCombinedDuty")
   incidentReportClassifications IncidentReport[]            @relation("IncidentReportClassificationCombinedDuty")

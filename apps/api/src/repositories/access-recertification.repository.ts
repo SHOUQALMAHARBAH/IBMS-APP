@@ -47,11 +47,49 @@ export class AccessRecertificationRepository {
    * under load). Returned rows are in `pairs` order. */
   createManyItems(
     cycleId: string,
-    pairs: { subjectUserId: string; reviewerUserId: string }[],
+    /** `combinedDutyActId` is set only for a declared self-review — see the service. It is what the
+     *  `AccessRecertificationItem_maker_checker_distinct` CHECK accepts on INSERT, so a pair where the
+     *  reviewer IS the subject and this is null is refused by the database, not by us. */
+    pairs: {
+      /** Supplied only for a declared self-review, because the act that excuses it must name the item and
+       *  must exist first — see the service. Every other item lets the database generate its own. */
+      id?: string;
+      subjectUserId: string;
+      reviewerUserId: string;
+      combinedDutyActId?: string | null;
+    }[],
   ): Promise<AccessRecertificationItem[]> {
     return this.prisma.client.accessRecertificationItem.createManyAndReturn({
       data: pairs.map((pair) => ({ cycleId, ...pair })),
     });
+  }
+
+  /**
+   * Of these act ids, which are the act on the ARRANGEMENT — she was SET TO review her own access — as
+   * opposed to the review itself.
+   *
+   * ASKED IN THIS DIRECTION ON PURPOSE, and the first version asked the other way.
+   *
+   * Both acts carry the same constraint name, so only the item knows which column each sits in. Looking up
+   * the REVIEW acts and flagging those made the flag depend on a join SUCCEEDING: an act whose item had
+   * gone, or one recorded by any path that does not write `decisionCombinedDutyActId`, would silently stop
+   * sorting to the top of the self-approval report — and being at the top, always, is the owner's whole
+   * condition. The report's own e2e caught it immediately.
+   *
+   * So the question is inverted. An access act is flagged unless it is POSITIVELY identified as the
+   * arrangement, which means an act we cannot classify stays flagged. That is the safe direction: the cost
+   * of a wrongly flagged act is one extra line at the top of a short report, and the cost of a wrongly
+   * unflagged one is a self-review nobody sees.
+   */
+  async findArrangementActIds(actIds: string[]): Promise<string[]> {
+    if (actIds.length === 0) return [];
+    const rows = await this.prisma.client.accessRecertificationItem.findMany({
+      where: { combinedDutyActId: { in: actIds } },
+      select: { combinedDutyActId: true },
+    });
+    return rows
+      .map((r) => r.combinedDutyActId)
+      .filter((id): id is string => id !== null);
   }
 
   findItemById(id: string): Promise<AccessRecertificationItem | null> {
@@ -86,11 +124,14 @@ export class AccessRecertificationRepository {
     id: string,
     reviewerUserId: string,
     decision: 'confirmed' | 'revoked' | 'changed',
+    /** The act on the REVIEW, where the item's own `combinedDutyActId` is the act on the arrangement.
+     *  Null on every ordinary two-person review. */
+    decisionCombinedDutyActId: string | null = null,
   ): Promise<AccessRecertificationItem | null> {
     const { count } =
       await this.prisma.client.accessRecertificationItem.updateMany({
         where: { id, reviewerUserId, decision: null },
-        data: { decision, reviewedAt: new Date() },
+        data: { decision, reviewedAt: new Date(), decisionCombinedDutyActId },
       });
     if (count === 0) return null;
     return this.prisma.client.accessRecertificationItem.findUniqueOrThrow({

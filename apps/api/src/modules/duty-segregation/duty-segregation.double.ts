@@ -1,4 +1,6 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import { assertDifferentActors } from '../../common/maker-checker.util';
+import { COMBINED_DUTY_REASON_MIN_LENGTH } from './duty-segregation.service';
 import type {
   DutySegregationService,
   ResolveDutySegregationInput,
@@ -35,6 +37,37 @@ export function segregatedOfficeDutySegregation(): DutySegregationService {
       // A resolved promise, not a bare value: the real engine is async, and a synchronous double would let a
       // missing `await` at a call site pass here and fail in production.
       return Promise.resolve(null);
+    },
+  } as unknown as DutySegregationService;
+}
+
+/**
+ * A `DutySegregationService` standing in for an office that HAS declared COMBINED, returning a fixed act id.
+ *
+ * Added for `AccessRecertificationItem`, the one pair whose combined path a unit test can reach usefully:
+ * its act is written during `startCycle`, so whether the item is created at all depends on the engine's
+ * answer. For the other fourteen the combined path is a repository write and belongs in the e2e.
+ *
+ * It still refuses a reason below the floor, because a double that accepts anything would let a call site
+ * forget to pass the reason and keep passing here.
+ */
+export function combinedOfficeDutySegregation(
+  actId = 'combined-duty-act-1',
+): DutySegregationService {
+  return {
+    resolve: (input: ResolveDutySegregationInput) => {
+      if (input.checkerId == null || input.checkerId !== input.makerId) {
+        return Promise.resolve(null);
+      }
+      const reason = (input.reason ?? '').trim();
+      if (reason.length < COMBINED_DUTY_REASON_MIN_LENGTH) {
+        return Promise.reject(
+          new UnprocessableEntityException(
+            `${input.context}: performing both halves yourself requires a reason of at least ${COMBINED_DUTY_REASON_MIN_LENGTH} characters.`,
+          ),
+        );
+      }
+      return Promise.resolve(actId);
     },
   } as unknown as DutySegregationService;
 }

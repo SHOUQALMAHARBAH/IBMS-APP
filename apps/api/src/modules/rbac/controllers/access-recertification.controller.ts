@@ -69,7 +69,12 @@ export class AccessRecertificationController {
     const dueAt = dto.dueAt
       ? new Date(dto.dueAt)
       : addBusinessDays(new Date(), CYCLE_SLA_BUSINESS_DAYS);
-    return this.recertification.startCycle(dto.cycleLabel, dueAt, user.id);
+    return this.recertification.startCycle(
+      dto.cycleLabel,
+      dueAt,
+      user.id,
+      dto.combinedDutyReason,
+    );
   }
 
   @RequirePermissions('access-recertification.review')
@@ -93,7 +98,12 @@ export class AccessRecertificationController {
     @Body() dto: RecertificationDecisionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.recertification.decide(id, user.id, dto.decision);
+    return this.recertification.decide(
+      id,
+      user.id,
+      dto.decision,
+      dto.combinedDutyReason,
+    );
   }
 
   @RequirePermissions('access-recertification.cycle.start')

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { permissionsForRoles } from "./fixtures/role-permissions";
+import { expectNone } from "./support/anchored";
 
 const ME_BASE = {
   id: "user-1",
@@ -106,6 +107,85 @@ test("shows a friendly message when the user lacks review permission", async ({ 
   await page.goto("/access-recertification");
 
   await expect(page.locator('p[role="alert"]')).toContainText("don't hold the access-recertification.review");
+});
+
+/**
+ * An EXACT permission set with a declared mode — the same reason `payment-channels.spec.ts` needs one.
+ *
+ * No role name can express "reviewing my OWN access in an office that has declared combined duties", and
+ * that is the only state in which the owner's Option 2 is visible on screen.
+ */
+async function mockAuthCombined(page: Page) {
+  await page.route("**/auth/refresh", (route) =>
+    route.fulfill({ status: 200, json: { accessToken: "fake-access-token" } }),
+  );
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        ...ME_BASE,
+        roles: ["COMPLIANCE_OFFICER"],
+        permissions: permissionsForRoles(["COMPLIANCE_OFFICER"]),
+        dutySegregationMode: "COMBINED",
+      },
+    }),
+  );
+}
+
+test("reviewing your OWN access asks why, and refuses until it is answered", async ({ page }) => {
+  // The owner chose Option 2: she is asked again at the review itself, so the flagged line in the
+  // self-approval report is dated to the act rather than to the arrangement.
+  await mockAuthCombined(page);
+  const ownItem = { ...ITEMS[0], subjectUserId: ME_BASE.id, subjectFullName: "Compliance Officer" };
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: [ownItem] }),
+  );
+  const sent: string[] = [];
+  await page.route("**/access-recertification/items/item-1/decision", (route) => {
+    sent.push(route.request().postData() ?? "");
+    return route.fulfill({
+      status: 201,
+      json: { id: "item-1", cycleId: "cycle-1", subjectUserId: ME_BASE.id, reviewerUserId: ME_BASE.id, decision: "confirmed", reviewedAt: "2026-03-14T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z" },
+    });
+  });
+
+  await page.goto("/access-recertification");
+
+  const reason = page.getByTestId("combined-duty-reason-item-1");
+  await expect(reason).toBeVisible();
+  const confirm = page.getByRole("button", { name: "Confirm" });
+  // Refused until answered — all three decision buttons, because three buttons are three ways to send a
+  // request the screen already knows will be refused.
+  await expect(confirm).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Revoke" })).toBeDisabled();
+
+  await reason.fill("too short");
+  await expect(confirm).toBeDisabled();
+
+  await reason.fill("  Still the only person in this office.  ");
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+
+  await expect.poll(() => sent.length, { message: "no decision was sent" }).toBeGreaterThan(0);
+  expect(JSON.parse(sent[0]!)).toEqual({
+    decision: "confirmed",
+    // Trimmed: the surrounding whitespace is not part of what she said.
+    combinedDutyReason: "Still the only person in this office.",
+  });
+});
+
+test("reviewing SOMEBODY ELSE's access asks nothing, on the same screen", async ({ page }) => {
+  // The other half, anchored on the enabled button from the SAME render — an absence satisfied by an
+  // unhydrated page would pass while proving nothing.
+  await mockAuthCombined(page);
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: [ITEMS[0]] }),
+  );
+
+  await page.goto("/access-recertification");
+  const confirm = page.getByRole("button", { name: "Confirm" });
+  await expect(confirm).toBeEnabled();
+  await expectNone(page.getByTestId("combined-duty-reason-item-1"), confirm);
 });
 
 test("lets a reviewer confirm an item, which then shows as decided", async ({ page }) => {
