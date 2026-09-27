@@ -857,9 +857,15 @@ build actually is today:
   stages rather than a place for a list. `/insurer-directory` has its own
   entry and its own permission — a refused line code renders as a REFUSAL rather
   than an empty page, because `[]` reads as "nobody writes this cover". Still
-  screenless: the insurance-line vocabulary, Q9's office form templates, and the
+  screenless: ~~the insurance-line vocabulary~~ (a screen since 2026-09-28,
+  `/settings/insurance-lines` — § 1.66), Q9's office form templates, and the
   read-only master registry (see `IMPROVEMENTS.md` § 1.44 for the measured list of
-  every API surface with no UI).
+  every API surface with no UI). **Q9 and the master registry are one item and it is
+  a FORM BUILDER, not a missing screen** — measured 2026-09-28: zero form templates
+  and zero fields on both databases, and a mapping is up to 300 bilingual typed
+  ordered fields, so a read-only view would be an empty page on every insurer. It
+  also has an undecided prerequisite: where a mapping comes from, since somebody must
+  transcribe an insurer's PDF or the product must extract it. § 1.67.
 
 - **Part A & Part B — in place.** Deferred edges (hardware-token/WebAuthn MFA
   enforcement, an SSO identity provider, an email/notification provider,

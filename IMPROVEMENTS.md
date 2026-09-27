@@ -3966,6 +3966,47 @@ repo names them the same on purpose.
 **Five plants, each killing one named test**: one name accepted instead of two, standard lines offered for
 correction, save allowed with nothing changed, the permission gate, and the swallowed collision message.
 
+
+### 1.67 — Q9'S SEVEN UNREACHABLE ROUTES ARE A FORM BUILDER, NOT A MISSING SCREEN — MEASURED BEFORE STARTING
+
+Sized rather than started, because the answer changes how it should be scheduled and because a read-only
+version of it would be an empty page.
+
+**The seven routes** are `GET`/`POST /insurers/:id/form-templates` plus `/resolved` (Q9, the office's own
+mappings) and the four `/insurer-masters/:id...` reads and write (the global catalogue). They answer one
+question — *which form do I submit against for this line, and what fields does it have?*
+
+**What the data says, measured on both databases:**
+
+    InsurerFormTemplate         0 rows      0 rows
+    OfficeInsurerFormTemplate   0 rows      0 rows
+    InsurerFormField            0 rows      0 rows
+    Insurer                    19 rows    480 rows
+
+**So there is nothing to read.** A read-only screen — which is the cheap half and would close four of the
+seven routes — renders "no form mapped" for every insurer on every database. That is honest, and it is not
+worth a screen on its own: the value of this feature is entirely in the WRITE, because nothing can be
+resolved until something is mapped. Same shape as § 1.57's holiday calendar, with one difference that
+matters: there the missing input was a date, here it is a mapping of up to **300 fields**, each carrying a
+machine key, English and Arabic labels, a type from `InsurerFormFieldType`, a required flag, an order and
+its options (`MapInsurerFormFieldDto`, `ArrayMaxSize(300)`).
+
+**That is a form builder.** Bilingual, ordered, typed, with an option editor — on an Arabic-first platform
+where a field label reaches a document a client reads, so the Arabic label is not optional in practice even
+where the DTO allows it. It is a feature with its own design decisions (how a mapping is derived from an
+uploaded PDF, whether a field can be retired, what happens to submissions written against a previous
+mapping), and calling it "seven unreachable routes" understates it by a wide margin.
+
+**Recorded, not built, and deliberately not half-built.** The four reads are left closed rather than given
+an empty screen, because a screen that can only ever say "nothing here" trains its reader to stop opening
+it — and when the builder ships, the read view is part of it rather than a thing to reconcile with it.
+
+**What the owner needs in order to schedule it**, stated plainly: this is the one remaining item in § 1.44
+that is a FEATURE rather than a missing caller. Everything else on that list is a control with no button.
+It also has a prerequisite nobody has decided: **where a form mapping comes from.** Somebody has to read an
+insurer's PDF and transcribe 300 fields, or the product has to extract them, and those are very different
+products.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
