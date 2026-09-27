@@ -1,6 +1,6 @@
 PERMISSION CATALOGUE — input for the Arabic one-line descriptions
 
-216 permission codes, 12 modules. Generated from the seeded database by
+217 permission codes, 12 modules. Generated from the seeded database by
 `npm run db:permission-descriptions`, so this IS what the Role screen renders — not a separate
 list that can drift from it. Regenerate rather than hand-editing the structure: any line you have
 already written after `ar:` is carried forward by code and is never overwritten.
@@ -150,9 +150,16 @@ MODULE: claims   —   المطالبات   (13 codes)
           en: View Loss Ratio and claims analytics
           ar: ................................................................
 
-MODULE: commercial-front-office   —   المكتب الأمامي التجاري   (32 codes)
+MODULE: commercial-front-office   —   المكتب الأمامي التجاري   (33 codes)
 ------------------------------------------------------------------------------------------------
 
+  [5-STATE] customer   (create / update)
+      customer.create
+          en: Create a Customer (individual/corporate)
+          ar: ................................................................
+      customer.update
+          en: Correct a customer's contact details — phone, email and registered address. Does NOT cover name, date of birth, nationality or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit
+          ar: ................................................................
   [5-STATE] needs-assessment   (create / read / update)
       needs-assessment.create
           en: Capture a Needs Assessment questionnaire
@@ -192,10 +199,6 @@ MODULE: commercial-front-office   —   المكتب الأمامي التجار
   [toggle]  customer.360-view.read
       customer.360-view.read
           en: Read the aggregated 360° customer view
-          ar: ................................................................
-  [toggle]  customer.create
-      customer.create
-          en: Create a Customer (individual/corporate)
           ar: ................................................................
   [toggle]  interaction.log
       interaction.log
@@ -897,4 +900,4 @@ MODULE: supporting-operations   —   العمليات المساندة   (17 co
           en: Record security-awareness training completion
           ar: ................................................................
 ================================================================================================
-TOTALS: 20 five-state families covering 56 codes, 160 toggles, 216 codes in all.
+TOTALS: 21 five-state families covering 58 codes, 159 toggles, 217 codes in all.

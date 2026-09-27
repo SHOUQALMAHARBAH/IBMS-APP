@@ -44,6 +44,12 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // umbrella does not just add rows, it MOVES codes out of the toggle list into a family. That is the
     // scheme becoming visible on the screen, which is the point of it.
     //
+    // 216 -> 217 (IMPROVEMENTS § 3.14: `customer.update`, so a customer's contact details can be
+    // corrected at all). This one CREATES a family: `customer` had only `customer.create` as a CRUD verb
+    // and was therefore a toggle, and two verbs is the threshold — so families go 20 -> 21, family codes
+    // 56 -> 58 (create AND update), and toggles 160 -> 159 because `create` moved out of that list.
+    // `customer.bulk-import` stays a toggle; it is not one of the seven CRUD verbs.
+    //
     // 213 -> 216 (four-action Phase 4, second umbrella, owner-ruled: `sla.policy.manage` becomes
     // `.create` / `.update` / `.deactivate` PLUS `sla.holiday.create`). Four successors for one umbrella
     // because it gated two ENTITIES — SLA policies and the business-day holiday calendar — which is
@@ -75,10 +81,10 @@ describe('the permission matrix is derived from the catalogue, not hard-coded', 
     // a point on that scale — it is a separate act with its own terminal semantics. An office granting
     // "full" on policies is not thereby granting the withdrawal of a placement, and the matrix says so by
     // rendering it as its own checkbox.
-    expect(PERMISSION_CATALOGUE.length).toBe(216);
-    expect(crud.length).toBe(20);
-    expect(crud.flatMap(codesOfRow).length).toBe(56);
-    expect(toggles.length).toBe(160);
+    expect(PERMISSION_CATALOGUE.length).toBe(217);
+    expect(crud.length).toBe(21);
+    expect(crud.flatMap(codesOfRow).length).toBe(58);
+    expect(toggles.length).toBe(159);
     expect(crud.flatMap(codesOfRow).length + toggles.length).toBe(PERMISSION_CATALOGUE.length);
   });
 

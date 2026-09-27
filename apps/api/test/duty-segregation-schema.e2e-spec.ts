@@ -310,9 +310,37 @@ describe('duty segregation mode — the database half (e2e)', () => {
       ).toBe(true);
     }
 
-    const columns = await rawPrisma.$queryRaw<{ count: bigint }[]>`
-      SELECT count(*) AS count FROM information_schema.columns
+    // Every pair's ESCAPE column exists, and nothing else named like one does — except the evidence
+    // columns listed below, which are not escapes.
+    //
+    // This counted `%ombinedDutyActId` against the registry length and expected them equal: one column per
+    // pair. `AccessRecertificationItem.decisionCombinedDutyActId` broke that at 16 against 15, and the
+    // failure was correct — the invariant had changed shape, not been violated.
+    //
+    // That column is EVIDENCE, not an escape. The pair's CHECK is satisfied at INSERT by
+    // `combinedDutyActId` (she was set to review her own access); the decision column records that she DID,
+    // dated to the review, so the self-approval report can flag the act rather than the arrangement. It is
+    // deliberately NOT a disjunct of any CHECK — adding it would loosen a constraint that is already
+    // satisfied. See migration 20261031100000 and `docs/decision-reviewing-your-own-access.md`.
+    //
+    // Enumerated rather than counted, so a column added by accident still fails here.
+    const EVIDENCE_ONLY_COLUMNS = [
+      'decisionCombinedDutyActId', // AccessRecertificationItem — the act on the review
+    ];
+    const columnRows = await rawPrisma.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND column_name LIKE '%ombinedDutyActId'`;
-    expect(Number(columns[0].count)).toBe(MAKER_CHECKER_REGISTRY.length);
+    const escapeColumns = columnRows
+      .map((r) => r.column_name)
+      .filter((name) => !EVIDENCE_ONLY_COLUMNS.includes(name));
+    expect(escapeColumns).toHaveLength(MAKER_CHECKER_REGISTRY.length);
+    // And each evidence column is really there, so the list cannot rot into naming a column that was
+    // renamed or dropped — which would silently relax the count above.
+    for (const name of EVIDENCE_ONLY_COLUMNS) {
+      expect(
+        columnRows.some((r) => r.column_name === name),
+        `${name} is listed as an evidence column but no table has it`,
+      ).toBe(true);
+    }
   }, 120_000);
 });

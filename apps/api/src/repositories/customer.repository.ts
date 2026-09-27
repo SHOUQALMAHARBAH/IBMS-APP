@@ -100,6 +100,25 @@ export class CustomerRepository {
     return this.prisma.client.customer.create({ data: input });
   }
 
+  /**
+   * Correct a customer's CONTACT details. The first write to a `Customer` row this codebase has ever had
+   * other than the create — see IMPROVEMENTS § 3.14.
+   *
+   * Only the three fields with no screening consequence. Widening this to a name or a date of birth would
+   * put a screening event behind a repository method, which is exactly the shape the AMLU rules refuse:
+   * those ship with the re-screening mechanism or not at all.
+   */
+  updateContactDetails(
+    id: string,
+    data: {
+      contactPhoneEnc?: string;
+      contactEmailEnc?: string;
+      registeredAddress?: string;
+    },
+  ): Promise<Customer> {
+    return this.prisma.client.customer.update({ where: { id }, data });
+  }
+
   findById(id: string): Promise<Customer | null> {
     return this.prisma.client.customer.findUnique({ where: { id } });
   }

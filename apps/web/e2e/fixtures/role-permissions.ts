@@ -15,7 +15,7 @@
  * the grid as declared instead of as granted. `--check` fails without writing,
  * so a stale copy is a red gate rather than four confusing Playwright failures.
  *
- * 12 seeded (`isSystem`) roles, 490 grants, from the default office. An office's own
+ * 12 seeded (`isSystem`) roles, 491 grants, from the default office. An office's own
  * custom roles are deliberately EXCLUDED — see the comment in the generator.
  */
 export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
@@ -451,6 +451,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'cross-sell.read',
     'customer.360-view.read',
     'customer.create',
+    'customer.update',
     'dashboard.sales.view',
     'data-sharing.request',
     'document.create',
@@ -549,7 +550,7 @@ export function permissionsForRoles(roles: readonly string[]): string[] {
  * The WHOLE catalogue — every permission the platform defines, not only the granted ones.
  *
  * The Role screen's matrix renders all of it, so the test that pins the matrix's shape runs against
- * this rather than a hand-written sample: 216 codes across 12 modules at generation time.
+ * this rather than a hand-written sample: 217 codes across 12 modules at generation time.
  */
 export const PERMISSION_CATALOGUE: readonly {
   code: string;
@@ -595,6 +596,7 @@ export const PERMISSION_CATALOGUE: readonly {
   { code: 'customer-file.all-owners.read', module: 'commercial-front-office', description: "See any customer's COMMERCIAL file — risk profile, needs assessment, insurance program, opportunity, RFQ, quotation, comparison, client decision — regardless of owner" },
   { code: 'customer.360-view.read', module: 'commercial-front-office', description: "Read the aggregated 360° customer view" },
   { code: 'customer.create', module: 'commercial-front-office', description: "Create a Customer (individual/corporate)" },
+  { code: 'customer.update', module: 'commercial-front-office', description: "Correct a customer's contact details — phone, email and registered address. Does NOT cover name, date of birth, nationality or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit" },
   { code: 'interaction.log', module: 'commercial-front-office', description: "Log a customer interaction (meeting/call/email/...)" },
   { code: 'kyc.approve', module: 'commercial-front-office', description: "Approve a KYC file and activate the Customer (maker/checker: capturer != approver)" },
   { code: 'kyc.capture', module: 'commercial-front-office', description: "Capture KYC data and supporting documents" },

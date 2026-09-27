@@ -1,7 +1,16 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerContactDto } from './dto/update-customer-contact.dto';
 import { ListCustomersQueryDto } from './dto/list-customers-query.dto';
 import { CreateUboDto } from './dto/create-ubo.dto';
 import { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
@@ -36,6 +45,23 @@ export class CustomerController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.customers.list(query, user);
+  }
+
+  /**
+   * IMPROVEMENTS § 3.14 — the first write to a customer record other than its creation.
+   *
+   * `customer.update` gates exactly the three fields that trigger no screening. The identifier fields are
+   * refused by the DTO, because changing one is a screening event under the AMLU rules and ships with the
+   * re-screening mechanism: https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
+   */
+  @RequirePermissions('customer.update')
+  @Patch(':id')
+  updateContactDetails(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerContactDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.customers.updateContactDetails(id, dto, user);
   }
 
   @RequirePermissions('customer.360-view.read')

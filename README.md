@@ -4116,6 +4116,22 @@ the office's own mode and declaration date — on `/internal-controls`, above th
 Access self-reviews sort first and render flagged, which is the owner's condition and is proven by content
 rather than by a status code. Reading it is audited (counts only, never a name).
 
+**Correcting a customer's contact details (2026-09-27): `PATCH /customers/:id`, `customer.update`**
+(migration `20261101100000`). The first write to a `Customer` row other than its creation — see
+`IMPROVEMENTS.md` § 3.14 for what that absence meant, including a PDPL CORRECTION request closeable only
+by attestation.
+
+**Phone, email and registered address only.** Name, date of birth, nationality, national ID and
+`legalName` are ABSENT from `UpdateCustomerContactDto`, so `forbidNonWhitelisted` refuses each with a 400.
+That is deliberate and it is the control: Jordan's AMLU requires screening "upon KYC reviews or changes to
+a customer's information" (https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions), so changing one of
+those is a screening event, and the re-screening mechanism is the precondition for editing them at all.
+Adding a field here without that mechanism removes a control rather than adding a feature.
+
+The audit row names WHICH fields changed and never the encrypted values; the address is recorded before
+and after, because it is not an encrypted column. An empty correction is a 422 rather than a silent 200.
+`registeredAddress` is corporate-only, mirroring the create path.
+
 **Reviewing your own access (2026-09-27): a one-person office can recertify itself, and the
 self-approval report is dated to the REVIEW.** Migration `20261031100000` adds
 `AccessRecertificationItem.decisionCombinedDutyActId` beside the existing `combinedDutyActId`: two acts

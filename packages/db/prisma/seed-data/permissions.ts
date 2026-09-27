@@ -146,6 +146,19 @@ const commercialFrontOffice: PermissionSeed[] = [
     description: "Create a Customer (individual/corporate)",
     roles: [SALES],
   },
+  // IMPROVEMENTS § 3.14 — a customer record had NO update path at all, which is also why a PDPL
+  // CORRECTION request could only be closed by attestation. This covers the three fields with no
+  // regulatory consequence. Name, date of birth, nationality and identity numbers are NOT here: Jordan's
+  // AMLU requires screening "upon KYC reviews or changes to a customer's information", so changing one of
+  // those is a screening event and ships only with the re-screening mechanism.
+  // https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
+  {
+    code: "customer.update",
+    module: "commercial-front-office",
+    description:
+      "Correct a customer's contact details — phone, email and registered address. Does NOT cover name, date of birth, nationality or identity numbers: changing one of those is a screening event under the AMLU rules, not an edit",
+    roles: [SALES],
+  },
   {
     code: "kyc.capture",
     module: "commercial-front-office",
