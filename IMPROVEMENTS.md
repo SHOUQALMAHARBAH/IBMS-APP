@@ -3440,6 +3440,58 @@ with the measurement, in the same class as the identifier questions in § 3.14: 
 that screening is required, and what the system should DO on a hit at that moment is not something to
 infer.
 
+### 1.59 `P1` — A CUSTOMER'S SCREENING STANDING GATES NOTHING AFTER ONBOARDING. `Customer.status` is written and never read
+
+Found while designing the identifier-correction re-screening (§ 3.14, the owner's requirement that "a
+change sets screening state to RE-SCREENING REQUIRED, and the prior result IS NOT the current
+result"). That requirement cannot be delivered by a state change, and the reason is the finding.
+
+**Measured, three ways, all agreeing:**
+
+1. **`Customer.status` is written by exactly one line and read as a gate by nothing.** The only
+   `PENDING_KYC -> ACTIVE` move is in `kyc.service.ts` on approval — the backlog's own rule, "do not
+   activate `Customer.status = ACTIVE` before KYC approval", and it IS enforced. Every other reference
+   to `PENDING_KYC` in `apps/api/src` is inside that same file. No other module tests it.
+2. **No business path reads the customer's KYC record.** `findLatestByCustomerId` has three callers:
+   `kyc.service.ts`, `screening.service.ts`, and the repository that defines it.
+3. **The four paths that matter contain zero references** to `PENDING_KYC`, `customer.status`,
+   `kycRecord`, `KycStatus` or an approved-KYC check: `policy.service.ts`, `claim.service.ts`,
+   `invoice.service.ts`, `rfq.service.ts`.
+
+**So a customer whose KYC was never approved — or was REJECTED — can have a policy placed, a claim
+notified, and money received.** Onboarding is gated in the sense the backlog asked for: approval is
+required to reach ACTIVE. Nothing then requires ACTIVE in order to do business.
+
+#### Why this blocks half of the owner's requirement, and which half
+
+The correction record, the mandatory reason, the re-screening trigger and moving the KYC file out of
+APPROVED are all buildable and are worth building: they make the FILE say that its screening is stale,
+and they retain the evidence the AMLU requires.
+
+What cannot be built without a decision is the consequence. "The prior result is not the current
+result" is a statement about consumers, and there are none. Moving the file to a non-APPROVED state
+changes what the KYC screen shows and changes nothing else, because no other screen or service asks.
+
+**This is the same decision as § 1.58's obligation 2**, arrived at from the opposite direction. That
+entry found no transaction path consults screening; this one finds no path consults the customer's
+standing at all. They are one gap seen twice: **the product has no place where a currently-valid
+screening is required for anything.**
+
+#### What the fix requires, and why it is not ours to pick
+
+Which business acts require a current screening — placing a policy, notifying a claim, receiving a
+receipt, remitting to an insurer, paying a refund — and what a stale or hit result should do to each
+(refuse, hold, allow-and-flag) are decisions with money and contractual consequence. Refusing a
+remittance to an insurer is not a technical choice. The AMLU text is explicit that screening is
+required *"before processing any transaction"*; it does not say what a broker's system should do to a
+transaction when the screening is stale, and inferring that is exactly the kind of judgement the owner
+has told us to bring a source for rather than supply.
+
+**Recorded, with the identifier work built around it**: the record and the trigger ship, and the gate
+is named as the missing half rather than approximated. A state nothing reads is not a control, and
+shipping one while calling the requirement met would be the worst available outcome — a claim of
+enforcement with no enforcement behind it, which is § 1.50's shape on a control that matters more.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
@@ -4027,6 +4079,24 @@ and only one of them is hers:
   discriminator re-run the check; must the approval record what it approved). Same treatment as the
   duty-segregation citations: the Central Bank's AML instructions, the office's own approved policy, or the
   compliance officer's determination — put in a form that can be answered yes or no.
+
+**PARTLY BUILT 2026-09-27.** Contact details (phone, email, registered address) are correctable —
+`customer.update`, migration `20261101100000`. The identifier half has its RECORD built
+(`CustomerIdentifierCorrection`, migration `20261102100000`) and its consequence blocked by § 1.59: the
+table retains what the AMLU requires, pointing at the prior and new `ScreeningResult` rows with
+`onDelete: Restrict` so "never delete the prior result" is structural, with both values encrypted so the
+retention requirement and `sensitive-data-handling.md` are satisfied together.
+
+**TWO OF THE OWNER'S IDENTIFIERS ARE NOT COLUMNS ON `Customer` — measured, not assumed.** `placeOfBirth`
+and passport do not exist. Adding them is a decision about what identity evidence this product holds,
+with its own encryption, KYC-capture and screening-discriminator consequences, so the CHECK on `field`
+pins the nine identifiers that DO exist and those two are absent rather than invented.
+
+**And the clerical-retention columns exist while NOTHING writes them**, deliberately: the owner ruled
+that a documented clerical correction may leave the prior identity verification standing only with
+evidence, with the decision recorded against the person who made it, and appearing in the compliance
+report. A CHECK enforces all-three-or-none so "documented as clerical" cannot mean a ticked box.
+Re-verification is unconditional today.
 
 **One part of this is recommended REGARDLESS of which option is chosen, and it is the part not to defer:**
 while correcting a name is impossible, staff must not be able to mark such a request "done". There has to be

@@ -370,6 +370,7 @@ model Organization {
   dutySegregationModeDeclaredAt       DateTime?
   dutySegregationModeDeclaredByUserId String?
   combinedDutyActs                    CombinedDutyAct[]
+  identifierCorrections               CustomerIdentifierCorrection[]
 }
 
 /// Whether a Role still grants anything. Retirement rather than deletion — see
@@ -902,6 +903,61 @@ model AccessRecertificationCycle {
   @@index([organizationId])
 }
 
+/// Correcting a SCREENING IDENTIFIER, and the evidence retained per change.
+///
+/// Jordan's AMLU requires screening "upon KYC reviews or changes to a customer's information", and requires
+/// the entity to "keep the verification mechanism and actions taken regarding the case in internal records"
+/// — https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions. So this table is the obligation, not
+/// bookkeeping.
+///
+/// The list version, the screening time, the match reviewer and the final decision are NOT duplicated here:
+/// they live on `ScreeningResult` (`datasetVersion`, `screenedAt`) and `ScreeningMatch` (`status`,
+/// `closedByUserId`, `closedAt`), and this record points at the results. `onDelete: Restrict` on both is
+/// what makes "never delete the prior result" structural rather than a rule.
+///
+/// `placeOfBirth` and passport are in the owner's identifier list and are NOT columns on `Customer` —
+/// measured. Adding them is a data-model decision about what identity evidence this product holds; see
+/// IMPROVEMENTS § 3.14.
+model CustomerIdentifierCorrection {
+  id                               String           @id @default(uuid())
+  /// Part I §3.2 — supplied by `tenantScopeExtension`, never by hand.
+  organizationId                   String           @default(dbgenerated())
+  organization                     Organization     @relation(fields: [organizationId], references: [id])
+  customerId                       String
+  customer                         Customer         @relation(fields: [customerId], references: [id])
+  /// Which identifier changed. Pinned by a CHECK in the migration so a typo cannot become a new category.
+  field                            String
+  /// ENCRYPT. A corrected national ID is Highly Confidential and `Customer.nationalIdEnc` exists so it is
+  /// not at rest in the clear; storing the before/after in plaintext here would defeat that column.
+  beforeValueEnc                   String? // -- ENCRYPT (Highly Confidential when the field is an identity number)
+  /// ENCRYPT — see above.
+  afterValueEnc                    String? // -- ENCRYPT (Highly Confidential when the field is an identity number)
+  /// Mandatory, unlike a contact-detail correction: this is part of the record the AMLU requires retained.
+  reason                           String
+  correctedByUserId                String
+  correctedAt                      DateTime         @default(now())
+  /// The screening either side of the change. The prior one is the evidence; RESTRICT keeps it.
+  priorScreeningResultId           String?
+  priorScreeningResult             ScreeningResult? @relation("IdentifierCorrectionPriorScreening", fields: [priorScreeningResultId], references: [id], onDelete: Restrict)
+  newScreeningResultId             String?
+  newScreeningResult               ScreeningResult? @relation("IdentifierCorrectionNewScreening", fields: [newScreeningResultId], references: [id], onDelete: Restrict)
+  /// What the KYC file's status was before this correction undid it.
+  kycStatusBefore                  String?
+  kycRecordId                      String?
+  kycRecord                        KYCRecord?       @relation(fields: [kycRecordId], references: [id], onDelete: Restrict)
+  /// The NOT-ADOPTED-AS-AUTOMATIC path. A documented clerical correction may leave the prior identity
+  /// verification standing ONLY with evidence, with the decision recorded against the person who made it,
+  /// and appearing in the compliance report. Nothing writes these yet: re-verification is unconditional.
+  /// All three or none — enforced by a CHECK, so "documented as clerical" cannot mean a ticked box.
+  clericalRetentionEvidence        String?
+  clericalRetentionDecidedByUserId String?
+  clericalRetentionDecidedAt       DateTime?
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([correctedAt])
+}
+
 model AccessRecertificationItem {
   id                        String                     @id @default(uuid())
   /// Part I §3.2 (multi-tenancy) — the Organization (brokerage office) this
@@ -1211,13 +1267,13 @@ model Customer {
   riskProfiles                RiskProfile[]
   opportunities               Opportunity[]
   policies                    Policy[]
-  claims                      Claim[]                      @relation("ClaimCustomer")
+  claims                      Claim[]                        @relation("ClaimCustomer")
   complaints                  Complaint[]
   interactions                Interaction[]
   insuredPersons              InsuredPerson[]
   consentRecords              ConsentRecord[]
-  dataSubjectRequests         DataSubjectRequest[]         @relation("DsrCustomer")
-  documents                   Document[]                   @relation("CustomerDocuments")
+  dataSubjectRequests         DataSubjectRequest[]           @relation("DsrCustomer")
+  documents                   Document[]                     @relation("CustomerDocuments")
   invoices                    Invoice[]
   clientFundsLedgerEntries    ClientFundsLedgerEntry[]
   paymentChannels             PaymentChannel[]
@@ -1228,6 +1284,8 @@ model Customer {
   upSellRecommendations       UpSellRecommendation[]
   transactionMonitoringAlerts TransactionMonitoringAlert[]
   legalHolds                  LegalHold[]
+  /// Every recorded correction of a screening identifier on this customer.
+  identifierCorrections       CustomerIdentifierCorrection[]
 
   @@index([legalName])
   @@index([status])
@@ -1334,17 +1392,19 @@ model KYCRecord {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  screeningResults  ScreeningResult[]
-  screeningMatches  ScreeningMatch[]
-  riskRating        RiskRating?
-  screeningRequests ScreeningRequest[]
-  holdReleases      ScreeningHoldRelease[]
+  screeningResults      ScreeningResult[]
+  screeningMatches      ScreeningMatch[]
+  riskRating            RiskRating?
+  screeningRequests     ScreeningRequest[]
+  holdReleases          ScreeningHoldRelease[]
   /// Part 4 — set only when this pair's two halves were performed by ONE person in an office that
   /// has declared COMBINED mode. The `KYCRecord_maker_checker_distinct` family of CHECK constraints
   /// admits a self-approval only when this is non-null, and a trigger on `CombinedDutyAct` refuses
   /// the act itself unless the office is COMBINED. One column PER CONSTRAINT, never per table.
-  combinedDutyActId String?
-  combinedDutyAct   CombinedDutyAct?       @relation("KYCRecordCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
+  combinedDutyActId     String?
+  combinedDutyAct       CombinedDutyAct?               @relation("KYCRecordCombinedDuty", fields: [combinedDutyActId], references: [id], onDelete: Restrict)
+  /// Identifier corrections that took this file out of its previous status.
+  identifierCorrections CustomerIdentifierCorrection[]
 
   @@index([customerId])
   @@index([status])
@@ -1414,13 +1474,18 @@ model ScreeningResult {
   /// The attempt that produced this result — which provider, which dataset,
   /// and why it failed if it did.
   screeningRequestId String?
-  screeningRequest   ScreeningRequest?        @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
+  screeningRequest   ScreeningRequest?              @relation(fields: [screeningRequestId], references: [id], onDelete: SetNull)
   provider           ScreeningProviderKind?
   /// The five-value outcome behind `result`. A DB CHECK
   /// (`ScreeningResult_clear_requires_no_match`) makes it impossible to store
   /// a CLEAR result from any attempt other than NO_MATCH.
   attemptOutcome     ScreeningAttemptOutcome?
   datasetVersion     String?
+  /// Corrections that name this result as the screening BEFORE the change — the evidence the AMLU
+  /// requires retained, which is why the relation is Restrict on the correction's side.
+  correctionsAsPrior CustomerIdentifierCorrection[] @relation("IdentifierCorrectionPriorScreening")
+  /// Corrections that name this result as the screening AFTER the change.
+  correctionsAsNew   CustomerIdentifierCorrection[] @relation("IdentifierCorrectionNewScreening")
 
   @@index([kycRecordId])
   @@index([screeningRequestId])
