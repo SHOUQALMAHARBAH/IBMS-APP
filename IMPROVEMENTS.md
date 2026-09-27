@@ -2827,7 +2827,7 @@ see. Ordered by consequence:**
 | ~~`screening/matches/:id/{assign,escalate,notes,start-review,case}`~~ | 5 | ~~The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case, escalate one, add a note, or open the case view.~~ **CLOSED 2026-09-27, and the sentence above was WRONG about the consequence in the direction that matters: a match could not be decided either.** See § 1.62 — `decide()` refuses unless the case is UNDER_REVIEW or ESCALATED, and every route to those states was one of these five. |
 | ~~`sla/timers/:id/{pause,resume}`~~ | 2 | ~~`sla.timer.pause` exists as a permission and can only be exercised by constructing a request by hand.~~ **CLOSED 2026-09-27**, second of the 33, and closing it found § 1.60: the dashboard was PAUSE-BLIND, so shipping the button without that fix would have introduced a false breach rather than found one. Pause/resume controls on `/sla-dashboard`, gated on `sla.timer.pause`, mandatory ten-character reason sent trimmed. The routes had no api e2e either — two now exist. |
 | `GET /sla/timers/:id/status` | 1 | **REDUNDANT SURFACE, NOT A MISSING CAPABILITY — and the distinction is a correction to this measurement.** It answers "where does this one timer stand, and is its deadline the law?", which is exactly the six fields `GET /sla-dashboard/timers` now carries per row (§ 1.60). Wiring a caller would add a request that duplicates one already made. **This list conflates two kinds of unreachable route**: a capability nobody can exercise (the refund disbursement, pause/resume, the screening queue) and a read whose answer another called route already returns. Only the first kind is a gap; the count is actionable only once they are separated, and the remaining rows have NOT been re-classified this way. |
-| `sla/holidays` (GET + POST) | 2 | § 1.57 — the calendar every business-day deadline is counted against. Found by hand first; this method finds it too. |
+| ~~`sla/holidays` (GET + POST)~~ | 2 | ~~§ 1.57 — the calendar every business-day deadline is counted against.~~ **CLOSED 2026-09-27**: a "Non-working days" section on `/sla-policies`, which is where it belongs because every holder of `sla.holiday.create` also holds `sla.policy.read` (measured — § 1.61's rule). Closing it found that a duplicate date was a **500** and that adding a holiday was **not audited**; both fixed. The DATES remain the owner's to supply — see § 1.57, which is now half-closed rather than closed. |
 | `insurer-masters/:id` and its form templates | 4 | The GLOBAL catalogue: view one, list/add its form templates. |
 | `insurers/:id/form-templates` | 3 | Already recorded above (Q9's UI). |
 | `PATCH /insurance-lines/:id` | 1 | An office cannot correct a line of business it added. Also recorded in `docs/b7-consistency-record.md`. |
@@ -3363,12 +3363,48 @@ is two days later than the one computed. The breach reports, the SLA dashboard, 
 drawn from them therefore over-report lateness. For a compliance artefact that is the worse direction:
 the brokerage's own records would show it missing statutory deadlines it actually met.
 
+#### PARTIALLY CLOSED 2026-09-27 — the way in exists; the dates do not
+
+**What shipped.** `GET`/`POST /sla/holidays` now have a caller: a "Non-working days" section on
+`/sla-policies`, listing the calendar and adding a day (date · occasion · calendar, defaulting to ALL
+calendars because a national holiday is the ordinary case). When the calendar is empty the section does
+not render an empty state — it renders an **alert stating the direction of the error in the owner's own
+terms**: that deadlines land earlier than they really fall, that a breach is reported before it happened,
+and that the compliance figures currently overstate lateness *against this brokerage*. An empty table
+would have read as "nothing to see".
+
+**What did NOT ship, and must not be invented.** The dates themselves. Jordan's public holidays are
+gazetted annually and several are lunar, so they cannot be computed, and writing a guessed list into a
+seed would be recording an internal guess as a legal fact — the exact thing `sla-policy-source.config.ts`
+refuses to let a REGULATORY policy do. **So this entry stays open until the office enters its own
+calendar, and the screen's own warning is what will keep saying so until then.**
+
+#### Two defects found only because the route finally had a caller
+
+1. **A duplicate date was a 500.** The controller called `SlaPolicyRepository` directly, there is no
+   global Prisma exception filter, and the table carries two partial UNIQUE indexes on the date — so a
+   second entry for the same day was an unhandled `P2002`. Two people working from the same published
+   holiday list is ordinary, and "the system is broken" is the wrong thing to tell the second one. Now a
+   409 naming the day, through a new `SlaPolicyService.createHoliday`.
+2. **Adding a holiday was not audited.** Editing one policy's duration was. A single holiday row moves
+   **every** business-day deadline in the office at once, and a policy edit moves one — so the unaudited
+   act was the higher-leverage one. Now a `CREATE` row on `SlaHoliday` carrying the day, the occasion and
+   the calendar.
+
+**And one thing measured that turned out to be FINE**, recorded because the opposite was expected: the
+unique index tolerating duplicate NULLs — the shape that bit `CommissionAgreement` (§ 1.25) — is already
+closed here by **two partial uniques**, `WHERE calendarType IS NULL` on `(org, date)` and
+`WHERE calendarType IS NOT NULL` on `(org, date, calendarType)`. `db:divergence` cannot see partial
+indexes, so this could only be established by querying `pg_index` on both databases, which is what was
+done. An e2e now pins both halves: the same day twice is a 409, and the same day with a NAMED calendar is
+still accepted.
+
 **Fix, in the order that matters:**
 
 1. **Seed the calendar.** Jordan's public holidays are gazetted annually and several are lunar, so
    they cannot be computed — they have to be entered. Until they are, the two routes below have nothing
    to maintain.
-2. **Give `POST /sla/holidays` a screen.** It now has its own permission (`sla.holiday.create`,
+2. ~~**Give `POST /sla/holidays` a screen.**~~ **DONE 2026-09-27, see above.** It has its own permission (`sla.holiday.create`,
    split out in migration `20261030100000` precisely because maintaining the calendar is a different
    job from configuring a policy), and that code currently gates a route no screen calls — which is
    § 1.44's shape, recorded here rather than left to be discovered.

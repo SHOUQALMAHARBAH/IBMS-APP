@@ -296,6 +296,61 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     });
   });
 
+  it('refuses the same non-working day twice with a 409, and audits the act', async () => {
+    // BOTH HALVES EXISTED IN NEITHER FORM BEFORE THE ROUTE HAD A CALLER.
+    //
+    // The controller called the repository directly, there is no global Prisma
+    // exception filter, and the table carries two partial UNIQUE indexes on the
+    // date — so a second entry for the same day was an unhandled P2002 and a
+    // 500. Two people working from the same published holiday list is not an
+    // edge case, and "the system is broken" is the wrong thing to tell the
+    // second one.
+    //
+    // And nothing audited a holiday, while editing one policy's duration was
+    // audited — even though a single holiday row moves EVERY business-day
+    // deadline in the office at once.
+    const observedOn = `2032-04-0${Math.floor(Math.random() * 9)}`;
+    const name = `E2E duplicate holiday ${RUN}`;
+
+    const created = await request(app.getHttpServer())
+      .post('/sla/holidays')
+      .set(bearer(compliance.accessToken))
+      .send({ observedOn, name })
+      .expect(201);
+    const holidayId = (created.body as { id: string }).id;
+
+    // The SAME day again — a 409, and the message names the day rather than
+    // leaving the reader to guess which entry collided.
+    const conflict = await request(app.getHttpServer())
+      .post('/sla/holidays')
+      .set(bearer(compliance.accessToken))
+      .send({ observedOn, name: `${name} (again)` })
+      .expect(409);
+    expect((conflict.body as { message: string }).message).toContain(
+      observedOn,
+    );
+
+    // A NAMED CALENDAR on the same day is a DIFFERENT row and must still be
+    // accepted: the two partial uniques are "one all-calendars entry per date"
+    // and "one entry per date per calendar", not "one row per date".
+    await request(app.getHttpServer())
+      .post('/sla/holidays')
+      .set(bearer(compliance.accessToken))
+      .send({ observedOn, name: `${name} (custom)`, calendarType: 'CUSTOM' })
+      .expect(201);
+
+    const audit = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'SlaHoliday', entityId: holidayId },
+    });
+    expect(audit).toHaveLength(1);
+    expect(audit[0].action).toBe('CREATE');
+    expect(JSON.stringify(audit[0].afterValue)).toContain(observedOn);
+
+    await prisma.slaHoliday.deleteMany({
+      where: { name: { startsWith: name } },
+    });
+  });
+
   it('separates "change the duration" from "declare it legally required"', async () => {
     // BRANCH_DEPARTMENT_MANAGER holds sla.policy.update but NOT
     // sla.policy.regulatory. Shortening a deadline is a normal governance

@@ -69,6 +69,26 @@ export const COMPLIANCE_SCREENING = {
     slapEveryDeadlineInTheSystem:
       'كل مهلة زمنية في النظام قابلة للتهيئة من هنا دون تغيير في الشيفرة. الأهم: يوضّح هذا الجدول مصدر كل مهلة — «تنظيمي» يعني أنّ هناك نصاً قانونياً يوجبها ويُذكر مرجعه، وأي تصنيف آخر يعني أنّها هدف داخلي وليست إلزاماً قانونياً.',
     slapNoPolicies: 'لا توجد سياسات.',
+    slapHolidaysHeading: 'أيام العطل الرسمية',
+    slapHolidaysIntro:
+      'كل مهلة محسوبة بأيام العمل تُحتسب مقابل هذا التقويم. الأيام المدرجة هنا ' +
+      'لا تُحتسب ضمن المدة.',
+    slapHolidaysEmptyWarning:
+      'التقويم فارغ. كل مهلة محسوبة بأيام العمل تُحسب حالياً كأن الجمعة هي يوم ' +
+      'العمل المعطَّل الوحيد في السنة — فتأتي المواعيد أبكر من حقيقتها، ويُسجَّل ' +
+      'التجاوز قبل وقوعه، ويُسجَّل الإنجاز الواقع داخل المدة الحقيقية متأخراً. ' +
+      'أرقام الالتزام الحالية تُظهر تأخراً أكبر من الواقع — في غير مصلحة الشركة. ' +
+      'أدخل الأيام المعتمدة رسمياً.',
+    slapHolidayDate: 'التاريخ',
+    slapHolidayName: 'المناسبة',
+    slapHolidayCalendar: 'التقويم',
+    slapHolidayAllCalendars: 'كل التقاويم',
+    slapHolidayAdd: 'إضافة يوم عطلة',
+    slapHolidayAddError: 'تعذّر إضافة يوم العطلة — حاول مرة أخرى.',
+    slapHolidayLoadError: 'تعذّر تحميل تقويم العطل — حاول مرة أخرى.',
+    slapHolidayReadOnly:
+      'لا تملك صلاحية sla.holiday.create، فالتقويم للقراءة فقط.',
+    slapHolidayLoading: 'جارٍ تحميل التقويم…',
     slapProcess: 'العملية',
     slapDuration: 'المهلة',
     slapSource: 'المصدر',
@@ -224,6 +244,27 @@ export const COMPLIANCE_SCREENING = {
     slapEveryDeadlineInTheSystem:
       'Every deadline in the system is configured here, with no code change. More importantly, this table states where each deadline COMES FROM: “Regulatory” means an instrument requires it and names that instrument; any other classification means it is an internal target, not a legal obligation.',
     slapNoPolicies: 'No policies.',
+    slapHolidaysHeading: 'Non-working days',
+    slapHolidaysIntro:
+      'Every deadline measured in business days is counted against this calendar. ' +
+      'A day listed here does not consume any of the allowance.',
+    slapHolidaysEmptyWarning:
+      'The calendar is EMPTY. Every business-day deadline is currently computed as ' +
+      'though Fridays were the only non-working days of the year, so deadlines land ' +
+      'earlier than they really fall, a breach is reported before it happens, and ' +
+      'work finished inside the true window is recorded late. The compliance figures ' +
+      'currently overstate lateness — against this brokerage. Enter the officially ' +
+      'observed days.',
+    slapHolidayDate: 'Date',
+    slapHolidayName: 'Occasion',
+    slapHolidayCalendar: 'Calendar',
+    slapHolidayAllCalendars: 'All calendars',
+    slapHolidayAdd: 'Add non-working day',
+    slapHolidayAddError: 'Could not add that day — try again.',
+    slapHolidayLoadError: 'Could not load the calendar — try again.',
+    slapHolidayReadOnly:
+      'You do not hold sla.holiday.create, so the calendar is read-only.',
+    slapHolidayLoading: 'Loading the calendar…',
     slapProcess: 'Process',
     slapDuration: 'Duration',
     slapSource: 'Source',

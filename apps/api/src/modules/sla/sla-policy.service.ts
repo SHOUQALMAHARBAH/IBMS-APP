@@ -6,7 +6,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
-import type { SlaPolicyStatus } from '@ibms/db';
+import type { SlaHoliday, SlaPolicy, SlaPolicyStatus } from '@ibms/db';
 import {
   SlaPolicyRepository,
   type SlaPolicyWithEscalations,
@@ -324,6 +324,73 @@ export class SlaPolicyService {
       afterValue: { status: 'INACTIVE' },
     });
     return this.get(id);
+  }
+
+  /**
+   * Record a non-working day.
+   *
+   * WHY THIS IS NOW A SERVICE METHOD RATHER THAN A DIRECT REPOSITORY CALL
+   * --------------------------------------------------------------------
+   * `POST /sla/holidays` had no web caller (IMPROVEMENTS § 1.44), so its first
+   * predictable user error had never been reached. The controller called the
+   * repository directly, there is no global Prisma exception filter, and the
+   * table carries two partial UNIQUE indexes on the date — so entering the same
+   * day twice produced an unhandled P2002 and a **500**. Two people working from
+   * the same published holiday list is not an edge case, and "the system is
+   * broken" is the wrong thing to tell the second one.
+   *
+   * AND THE ACT IS NOW AUDITED, WHICH IT WAS NOT
+   * -------------------------------------------
+   * Editing one policy's duration was audited; adding a holiday was not — even
+   * though a single holiday row moves EVERY business-day deadline in the office
+   * at once, and a policy edit moves one. That is the same argument that makes
+   * pausing a timer an audited act: what changed a compliance deadline has to be
+   * answerable afterwards.
+   */
+  async createHoliday(
+    input: {
+      observedOn: Date;
+      name: string;
+      calendarType: SlaPolicy['calendarType'] | null;
+    },
+    actor: AuthenticatedUser,
+  ): Promise<SlaHoliday> {
+    // The stored form is the whole UTC day; this is the spelling used in the
+    // refusal and the audit row so both name the day a reader typed.
+    const day = input.observedOn.toISOString().slice(0, 10);
+
+    let created: SlaHoliday;
+    try {
+      created = await this.policies.createHoliday({
+        ...input,
+        createdByUserId: actor.id,
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          input.calendarType == null
+            ? `${day} is already recorded as a non-working day for every calendar.`
+            : `${day} is already recorded as a non-working day for the ${input.calendarType} calendar.`,
+        );
+      }
+      throw err;
+    }
+
+    await this.safeAudit({
+      userId: actor.id,
+      action: 'CREATE',
+      entityType: 'SlaHoliday',
+      entityId: created.id,
+      afterValue: {
+        observedOn: day,
+        name: created.name,
+        calendarType: created.calendarType,
+      },
+    });
+    return created;
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

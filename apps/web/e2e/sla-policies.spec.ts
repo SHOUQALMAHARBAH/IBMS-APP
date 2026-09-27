@@ -112,6 +112,48 @@ async function mockPolicies(page: Page, rows: Record<string, unknown>[]) {
     if (route.request().method() !== "GET") return route.fallback();
     return route.fulfill({ status: 200, json: rows });
   });
+  // The screen now also loads the non-working-day calendar, so every test needs
+  // it mocked or the request escapes to a server that is not running and the
+  // section renders a load error over the policies the test is about.
+  await mockHolidays(page, []);
+}
+
+function holidayRow(over: Record<string, unknown> = {}) {
+  return {
+    id: "hol-1",
+    observedOn: "2026-05-25T00:00:00.000Z",
+    name: "Independence Day",
+    calendarType: null,
+    createdByUserId: "user-1",
+    createdAt: "2026-01-02T00:00:00.000Z",
+    ...over,
+  };
+}
+
+/** Re-routable: a later `page.route` for the same pattern takes precedence, so a
+ * test can override the default empty calendar. */
+async function mockHolidays(page: Page, rows: Record<string, unknown>[]) {
+  await page.route("**/sla/holidays", (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    return route.fulfill({ status: 200, json: rows });
+  });
+}
+
+/** Every POST to the calendar, captured so an assertion is about the wire. */
+async function captureHolidayPosts(page: Page, status = 201) {
+  const calls: { body: unknown }[] = [];
+  await page.route("**/sla/holidays", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    calls.push({ body: route.request().postDataJSON() });
+    return route.fulfill({
+      status,
+      json:
+        status === 409
+          ? { message: "2026-05-25 is already recorded as a non-working day for every calendar." }
+          : holidayRow(),
+    });
+  });
+  return calls;
 }
 
 test("marks an internal SLA as NOT a legal requirement", async ({ page }) => {
@@ -230,6 +272,134 @@ test("surfaces a permission failure rather than an empty list", async ({
     page.getByRole("alert").filter({ hasText: "sla.policy.read" }),
   ).toBeVisible();
   await expect(page.getByText("No policies.")).toHaveCount(0);
+});
+
+/*
+ * THE NON-WORKING-DAY CALENDAR — `GET`/`POST /sla/holidays`, which had no web
+ * caller at all (IMPROVEMENTS § 1.44, § 1.57).
+ *
+ * The empty state is the interesting one and it is not an empty state: the dev
+ * database holds zero holiday rows, so every business-day deadline in the system
+ * is computed as though Fridays were the only non-working days of the year, and
+ * the resulting figures overstate the brokerage's lateness against itself.
+ */
+
+test("says plainly that an EMPTY calendar makes every business-day deadline wrong", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+
+  await page.goto("/sla-policies");
+  // Anchor: the section rendered at all.
+  await expect(page.getByTestId("sla-holidays")).toBeVisible();
+
+  const warning = page.getByTestId("sla-holidays-empty-warning");
+  await expect(warning).toBeVisible();
+  // The DIRECTION of the error is the part that matters to the owner, so it is
+  // asserted rather than just the presence of a warning.
+  await expect(warning).toContainText("overstate lateness");
+});
+
+test("does NOT warn once the calendar has days in it", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, [holidayRow()]);
+
+  await page.goto("/sla-policies");
+  // Positive anchor from the same render before asserting the absence.
+  await expect(page.getByTestId("sla-holiday-hol-1")).toContainText(
+    "Independence Day",
+  );
+  await expect(page.getByTestId("sla-holidays-empty-warning")).toHaveCount(0);
+  // Rendered as the stored UTC day, never shifted by a local-time conversion.
+  await expect(page.getByTestId("sla-holiday-hol-1")).toContainText(
+    "2026-05-25",
+  );
+  await expect(page.getByTestId("sla-holiday-hol-1")).toContainText(
+    "All calendars",
+  );
+});
+
+test("records a non-working day, defaulting to every calendar", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  const calls = await captureHolidayPosts(page);
+
+  await page.goto("/sla-policies");
+  const add = page.getByTestId("sla-holiday-add");
+  // Neither field filled: the button must not send a request the DTO refuses.
+  await expect(add).toBeDisabled();
+
+  await page.getByTestId("sla-holiday-date").fill("2026-05-25");
+  await expect(add).toBeDisabled(); // a date with no occasion is still refused
+  await page.getByTestId("sla-holiday-name").fill("  Independence Day  ");
+  await expect(add).toBeEnabled();
+  await add.click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  // No `calendarType` at all rather than a null: omitted means every calendar,
+  // and the DTO whitelist refuses a field it does not declare.
+  expect(calls[0].body).toEqual({
+    observedOn: "2026-05-25",
+    name: "Independence Day",
+  });
+});
+
+test("sends the named calendar when one is chosen", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  const calls = await captureHolidayPosts(page);
+
+  await page.goto("/sla-policies");
+  await page.getByTestId("sla-holiday-date").fill("2026-05-25");
+  await page.getByTestId("sla-holiday-name").fill("Office closure");
+  await page.getByTestId("sla-holiday-calendar").selectOption("CUSTOM");
+  await page.getByTestId("sla-holiday-add").click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  expect(calls[0].body).toEqual({
+    observedOn: "2026-05-25",
+    name: "Office closure",
+    calendarType: "CUSTOM",
+  });
+});
+
+test("shows the API's own sentence when the day is already recorded", async ({
+  page,
+}) => {
+  // A duplicate used to be an unhandled P2002 and a 500. Two people working from
+  // the same published holiday list is ordinary, and "the system is broken" is
+  // the wrong thing to tell the second one.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  await captureHolidayPosts(page, 409);
+
+  await page.goto("/sla-policies");
+  await page.getByTestId("sla-holiday-date").fill("2026-05-25");
+  await page.getByTestId("sla-holiday-name").fill("Independence Day");
+  await page.getByTestId("sla-holiday-add").click();
+
+  await expect(page.getByTestId("sla-holiday-add-error")).toContainText(
+    "already recorded as a non-working day",
+  );
+});
+
+test("a reader without sla.holiday.create sees the calendar and no form", async ({
+  page,
+}) => {
+  // The External Auditor holds sla.policy.read and not sla.holiday.create.
+  await mockAuthWithCodes(page, ["sla.policy.read"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, [holidayRow()]);
+
+  await page.goto("/sla-policies");
+  // Anchor: they can read the calendar.
+  await expect(page.getByTestId("sla-holiday-hol-1")).toBeVisible();
+  await expect(page.getByTestId("sla-holiday-add")).toHaveCount(0);
+  await expect(page.getByText("sla.holiday.create")).toBeVisible();
 });
 
 test("renders in Arabic with RTL direction", async ({ page }) => {

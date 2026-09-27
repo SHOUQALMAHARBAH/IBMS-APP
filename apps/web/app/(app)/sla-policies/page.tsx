@@ -17,6 +17,7 @@ import {
   type SlaPolicyStatus,
 } from "../../../lib/sla/sla-policy-api";
 import { hasPermission } from '../../../lib/auth/permissions';
+import { SlaHolidayCalendar } from '../../../components/sla/SlaHolidayCalendar';
 
 const STATUSES: (SlaPolicyStatus | "ALL")[] = [
   "ALL",
@@ -329,6 +330,12 @@ export default function SlaPoliciesPage() {
         // and a "Loading…" line never appear together.
         <p>{t('slapLoading')}</p>
       )}
+
+      {/* The calendar every BUSINESS_DAYS policy above is counted against. On
+        * this screen rather than its own, because every role holding
+        * `sla.holiday.create` also holds `sla.policy.read` — measured, since a
+        * control on a screen its permission-holders cannot open is § 1.61. */}
+      <SlaHolidayCalendar />
     </main>
   );
 }

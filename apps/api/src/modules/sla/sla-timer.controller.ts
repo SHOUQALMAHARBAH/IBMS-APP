@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SlaTimerService } from './sla-timer.service';
 import { SlaPolicyRepository } from '../../repositories/sla-policy.repository';
+import { SlaPolicyService } from './sla-policy.service';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -22,6 +23,7 @@ export class SlaTimerController {
   constructor(
     private readonly timers: SlaTimerService,
     private readonly policies: SlaPolicyRepository,
+    private readonly policyService: SlaPolicyService,
   ) {}
 
   /** Where a timer stands, with the provenance of its deadline attached: a
@@ -67,14 +69,20 @@ export class SlaTimerController {
     @Body() dto: CreateSlaHolidayDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.policies.createHoliday({
-      // Parsed as a UTC whole day, matching how `SlaHoliday.observedOn` is
-      // stored and how `utcDateKey` looks it up. A local-time parse here would
-      // shift the holiday a day for half the world.
-      observedOn: new Date(`${dto.observedOn}T00:00:00.000Z`),
-      name: dto.name,
-      calendarType: dto.calendarType ?? null,
-      createdByUserId: user.id,
-    });
+    // Through the SERVICE, not the repository: a duplicate date has to come back
+    // as a 409 naming the day rather than an unhandled P2002, and adding a
+    // holiday has to be audited — one holiday row moves every business-day
+    // deadline in the office.
+    return this.policyService.createHoliday(
+      {
+        // Parsed as a UTC whole day, matching how `SlaHoliday.observedOn` is
+        // stored and how `utcDateKey` looks it up. A local-time parse here would
+        // shift the holiday a day for half the world.
+        observedOn: new Date(`${dto.observedOn}T00:00:00.000Z`),
+        name: dto.name,
+        calendarType: dto.calendarType ?? null,
+      },
+      user,
+    );
   }
 }

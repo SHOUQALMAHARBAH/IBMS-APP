@@ -1,0 +1,32 @@
+{
+  "empty-warning-shows-even-when-days-exist": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "      {rows != null && rows.length === 0 && (",
+    "to": "      {rows != null && ("
+  },
+  "add-ignores-the-name-floor": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "            disabled={busy || !holidayDateIsValid(day) || !holidayNameIsValid(name)}",
+    "to": "            disabled={busy || !holidayDateIsValid(day)}"
+  },
+  "holiday-name-sent-untrimmed": {
+    "file": "apps/web/lib/sla/sla-holiday-api.ts",
+    "from": "    name: input.name.trim(),",
+    "to": "    name: input.name,"
+  },
+  "calendar-type-always-sent": {
+    "file": "apps/web/lib/sla/sla-holiday-api.ts",
+    "from": "    ...(input.calendarType ? { calendarType: input.calendarType } : {}),",
+    "to": "    calendarType: input.calendarType ?? null,"
+  },
+  "calendar-form-ignores-the-permission": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "  const canCreate = hasPermission(user, 'sla.holiday.create');",
+    "to": "  const canCreate = true;"
+  },
+  "conflict-message-swallowed": {
+    "file": "apps/web/components/sla/SlaHolidayCalendar.tsx",
+    "from": "      setAddError(\n        err instanceof ApiError ? err.message : t('slapHolidayAddError'),\n      );",
+    "to": "      setAddError(t('slapHolidayAddError'));"
+  }
+}
