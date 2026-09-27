@@ -3776,6 +3776,68 @@ check, the audit call — killed at both unit and HTTP level — and the audit r
 the web half (both halves of the restorable condition, the reason floor, the trim, and the swallowed
 server refusal).
 
+
+### 1.64 `P1` — EIGHT DATE FIELDS VALIDATE THE SHAPE AND NOT THE DAY, AND SEVEN OF THEIR MESSAGES CLAIM OTHERWISE
+
+**Found by CI, from a bad date in a test I had just written rather than from reading the code.** The test
+generated its day as `2032-04-0${Math.floor(Math.random() * 9)}`, which produces `2032-04-00` one run in
+nine. It passed locally, went red in CI with `RangeError: Invalid time value` and a 500, and chasing that
+found the real defect underneath.
+
+`@Matches(/^\d{4}-\d{2}-\d{2}$/)` is the established spelling for a whole-day field across this api —
+**eight sites** — and it admits three kinds of value that are not dates. Measured:
+
+    '2032-04-00'   regex passes  ->  Invalid Date  ->  500
+    '2026-13-01'   regex passes  ->  Invalid Date  ->  500
+    '2026-02-30'   regex passes  ->  2026-03-02    ->  SILENTLY THE WRONG DAY
+
+**The third is the dangerous one, and it is the reverse of how it looks.** A 500 is loud and somebody
+reports it. The rollover stores a fact nobody typed: an administrator who types 30 February gets a
+non-working day recorded on **2 March**, with no error, and every business-day deadline in the office then
+counts against a date she never entered.
+
+**And seven of the eight messages already claim the check this does not make** — they read *"must be a
+calendar date in YYYY-MM-DD form"*. That is § 1.50's shape appearing inside a validation message: the
+message is the promise, and the regex is what is enforced. An administrator reading the refusal has every
+reason to believe the date was checked.
+
+#### Fixed: the two sites where the value is STORED and something depends on it
+
+- **`SlaHoliday.observedOn`** — the deadline consequence above. `@IsCalendarDate()` (new,
+  `common/is-calendar-date.validator.ts`) now sits beside the `@Matches`, deliberately as a SECOND
+  decorator so "that is not a date" and "that day does not exist" stay two different messages.
+- **`CommissionAgreement.effectiveFrom`** — the money consequence. Its service already guarded
+  `Number.isNaN`, so the two loud cases were 422s rather than 500s, and **the rollover went straight
+  through**: `effectiveFrom` decides which agreement governs a policy, so a typo of 30 February silently
+  moves the date the broker's commission rate starts applying from.
+
+The check is a **round trip** — parse as a whole UTC day, require the ISO date back out to be
+byte-identical — because it is the only form that catches all three: a rollover changes the string, and an
+invalid date has none. A NaN check catches two of the three and misses the one that matters, which is
+exactly the state the commission service was in.
+
+#### Recorded, not fixed: the six remaining sites
+
+`asOf` on `financial-report-query`, `insurer-payables-query`, `receivables-ageing-query`,
+`claims-dashboard-query`, `executive-dashboard-query`, `financial-dashboard-query`. All are **query
+parameters on read-only reports**, so the consequence is a report window silently shifted by a day or two,
+or a 500 — bad, and not the same as a stored compliance or commission fact. Changing six report endpoints'
+refusal behaviour is a separate decision from fixing the two writers, and bundling them would have put a
+behaviour change to the finance and executive dashboards inside a commit about the holiday calendar.
+**`isCalendarDate` is exported and one decorator away from each of them.**
+
+#### The two lessons, and one is about my own test
+
+**A random fixture is a test that runs a different case each time.** `Math.random() * 9` gave a 1-in-9
+chance of an invalid date; eight runs of nine prove nothing about the ninth. Where a test needs a distinct
+value per run, derive it from something that cannot be out of range, or assert the generated value is
+valid before using it. The fixture is now `1 + Math.floor(Math.random() * 8)`, and the invalid dates are a
+deliberate test of their own rather than an accident.
+
+**And this is the argument for CI restated with evidence** (`verification-contract.md`): the local run was
+green, twice, on the same code. The only thing that differed was which date the generator happened to
+pick. A gate that runs the same code against a different random draw is a different gate.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

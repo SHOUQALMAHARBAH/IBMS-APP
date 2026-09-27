@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { isCalendarDate } from '../../common/is-calendar-date.validator';
 import { Prisma } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
@@ -246,13 +247,20 @@ export class CommissionAgreementService {
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
       );
     }
-    const parsed = new Date(`${raw}T00:00:00.000Z`);
-    if (Number.isNaN(parsed.getTime())) {
+    // A ROUND TRIP, not just a NaN check. The NaN check alone catches
+    // `2026-13-01` and `2032-04-00`, and misses the one that matters:
+    // `2026-02-30` parses cleanly to 2 MARCH. On this field that is not cosmetic
+    // — `effectiveFrom` decides which agreement governs a policy, so an
+    // administrator typing 30 February would silently set the date the broker's
+    // commission rate starts applying from, and the stored record would show a
+    // day she never entered. Found while fixing the same hole on the holiday
+    // calendar (IMPROVEMENTS § 1.64).
+    if (!isCalendarDate(raw)) {
       throw new UnprocessableEntityException(
         `effectiveFrom ${raw} is not a valid calendar date.`,
       );
     }
-    return parsed;
+    return new Date(`${raw}T00:00:00.000Z`);
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {

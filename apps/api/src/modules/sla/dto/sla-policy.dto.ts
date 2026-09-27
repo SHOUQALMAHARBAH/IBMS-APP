@@ -14,6 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { IsCalendarDate } from '../../../common/is-calendar-date.validator';
 import { Transform, Type } from 'class-transformer';
 import { emptyStringToUndefined, trimIfString } from '../../../common/dto.util';
 
@@ -296,6 +297,13 @@ export class CreateSlaHolidayDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'observedOn must be a YYYY-MM-DD date',
   })
+  // AND a day that exists. The regex above accepts `2026-02-30`, which
+  // `new Date` silently rolls forward to 2 March — so a holiday would be stored
+  // on a day nobody typed, and every business-day deadline in the office would
+  // count against the wrong date. `2026-13-01` and `2032-04-00` are worse-looking
+  // and less dangerous: they produce an Invalid Date and a 500, which somebody
+  // reports. See `is-calendar-date.validator.ts`.
+  @IsCalendarDate()
   observedOn!: string;
 
   @Transform(trimIfString)

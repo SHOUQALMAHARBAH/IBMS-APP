@@ -309,7 +309,12 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     // And nothing audited a holiday, while editing one policy's duration was
     // audited — even though a single holiday row moves EVERY business-day
     // deadline in the office at once.
-    const observedOn = `2032-04-0${Math.floor(Math.random() * 9)}`;
+    // 1 + 0..8, never day 00. THE ORIGINAL WAS `Math.floor(Math.random() * 9)`,
+    // which produces `2032-04-00` one run in nine — a shape-valid date that is
+    // not a day. It passed locally and made CI red, and chasing it found the real
+    // defect underneath: nothing validated that a date EXISTS (see the test
+    // below, and `is-calendar-date.validator.ts`).
+    const observedOn = `2032-04-0${1 + Math.floor(Math.random() * 8)}`;
     const name = `E2E duplicate holiday ${RUN}`;
 
     const created = await request(app.getHttpServer())
@@ -348,6 +353,42 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
 
     await prisma.slaHoliday.deleteMany({
       where: { name: { startsWith: name } },
+    });
+  });
+
+  it('refuses a date that is shaped like a day but is not one', async () => {
+    // FOUND BY CI, from a bad date in the test above rather than from reading.
+    //
+    // `@Matches(/^\d{4}-\d{2}-\d{2}$/)` is the established spelling for a
+    // whole-day field across this api, and it admits three non-dates. The 400s
+    // below are the point; the SILENT one is why this test exists at all:
+    // `2026-02-30` parses to 2 March, so without the guard an administrator
+    // typing 30 February would have a non-working day recorded on a day she never
+    // entered, and every business-day deadline in the office would count against
+    // it.
+    for (const bad of [
+      '2032-04-00',
+      '2026-13-01',
+      '2026-02-30',
+      '2026-04-31',
+    ]) {
+      await request(app.getHttpServer())
+        .post('/sla/holidays')
+        .set(bearer(compliance.accessToken))
+        .send({ observedOn: bad, name: `E2E bad date ${RUN}` })
+        .expect(400);
+    }
+
+    // POSITIVE ANCHOR: a real day in the same shape is still accepted, so the
+    // four refusals above are about the dates and not about the route.
+    await request(app.getHttpServer())
+      .post('/sla/holidays')
+      .set(bearer(compliance.accessToken))
+      .send({ observedOn: '2032-02-29', name: `E2E leap day ${RUN}` })
+      .expect(201);
+
+    await prisma.slaHoliday.deleteMany({
+      where: { name: { contains: `day ${RUN}` } },
     });
   });
 
