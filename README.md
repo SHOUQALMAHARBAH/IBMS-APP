@@ -4133,6 +4133,41 @@ condition is `refundIsPayable`, exported and unit-tested, because a below-thresh
 with `approvedByUserId` left NULL and a condition that only checked for an approver would make every small
 refund unpayable.
 
+**A statutory clock can be stopped, and a stopped one no longer reads as a breach (2026-09-27).**
+`POST /sla/timers/:id/{pause,resume}` had no web caller; pause/resume controls now sit on
+`/sla-dashboard`, gated on `sla.timer.pause`, with a mandatory ten-character reason sent trimmed and the
+stated basis rendered beside the stopped clock. Closing it exposed `IMPROVEMENTS.md` § 1.60: the dashboard
+was PAUSE-BLIND. `classifyTimer` compared raw `dueAt`, so a paused timer reported `breached`, `overdueDays`
+was inflated by the whole pause, and a timer resolved inside its adjusted deadline reported
+`resolved_late` — which never changes again and feeds `breachRate` forever. No figure had ever been wrong
+(measured: 327 timers, none ever paused), and giving pause a button is what would have made them wrong.
+
+**The sanctions review queue can decide a match (2026-09-27).** Five `screening/matches/:id/*` routes had
+no web caller, and the consequence was worse than missing conveniences: `decide()` refuses unless the case
+is `UNDER_REVIEW` or `ESCALATED`, every route to those states was one of the five, so every match sat at
+`OPEN` and the queue's only control returned 422 every time. `ScreeningCasePanel` now carries assign /
+start-review / escalate / notes, the list view carries the case workflow it had been omitting, and
+`GET /screening/reviewers` sources the assignee picker (its own route, because a Compliance Officer does
+not hold `user.manage`). `IMPROVEMENTS.md` § 1.62 — where the sharpest finding is that a fully green api
+e2e over the whole workflow is what kept this invisible.
+
+**An office can enter Eid (2026-09-27).** `GET`/`POST /sla/holidays` had no web caller: a "Non-working
+days" section now sits on `/sla-policies` (measured placement — every holder of `sla.holiday.create` also
+holds `sla.policy.read`). While the calendar is empty the section renders an ALERT, not an empty state,
+saying that every business-day deadline is computed as though Fridays were the only non-working days and
+that the resulting figures overstate the brokerage's own lateness. The gazetted dates remain the office's
+to supply, so `IMPROVEMENTS.md` § 1.57 is half closed, not closed. Closing the route found that a
+duplicate date was a 500 and that adding a holiday was not audited.
+
+**A bad sanctions-list ingest can be rolled back, and the act is now audited (2026-09-27).**
+`GET /watchlist-sync/datasets` and `POST /watchlist-sync/datasets/:id/rollback` had no web caller, and the
+rollback — the module's own "most consequential manual override", which decides that the newest available
+list is NOT the one screening runs against — wrote no audit row at all, only a `logger.warn`. A "List
+generations" section on `/watchlist-sync` closes it; `IMPROVEMENTS.md` § 1.63. The control is offered only
+on a generation that is SUPERSEDED and still carries rows, because a generation past the retention window
+is still LISTED and restoring it would leave screening running against nothing — which looks exactly like
+screening that cleared everybody.
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold

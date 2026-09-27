@@ -510,12 +510,28 @@ describe('Part B — dataset operations are permission-gated', () => {
       .send({})
       .expect(400);
 
+    const REASON = 'The newer feed was truncated; reverting to 18:00.';
     const res = await request(application.getHttpServer())
       .post(`/watchlist-sync/datasets/${good.id}/rollback`)
       .set(bearer(compliance.accessToken))
-      .send({ reason: 'The newer feed was truncated; reverting to 18:00.' })
+      .send({ reason: REASON })
       .expect(201);
     expect((res.body as { status: string }).status).toBe('PUBLISHED');
     expect(await visibleNames()).toEqual([...OLD].sort());
+
+    // AND IT IS AUDITED. Until 2026-09-27 the only record of the module's own
+    // "most consequential manual override" was a `logger.warn` — which is not
+    // queryable from the audit screen, not covered by `AuditLogEntry`'s
+    // immutability trigger, and not retained on the same terms. "Who decided we
+    // screen against last month's list, and why" is what an examiner asks.
+    const audit = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'WatchlistDatasetVersion', entityId: good.id },
+    });
+    expect(audit).toHaveLength(1);
+    expect(audit[0].userId).toBe(compliance.id);
+    expect(JSON.stringify(audit[0].afterValue)).toContain(REASON);
+    // BOTH SIDES: the row has to say which list was given up, not only which one
+    // is now live.
+    expect(JSON.stringify(audit[0].beforeValue)).toContain(next.version);
   });
 });

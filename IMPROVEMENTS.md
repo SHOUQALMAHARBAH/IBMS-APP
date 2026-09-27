@@ -2837,7 +2837,7 @@ see. Ordered by consequence:**
 
 | `GET /client-decisions/:id` | 1 | The web POSTs to `/client-decisions` and never reads one back. |
 | `GET /feedback/:id` | 1 | The list is called; the single-feedback read is not. |
-| `watchlist-sync/datasets` + `datasets/:id/rollback` | 2 | The web calls `/watchlist-sync/run` and `/status` only. **Rolling back a bad sanctions-list ingest is not reachable**, which belongs beside § 1.58's obligation 1. |
+| ~~`watchlist-sync/datasets` + `datasets/:id/rollback`~~ | 2 | ~~The web calls `/watchlist-sync/run` and `/status` only. **Rolling back a bad sanctions-list ingest is not reachable.**~~ **CLOSED 2026-09-27** — a "List generations" section on `/watchlist-sync`, and § 1.63: the module's own "most consequential manual override" wrote **no audit row**, only a `logger.warn`. |
 
 Every one of those was confirmed by hand as having zero web mentions, not taken from the script's word.
 
@@ -3719,6 +3719,62 @@ button is ALSO disabled while the reason is too short: asserting `toBeDisabled()
 tell the two causes apart. The test now types a valid reason first, so the only remaining cause is the
 case state, and the re-planted gate kills it. **The same shape as "nine characters, not zero": an
 assertion has to isolate the one cause it claims to be about.**
+
+
+### 1.63 `P1` — THE MOST CONSEQUENTIAL OVERRIDE IN THE SANCTIONS MODULE WROTE NO AUDIT ROW, AND NOTHING COULD REACH IT
+
+`POST /watchlist-sync/datasets/:id/rollback` republishes an earlier generation of a sanctions list — it
+decides that the newest available list is **not** the one screening runs against. The service's own header
+calls it *"the most consequential manual override in this module"*. Two things were true of it:
+
+1. **No web caller** (§ 1.44). An office that received a truncated or corrupted list had no way back to
+   the last good generation from inside the application.
+2. **No audit row.** `watchlist-sync.service.ts` contained no reference to `AuditService` at all. The only
+   record was a `this.logger.warn`.
+
+**An application log is not the audit trail**, and the difference is not stylistic: it is not queryable
+from the audit screen, it is not covered by the immutability trigger on `AuditLogEntry`, and it is not
+retained on the same terms. *"Who decided we screen against last month's list, and why"* is a question an
+AML examiner asks, and the answer lived in a log file.
+
+Both closed: a "List generations" section on `/watchlist-sync` with a mandatory ten-character reason, and
+a `CREATE`-shaped `UPDATE` audit row carrying **both sides** — the version given up and the version
+restored — plus the reason and the surviving row count. A row naming only the new version cannot answer
+what was given up.
+
+#### A CLAIM I WROTE FIVE TIMES AND HAD TO CORRECT
+
+I recorded, in five separate comments, that the rollback *"had no test of any kind"*. **That was false, and
+it was false because I read the output of `grep ... | head -4`** — the matching file was below the cut.
+`watchlist-dataset-lifecycle.e2e-spec.ts` covers the rollback through HTTP: 403 for a Sales Officer, 400
+with no reason, 201 with one, and the generation becoming live again.
+
+What was genuinely missing, checked properly this time: the two **state** refusals (not-SUPERSEDED, and
+rows reclaimed by retention) had no coverage at any level, and nothing asserted the audit row because
+there was none. All five comments are corrected in place rather than deleted, because the distinction
+between "untested" and "partly tested" is the whole content.
+
+**The lesson is the one this file already carries about measurements, applied to my own reading: `head` on
+a grep is a truncation, and a truncated search that returns nothing reads exactly like a search that found
+nothing.** It is the same failure shape as § 1.51(a) — an absent result and a negative result are
+indistinguishable unless you check which one you have. I had already been bitten by this once this
+session, on the web `AuditAction` enum, where `grep -A26` cut the enum short and I reported one missing
+value where there were three.
+
+#### The refusal that is a trap, and why the screen is conditional
+
+The service refuses three ways, and the third is not symmetrical with the others: **a generation past the
+retention window is still LISTED** — so it looks available — while its rows are gone. Restoring it would
+leave screening running against nothing, and **screening that finds nobody is indistinguishable from
+screening that cleared everybody.** So the screen offers the control only on a generation that is
+SUPERSEDED *and* still carries rows, and states the reason on the ones it refuses — because "why can I not
+restore this one" is exactly what a listed generation provokes. The server's live count remains the
+authority, and its 422 is rendered rather than swallowed.
+
+**Nine plants, each killing one named test**: four on the api half (the SUPERSEDED check, the retention
+check, the audit call — killed at both unit and HTTP level — and the audit row's `beforeValue`), five on
+the web half (both halves of the restorable condition, the reason floor, the trim, and the swallowed
+server refusal).
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

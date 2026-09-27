@@ -1,0 +1,47 @@
+{
+  "rollback-allows-a-non-superseded-generation": {
+    "file": "apps/api/src/modules/compliance-risk/watchlist-sync.service.ts",
+    "from": "    if (target.status !== 'SUPERSEDED') {",
+    "to": "    if (false) {"
+  },
+  "rollback-ignores-retention": {
+    "file": "apps/api/src/modules/compliance-risk/watchlist-sync.service.ts",
+    "from": "    if (remaining === 0) {",
+    "to": "    if (false) {"
+  },
+  "rollback-not-audited": {
+    "file": "apps/api/src/modules/compliance-risk/watchlist-sync.service.ts",
+    "from": "      await this.audit.record({\n        userId: actorUserId,\n        action: 'UPDATE',\n        entityType: 'WatchlistDatasetVersion',",
+    "to": "      await Promise.resolve({\n        userId: actorUserId,\n        action: 'UPDATE',\n        entityType: 'WatchlistDatasetVersion',"
+  },
+  "rollback-audit-drops-the-old-version": {
+    "file": "apps/api/src/modules/compliance-risk/watchlist-sync.service.ts",
+    "from": "          publishedVersion: current?.version ?? null,",
+    "to": "          publishedVersion: null,"
+  },
+  "restore-offered-though-rows-were-reclaimed": {
+    "file": "apps/web/lib/compliance-risk/watchlist-sync-api.ts",
+    "from": "  return d.status === 'SUPERSEDED' && (d.recordCount ?? 0) > 0;",
+    "to": "  return d.status === 'SUPERSEDED';"
+  },
+  "restore-offered-on-the-live-generation": {
+    "file": "apps/web/lib/compliance-risk/watchlist-sync-api.ts",
+    "from": "  return d.status === 'SUPERSEDED' && (d.recordCount ?? 0) > 0;",
+    "to": "  return (d.recordCount ?? 0) > 0;"
+  },
+  "restore-reason-floor-ignored": {
+    "file": "apps/web/components/compliance-risk/WatchlistGenerations.tsx",
+    "from": "                            disabled={busy || !rollbackReasonIsValid(reason)}",
+    "to": "                            disabled={busy}"
+  },
+  "restore-reason-sent-untrimmed": {
+    "file": "apps/web/lib/compliance-risk/watchlist-sync-api.ts",
+    "from": "    reason: reason.trim(),\n  });\n}\n\n/** The DTO's floor.",
+    "to": "    reason,\n  });\n}\n\n/** The DTO's floor."
+  },
+  "server-refusal-swallowed": {
+    "file": "apps/web/components/compliance-risk/WatchlistGenerations.tsx",
+    "from": "        setActionError(\n          err instanceof ApiError ? err.message : t('wsRestoreError'),\n        );",
+    "to": "        setActionError(t('wsRestoreError'));"
+  }
+}

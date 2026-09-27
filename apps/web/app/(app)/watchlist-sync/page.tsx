@@ -10,6 +10,7 @@ import {
   runWatchlistSync,
   type WatchlistSyncRun,
 } from '../../../lib/compliance-risk/watchlist-sync-api';
+import { WatchlistGenerations } from '../../../components/compliance-risk/WatchlistGenerations';
 import { ApiError } from '../../../lib/auth/api-client';
 import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
@@ -155,7 +156,7 @@ export default function WatchlistSyncPage() {
         runs.length === 0 ? (
           <p style={{ color: 'var(--ink-secondary)' }}>{t('wsNone')}</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto' }} data-testid="watchlist-runs">
             <table style={{ borderCollapse: 'collapse', minWidth: '40rem' }}>
               <thead>
                 <tr>
@@ -188,6 +189,12 @@ export default function WatchlistSyncPage() {
         // and a "Loading…" line never appear together.
         <p>{t('wsLoading')}</p>
       )}
+
+      {/* The generations behind the runs above, and the way back to an earlier
+        * one. Same permission as the rest of this screen (`sanctions-pep.screen`
+        * gates all four routes), so no separate gate is needed — which is why
+        * this is a section here rather than a screen of its own. */}
+      <WatchlistGenerations />
     </main>
   );
 }

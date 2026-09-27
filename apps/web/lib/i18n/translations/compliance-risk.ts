@@ -52,6 +52,27 @@ export const COMPLIANCE_RISK = {
     wsColSource: 'المصدر',
     wsColStatus: 'الحالة',
     wsColRecords: 'السجلات',
+    wsGenerationsHeading: 'إصدارات القوائم',
+    wsGenerationsIntro:
+      'كل تنزيل للقائمة يُحفظ كإصدار. الإصدار المنشور هو الذي يجري الفحص ' +
+      'مقابله الآن.',
+    wsGenerationsNone: 'لا توجد إصدارات بعد — لم تُنفَّذ أي مزامنة.',
+    wsColVersion: 'الإصدار',
+    wsColDownloaded: 'نُزّل في',
+    wsColGenerationStatus: 'الحالة',
+    wsRestore: 'استعادة هذا الإصدار',
+    wsRestoreReason: 'سبب استعادة قائمة أقدم (١٠ أحرف على الأقل)',
+    wsRestoreReasonHint:
+      'استعادة إصدار أقدم تُضيّق ما يمكن أن يكتشفه الفحص. اذكر ما حدث للإصدار ' +
+      'الأحدث — السبب يُسجَّل في سجل التدقيق ويُنسب إليك.',
+    wsRestoreConfirm: 'تأكيد الاستعادة',
+    wsCancel: 'إلغاء',
+    wsRestoreError: 'تعذّرت استعادة هذا الإصدار.',
+    wsGenerationsLoadError: 'تعذّر تحميل إصدارات القوائم — حاول مرة أخرى.',
+    wsRestoreUnavailable:
+      'لا يمكن الاستعادة إلا إلى إصدار سابق ما زالت سجلاته محفوظة.',
+    wsRolledBackFrom: 'استُعيد — السبب المسجَّل:',
+    wsGenerationsLoading: 'جارٍ تحميل الإصدارات…',
     wsColStarted: 'وقت البدء',
     wsColCompleted: 'وقت الانتهاء',
     wsLoading: 'جارٍ التحميل…',
@@ -337,6 +358,28 @@ export const COMPLIANCE_RISK = {
     wsColSource: 'Source',
     wsColStatus: 'Status',
     wsColRecords: 'Records',
+    wsGenerationsHeading: 'List generations',
+    wsGenerationsIntro:
+      'Every download of a list is kept as a generation. The PUBLISHED one is what ' +
+      'screening runs against right now.',
+    wsGenerationsNone: 'No generations yet — no sync has run.',
+    wsColVersion: 'Generation',
+    wsColDownloaded: 'Downloaded',
+    wsColGenerationStatus: 'Status',
+    wsRestore: 'Restore this generation',
+    wsRestoreReason: 'Reason for restoring an older list (min. 10 characters)',
+    wsRestoreReasonHint:
+      'Restoring an older generation narrows what screening can find. Say what was ' +
+      'wrong with the newer one — the reason is written to the audit log and ' +
+      'attributed to you.',
+    wsRestoreConfirm: 'Confirm restore',
+    wsCancel: 'Cancel',
+    wsRestoreError: 'Could not restore that generation.',
+    wsGenerationsLoadError: 'Could not load the list generations — try again.',
+    wsRestoreUnavailable:
+      'Only a superseded generation whose records are still held can be restored.',
+    wsRolledBackFrom: 'Restored — recorded reason:',
+    wsGenerationsLoading: 'Loading generations…',
     wsColStarted: 'Started',
     wsColCompleted: 'Completed',
     wsLoading: 'Loading…',

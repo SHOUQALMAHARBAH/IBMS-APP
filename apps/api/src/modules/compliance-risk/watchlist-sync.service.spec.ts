@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { WatchlistDatasetVersionRepository } from '../../repositories/watchlist-dataset-version.repository';
 import { Prisma } from '@ibms/db';
 import { WatchlistSyncService } from './watchlist-sync.service';
+import type { AuditService } from '../audit/audit.service';
 import type { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import type {
   OfacSdnFetcher,
@@ -58,6 +59,7 @@ function makeService(
   // never blocks the 1-record OFAC_SAMPLE/UN_SAMPLE fixtures below by
   // default — tests targeting the floor itself override this explicitly.
   const findLastSuccessfulRun = vi.fn().mockResolvedValue({ recordCount: 1 });
+  const countByDatasetVersion = vi.fn().mockResolvedValue(0);
   const entries = {
     createSyncRun,
     completeSyncRun,
@@ -67,6 +69,7 @@ function makeService(
     findLatestSyncRuns,
     findLastSuccessfulRun,
     ...over.entries,
+    countByDatasetVersion,
   } as unknown as WatchlistEntryRepository;
 
   const ofac = {
@@ -97,8 +100,10 @@ function makeService(
   const countNewAgainstPublished = vi.fn().mockResolvedValue(0);
   const publish = vi.fn().mockResolvedValue({ id: 'ver-1' });
   const pruneRetired = vi.fn().mockResolvedValue(0);
+  const findVersionById = vi.fn().mockResolvedValue(null);
   const versions = {
     create: createVersion,
+    findById: findVersionById,
     findPublished,
     markValidated,
     markRejected,
@@ -107,10 +112,19 @@ function makeService(
     pruneRetired,
   } as unknown as WatchlistDatasetVersionRepository;
 
-  const service = new WatchlistSyncService(entries, versions, ofac, un);
+  // The rollback writes an audit row — republishing an older sanctions list is
+  // the module's most consequential manual override, and until 2026-09-27 its
+  // only record was a `logger.warn`.
+  const auditRecord = vi.fn().mockResolvedValue(undefined);
+  const audit = { record: auditRecord } as unknown as AuditService;
+
+  const service = new WatchlistSyncService(entries, versions, ofac, un, audit);
   return {
     service,
     mocks: {
+      auditRecord,
+      findVersionById,
+      countByDatasetVersion,
       createSyncRun,
       completeSyncRun,
       upsertMany,
@@ -346,5 +360,135 @@ describe('WatchlistSyncService.runSync (Process 49)', () => {
       [],
       'ver-1',
     );
+  });
+});
+
+/*
+ * REPUBLISHING AN OLDER SANCTIONS LIST — the module's own comment calls it "the
+ * most consequential manual override in this module", and until 2026-09-27 it had
+ * no web caller and wrote no audit row (IMPROVEMENTS § 1.44, § 1.63).
+ *
+ * WHAT WAS AND WAS NOT ALREADY TESTED — corrected after checking rather than
+ * asserted: `watchlist-dataset-lifecycle.e2e-spec.ts` already covers the happy
+ * path, the mandatory reason and the RBAC refusal. What it does NOT cover is the
+ * two STATE refusals, which is what the tests below add.
+ *
+ * Those refusals are three different operator problems and are asserted
+ * separately, because a single "it refuses" test cannot tell them apart — and the
+ * retention one is the case an operator actually hits.
+ */
+describe('rollbackDataset', () => {
+  const SUPERSEDED = {
+    id: 'ver-old',
+    source: 'OFAC_SDN',
+    status: 'SUPERSEDED',
+    version: '2026-08-01',
+  };
+
+  it('refuses a generation that does not exist', async () => {
+    const { service, mocks } = makeService();
+    mocks.findVersionById.mockResolvedValue(null);
+    await expect(
+      service.rollbackDataset('nope', 'A stated reason, long enough', 'user-1'),
+    ).rejects.toThrow(/not found/i);
+    expect(mocks.publish).not.toHaveBeenCalled();
+  });
+
+  it('refuses a generation that is not SUPERSEDED, naming its status', async () => {
+    // Republishing the already-live one is a no-op dressed as an action, and a
+    // REJECTED one was refused for a reason.
+    const { service, mocks } = makeService();
+    mocks.findVersionById.mockResolvedValue({
+      ...SUPERSEDED,
+      status: 'PUBLISHED',
+    });
+    await expect(
+      service.rollbackDataset(
+        'ver-old',
+        'A stated reason, long enough',
+        'user-1',
+      ),
+    ).rejects.toThrow(/PUBLISHED/);
+    expect(mocks.publish).not.toHaveBeenCalled();
+  });
+
+  it('refuses a generation whose rows retention has already reclaimed', async () => {
+    // THE ONE AN OPERATOR ACTUALLY HITS. The generation is still listed, so it
+    // looks available; its entries are gone, so restoring it would leave
+    // screening running against nothing. A silent success here would be the worst
+    // outcome available — screening that finds nobody looks exactly like
+    // screening that cleared everybody.
+    const { service, mocks } = makeService();
+    mocks.findVersionById.mockResolvedValue(SUPERSEDED);
+    mocks.countByDatasetVersion.mockResolvedValue(0);
+    await expect(
+      service.rollbackDataset(
+        'ver-old',
+        'A stated reason, long enough',
+        'user-1',
+      ),
+    ).rejects.toThrow(/no records left/i);
+    expect(mocks.publish).not.toHaveBeenCalled();
+  });
+
+  it('republishes the generation and AUDITS the act with its stated reason', async () => {
+    const { service, mocks } = makeService();
+    mocks.findVersionById.mockResolvedValue(SUPERSEDED);
+    mocks.countByDatasetVersion.mockResolvedValue(4231);
+    mocks.findPublished.mockResolvedValue({
+      id: 'ver-current',
+      version: '2026-09-01',
+    });
+    mocks.publish.mockResolvedValue({ ...SUPERSEDED, status: 'PUBLISHED' });
+
+    const REASON = 'The 2026-09-01 ingest truncated the SDN list at 400 rows';
+    await service.rollbackDataset('ver-old', REASON, 'user-1');
+
+    expect(mocks.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'ver-old',
+        publishedByUserId: 'user-1',
+        rolledBackFromId: 'ver-current',
+        rollbackReason: REASON,
+      }),
+    );
+
+    // The audit row is the point: an application log is not the audit trail —
+    // not queryable from the audit screen, not covered by the immutability
+    // trigger, not retained on the same terms. "Who decided we screen against
+    // last month's list, and why" is what an examiner asks.
+    expect(mocks.auditRecord).toHaveBeenCalledTimes(1);
+    const row = mocks.auditRecord.mock.calls[0][0] as {
+      userId: string;
+      action: string;
+      entityType: string;
+      beforeValue: { publishedVersion: string | null };
+      afterValue: { rollbackReason: string; publishedVersion: string };
+    };
+    expect(row.userId).toBe('user-1');
+    expect(row.entityType).toBe('WatchlistDatasetVersion');
+    // BOTH SIDES: which list we were on, and which we moved to. A row carrying
+    // only the new version cannot answer what was given up.
+    expect(row.beforeValue.publishedVersion).toBe('2026-09-01');
+    expect(row.afterValue.publishedVersion).toBe('2026-08-01');
+    expect(row.afterValue.rollbackReason).toBe(REASON);
+  });
+
+  it('does not fail the rollback when the audit write fails', async () => {
+    // The rollback has committed and screening has already moved, so reporting a
+    // failure now would describe something that did happen as not having happened.
+    const { service, mocks } = makeService();
+    mocks.findVersionById.mockResolvedValue(SUPERSEDED);
+    mocks.countByDatasetVersion.mockResolvedValue(10);
+    mocks.publish.mockResolvedValue({ ...SUPERSEDED, status: 'PUBLISHED' });
+    mocks.auditRecord.mockRejectedValue(new Error('audit down'));
+
+    await expect(
+      service.rollbackDataset(
+        'ver-old',
+        'A stated reason, long enough',
+        'user-1',
+      ),
+    ).resolves.toMatchObject({ id: 'ver-old' });
   });
 });

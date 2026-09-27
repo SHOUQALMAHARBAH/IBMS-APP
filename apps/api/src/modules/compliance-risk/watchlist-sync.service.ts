@@ -10,6 +10,7 @@ import type { WatchlistSource, WatchlistSyncRun } from '@ibms/db';
 import { WatchlistEntryRepository } from '../../repositories/watchlist-entry.repository';
 import type { WatchlistDatasetVersion } from '@ibms/db';
 import { WatchlistDatasetVersionRepository } from '../../repositories/watchlist-dataset-version.repository';
+import { AuditService } from '../audit/audit.service';
 import { validateDataset } from './watchlist-dataset.config';
 import { OfacSdnFetcher, UnConsolidatedFetcher } from './watchlist-fetchers';
 import {
@@ -54,6 +55,7 @@ export class WatchlistSyncService {
     private readonly versions: WatchlistDatasetVersionRepository,
     private readonly ofac: OfacSdnFetcher,
     private readonly un: UnConsolidatedFetcher,
+    private readonly audit: AuditService,
   ) {}
 
   /** Syncs both sources, each independently. Never throws — a scheduler
@@ -279,6 +281,46 @@ export class WatchlistSyncService {
     this.logger.warn(
       `Watchlist ROLLBACK (${target.source}): ${current?.version ?? '(none)'} -> ${restored.version} by ${actorUserId}. Screening now runs against the restored generation.`,
     );
+
+    // AUDITED, which it was not.
+    //
+    // This service's own comment calls the rollback "the most consequential
+    // manual override in this module" — it decides that the newest available
+    // sanctions list is NOT the one screening runs against — and the only record
+    // of it was the `logger.warn` above. An application log is not the audit
+    // trail: it is not queryable from the audit screen, it is not covered by the
+    // immutability trigger on `AuditLogEntry`, and it is not retained on the same
+    // terms. "Who decided we screen against last month's list, and why" is
+    // exactly the question an AML examiner asks.
+    //
+    // Best-effort, after the write, on the established pattern: the rollback has
+    // committed and screening has already moved, so failing the request now would
+    // report a failure for something that happened.
+    try {
+      await this.audit.record({
+        userId: actorUserId,
+        action: 'UPDATE',
+        entityType: 'WatchlistDatasetVersion',
+        entityId: restored.id,
+        beforeValue: {
+          source: target.source,
+          publishedVersion: current?.version ?? null,
+        },
+        afterValue: {
+          source: target.source,
+          publishedVersion: restored.version,
+          rolledBackFromId: current?.id ?? null,
+          // The stated basis IS the control here: an older sanctions list is a
+          // deliberate narrowing of what screening can find.
+          rollbackReason: reason,
+          recordsAvailable: remaining,
+        },
+      });
+    } catch (err) {
+      this.logger.error(
+        `Watchlist rollback audit failed after the rollback committed: ${(err as Error).message}`,
+      );
+    }
     return restored;
   }
 }
