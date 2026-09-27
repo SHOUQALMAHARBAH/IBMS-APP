@@ -240,7 +240,11 @@ test("four-state screenshots: /watchlist-sync (item #2 RTL layout mirroring)", a
     route.fulfill({ status: 403, json: { message: "no" } }),
   );
   await page.goto(page.url());
-  await expect(page.locator('p[role="alert"]')).toBeVisible();
+  // TWO alerts now, and both are correct: the sync-runs load and the list-generations
+  // load are independent reads of the same screen, and a 403 fails both. Asserting a
+  // COUNT rather than `.first()` keeps this honest — it says "the error state is
+  // reported", and it would notice a section that silently rendered nothing.
+  await expect(page.locator('p[role="alert"]')).toHaveCount(2);
   await capture(page, "watchlist-sync", "error");
   await page.unroute("http://localhost:4000/watchlist-sync/status**");
 

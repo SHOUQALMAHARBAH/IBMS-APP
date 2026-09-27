@@ -205,7 +205,14 @@ test("shows business days as the unit, not raw hours", async ({ page }) => {
 
   await page.goto("/sla-policies");
 
-  await expect(page.getByText("business days")).toBeVisible();
+  // SCOPED to the policies table, not weakened. This test is about the DURATION
+  // rendering as a unit rather than raw hours, and the phrase now also appears in
+  // the non-working-days section's own intro ("every deadline measured in business
+  // days is counted against this calendar") — a second legitimate match, which
+  // makes a page-wide query ambiguous rather than wrong.
+  await expect(
+    page.getByRole("table").first().getByText("business days"),
+  ).toBeVisible();
 });
 
 test("a read-only role sees the policies but cannot edit them", async ({
