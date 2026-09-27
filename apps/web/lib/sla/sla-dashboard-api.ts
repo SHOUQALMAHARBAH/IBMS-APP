@@ -11,6 +11,10 @@ export const SLA_TIMER_LEAF_STATES = [
   'due_soon',
   'breached',
   'escalated',
+  // A deliberately stopped clock. Its own state rather than a flag, because
+  // 'on_track' would claim it is running and 'breached' would report a breach
+  // that has not happened — which is what this screen used to show.
+  'paused',
   'resolved_on_time',
   'resolved_late',
 ] as const;
@@ -36,6 +40,7 @@ export interface SlaStateCounts {
   dueSoon: number;
   breached: number;
   escalated: number;
+  paused: number;
   resolvedOnTime: number;
   resolvedLate: number;
   openBreached: number;
@@ -89,6 +94,36 @@ export interface SlaTimerRow {
   createdAt: string;
   ageDays: number;
   overdueDays: number | null;
+
+  /* The API has returned all of the following since SLA policies landed and
+   * this interface omitted every one of them, so the screen could not show
+   * them and TypeScript could not say so: an interface that simply lacks a
+   * field the payload carries is a silent drop, not an error. `isRegulatory`
+   * is the sharpest — its own comment on the API side reads "a screen
+   * reporting a breach must be able to say whether what was breached is the
+   * law", and this screen could not. */
+
+  /** Pause-aware lifecycle status. `PAUSED` is the one `state` cannot express
+   * as anything but a guess. */
+  slaStatus:
+    | 'NOT_STARTED'
+    | 'ON_TRACK'
+    | 'APPROACHING_DUE'
+    | 'BREACHED'
+    | 'COMPLETED_WITHIN_SLA'
+    | 'COMPLETED_AFTER_SLA'
+    | 'PAUSED';
+  /** Milliseconds to the pause-adjusted deadline; negative once overdue, null
+   * while paused (a stopped clock has no countdown). */
+  remainingMs: number | null;
+  /** `dueAt` shifted by accumulated pause; `dueAt` itself never moves. */
+  effectiveDueAt: string;
+  pausedAt: string | null;
+  pauseReason: string | null;
+  /** TRUE only when the deadline came from a REGULATORY policy. */
+  isRegulatory: boolean;
+  sourceType: string | null;
+  policyCode: string | null;
 }
 
 export function getSlaDashboardSummary(): Promise<SlaDashboardSummary> {
@@ -127,27 +162,10 @@ export function formatSlaDuration(d: SlaDuration | null): string {
   return `${d.value} ${unit}${d.value === 1 ? '' : 's'}`;
 }
 
-const STATE_LABEL: Record<SlaTimerLeafState, string> = {
-  on_track: 'On track',
-  due_soon: 'Due soon',
-  breached: 'Breached',
-  escalated: 'Escalated',
-  resolved_on_time: 'Resolved on time',
-  resolved_late: 'Resolved late',
-};
-
-export function slaStateLabel(state: SlaTimerLeafState): string {
-  return STATE_LABEL[state] ?? state;
-}
-
-const STATE_FILTER_LABEL: Record<SlaTimerStateFilter, string> = {
-  ...STATE_LABEL,
-  open: 'Open (unresolved)',
-  open_breached: 'Breached or escalated',
-  at_risk: 'At risk (due soon / breached / escalated)',
-  resolved: 'Resolved (any)',
-};
-
-export function slaStateFilterLabel(filter: SlaTimerStateFilter): string {
-  return STATE_FILTER_LABEL[filter] ?? filter;
-}
+/* The English `STATE_LABEL` / `slaStateLabel` / `slaStateFilterLabel` trio was
+ * REMOVED here, not left dormant. The dashboard screen translates these through
+ * `STATE_FILTER_LABEL_KEY` and was the only consumer of `slaStateLabel`;
+ * `slaStateFilterLabel` had no consumer at all. On an Arabic-first platform a
+ * helper that returns hardcoded English is a trap a future screen would reach
+ * for exactly once, and the failure — an Arabic reader seeing "Resolved late" —
+ * is one no type or test catches. The vocabulary lives in the dictionary. */

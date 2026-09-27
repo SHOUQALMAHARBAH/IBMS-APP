@@ -2825,7 +2825,8 @@ see. Ordered by consequence:**
 |---|---|---|
 | ~~`POST /refunds/:id/disburse`~~ | 1 | ~~**Money leaves the office through this route and nothing can call it.**~~ **CLOSED 2026-09-27**, the first of the 33 on the owner's instruction, because it is the one with a balance attached. A "Pay refund" action on the endorsement's APPLIED state, gated on `refund.disburse` (FINANCE) — deliberately a different grant from `refund.approve` (Manager or Finance), so approving and paying are not one capability. The condition is `refundIsPayable`, exported and unit-tested rather than written inside the button, because three facts must agree and **the below-threshold branch is the one a reasonable condition gets wrong**: a refund under the value threshold is auto-cleared with `approvedByUserId` left NULL, so testing only for an approver would make every small refund permanently unpayable — and no endorsement fixture in the web e2e carries a refund at all, so nothing would have caught it. Planted both ways. |
 | `screening/matches/:id/{assign,escalate,notes,start-review,case}` | 5 | The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case to someone, escalate one, add a note, or open the case view. On an AML control, the workflow around the decision is the part that evidences it. |
-| `sla/timers/:id/{pause,resume,status}` | 3 | `sla.timer.pause` exists as a permission. **Pausing a statutory clock is exactly the act that must be visible and audited**, and it can only be done by constructing a request by hand. |
+| ~~`sla/timers/:id/{pause,resume}`~~ | 2 | ~~`sla.timer.pause` exists as a permission and can only be exercised by constructing a request by hand.~~ **CLOSED 2026-09-27**, second of the 33, and closing it found § 1.60: the dashboard was PAUSE-BLIND, so shipping the button without that fix would have introduced a false breach rather than found one. Pause/resume controls on `/sla-dashboard`, gated on `sla.timer.pause`, mandatory ten-character reason sent trimmed. The routes had no api e2e either — two now exist. |
+| `GET /sla/timers/:id/status` | 1 | **REDUNDANT SURFACE, NOT A MISSING CAPABILITY — and the distinction is a correction to this measurement.** It answers "where does this one timer stand, and is its deadline the law?", which is exactly the six fields `GET /sla-dashboard/timers` now carries per row (§ 1.60). Wiring a caller would add a request that duplicates one already made. **This list conflates two kinds of unreachable route**: a capability nobody can exercise (the refund disbursement, pause/resume, the screening queue) and a read whose answer another called route already returns. Only the first kind is a gap; the count is actionable only once they are separated, and the remaining rows have NOT been re-classified this way. |
 | `sla/holidays` (GET + POST) | 2 | § 1.57 — the calendar every business-day deadline is counted against. Found by hand first; this method finds it too. |
 | `insurer-masters/:id` and its form templates | 4 | The GLOBAL catalogue: view one, list/add its form templates. |
 | `insurers/:id/form-templates` | 3 | Already recorded above (Q9's UI). |
@@ -2834,7 +2835,19 @@ see. Ordered by consequence:**
 | `GET /access-recertification/cycles/:id/admin-items` | 1 | The administrator's view of a recertification cycle. |
 | `GET /security/encryption-keys` | 1 | The key inventory. |
 
+| `GET /client-decisions/:id` | 1 | The web POSTs to `/client-decisions` and never reads one back. |
+| `GET /feedback/:id` | 1 | The list is called; the single-feedback read is not. |
+| `watchlist-sync/datasets` + `datasets/:id/rollback` | 2 | The web calls `/watchlist-sync/run` and `/status` only. **Rolling back a bad sanctions-list ingest is not reachable**, which belongs beside § 1.58's obligation 1. |
+
 Every one of those was confirmed by hand as having zero web mentions, not taken from the script's word.
+
+**TWO CORRECTIONS TO THE TABLE ABOVE, both found by re-running the measurement rather than trusting the
+note.** (1) It listed `GET /sla-dashboard/timers` as unreachable. That was written from the output of the
+run BEFORE class 4 (the nested template literal) was closed — the very class the entry warns about — and
+the row has a caller. **A findings table assembled from a superseded run is the same defect as the one it
+was documenting.** (2) Four genuinely unreachable routes were never tabled at all, because the original
+entry listed only what it called the sharpest and the remainder were left in the script's output; they are
+added above. The count itself was right (33, now 30): what was wrong was which rows it named.
 
 **NOT MADE A GATE, deliberately.** A guard here would need a maintained allow-list of 33 entries that
 rots, and — more importantly — the matcher needed four corrections to stop libelling working screens.
@@ -3491,6 +3504,97 @@ has told us to bring a source for rather than supply.
 is named as the missing half rather than approximated. A state nothing reads is not a control, and
 shipping one while calling the requirement met would be the worst available outcome — a claim of
 enforcement with no enforcement behind it, which is § 1.50's shape on a control that matters more.
+
+
+### 1.60 `P1` — THE SLA DASHBOARD WAS PAUSE-BLIND: a stopped clock read BREACHED, and a timer resolved inside the deadline it actually had was recorded late FOREVER
+
+Found while closing `POST /sla/timers/:id/pause` (§ 1.44). The route being unreachable is precisely what
+had kept this invisible, and **giving it a button is what would have made the numbers wrong** — so both
+landed in one commit.
+
+`SlaTimerLeafState` — the dashboard's own bucketing — was computed by `classifyTimer` comparing raw
+`dueAt` against `now`. `dueAt` is deliberately never moved by a pause (`effectiveDueAt`'s contract: "when
+was this originally due?" and "how long did you actually have?" are different questions and both stay
+answerable). The pause-adjusted answer already existed, per row, as `slaStatus` / `effectiveDueAt` /
+`remainingMs`. **The dashboard used neither, in three places that matter differently:**
+
+1. **A paused timer past `dueAt` reported `breached`** — on the screen, in `tally`, and in `breachRate`.
+2. **A timer resolved after `dueAt` but INSIDE its adjusted deadline reported `resolved_late`.** This is
+   the serious one: `resolved_late` never changes again and sits in the numerator of `breachRate`, so it
+   is not a display glitch that clears on the next render but a **wrong compliance figure on the record**.
+3. **`overdueDays` was measured from `dueAt`**, inflating the figure by the entire pause. Proven: a timer
+   due 10 Jan, paused four days, read 16 Jan reported **6 days overdue where the answer is 2**.
+
+All three over-report lateness **against the brokerage** — the same direction as the empty holiday
+calendar (§ 1.57), and the same argument applies: the owner's own numbers were set to blame her.
+
+**AND IT WAS KNOWN AND PINNED.** A test asserted `expect(row.state).toBe('breached')` for a paused timer,
+commented *"the older bucketing, kept for continuity"*. That was defensible while nothing could pause —
+which was true, and measured before changing anything: **327 timers across dev and db-test, `pausedAt`
+null and `pausedTotalMs` 0 on every row, so no figure this product has ever shown was wrong.** The
+decision was not overruled on taste; its precondition was removed. The continuity that actually mattered
+is kept: `paused` is in the `open` filter group, so a paused timer still appears under the screen's
+default view instead of vanishing.
+
+`paused` is a leaf state of its own, not a flag, because **both alternatives assert something false**:
+`on_track` claims the clock is running, `breached` reports a breach that has not happened. It is counted
+in `SlaStateCounts` for a structural reason — `tally` increments `total` unconditionally, so a state with
+no bucket makes `total` silently exceed the sum of its parts — and appears in NEITHER half of
+`breachRate`, because a stopped clock has not yet reached a timeliness verdict.
+
+#### The second half: the web interface silently dropped SIX fields the API returns
+
+`SlaTimerRow` in `apps/web/lib/sla/sla-dashboard-api.ts` omitted `slaStatus`, `remainingMs`,
+`effectiveDueAt`, `isRegulatory`, `sourceType` and `policyCode`. **An interface that merely lacks a field
+the payload carries is not a type error** — it is a silent drop, and the screen could not render what it
+could not see. The sharpest is `isRegulatory`, whose comment on the API side reads *"a screen reporting a
+breach must be able to say whether what was breached is the law"* — and this screen, the one that reports
+breaches, could not. It now carries a `Regulatory` marker, asserted present on a regulatory row and
+absent on an internal-policy one in the same render.
+
+**The class, which is the reusable part:** a response-shape change on the api side that ADDS fields is
+invisible to the web forever. Nothing fails, nothing warns, and the capability simply never arrives. The
+`AuditAction` parity guard (§ 1.52) exists because of the same shape in the enum direction; there is no
+equivalent guard for a response interface, and building one is not attempted here — recorded as the gap.
+
+#### Also removed: two dead English-only labellers
+
+`slaStateLabel` was imported and unused after this change; `slaStateFilterLabel` had **no consumer at
+all**. Both returned hardcoded English. On an Arabic-first platform that is a trap a future screen reaches
+for exactly once, and the failure — an Arabic reader seeing "Resolved late" — is one no type or test
+catches. Deleted rather than left dormant. The screen's own key map was also tightened from
+`Record<string, TranslationKey>` to a total map over the union: as a loose map, adding a state compiled
+fine and rendered the raw word `paused`, which is § 1.45 exactly.
+
+**Proven by nine plants.** Three on the api half (the pause branch dropped → `expected 'on_track' to be
+'paused'`; the resolved comparison reverted to raw `dueAt` → `expected 'resolved_late' to be
+'resolved_on_time'`, killed at BOTH the unit and HTTP levels; the overdue measurement reverted →
+`expected 6 to be 2`), five on the web half (the ten-character floor, the trim, the permission check, the
+regulatory marker, the resume condition), each killing exactly one named test.
+
+### 1.61 `P2` — THE DPO HOLDS `sla.timer.pause` AND CANNOT OPEN THE SCREEN THE CONTROL IS ON
+
+Measured while choosing which role to write the § 1.60 tests against. Three roles hold `sla.timer.pause`:
+
+    BRANCH_DEPARTMENT_MANAGER   sla-dashboard.view YES   sla.timer.pause YES
+    COMPLIANCE_OFFICER          sla-dashboard.view YES   sla.timer.pause YES
+    DATA_PROTECTION_OFFICER     sla-dashboard.view NO    sla.timer.pause YES
+
+**So for the DPO the route is still unreachable**, and the DPO is the role whose own deadlines — the PDPL
+DSR clocks — are the likeliest thing anybody would legitimately need to pause.
+
+This is the rule that already cost one CI refutation, in its other form: *a nav entry must sit in a group
+every holder of its gating permission can see* (the `/insurers` placement, refuted by
+`sidebar-executive.spec.ts`). Its generalisation is **a control must sit on a screen every holder of its
+permission can open**, and nothing checks it — the web e2e can only assert what a role CAN see, never
+that a permission it holds has somewhere to be used.
+
+**Not fixed, because both available fixes are decisions and neither is a tidy-up.** Granting the DPO
+`sla-dashboard.view` widens what that role reads book-wide — the dashboard is every module's timers, not
+only the PDPL ones. Putting a pause control on the DSR screen instead is the narrower answer and is
+probably the right one, but it is a second control for the same act, and this repo's own rule from the
+combined-duty field is that a second copy is where the wording drifts. **Put to the owner as: should the
+Data Protection Officer stop a clock from the DSR record, or read the whole SLA dashboard?**
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

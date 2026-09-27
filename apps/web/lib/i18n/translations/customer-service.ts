@@ -161,12 +161,31 @@ export const CUSTOMER_SERVICE = {
     slaDashNoTimersInState: 'لا توجد مؤقتات في هذه الحالة.',
     slaDashLoadError: 'تعذّر تحميل لوحة المهل — حاول مرة أخرى.',
     slaDashTimerLoadError: 'تعذّر تحميل قائمة المؤقتات — حاول مرة أخرى.',
+    slaDashColClock: 'الساعة',
+    slaDashColActions: 'إجراءات',
+    slaDashPause: 'إيقاف الساعة',
+    slaDashResume: 'استئناف الساعة',
+    slaDashPausedSince: 'موقوفة منذ',
+    slaDashPauseReasonLabel: 'سبب إيقاف الساعة',
+    slaDashPauseReasonHint:
+      'اذكر سبب إيقاف هذه المهلة — عشرة أحرف على الأقل. السبب يُسجَّل في سجل ' +
+      'التدقيق، وساعة امتثال موقوفة بلا سبب مذكور لا تختلف عن ساعة نسي أحدهم ' +
+      'استئنافها.',
+    slaDashConfirmPause: 'تأكيد الإيقاف',
+    slaDashCancel: 'إلغاء',
+    slaDashRegulatory: 'مهلة نظامية',
+    slaDashRegulatoryTitle: 'هذه المهلة مصدرها نظامي، لا هدف داخلي.',
+    slaDashPauseError: 'تعذّر إيقاف الساعة — حاول مرة أخرى.',
+    slaDashResumeError: 'تعذّر استئناف الساعة — حاول مرة أخرى.',
+    slaDashNoPausePermission:
+      'لا تملك صلاحية sla.timer.pause، لذا لا يمكنك إيقاف ساعة أو استئنافها.',
     slaDashNoPermission:
       'لا تملك صلاحية sla-dashboard.view، لذا لا يوجد ما يُعرض هنا.',
     slaDashStateOnTrack: 'ضمن المهلة',
     slaDashStateDueSoon: 'تقترب من الاستحقاق',
     slaDashStateBreached: 'تجاوزت المهلة',
     slaDashStateEscalated: 'مُصعَّدة',
+    slaDashStatePaused: 'موقوفة مؤقتاً',
     slaDashStateResolvedOnTime: 'حُلّت في موعدها',
     slaDashStateResolvedLate: 'حُلّت متأخرة',
     slaDashStateOpen: 'مفتوحة (لم تُحل)',
@@ -323,12 +342,31 @@ export const CUSTOMER_SERVICE = {
     slaDashNoTimersInState: 'No timers in this state.',
     slaDashLoadError: 'Could not load the SLA dashboard — try again.',
     slaDashTimerLoadError: 'Could not load the timer list — try again.',
+    slaDashColClock: 'Clock',
+    slaDashColActions: 'Actions',
+    slaDashPause: 'Pause clock',
+    slaDashResume: 'Resume clock',
+    slaDashPausedSince: 'Paused since',
+    slaDashPauseReasonLabel: 'Reason for pausing the clock',
+    slaDashPauseReasonHint:
+      'Say why this deadline is being stopped — at least ten characters. The ' +
+      'reason is written to the audit log, and a stopped compliance clock with ' +
+      'no stated basis is indistinguishable from one somebody forgot to restart.',
+    slaDashConfirmPause: 'Confirm pause',
+    slaDashCancel: 'Cancel',
+    slaDashRegulatory: 'Regulatory',
+    slaDashRegulatoryTitle: 'This deadline comes from a regulatory source, not an internal target.',
+    slaDashPauseError: 'Could not pause the clock — try again.',
+    slaDashResumeError: 'Could not resume the clock — try again.',
+    slaDashNoPausePermission:
+      'You do not hold sla.timer.pause, so you cannot stop or restart a clock.',
     slaDashNoPermission:
       "You don't hold the sla-dashboard.view permission, so there's nothing to show here.",
     slaDashStateOnTrack: 'On track',
     slaDashStateDueSoon: 'Due soon',
     slaDashStateBreached: 'Breached',
     slaDashStateEscalated: 'Escalated',
+    slaDashStatePaused: 'Paused',
     slaDashStateResolvedOnTime: 'Resolved on time',
     slaDashStateResolvedLate: 'Resolved late',
     slaDashStateOpen: 'Open (unresolved)',

@@ -89,12 +89,20 @@ export const SLA_DASHBOARD_SENSITIVE_ENTITY_TYPES = [
 
 // --- timer state ----------------------------------------------------------------
 
-/** The six mutually-exclusive leaf states a timer is in at a given `now`. */
+/**
+ * The seven mutually-exclusive leaf states a timer is in at a given `now`.
+ *
+ * `paused` is a state of its own rather than a flag on another one, because
+ * both alternatives assert something false: bucketing a stopped clock as
+ * `on_track` claims it is running towards a deadline, and bucketing it as
+ * `breached` reports a breach that has not happened. See `classifyTimer`.
+ */
 export const SLA_TIMER_LEAF_STATES = [
   'on_track',
   'due_soon',
   'breached',
   'escalated',
+  'paused',
   'resolved_on_time',
   'resolved_late',
 ] as const;
@@ -105,7 +113,9 @@ export const SLA_TIMER_STATE_GROUPS: Record<
   string,
   readonly SlaTimerLeafState[]
 > = {
-  open: ['on_track', 'due_soon', 'breached', 'escalated'],
+  // A paused timer is OPEN — the obligation is outstanding — but it is not
+  // AT RISK, because its clock is not running towards anything.
+  open: ['on_track', 'due_soon', 'breached', 'escalated', 'paused'],
   open_breached: ['breached', 'escalated'],
   at_risk: ['due_soon', 'breached', 'escalated'],
   resolved: ['resolved_on_time', 'resolved_late'],
@@ -127,9 +137,13 @@ export function stateMatchesFilter(
 
 /** Worst-first ordering for the drill-down list. */
 const STATE_SEVERITY: Record<SlaTimerLeafState, number> = {
-  escalated: 5,
-  breached: 4,
-  due_soon: 3,
+  escalated: 6,
+  breached: 5,
+  due_soon: 4,
+  // Above `on_track` because somebody deliberately stopped a compliance clock
+  // and that is worth a reader's eye; below `due_soon` because a stopped clock
+  // is not running out.
+  paused: 3,
   resolved_late: 2,
   on_track: 1,
   resolved_on_time: 0,
@@ -150,6 +164,8 @@ export interface SlaTimerLike {
    * absent behaves as "never paused", which is what those rows are. */
   pausedAt?: Date | null;
   pausedTotalMs?: number;
+  /** The stated basis for the pause, mandatory at the route that sets it. */
+  pauseReason?: string | null;
   breachedAt?: Date | null;
   /** The policy that set this deadline, when one did. */
   slaPolicy?: {
@@ -170,12 +186,39 @@ export function baseWorkflowName(workflowName: string): string {
 /**
  * The single leaf state of a timer at `now`. Precedence (a resolved timer is
  * never also "breached"; an escalated timer is always past due):
- *   1. resolved & on/before deadline  → resolved_on_time
- *   2. resolved & after deadline      → resolved_late
- *   3. unresolved & escalated         → escalated
- *   4. unresolved & due at/before now → breached
- *   5. unresolved & due within window → due_soon
- *   6. otherwise                      → on_track
+ *   1. resolved & on/before adjusted deadline  → resolved_on_time
+ *   2. resolved & after adjusted deadline      → resolved_late
+ *   3. unresolved & escalated                  → escalated
+ *   4. unresolved & paused                     → paused
+ *   5. unresolved & adjusted due at/before now → breached
+ *   6. unresolved & due within window          → due_soon
+ *   7. otherwise                               → on_track
+ *
+ * EVERY COMPARISON IS AGAINST THE PAUSE-ADJUSTED DEADLINE, NOT `dueAt`
+ * ------------------------------------------------------------------
+ * `dueAt` is never moved by a pause (`effectiveDueAt`'s own contract: "when
+ * was this originally due?" and "how long did you actually have?" are
+ * different questions and both stay answerable). This function used to compare
+ * against raw `dueAt`, which made every figure on the dashboard pause-blind:
+ *
+ *   - a paused timer past `dueAt` reported BREACHED, a breach that had not
+ *     happened;
+ *   - a timer resolved inside its adjusted deadline but after `dueAt`
+ *     reported `resolved_late`, which is PERMANENT and feeds `breachRate`;
+ *   - `overdueDaysFor` measured from `dueAt`, inflating the figure by the
+ *     whole pause.
+ *
+ * All three over-report lateness AGAINST the brokerage, the same direction as
+ * the empty holiday calendar (IMPROVEMENTS § 1.57). None of them had ever
+ * produced a wrong number, for one reason only: pause had no caller, so no
+ * timer in either database had ever been paused (measured: 327 timers,
+ * `pausedTotalMs` 0 on every row). Giving pause a button is what would have
+ * made them wrong, which is why this landed in the same commit.
+ *
+ * The resolved branch uses `dueAt + pausedTotalMs` rather than
+ * `effectiveDueAt(now)`, matching `slaStatus`: once a timer is resolved the
+ * adjustment must stop growing, or a long-closed row would drift later every
+ * time the dashboard is opened.
  */
 export function classifyTimer(
   timer: SlaTimerLike,
@@ -183,14 +226,36 @@ export function classifyTimer(
   dueSoonCutoff: Date,
 ): SlaTimerLeafState {
   if (timer.resolvedAt != null) {
-    return timer.resolvedAt.getTime() > timer.dueAt.getTime()
+    const dueAtCompletion = timer.dueAt.getTime() + (timer.pausedTotalMs ?? 0);
+    return timer.resolvedAt.getTime() > dueAtCompletion
       ? 'resolved_late'
       : 'resolved_on_time';
   }
   if (timer.escalatedAt != null) return 'escalated';
-  if (timer.dueAt.getTime() <= now.getTime()) return 'breached';
-  if (timer.dueAt.getTime() <= dueSoonCutoff.getTime()) return 'due_soon';
+  // Before the deadline comparisons: a paused clock is neither running out nor
+  // past anything.
+  if (timer.pausedAt != null) return 'paused';
+  const adjustedDue = adjustedDueAt(timer, now).getTime();
+  if (adjustedDue <= now.getTime()) return 'breached';
+  if (adjustedDue <= dueSoonCutoff.getTime()) return 'due_soon';
   return 'on_track';
+}
+
+/** `effectiveDueAt` over the dashboard's own looser row shape, where the pause
+ * columns are optional (a caller predating SLA policies omits them, and absent
+ * means never paused). One deadline calculation serves the whole product. */
+function adjustedDueAt(timer: SlaTimerLike, now: Date): Date {
+  return effectiveDueAt(
+    {
+      dueAt: timer.dueAt,
+      createdAt: timer.createdAt,
+      resolvedAt: timer.resolvedAt,
+      pausedAt: timer.pausedAt ?? null,
+      pausedTotalMs: timer.pausedTotalMs ?? 0,
+      breachedAt: timer.breachedAt ?? null,
+    },
+    now,
+  );
 }
 
 /** `now − dueAt` for an open breach; `resolvedAt − dueAt` for a late close;
@@ -200,11 +265,17 @@ function overdueDaysFor(
   now: Date,
   state: SlaTimerLeafState,
 ): number | null {
+  // Measured from the ADJUSTED deadline: time the clock spent stopped is not
+  // time the obligation was overdue, and charging it as such is the same
+  // over-reporting the classifier above describes.
   if (state === 'breached' || state === 'escalated') {
-    return wholeDaysBetween(timer.dueAt, now);
+    return wholeDaysBetween(adjustedDueAt(timer, now), now);
   }
   if (state === 'resolved_late' && timer.resolvedAt != null) {
-    return wholeDaysBetween(timer.dueAt, timer.resolvedAt);
+    return wholeDaysBetween(
+      new Date(timer.dueAt.getTime() + (timer.pausedTotalMs ?? 0)),
+      timer.resolvedAt,
+    );
   }
   return null;
 }
@@ -240,6 +311,13 @@ export interface SlaTimerRow {
   remainingMs: number | null;
   /** `dueAt` shifted by accumulated pause. `dueAt` itself is never moved. */
   effectiveDueAt: string;
+  /** When the clock was stopped, and the basis given for stopping it.
+   * `PauseSlaTimerDto` makes the reason mandatory because "a stopped
+   * compliance clock with no stated basis is indistinguishable from one
+   * somebody forgot to restart" — which is only true if somebody can SEE the
+   * basis. Both null unless currently paused. */
+  pausedAt: string | null;
+  pauseReason: string | null;
   /** TRUE only when the deadline came from a policy whose source is
    * REGULATORY. A screen reporting a breach must be able to say whether what
    * was breached is the law. */
@@ -316,6 +394,8 @@ export function deriveSlaTimerRow(
     ),
     remainingMs: remainingMs(timerState, now),
     effectiveDueAt: effectiveDueAt(timerState, now).toISOString(),
+    pausedAt: timer.pausedAt ? timer.pausedAt.toISOString() : null,
+    pauseReason: timer.pauseReason ?? null,
     // Authoritative when a policy exists. `facts.drafted` is only the
     // registry-only fallback for a timer created before policies did.
     isRegulatory: timer.slaPolicy
@@ -362,6 +442,10 @@ export interface SlaStateCounts {
   dueSoon: number;
   breached: number;
   escalated: number;
+  /** Unresolved with the clock deliberately stopped. Counted separately rather
+   * than folded into another bucket, or `total` would stop equalling the sum of
+   * the states and a paused timer would be invisible in every figure. */
+  paused: number;
   resolvedOnTime: number;
   resolvedLate: number;
   /** breached + escalated — unresolved and past its deadline. */
@@ -417,6 +501,7 @@ function emptyCounts(): SlaStateCounts {
     dueSoon: 0,
     breached: 0,
     escalated: 0,
+    paused: 0,
     resolvedOnTime: 0,
     resolvedLate: 0,
     openBreached: 0,
@@ -429,11 +514,16 @@ function tally(counts: SlaStateCounts, state: SlaTimerLeafState): void {
   else if (state === 'due_soon') counts.dueSoon += 1;
   else if (state === 'breached') counts.breached += 1;
   else if (state === 'escalated') counts.escalated += 1;
+  else if (state === 'paused') counts.paused += 1;
   else if (state === 'resolved_on_time') counts.resolvedOnTime += 1;
   else if (state === 'resolved_late') counts.resolvedLate += 1;
   if (state === 'breached' || state === 'escalated') counts.openBreached += 1;
 }
 
+// `paused` appears in NEITHER half, deliberately: a stopped clock has not yet
+// reached a timeliness verdict, so counting it as on-time would flatter the
+// rate and counting it as late would be the false breach this file exists to
+// stop reporting.
 function breachRate(c: SlaStateCounts): string {
   const denom = c.resolvedOnTime + c.resolvedLate + c.breached + c.escalated;
   if (denom === 0) return '0.0000';

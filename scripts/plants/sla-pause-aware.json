@@ -1,0 +1,17 @@
+{
+  "classifier-ignores-pause": {
+    "file": "apps/api/src/modules/sla-dashboard/sla-dashboard.config.ts",
+    "from": "  if (timer.pausedAt != null) return 'paused';",
+    "to": "  if (false) return 'paused';"
+  },
+  "resolved-compared-against-raw-dueat": {
+    "file": "apps/api/src/modules/sla-dashboard/sla-dashboard.config.ts",
+    "from": "    const dueAtCompletion =\n      timer.dueAt.getTime() + (timer.pausedTotalMs ?? 0);",
+    "to": "    const dueAtCompletion = timer.dueAt.getTime();"
+  },
+  "overdue-days-measured-from-dueat": {
+    "file": "apps/api/src/modules/sla-dashboard/sla-dashboard.config.ts",
+    "from": "    return wholeDaysBetween(adjustedDueAt(timer, now), now);",
+    "to": "    return wholeDaysBetween(timer.dueAt, now);"
+  }
+}

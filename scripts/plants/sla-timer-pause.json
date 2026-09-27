@@ -1,0 +1,27 @@
+{
+  "confirm-ignores-the-reason-floor": {
+    "file": "apps/web/app/(app)/sla-dashboard/page.tsx",
+    "from": "                                      busyId === r.id ||\n                                      !slaPauseReasonIsValid(pauseReason)",
+    "to": "                                      busyId === r.id"
+  },
+  "reason-sent-untrimmed": {
+    "file": "apps/web/lib/sla/sla-timer-api.ts",
+    "from": "  return apiPost(`/sla/timers/${timerId}/pause`, { reason: reason.trim() });",
+    "to": "  return apiPost(`/sla/timers/${timerId}/pause`, { reason });"
+  },
+  "controls-ignore-the-permission": {
+    "file": "apps/web/app/(app)/sla-dashboard/page.tsx",
+    "from": "  const canPause = hasPermission(user, 'sla.timer.pause');",
+    "to": "  const canPause = true;"
+  },
+  "regulatory-marker-on-every-row": {
+    "file": "apps/web/app/(app)/sla-dashboard/page.tsx",
+    "from": "                          {r.isRegulatory && (",
+    "to": "                          {true && ("
+  },
+  "resume-offered-whatever-the-status": {
+    "file": "apps/web/app/(app)/sla-dashboard/page.tsx",
+    "from": "                            ) : r.slaStatus === 'PAUSED' ? (",
+    "to": "                            ) : false ? ("
+  }
+}
