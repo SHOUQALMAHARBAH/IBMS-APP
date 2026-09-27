@@ -125,6 +125,10 @@ export default function OpportunityDetailPage() {
   const canDeliverPolicy = hasPermission(user, 'policy.deliver');
   const canManageEndorsement = hasPermission(user, 'endorsement.create');
   const canApproveRefund = hasPermission(user, 'refund.approve');
+  // Finance pays the approved refund. Separate from the approval on purpose and by grant: `refund.approve`
+  // goes to Manager or Finance, `refund.disburse` to Finance alone — so approving and paying are not one
+  // capability, which is the whole point of a maker/checker pair having a payment step after it.
+  const canDisburseRefund = hasPermission(user, 'refund.disburse');
   const canInvoice = hasPermission(user, 'invoice.create');
   const canCollect = hasPermission(user, 'receipt.record');
   const canCalculateCommission = hasPermission(user, 'commission.calculate');
@@ -287,6 +291,7 @@ export default function OpportunityDetailPage() {
             opportunityId={opportunity.id}
             canManage={canManageEndorsement}
             canApproveRefund={canApproveRefund}
+            canDisburseRefund={canDisburseRefund}
             canDiscard={canDiscardEndorsement}
             // Part 4 — from `/auth/me`, so the section can decide whether to ask the approver for a reason.
             dutySegregationMode={user.dutySegregationMode ?? 'SEGREGATED'}

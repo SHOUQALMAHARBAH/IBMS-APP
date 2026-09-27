@@ -4116,6 +4116,21 @@ the office's own mode and declaration date — on `/internal-controls`, above th
 Access self-reviews sort first and render flagged, which is the owner's condition and is proven by content
 rather than by a status code. Reading it is audited (counts only, never a name).
 
+**An approved refund can be paid (2026-09-27).** `POST /refunds/:id/disburse` had no web caller, so
+money left the office through a route nothing could invoke — the first of `IMPROVEMENTS.md` § 1.44's 33
+unreachable routes to close, because it is the one with a balance attached. A "Pay refund" action on the
+endorsement's APPLIED state, gated on `refund.disburse` (FINANCE), which is deliberately a different
+grant from `refund.approve` (Manager or Finance): approving and paying are not one capability. The
+condition is `refundIsPayable`, exported and unit-tested, because a below-threshold refund is auto-cleared
+with `approvedByUserId` left NULL and a condition that only checked for an approver would make every small
+refund unpayable.
+
+**Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
+re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
+of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold
+gates KYC approval ("prior to onboarding"), which is a different obligation from "before processing any
+transaction". Both are with the owner; nothing in either area was changed.
+
 **Correcting a customer's contact details (2026-09-27): `PATCH /customers/:id`, `customer.update`**
 (migration `20261101100000`). The first write to a `Customer` row other than its creation — see
 `IMPROVEMENTS.md` § 3.14 for what that absence meant, including a PDPL CORRECTION request closeable only

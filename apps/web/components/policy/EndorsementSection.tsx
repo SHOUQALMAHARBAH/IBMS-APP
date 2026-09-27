@@ -6,6 +6,8 @@ import {
   advanceEndorsement,
   applyEndorsement,
   approveEndorsementRefund,
+  disburseRefund,
+  refundIsPayable,
   calculateEndorsementAdjustment,
   listEndorsementsForPolicy,
   notifyEndorsementClient,
@@ -39,6 +41,8 @@ interface Props {
   canManage: boolean;
   /** Manager — approve a return-premium refund above the value threshold. */
   canApproveRefund: boolean;
+  /** Finance — pay an approved refund. `refund.disburse`. */
+  canDisburseRefund: boolean;
   /**
    * Part 4 — the office's declared mode, from `/auth/me`, and the caller's own id.
    *
@@ -64,6 +68,7 @@ function nextAction(
   e: Endorsement,
   canManage: boolean,
   canApproveRefund: boolean,
+  canDisburseRefund: boolean,
   t: (key: TranslationKey) => string,
   /** Part 4 — sent only on the refund approval, and only when the screen asked for it. */
   combinedDutyReason?: string,
@@ -96,10 +101,29 @@ function nextAction(
           }
         : null;
     }
-    case 'APPLIED':
+    case 'APPLIED': {
+      // PAY THE APPROVED REFUND — IMPROVEMENTS § 1.44's first closure.
+      //
+      // `POST /refunds/:id/disburse` had no web caller at all, so money left the office through a route
+      // nothing could invoke and an approved refund could not be paid from the application. It takes
+      // precedence over "notify the client" here because an unpaid refund is money the office still holds
+      // and the client is owed.
+      //
+      // Offered only when there is something to pay: a refund that exists, is approved (or was cleared
+      // below the threshold, where `approvedByUserId` stays null and `needsApproval` is false), and has not
+      // been paid. `paidAt` is what stops the button reappearing after a payment; the service refuses a
+      // second attempt regardless, because a status-conditional write is the real guard.
+      if (canDisburseRefund && refundIsPayable(e.refund)) {
+        const refundId = e.refund.id;
+        return {
+          label: t('endorsementDisburseRefundButton'),
+          run: () => disburseRefund(refundId),
+        };
+      }
       return canManage
         ? { label: t('endorsementNotifyButton'), run: () => notifyEndorsementClient(e.id) }
         : null;
+    }
     default:
       return null;
   }
@@ -109,6 +133,7 @@ export function EndorsementSection({
   opportunityId,
   canManage,
   canApproveRefund,
+  canDisburseRefund,
   canDiscard,
   dutySegregationMode,
   currentUserId,
@@ -221,6 +246,7 @@ export function EndorsementSection({
             e,
             canManage,
             canApproveRefund,
+            canDisburseRefund,
             t,
             needsDeclaration ? declaration : undefined,
           );

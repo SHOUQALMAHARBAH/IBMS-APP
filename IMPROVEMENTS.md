@@ -2823,7 +2823,7 @@ see. Ordered by consequence:**
 
 | Surface | Routes | Why it matters |
 |---|---|---|
-| `POST /refunds/:id/disburse` | 1 | **Money leaves the office through this route and nothing can call it.** `refund.disburse` is granted to FINANCE; the route stamps `paidAt` and books the client-funds out movement in one transaction. An approved refund cannot be paid from the application. |
+| ~~`POST /refunds/:id/disburse`~~ | 1 | ~~**Money leaves the office through this route and nothing can call it.**~~ **CLOSED 2026-09-27**, the first of the 33 on the owner's instruction, because it is the one with a balance attached. A "Pay refund" action on the endorsement's APPLIED state, gated on `refund.disburse` (FINANCE) — deliberately a different grant from `refund.approve` (Manager or Finance), so approving and paying are not one capability. The condition is `refundIsPayable`, exported and unit-tested rather than written inside the button, because three facts must agree and **the below-threshold branch is the one a reasonable condition gets wrong**: a refund under the value threshold is auto-cleared with `approvedByUserId` left NULL, so testing only for an approver would make every small refund permanently unpayable — and no endorsement fixture in the web e2e carries a refund at all, so nothing would have caught it. Planted both ways. |
 | `screening/matches/:id/{assign,escalate,notes,start-review,case}` | 5 | The sanctions review queue is HALF built: `review` and `pending-count` are called, so a match can be decided — but a Compliance Officer cannot assign a case to someone, escalate one, add a note, or open the case view. On an AML control, the workflow around the decision is the part that evidences it. |
 | `sla/timers/:id/{pause,resume,status}` | 3 | `sla.timer.pause` exists as a permission. **Pausing a statutory clock is exactly the act that must be visible and audited**, and it can only be done by constructing a request by hand. |
 | `sla/holidays` (GET + POST) | 2 | § 1.57 — the calendar every business-day deadline is counted against. Found by hand first; this method finds it too. |
@@ -3300,7 +3300,25 @@ Two consequences worth stating, because both were live in this repo:
   input file was the one; `docs/` holds others she is the intended author or reader of, and the test to
   apply is the one above.
 
-### 1.57 `P2` — THE HOLIDAY CALENDAR IS EMPTY AND UNREACHABLE, SO EVERY BUSINESS-DAY DEADLINE IS A LOWER BOUND
+### 1.57 `P1` — THE OWNER'S OWN COMPLIANCE NUMBERS ARE CURRENTLY WRONG, IN THE DIRECTION THAT BLAMES HER
+
+**Raised from P2 on the owner's framing, which is sharper than the original and is the reason this moves
+up the queue.** The technical finding is unchanged and is below; what changed is who bears the cost.
+
+The holiday calendar every business-day deadline is counted against is empty, and an office cannot
+enter Eid. Skipping only weekends makes every computed deadline EARLIER than the law requires — so the
+SLA dashboard, the breach reports, and any PDPL evidence drawn from them **over-report the brokerage
+missing statutory deadlines it actually met.**
+
+Put plainly, and this is what she needs told: *her own records currently accuse her of lateness she is
+not guilty of.* If a regulator or an auditor reads the breach report, the brokerage is the party the
+error falsifies against. A safe failure direction for a control is not a safe direction for EVIDENCE,
+and this is evidence.
+
+That is also why "the direction is safe" is not a reason to leave it: the system being stricter than the
+law merely chases staff early, which is tolerable, while the RECORD being wrong is a compliance artefact
+that misstates the brokerage's own performance.
+
 
 Found while splitting `sla.policy.manage` (four-action Phase 4): the umbrella's fifth route is
 `POST /sla/holidays`, which turned out to be the only writer of a table nothing can reach.
@@ -3347,6 +3365,80 @@ the brokerage's own records would show it missing statutory deadlines it actuall
 
 **Not built.** Item 1 needs a source (the gazette, or the owner's list), which makes it the same class
 as the drafted/unsourced values in § 4 rather than something to invent.
+
+### 1.58 `P1` — TWO AMLU SCREENING OBLIGATIONS MEASURED: one met by coincidence of cadence, one absent entirely
+
+The owner verified Jordan's AMLU FAQ against the primary source and found that the same sentence
+requires screening in two cases this codebase has never tracked. Measured here as fact and
+**nothing changed**, per the instruction.
+
+> "Upon any updates to the Local Terrorist List or UN Consolidated List … Prior to onboarding new
+> customers … Upon KYC reviews or changes to a customer's information … **Before processing any
+> transaction**."
+>
+> — https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions
+
+---
+
+#### Obligation 1 — screening on LIST UPDATES: met, but by coincidence rather than by mechanism
+
+**What exists.** `ScreeningBatchScheduler` re-screens every active customer whose latest KYC record is
+in `ACTIVE_CUSTOMER_RESCREEN_STATUSES`, on a fixed cron: `SANCTIONS_RESCREEN_CRON = '0 */4 * * *'`.
+The same logic is reachable on demand at `POST /screening/recurring-batch` (`sanctions-pep.screen`).
+So existing customers ARE re-screened, and within four hours of any list change.
+
+**What does not exist.** Nothing connects the two. `WATCHLIST_SYNC_CRON = '0 */12 * * *'` ingests the
+lists on its own separate schedule, and `watchlist-sync.service.ts` contains no reference to
+`ScreeningService` or `runRecurringBatch` at all — a sync that brings in a thousand new listings
+triggers no screening. The 4-hourly sweep would run identically if the lists never changed again.
+
+**Why that is worth recording rather than shrugging at.** The obligation is currently satisfied by the
+ARITHMETIC of two unrelated cron expressions. Relax `SANCTIONS_RESCREEN_CRON` to daily — a plausible
+change, since the header comment says the 4-hourly figure replaced a drafted monthly one and the real
+list-refresh cadence was unknown — and the obligation silently stops being met, with nothing failing.
+A compliance property held by a cadence nobody knows is load-bearing is the same shape as a guard
+nobody reads.
+
+**The honest fix, when the owner wants it:** have the sync ENQUEUE a re-screen when a sync actually
+changed the dataset, so the obligation is met by causation. The cadence then becomes a backstop rather
+than the mechanism. Note that the sync already knows whether anything changed — it versions datasets —
+so this is wiring, not new capability.
+
+---
+
+#### Obligation 2 — screening BEFORE PROCESSING A TRANSACTION: absent
+
+**Measured across every money-movement path.** Zero mentions of screening, the watchlist, sanctions or
+a screening hold in:
+
+    invoice.service.ts             (the client RECEIPT and the insurer REMITTANCE)
+    refund.service.ts              (refund approval and disbursement)
+    commission-ledger.service.ts   (commission settlement)
+    collection.service.ts          (the collection cycle)
+
+And the complement: every file in `apps/api/src` that reads screening state at all is
+`modules/customer/*` (KYC and the screening module itself), `notification.service.ts`,
+`sla-registry.config.ts`, and two repositories. **No transaction path consults it.**
+
+**What the screening hold actually gates.** `ScreeningHoldService` is read by `kyc.service.ts`, where a
+`BLOCKED` hold refuses a KYC APPROVAL and a `REVIEW_REQUIRED` hold demands a written acceptance. That
+is the AMLU's *"prior to onboarding new customers"* obligation, and it works. It is a different
+obligation from *"before processing any transaction"*, and satisfying the first does not satisfy the
+second: a customer onboarded cleanly in March whose name appears on a list in June can be paid in July
+with nothing consulted.
+
+**This is a larger gap than § 1.50, and the owner named why.** § 1.50 is a claim without a capability —
+`refund.raise` describing something nothing enforces. This is an **obligation without a claim**: no
+screen, no permission, no description and no document asserts that transactions are screened, so
+nothing is lying — and nothing is happening either. There is no false statement to find, which is
+precisely why it survived every audit of the catalogue.
+
+**Not built.** Which paths count as "processing a transaction", and what a hit should do to one
+(refuse, hold, allow-and-flag), are decisions with money and regulatory consequence — the second
+especially, since refusing a remittance to an insurer has contractual effects. Recorded for the owner
+with the measurement, in the same class as the identifier questions in § 3.14: the source is explicit
+that screening is required, and what the system should DO on a hit at that moment is not something to
+infer.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
