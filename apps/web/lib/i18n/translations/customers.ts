@@ -33,6 +33,31 @@ export const CUSTOMERS = {
     customerFieldContactEmail: "البريد الإلكتروني",
     customerFieldRegistrationNumber: "رقم السجل",
     customerFieldRegisteredAddress: "العنوان المسجل",
+    customerCorrectHeading: "تصحيح بيانات الاتصال",
+    customerCorrectIntro:
+      "صحّح رقم الهاتف أو البريد الإلكتروني أو العنوان المسجل. اترك أي حقل فارغاً " +
+      "لتركه كما هو — الحقول تبدأ فارغة عن قصد، لأن المعروض على الشاشة مُقنَّع " +
+      "وليس القيمة نفسها.",
+    customerCorrectOpen: "تصحيح بيانات الاتصال",
+    customerCorrectPhone: "رقم الهاتف الجديد",
+    customerCorrectEmail: "البريد الإلكتروني الجديد",
+    customerCorrectAddress: "العنوان المسجل الجديد",
+    customerCorrectReason: "سبب التصحيح",
+    customerCorrectReasonHint:
+      "يُسجَّل السبب مع كل حقل مُصحَّح ويُنسب إليك. اذكر من أبلغ عن الخطأ وكيف " +
+      "تحقّقت منه.",
+    customerCorrectAnswersDsr: "رقم طلب صاحب البيانات (إن كان هذا التصحيح رداً على طلب)",
+    customerCorrectAnswersDsrHint:
+      "إن كان هذا التصحيح رداً على طلب تصحيح نظامي، أدخل رقم الطلب. لا يمكن إغلاق " +
+      "طلب التصحيح قبل تسجيل تصحيح فعلي مرتبط به.",
+    customerCorrectSubmit: "تسجيل التصحيح",
+    customerCorrectCancel: "إلغاء",
+    customerCorrectError: "تعذّر تسجيل التصحيح — حاول مرة أخرى.",
+    customerCorrectNoPermission:
+      "لا تملك صلاحية customer.update، فلا يمكنك تصحيح بيانات الاتصال.",
+    customerCorrectIdentifiersNote:
+      "الاسم وتاريخ الميلاد والجنسية ورقم الهوية لا تُصحَّح من هنا: تغييرها يستوجب " +
+      "إعادة الفحص مقابل قوائم العقوبات، وهذه الآلية لم تُبنَ بعد.",
     customerFieldNatureOfBusiness: "طبيعة النشاط",
     customerFieldLanguagePreference: "تفضيل اللغة",
     customerFieldGivenName: "الاسم الأول",
@@ -225,6 +250,33 @@ export const CUSTOMERS = {
     customerFieldContactEmail: "Contact email",
     customerFieldRegistrationNumber: "Registration number",
     customerFieldRegisteredAddress: "Registered address",
+    customerCorrectHeading: "Correct contact details",
+    customerCorrectIntro:
+      "Correct the phone number, email address or registered address. Leave a field " +
+      "blank to leave it unchanged — the fields start empty deliberately, because " +
+      "what the page shows is masked rather than the value itself.",
+    customerCorrectOpen: "Correct contact details",
+    customerCorrectPhone: "New phone number",
+    customerCorrectEmail: "New email address",
+    customerCorrectAddress: "New registered address",
+    customerCorrectReason: "Reason for the correction",
+    customerCorrectReasonHint:
+      "The reason is stored against every corrected field and attributed to you. Say " +
+      "who reported the error and how you verified it.",
+    customerCorrectAnswersDsr: "Data subject request reference (if this answers one)",
+    customerCorrectAnswersDsrHint:
+      "If this correction answers a statutory correction request, enter its " +
+      "reference. A correction request cannot be closed until a correction has " +
+      "actually been recorded against it.",
+    customerCorrectSubmit: "Record the correction",
+    customerCorrectCancel: "Cancel",
+    customerCorrectError: "Could not record the correction — try again.",
+    customerCorrectNoPermission:
+      "You do not hold customer.update, so you cannot correct contact details.",
+    customerCorrectIdentifiersNote:
+      "Name, date of birth, nationality and national ID are not corrected here: " +
+      "changing one is a screening event against the sanctions lists, and that " +
+      "mechanism is not built yet.",
     customerFieldNatureOfBusiness: "Nature of business",
     customerFieldLanguagePreference: "Language preference",
     customerFieldGivenName: "Given name",

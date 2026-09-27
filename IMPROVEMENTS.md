@@ -2849,6 +2849,24 @@ was documenting.** (2) Four genuinely unreachable routes were never tabled at al
 entry listed only what it called the sharpest and the remainder were left in the script's output; they are
 added above. The count itself was right (33, now 30): what was wrong was which rows it named.
 
+**THE COUNT IS A LOWER BOUND, AND THIS ENTRY DID NOT SAY SO — § 1.65.** The script is verb-agnostic and
+says so in its own docstring: it answers "does any web code address this PATH at all". A route whose path
+is called with a DIFFERENT METHOD therefore reads as reachable. `scripts/measurements/unreachable-routes-by-verb.py`
+is a second pass that pairs the helper with the method (`apiGet`→GET, `apiPost`→POST, …) and finds
+**14 more routes on top of the 21** — every one of them counted as reachable by the first pass. Four were
+hand-checked rather than taken from the script:
+
+- **`POST /insurance-lines`** — an office cannot ADD a line of business, not merely cannot correct one.
+  `GET /insurance-lines` is called for a picker, which is what hid it.
+- **`PATCH /customers/:id`** — § 1.65, and it was MINE.
+- **`GET /knowledge-base-articles`** and **`/:id`** — the web POSTs and PATCHes articles and never reads
+  one back: an office can write a knowledge-base article and cannot open it.
+- **`PATCH /employees/:id`** — the web PATCHes only the nested training and deprovisioning paths, so an
+  employee record cannot be corrected.
+
+The remaining ten are listed by the script and are NOT hand-verified; treat them as candidates, which is
+the same standard the first pass's four false-positive classes earned.
+
 **NOT MADE A GATE, deliberately.** A guard here would need a maintained allow-list of 33 entries that
 rots, and — more importantly — the matcher needed four corrections to stop libelling working screens.
 A brittle matcher in a red gate is a liability, not a control: the first false red teaches everyone to
@@ -3837,6 +3855,62 @@ deliberate test of their own rather than an accident.
 **And this is the argument for CI restated with evidence** (`verification-contract.md`): the local run was
 green, twice, on the same code. The only thing that differed was which date the generator happened to
 pick. A gate that runs the same code against a different random draw is a different gate.
+
+
+### 1.65 `P1` — I SHIPPED AN UNREACHABLE ROUTE, THE DAY AFTER MEASURING § 1.44, AND IT MADE A STATUTORY RIGHT UNANSWERABLE
+
+`PATCH /customers/:id` — the contact-detail correction built to the owner's own requirement ("correctable
+now, unconditionally: phone, address, email") — shipped with **no web caller**. Found by the verb-aware
+second pass, four commits later.
+
+**Two capabilities were unreachable, and the second is the serious one.**
+
+1. The correction itself. An officer told a wrong phone number could not change it.
+2. **`DsrService.fulfil` refuses to close a CORRECTION request until a correction has been RECORDED
+   against it** — the no-false-closure gate built in the same commit — and this route is the only thing
+   that records one. So a customer exercising a statutory right to have their data corrected could have
+   the request neither answered NOR closed. The gate did exactly what it was built to do; its precondition
+   was unreachable.
+
+**That is § 1.62's shape — a gate whose precondition nothing can satisfy — shipped one commit after I
+wrote § 1.62 up.** Knowing the failure mode and naming it in a document did not stop me producing it. What
+would have caught it is a measurement that pairs the method with the path, and the reason the existing one
+did not is that `GET /customers/:id` IS called, so the path looked covered.
+
+#### The measurement was wrong in a way its own docstring predicted
+
+`unreachable-routes.py` says it is verb-agnostic. § 1.44's ENTRY did not, and reported "33 routes" as
+though it were the answer. A lower bound presented as a count is the same defect as a claim without
+enforcement: everything stated is true, and the number is believed to mean more than it does. Corrected
+above, with the second pass committed beside it.
+
+#### Two things in the fix that are not obvious
+
+**Nothing may be prefilled.** `contactPhone` and `contactEmail` arrive MASKED on the detail read —
+encrypted at rest, revealed only through their own audited endpoint. A correction form prefilled from what
+the page displays would write the mask back as the customer's phone number. So every field starts empty,
+and a blank field is omitted rather than sent.
+
+**And the statutory flow needs two people, which nothing said out loud.** Measured against the seeded
+grid:
+
+    DATA_PROTECTION_OFFICER   dsr.close, dsr.handle, dsr.log   customer.update NO
+    SALES_RELATIONSHIP_OFFICER                      dsr.log    customer.update YES
+
+So the officer who must CLOSE a correction request cannot RECORD the correction that unlocks it, and the
+one who can record it cannot close the request. That is § 1.61's rule on a statutory deadline. It is
+defensible as segregation — the person changing customer data is not the person certifying the request was
+answered — but it has to be a DECISION rather than an accident, and it only works because the correction
+form carries the request reference. **Put to the owner as: should the DPO record the correction, or is the
+two-person flow the intent?** Granting the DPO `customer.update` widens who may edit customer data, which
+is not a tidy-up.
+
+**Six plants, and one killed nothing.** Removing the empty-string filter left all 16 tests green, because
+an UNTOUCHED field is `undefined` and never reaches the request body — the filter only matters for a field
+typed into and then CLEARED, which becomes `''` and would instruct the server to store an empty phone
+number. That case is now its own test, and the re-planted filter kills it. **Third time this session that a
+plant found a test which could not observe the thing it was named for** (§ 1.62's decision gate, § 1.60's
+first pass, and this), and every one was found by naming the victim before running rather than by reading.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

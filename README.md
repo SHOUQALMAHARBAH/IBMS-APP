@@ -4168,6 +4168,15 @@ on a generation that is SUPERSEDED and still carries rows, because a generation 
 is still LISTED and restoring it would leave screening running against nothing — which looks exactly like
 screening that cleared everybody.
 
+**A customer's contact details can actually be corrected now (2026-09-28).** `PATCH /customers/:id`
+shipped one day earlier with no web caller, which made two things unreachable: the correction itself, and
+the closure of a statutory CORRECTION request — `DsrService.fulfil` refuses to close one until a correction
+has been RECORDED against it, and that route is the only thing that records one. A correction control now
+sits under the profile on `/customers/[id]`, gated on `customer.update`, prefilling NOTHING (phone and
+email arrive masked, so prefilling would write the mask back as the customer's phone number) and carrying
+the request reference that satisfies the gate. `IMPROVEMENTS.md` § 1.65 — including that the statutory flow
+needs two people, because the DPO who closes the request does not hold `customer.update`.
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold

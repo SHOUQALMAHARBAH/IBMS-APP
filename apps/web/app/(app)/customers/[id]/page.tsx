@@ -14,6 +14,7 @@ import {
   type RevealableField,
   type Ubo,
 } from '../../../../lib/customer/customer-api';
+import { CustomerContactCorrection } from '../../../../components/customer/CustomerContactCorrection';
 import { ApiError } from '../../../../lib/auth/api-client';
 import { errorStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle, smallButtonStyle } from '../../../../components/lead/lead.styles';
@@ -294,6 +295,16 @@ export default function CustomerProfilePage() {
               ) : null}
             </div>
           ) : null}
+
+          {/* Correcting the three contact fields. Placed directly under the profile
+            * it edits, and it reloads through the same `load` the page already uses,
+            * because a correction changes the MASKED values shown above. */}
+          <div style={{ marginTop: '1.25rem' }}>
+            <CustomerContactCorrection
+              customerId={customer.id}
+              onCorrected={load}
+            />
+          </div>
 
           {customer.customerType === 'CORPORATE' ? (
             <section style={{ marginTop: '2rem' }}>

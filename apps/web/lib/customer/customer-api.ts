@@ -3,7 +3,7 @@
 // prospect-api.ts's conventions (thin typed wrappers over apiGet/apiPost).
 
 import type { Paginated } from '../api/paginated';
-import { apiGet, apiPost } from '../auth/api-client';
+import { apiGet, apiPatch, apiPost } from '../auth/api-client';
 
 export type CustomerType = 'INDIVIDUAL' | 'CORPORATE';
 export type CustomerStatus = 'PENDING_KYC' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
@@ -173,4 +173,61 @@ export function addCustomerDocument(
 
 export function listCustomerDocuments(customerId: string): Promise<CustomerDocument[]> {
   return apiGet(`/customers/${customerId}/documents`);
+}
+
+/*
+ * CORRECTING A CUSTOMER'S CONTACT DETAILS — `PATCH /customers/:id`.
+ *
+ * WHY THIS EXISTS AND WHY ITS ABSENCE MATTERED
+ * -------------------------------------------
+ * The route shipped without a web caller, which made two capabilities unreachable
+ * at once (IMPROVEMENTS § 1.65). The first is the owner's own requirement: phone,
+ * address and email correctable unconditionally. The second is worse, because it is
+ * a gate whose precondition became unreachable — `DsrService.fulfil` refuses to
+ * close a CORRECTION request until a correction has actually been RECORDED against
+ * it, and this route is the only thing that records one. So a customer exercising a
+ * statutory right to have their data corrected could have the request neither
+ * answered nor closed.
+ *
+ * THE FORM MUST NOT PREFILL, AND THAT IS NOT A STYLE CHOICE
+ * -------------------------------------------------------
+ * `contactPhone` and `contactEmail` arrive MASKED on the detail read — they are
+ * encrypted at rest and revealed through their own audited endpoint. Prefilling a
+ * correction form from the displayed value would write the mask back into the
+ * record as the customer's phone number. So every field starts empty, and an
+ * untouched field is omitted rather than sent: the DTO's `emptyStringToUndefined`
+ * makes that the same thing server-side.
+ */
+export interface CustomerContactCorrection {
+  contactPhone?: string;
+  contactEmail?: string;
+  registeredAddress?: string;
+  /** Why the change was made. Stored on every correction row; the service supplies
+   * a neutral default when absent, which is a worse record than a real sentence. */
+  reason?: string;
+  /** Present only when this correction ANSWERS a statutory request. `answersRequestId`
+   * is what `DsrService.fulfil` then looks for before it will close that request. */
+  answersRequestType?: 'dsr';
+  answersRequestId?: string;
+}
+
+export function updateCustomerContactDetails(
+  customerId: string,
+  input: CustomerContactCorrection,
+): Promise<Customer> {
+  // Only the fields actually typed. An empty string would be an instruction to
+  // store an empty string, which is not what a blank box means.
+  const body: Record<string, string> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (typeof v === 'string' && v.trim() !== '') body[k] = v.trim();
+  }
+  return apiPatch(`/customers/${encodeURIComponent(customerId)}`, body);
+}
+
+/** At least one of the three fields carries a value — the service refuses an empty
+ * correction with a 422, and a screen should not send one. */
+export function hasSomethingToCorrect(input: CustomerContactCorrection): boolean {
+  return [input.contactPhone, input.contactEmail, input.registeredAddress].some(
+    (v) => (v ?? '').trim() !== '',
+  );
 }
