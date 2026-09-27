@@ -407,6 +407,17 @@ export const OPERATIONS = {
     renInsurerTermsWorsened: 'شروط المؤمِّن ساءت',
     renRiskChanged: 'تغيّر الخطر',
     secDevicesHeading: 'الأجهزة الموثوقة',
+    secKeysHeading: 'مفاتيح تشفير البيانات',
+    secKeysIntro:
+      'المفاتيح التي تُشفَّر بها الحقول الشديدة السرية. تُعرض المُعرِّفات والحالة ' +
+      'فقط — مادة المفتاح نفسها لا تصل إلى المتصفح ولا إلى أي استجابة.',
+    secKeysColId: 'مُعرِّف المفتاح',
+    secKeysColStatus: 'الحالة',
+    secKeysActive: 'نشط — يُستخدم للتشفير الجديد',
+    secKeysRetired: 'متقاعد — يفكّ تشفير الصفوف القديمة فقط',
+    secKeysNone: 'لا توجد مفاتيح مُعدَّة.',
+    secKeysLoadError: 'تعذّر تحميل قائمة المفاتيح — حاول مرة أخرى.',
+    secKeysLoading: 'جارٍ تحميل المفاتيح…',
     secDevicesIntro:
       'هذه الأجهزة تتخطّى رمز التحقق عند تسجيل الدخول. ألغِ الثقة بأي جهاز لا تعرفه.',
     secNoTrustedDevices: 'لا توجد أجهزة موثوقة.',
@@ -955,6 +966,17 @@ export const OPERATIONS = {
     renInsurerTermsWorsened: 'Insurer terms worsened',
     renRiskChanged: 'Risk changed',
     secDevicesHeading: 'Trusted devices',
+    secKeysHeading: 'Data encryption keys',
+    secKeysIntro:
+      'The keys Highly Confidential fields are encrypted with. Identifiers and status ' +
+      'only — the key material itself never reaches a browser or any response.',
+    secKeysColId: 'Key ID',
+    secKeysColStatus: 'Status',
+    secKeysActive: 'Active — used for new encryption',
+    secKeysRetired: 'Retired — decrypts existing rows only',
+    secKeysNone: 'No keys are configured.',
+    secKeysLoadError: 'Could not load the key list — try again.',
+    secKeysLoading: 'Loading keys…',
     secDevicesIntro:
       'These devices skip the verification code at sign-in. Revoke any you do not recognise.',
     secNoTrustedDevices: 'No trusted devices.',

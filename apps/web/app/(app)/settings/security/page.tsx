@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth/auth-context';
+import { EncryptionKeyInventory } from '../../../../components/security/EncryptionKeyInventory';
 import {
   changePassword,
   enrollTotp,
@@ -403,6 +404,12 @@ export default function SecuritySettingsPage() {
         </p>
         {user.accessValidUntil ? <p>Your access to IBMS ends: {formatDateTime(user.accessValidUntil, language)}</p> : null}
       </section>
+
+      {/* Renders only for a holder of `encryption-key.read`. A gated SECTION on an
+        * ungated page: this route is the only way through the MFA enrolment guard, so
+        * gating the PAGE would lock ten of eleven roles out of pairing an
+        * authenticator. */}
+      <EncryptionKeyInventory />
 
       <button type="button" onClick={() => void handleLogout()} style={{ ...buttonStyle, marginTop: '2rem' }}>
         {t('signOut')}

@@ -4192,6 +4192,14 @@ required because Arabic is the primary language and a line name reaches document
 `IMPROVEMENTS.md` § 1.66 — including that the hand-written b7 survey had both verbs right while the
 automated path-only measurement could only ever see one of them.
 
+**The encryption-key inventory is readable (2026-09-28).** `GET /security/encryption-keys` had no web
+caller, so a key custodian could not see which key is encrypting customers' national IDs, nor how many
+retired keys are still held to decrypt older rows — the figure that says how much old ciphertext has not
+been rotated forward. Now a section on `/settings/security` that renders only for a holder of
+`encryption-key.read`; that page stays ungated because it is the only route through the MFA enrolment
+guard. Key material is absent from the response by construction and the screen says so.
+`IMPROVEMENTS.md` § 1.68.
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold

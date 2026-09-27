@@ -2833,7 +2833,7 @@ see. Ordered by consequence:**
 | ~~`PATCH /insurance-lines/:id`~~ **and `POST /insurance-lines`** | 2 | ~~An office cannot correct a line of business it added.~~ **CLOSED 2026-09-28**, and the POST turned out to be unreachable too — invisible to the path-only pass because `GET /insurance-lines` is called by three pickers. So an office could neither ADD nor correct a line. `/settings/insurance-lines`, gated on both write codes. § 1.66. |
 | `GET /cross-border-transfers/:id` | 1 | The list is reachable; the single-transfer detail read is not. |
 | `GET /access-recertification/cycles/:id/admin-items` | 1 | The administrator's view of a recertification cycle. |
-| `GET /security/encryption-keys` | 1 | The key inventory. |
+| ~~`GET /security/encryption-keys`~~ | 1 | ~~The key inventory.~~ **CLOSED 2026-09-28** — a gated section on `/settings/security`, which is the cheapest correct placement because that page must stay UNGATED (it is the only route through the MFA enrolment guard). § 1.68. |
 
 | `GET /client-decisions/:id` | 1 | The web POSTs to `/client-decisions` and never reads one back. |
 | `GET /feedback/:id` | 1 | The list is called; the single-feedback read is not. |
@@ -4006,6 +4006,39 @@ that is a FEATURE rather than a missing caller. Everything else on that list is 
 It also has a prerequisite nobody has decided: **where a form mapping comes from.** Somebody has to read an
 insurer's PDF and transcribe 300 fields, or the product has to extract them, and those are very different
 products.
+
+
+### 1.68 — THE KEY-MANAGEMENT CONTROL COULD NOT ANSWER THE QUESTION IT EXISTS FOR
+
+`GET /security/encryption-keys` had no web caller, so the two roles holding
+`encryption-key.read` — OFFICE_ADMINISTRATOR and SYSTEM_SECURITY_ADMINISTRATOR — could not answer *which
+key is encrypting our customers' national IDs right now, and how many retired keys are we still holding in
+order to decrypt older rows?* without inspecting the running process.
+
+Both halves matter and the second is the less obvious one: **the count of retired keys is how much old
+ciphertext has not been rotated forward**, which is the figure a key-rotation control is actually about. A
+custodian who cannot see it cannot tell a completed rotation from one that stalled.
+
+Closed as a gated SECTION on `/settings/security`, and the placement is the interesting decision.
+
+**That page must stay UNGATED** — it is the only route through `MfaRequiredGuard`, so gating the page
+would lock ten of eleven roles out of pairing an authenticator, which is a defect this repo has already
+recorded. A gated section on an ungated page therefore needs no new nav entry and raises no § 1.61
+question: it renders for exactly the two roles holding the code.
+
+**It renders NOTHING for a reader without the code — not a refusal sentence.** That is the opposite of the
+choice made for the pause control, the correction form and the line admin, all of which say "you do not
+hold X". Those sit on screens whose whole purpose is the action, so naming the missing grant is useful. A
+Sales Officer on `/settings/security` came to pair an authenticator and has no reason to be told that a key
+inventory they have never heard of exists. **The rule is not "always explain the refusal" but "explain it
+where the reader came for the thing refused".**
+
+Key material is absent from the response by construction — the endpoint returns an id and a status, and the
+keys live in memory/env config — which is what makes a custodian's browser a safe place to render this at
+all. The screen says so, in both languages.
+
+**Three plants, each killing one named test**: the permission gate, active and retired rendering the same
+label, and the empty registry rendering an empty table instead of saying so.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
