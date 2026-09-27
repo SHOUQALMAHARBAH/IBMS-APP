@@ -333,6 +333,8 @@ export const OPERATIONS = {
     homeUsersBlurb: 'أنشئ حسابات المستخدمين، وأسند الأدوار أو اسحبها، وفعّل الحساب أو ألغِه.',
     homeEmployeesBlurb: 'سجلات الموظفين والتراخيص والشهادات والتدريب.',
     homeOrgUnitsBlurb: 'أسماء أقسام مكتبك وفروعه — تُنشأ قبل تسجيل أول موظف.',
+    homeInsuranceLinesBlurb:
+      'فروع التأمين التي تُصنَّف بها أعمالك — أضِف فرعاً لا تغطيه القائمة القياسية.',
     navGroupAccount: 'حسابك',
     homeNoDestinations:
       'لا توجد شاشة متاحة لحسابك حالياً — لم تُسند إليك أي صلاحية بعد. راجع مسؤول النظام في مكتبك.',
@@ -881,6 +883,8 @@ export const OPERATIONS = {
     homeUsersBlurb: 'Create user accounts, grant or revoke roles, activate or deactivate access.',
     homeEmployeesBlurb: 'Employee records, licences, certifications and training.',
     homeOrgUnitsBlurb: "Your office's department and branch names — created before the first employee.",
+    homeInsuranceLinesBlurb:
+      'The lines of business your work is classified by — add one the standard list does not cover.',
     navGroupAccount: 'Your account',
     homeNoDestinations:
       'No screen is available to your account yet — no permissions have been granted to it. Ask your office administrator.',

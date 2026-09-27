@@ -2830,7 +2830,7 @@ see. Ordered by consequence:**
 | ~~`sla/holidays` (GET + POST)~~ | 2 | ~~§ 1.57 — the calendar every business-day deadline is counted against.~~ **CLOSED 2026-09-27**: a "Non-working days" section on `/sla-policies`, which is where it belongs because every holder of `sla.holiday.create` also holds `sla.policy.read` (measured — § 1.61's rule). Closing it found that a duplicate date was a **500** and that adding a holiday was **not audited**; both fixed. The DATES remain the owner's to supply — see § 1.57, which is now half-closed rather than closed. |
 | `insurer-masters/:id` and its form templates | 4 | The GLOBAL catalogue: view one, list/add its form templates. |
 | `insurers/:id/form-templates` | 3 | Already recorded above (Q9's UI). |
-| `PATCH /insurance-lines/:id` | 1 | An office cannot correct a line of business it added. Also recorded in `docs/b7-consistency-record.md`. |
+| ~~`PATCH /insurance-lines/:id`~~ **and `POST /insurance-lines`** | 2 | ~~An office cannot correct a line of business it added.~~ **CLOSED 2026-09-28**, and the POST turned out to be unreachable too — invisible to the path-only pass because `GET /insurance-lines` is called by three pickers. So an office could neither ADD nor correct a line. `/settings/insurance-lines`, gated on both write codes. § 1.66. |
 | `GET /cross-border-transfers/:id` | 1 | The list is reachable; the single-transfer detail read is not. |
 | `GET /access-recertification/cycles/:id/admin-items` | 1 | The administrator's view of a recertification cycle. |
 | `GET /security/encryption-keys` | 1 | The key inventory. |
@@ -2856,8 +2856,8 @@ is a second pass that pairs the helper with the method (`apiGet`→GET, `apiPost
 **14 more routes on top of the 21** — every one of them counted as reachable by the first pass. Four were
 hand-checked rather than taken from the script:
 
-- **`POST /insurance-lines`** — an office cannot ADD a line of business, not merely cannot correct one.
-  `GET /insurance-lines` is called for a picker, which is what hid it.
+- ~~**`POST /insurance-lines`**~~ — an office cannot ADD a line of business, not merely cannot correct one.
+  `GET /insurance-lines` is called for a picker, which is what hid it. **CLOSED — § 1.66.**
 - **`PATCH /customers/:id`** — § 1.65, and it was MINE.
 - **`GET /knowledge-base-articles`** and **`/:id`** — the web POSTs and PATCHes articles and never reads
   one back: an office can write a knowledge-base article and cannot open it.
@@ -3911,6 +3911,60 @@ typed into and then CLEARED, which becomes `''` and would instruct the server to
 number. That case is now its own test, and the re-planted filter kills it. **Third time this session that a
 plant found a test which could not observe the thing it was named for** (§ 1.62's decision gate, § 1.60's
 first pass, and this), and every one was found by naming the victim before running rather than by reading.
+
+
+### 1.66 — AN OFFICE COULD NEITHER ADD NOR CORRECT A LINE OF BUSINESS, AND A MOCK GLOB ATE THE PAGE ITSELF
+
+`POST /insurance-lines` and `PATCH /insurance-lines/:id` both had no web caller. The PATCH was already
+recorded in § 1.44; **the POST was not, because the path-only measurement could not see it** —
+`GET /insurance-lines` is called by three pickers (`/commission`, `/insurer-directory`, `/insurers/new`), so
+a POST on the same path read as covered. It took the verb-aware pass (§ 1.65) to find it.
+
+**AND A HAND SURVEY HAD ALREADY GOT IT RIGHT.** `docs/b7-consistency-record.md`'s own row reads
+"`POST`/`PATCH /insurance-lines` have no web client function at all" — both verbs, correctly, written by
+reading the client file. The automated measurement recorded one of the two and was structurally incapable
+of recording the other. That is worth keeping in view whenever a script's number is preferred to a
+person's reading: **the script is better at breadth and worse at knowing what it is not looking at.** The
+fix was not to trust the survey more, but to make the script able to see verbs — and then to hand-check
+four of its fourteen new rows, because a new measurement earns the same scepticism the last one did.
+
+**What that cost is bigger than a missing edit button.** The insurance line is the axis this product
+classifies business by — commission rates resolve against it, the RFQ and the policy copy it, the directory
+filters on it. An office writing a line the standard 32 do not cover had **no way to name it**, so that
+business had nowhere to sit in any screen that groups by line.
+
+`/settings/insurance-lines` closes both. Three things in it are decisions rather than layout:
+
+**The placement is measured, not chosen.** `insurance-line.create` and `insurance-line.update` are held by
+OFFICE_ADMINISTRATOR alone, and that role also holds the `insurer.read` the list needs — so the control is
+on a screen every holder of its permission can open (§ 1.61). The nav entry names BOTH write codes,
+following `/settings/org-units`, so a future role holding one still gets in.
+
+**A standard line is not editable, and the server already agreed.** `PATCH` resolves through
+`findOfficeLineById`, so a standard line's id reads as ABSENT rather than forbidden — it is not an office
+addition. The screen offers the control only where `isStandard` is false and STATES the reason on the rows
+it does not, because a missing button with no explanation reads as a broken screen.
+
+**Both names are required, and the test asserts the English-only case is refused.** Arabic is this
+platform's primary language and a line name appears on documents a client reads, so a one-script entry
+renders untranslated mid-sentence. A test that only submits an empty form cannot tell "both required" from
+"non-empty required".
+
+#### The trap worth remembering: a route glob that matches the page's own URL
+
+The first run of the new spec rendered **a page of raw JSON with no heading and no error**, and every
+assertion failed with "element(s) not found". Cause: `page.route("**/insurance-lines", …)` also matches
+this screen's own URL, `/settings/insurance-lines` — so Playwright intercepted the PAGE NAVIGATION and
+served the mocked list as the document.
+
+**That failure mode is indistinguishable from a screen that failed to mount**, which is what made it worth
+a minute of diagnosis rather than a guess: the error-context snapshot showed the JSON as the page's only
+text, and that is the tell. Name the API origin (`http://localhost:4000/...`) whenever a route pattern
+could also match a page path — which is any time the API collection and the screen share a noun, and this
+repo names them the same on purpose.
+
+**Five plants, each killing one named test**: one name accepted instead of two, standard lines offered for
+correction, save allowed with nothing changed, the permission gate, and the swallowed collision message.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

@@ -1,0 +1,27 @@
+{
+  "add-allows-one-name-only": {
+    "file": "apps/web/lib/insurer/insurance-line-api.ts",
+    "from": "    input.nameEn.trim().length >= LINE_NAME_MIN_LENGTH &&\n    input.nameAr.trim().length >= LINE_NAME_MIN_LENGTH",
+    "to": "    input.nameEn.trim().length >= LINE_NAME_MIN_LENGTH"
+  },
+  "standard-lines-offered-for-correction": {
+    "file": "apps/web/app/(app)/settings/insurance-lines/page.tsx",
+    "from": "                      {l.isStandard ? (\n                        <span style={muted} data-testid={`line-locked-${l.id}`}>",
+    "to": "                      {false ? (\n                        <span style={muted} data-testid={`line-locked-${l.id}`}>"
+  },
+  "save-allowed-with-no-changes": {
+    "file": "apps/web/app/(app)/settings/insurance-lines/page.tsx",
+    "from": "                            disabled={busy || !lineEditHasChanges(edit, l)}",
+    "to": "                            disabled={busy}"
+  },
+  "write-controls-ignore-the-permission": {
+    "file": "apps/web/app/(app)/settings/insurance-lines/page.tsx",
+    "from": "  const canCreate = hasPermission(user, 'insurance-line.create');",
+    "to": "  const canCreate = true;"
+  },
+  "collision-message-swallowed": {
+    "file": "apps/web/app/(app)/settings/insurance-lines/page.tsx",
+    "from": "      setActionError(\n        err instanceof ApiError ? err.message : t('lineAdminAddError'),\n      );",
+    "to": "      setActionError(t('lineAdminAddError'));"
+  }
+}

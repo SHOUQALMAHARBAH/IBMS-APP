@@ -44,6 +44,7 @@ const BLURBS: Partial<Record<string, TranslationKey>> = {
   '/settings/users': 'homeUsersBlurb',
   '/employees': 'homeEmployeesBlurb',
   '/settings/org-units': 'homeOrgUnitsBlurb',
+  '/settings/insurance-lines': 'homeInsuranceLinesBlurb',
 };
 
 export default function HomePage() {

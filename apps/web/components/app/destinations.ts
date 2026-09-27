@@ -269,6 +269,15 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         permissions: ['duty-segregation.mode.declare', 'internal-controls.view'],
       },
       {
+        href: '/settings/insurance-lines',
+        labelKey: 'navInsuranceLines',
+        // BOTH write codes, following org-units: today OFFICE_ADMINISTRATOR holds
+        // each, and a future role holding only one still gets in with the column it
+        // cannot use rendered read-only. Gating on `insurer.read` instead would put
+        // the link in front of six roles that can change nothing here.
+        permissions: ['insurance-line.create', 'insurance-line.update'],
+      },
+      {
         href: '/settings/org-units',
         labelKey: 'navOrgUnits',
         // Either code opens the screen; each column renders only for the one that gates it. A single

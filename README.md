@@ -4177,6 +4177,15 @@ email arrive masked, so prefilling would write the mask back as the customer's p
 the request reference that satisfies the gate. `IMPROVEMENTS.md` § 1.65 — including that the statutory flow
 needs two people, because the DPO who closes the request does not hold `customer.update`.
 
+**An office can add and correct its own lines of business (2026-09-28).** `POST /insurance-lines` and
+`PATCH /insurance-lines/:id` had no web caller, so the vocabulary this product classifies all business by
+could be read and never extended — and a broker writing a line the standard 32 do not cover had no way to
+name it. `/settings/insurance-lines`, gated on `insurance-line.create` + `.update` (OFFICE_ADMINISTRATOR
+holds both). A standard line is deliberately not editable there and the row says why; both names are
+required because Arabic is the primary language and a line name reaches documents a client reads.
+`IMPROVEMENTS.md` § 1.66 — including that the hand-written b7 survey had both verbs right while the
+automated path-only measurement could only ever see one of them.
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold
