@@ -14,7 +14,8 @@ modules — **Domain A, Processes 1–10**: Lead Management (#1 — create/list/
 `LeadStatus` transition, an intake-form + pipeline-board screen), Prospect Management (#2
 — convert a qualified Lead, capture its qualification profile, a profile screen), Customer
 Acquisition/Onboarding (#3-4 — individual/corporate Customer creation, UBO capture, KYC
-lifecycle with *simulated* sanctions/PEP/AML screening and maker/checker approval, a
+lifecycle with sanctions screening (real lists; PEP and pre-transaction screening are
+NOT implemented — see § Known gaps) and maker/checker approval, a
 step-by-step wizard + Compliance queue), Needs Assessment (#5 — a structured risk
 questionnaire that derives a recommended coverage list, with a review + approval gate),
 Risk Assessment (#6 — a per-site asset survey deriving Sum Insured + indemnity period,
@@ -2401,6 +2402,37 @@ else.
   `KycService.decide()` is the only caller of the `Customer` `PENDING_KYC -> ACTIVE`
   move, gated on `assertDifferentActors(kyc.createdByUserId, actorUserId, ...)` (A.5) so
   the Sales Officer who captured a KYC file can never also be its approver.
+- **PRE-TRANSACTION SCREENING IS A REGULATORY OBLIGATION AND IS NOT IMPLEMENTED**
+  (`IMPROVEMENTS.md` § 1.58, obligation 2). Jordan's AMLU requires screening *"before
+  processing any transaction"*
+  (https://amlu.gov.jo/EN/Pages/Frequently_Asked_Questions). **No money-movement path
+  in this system consults screening at any point.** Measured: zero references to
+  screening, the watchlist, sanctions or a hold in `invoice.service.ts` (client receipt
+  and insurer remittance), `refund.service.ts`, `commission-ledger.service.ts` or
+  `collection.service.ts`; and the complement holds — every file that reads screening
+  state is the customer/KYC module, notifications, the SLA registry and two
+  repositories.
+
+  **What DOES exist is a different obligation.** `ScreeningHoldService` gates KYC
+  APPROVAL, which is the AMLU's *"prior to onboarding new customers"* leg, and it
+  works. Satisfying it does not satisfy this one: a customer onboarded cleanly in March
+  whose name appears on a list in June can be paid in July with nothing consulted. The
+  nightly AML/CFT **transaction monitoring** sweep is also a different thing — it looks
+  at patterns AFTER the fact and raises alerts; it is not a pre-transaction screen.
+
+  **Deliberately deferred, not overlooked** (owner's decision, 2026-09-28): which paths
+  count as processing a transaction, and what a hit should DO to one — refuse, hold, or
+  allow-and-flag — are decisions with money and contractual consequence. Refusing a
+  remittance to an insurer is not a technical choice. **This note exists because
+  deferring the work is legitimate and hiding the gap is not** — the same standard
+  applied to the PEP row below, applied to our own deferral rather than only to whoever
+  wrote the original.
+
+- **A BENEFICIAL OWNER CAN BE ADDED WITHOUT ANY SCREENING**, and is in the same deferred
+  set. `POST /customers/:id/ubos` runs no screening; there is no PATCH and no DELETE, so
+  an existing UBO cannot be edited or removed. Measured 2026-09-28. Recorded here rather
+  than fixed, for the reason above.
+
 - **Sanctions/PEP/AML screening now checks a real, free, publicly published data source
   in every environment including production (Part C #49) — this row is no longer
   accurate as originally written.** `ScreeningService` checks the Customer's `legalName`

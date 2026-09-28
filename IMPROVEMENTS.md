@@ -3435,6 +3435,13 @@ as the drafted/unsourced values in § 4 rather than something to invent.
 
 ### 1.58 `P1` — TWO AMLU SCREENING OBLIGATIONS MEASURED: one met by coincidence of cadence, one absent entirely
 
+> **DEFERRED BY THE OWNER, 2026-09-28 — do not build, do not extend.** All money work and
+> all AML/screening work waits until after the broker session. The reasoning is not delay:
+> **the broker's day is about money**, he knows that area better than anyone here, and
+> building it after him is the correct order rather than a postponement. This entry's
+> state is recorded below and nothing further is designed from it. Five safety conditions
+> hold the deferral in place — see `## The 2026-09-28 deferral` at the end of § 1.
+
 The owner verified Jordan's AMLU FAQ against the primary source and found that the same sentence
 requires screening in two cases this codebase has never tracked. Measured here as fact and
 **nothing changed**, per the instruction.
@@ -3508,6 +3515,13 @@ that screening is required, and what the system should DO on a hit at that momen
 infer.
 
 ### 1.59 `P1` — A CUSTOMER'S SCREENING STANDING GATES NOTHING AFTER ONBOARDING. `Customer.status` is written and never read
+
+> **DEFERRED BY THE OWNER, 2026-09-28 — do not build, do not extend.** All money work and
+> all AML/screening work waits until after the broker session. The reasoning is not delay:
+> **the broker's day is about money**, he knows that area better than anyone here, and
+> building it after him is the correct order rather than a postponement. This entry's
+> state is recorded below and nothing further is designed from it. Five safety conditions
+> hold the deferral in place — see `## The 2026-09-28 deferral` at the end of § 1.
 
 Found while designing the identifier-correction re-screening (§ 3.14, the owner's requirement that "a
 change sets screening state to RE-SCREENING REQUIRED, and the prior result IS NOT the current
@@ -4289,6 +4303,49 @@ problem from a stable one.
 
 
 
+## The 2026-09-28 deferral
+
+**The owner deferred all money work and all AML/screening work until after the broker
+session.** Recorded here because a deferral that is not written down becomes an omission
+nobody can account for.
+
+**Why it is the right order, in her framing**: the broker's day is about money — premiums,
+commissions, claim payments, settlements — and he knows that area better than anyone
+building it. Building after him is not a delay.
+
+### Deferred — do not build, do not extend
+
+**AML and screening.** § 1.59 (nothing reads a customer's screening standing) · § 1.58
+obligation 2 (no transaction path is screened) · § 3.14's regulatory half · editing any
+screening identifier · a PEP data provider · renaming `sanctions-pep.screen` and
+`aml.monitor`.
+
+**Money.** The payment-methods work in full (types, cheque states, offset, net
+remittance, IBAN validation, CliQ caps) · the four commercial surfaces · who sees
+commission rates · payment methods and insurer credit terms.
+
+### The five safety conditions, and their verified state
+
+| | Condition | State, measured 2026-09-28 |
+|---|---|---|
+| 1 | The screening identifiers stay uneditable | **HOLDS, at three layers.** `UpdateCustomerContactDto` declares only phone, email and registered address, and `forbidNonWhitelisted: true` is set globally — so an identifier arrives as a 400 naming the field. The repository's single `customer.update` write accepts only those three in its TypeScript signature, so even a service bug cannot pass a name. `customer.e2e-spec.ts` refuses six identifiers **one at a time**. `placeOfBirth` and passport are not columns at all. A beneficial owner can be ADDED and READ — there is no PATCH and no DELETE — so none of the six can be edited from anywhere. |
+| 2 | No claim is reintroduced | **HOLDS.** Three AML/PEP appearances in user-facing text, each legitimate: permission-code names inside refusal messages (renaming those is itself deferred); the PEP **negative** claim — *"PEP screening is NOT operational. No customer may be represented as clear of PEP status"* — which is the honesty fix and must stay; and the AML/CFT **transaction monitoring** screen, which describes a sweep that genuinely runs (a nightly `@Cron` plus an on-demand route). Nothing claims a check runs that does not. |
+| 3 | What is built in screening stays and is not extended | **HOLDS.** The sanctions case queue, the watchlist rollback and its audit row, and the sanctions check itself are untouched since they closed. |
+| 4 | The confirmed absence stays written and visible | **DONE.** README § Known gaps now carries *"pre-transaction screening is a regulatory obligation and is not implemented"* with the AMLU citation and the measurement, directly above the screening row, plus a pointer from the top-of-file summary — which previously described screening as *"simulated"*, itself stale. The beneficial-owner gap is recorded beside it. |
+| 5 | The refund disbursement stays at its minimum | **HOLDS — and it is SMALLER than believed.** It records **no payment method** and **no external reference**: the route takes no request body at all, stamps `paidAt`, and writes a ledger entry whose reference is system-derived (`refund:<id>`). So a paid refund cannot be reconciled against a bank statement — nothing records which account it left or what the bank will show. Left exactly as it is per the deferral; on the broker-session list as question 7. |
+
+### What the deferral changes
+
+The owner's blocked decisions drop from seven to **four**: § 1.67, § 1.61, § 1.65, § 1.53.
+Briefs for those are in `docs/decisions-2026-09-28.md`, written in plain language. § 1.59,
+§ 1.58 and § 3.14's regulatory half get no brief — their state is recorded above and
+nothing further is designed from them.
+
+The money questions the broker should be asked are accumulating in
+`docs/broker-session-money-questions.md` — the owner's own six, plus three added from
+measurement. **Add to it whenever deferred work touches something unanswerable.** His
+answers are the input to the money work; our guesses are not.
+
 ## 2. Bugs found & fixed this session (regression-watch)
 
 All fixed and covered by tests; listed so a future refactor doesn't silently
@@ -4518,6 +4575,12 @@ entry follows, for the record.
   SLA figures once a service charter supplies them.
 
 ### 3.14 `P1` — A customer record cannot be CORRECTED, and a PDPL correction request is closed by attestation alone
+
+> **THE REGULATORY HALF IS DEFERRED BY THE OWNER, 2026-09-28** — do not build, do not
+> extend. What is BUILT and stays: phone, email and registered address are correctable,
+> and the screening identifiers are refused by construction. What is deferred: editing any
+> screening identifier, which requires the re-screening mechanism, which requires § 1.59's
+> missing consequence. The first half of this entry is closed; the second is on hold.
 
 Measured while scoping four-action Phase 3 ("update codes where a real update scenario
 exists, customer first"). The scope turned out to be larger than a permission code.
