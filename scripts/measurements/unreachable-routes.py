@@ -91,6 +91,49 @@ CALL = re.compile(
 )
 PATHARG = re.compile(r"^\s*([`'\"])(.*?)\1", re.S)
 
+# FAILURE MODE 5, found 2026-09-28: PATHARG is anchored at `^`, so it only matches a first
+# argument that BEGINS with a quote. A ternary does not:
+#
+#     apiGet(
+#       category
+#         ? `/knowledge-base-articles?category=${encodeURIComponent(category)}`
+#         : '/knowledge-base-articles',
+#     )
+#
+# The match failed, the call was skipped, and the path counted as addressed by nothing. This
+# pass is verb-AGNOSTIC so it usually survives — some other call POSTs the same path with a
+# bare literal and the path reads as reached. The VERB-AWARE pass does not: it separates GET
+# from POST, so a path POSTed with a literal and GET through a ternary reads as "GET
+# unreachable". That produced two false positives, and one of them had been recorded in
+# CLAUDE.md as a hand-CHECKED finding (`GET /knowledge-base-articles`).
+#
+# So scan the whole FIRST argument for path-like literals instead of requiring it to start
+# with one. Bounded at the first top-level comma, because argument two is a request body and
+# a string inside it is not a path.
+_STRLIT = re.compile(
+    r"([`'" + '"' + r"])((?:" + (chr(92) * 2) + r".|(?!" + chr(92) + r"1)[^" + (chr(92) * 2) + r"])*)" + chr(92) + r"1",
+    re.S,
+)
+
+
+def first_arg_paths(text):
+    """Every '/'-leading string literal in the first argument of a call whose '(' was consumed."""
+    depth = 0
+    end = len(text)
+    for i, ch in enumerate(text):
+        if ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            if depth == 0:
+                end = i
+                break
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            end = i
+            break
+    return [m.group(2) for m in _STRLIT.finditer(text[:end]) if m.group(2).startswith('/')]
+
+
 
 def web_calls():
     """Verb-agnostic: every path STRING passed as the first argument of a client call.

@@ -76,18 +76,23 @@ def web_calls_by_verb():
                 ).read()
                 for m in base.CALL.finditer(src):
                     helper = m.group(1) or m.group(2)
-                    arg = base.PATHARG.match(src[m.end():])
-                    if not arg:
-                        continue
-                    path = base.norm(arg.group(2))
-                    if not path:
-                        continue
-                    if helper in OPAQUE:
-                        opaque_paths.add(path)
-                        continue
-                    method = HELPER_METHOD.get(helper)
-                    if method:
-                        by_path.setdefault(path, set()).add(method)
+                    # EVERY path literal in the first argument, not just one anchored at its
+                    # start. `base.PATHARG` requires the argument to BEGIN with a quote, which
+                    # a ternary does not -- and this pass is where that matters, because it
+                    # separates GET from POST: a path POSTed with a bare literal and GET
+                    # through a ternary read as "GET unreachable". Two false positives came
+                    # from that, one of them recorded as a hand-checked finding. See FAILURE
+                    # MODE 5 in unreachable-routes.py.
+                    for raw in base.first_arg_paths(src[m.end():]):
+                        path = base.norm(raw)
+                        if not path:
+                            continue
+                        if helper in OPAQUE:
+                            opaque_paths.add(path)
+                            continue
+                        method = HELPER_METHOD.get(helper)
+                        if method:
+                            by_path.setdefault(path, set()).add(method)
     return by_path, opaque_paths
 
 
