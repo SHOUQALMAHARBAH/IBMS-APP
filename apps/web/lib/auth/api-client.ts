@@ -41,7 +41,18 @@ export function isMfaEnrolmentError(err: unknown): boolean {
 async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  // NOT for a FormData body. The browser has to set `multipart/form-data` ITSELF, because only it
+  // knows the boundary token it generated — stamping `application/json` here makes the server read
+  // a multipart payload as JSON and reject it, and the failure looks like a bad file rather than a
+  // bad header. This is the first multipart upload the app makes; `apiFetchBlob` above is the same
+  // moment for the first binary download.
+  if (
+    init.body &&
+    !(init.body instanceof FormData) &&
+    !headers.has('Content-Type')
+  ) {
+    headers.set('Content-Type', 'application/json');
+  }
   return fetch(`${API_URL}${path}`, { ...init, headers, credentials: 'include' });
 }
 
@@ -140,6 +151,17 @@ export async function apiFetchBlob(
 
 export function apiPost<T>(path: string, body?: unknown, options?: { skipAuthRetry?: boolean }): Promise<T> {
   return apiFetch<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, options);
+}
+
+/**
+ * A multipart POST — a file plus ordinary form fields.
+ *
+ * Separate from `apiPost` rather than a branch inside it: the two differ in what they may not do.
+ * `apiPost` serialises its body, which would turn a `File` into `{}`, and this one must leave the
+ * body untouched so the browser can set the boundary.
+ */
+export function apiPostFormData<T>(path: string, form: FormData): Promise<T> {
+  return apiFetch<T>(path, { method: 'POST', body: form });
 }
 
 export function apiGet<T>(path: string, options?: { skipAuthRetry?: boolean }): Promise<T> {

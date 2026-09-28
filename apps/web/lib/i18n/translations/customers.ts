@@ -2,6 +2,39 @@
 // Process 3-4, Customer Acquisition/Onboarding + KYC.
 export const CUSTOMERS = {
   AR: {
+    // /settings/customer-import — loading an office's legacy customer file.
+    // The screening line is worded as WORK, never as an error: the row is imported and any match
+    // goes to the sanctions review queue like any other.
+    impHeading: 'استيراد العملاء',
+    impIntro:
+      'حمّل ملف عملائك الحالي كما هو. أنت من يحدد أي عمود في ملفك يحمل كل حقل، ' +
+      'فلا حاجة لإعادة كتابة الملف. تُفحص كل صفحة مقابل قوائم الجزاءات أثناء الاستيراد.',
+    impLoading: 'جارٍ التحميل…',
+    impNoPermission: 'لا تملك صلاحية customer.bulk-import اللازمة لاستيراد ملف عملاء.',
+    impUploadLegend: 'الملف وربط الأعمدة',
+    impFileLabel: 'ملف CSV',
+    impMappingIntro:
+      'اكتب اسم العمود في ملفك مقابل كل حقل. اترك الحقل فارغاً إن لم يكن في ملفك. ' +
+      'الحقول المعلَّمة بنجمة مطلوبة.',
+    impFieldLegalName: 'الاسم القانوني',
+    impFieldCustomerType: 'نوع العميل (فرد / شركة)',
+    impFieldRegistrationNumber: 'رقم التسجيل',
+    impFieldNationality: 'الجنسية',
+    impFieldContactEmail: 'البريد الإلكتروني',
+    impFieldContactPhone: 'الهاتف',
+    impFieldRegisteredAddress: 'العنوان المسجَّل',
+    impMissingRequired: 'لم تُربط الحقول المطلوبة: {fields}.',
+    impSubmit: 'استيراد',
+    impImporting: 'جارٍ الاستيراد…',
+    impFailed: 'تعذر استيراد الملف.',
+    impResultHeading: 'نتيجة استيراد {fileName}',
+    impResultCounts: 'استُورد {imported} من {total} صف، ورُفض {rejected}.',
+    impScreeningClear: 'فُحص {screened} صف مقابل قوائم الجزاءات، ولم تظهر أي مطابقة محتملة.',
+    impScreeningFlagged:
+      'فُحص {screened} صف مقابل قوائم الجزاءات، وظهرت {flagged} مطابقة محتملة. ' +
+      'الصفوف مستوردة، والمطابقات في قائمة مراجعة الجزاءات للفصل فيها.',
+    impColLine: 'رقم السطر في ملفك',
+    impColReason: 'السبب',
     customersHeading: "العملاء",
     customersProcessIntro:
       "العملية 3-4 — اكتساب العملاء والتهيئة (أفراد وشركات)، اعرف عميلك، والملكية النفعية.",
@@ -218,6 +251,41 @@ export const CUSTOMERS = {
     kycStatusPeriodicReviewDue: "مراجعة دورية مستحقة",
   },
   EN: {
+    // /settings/customer-import — loading an office's legacy customer file.
+    impHeading: 'Customer import',
+    impIntro:
+      'Upload your existing customer file as it is. You say which column in YOUR file carries ' +
+      'each field, so the file does not have to be rewritten. Every row is screened against the ' +
+      'sanctions lists as it is imported.',
+    impLoading: 'Loading…',
+    impNoPermission:
+      'You do not hold the customer.bulk-import permission needed to load a customer file.',
+    impUploadLegend: 'The file, and which column is which',
+    impFileLabel: 'CSV file',
+    impMappingIntro:
+      'Name the column in your file for each field. Leave a field empty if your file does not ' +
+      'carry it. Fields marked with an asterisk are required.',
+    impFieldLegalName: 'Legal name',
+    impFieldCustomerType: 'Customer type (individual / corporate)',
+    impFieldRegistrationNumber: 'Registration number',
+    impFieldNationality: 'Nationality',
+    impFieldContactEmail: 'Email',
+    impFieldContactPhone: 'Phone',
+    impFieldRegisteredAddress: 'Registered address',
+    impMissingRequired: 'No column named yet for: {fields}.',
+    impSubmit: 'Import',
+    impImporting: 'Importing…',
+    impFailed: 'Could not import the file.',
+    impResultHeading: 'Result of importing {fileName}',
+    impResultCounts: 'Imported {imported} of {total} rows; {rejected} rejected.',
+    impScreeningClear:
+      'Screened {screened} rows against the sanctions lists, with no potential match.',
+    impScreeningFlagged:
+      'Screened {screened} rows against the sanctions lists, with {flagged} potential ' +
+      'match(es). Those rows ARE imported; the matches are in the sanctions review queue to be ' +
+      'decided.',
+    impColLine: 'Line in your file',
+    impColReason: 'Reason',
     customersHeading: "Customers",
     customersProcessIntro:
       "Process 3-4 — customer acquisition and onboarding (individual and corporate), KYC, and " +

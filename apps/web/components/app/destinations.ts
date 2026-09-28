@@ -264,6 +264,13 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         ],
       },
       { href: '/settings/users', labelKey: 'navUserAdmin', permissions: ['user.manage'] },
+      // Both holders of `customer.bulk-import` are administrator roles, and neither holds any code
+      // that reads a customer — so this cannot sit on `/customers`, a screen they cannot use.
+      {
+        href: '/settings/customer-import',
+        labelKey: 'navCustomerImport',
+        permissions: ['customer.bulk-import'],
+      },
       // `role.read`, not a write code: a caller who may look at the office's
       // roles but not change them gets the screen read-only rather than no link
       // at all. That is the whole reason the prep step split those two names.

@@ -4655,6 +4655,69 @@ precisely the state an office creates the first time it uses the Role screen.
 
 **Verification**: web e2e `employees` 10/10 (from 5), web unit 109, typecheck clean.
 
+
+### 1.74 `P2` — `customer.bulk-import` WAS A PERMISSION ITS TWO HOLDERS COULD NOT EXERCISE; AND THEY CANNOT CREATE ONE CUSTOMER OR READ WHAT THEY IMPORT
+
+`POST /imports/customers` had no web caller — the oldest entry on § 1.44's list, recorded as a gap
+since the insurer work first measured it. An office migrating from a previous system had no way to
+load its customer file.
+
+#### The deferral was checked first, and the import does NOT extend screening
+
+The 2026-09-28 deferral's condition 3 is that what is built in screening stays and is not
+extended. Measured before writing anything: `legacy-import.service.ts` screens **every imported
+row through the SAME `ScreeningService.run` the intake flow uses** — its own header says so — and
+reports the count. So giving the route a caller exercises existing screening rather than adding
+any, and nothing about the deferred work is touched.
+
+#### The finding: the two roles that may import cannot create one customer, or read any
+
+    customer.bulk-import    OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR
+    customer.create         SALES_RELATIONSHIP_OFFICER, ...  (NEITHER importer holds it)
+
+And per the first-run measurement, the office administrator holds **29 codes and none of them
+reads a customer.** So whoever loads five hundred customers cannot create one by hand and cannot
+then open what they loaded.
+
+**Defensible as segregation** — a migration tool is not a data-entry path, and reading customers
+is sales work — **but it is a decision rather than something to discover**, and it settles where
+the screen goes: § 1.61 says a control must sit where every holder of its permission can reach it,
+so this cannot be a section on `/customers`. Both holders are administrator roles, so it is
+`/settings/customer-import` with its own nav entry gated on the import code.
+
+#### The screening count is reported APART from the failures, and worded as work
+
+A potential match does not stop the import: the row is written and the match joins the sanctions
+review queue. So the screen states the rows **ARE** imported and says where the matches went.
+Folding `screeningFlagged` in with `rejected` and `failures` would teach an office to treat a real
+hit as a data problem — the one wording mistake on this screen that would matter.
+
+#### The first multipart upload the app makes, and the shared client would have broken it
+
+`rawFetch` set `Content-Type: application/json` on **any** body without one. On a `FormData` body
+that is fatal: the browser has to set `multipart/form-data` itself because only it knows the
+boundary token it generated, so the server would read a multipart payload as JSON — and the
+failure looks like a bad FILE rather than a bad header. Now excluded at the one chokepoint every
+request passes through, with `apiPostFormData` beside `apiFetchBlob`, which was the same moment
+for the first binary download. **The test asserts the content type and the presence of a
+boundary**, because nothing else would name that cause.
+
+`mapping` is how an office imports the file it already has rather than rewriting it: seven fields,
+two required, each naming a column heading in THEIR file. An unmapped field is sent **absent,
+never `''`** — an empty heading tells the server to look for a column named `""`, which is a
+different request from "my file does not carry that field".
+
+**Seven plants**, each killing the test it names, including reverting the content-type exclusion
+and loosening the required set from two fields to one — caught only because the test names the
+required columns **one at a time**.
+
+**Verification**: new `customer-import.spec.ts` 7/7 including a11y; the five nav-sensitive specs
+33/33 after the new destination; web unit 109; typecheck clean, lint 0 errors.
+
+**Two `getByRole("alert")` queries failed first** and are the recorded trap's third occurrence in
+this repo: Next renders its own route announcer with `role="alert"`, so a page-wide query is a
+strict-mode violation. Scope to `main`.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
