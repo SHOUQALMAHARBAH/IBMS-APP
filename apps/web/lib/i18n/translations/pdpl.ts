@@ -79,6 +79,17 @@ export const PDPL = {
     dsrColAction: 'الإجراء',
     dsrNoRetentionHold: 'لا يوجد حجز احتفاظ قائم',
     dsrVerifyIdentity: 'التحقق من الهوية',
+    dsrClockHeading: 'ساعة المهلة القانونية',
+    dsrClockCounts: 'موقوفة: {paused} من {open} ساعة مفتوحة',
+    dsrClockReason: 'سبب إيقاف الساعة',
+    dsrClockReasonHint:
+      'اذكر سبب توقف المهلة — عشرة أحرف على الأقل. يُسجَّل السبب في سجل التدقيق لكل ' +
+      'ساعة تُوقف، وساعة موقوفة بلا سبب مذكور لا تختلف عن ساعة نسي أحدهم استئنافها.',
+    dsrClockPause: 'إيقاف الساعة',
+    dsrClockResume: 'استئناف الساعة',
+    dsrClockDone: 'إغلاق',
+    dsrClockLoadError: 'تعذّر قراءة حالة الساعة — حاول مرة أخرى.',
+    dsrClockActionError: 'تعذّر تنفيذ الإجراء على الساعة — حاول مرة أخرى.',
     dsrStartButton: 'بدء المعالجة',
     dsrAssignButton: 'إسناد',
     dsrExtendButton: 'تمديد ١٥ يوماً',
@@ -387,6 +398,18 @@ export const PDPL = {
     dsrColAction: 'Action',
     dsrNoRetentionHold: 'No open retention hold',
     dsrVerifyIdentity: 'Verify identity',
+    dsrClockHeading: 'Statutory clock',
+    dsrClockCounts: 'Paused: {paused} of {open} open clock(s)',
+    dsrClockReason: 'Reason for stopping the clock',
+    dsrClockReasonHint:
+      'Say why the deadline is stopping — at least ten characters. The reason is written ' +
+      'to the audit log for every clock it stops, and a stopped clock with no stated ' +
+      'basis is indistinguishable from one somebody forgot to restart.',
+    dsrClockPause: 'Stop the clock',
+    dsrClockResume: 'Restart the clock',
+    dsrClockDone: 'Done',
+    dsrClockLoadError: 'Could not read the clock state — try again.',
+    dsrClockActionError: 'That clock action failed — try again.',
     dsrStartButton: 'Start',
     dsrAssignButton: 'Assign',
     dsrExtendButton: 'Apply +15 day extension',

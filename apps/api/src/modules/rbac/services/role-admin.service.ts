@@ -233,6 +233,46 @@ export class RoleAdminService {
    * The audit row names which codes MOVED, not that "permissions changed": that
    * diff is the only record of when an office widened a role, and it is the first
    * thing an auditor asks for.
+   *
+   * ## AN ADMINISTRATOR CAN GRANT THEMSELVES ANYTHING, AND THAT IS THE DECISION
+   *
+   * IMPROVEMENTS § 1.53, decided by the owner 2026-09-28: **this permission is NOT split
+   * and there is NO self-grant check.** An office administrator editing this screen can
+   * add any capability in the catalogue to their own role. If you have arrived here
+   * intending to close that, read all three of the following — the first two alone read
+   * like an excuse, and it is the third that makes the decision acceptable rather than
+   * merely necessary.
+   *
+   * **1. Blocking a self-grant breaks the screen's actual job.** Configuring a Finance
+   * role with capabilities the administrator will never hold is precisely what this screen
+   * is for. A rule of "you may not grant what you do not hold" makes the common,
+   * legitimate case impossible while stopping nothing an administrator could not achieve
+   * by creating a second role and assigning it to themselves.
+   *
+   * **2. A second approver cannot exist in a one-person office**, which is the size of
+   * office this product is built for. Requiring one would mean such an office could never
+   * change a permission at all — the shape Part 4's declared duty-segregation mode exists
+   * to avoid.
+   *
+   * **3. The change is already recorded, and recorded usefully.** Measured, not assumed:
+   * the audit row below carries `beforeValue.permissionCodes`, `afterValue.permissionCodes`
+   * and an explicit `added` / `removed` diff. So "who widened which role, when, and by
+   * exactly which capabilities" is answerable from the audit trail without reconstructing
+   * it from two snapshots. **That is what makes prevention unnecessary here: the control is
+   * detective rather than preventive, and it is a real one.**
+   *
+   * ## THIS DECISION'S BASIS IS THE CONTENT OF THAT ROW
+   *
+   * If the audit row ever stops naming the capabilities — if it degrades to "permissions
+   * changed", or drops the diff — then point 3 is no longer true and § 1.53 loses its
+   * basis. `role-admin.service.spec.ts` therefore asserts the row's CONTENT, not its
+   * existence: the before set, the after set, and the added/removed diff by name. A test
+   * that only checked an audit row was written would pass on the degraded version.
+   *
+   * And what is NOT at stake, so nobody re-derives it: the money controls are unreachable
+   * by any grant. `assertDifferentActors` plus fifteen database CHECK constraints refuse a
+   * self-approval regardless of what permissions the actor holds, so this is a segregation
+   * boundary question and not an open exploit.
    */
   async setPermissions(
     roleId: string,

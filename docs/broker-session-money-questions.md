@@ -1,5 +1,12 @@
-# أسئلة المال للوسيط — قائمة تُضاف إليها
-# Money questions for the broker — a running list
+# أسئلة جلسة الوسيط — قائمة تُضاف إليها
+# Broker-session questions — a running list
+
+**بنيتها**: قسم المال أولاً — وهو مُدخَل العمل المؤجَّل — يليه ما ليس عن المال. ملف واحد
+لجلسة واحدة: من يدخل الغرفة يحمل قائمة واحدة، لا اثنتين.
+
+**Structure**: the money section first — it is the input to the deferred money work —
+then the questions that are not about money. One file for one session: whoever walks into
+that room carries one list, not two.
 
 **الحالة: قائمة عاملة، لا قرار ولا تصميم.** أُنشئت بقرار المالكة في 2026-09-28 بتأجيل كل
 عمل المال وكل عمل مكافحة غسل الأموال إلى ما بعد جلسة الوسيط. إجاباته هي مُدخَل هذا العمل،
@@ -134,3 +141,41 @@ part of the system from the rest of this list.
 this — the agreement in force on a date governs — but nobody has confirmed that matches
 his practice. If a renegotiated rate is meant to apply to business already placed, the
 current model gives the wrong answer silently and every commission figure drifts.
+
+---
+
+# ما ليس عن المال / Not about money
+
+*Same rule: each question carries what it DECIDES.*
+
+### ١١. بنماذج كم شركة تأمين يعمل فعلاً، وكيف يملؤها اليوم؟ / How many insurers' forms does he actually use, and how does he fill them today?
+
+وهل إعادة إدخال البيانات نفسها في نموذج كل شركة كلفة حقيقية في يومه، أم أمر هامشي؟
+
+And is re-keying the same data into each insurer's form a real cost in his day, or a
+marginal one?
+
+**ما الذي يقرره / What it decides.** § 1.67 — the largest remaining item, and the only one
+on the unreachable-routes list that is a FEATURE rather than a missing button. The system
+can hold a map of each insurer's proposal form so an office fills the fields once; a map
+runs to **300 fields**, each with an Arabic name, an English name, a type, an order,
+whether it is required and its options. That is a bilingual form builder.
+
+**Measured 2026-09-28: zero maps and zero fields exist on either database**, against 19
+and 480 insurers — so nothing is lost by waiting, there is no accumulation and no
+migration. **No option has been chosen deliberately**: his answer may remove both of them
+(transcribe each form once, or extract from the insurer's file), because if he works with
+three insurers and fills their forms in minutes, the builder is a solution to a problem he
+does not have. If it IS needed, the plan is one insurer and one line first, to learn the
+true cost before committing.
+
+### ١٢. إن وقعت عطلة رسمية يوم جمعة أو سبت، هل يُعوَّض يوم عمل بديل؟ / If an official holiday falls on a Friday or Saturday, does the office get a substitute working day?
+
+**ما الذي يقرره / What it decides.** Every SLA deadline in the system is counted in
+WORKING days, so a substitute day that the calendar does not carry makes the deadline land
+one day early — the same direction of error as the empty calendar, against the brokerage.
+It is recoverable, because holiday entry is manual and an office can add the day; **but the
+office has to know to.** If substitution is the practice, the per-year screen should ask
+for it alongside the occasion rather than leaving somebody to remember.
+
+Not a build item — an input. Raised by the owner 2026-09-28.

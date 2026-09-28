@@ -4237,6 +4237,17 @@ been rotated forward. Now a section on `/settings/security` that renders only fo
 guard. Key material is absent from the response by construction and the screen says so.
 `IMPROVEMENTS.md` § 1.68.
 
+**A statutory clock can be stopped from the request itself (2026-09-28).** Owner decision on
+`IMPROVEMENTS.md` § 1.61: the Data Protection Officer holds `sla.timer.pause` and NOT
+`sla-dashboard.view`, so the capability was unreachable for the one role whose own statutory clocks are
+the likeliest thing anybody would legitimately pause. The control moved to `/dsr` rather than the
+deadlines dashboard being opened up — the pause happens for one request, for one stated cause.
+`POST /dsr/:id/sla/pause` and `/sla/resume`, gated on `sla.timer.pause` (not on `dsr.handle`: stopping a
+compliance clock is the same act here as anywhere else). **It pauses EVERY open timer on the request** —
+measured, a request carries four (two escalation stages, and a second pair once an extension re-bases the
+deadline) — because pausing one of four looks exactly like a control that worked while the request still
+escalates. The screen shows the counts, not the word "paused", and the detail read carries `slaClock`.
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold

@@ -29,6 +29,7 @@ import { errorStyle } from '../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
+import { DsrClockControl } from '../../../components/pdpl/DsrClockControl';
 
 const LOG_ROLES = [
   'dsr.log',
@@ -243,6 +244,16 @@ export default function DsrPage() {
                               {t('dsrNoRetentionHold')}
                             </label>
                           ) : null}
+                          {/* The statutory clock, controlled from the request itself —
+                            * the DPO holds `sla.timer.pause` and cannot open the
+                            * deadlines dashboard (IMPROVEMENTS § 1.61). Gated on that
+                            * permission inside the component, not on `dsr.handle`:
+                            * stopping a compliance clock is the same act here as
+                            * anywhere else. */}
+                          <DsrClockControl
+                            requestId={d.id}
+                            closed={d.closedAt !== null}
+                          />
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                             {canHandle && d.status === 'RECEIVED' ? (
                               <button

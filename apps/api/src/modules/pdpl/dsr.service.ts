@@ -9,6 +9,7 @@ import type { DataSubjectRequest } from '@ibms/db';
 import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
+import type { AuthenticatedUser } from '../auth/auth.types';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { hasExactlyOneOwner } from '../../common/dto.util';
 import { DsrRepository } from '../../repositories/dsr.repository';
@@ -609,6 +610,47 @@ export class DsrService {
 
   // --- reads -----------------------------------------------------
 
+  /**
+   * Stop this request's clock — every open timer on it, for one stated reason.
+   *
+   * A request does not have A clock: measured, one carries four `SlaTimer` rows (two
+   * escalation stages, and a second pair once an extension re-bases the deadline). The
+   * engine's `pauseForEntity` covers all of them, because pausing one of four looks
+   * exactly like a control that worked while the request still escalates.
+   */
+  async pauseSla(
+    id: string,
+    reason: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ paused: number; alreadyPaused: number; open: number }> {
+    const dsr = await this.load(id);
+    if (dsr.closedAt !== null) {
+      throw new UnprocessableEntityException(
+        `Request ${id} is closed. A closed request's clock has already stopped — there is nothing to pause.`,
+      );
+    }
+    const result = await this.slaTimer.pauseForEntity(
+      'DataSubjectRequest',
+      id,
+      reason,
+      actor.id,
+    );
+    if (result.open === 0) {
+      throw new UnprocessableEntityException(
+        `Request ${id} has no running clock to pause.`,
+      );
+    }
+    return result;
+  }
+
+  async resumeSla(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<{ resumed: number; notPaused: number }> {
+    await this.load(id);
+    return this.slaTimer.resumeForEntity('DataSubjectRequest', id, actor.id);
+  }
+
   async get(id: string, actorUserId: string): Promise<DataSubjectRequestView> {
     const dsr = await this.load(id);
     await this.safeAudit({
@@ -619,7 +661,13 @@ export class DsrService {
       afterValue: { dataSubjectRequestId: id },
       isSensitiveDataAccess: true,
     });
-    return deriveDsrView(dsr, new Date());
+    // The clock state on the DETAIL read only — a list would pay one timer query per row
+    // for a figure no list shows.
+    const slaClock = await this.slaTimer.entityClockState(
+      'DataSubjectRequest',
+      id,
+    );
+    return { ...deriveDsrView(dsr, new Date()), slaClock };
   }
 
   async list(

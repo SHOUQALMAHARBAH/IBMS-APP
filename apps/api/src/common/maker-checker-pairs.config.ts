@@ -24,6 +24,13 @@
  * `test/maker-checker-pairs.e2e-spec.ts` now does, so a sixteenth constraint cannot be added without this
  * file moving.
  *
+ * ## One pair carries a decision as well as a constraint
+ *
+ * `DataSubjectRequest` (closure) is annotated in place with IMPROVEMENTS § 1.65: the split
+ * between CORRECTING a customer's details and CLOSING the request that asked for it is
+ * deliberate as of 2026-09-28, not an accident of who holds which permission. Read that
+ * note before proposing that one person should be able to do both.
+ *
  * ## The constraint name is the identity
  *
  * Not the entity: `NeedsAssessment` has TWO pairs and they must never be interchangeable — a declared
@@ -201,6 +208,37 @@ export const MAKER_CHECKER_REGISTRY = [
     source: 'Process 42',
   },
   {
+    /*
+     * A DELIBERATE TWO-PERSON FLOW, decided 2026-09-28 — do not "simplify" it.
+     *
+     * IMPROVEMENTS § 1.65. This pair already gave DSR closure its two-person property and
+     * its combined-duty escape, and that is not what the decision is about. What the
+     * decision settles is the relationship between CORRECTING a customer's details and
+     * CLOSING the request that asked for the correction:
+     *
+     *   SALES_RELATIONSHIP_OFFICER   customer.update  YES    dsr.close  no
+     *   DATA_PROTECTION_OFFICER      customer.update  no     dsr.close  YES
+     *
+     * So the officer who can change a phone number cannot close the request, and the DPO
+     * who closes it cannot change the number. **Until this entry existed, that was a
+     * by-product of a permission split made for another reason** — nobody had decided it,
+     * and the obvious tidy-up is to grant the DPO `customer.update` so one person can
+     * finish the job.
+     *
+     * The owner decided to KEEP it at two, because it is real segregation: the person who
+     * alters customer data is not the person certifying to a regulator that the request
+     * was answered. It works only because the correction carries the request's reference,
+     * which is what `DsrService.fulfil` looks for before it will close anything.
+     *
+     * It inherits the office's declared mode like every other pair here: a SEGREGATED
+     * office needs two people, and an office that has declared COMBINED duties can do both
+     * halves with one — recorded, with a stated reason, and surfaced in the self-approval
+     * report. That is the property that makes keeping it at two safe for a one-person
+     * office rather than a wall.
+     *
+     * If you are here to grant the DPO `customer.update`: that is a decision to reverse,
+     * not a cleanup. It widens who may edit customer data.
+     */
     entityType: 'DataSubjectRequest',
     pairLabel: 'processedByUserId / closedByUserId',
     modelProperty: 'dataSubjectRequest',

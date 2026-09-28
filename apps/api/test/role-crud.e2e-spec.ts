@@ -217,6 +217,69 @@ describe('isSystem is a protection flag and grants NOTHING', () => {
 });
 
 describe('Role CRUD', () => {
+  it('records WHICH capabilities a permission change moved, by name', async () => {
+    /*
+     * THIS TEST IS THE BASIS OF A DECISION, NOT A NICETY.
+     *
+     * IMPROVEMENTS § 1.53: an office administrator may grant themselves any capability,
+     * and the owner decided on 2026-09-28 to leave that as it is. The decision is
+     * acceptable because the control is DETECTIVE and real — the audit row names the
+     * capabilities that moved, so "who widened which role, when, and by exactly what" is
+     * answerable from the trail.
+     *
+     * **If this row ever degrades to "permissions changed", that decision loses its
+     * basis.** So this asserts the row's CONTENT: the before set, the after set, and the
+     * added/removed diff by name. A test that only checked an audit row was written would
+     * pass on the degraded version, which is the whole reason the owner asked for this one.
+     */
+    const created = await request(app!.getHttpServer())
+      .post('/rbac/roles')
+      .set(bearer(admin.accessToken))
+      .send({
+        name: `Audit Diff ${tag}`,
+        nameAr: `تدقيق الفروق ${tag}`,
+        nameEn: `Audit Diff ${tag}`,
+        permissionCodes: ['lead.list.read', 'customer.360-view.read'],
+      })
+      .expect(201);
+    const roleId = (created.body as { id: string }).id;
+    createdRoleIds.push(roleId);
+
+    // Swap one capability for another, so the diff has both a removal and an addition —
+    // a test that only ADDS cannot tell a diff from a snapshot of the new set.
+    await request(app!.getHttpServer())
+      .put(`/rbac/roles/${roleId}/permissions`)
+      .set(bearer(admin.accessToken))
+      .send({ permissionCodes: ['lead.list.read', 'rfq.read'] })
+      .expect(200);
+
+    const rows = await prisma.auditLogEntry.findMany({
+      where: { entityType: 'RolePermission', entityId: roleId },
+      orderBy: { occurredAt: 'desc' },
+      take: 1,
+    });
+    expect(rows, 'the permission change wrote no audit row at all').toHaveLength(1);
+
+    const before = rows[0].beforeValue as { permissionCodes?: string[] };
+    const after = rows[0].afterValue as {
+      permissionCodes?: string[];
+      added?: string[];
+      removed?: string[];
+    };
+
+    // The BEFORE set, named — without it the row cannot say what the office gave up.
+    expect(before.permissionCodes).toEqual([
+      'customer.360-view.read',
+      'lead.list.read',
+    ]);
+    // The AFTER set, named.
+    expect(after.permissionCodes).toEqual(['lead.list.read', 'rfq.read']);
+    // And the DIFF, by name — the part an auditor reads first, and the part a degraded
+    // row would drop while still looking like a record.
+    expect(after.added).toEqual(['rfq.read']);
+    expect(after.removed).toEqual(['customer.360-view.read']);
+  });
+
   it('creates a role with its grants, reads them back, and lists it with counts', async () => {
     const created = await request(app!.getHttpServer())
       .post('/rbac/roles')

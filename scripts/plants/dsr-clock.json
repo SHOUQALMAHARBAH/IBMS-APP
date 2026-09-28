@@ -1,0 +1,27 @@
+{
+  "dpo-also-granted-the-dashboard": {
+    "file": "apps/web/e2e/fixtures/role-permissions.ts",
+    "from": "    'sla.policy.read',\n    'sla.policy.regulatory',\n    'sla.timer.pause',",
+    "to": "    'sla-dashboard.view',\n    'sla.policy.read',\n    'sla.policy.regulatory',\n    'sla.timer.pause',"
+  },
+  "clock-state-shown-as-a-word": {
+    "file": "apps/web/components/pdpl/DsrClockControl.tsx",
+    "from": "          {t('dsrClockCounts', {\n            paused: String(clock.paused),\n            open: String(clock.open),\n          })}",
+    "to": "          {isPaused ? 'Paused' : 'Running'}"
+  },
+  "clock-reason-floor-ignored": {
+    "file": "apps/web/components/pdpl/DsrClockControl.tsx",
+    "from": "            disabled={busy || !dsrPauseReasonIsValid(reason)}",
+    "to": "            disabled={busy}"
+  },
+  "pause-covers-only-the-first-timer": {
+    "file": "apps/api/src/modules/sla/sla-timer.service.ts",
+    "from": "    for (const t of open) {\n      if (t.pausedAt !== null) {\n        alreadyPaused += 1;\n        continue;\n      }\n      await this.pause(t.id, reason, actorUserId);\n      paused += 1;\n    }",
+    "to": "    for (const t of open.slice(0, 1)) {\n      if (t.pausedAt !== null) {\n        alreadyPaused += 1;\n        continue;\n      }\n      await this.pause(t.id, reason, actorUserId);\n      paused += 1;\n    }"
+  },
+  "closed-request-can-be-paused": {
+    "file": "apps/api/src/modules/pdpl/dsr.service.ts",
+    "from": "    if (dsr.closedAt !== null) {",
+    "to": "    if (false) {"
+  }
+}

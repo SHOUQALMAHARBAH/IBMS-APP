@@ -2920,6 +2920,20 @@ set" guard in this repo has that shape, and this is why.
 
 ### 1.53 — RENAMING A ROLE AND RE-GRANTING IT ARE ONE PERMISSION
 
+> **DECIDED 2026-09-28 — not split, and the reasoning is in the code where the split would
+> be proposed.** `RoleAdminService.setPermissions` now carries the three-part note in full:
+> blocking a self-grant breaks the screen's actual job; a second approver cannot exist in a
+> one-person office; and — the part that makes it acceptable rather than merely necessary —
+> the audit row already names the capabilities that moved, so the control is detective and
+> real.
+>
+> **The decision's basis is now pinned by a test on the row's CONTENT**, as the owner
+> required: `role-crud.e2e-spec.ts` asserts the before set, the after set, and the
+> added/removed diff by name. Planting `added: undefined` kills it — and kills a second,
+> pre-existing assertion I had not noticed, so that basis was already half-guarded. If that
+> row ever degrades to "permissions changed", this decision loses its basis and the tests
+> say so.
+
 Four-action Phase 1 split `role.manage` into `role.create` / `role.update` / `role.deactivate`, and
 `role.update` gates three routes that are not the same kind of act:
 
@@ -3708,6 +3722,28 @@ regulatory marker, the resume condition), each killing exactly one named test.
 
 ### 1.61 `P2` — THE DPO HOLDS `sla.timer.pause` AND CANNOT OPEN THE SCREEN THE CONTROL IS ON
 
+> **DECIDED AND CLOSED 2026-09-28 — option (b): the control moved to the request.** The
+> stop-the-clock button now sits on the data-subject request itself, and the DPO was NOT
+> granted `sla-dashboard.view`. The owner's reason is the one recorded below: the pause
+> happens for one request, for one stated cause, so it belongs where that request is, and
+> granting the dashboard would widen what the role sees for the whole office to save a line
+> of code.
+>
+> **Two things the build found that the decision did not anticipate.** A request does not
+> have A clock — measured, it carries **four** `SlaTimer` rows (two escalation stages, and a
+> second pair once an extension re-bases the deadline) — so the act pauses EVERY open timer
+> for one stated reason, because pausing one of four looks exactly like a control that
+> worked while the request still escalates. And the screen shows the COUNTS rather than the
+> word "paused", because a two-of-four state is real and a word would be wrong about the
+> rest.
+>
+> **The acceptance's second half caught a hole in my own test.** The owner asked for the
+> dashboard refusal to be asserted explicitly, warning that a test proving only the button
+> would pass on the version that also handed over the dashboard. Mine did exactly that:
+> planting `sla-dashboard.view` onto the DPO left all 8 tests green, because
+> `getByRole('link', …)` can never match a nav anchor inside a collapsed group (measured:
+> byRole=0, byHref=1). Re-pointed at the href through `expectNone`, the plant now kills it.
+
 Measured while choosing which role to write the § 1.60 tests against. Three roles hold `sla.timer.pause`:
 
     BRANCH_DEPARTMENT_MANAGER   sla-dashboard.view YES   sla.timer.pause YES
@@ -3939,6 +3975,20 @@ pick. A gate that runs the same code against a different random draw is a differ
 
 ### 1.65 `P1` — I SHIPPED AN UNREACHABLE ROUTE, THE DAY AFTER MEASURING § 1.44, AND IT MADE A STATUTORY RIGHT UNANSWERABLE
 
+> **DECIDED 2026-09-28 — it stays at two people, and it is now a decision rather than an
+> accident.** Recorded in `maker-checker-pairs.config.ts` beside the
+> `DataSubjectRequest` closure pair, with the reason and with an explicit instruction to
+> whoever arrives intending to grant the DPO `customer.update`: that is a reversal, not a
+> cleanup.
+>
+> **And the owner's premise turned out to be already satisfied**, which is better news than
+> expected: DSR closure is ALREADY one of the fifteen registered pairs
+> (`processedByUserId / closedByUserId`, backed by a real CHECK constraint, `dsr.close` as
+> the checker permission), so it already inherits the declared office mode — a SEGREGATED
+> office needs two, and an office that declared COMBINED can do both halves with one,
+> recorded and surfaced in the self-approval report. Nothing had to be added to make that
+> true; what was missing was the statement that the correction/closure split is deliberate.
+
 `PATCH /customers/:id` — the contact-detail correction built to the owner's own requirement ("correctable
 now, unconditionally: phone, address, email") — shipped with **no web caller**. Found by the verb-aware
 second pass, four commits later.
@@ -4048,6 +4098,13 @@ correction, save allowed with nothing changed, the permission gate, and the swal
 
 
 ### 1.67 — Q9'S SEVEN UNREACHABLE ROUTES ARE A FORM BUILDER, NOT A MISSING SCREEN — MEASURED BEFORE STARTING
+
+> **DECIDED 2026-09-28 — no option chosen, nothing built, and the question goes to the
+> broker.** It is on `docs/broker-session-money-questions.md` as question 11, with what it
+> decides attached: how many insurers' forms he actually uses, and whether re-keying is a
+> real cost in his day. His answer may remove both build options. Nothing is lost by
+> waiting — zero maps exist on either database, so there is no accumulation and no
+> migration. If it is needed, one insurer and one line first.
 
 Sized rather than started, because the answer changes how it should be scheduled and because a read-only
 version of it would be an empty page.

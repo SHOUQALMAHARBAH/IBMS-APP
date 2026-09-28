@@ -132,6 +132,24 @@ export interface DataSubjectRequestView {
   closedByUserId: string | null;
   rejectionReason: string | null;
   noOpenRetentionHoldConfirmedAt: string | null;
+
+  /* THE REQUEST'S OWN CLOCK STATE. A request carries SEVERAL `SlaTimer` rows — two
+   * escalation stages, and a second pair once an extension re-bases the deadline — so
+   * these are COUNTS rather than a boolean: "two of four paused" is a real state an
+   * extension can produce, and a boolean would round it to "paused" or "running" and be
+   * wrong about the rest. Present so the pause control on the request screen offers the
+   * right action without a second request (IMPROVEMENTS § 1.61).
+   *
+   * OPTIONAL, and only on the DETAIL read. A list of requests has no use for it and
+   * populating it there would be one timer query per row — an N+1 for a figure nobody
+   * reads on a list. A caller that does not find it must treat the clock as unknown
+   * rather than as running. */
+  slaClock?: {
+    open: number;
+    paused: number;
+    pauseReason: string | null;
+    pausedAt: string | null;
+  };
   /** Derived — `status` is not yet CLOSED/terminal and `slaDueAt` has
    * passed. The `Policy.issuanceComplete` / `ServiceRequest.sla.breached`
    * shape: a live-computed convenience so the UI shows "overdue" without
