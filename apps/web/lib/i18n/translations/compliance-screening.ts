@@ -114,6 +114,35 @@ export const COMPLIANCE_SCREENING = {
     slapStatus: 'الحالة',
     slapAction: 'إجراء',
     slapNotALegalRequirement: 'ليست إلزاماً قانونياً',
+    // Defining a new SLA policy. The REGULATORY wording is the load-bearing part: it must say
+    // that the choice claims LEGAL force, because recording an internal target as a legal
+    // requirement is the failure `sourceType` exists to prevent.
+    slapCreateOpen: 'تعريف سياسة مدة جديدة',
+    slapCreateLegend: 'سياسة مدة جديدة',
+    slapCreateCode: 'رمز السياسة',
+    slapCreateCodeHint:
+      'من 3 إلى 64 خانة: أحرف إنجليزية كبيرة وأرقام وشرطات، مثل SLA-DSR-ACCESS. ' +
+      'يُقتبس في مستندات الحوكمة، فلا يتغير عند تغيّر المدة.',
+    slapCreateName: 'اسم السياسة',
+    slapCreateProcess: 'العملية',
+    slapCreateWorkflowState: 'حالة سير العمل (اتركها فارغة لتشمل العملية كاملة)',
+    slapCreateDescription: 'الوصف',
+    slapCreateDuration: 'المدة',
+    slapCreateUnit: 'الوحدة',
+    slapCreateCalendar: 'التقويم',
+    slapCreateSourceType: 'مصدر الإلزام',
+    slapCreateNotRegulatoryNote:
+      'لا تملك صلاحية sla.policy.regulatory، فلا يمكنك تسجيل هذه السياسة كإلزام قانوني.',
+    slapCreateRegulatoryWarning:
+      'تسجيل السياسة كإلزام قانوني يقتضي تسمية النص الذي يفرضها. المرجع والمستند مطلوبان.',
+    slapCreateSourceReference: 'المرجع',
+    slapCreateSourceDocument: 'المستند',
+    slapCreateSourceSection: 'البند',
+    slapCreateBornDraft:
+      'تُنشأ السياسة كمسودة. التفعيل قرار منفصل ومسجَّل، فلا تسري المدة قبله.',
+    slapCreateSave: 'حفظ السياسة',
+    slapCreateCancel: 'إلغاء الإدخال',
+    slapCreateFailed: 'تعذر إنشاء السياسة.',
     slap247: 'على مدار الساعة',
     slapCustom: 'مخصّص',
     slapJordanWorkingDays: 'أيام العمل (الأردن)',
@@ -309,6 +338,33 @@ export const COMPLIANCE_SCREENING = {
     slapStatus: 'Status',
     slapAction: 'Action',
     slapNotALegalRequirement: 'Not a legal requirement',
+    // Defining a new SLA policy.
+    slapCreateOpen: 'Define a new SLA policy',
+    slapCreateLegend: 'New SLA policy',
+    slapCreateCode: 'Policy code',
+    slapCreateCodeHint:
+      '3 to 64 characters of upper-case letters, digits and hyphens, e.g. SLA-DSR-ACCESS. ' +
+      'It is quoted in governance documents, so it does not change when the duration does.',
+    slapCreateName: 'Policy name',
+    slapCreateProcess: 'Process',
+    slapCreateWorkflowState: 'Workflow state (leave empty for the whole process)',
+    slapCreateDescription: 'Description',
+    slapCreateDuration: 'Duration',
+    slapCreateUnit: 'Unit',
+    slapCreateCalendar: 'Calendar',
+    slapCreateSourceType: 'Where this SLA comes from',
+    slapCreateNotRegulatoryNote:
+      'You do not hold sla.policy.regulatory, so you cannot record this policy as a legal requirement.',
+    slapCreateRegulatoryWarning:
+      'Recording this as a legal requirement means naming the instrument that imposes it. The reference and the document are both required.',
+    slapCreateSourceReference: 'Reference',
+    slapCreateSourceDocument: 'Document',
+    slapCreateSourceSection: 'Section',
+    slapCreateBornDraft:
+      'A new policy is created as a DRAFT. Activation is its own recorded decision, so the duration does not apply until then.',
+    slapCreateSave: 'Save the policy',
+    slapCreateCancel: 'Discard',
+    slapCreateFailed: 'Could not create the policy.',
     slap247: '24/7',
     slapCustom: 'Custom',
     slapJordanWorkingDays: 'Jordan working days',

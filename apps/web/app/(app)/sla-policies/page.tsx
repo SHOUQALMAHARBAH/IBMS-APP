@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { NewSlaPolicyForm } from '../../../components/sla/NewSlaPolicyForm';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../lib/auth/auth-context";
@@ -175,6 +176,10 @@ export default function SlaPoliciesPage() {
           </button>
         ))}
       </div>
+
+      {/* ABOVE the list, per B.7 rule 1: a create form below the table it adds to is a control
+          the reader scrolls past. Gated internally on `sla.policy.create`. */}
+      <NewSlaPolicyForm onCreated={() => void load(status)} />
 
       {actionError ? (
         <p role="alert" style={errorStyle}>

@@ -201,6 +201,141 @@ async function captureHolidayPosts(page: Page, status = 201) {
   return calls;
 }
 
+/*
+ * DEFINING AN SLA POLICY — `POST /sla/policies`, which had no web caller, so an office could edit
+ * the duration of a seeded policy and never state a target of its own.
+ *
+ * The load-bearing property is `sourceType`. REGULATORY claims LEGAL force, and the API gates the
+ * whole route on `sla.policy.create` alone while changing an EXISTING policy's source type needs
+ * `sla.policy.regulatory` on top — so two roles can create as REGULATORY what they could not
+ * change to REGULATORY. The server is deliberately not tightened (a refusal change on a route
+ * with a passing e2e); the FORM is what keeps the two paths consistent, which is why these tests
+ * drive it through exact permission sets rather than role names.
+ */
+
+test("offers the create form only where sla.policy.create is held", async ({ page }) => {
+  await mockAuthWithCodes(page, ["sla.policy.read"]);
+  await mockPolicies(page, [policy()]);
+  await page.goto("/sla-policies");
+
+  // Anchored on the list rendering, so the absence is not satisfied by a page that never mounted.
+  await expect(page.getByText("DSR — Access / Deletion")).toBeVisible();
+  await expect(page.getByTestId("new-sla-policy-open")).toHaveCount(0);
+
+  await mockAuthWithCodes(page, ["sla.policy.read", "sla.policy.create"]);
+  await page.goto("/sla-policies");
+  await expect(page.getByTestId("new-sla-policy-open")).toBeVisible();
+});
+
+test("the create form sits ABOVE the list it adds to", async ({ page }) => {
+  // B.7 rule 1. A create form below its own table is a control the reader scrolls past, and four
+  // screens were fixed for exactly this.
+  await mockAuthWithCodes(page, ["sla.policy.read", "sla.policy.create"]);
+  await mockPolicies(page, [policy()]);
+  await page.goto("/sla-policies");
+
+  const form = await page.getByTestId("new-sla-policy-open").boundingBox();
+  const table = await page.getByRole("table").first().boundingBox();
+  expect(form).not.toBeNull();
+  expect(table).not.toBeNull();
+  expect(form!.y).toBeLessThan(table!.y);
+});
+
+test("sends the policy, with an untouched optional field absent rather than empty", async ({
+  page,
+}) => {
+  await mockAuthWithCodes(page, ["sla.policy.read", "sla.policy.create"]);
+  await mockPolicies(page, [policy()]);
+
+  let body: unknown = null;
+  await page.route("**/sla/policies", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    body = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: policy() });
+  });
+  await page.goto("/sla-policies");
+
+  await page.getByTestId("new-sla-policy-open").click();
+  await page.getByTestId("new-sla-code").fill("sla-quote-response");
+  await page.getByTestId("new-sla-name").fill("  Quote response  ");
+  await page.getByTestId("new-sla-process").fill("rfq_response");
+  await page.getByTestId("new-sla-duration").fill("2");
+  await page.getByTestId("new-sla-save").click();
+
+  await expect(page.getByTestId("new-sla-policy-form")).toHaveCount(0);
+  expect(body).toMatchObject({
+    // Upper-cased for the server's pattern rather than 422'd back at the reader.
+    policyCode: "SLA-QUOTE-RESPONSE",
+    policyName: "Quote response",
+    processType: "rfq_response",
+    durationValue: 2,
+    durationUnit: "BUSINESS_DAYS",
+    sourceType: "INTERNAL_POLICY",
+  });
+  // An untouched optional field must be ABSENT, never ''. An empty string would store a workflow
+  // state of "" instead of meaning "the whole process".
+  expect(body).not.toHaveProperty("workflowState");
+  expect(body).not.toHaveProperty("description");
+});
+
+test("does NOT offer REGULATORY without sla.policy.regulatory, and says why", async ({
+  page,
+}) => {
+  // Measured: BRANCH_DEPARTMENT_MANAGER and EXECUTIVE_MANAGEMENT hold `sla.policy.create` and NOT
+  // `sla.policy.regulatory` — so on the API they cannot change a policy to REGULATORY and could
+  // create one that way. The form is what closes that.
+  await mockAuthWithCodes(page, ["sla.policy.read", "sla.policy.create"]);
+  await mockPolicies(page, [policy()]);
+  await page.goto("/sla-policies");
+
+  await page.getByTestId("new-sla-policy-open").click();
+  const sourceType = page.getByTestId("new-sla-source-type");
+  // Anchored on an option that IS offered, so "no REGULATORY option" cannot pass on an empty
+  // select that never rendered.
+  await expect(
+    sourceType.getByRole("option", { name: "INTERNAL_POLICY" }),
+  ).toHaveCount(1);
+  await expect(
+    sourceType.getByRole("option", { name: "REGULATORY" }),
+  ).toHaveCount(0);
+  // Silence would read as "there is no such thing". The reader came here to state a target and
+  // needs to know which grant they lack.
+  await expect(page.getByTestId("new-sla-regulatory-note")).toContainText(
+    "sla.policy.regulatory",
+  );
+});
+
+test("REGULATORY demands BOTH citations before it will save", async ({ page }) => {
+  await mockAuthWithCodes(page, [
+    "sla.policy.read",
+    "sla.policy.create",
+    "sla.policy.regulatory",
+  ]);
+  await mockPolicies(page, [policy()]);
+  await page.goto("/sla-policies");
+
+  await page.getByTestId("new-sla-policy-open").click();
+  await page.getByTestId("new-sla-code").fill("SLA-BREACH-NOTIFY");
+  await page.getByTestId("new-sla-name").fill("Breach notification");
+  await page.getByTestId("new-sla-process").fill("breach_notification");
+  await page.getByTestId("new-sla-duration").fill("72");
+  await page.getByTestId("new-sla-unit").selectOption("HOURS");
+
+  await page.getByTestId("new-sla-source-type").selectOption("REGULATORY");
+  await expect(page.getByTestId("new-sla-regulatory-warning")).toContainText(
+    "naming the instrument",
+  );
+  await expect(page.getByTestId("new-sla-save")).toBeDisabled();
+
+  // ONE citation at a time. Filling both at once cannot tell "both are required" from "one is" —
+  // the same reason the insurance-line form asserts the English-only case is refused.
+  await page.getByTestId("new-sla-source-reference").fill("PDPL 24/2023 art. 27");
+  await expect(page.getByTestId("new-sla-save")).toBeDisabled();
+
+  await page.getByTestId("new-sla-source-document").fill("PRIV-STD-01");
+  await expect(page.getByTestId("new-sla-save")).toBeEnabled();
+});
+
 test("marks an internal SLA as NOT a legal requirement", async ({ page }) => {
   // The 3-business-day sanctions-match figure: drafted in this repo, tighter
   // than the standard KYC review, on reasoning that is the broker's and not a

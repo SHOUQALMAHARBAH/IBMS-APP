@@ -4537,6 +4537,70 @@ is invisible there, and the filter's `user.manage` lookup is live only over HTTP
 `access-recertification` 14/14 (from 9), the new api e2e test passing at 17s, both typechecks
 clean, lint 0 errors.
 
+
+### 1.72 `P2` — AN OFFICE COULD NOT STATE AN SLA OF ITS OWN — AND CLOSING THAT FOUND THAT `CREATE` CAN ASSERT LEGAL FORCE WHERE `UPDATE` CANNOT
+
+> **OWNER DECISION NEEDED on the asymmetry below.** The screen closes it; the API is
+> deliberately unchanged, because tightening a route with a passing e2e is a behaviour change
+> and the precedent (the screening `assign` case) is to reconcile it by decision rather than by
+> accident.
+
+`POST /sla/policies` had no web caller. The screen could edit a seeded policy's **duration** —
+one number input, which was the whole of its write surface — and nothing else. So an office could
+not state a target of its own: not "answer a quote request within two business days", not
+anything. `sla.policy.create` was split out of the `sla.policy.manage` umbrella deliberately in
+four-action Phase 4 and granted to three roles, and nothing could exercise it.
+
+#### The finding: the code that protects "this SLA has legal force" is on the wrong half
+
+`sourceType` decides whether a policy claims **legal force**. The DTO says so in as many words —
+*"recording an internal target as a legal requirement is the failure this field exists to
+prevent"* — and a database CHECK refuses `REGULATORY` without naming the instrument.
+
+    PATCH /sla/policies/:id/source   ->  sla.policy.update + sla.policy.regulatory
+    POST  /sla/policies              ->  sla.policy.create                (sourceType in the body)
+
+    sla.policy.create       BRANCH_DEPARTMENT_MANAGER, COMPLIANCE_OFFICER, EXECUTIVE_MANAGEMENT
+    sla.policy.regulatory   COMPLIANCE_OFFICER, DATA_PROTECTION_OFFICER
+
+**So BRANCH_DEPARTMENT_MANAGER and EXECUTIVE_MANAGEMENT cannot CHANGE a policy to REGULATORY and
+could CREATE one that way.** The database CHECK still forces them to name an instrument, so the
+claim is never anonymous — but naming one is not the same as being permitted to assert it, and
+the split's own stated purpose is *"`sla.policy.regulatory` on top for the fields that assert an
+SLA is a legal requirement"*. The route having no caller is the only reason nobody has hit it,
+which is § 1.65's shape pointed the other way: **giving a route a caller can make an existing
+permission hole reachable.**
+
+**The screen keeps the two paths consistent**: `REGULATORY` is offered only to a holder of
+`sla.policy.regulatory`, and a caller without it is TOLD which grant they lack rather than simply
+not seeing the option — silence there reads as "there is no such thing", and this reader came to
+state a target. Whether the API should refuse it too is the owner's call.
+
+#### What the form does and does not take
+
+The essential fields only: code, name, process, optional workflow state and description,
+duration + unit, calendar, source type and its citations. Working hours, timezone, the warning
+threshold and the escalation stages have server defaults and are left off — they are refinements
+of a policy that exists, and **a fifteen-field form to say "two business days" is a form nobody
+completes.** `CUSTOM` calendar is also absent: it needs `customWeekendDays`, and a custom
+calendar whose weekend nobody set would count deadlines against Jordan's by accident.
+
+Three details that are correctness rather than polish. `durationValue` allows **0**, because an
+SLA whose deadline is the triggering event itself is real (`termination_access_revocation` is 0
+hours) and `min={1}` would refuse a policy the registry already contains. An untouched optional
+field is sent **absent, never `''`** — an empty workflow state would store `""` instead of
+meaning "the whole process". And the form says a new policy is born **DRAFT**, because activation
+is its own audited decision and somebody who creates one and sees no change in behaviour will
+otherwise assume it failed.
+
+**Seven plants**, each killing the test it names, and the sharpest is the third: loosening the
+two-citation gate from `||` to `&&` — so EITHER citation satisfies it. That is only caught
+because the test types **one citation at a time**; a test filling both at once cannot tell "both
+are required" from "one is", the same reason the insurance-line form asserts the English-only
+case is refused.
+
+**Verification**: web e2e `sla-policies` 25/25 (from 20), web unit 109, typecheck clean.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
