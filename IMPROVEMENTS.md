@@ -4138,6 +4138,36 @@ mapping), and calling it "seven unreachable routes" understates it by a wide mar
 an empty screen, because a screen that can only ever say "nothing here" trains its reader to stop opening
 it — and when the builder ships, the read view is part of it rather than a thing to reconcile with it.
 
+**ADDENDUM 2026-09-28 — it was built anyway, and reverted; here is what that measured.** I
+shipped the transcription builder while closing § 1.44's count, one day after this decision. It
+is reverted (§ 1.70 has the mechanism and the rule it earns), and nothing accumulated because
+zero maps exist. What the attempt DID establish, which is useful if the broker says yes and
+costs nothing to keep:
+
+- **The two writes cannot share one control.** `insurer.office-form.map` writes a row one office
+  reads; `insurer.form.map` changes the form EVERY office submits against. A single "save" that
+  picked a target would let somebody publish platform-wide believing they had edited their own
+  copy. Two forms, two buttons, and the shared one has to say what it affects.
+- **The shared publish needs `GET .../form-templates/current` before it writes.** Publishing
+  creates a new VERSION over whatever every office currently submits against, and superseding a
+  live mapping must not look identical to creating the first one.
+- **`GET .../resolved` is the only thing that may decide precedence.** Fetching both lists and
+  working out "office beats shared" locally saves a request per line and puts the rule in two
+  places; the screen's copy is the one nobody re-checks when the rule changes.
+- **The shared catalogue refuses a line only one office recognises**, so a shared-target picker
+  must filter `isStandard` rather than let the server 422 a choice the screen knew was invalid.
+- **An office-local company has no shared half at all** — `insurerMasterId` is null, so the
+  catalogue routes are unaddressable. That column must be absent, not empty: empty reads as
+  "nobody has mapped it yet" and sends somebody looking for a control that cannot exist.
+- **§ 1.61 measured**: `SYSTEM_SECURITY_ADMINISTRATOR` holds BOTH map codes and neither
+  `insurer.read` nor `insurer.master.read`, so it cannot open any screen either control could
+  sit on, nor reach the insurer list to find the company. **The grant is inert for that role
+  wherever the control goes** — a question about the grant, not about placement.
+
+**The scope to build, if it is wanted, is still one insurer and one line** — not what I built,
+which covered every line an insurer offers and both targets at once.
+
+
 **What the owner needs in order to schedule it**, stated plainly: this is the one remaining item in § 1.44
 that is a FEATURE rather than a missing caller. Everything else on that list is a control with no button.
 It also has a prerequisite nobody has decided: **where a form mapping comes from.** Somebody has to read an
@@ -4287,6 +4317,165 @@ died correctly), and it exempts a test that also asserts by href, because
 `sidebar-manager.spec.ts` pins the accessibility consequence of a collapsed group on purpose
 and says so. Proven both ways: it passes on the suite as it stands, and planting the old
 `policies.spec.ts` spelling back makes it name that file.
+
+
+
+#### ADDENDUM 2026-09-28 — AN ANCHOR THAT RENDERS BEFORE THE RELEVANT FETCH IS NOT AN ANCHOR
+
+Found the same day, in a test I wrote the same day, and it is a hole in the guard above rather
+than a slip. The guard requires an absence assertion to have a positive anchor before it. It
+cannot check **which** fetch the anchor proves finished.
+
+The case: a section loads two things in sequence — the office's own rows, then, only for a
+catalogue-linked company, the shared rows. A test asserted the shared column is ABSENT for an
+office-local company, anchored on the office column rendering its em-dash.
+
+    await expect(page.getByTestId("office-form-line-motor")).toHaveText("—");   // anchor
+    await expect(page.getByTestId("shared-form-line-motor")).toHaveCount(0);    // the claim
+
+The anchor is satisfied by the FIRST fetch. `toHaveCount(0)` passes on its first poll, so when
+the second fetch is still in flight the assertion is already true and never re-checks. **Planted,
+it dies in the full spec and PASSES when run alone** — identical build, twice, both ways round:
+alone the assertion wins the race, under two workers' load the fetch does. A test whose verdict
+depends on machine load is one that can be green locally and red in CI, or the reverse, with
+nothing changed.
+
+**The rule: anchor an absence assertion on the completion of the fetch that would produce the
+thing you claim is absent** — not on any positive fact that happens to be on screen. When the
+whole point is that the second fetch never happens, the anchor has to be something the component
+only renders once `load()` has fully settled (a `data-loaded` marker is the cheap form), because
+otherwise "not yet" and "never" are indistinguishable.
+
+This is § 1.51(a)'s shape one level in: the guard fires, the anchor exists, and the proof is still
+absent. It is recorded rather than fixed because the test it was found in belonged to the Q9
+builder, which is reverted (§ 1.70) — **but the hole is in the guard, not in that test**, and the
+next conditionally-fetched column will hit it.
+
+
+### 1.70 — THE UNREACHABLE ROUTES, CLASSIFIED: 29 routes, 13 redundant surface, 10 real; and the matcher's fifth failure mode had already cost a hand-checked claim
+
+Queue item 1. Both passes re-run rather than quoted, because the counts have been wrong by
+arithmetic three times.
+
+#### The denominator first
+
+    routes addressed by no web caller        29     (19 path-only + 10 verb-aware)
+      the email integration routes            6     -> queue item 2, out of scope here
+    in scope for item 1                      23
+      REDUNDANT SURFACE, no build            13
+      MISSING CAPABILITY                     10
+
+**The verb-aware pass was 12 and is 10.** `PATHARG` is anchored at `^`, so it only matches a
+first argument that BEGINS with a quote. A ternary does not:
+
+    apiGet(
+      category
+        ? `/knowledge-base-articles?category=${encodeURIComponent(category)}`
+        : '/knowledge-base-articles',
+    )
+
+The match failed, the call was skipped, and the path counted as addressed by nothing. **The
+path-only pass survives this and the verb-aware pass cannot**: the first is verb-AGNOSTIC, so a
+sibling `apiPost('/knowledge-base-articles', ...)` literal makes the path read as reached; the
+second separates the verbs, so a path POSTed with a literal and GET through a ternary reads as
+"GET unreachable".
+
+**Two false positives, and one of them was recorded in CLAUDE.md as a hand-CHECKED finding** —
+*"`GET /knowledge-base-articles` and `/:id` (the web POSTs and PATCHes articles and never reads
+one back)"*. `listKnowledgeBaseArticles` reads it. `GET /bcp-dr-plans` was the other. Both were
+"checked" against the script's claim rather than against the client file, which is the
+head-truncated-grep class with the halves swapped: not a search that stopped short, but a
+search whose output I did not go behind. Retracted in place; both passes now share
+`first_arg_paths`, which scans the whole first argument for `/`-leading literals bounded at the
+first top-level comma, so a string inside a request body is still not read as a path.
+
+#### 13 are redundant surface, by ONE repeating shape
+
+Every one is `GET /:id` where the service's `get()` returns exactly the view type `list()`
+returns an array of, the list is an unpaginated bare array so the screen already holds every
+row, and no `[id]` detail page exists that would need to fetch one by id. That is the
+`GET /sla/timers/:id/status` precedent applied thirteen times, measured per route — three
+needed a hand-check where the method-name heuristic missed the list, and all three held.
+
+**A detail read is not deleted for being unused.** It is a normal REST affordance a future
+detail page will need, it is covered by e2e tests, and the gap the owner cares about is "a
+capability nobody can exercise" — not surface area. One of the 13 is
+`GET /transaction-monitoring-alerts/:id`, which also sits inside the AML deferral; it needs no
+build either way, so there is nothing to reconcile.
+
+#### The 10 that are real
+
+| Route | What nobody can do |
+|---|---|
+| `GET /insurers/:id/form-templates/resolved` | see which submission form applies to an insurer |
+| `GET` / `POST /insurers/:id/form-templates` | set this office's own form mapping (Q9's whole feature) |
+| `GET` x2 / `POST /insurer-masters/:id/form-templates` | read or publish the shared catalogue's form |
+| `PATCH /employees/:id` | correct an employee record |
+| `POST /sla/policies` | define an SLA policy — only the seeded ones can be edited |
+| `GET /access-recertification/cycles/:id/admin-items` | see whether administrator accounts were reviewed in a cycle |
+| `POST /imports/customers` | bulk-import customers |
+
+**The recertification one is the sharpest.** That route exists BECAUSE Part 5.1 says
+administrators are not exempt from access recertification — and the record proving they were
+reviewed is readable by nobody. The screen calls only "items where I am the reviewer", so the
+cycle starter cannot see the administrator subset at all.
+
+#### § 1.61 measured for all ten, and it found three things
+
+    insurer.office-form.map   OFFICE_ADMINISTRATOR, PLACEMENT_TECHNICAL_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR
+    insurer.form.map          PLACEMENT_TECHNICAL_OFFICER, SYSTEM_SECURITY_ADMINISTRATOR
+    customer.bulk-import      OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR
+
+1. `SYSTEM_SECURITY_ADMINISTRATOR` holds BOTH insurer mapping codes and neither
+   `insurer.read` nor `insurer.master.read`, so it cannot open the screen either control sits on
+   — and cannot reach the insurer list to find the company in the first place. The grant is
+   **inert for that role wherever the control is put**, which makes it a question about the
+   grant rather than about placement. Recorded, not changed.
+2. `customer.bulk-import` is held by two roles and **neither holds `customer.create`** — so the
+   only people who can bulk-import customers cannot create one by hand, and (per the first-run
+   measurement) the office administrator holds no code that reads a customer at all. A bulk
+   import screen would let them create records they cannot then see. That is batch 3's blocking
+   question, not a detail.
+3. The measurement's first run answered "NOBODY" for all ten codes, because my parser missed the
+   quotes around the role names in the fixture. Caught by the rule written three days earlier:
+   **a measurement whose answer is "nothing, everywhere" is suspect before it is believed.** The
+   parser now asserts the fixture's own header figures (12 roles, 491 grants) before reporting.
+
+#### AND I BUILT ONE OF THE TEN THAT WAS ALREADY DECIDED NOT TO BUILD
+
+Six of the ten are Q9's form-template routes, and I built the screen for them — a bilingual
+300-field form builder, a web client, eleven Playwright tests and an a11y test, ten plants.
+**§ 1.67 decided on 2026-09-28 that this is not built**: no option chosen, the question is
+number 11 on the broker list, and *"his answer may remove both build options"* because if he
+works with three insurers and fills their forms in minutes, the builder solves a problem he does
+not have. If it IS wanted, the recorded plan is **one insurer and one line first**. I built it
+for every line, the day after.
+
+**Reverted.** Nothing accumulated — zero maps and zero fields on both databases, which is
+exactly the reason § 1.67 gave for why waiting costs nothing.
+
+**The mechanism, because it is not "I forgot".** The queue item was *"unreachable routes — 19
+first sweep, 12 type-aware"*, and § 1.67 carves these six out of that list in its own words:
+*"this is the one remaining item in § 1.44 that is a FEATURE rather than a missing caller.
+Everything else on that list is a control with no button."* **The count and the classification
+disagreed, and I worked from the count.** My own classification pass, in this same session, put
+the six at the top of the "real" table — and I never intersected that table with the decided and
+deferred items, which were in front of me.
+
+**What caught it was the doc-currency gate, which is meant for the opposite problem.** Grepping
+the feature's own nouns for claims the change had made false found README's *"Still screenless:
+… Q9's office form templates"* and `docs/insurer-management.md`'s *"Not built, deliberately"* —
+and those claims were not stale. They were correct, and I was the thing that had gone wrong.
+**A gate built to catch a document lagging the code caught code that had run ahead of a
+decision.** Second time this session a rule fired outside its stated purpose: the
+"nothing-everywhere is suspect" rule caught my own permission parser.
+
+**The rule this earns**: *the deferral and decision list is part of the SCOPE of every queue
+item, and the intersection is checked before the first file is written, not in the pass
+afterwards.* A queue item that names a count does not thereby authorise the items that count
+contains. And § 1.62's shape again, one level up: knowing a failure mode and writing it down did
+not stop me producing it — this time the document I overran was one I had written myself, three
+times over, in three files.
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
