@@ -4838,6 +4838,93 @@ The remaining 15 are **a report, not a verdict**: each needs the same hand-read,
 reachable by a link this check cannot see (it answers "no NAV route", not "unreachable by any
 means").
 
+
+### 1.76 — AN OFFICE COULD NOT CONNECT ITS OWN MAILBOX: SIX ROUTES, TWO GRANTED PERMISSIONS, NO CALLER
+
+Queue item 2. `email.integration.read` and `email.integration.manage` were both granted and neither
+could be exercised — the longest-standing gap on § 1.44's list after the customer import, and the
+one the four-action Phase 4 work declined to split *because* nothing could reach it.
+
+**Scope: 6 routes.** status · authorize-url · connect · verify · test · revoke. All six now have a
+caller at `/settings/email`.
+
+#### `state` is a security control the SCREEN owns, and nothing else can
+
+`authorize-url` returns a `state` beside the URL, and the service says why in its own words: *"an
+authorization code accepted without checking it can be replayed from another site (CSRF against the
+connect flow)."* **The API cannot check it — it never sees the redirect** — so the comparison is the
+client's, and it is this feature's only real client-side security obligation.
+
+The administrator pastes the WHOLE redirect address rather than a code field and a state field, and
+that is correctness rather than kindness: **two fields is a form where somebody pastes the code and
+leaves the state blank**, at which point the screen either refuses a legitimate connection or skips
+the check. One field, both halves parsed, and a mismatch refuses **without calling the server** —
+asserted on `connectCalled`, because a screen that complained and connected anyway would pass a test
+that only read the message.
+
+`rel="noreferrer"` on the consent link for the same reason: the address carries the `state`, and a
+referrer header would hand it to whatever the provider links onward to.
+
+#### The deployment gap is stated in the reader's terms — and the variable names go to ONE role
+
+With no OAuth application configured the API refuses with a 422 naming
+`EMAIL_MS_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI`. That message is correct **and it is internal
+implementation detail**, which the frontend directive § 2 reserves for the System/Security
+Administrator. The service already agrees about the substance: *"a deployment-side gap, so it is
+stated as one. The administrator cannot fix this from the UI and should not be told to try."*
+
+So the same refusal reads differently for two roles, and **both are asserted**: everybody gets the
+fact and that it is not theirs to fix; the administrator who would act on it additionally gets the
+names. The detail is ADDED, never substituted — a reader who can fix it still needs the sentence
+that says what is wrong.
+
+#### Read and write are different grants, so the read-only view is a real state
+
+Measured: `email.integration.read` is held by four roles, `.manage` by two, and `manage ⊆ read`. A
+Manager or an Executive therefore sees whether the mailbox works and is offered **no control** —
+directive § 1, the control does not exist rather than existing and refusing. Both already see the
+Administration group, so every holder of the read has a route to the screen (§ 1.61, measured before
+placing it).
+
+#### Three copy decisions that are correctness, not tone
+
+- **The test message says WHERE it went** — the office's own mailbox, by address. Without that an
+  administrator waits for a message in the wrong inbox and concludes the send failed.
+- **A credential rejection names the remedy.** "The provider withdrew consent" and "this system is
+  broken" look identical otherwise, and only one of them is something the reader can act on.
+- **"Connected" and "able to send" are kept apart.** `verify` can report a connected mailbox that
+  cannot send, and that is the state worth surfacing; collapsing them would call a dead mailbox
+  healthy.
+
+**Ten plants**, each killing the test it names, including two on the `state` check from opposite
+sides (never compared; compared and then connected anyway) and two on the detail rule (shown to
+everyone; hidden from everyone).
+
+**The i18n registration guard fired, on its own stated scenario.** A new dictionary must be added to
+`translations.ts` AND to the hand-written map in `translations.test.ts`; registering only the first
+left the file on disk uncovered and the guard named it. That guard exists because `auth.ts` once
+silently excluded its keys from the parity check — second time it has caught the thing it was built
+for.
+
+#### Re-measured, not computed
+
+    path-only pass      17 -> 11      (all six closed)
+    verb-aware pass      8 -> 8       (untouched: all eight are redundant detail reads)
+
+**19 of the original 29 remain, and they are exactly two groups**: the 7 Q9 rows (§ 1.67's decision)
+and 12 redundant detail reads. Nothing on § 1.44's list is now both a real capability and
+undecided.
+
+**And the plant harness reported success having done nothing**, which is § 1.51(a) and was caught by
+reading the output file rather than the exit code: the runner script was generated by `sed` from an
+earlier runner that the scratchpad no longer held, so `sed` produced an empty file and `bash` on an
+empty file exits 0. The replacement refuses to proceed when the plant list is empty, rather than
+looping zero times and printing nothing. **A harness that can silently run no plants is
+indistinguishable from ten guards that all hold.**
+
+**Verification**: new `email-integration.spec.ts` 12/12 including a11y and all four states; the five
+nav-sensitive specs 33/33 after the new destination; web unit 109; typecheck clean, lint 0 errors.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

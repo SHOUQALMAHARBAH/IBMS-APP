@@ -271,6 +271,15 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
         labelKey: 'navCustomerImport',
         permissions: ['customer.bulk-import'],
       },
+      // Gated on the READ, not the manage: four roles may see whether the office's mailbox works
+      // and two may change it, so a Manager or an Executive gets the status and no controls.
+      // Both already see this group (they hold `access-recertification.review`), so every holder
+      // of the read has a route to it.
+      {
+        href: '/settings/email',
+        labelKey: 'navEmailIntegration',
+        permissions: ['email.integration.read'],
+      },
       // `role.read`, not a write code: a caller who may look at the office's
       // roles but not change them gets the screen read-only rather than no link
       // at all. That is the whole reason the prep step split those two names.

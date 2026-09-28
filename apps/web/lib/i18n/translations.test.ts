@@ -20,6 +20,7 @@ import { OPERATIONS } from './translations/operations';
 import { DETAIL_PAGES } from './translations/detail-pages';
 import { ENUMS } from './translations/enums';
 import { INSURERS } from './translations/insurers';
+import { EMAIL } from './translations/email';
 import { PERMISSION_CATALOGUE } from '../../e2e/fixtures/role-permissions';
 
 describe('translate', () => {
@@ -74,6 +75,7 @@ describe('the merged dictionary', () => {
     'detail-pages.ts': DETAIL_PAGES,
     'enums.ts': ENUMS,
     'insurers.ts': INSURERS,
+    'email.ts': EMAIL,
   };
 
   // Without this, the map above silently under-covers the moment someone adds
