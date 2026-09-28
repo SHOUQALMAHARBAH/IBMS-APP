@@ -252,7 +252,16 @@ export const DESTINATION_GROUPS: readonly DestinationGroup[] = [
       {
         href: '/access-recertification',
         labelKey: 'navAccessRecertification',
-        permissions: ['access-recertification.review'],
+        // BOTH codes, because the screen carries two different people's work and the list is
+        // OR-ed. Measured: of the three roles holding `access-recertification.cycle.start`, two
+        // (OFFICE_ADMINISTRATOR, SYSTEM_SECURITY_ADMINISTRATOR) hold no `.review` — so with only
+        // `.review` here they had no navigation route to the start-cycle control they hold, nor
+        // to the administrator review record gated on the same code. Same reasoning as
+        // `/settings/roles` taking `role.read` below: name the codes a screen actually serves.
+        permissions: [
+          'access-recertification.review',
+          'access-recertification.cycle.start',
+        ],
       },
       { href: '/settings/users', labelKey: 'navUserAdmin', permissions: ['user.manage'] },
       // `role.read`, not a write code: a caller who may look at the office's

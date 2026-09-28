@@ -21,6 +21,10 @@ export interface RecertificationItem {
    *  administrator role. */
   subjectIsUserAdministrator: boolean;
   reviewerUserId: string;
+  /** WHO reviewed this subject, by name. Near-redundant on the reviewer's own queue — every row
+   *  is theirs — and the whole point on the administrator record, where "was this administrator
+   *  reviewed" is only half the question. */
+  reviewerFullName: string;
   decision: RecertificationDecision | null;
   reviewedAt: string | null;
   createdAt: string;
@@ -53,6 +57,32 @@ export interface RecertificationDecisionResult {
 
 export function listMyRecertificationItems(): Promise<RecertificationItem[]> {
   return apiGet('/access-recertification/items');
+}
+
+/**
+ * The office's cycles, newest first — gated on EITHER recertification code.
+ *
+ * Exists so `listAdminRecertificationItems` can be addressed: before it, the only source of a
+ * cycle id was the start-cycle response, so the administrator review record was readable for a
+ * cycle you had just started in this session and for no earlier one.
+ */
+export function listRecertificationCycles(): Promise<RecertificationCycle[]> {
+  return apiGet('/access-recertification/cycles');
+}
+
+/**
+ * The administrator subjects in one cycle — Part 5.1's "the administrator is NOT exempt from
+ * recertification of its own access", which makes this the record proving they were covered.
+ *
+ * Returns the same ENRICHED shape the reviewer's queue does. It used to return raw rows, so a
+ * screen would have rendered uuids for both the subject and the reviewer.
+ */
+export function listAdminRecertificationItems(
+  cycleId: string,
+): Promise<RecertificationItem[]> {
+  return apiGet(
+    `/access-recertification/cycles/${encodeURIComponent(cycleId)}/admin-items`,
+  );
 }
 
 export function startRecertificationCycle(input: {

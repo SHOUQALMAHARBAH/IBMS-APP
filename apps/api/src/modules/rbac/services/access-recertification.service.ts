@@ -11,7 +11,10 @@ import type {
 } from '@ibms/db';
 import { randomUUID } from 'node:crypto';
 import { DutySegregationService } from '../../duty-segregation/duty-segregation.service';
-import { AccessRecertificationRepository } from '../../../repositories/access-recertification.repository';
+import {
+  AccessRecertificationRepository,
+  type AccessRecertificationItemWithCycle,
+} from '../../../repositories/access-recertification.repository';
 import { RoleRepository } from '../../../repositories/role.repository';
 import { UserRepository } from '../../../repositories/user.repository';
 import { AuditService } from '../../audit/audit.service';
@@ -43,9 +46,28 @@ export interface RecertificationItemView {
    */
   subjectIsUserAdministrator: boolean;
   reviewerUserId: string;
+  /**
+   * WHO reviewed this subject, by name.
+   *
+   * On the reviewer's own queue this is near-redundant — every row is theirs. It is here for the
+   * ADMINISTRATOR record (`getAdminAccessItems`), where it is the whole point: "was this
+   * administrator's access reviewed" is only half a question, and the other half is by whom. A
+   * screen rendering `reviewerUserId` would put a uuid in front of the person auditing the
+   * review, which is the defect the audit trail already had to fix once.
+   */
+  reviewerFullName: string;
   decision: string | null;
   reviewedAt: Date | null;
   createdAt: Date;
+}
+
+/** GET /access-recertification/cycles response shape. */
+export interface RecertificationCycleView {
+  id: string;
+  cycleLabel: string;
+  startedAt: Date;
+  dueAt: Date;
+  closedAt: Date | null;
 }
 
 /** Part 10.1 — periodic (quarterly) access-recertification cycle. One item
@@ -253,20 +275,61 @@ export class AccessRecertificationService {
     reviewerUserId: string,
     cycleId?: string,
   ): Promise<RecertificationItemView[]> {
-    const items = await this.repo.findItemsByReviewer(reviewerUserId, cycleId);
+    return this.enrichItems(
+      await this.repo.findItemsByReviewer(reviewerUserId, cycleId),
+    );
+  }
+
+  /**
+   * The office's cycles, newest first.
+   *
+   * `admin-items` is addressed by a cycle id, and before this nothing could supply one except
+   * the `POST /cycles` response — so the administrator review record was readable for a cycle
+   * you had just started and for no earlier one, while the question it answers ("were the
+   * administrators covered in last quarter's cycle") is an audit-time one.
+   */
+  async listCycles(): Promise<RecertificationCycleView[]> {
+    const cycles = await this.repo.findCycles();
+    return cycles.map((cycle) => ({
+      id: cycle.id,
+      cycleLabel: cycle.cycleLabel,
+      startedAt: cycle.startedAt,
+      dueAt: cycle.dueAt,
+      closedAt: cycle.closedAt,
+    }));
+  }
+
+  /**
+   * Item rows -> view rows, with every lookup BATCHED.
+   *
+   * Shared by the reviewer's queue and the administrator record rather than written twice: the
+   * two differ only in which rows they select, and a second copy is a second place for
+   * `(deleted user)` — or the administrator badge, which is resolved from `user.manage` and not
+   * from a role name — to drift.
+   */
+  private async enrichItems(
+    items: AccessRecertificationItemWithCycle[],
+  ): Promise<RecertificationItemView[]> {
     if (items.length === 0) return [];
 
     const subjectIds = [...new Set(items.map((i) => i.subjectUserId))];
-    const [subjects, rolesBySubject, administrators] = await Promise.all([
-      this.users.findSummariesByIds(subjectIds),
-      // One query for every subject's roles, not one per item — see
-      // UserRepository.getRoleNamesByIds.
-      this.users.getRoleNamesByIds(subjectIds),
-      // One query for the whole page, same reason. Resolved through the same
-      // capability the last-administrator guard and `getAdminAccessItems` use.
-      this.roles.findActiveUserIdsWithPermission('user.manage'),
-    ]);
+    const reviewerIds = [...new Set(items.map((i) => i.reviewerUserId))];
+    const [subjects, reviewers, rolesBySubject, administrators] =
+      await Promise.all([
+        this.users.findSummariesByIds(subjectIds),
+        // A separate batched read rather than adding the reviewer to the subject set: the two
+        // sets overlap only in a declared self-review, and one query each keeps the lookup
+        // maps honest about which id came from where.
+        this.users.findSummariesByIds(reviewerIds),
+        // One query for every subject's roles, not one per item — see
+        // UserRepository.getRoleNamesByIds.
+        this.users.getRoleNamesByIds(subjectIds),
+        // One query for the whole page, same reason. Resolved through the same
+        // capability the last-administrator guard uses.
+        this.roles.findActiveUserIdsWithPermission('user.manage'),
+      ]);
     const subjectById = new Map(subjects.map((s) => [s.id, s]));
+    const reviewerById = new Map(reviewers.map((r) => [r.id, r]));
     const administratorIds = new Set(administrators);
 
     return items.map((item) => {
@@ -281,6 +344,8 @@ export class AccessRecertificationService {
         subjectRoles: rolesBySubject.get(item.subjectUserId) ?? [],
         subjectIsUserAdministrator: administratorIds.has(item.subjectUserId),
         reviewerUserId: item.reviewerUserId,
+        reviewerFullName:
+          reviewerById.get(item.reviewerUserId)?.fullName ?? '(deleted user)',
         decision: item.decision,
         reviewedAt: item.reviewedAt,
         createdAt: item.createdAt,
@@ -371,14 +436,26 @@ export class AccessRecertificationService {
    * resolved through the same query, so the two cannot drift apart on what
    * "administrator" means.
    */
+  /**
+   * The administrator subjects in one cycle, ENRICHED.
+   *
+   * Part 5.1 is explicit that the administrator is not exempt from recertification of its own
+   * access, so this is the record proving they were covered. It returned RAW rows, carrying
+   * `subjectUserId` and `reviewerUserId` as uuids and no cycle label — which is unreadable by
+   * the only person who would ask, and is the defect the audit trail already had to fix when its
+   * "User" column rendered a uuid at whoever was reviewing who did what. It now goes through the
+   * same `enrichItems` the reviewer's queue uses.
+   */
   async getAdminAccessItems(
     cycleId: string,
-  ): Promise<AccessRecertificationItem[]> {
+  ): Promise<RecertificationItemView[]> {
     const adminUserIds = new Set(
       await this.roles.findActiveUserIdsWithPermission('user.manage'),
     );
     const items = await this.repo.findItemsByCycle(cycleId);
-    return items.filter((item) => adminUserIds.has(item.subjectUserId));
+    return this.enrichItems(
+      items.filter((item) => adminUserIds.has(item.subjectUserId)),
+    );
   }
 
   /**

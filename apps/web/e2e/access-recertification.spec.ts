@@ -23,6 +23,84 @@ async function mockAuth(page: Page, roles: string[]) {
   await page.route("**/auth/me", (route) =>
     route.fulfill({ status: 200, json: { ...ME_BASE, roles, permissions: permissionsForRoles(roles) } }),
   );
+  // The administrator-record section renders for ANY role holding
+  // `access-recertification.cycle.start`, which COMPLIANCE_OFFICER does — so every test on this
+  // screen needs these two reads answered or the section reports a load failure and puts an
+  // extra role="alert" on the page. Defaults to NO cycles, which is the quiet state; a test
+  // about the record registers its own routes afterwards, and the later registration wins.
+  await page.route("http://localhost:4000/access-recertification/cycles", (route) =>
+    route.fulfill({ status: 200, json: [] }),
+  );
+}
+
+const CYCLES = [
+  {
+    id: "cycle-2",
+    cycleLabel: "Q2-2026",
+    startedAt: "2026-04-01T00:00:00.000Z",
+    dueAt: "2026-04-22T00:00:00.000Z",
+    closedAt: null,
+  },
+  {
+    id: "cycle-1",
+    cycleLabel: "Q1-2026",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    dueAt: "2026-01-22T00:00:00.000Z",
+    closedAt: "2026-01-20T00:00:00.000Z",
+  },
+];
+
+/** An administrator subject reviewed by somebody else, and one who reviewed themselves. */
+const ADMIN_ITEMS = [
+  {
+    id: "admin-item-1",
+    cycleId: "cycle-2",
+    cycleLabel: "Q2-2026",
+    subjectUserId: "admin-1",
+    subjectFullName: "Office Administrator",
+    subjectEmail: "oa@ibms.test",
+    subjectRoles: ["OFFICE_ADMINISTRATOR"],
+    subjectIsUserAdministrator: true,
+    reviewerUserId: "reviewer-9",
+    reviewerFullName: "Compliance Reviewer",
+    decision: "confirmed",
+    reviewedAt: "2026-04-05T00:00:00.000Z",
+    createdAt: "2026-04-01T00:00:00.000Z",
+  },
+  {
+    id: "admin-item-2",
+    cycleId: "cycle-2",
+    cycleLabel: "Q2-2026",
+    subjectUserId: "admin-2",
+    subjectFullName: "Security Administrator",
+    subjectEmail: "sa@ibms.test",
+    subjectRoles: ["SYSTEM_SECURITY_ADMINISTRATOR"],
+    subjectIsUserAdministrator: true,
+    // Reviewer IS the subject — a declared self-review the office allowed.
+    reviewerUserId: "admin-2",
+    reviewerFullName: "Security Administrator",
+    decision: null,
+    reviewedAt: null,
+    createdAt: "2026-04-01T00:00:00.000Z",
+  },
+];
+
+/** The record's two reads, with the cycle list non-empty. Registered AFTER mockAuth so it wins. */
+async function mockAdminRecord(
+  page: Page,
+  itemsByCycle: Record<string, unknown[]>,
+) {
+  await page.route("http://localhost:4000/access-recertification/cycles", (route) =>
+    route.fulfill({ status: 200, json: CYCLES }),
+  );
+  await page.route(
+    "http://localhost:4000/access-recertification/cycles/*/admin-items",
+    (route) => {
+      const match = /\/cycles\/([^/]+)\/admin-items/.exec(route.request().url());
+      const id = match?.[1] ?? "";
+      return route.fulfill({ status: 200, json: itemsByCycle[id] ?? [] });
+    },
+  );
 }
 
 const ITEMS = [
@@ -39,6 +117,7 @@ const ITEMS = [
     // users?" once role names are office-chosen.
     subjectIsUserAdministrator: false,
     reviewerUserId: "user-1",
+    reviewerFullName: "Compliance Reviewer",
     decision: null,
     reviewedAt: null,
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -53,6 +132,7 @@ const ITEMS = [
     subjectRoles: ["SYSTEM_SECURITY_ADMINISTRATOR"],
     subjectIsUserAdministrator: true,
     reviewerUserId: "user-1",
+    reviewerFullName: "Compliance Reviewer",
     decision: null,
     reviewedAt: null,
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -222,6 +302,134 @@ test("lets a reviewer confirm an item, which then shows as decided", async ({ pa
   // The row must survive the update without crashing — its enriched fields
   // (only present in the original GET response) should still render.
   await expect(page.getByText("SALES RELATIONSHIP OFFICER")).toBeVisible();
+});
+
+/*
+ * THE ADMINISTRATOR ACCESS REVIEW RECORD — `GET /cycles/:id/admin-items`, which had no web
+ * caller.
+ *
+ * Part 5.1 is explicit that whoever can administer users is NOT exempt from recertification of
+ * their own access. This is the record proving they were covered, and nobody could read it.
+ */
+
+test("shows which administrator accounts a cycle covered, and who reviewed each", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: ITEMS }),
+  );
+  await mockAdminRecord(page, { "cycle-2": ADMIN_ITEMS });
+  await page.goto("/access-recertification");
+
+  const record = page.getByTestId("admin-access-record");
+  await expect(record.getByRole("heading")).toHaveText(
+    "Administrator access review record",
+  );
+
+  // The SUBJECT by name, and the REVIEWER by name. The route returned raw uuids for both until
+  // this section existed, which is unreadable by the only person who would ask.
+  await expect(record).toContainText("Office Administrator");
+  await expect(record).toContainText("Compliance Reviewer");
+  await expect(page.getByTestId("admin-decision-admin-item-1")).toHaveText(
+    "Confirmed",
+  );
+  // An undecided administrator row says so rather than rendering blank — "not reviewed" is the
+  // answer this record exists to surface.
+  await expect(page.getByTestId("admin-decision-admin-item-2")).toHaveText(
+    "Not yet reviewed",
+  );
+});
+
+test("marks an administrator who reviewed their own access", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: ITEMS }),
+  );
+  await mockAdminRecord(page, { "cycle-2": ADMIN_ITEMS });
+  await page.goto("/access-recertification");
+
+  // Anchored on the other row first, so the absence below cannot pass on an unrendered table.
+  await expect(page.getByTestId("admin-decision-admin-item-1")).toHaveText(
+    "Confirmed",
+  );
+  await expect(page.getByTestId("self-review-admin-item-2")).toContainText(
+    "reviewed their own access",
+  );
+  // The row reviewed by somebody else must NOT be marked, or the mark says nothing.
+  await expect(page.getByTestId("self-review-admin-item-1")).toHaveCount(0);
+});
+
+test("warns, rather than showing an empty table, when a cycle covered no administrator", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: ITEMS }),
+  );
+  // Q1 covered nobody who can administer users. That is the condition Part 5.1 exists to
+  // prevent, so it must not read as "nothing to see".
+  await mockAdminRecord(page, { "cycle-2": ADMIN_ITEMS, "cycle-1": [] });
+  await page.goto("/access-recertification");
+
+  // Start from the cycle that DOES have rows, so the switch below is observable.
+  await expect(page.getByTestId("admin-decision-admin-item-1")).toBeVisible();
+
+  await page.getByTestId("admin-record-cycle").selectOption("cycle-1");
+  await expect(page.getByTestId("admin-record-none")).toContainText(
+    "covered no administrator account",
+  );
+  await expect(page.getByTestId("admin-decision-admin-item-1")).toHaveCount(0);
+});
+
+test("asks about an EARLIER cycle, not only the one just started", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: ITEMS }),
+  );
+  const earlier = [
+    {
+      ...ADMIN_ITEMS[0]!,
+      id: "admin-item-old",
+      cycleId: "cycle-1",
+      cycleLabel: "Q1-2026",
+      subjectFullName: "Former Administrator",
+      reviewerFullName: "Executive Manager",
+    },
+  ];
+  await mockAdminRecord(page, { "cycle-2": ADMIN_ITEMS, "cycle-1": earlier });
+  await page.goto("/access-recertification");
+
+  // Defaults to the newest cycle, which is what somebody opening the section is asking about.
+  await expect(page.getByTestId("admin-record-cycle")).toHaveValue("cycle-2");
+
+  // The audit-time question is about a cycle that closed months ago. Before the cycles list
+  // existed the only obtainable id was the one from the start-cycle response, so this was
+  // unanswerable.
+  await page.getByTestId("admin-record-cycle").selectOption("cycle-1");
+  await expect(page.getByTestId("admin-access-record")).toContainText(
+    "Former Administrator",
+  );
+  await expect(page.getByTestId("admin-access-record")).toContainText(
+    "Executive Manager",
+  );
+});
+
+test("a reviewer who cannot start cycles is not shown the administrator record", async ({
+  page,
+}) => {
+  // BRANCH_DEPARTMENT_MANAGER holds `access-recertification.review` and NOT `.cycle.start` —
+  // measured from the seeded grid. The record is gated on the same code as the route.
+  await mockAuth(page, ["BRANCH_DEPARTMENT_MANAGER"]);
+  await page.route("**/access-recertification/items", (route) =>
+    route.fulfill({ status: 200, json: ITEMS }),
+  );
+  await mockAdminRecord(page, { "cycle-2": ADMIN_ITEMS });
+  await page.goto("/access-recertification");
+
+  // Anchored on their OWN queue rendering, so the absence is not satisfied by an unmounted page.
+  await expect(page.getByText("Sales Officer")).toBeVisible();
+  await expect(page.getByTestId("admin-access-record")).toHaveCount(0);
 });
 
 test("access-recertification page has no serious/critical accessibility violations @a11y", async ({ page }) => {

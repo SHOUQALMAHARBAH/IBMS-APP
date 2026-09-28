@@ -4477,6 +4477,66 @@ contains. And § 1.62's shape again, one level up: knowing a failure mode and wr
 not stop me producing it — this time the document I overran was one I had written myself, three
 times over, in three files.
 
+
+### 1.71 — THE ADMINISTRATOR REVIEW RECORD WAS UNREADABLE, UNADDRESSABLE, AND RETURNED UUIDS
+
+`GET /access-recertification/cycles/:id/admin-items` exists because Part 5.1 is explicit that
+whoever can administer users is **not exempt** from recertification of their own access. It is
+the record proving they were covered. Closing it found three separate faults stacked on each
+other, and each one alone would have made the control useless.
+
+**(1) No web caller.** The screen calls only "items where I am the reviewer", so the
+administrator subset was readable by nobody. It also had **no api e2e** — a
+compliance-evidence control exercised by one unit test and nothing else.
+
+**(2) Unaddressable.** The route takes a cycle id and **nothing could supply one.** There was no
+cycles-list route at all; the only source was the `POST /cycles` response. So the record was
+readable for a cycle you had just started in this session and for no earlier one — while *"were
+the administrators covered in last quarter's cycle"* is precisely the audit-time question it
+exists to answer. § 1.65's rule applied to a read: **a route is only as reachable as the thing
+that addresses it.** `GET /access-recertification/cycles` is new, gated on EITHER code, which is
+one of the few places `PermissionsGuard`'s OR is what you want — a reviewer needs the label of
+the cycle their queue belongs to, and whoever starts cycles needs one to ask about.
+
+**(3) It returned RAW rows.** `subjectUserId` and `reviewerUserId` as uuids, no cycle label — so
+a screen would have put uuids in front of the one person who would ever ask. That is the defect
+the audit trail already had to fix when its "User" column rendered a uuid at whoever was
+reviewing who did what. It now goes through the same `enrichItems` the reviewer's queue uses,
+extracted rather than copied, and the view gained `reviewerFullName`: **"was this administrator
+reviewed" is only half the question**, and a uuid cannot answer the other half.
+
+**§ 1.61, measured, and it was already broken for the control that existed.** Of the three roles
+holding `access-recertification.cycle.start`, **two hold no `access-recertification.review`** —
+and the nav entry was gated on `.review` alone, so `OFFICE_ADMINISTRATOR` and
+`SYSTEM_SECURITY_ADMINISTRATOR` had no navigation route to the start-cycle control they hold.
+The entry now names both codes, same reasoning as `/settings/roles` taking `role.read`.
+
+**Zero administrator items renders as a WARNING, not an empty table.** A cycle that covered no
+administrator account is the condition Part 5.1 exists to prevent, so an empty state would say
+the opposite of what the absence means — the same treatment the empty holiday calendar gets.
+
+**`findItemsByCycle` had no `orderBy`** — § 1.42's class, on a read now rendered as a list. It is
+a total order (`createdAt desc, id asc`) because a cycle writes every item in one transaction, so
+timestamps tie routinely.
+
+#### A PLANT KILLED NOTHING, on the assertion that mattered most
+
+Emptying the reviewer lookup left the api e2e **green**. The assertions were
+`toBeTruthy()` and `not.toBe(the uuid)` — and the fallback is the literal `'(deleted user)'`,
+which is truthy and is not a uuid. **My assertion could not tell "the name was resolved" from
+"the lookup failed and printed a placeholder"**, which is the exact thing the enrichment exists
+to do. Re-pointed at the actual name, the plant dies with
+`expected '(deleted user)' to be 'RBAC Test User'`. § 1.51(d): an assertion has to isolate the
+one cause it claims to be about.
+
+**Nine plants, every one killing the test it named** (four at the api unit level, five on the
+web), plus two run against the api e2e — because the web tests MOCK the api, so a service plant
+is invisible there, and the filter's `user.manage` lookup is live only over HTTP.
+
+**Verification**: api unit 94/94 across the rbac module (recertification spec 20 → 22), web e2e
+`access-recertification` 14/14 (from 9), the new api e2e test passing at 17s, both typechecks
+clean, lint 0 errors.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

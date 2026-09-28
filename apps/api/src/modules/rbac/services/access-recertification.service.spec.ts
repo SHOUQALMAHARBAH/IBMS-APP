@@ -19,6 +19,7 @@ interface Mocks {
   recordDecision: Mock;
   revokeAllActiveRoleAssignmentsForUser: Mock;
   findItemsByCycle: Mock;
+  findCycles: Mock;
   findSummariesByIds: Mock;
   getRoleNamesByIds: Mock;
   startTimer: Mock;
@@ -58,6 +59,7 @@ function makeDeps(overrides?: {
     .fn()
     .mockResolvedValue(undefined);
   const findItemsByCycle = vi.fn().mockResolvedValue([]);
+  const findCycles = vi.fn().mockResolvedValue([]);
 
   const repo = {
     createCycle: vi.fn().mockResolvedValue({ id: 'cycle-1' }),
@@ -67,6 +69,7 @@ function makeDeps(overrides?: {
     createManyItems,
     findItemById,
     findItemsByCycle,
+    findCycles,
     findItemsByReviewer,
     recordDecision,
     revokeAllActiveRoleAssignmentsForUser,
@@ -136,6 +139,7 @@ function makeDeps(overrides?: {
       recordDecision,
       revokeAllActiveRoleAssignmentsForUser,
       findItemsByCycle,
+      findCycles,
       findSummariesByIds,
       getRoleNamesByIds,
       startTimer,
@@ -521,9 +525,25 @@ describe('AccessRecertificationService', () => {
           createdAt: new Date('2026-01-01'),
         },
       ]);
-      mocks.findSummariesByIds.mockResolvedValue([
-        { id: 'sales-1', fullName: 'Sales Officer', email: 'sales@ibms.test' },
-      ]);
+      // Answers for BOTH batched reads — the subject set and the reviewer set. A mock that only
+      // knew the subject would make the reviewer's name fall back to '(deleted user)' and the
+      // assertion below would pin that fallback as if it were the answer.
+      mocks.findSummariesByIds.mockImplementation((ids: string[]) =>
+        Promise.resolve(
+          [
+            {
+              id: 'sales-1',
+              fullName: 'Sales Officer',
+              email: 'sales@ibms.test',
+            },
+            {
+              id: 'reviewer-1',
+              fullName: 'Compliance Officer',
+              email: 'co@ibms.test',
+            },
+          ].filter((u) => ids.includes(u.id)),
+        ),
+      );
       mocks.getRoleNamesByIds.mockResolvedValue(
         new Map([['sales-1', ['SALES_RELATIONSHIP_OFFICER']]]),
       );
@@ -544,6 +564,7 @@ describe('AccessRecertificationService', () => {
           // subject is not an administrator.
           subjectIsUserAdministrator: false,
           reviewerUserId: 'reviewer-1',
+          reviewerFullName: 'Compliance Officer',
           decision: null,
           reviewedAt: null,
           createdAt: new Date('2026-01-01'),
@@ -559,14 +580,135 @@ describe('AccessRecertificationService', () => {
       // account Part 5.1 singles out as NOT exempt from recertification, and so
       // exactly the one this report exists to prove was reviewed.
       const { service, mocks } = makeDeps({ admins: ['admin-1'] });
+      // The fixture carries the CYCLE relation because the repository read includes it. A
+      // fixture that omits a field the read returns is a fixture that lies — and this one used
+      // to, because the read was raw.
       mocks.findItemsByCycle.mockResolvedValue([
-        { id: 'item-1', subjectUserId: 'admin-1' },
-        { id: 'item-2', subjectUserId: 'sales-1' },
+        {
+          id: 'item-1',
+          cycleId: 'cycle-1',
+          cycle: { cycleLabel: 'Q1-2026' },
+          subjectUserId: 'admin-1',
+          reviewerUserId: 'reviewer-1',
+          decision: 'confirmed',
+          reviewedAt: new Date('2026-01-05'),
+          createdAt: new Date('2026-01-01'),
+        },
+        {
+          id: 'item-2',
+          cycleId: 'cycle-1',
+          cycle: { cycleLabel: 'Q1-2026' },
+          subjectUserId: 'sales-1',
+          reviewerUserId: 'reviewer-1',
+          decision: null,
+          reviewedAt: null,
+          createdAt: new Date('2026-01-01'),
+        },
       ]);
+      mocks.findSummariesByIds.mockImplementation((ids: string[]) =>
+        Promise.resolve(
+          [
+            {
+              id: 'admin-1',
+              fullName: 'Office Administrator',
+              email: 'oa@ibms.test',
+            },
+            {
+              id: 'reviewer-1',
+              fullName: 'Compliance Officer',
+              email: 'co@ibms.test',
+            },
+          ].filter((u) => ids.includes(u.id)),
+        ),
+      );
+      mocks.getRoleNamesByIds.mockResolvedValue(
+        new Map([['admin-1', ['OFFICE_ADMINISTRATOR']]]),
+      );
 
       const items = await service.getAdminAccessItems('cycle-1');
 
-      expect(items).toEqual([{ id: 'item-1', subjectUserId: 'admin-1' }]);
+      expect(items).toHaveLength(1);
+      expect(items[0].subjectUserId).toBe('admin-1');
+      // The badge must be TRUE here. It is resolved from `user.manage`, and this report selects
+      // on the same capability — so a false badge on a row this report returned would mean the
+      // two disagreed about who an administrator is.
+      expect(items[0].subjectIsUserAdministrator).toBe(true);
+    });
+
+    it('names the subject AND the reviewer, because a uuid cannot answer "reviewed by whom"', async () => {
+      // The route returned raw rows until 2026-09-28: uuids for both people and no cycle label.
+      // That is unreadable by the only person who would ask — and it is the defect the audit
+      // trail already had to fix when its "User" column rendered a uuid.
+      const { service, mocks } = makeDeps({ admins: ['admin-1'] });
+      mocks.findItemsByCycle.mockResolvedValue([
+        {
+          id: 'item-1',
+          cycleId: 'cycle-1',
+          cycle: { cycleLabel: 'Q1-2026' },
+          subjectUserId: 'admin-1',
+          reviewerUserId: 'reviewer-1',
+          decision: 'confirmed',
+          reviewedAt: new Date('2026-01-05'),
+          createdAt: new Date('2026-01-01'),
+        },
+      ]);
+      mocks.findSummariesByIds.mockImplementation((ids: string[]) =>
+        Promise.resolve(
+          [
+            {
+              id: 'admin-1',
+              fullName: 'Office Administrator',
+              email: 'oa@ibms.test',
+            },
+            {
+              id: 'reviewer-1',
+              fullName: 'Compliance Officer',
+              email: 'co@ibms.test',
+            },
+          ].filter((u) => ids.includes(u.id)),
+        ),
+      );
+      mocks.getRoleNamesByIds.mockResolvedValue(
+        new Map([['admin-1', ['OFFICE_ADMINISTRATOR']]]),
+      );
+
+      const [item] = await service.getAdminAccessItems('cycle-1');
+
+      expect(item.subjectFullName).toBe('Office Administrator');
+      expect(item.reviewerFullName).toBe('Compliance Officer');
+      expect(item.cycleLabel).toBe('Q1-2026');
+      expect(item.decision).toBe('confirmed');
+    });
+  });
+
+  describe('listCycles', () => {
+    it("returns the office's cycles so admin-items can be addressed by one", async () => {
+      // Without this the only source of a cycle id was the POST /cycles response, so the
+      // administrator review record was readable for a cycle you had just started and for no
+      // earlier one — while the question it answers is an audit-time one.
+      const { service, mocks } = makeDeps();
+      mocks.findCycles.mockResolvedValue([
+        {
+          id: 'cycle-2',
+          cycleLabel: 'Q2-2026',
+          startedAt: new Date('2026-04-01'),
+          dueAt: new Date('2026-04-22'),
+          closedAt: null,
+        },
+        {
+          id: 'cycle-1',
+          cycleLabel: 'Q1-2026',
+          startedAt: new Date('2026-01-01'),
+          dueAt: new Date('2026-01-22'),
+          closedAt: new Date('2026-01-20'),
+        },
+      ]);
+
+      const cycles = await service.listCycles();
+
+      expect(cycles.map((c) => c.id)).toEqual(['cycle-2', 'cycle-1']);
+      expect(cycles[0].cycleLabel).toBe('Q2-2026');
+      expect(cycles[1].closedAt).toEqual(new Date('2026-01-20'));
     });
   });
 });

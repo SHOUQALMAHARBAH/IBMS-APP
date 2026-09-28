@@ -109,9 +109,40 @@ export class AccessRecertificationRepository {
     });
   }
 
-  findItemsByCycle(cycleId: string): Promise<AccessRecertificationItem[]> {
+  /**
+   * Every item in one cycle.
+   *
+   * Carries the cycle relation and a TOTAL order, both for the same reason its sibling above
+   * does: a caller that renders these as a list needs the label without a second query, and a
+   * `findMany` with no `orderBy` returns whatever order the plan produced — which for a screen
+   * means rows that move between renders, and is the § 1.42 class this repository was already
+   * bitten by when `findActiveUserIdsWithPermission` had no order and `pickReviewer` took `[0]`.
+   * `createdAt` alone is not total: a cycle writes all of its items in one transaction, so
+   * timestamps tie routinely.
+   */
+  findItemsByCycle(
+    cycleId: string,
+  ): Promise<AccessRecertificationItemWithCycle[]> {
     return this.prisma.client.accessRecertificationItem.findMany({
       where: { cycleId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      include: { cycle: { select: { cycleLabel: true } } },
+    });
+  }
+
+  /**
+   * The office's recertification cycles, newest first.
+   *
+   * Exists because `GET /cycles/:id/admin-items` needs a cycle id and nothing could supply one:
+   * the only other source was the `POST /cycles` response, so the administrator review record
+   * was readable for a cycle you had just started in this session and for no earlier one — and
+   * "were the administrators reviewed in last quarter's cycle" is precisely the audit-time
+   * question that route exists to answer. § 1.65's rule applied to a read: a route is only as
+   * reachable as the thing it needs to be addressed by.
+   */
+  findCycles(): Promise<AccessRecertificationCycle[]> {
+    return this.prisma.client.accessRecertificationCycle.findMany({
+      orderBy: [{ startedAt: 'desc' }, { id: 'asc' }],
     });
   }
 

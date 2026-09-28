@@ -220,6 +220,26 @@ export const OPERATIONS = {
     acrLoading: 'جارٍ التحميل…',
     acrLoadError: 'تعذّر تحميل قائمة المراجعة — حاول مرة أخرى.',
     acrNoPermission: 'لا تملك صلاحية access-recertification.review اللازمة لعرض هذه الشاشة.',
+    // The administrator review record — Part 5.1: whoever can administer users is NOT exempt
+    // from recertification of their own access, and this is the record proving they were covered.
+    acrAdminHeading: 'سجل مراجعة حسابات المسؤولين',
+    acrAdminIntro:
+      'من يملك إدارة المستخدمين ليس مستثنى من مراجعة صلاحياته. هذا السجل يبيّن أي حسابات ' +
+      'المسؤولين شملتها الدورة، ومن راجع كل منها.',
+    acrAdminCycleLabel: 'الدورة',
+    acrAdminNoCycles: 'لم تُفتح أي دورة مراجعة بعد.',
+    acrAdminNoneCovered:
+      'لم تشمل هذه الدورة أي حساب مسؤول. هذه هي الحالة التي يمنعها البند 5.1 — راجِع الدورة.',
+    acrAdminColSubject: 'الحساب',
+    acrAdminColReviewer: 'المراجع',
+    acrAdminColDecision: 'القرار',
+    acrAdminColReviewedAt: 'تاريخ المراجعة',
+    acrAdminSelfReview: '(راجع صلاحياته بنفسه)',
+    acrAdminNotYetReviewed: 'لم تُراجع بعد',
+    acrAdminDecisionConfirmed: 'أُكِّدت',
+    acrAdminDecisionRevoked: 'سُحبت',
+    acrAdminDecisionChanged: 'عُدِّلت',
+    acrAdminLoadFailed: 'تعذر تحميل سجل مراجعة حسابات المسؤولين.',
     acrStartCycleError: 'تعذّر بدء الدورة — حاول مرة أخرى.',
     acrCycleDueDate: 'تاريخ الاستحقاق (اختياري — الافتراضي 15 يوماً)',
     acrCycleLabel: 'وسم الدورة',
@@ -787,6 +807,28 @@ export const OPERATIONS = {
     acrLoading: 'Loading…',
     acrLoadError: 'Could not load your review queue — try again.',
     acrNoPermission: "You don't hold the access-recertification.review permission.",
+    // The administrator review record — Part 5.1: whoever can administer users is NOT exempt
+    // from recertification of their own access, and this is the record proving they were covered.
+    acrAdminHeading: 'Administrator access review record',
+    acrAdminIntro:
+      'Whoever can administer users is not exempt from review of their own access. This record ' +
+      'shows which administrator accounts a cycle covered, and who reviewed each one.',
+    acrAdminCycleLabel: 'Cycle',
+    acrAdminNoCycles: 'No review cycle has been opened yet.',
+    acrAdminNoneCovered:
+      'This cycle covered no administrator account. That is the condition Part 5.1 exists to ' +
+      'prevent — review the cycle.',
+    acrAdminColSubject: 'Account',
+    acrAdminColReviewer: 'Reviewer',
+    acrAdminColDecision: 'Decision',
+    acrAdminColReviewedAt: 'Reviewed on',
+    acrAdminSelfReview: '(reviewed their own access)',
+    acrAdminNotYetReviewed: 'Not yet reviewed',
+    acrAdminDecisionConfirmed: 'Confirmed',
+    acrAdminDecisionRevoked: 'Revoked',
+    acrAdminDecisionChanged: 'Changed',
+    acrAdminLoadFailed: 'Could not load the administrator access review record.'
+    ,
     acrStartCycleError: 'Could not start the cycle — try again.',
     acrCycleDueDate: 'Due date (optional — defaults to 15 days)',
     acrCycleLabel: 'Cycle label',
