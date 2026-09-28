@@ -90,5 +90,33 @@ export async function expectNone(target: Locator, anchor: Locator): Promise<void
     anchor,
     "expectNone: the anchor must be visible, otherwise the absence below is satisfied by a blank page and proves nothing.",
   ).toBeVisible();
+
+  /*
+   * THE SECOND WAY AN ABSENCE ASSERTION LIES, and this helper CANNOT close it.
+   *
+   * An anchor proves that SOMETHING rendered. It cannot prove that the read which would produce the
+   * absent element has finished. When a screen loads two things in sequence — the office's own rows,
+   * then the shared ones — an anchor from the FIRST read is visible while the second is still in
+   * flight, and `toHaveCount(0)` SUCCEEDS ON ITS FIRST POLL rather than waiting. "Not yet" and
+   * "never" become the same answer, and which one a run gets depends on machine load: measured
+   * 2026-09-28, a planted regression died under the full spec and PASSED when its own test ran
+   * alone, on the identical build.
+   *
+   * ## `waitForLoadState('networkidle')` DOES NOT FIX IT. Tried, and disproved by a test.
+   *
+   * It looks like the obvious barrier and it is a SNAPSHOT. The second request is issued only after
+   * the first resolves and the component re-renders, so at the instant this helper would ask, the
+   * page genuinely IS idle — idleness is precisely the state BETWEEN the two reads. Adding the wait
+   * changed nothing: `e2e/anchored-helper.spec.ts` holds the reproduction, with the second read
+   * delayed so the window is entered on every run rather than under load.
+   *
+   * ## So the fix is not here
+   *
+   * What the assertion would need is "has everything that could produce this element run yet", and
+   * nothing at the DOM boundary can answer that. It is answered by the CALLER choosing an anchor
+   * from the same read as the absent thing — which is a rule about call sites, enforced by
+   * `test/e2e-anchored-reads.test.ts`, not something this function can check. The four sites that
+   * had the wrong shape are fixed; the guard refuses new ones.
+   */
   await expect(target).toHaveCount(0);
 }

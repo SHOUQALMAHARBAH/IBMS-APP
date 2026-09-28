@@ -4562,10 +4562,25 @@ clean, lint 0 errors.
 
 ### 1.72 `P2` — AN OFFICE COULD NOT STATE AN SLA OF ITS OWN — AND CLOSING THAT FOUND THAT `CREATE` CAN ASSERT LEGAL FORCE WHERE `UPDATE` CANNOT
 
-> **OWNER DECISION NEEDED on the asymmetry below.** The screen closes it; the API is
-> deliberately unchanged, because tightening a route with a passing e2e is a behaviour change
-> and the precedent (the screening `assign` case) is to reconcile it by decision rather than by
-> accident.
+> **DECIDED 2026-09-28 — enforce it on BOTH, in the SERVER.** Creating an SLA already marked
+> REGULATORY now requires `sla.policy.regulatory`, exactly as changing one does. The owner's
+> reasoning: the stamp is a claim that the deadline is imposed by law, so whoever may make that
+> claim must be the same person in both directions — and because every office defines its own
+> roles, nothing keeps `sla.policy.create` narrowly granted, so a screen-only guard reopens the
+> moment anyone adds a screen, an import or a script.
+>
+> **The screening-`assign` precedent was RE-DERIVED and does not apply.** Its substantive reason was
+> that *a reviewer may be granted the permission after assignment* — tightening `assign` would
+> refuse a legitimate act. No such sequence exists here: the claim of legal force is made AT
+> creation, so the question is "may this person make it now", not "will they later be permitted to".
+> Its other reason — a refusal change on a route with a passing e2e — says *be careful*, not
+> *don't*. **A precedent nobody has re-derived is a habit, not a reason.**
+>
+> Enforced in `SlaPolicyService.create` rather than on the route, because `PermissionsGuard` ORs its
+> codes, so `@RequirePermissions('sla.policy.create', 'sla.policy.regulatory')` would let either one
+> through alone — the trap `user-admin.service.ts` records for the person-plus-account write. Proven
+> at unit level (3 tests) and over HTTP, with the complement on the same token: the identical caller
+> succeeds the moment the stamp is not REGULATORY.
 
 `POST /sla/policies` had no web caller. The screen could edit a seeded policy's **duration** —
 one number input, which was the whole of its write surface — and nothing else. So an office could
@@ -4739,6 +4754,87 @@ required columns **one at a time**.
 **Two `getByRole("alert")` queries failed first** and are the recorded trap's third occurrence in
 this repo: Next renders its own route announcer with `role="alert"`, so a page-wide query is a
 strict-mode violation. Scope to `main`.
+
+
+### 1.75 — THE RACING ANCHOR, CLOSED; AND PERMISSION-WITHOUT-A-ROUTE IS NOW A CHECK, WHICH FOUND 17
+
+Two guard items the owner pushed on, after each had been named twice without being closed.
+
+#### (a) The racing anchor — CLOSED, and the obvious fix is DISPROVED in place
+
+`toHaveCount(0)` succeeds on its FIRST poll, so an element that will exist once an in-flight read
+resolves satisfies it, and the verdict depends on machine load.
+
+**The denominator**, re-measurable with `scripts/measurements/absence-assertion-risk.py`:
+
+    absence assertions in the web suite      173
+      through expectNone()                    26
+      raw toHaveCount(0) / not.toBeVisible   147
+        several reads, one non-empty            4   <- hand-read
+
+**`waitForLoadState('networkidle')` DOES NOT FIX IT, and that is now pinned.** It is the obvious
+barrier and it is a SNAPSHOT: the second request is issued only after the first resolves, so at the
+instant the helper asks, the page genuinely IS idle — idleness is exactly the state BETWEEN two
+sequential reads. Implemented, disproved by a deterministic reproduction, reverted, and the
+reasoning left inside `expectNone` so the next person does not retry it.
+
+**`apps/web/e2e/anchored-helper.spec.ts` pins the rule** with the second read held for a fixed delay
+— longer than a first poll, far shorter than the timeout — so the window is entered on every run
+rather than under load. **Making the proof depend on parallelism would make the proof itself flaky,
+which is the defect it is about.** Two tests: a same-read anchor makes `expectNone` refuse a false
+absence, and an earlier-read anchor does not — the second asserted as a fact, so if anybody ever
+does make the helper close it, that test fails and the call-site rule can be relaxed.
+
+**All four candidates were hand-read and NONE was at risk** — four different reasons, and together
+they narrow the class far more than the fix would have:
+
+1. the read that would produce the absent value had not been MADE yet;
+2. the element would DISAPPEAR, not appear — `toHaveCount(0)` retries correctly in that direction,
+   so the race is **appear-late only**;
+3. "not yet" IS the intended claim (a loading-state capture, anchored on the loading indicator);
+4. the mock for the relevant read returns `[]`, so the element is absent before AND after it lands.
+
+**So the real predicate is narrow**: an absence claimed for a reason other than the data being
+empty, while the data that would produce it is present and still loading. Whether a mocked response
+would produce a given element needs the component's render logic, so **it is not statically
+decidable** — the script reports the shape for a person and decides nothing, which is the honest
+form for a check that cannot be exact.
+
+#### (b) Permission without a route — `scripts/measurements/permission-reachability.py`
+
+    (role, permission) pairs in the seeded grid       491
+      codes read directly by a page.tsx  (COVERED)     84
+      codes read only by a component (NOT COVERED)      7
+      covered (role, code) pairs with NO NAV ROUTE     17
+
+**The broad version was abandoned after producing 69 false positives**, including codes plainly
+reachable (`insurer.create` at `/insurers/new`), because a nav href is `/insurers` while the page
+route is `/insurers/[id]`, and a regex over `destinations.ts` truncated on a long comment. Three
+attempts, three different wrong answers. A guard that cries wolf 69 times is worse than none.
+
+**And the narrow version reported 0 until a plant proved it vacuous.** `/` is an ungated
+destination, so including the root in the ancestor chain made every route one hop from something
+visible — **it answered "none" whether or not a gap existed.** Excluding the root is the whole
+check. Re-planted, it reports `access-recertification.cycle.start` for exactly the two
+administrator roles, reproducing § 1.71's real finding.
+
+**A second plant killed nothing, and that one was MY PLANT, not the check**: narrowing
+`/settings/users` leaves `user.manage` reachable through `/employees`, which its holders can also
+see. Third time this session that distinction mattered.
+
+**Two of the 17 hand-checked, and both are real. One is serious.**
+
+- **`refund.disburse` — FINANCE_COLLECTIONS_OFFICER holds it, does not hold `opportunity.read`, and
+  the disburse control is on `/opportunities/[id]`.** § 1.58 recorded that route as the FIRST of the
+  unreachable routes to be closed, *"the one with a balance attached"* — and it was closed onto a
+  screen its only permission-holder cannot navigate to. Closing an unreachable route put its
+  control out of reach a second way.
+- **`interaction.log`** — three roles hold it, none holds `customer.360-view.read`, and `/crm` is the
+  only screen that logs an interaction.
+
+The remaining 15 are **a report, not a verdict**: each needs the same hand-read, and some will be
+reachable by a link this check cannot see (it answers "no NAV route", not "unreachable by any
+means").
 
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 

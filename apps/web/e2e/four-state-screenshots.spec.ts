@@ -692,6 +692,11 @@ test("four-state screenshots: /opportunities/[id] (item #7 slices — recommenda
   );
   await page.goto("/opportunities/opp-1");
   await expect(page.getByText("No RFQs yet.", { exact: false })).toBeVisible();
+  // NOT at risk of the anchored-read race, checked rather than assumed: the download button is
+  // produced by a RECOMMENDATION, and the recommendations mock two lines above returns `[]`. So the
+  // button is absent while that read is in flight AND absent after it lands — the assertion reaches
+  // the same verdict either way. The race only gives a WRONG answer where the absent element would
+  // be produced by data the mock actually returns. See `e2e/anchored-helper.spec.ts`.
   await expect(
     page.getByRole("button", { name: "Download report (PDF)" }),
   ).toHaveCount(0);

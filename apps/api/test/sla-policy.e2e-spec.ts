@@ -150,6 +150,78 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     expect(body.status).toBe('DRAFT');
   });
 
+  /*
+   * THE REGULATORY STAMP IS GATED IN BOTH DIRECTIONS, OVER HTTP.
+   *
+   * Changing a policy to REGULATORY has always needed `sla.policy.regulatory`. CREATING one that
+   * way needed only `sla.policy.create` — and BRANCH_DEPARTMENT_MANAGER holds the create code
+   * WITHOUT the regulatory one, so it could assert legal force on a new policy and not on an
+   * existing one.
+   *
+   * Proven at HTTP level and not only in the unit spec, because the whole reason the check moved
+   * into the server is that a screen-only guard reopens the moment anything else calls the route.
+   * A request built by hand IS that anything else.
+   */
+  it('refuses a REGULATORY policy created by a holder of sla.policy.create who lacks sla.policy.regulatory', async () => {
+    const manager = await makeUser('sla-manager', 'BRANCH_DEPARTMENT_MANAGER');
+
+    // FULLY CITED, so the only thing left to refuse is the authority to make the claim. Omitting
+    // the citations would produce the same 422 for a different reason and prove nothing.
+    const refused = await request(app.getHttpServer())
+      .post('/sla/policies')
+      .set(bearer(manager.accessToken))
+      .send({
+        policyCode: `SLA-E2E-MGR-REG-${RUN}`.toUpperCase().slice(0, 60),
+        policyName: 'Manager asserting legal force',
+        processType: `e2e_process_${RUN}`,
+        durationValue: 3,
+        durationUnit: 'BUSINESS_DAYS',
+        sourceType: 'REGULATORY',
+        sourceReference: 'PDPL Art. 23(b)',
+        sourceDocument: 'PRIV-SOP-05',
+      })
+      .expect(422);
+    // The message must name the code and the honest alternative, or the reader asks for the wrong
+    // grant and has no way forward.
+    expect(JSON.stringify(refused.body)).toContain('sla.policy.regulatory');
+    expect(JSON.stringify(refused.body)).toContain('INTERNAL_POLICY');
+
+    // THE COMPLEMENT, on the same token: the identical caller succeeds the moment the stamp is not
+    // REGULATORY. Without this the test above would pass equally on a build where that role simply
+    // cannot create policies at all.
+    const allowed = await request(app.getHttpServer())
+      .post('/sla/policies')
+      .set(bearer(manager.accessToken))
+      .send({
+        policyCode: `SLA-E2E-MGR-INT-${RUN}`.toUpperCase().slice(0, 60),
+        policyName: 'Manager stating an internal target',
+        processType: `e2e_process_${RUN}`,
+        durationValue: 3,
+        durationUnit: 'BUSINESS_DAYS',
+        sourceType: 'INTERNAL_POLICY',
+      })
+      .expect(201);
+    created.push((allowed.body as PolicyBody).id);
+
+    // And a holder of BOTH codes may still do it — so the gate is the permission and not the route.
+    const byCompliance = await request(app.getHttpServer())
+      .post('/sla/policies')
+      .set(bearer(compliance.accessToken))
+      .send({
+        policyCode: `SLA-E2E-CO-REG-${RUN}`.toUpperCase().slice(0, 60),
+        policyName: 'Compliance asserting legal force',
+        processType: `e2e_process_${RUN}`,
+        durationValue: 3,
+        durationUnit: 'BUSINESS_DAYS',
+        sourceType: 'REGULATORY',
+        sourceReference: 'PDPL Art. 23(b)',
+        sourceDocument: 'PRIV-SOP-05',
+      })
+      .expect(201);
+    created.push((byCompliance.body as PolicyBody).id);
+    expect((byCompliance.body as PolicyBody).isRegulatory).toBe(true);
+  }, 120_000);
+
   it('gates every route on RBAC', async () => {
     await request(app.getHttpServer())
       .get('/sla/policies')

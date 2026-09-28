@@ -13,17 +13,14 @@
  * internal target as a legal requirement is the failure this field exists to prevent", and a
  * database CHECK refuses REGULATORY without naming the instrument.
  *
- * But the API gates this whole route on `sla.policy.create` alone, while changing an EXISTING
- * policy's source type goes through `PATCH /sla/policies/:id/source`, which needs
- * `sla.policy.regulatory` on top. Measured: BRANCH_DEPARTMENT_MANAGER and EXECUTIVE_MANAGEMENT
- * hold the create code and NOT the regulatory one — so on the API they cannot change a policy to
- * REGULATORY and CAN create one that way.
+ * The SERVER enforces this, on BOTH paths, since the owner's decision of 2026-09-28: creating a
+ * policy already marked REGULATORY requires `sla.policy.regulatory`, exactly as changing one to
+ * REGULATORY does. `SlaPolicyService.create` refuses otherwise.
  *
- * The server is deliberately not tightened here: that is a refusal-behaviour change to a route
- * with a passing e2e, and the precedent (the screening `assign` case) is to reconcile it by
- * decision rather than by accident. So THIS FORM keeps the two paths consistent — REGULATORY is
- * offered only to a holder of `sla.policy.regulatory` — and the asymmetry is recorded for the
- * owner as § 1.72.
+ * **This form is not the guard.** It offers REGULATORY only to a holder so the reader is never
+ * shown a choice the server will refuse — but the guard is the service, deliberately, because
+ * every office defines its own roles and a screen-only check reopens the moment anything else
+ * calls the route: another screen, an import, a script. § 1.72 has the re-derivation.
  *
  * ## The form sits ABOVE the list
  *

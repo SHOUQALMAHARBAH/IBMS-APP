@@ -9,7 +9,38 @@ import type { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import type { CreateSlaPolicyDto } from './dto/sla-policy.dto';
 
-const actor = { id: 'compliance-1' } as AuthenticatedUser;
+/**
+ * The actor now carries its PERMISSIONS, because `create` reads them.
+ *
+ * The old fixture was `{ id } as AuthenticatedUser` — a cast past a field the type has, which is a
+ * fixture that lies: three tests failed with `Cannot read properties of undefined (reading 'has')`
+ * the moment the service asked a real question about the caller. The cast is what let it compile.
+ *
+ * `regulatoryActor` holds `sla.policy.regulatory`; `actor` deliberately does NOT, so every test
+ * that does not mention the regulatory stamp runs as somebody who cannot make that claim.
+ */
+function actorWith(codes: string[]): AuthenticatedUser {
+  // A COMPLETE object, not `{ id } as AuthenticatedUser`. The cast is what let the old fixture omit
+  // `permissions` and compile, and the service asking one real question about the caller turned
+  // that into `Cannot read properties of undefined (reading 'has')` in three tests. A fixture that
+  // satisfies the type cannot hide the next field either.
+  return {
+    id: 'compliance-1',
+    organizationId: 'org-1',
+    email: 'compliance@ibms.test',
+    roleIds: ['role-1'],
+    roles: ['COMPLIANCE_OFFICER'],
+    permissions: new Set(codes),
+    sessionId: 'session-1',
+  };
+}
+
+const actor = actorWith(['sla.policy.create', 'sla.policy.update']);
+const regulatoryActor = actorWith([
+  'sla.policy.create',
+  'sla.policy.update',
+  'sla.policy.regulatory',
+]);
 
 function policyRow(over: Record<string, unknown> = {}) {
   return {
@@ -84,7 +115,13 @@ describe('SlaPolicyService — an SLA is only "regulatory" if it names an instru
   it('refuses a REGULATORY policy with no citation, and says what to do instead', async () => {
     const deps = makeDeps();
     await expect(
-      deps.service.create({ ...baseDto, sourceType: 'REGULATORY' }, actor),
+      deps.service.create(
+        { ...baseDto, sourceType: 'REGULATORY' },
+        // The actor MAY make the claim — so what this test refuses is the missing citation and
+        // nothing else. Running it as somebody without the permission would pass for the wrong
+        // reason, which is the failure the permission check would otherwise hide.
+        regulatoryActor,
+      ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
     expect(deps.policies.create).not.toHaveBeenCalled();
   });
@@ -98,9 +135,64 @@ describe('SlaPolicyService — an SLA is only "regulatory" if it names an instru
         sourceReference: 'PDPL Art. 23(b)',
         sourceDocument: 'PRIV-SOP-05',
       },
+      regulatoryActor,
+    );
+    expect(deps.policies.create).toHaveBeenCalled();
+  });
+
+  /*
+   * THE STAMP IS GATED IN BOTH DIRECTIONS.
+   *
+   * Changing a policy to REGULATORY has always needed `sla.policy.regulatory`; CREATING one that
+   * way needed only `sla.policy.create`, which two roles hold without it. The stamp claims a
+   * deadline is imposed by law, so whoever may make that claim must be the same person either way
+   * — and a screen-only guard cannot hold it, because every office defines its own roles.
+   */
+  it('refuses to CREATE a REGULATORY policy without sla.policy.regulatory, even with citations', async () => {
+    const deps = makeDeps();
+    await expect(
+      deps.service.create(
+        {
+          ...baseDto,
+          sourceType: 'REGULATORY',
+          // Fully cited, so the ONLY thing left to refuse is the authority to make the claim. A
+          // test without citations could not tell the two refusals apart.
+          sourceReference: 'PDPL Art. 23(b)',
+          sourceDocument: 'PRIV-SOP-05',
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(deps.policies.create).not.toHaveBeenCalled();
+  });
+
+  it('lets the same caller create a NON-regulatory policy, so the refusal is about the claim', async () => {
+    const deps = makeDeps();
+    // The complement, and it is the half that stops the check being "this role cannot create
+    // policies": the identical actor succeeds the moment the stamp is not REGULATORY.
+    await deps.service.create(
+      { ...baseDto, sourceType: 'INTERNAL_POLICY' },
       actor,
     );
     expect(deps.policies.create).toHaveBeenCalled();
+  });
+
+  it('names the permission and the honest alternative in the refusal', async () => {
+    const deps = makeDeps();
+    // A refusal that does not name the code sends the reader to ask for the wrong grant, and one
+    // that does not name INTERNAL_POLICY leaves them with no way forward — which is how an
+    // internal target ends up recorded as a legal requirement by whoever DOES hold the code.
+    await expect(
+      deps.service.create(
+        {
+          ...baseDto,
+          sourceType: 'REGULATORY',
+          sourceReference: 'PDPL Art. 23(b)',
+          sourceDocument: 'PRIV-SOP-05',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(/sla\.policy\.regulatory[\s\S]*INTERNAL_POLICY/);
   });
 
   it('treats a whitespace-only citation as no citation', async () => {

@@ -125,6 +125,51 @@ export class SlaPolicyService {
     dto: CreateSlaPolicyDto,
     actor: AuthenticatedUser,
   ): Promise<SlaPolicyView> {
+    /*
+     * CREATING a policy already marked REGULATORY needs the same permission as CHANGING one to
+     * REGULATORY. The stamp is a claim that the deadline is imposed by law, and whoever may make
+     * that claim must be the same person in both directions.
+     *
+     * Measured 2026-09-28: `sla.policy.create` is held by BRANCH_DEPARTMENT_MANAGER,
+     * COMPLIANCE_OFFICER and EXECUTIVE_MANAGEMENT; `sla.policy.regulatory` by COMPLIANCE_OFFICER
+     * and the DPO. So two roles could not change a policy to REGULATORY and could create one that
+     * way — the route having no web caller was the only reason nobody had.
+     *
+     * ## Why this is in the SERVICE and not on the route
+     *
+     * The boundary elsewhere in this controller is a ROUTE boundary, and that is the better shape
+     * where it fits: `PATCH :id` vs `PATCH :id/source`. It cannot fit here. `PermissionsGuard` ORs
+     * its codes (`required.some`), so `@RequirePermissions('sla.policy.create',
+     * 'sla.policy.regulatory')` would let EITHER one through alone — the exact trap
+     * `user-admin.service.ts` records for the person-plus-account write, which is checked in the
+     * service for the same reason. Splitting into a second route for one conditional field would
+     * be a bigger change than the condition deserves.
+     *
+     * ## Why a SERVER check rather than the screen's
+     *
+     * The screen already offers REGULATORY only to a holder, and that is not enough. Every office
+     * defines its own roles, so nothing keeps `sla.policy.create` narrowly granted — and a
+     * screen-only guard reopens the moment anyone adds another screen, an import or a script.
+     *
+     * ## Why only REGULATORY, and not every citation field
+     *
+     * On create, EVERY policy states a `sourceType`; choosing `INTERNAL_POLICY` is not a claim of
+     * legal force. A `sourceReference` on a CONTRACTUAL policy names a contract, not a statute, so
+     * gating the citation fields here would refuse ordinary work. The claim is `REGULATORY` and
+     * nothing else — which is also exactly what the update path's `sourceType` disjunct catches.
+     */
+    if (
+      dto.sourceType === 'REGULATORY' &&
+      !actor.permissions.has('sla.policy.regulatory')
+    ) {
+      throw new UnprocessableEntityException(
+        'Creating an SLA policy marked REGULATORY requires the sla.policy.regulatory permission. ' +
+          'Asserting that a deadline is legally required is a different decision from defining ' +
+          'the deadline, and is controlled separately — record it as INTERNAL_POLICY instead, or ' +
+          'have somebody holding that permission create it.',
+      );
+    }
+
     assertSourceTraceable(dto.sourceType, dto);
 
     let created: SlaPolicyWithEscalations;
