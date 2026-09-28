@@ -190,6 +190,14 @@ npm run seed:demo -w api
 npm run demo:release -w api
 ```
 
+**Every screen is held to `docs/frontend-ux-directive.md`** — the owner's standing frontend and UX
+instruction, in the repo because it reached one session as a message and the next would not have seen
+it. Read it before building a screen. Its four-state requirement, its rule that a control a role
+cannot use does not exist on their screen, and its reservation of implementation detail to the
+System/Security Administrator are the three that change code most often. **It overlaps
+`docs/b7-consistency-record.md` and disagrees with it in four places** — the header of the directive
+states which, and those four are the owner's to settle, not to merge.
+
 **Handing the system to someone who does not read code: `docs/first-run.md`** — the
 bilingual (AR-first) first-sign-in walkthrough, walked against a running stack rather than
 written from the source. It carries the measured per-account permission table, so if the

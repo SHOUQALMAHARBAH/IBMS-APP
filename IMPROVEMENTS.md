@@ -5048,6 +5048,56 @@ rendered there.
 **Verification**: `rfq.spec.ts` + `policies.spec.ts` 43/43 as whole files, not filtered subsets —
 the rule the previous commit earned.
 
+
+### 1.78 — THE MONEY RULE, MEASURED: BOTH PAIRS HAVE A SCREEN, SO BOTH ARE DISPLAY WORK
+
+> **MEASURED AND REPORTED, NOT BUILT.** The owner's rule: *if we can show the line without building
+> the money screens, do it; if showing it requires building them, defer it with them.* That converts
+> "is this money work?" into a measurement — **does a screen already render this record?** Both
+> answers are below; neither is built pending her go-ahead.
+
+#### `Settlement` — SCREEN EXISTS
+
+`components/claim/ClaimCard.tsx` contains a whole `ClaimSettlement` sub-component, headed *"Process
+28 — the four distinct settlement figures + maker/checker"*. It renders `approvedAmount`,
+`deductible` and the net figure through `formatMoney`, and the web `Claim` type carries
+`approvedByUserId` and `secondApproverUserId` — **both halves of the pair are already on the
+screen.** Behind it, the api projects a `SettlementView` and the component already renders a
+`CombinedDutyReasonField` for the second approval, so the WRITE side of combined duty is wired here
+and only the READ side is missing.
+
+Mounted on `/claims/[id]` and, through `ClaimSection`, on the opportunity detail page.
+
+#### `CommissionLedgerEntry` — SCREEN EXISTS
+
+`components/policy/CommissionSection.tsx`, mounted on `/opportunities/[id]`. It renders the entry's
+amount, VAT, gross, effective amount, status, paid amount and payment reference — and, decisively,
+**`entry.overrideReason` and `entry.overrideRequestedByUserId`, which is the MAKER FIELD of this very
+pair** (`overrideRequestedByUserId / overrideApprovedByUserId`). A reader is already being shown who
+requested the override; what they cannot see is that the same person approved it.
+
+**A near-miss worth recording**: my first grep for `CommissionLedgerEntry` across the web found it
+only inside a COMMENT and I nearly reported "no screen". The web client names the type
+`CommissionEntry`, not `CommissionLedgerEntry` — **the api's model name and the web's type name
+differ, so a name-matched search answers a question about vocabulary rather than about screens.**
+What settled it was following the client functions that RETURN the type to their callers.
+
+#### So the rule sends both to the same side, and that is the answer rather than a hedge
+
+Both are **display work**: one view field and one `CombinedDutyOnRecord` line each, on screens that
+already exist and already show the surrounding figures. Neither requires building a money screen,
+because both money screens are built.
+
+**Awaiting her go-ahead before either is written.** The instruction was to report which side each
+falls on and not to build either way until reported.
+
+#### `KYCRecord` — RULED: build it with the ordinary thirteen
+
+The owner's ruling, recorded so nobody re-weighs it: the deferral covers money and screening, and
+**showing who performed an act and who approved it is neither.** It does not touch the screening
+engine, does not extend it, and adds no screening claim anywhere. It is the same line as the other
+twelve, on a record that happens to be a KYC record.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real
