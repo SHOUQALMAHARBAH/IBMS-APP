@@ -22,6 +22,24 @@ export interface RecordAuditEntryInput {
  * No update/delete method exists here on purpose — and since
  * 20260826083942_add_audit_log_entry_immutability_trigger, Postgres itself
  * rejects UPDATE/DELETE against this table regardless of caller.
+ *
+ * ## WHAT ENTERS THE AUDIT TRAIL IS DESCRIBED, NOT QUOTED
+ *
+ * Wider than the secrets rule above, and it follows from the immutability: this table cannot be
+ * edited or deleted by anyone, ever. So a personal detail quoted into `beforeValue`/`afterValue`
+ * is a personal detail **no erasure request can ever remove** — the PDPL right becomes
+ * unsatisfiable for that row, permanently, and no later decision can undo it.
+ *
+ * Record WHICH fields changed, not the values a person supplied. Where a value genuinely must be
+ * recorded, it must be one the subject's own record does not make identifying — the customer
+ * contact correction is the worked example: it names the fields that changed and never the
+ * encrypted phone or email, while recording the address before and after because that column is
+ * not encrypted and a correction history unable to say what the address was is not a history.
+ *
+ * The live case that earned this note: the customer bulk import's per-row rejection reasons were
+ * about to be persisted so the importer could read them later. One code path builds a reason from
+ * a raw write error, which can quote a legal name from the uploaded file — so the reasons must be
+ * reduced to field-shaped text BEFORE any of them reaches this table.
  */
 @Injectable()
 export class AuditService {
