@@ -112,6 +112,41 @@ export function createEmployee(
   return apiPost('/employees', input);
 }
 
+/**
+ * Correct an employee record — `PATCH /employees/:id`, which had no web caller, so a person's
+ * record could be created and never corrected. Only the training and de-provisioning paths were
+ * reachable.
+ *
+ * ## What is absent is the control
+ *
+ * The DTO carries no name, no national ID and no hire date. Those identify the person and the
+ * employment; changing them is not a correction of a clerical field. `UpdateEmployeeDto` simply
+ * does not declare them and `forbidNonWhitelisted` refuses each by name — the same construction
+ * the customer contact correction uses for the screening identifiers.
+ *
+ * `departmentId` IS accepted by the route and is NOT sent from here: `EmployeeDetail` extends
+ * `MaskedEmployee`, which does not carry it, so no screen can show which department a person is
+ * in — and a field whose current value the reader cannot see is one they cannot tell they are
+ * changing. Recorded as § 1.73 rather than papered over with a write-only picker.
+ *
+ * ## Both dates are HISTORICAL
+ *
+ * `parseHistoricalInstant` refuses a future value outright — "it is a record of something that
+ * already happened" — so the inputs carry today as their maximum rather than letting the reader
+ * discover it through a 422.
+ */
+export function updateEmployee(
+  id: string,
+  patch: {
+    position?: string;
+    licensedRole?: string;
+    confidentialityAgreementSignedAt?: string;
+    backgroundCheckCompletedAt?: string;
+  },
+): Promise<EmployeeDetail> {
+  return apiPatch(`/employees/${encodeURIComponent(id)}`, patch);
+}
+
 export function revealEmployeeField(
   id: string,
   reason: string,

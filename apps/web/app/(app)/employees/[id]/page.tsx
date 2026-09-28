@@ -22,6 +22,7 @@ import {
   type RoleCatalogueEntry,
 } from '../../../../lib/admin/user-admin-api';
 import { ApiError } from '../../../../lib/auth/api-client';
+import { CorrectEmployeeRecord } from '../../../../components/supporting-operations/CorrectEmployeeRecord';
 import { hasPermission } from '../../../../lib/auth/permissions';
 import { errorStyle, successStyle } from '../../../../components/auth/auth-form.styles';
 import { pageStyle } from '../../../../components/lead/lead.styles';
@@ -284,6 +285,13 @@ export default function EmployeeDetailPage() {
                 ? t('empdTerminatedOn', { date: employee.terminationDate.slice(0, 10) })
                 : t('empdActive')}
             </p>
+
+            {/*
+              Immediately under the fields it corrects. Gated internally on `employee.update`;
+              a reader without it sees the record and no control, which is what this page already
+              does with the reveal and the de-provisioning checklist.
+            */}
+            <CorrectEmployeeRecord employee={employee} onCorrected={() => void load()} />
 
             {canRevealNationalId ? (
               <form onSubmit={onReveal} style={formStyle}>

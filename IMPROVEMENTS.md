@@ -4601,6 +4601,60 @@ case is refused.
 
 **Verification**: web e2e `sla-policies` 25/25 (from 20), web unit 109, typecheck clean.
 
+
+### 1.73 `P2` — AN EMPLOYEE RECORD COULD BE CREATED AND NEVER CORRECTED; AND THE DETAIL VIEW DROPS A FIELD THE PATCH ACCEPTS
+
+`PATCH /employees/:id` had no web caller. Only the nested training and de-provisioning paths were
+reachable, so a mistyped position or a licence recorded against the wrong role stayed wrong, and
+the two compliance dates — the confidentiality undertaking and the background check — could be
+set at registration and never afterwards.
+
+#### The form PREFILLS, and the customer correction form deliberately does not
+
+The contrast is worth keeping because it is about **masking, not taste.** A customer's phone and
+email arrive MASKED on the detail read, so prefilling there would write the mask back as the
+customer's phone number — which is why that form starts empty. `position` and `licensedRole`
+arrive in the clear, so the current value IS the right starting point: making a reader retype a
+field they are not changing is how an unrelated field gets changed by accident. The national ID
+is masked here too, and it is not on the form at all, so the question never arises.
+
+#### Only what CHANGED is sent
+
+A PATCH that resends every field rewrites values nobody touched, and on a record carrying
+compliance dates that means **re-stamping an undertaking date because somebody fixed a job
+title.** The patch is diffed against the loaded record, and typing the original value back is not
+a change either — the save button goes quiet again, which the test asserts by round-tripping.
+
+#### Both dates are refused in the future BY THE CONTROL, not only by the server
+
+`parseHistoricalInstant` rejects a future value outright — *"it is a record of something that
+already happened"* — so the inputs carry today as their maximum rather than letting the reader
+discover it through a 422.
+
+#### THE SECOND FINDING: `departmentId` is accepted and unshowable
+
+The route accepts `departmentId`. `EmployeeDetail extends MaskedEmployee`, which **does not carry
+it** — so no screen can show which department a person is in, while `Employee.departmentId` exists
+on the model and is validated tenant-scoped on create. That is § 1.60's silent-drop shape: not a
+type error, so nothing failed and the capability simply never arrived.
+
+**Left off the form deliberately.** A field whose current value the reader cannot see is a field
+they cannot tell they are changing, and a write-only department picker would let somebody move a
+person between departments with no way to know where they were. Closing it properly means adding
+the field to the view and sourcing a picker — and `GET /admin/departments` has its own permission
+that `employee.update` holders may not hold, so it is a § 1.61 measurement rather than a line of
+code. Recorded, not built.
+
+#### "May read, may not correct" is a state no role name expresses
+
+`employee.read` and `employee.update` are held by the **same three** seeded roles, so the spec
+needs an exact permission set rather than a role — the same situation `payment-channel` hit, and
+precisely the state an office creates the first time it uses the Role screen.
+
+**Six plants**, each killing the test it names.
+
+**Verification**: web e2e `employees` 10/10 (from 5), web unit 109, typecheck clean.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

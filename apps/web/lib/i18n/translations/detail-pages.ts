@@ -33,6 +33,18 @@ export const DETAIL_PAGES = {
     empdStatusLabel: 'الحالة:',
     empdHireDateLabel: 'تاريخ التعيين:',
     empdLicensedRoleLabel: 'الدور المرخَّص:',
+    // Correcting an employee record. The note says what CANNOT be corrected, because the absent
+    // fields are the control: name, national ID and hire date are not on the form at all.
+    empdCorrectOpen: 'تصحيح بيانات السجل',
+    empdCorrectLegend: 'تصحيح بيانات السجل',
+    empdCorrectNote:
+      'الاسم والرقم الوطني وتاريخ التعيين لا تُصحَّح من هنا — فهي تحدد الشخص والتعيين نفسه. ' +
+      'التاريخان سجل لما وقع فعلاً، فلا يمكن أن يكونا في المستقبل.',
+    empdCorrectConfidentiality: 'تاريخ التوقيع على تعهد السرية',
+    empdCorrectBackgroundCheck: 'تاريخ إنجاز التحقق من الخلفية',
+    empdCorrectSave: 'حفظ التصحيح',
+    empdCorrectCancel: 'إلغاء الإدخال',
+    empdCorrectFailed: 'تعذر حفظ التصحيح.',
     empdPositionLabel: 'المسمّى الوظيفي:',
     empdNationalIdLabel: 'الرقم الوطني:',
     empdFamilyName: 'اسم العائلة:',
@@ -473,6 +485,18 @@ export const DETAIL_PAGES = {
     empdStatusLabel: 'Status:',
     empdHireDateLabel: 'Hire date:',
     empdLicensedRoleLabel: 'Licensed role:',
+    // Correcting an employee record.
+    empdCorrectOpen: 'Correct this record',
+    empdCorrectLegend: 'Correct this record',
+    empdCorrectNote:
+      'The name, national ID and hire date are not corrected here — they identify the person and ' +
+      'the employment itself. Both dates are records of something that already happened, so ' +
+      'neither can be in the future.',
+    empdCorrectConfidentiality: 'Confidentiality undertaking signed on',
+    empdCorrectBackgroundCheck: 'Background check completed on',
+    empdCorrectSave: 'Save the correction',
+    empdCorrectCancel: 'Discard',
+    empdCorrectFailed: 'Could not save the correction.',
     empdPositionLabel: 'Position:',
     empdNationalIdLabel: 'National ID:',
     empdFamilyName: 'Family name:',
