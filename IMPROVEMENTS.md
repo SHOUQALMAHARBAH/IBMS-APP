@@ -4762,6 +4762,25 @@ strict-mode violation. Scope to `main`.
 
 Two guard items the owner pushed on, after each had been named twice without being closed.
 
+#### AND THE COMMIT THAT ADDED ALL THIS BROKE CI, TWICE, IN THE SAME FILE
+
+Both failures were in the api e2e I added for the regulatory stamp, and **both were hidden by how I
+verified it**: I ran the new test alone with `-t`.
+
+1. **A 409 from signup.** This spec's `uniqueEmail` is `${label}-${RUN}` — unique per run and
+   **deterministic per label** — and a test further down the file already created a `sla-manager`.
+   Whichever ran second collided. **A `-t`-filtered run cannot see a fixture collision with the
+   tests it filtered out**, which is the whole class: the filter removes exactly the evidence.
+2. **A sibling's expected 422 became a 200.** My fixtures used the shared `processType`, a
+   neighbouring test lists policies by that filter, and the REGULATORY rows I added made its
+   `sourceType` PATCH a no-op — so the update path correctly did not refuse it. Second instance of
+   the recorded rule that a new e2e fixture must not perturb a neighbouring assertion.
+
+**Run the whole FILE before pushing an e2e, never just the new test.** The file is the unit that
+shares fixtures, a database and an ordering; `-t` proves the new assertion and nothing about what it
+did to its neighbours. CI is what caught both — the argument for it being the gate, made against my
+own work.
+
 #### (a) The racing anchor — CLOSED, and the obvious fix is DISPROVED in place
 
 `toHaveCount(0)` succeeds on its FIRST poll, so an element that will exist once an in-flight read

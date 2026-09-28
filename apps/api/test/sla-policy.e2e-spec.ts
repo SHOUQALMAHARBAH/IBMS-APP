@@ -163,8 +163,21 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
    * A request built by hand IS that anything else.
    */
   it('refuses a REGULATORY policy created by a holder of sla.policy.create who lacks sla.policy.regulatory', async () => {
-    const manager = await makeUser('sla-manager', 'BRANCH_DEPARTMENT_MANAGER');
+    // A DISTINCT label. `uniqueEmail` here is `${label}-${RUN}`, unique per run and DETERMINISTIC
+    // per label, and a test further down this file already makes a `sla-manager` — so sharing the
+    // label meant whichever ran second got a 409 from signup. CI caught it; my own local run could
+    // not, because `-t` filtered the other test out, and a filtered run cannot see a fixture
+    // collision with the tests it excluded.
+    const manager = await makeUser(
+      'sla-regulatory-manager',
+      'BRANCH_DEPARTMENT_MANAGER',
+    );
 
+    // Its OWN processType, not the shared `e2e_process_${RUN}`. A sibling test lists policies by
+    // that filter and asserts on what it finds, so adding REGULATORY rows to it made that test's
+    // `sourceType` PATCH a no-op change and turned its expected 422 into a 200. A new fixture must
+    // not perturb a neighbouring assertion.
+    //
     // FULLY CITED, so the only thing left to refuse is the authority to make the claim. Omitting
     // the citations would produce the same 422 for a different reason and prove nothing.
     const refused = await request(app.getHttpServer())
@@ -173,7 +186,7 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
       .send({
         policyCode: `SLA-E2E-MGR-REG-${RUN}`.toUpperCase().slice(0, 60),
         policyName: 'Manager asserting legal force',
-        processType: `e2e_process_${RUN}`,
+        processType: `e2e_regstamp_${RUN}`,
         durationValue: 3,
         durationUnit: 'BUSINESS_DAYS',
         sourceType: 'REGULATORY',
@@ -195,7 +208,7 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
       .send({
         policyCode: `SLA-E2E-MGR-INT-${RUN}`.toUpperCase().slice(0, 60),
         policyName: 'Manager stating an internal target',
-        processType: `e2e_process_${RUN}`,
+        processType: `e2e_regstamp_${RUN}`,
         durationValue: 3,
         durationUnit: 'BUSINESS_DAYS',
         sourceType: 'INTERNAL_POLICY',
@@ -210,7 +223,7 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
       .send({
         policyCode: `SLA-E2E-CO-REG-${RUN}`.toUpperCase().slice(0, 60),
         policyName: 'Compliance asserting legal force',
-        processType: `e2e_process_${RUN}`,
+        processType: `e2e_regstamp_${RUN}`,
         durationValue: 3,
         durationUnit: 'BUSINESS_DAYS',
         sourceType: 'REGULATORY',
