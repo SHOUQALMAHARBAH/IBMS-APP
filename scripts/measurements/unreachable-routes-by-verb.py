@@ -52,6 +52,9 @@ finally:
 HELPER_METHOD = {
     'apiGet': 'GET',
     'apiPost': 'POST',
+    # The multipart upload helper. Without this row the first multipart caller in the app reads as
+    # no caller at all — `apiPost` matches its prefix and then fails on the required '('.
+    'apiPostFormData': 'POST',
     'apiPatch': 'PATCH',
     'apiPut': 'PUT',
     'apiDelete': 'DELETE',

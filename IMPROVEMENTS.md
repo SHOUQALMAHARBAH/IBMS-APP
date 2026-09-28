@@ -4403,6 +4403,28 @@ capability nobody can exercise" — not surface area. One of the 13 is
 `GET /transaction-monitoring-alerts/:id`, which also sits inside the AML deferral; it needs no
 build either way, so there is nothing to reconcile.
 
+#### CLOSED, re-measured rather than computed
+
+    path-only pass      19 -> 17
+    verb-aware pass     10 -> 8
+
+**Closed (4):** `GET /access-recertification/cycles/:id/admin-items` (§ 1.71, plus a new
+`GET /cycles` so it can be addressed at all), `POST /sla/policies` (§ 1.72), `PATCH /employees/:id`
+(§ 1.73), `POST /imports/customers` (§ 1.74).
+
+**Not built (6):** Q9's form templates — § 1.67's decision, built in error and reverted.
+
+**The remaining 17 + 8 are exactly three groups and nothing else:** the 6 email integration routes
+(queue item 2), the 7 Q9 rows, and 12 redundant detail reads. Item 1 holds nothing undecided.
+
+**AND THE FIRST RE-MEASUREMENT WAS WRONG, because I broke the matcher by writing new code.**
+`POST /imports/customers` still read as unreached after its screen shipped: the caller goes through
+a new `apiPostFormData` helper, and `CALL`'s alternation matches `apiPost` and then requires `(`,
+which `FormData(` is not. **A helper added to the web client is invisible to the gate that finds
+unreachable routes until the matcher is told about it** — so a real caller reads as no caller,
+forever, in the safe-looking direction. Both passes now know the name, and `PostFormData` is listed
+BEFORE `Post` because alternation is leftmost-first.
+
 #### The 10 that are real
 
 | Route | What nobody can do |

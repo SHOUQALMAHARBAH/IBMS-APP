@@ -85,9 +85,9 @@ def api_routes():
 
 
 CALL = re.compile(
-    r"(api(?:Get|Post|Patch|Put|Delete|FetchBlob)|authFetch|apiFetch|request)"
+    r"(api(?:Get|PostFormData|Post|Patch|Put|Delete|FetchBlob)|authFetch|apiFetch|request)"
     r"\s*<[^>]*>\s*\(|"
-    r"(api(?:Get|Post|Patch|Put|Delete|FetchBlob)|authFetch|apiFetch|request)\s*\("
+    r"(api(?:Get|PostFormData|Post|Patch|Put|Delete|FetchBlob)|authFetch|apiFetch|request)\s*\("
 )
 PATHARG = re.compile(r"^\s*([`'\"])(.*?)\1", re.S)
 
