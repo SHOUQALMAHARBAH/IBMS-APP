@@ -4221,7 +4221,7 @@ Of the **8 permission-driven** shell assertions:
 | `claims-queue.spec.ts` no Claims link without `claim.read` | **DIED** — but by luck, see below |
 | `home-launcher.spec.ts` administrator sees no card she cannot open | **DIED** |
 | `home-launcher.spec.ts` sales officer sees no administration card | **DIED** |
-| `home-launcher.spec.ts` (two more) | **unreached** — an earlier assertion in the same test dies first, so the guard is observed |
+| `home-launcher.spec.ts` (two more) | **unreached, now CLOSED** — see below |
 | `policies.spec.ts` DPO cannot see the Policies link | **SURVIVED — vacuous** |
 
 The 13 UI-state assertions correctly survive a permission plant: they are about a collapsed
@@ -4256,6 +4256,25 @@ expanded, which is luck rather than design.
 — but the role in that test holds no `policy.read` either, so it asserted one absence
 against another and failed. The anchor is now the nav LANDMARK, which proves the shell
 hydrated, which is all an anchor has to do.
+
+#### The two "unreached" ones, closed — observed-through-a-neighbour is a property of the TEST
+
+Neither could be reached by the plant: an earlier assertion in the same test died first, so
+execution never got to them. I was right not to claim them as proven, and the owner named why
+that is not the end of it — **the guard is observed through a neighbour, which is a property
+of the current line ORDER and not of the assertion.** Edit or remove the line above and both
+go quiet again, with nothing saying so.
+
+Reordering is not a fix, because it only moves which one is unreached. Both were closed by
+changing the shape instead, and the two cases differ:
+
+- **Two assertions of ONE property** (a sales officer sees neither administration card) became
+  **one assertion over both hrefs**. There is no second statement left to be unreached.
+- **Two DIFFERENT claims sharing a test** (the empty-state message, and which cards a role with
+  zero grants is offered) became **two tests**. Each now reaches its own plant.
+
+The split test keeps the Security card as its ANCHOR, not as decoration: without it the
+absence below is satisfied by a launcher that rendered nothing at all.
 
 #### The guard, and why it is narrow
 

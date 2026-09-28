@@ -59,8 +59,17 @@ test("offers a sales officer their own screens, and not the administration ones"
 
   await expect(page.locator('[data-home-card="/customers"]')).toBeVisible();
   await expect(page.locator('[data-home-card="/leads"]')).toBeVisible();
-  await expect(page.locator('[data-home-card="/settings/roles"]')).toHaveCount(0);
-  await expect(page.locator('[data-home-card="/settings/users"]')).toHaveCount(0);
+  // ONE assertion over BOTH administration cards, not two.
+  //
+  // As two consecutive assertions the second could never be reached by a plant: whichever
+  // ran first died and the other never executed, so it was proven only through its
+  // neighbour — a property of this test's line order rather than of the assertion, which
+  // goes quiet the day somebody edits the line above it (IMPROVEMENTS § 1.69).
+  await expect(
+    page.locator(
+      '[data-home-card="/settings/roles"], [data-home-card="/settings/users"]',
+    ),
+  ).toHaveCount(0);
 });
 
 test("every card on the launcher is a route the user's permissions allow", async ({ page }) => {
@@ -94,8 +103,19 @@ test("says so plainly when a role grants nothing at all", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("status")).toContainText("No screen is available");
+});
+
+test("offers a role with no grants only Security, not an administration card", async ({ page }) => {
+  // SPLIT from the test above, which asserted the empty-state message first — so this
+  // assertion could never be reached by a plant that breaks the launcher's filter: the
+  // message died and this never ran. It was proven only through its neighbour, which is a
+  // property of that test's line order and not of this claim (IMPROVEMENTS § 1.69).
+  await mockAuth(page, ["CUSTOM_EMPTY_ROLE"], []);
+  await page.goto("/");
+
   // Security stays. It is ungated on purpose: this user's only route is the one that lets them enrol
-  // an authenticator, and an account with no permissions must not also lose that.
+  // an authenticator, and an account with no permissions must not also lose that. It is also the
+  // anchor — without it the absence below is satisfied by a launcher that rendered nothing.
   await expect(page.locator('[data-home-card="/settings/security"]')).toBeVisible();
   await expect(page.locator('[data-home-card="/settings/roles"]')).toHaveCount(0);
 });
