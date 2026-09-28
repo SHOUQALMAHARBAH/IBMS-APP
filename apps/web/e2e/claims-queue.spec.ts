@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { expectNone } from "./support/anchored";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
 /*
@@ -167,9 +168,17 @@ test("the sidebar offers Claims to a Claims Officer and hides it without claim.r
   await page.unroute("**/auth/me");
   await mockAuth(page, ["FINANCE_COLLECTIONS_OFFICER"]);
   await page.goto("/policies");
-  await expect(
-    page.getByRole("link", { name: "Claims", exact: true }),
-  ).toHaveCount(0);
+  // BY HREF. This assertion did die under a "every role holds every permission" plant, so
+  // it was not vacuous — but it passed only because the group holding the current route
+  // happened to be expanded, which is luck rather than design. The href is in the DOM
+  // whether or not its group is open, so the assertion no longer depends on which page the
+  // test happens to be standing on.
+  // The anchor is the nav LANDMARK, not another destination: this role holds no
+  // `policy.read` either, so anchoring on the Policies link asserted the absence of one
+  // thing against the absence of another and failed. The landmark proves the shell
+  // hydrated, which is all an anchor has to do.
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await expectNone(nav.locator('a[href="/claims"]'), nav);
 });
 
 test("the queue filters by status and by needs-follow-up, and both travel with the page", async ({

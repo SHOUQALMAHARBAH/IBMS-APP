@@ -4177,6 +4177,98 @@ all. The screen says so, in both languages.
 **Three plants, each killing one named test**: the permission gate, active and retired rendering the same
 label, and the empty registry rendering an empty table instead of saying so.
 
+
+### 1.69 — THE VACUOUS NEGATIVE NAV ASSERTION, SWEPT: 176 negative assertions, 21 on the shell, ONE that could not fail
+
+Raised by the owner after § 1.61's fix found one in my own test, with the right framing:
+**hiding screens rather than showing a refusal is a stated product requirement, so every
+"this role cannot reach X" test is load-bearing — and a vacuous one does not weaken the
+guard, it removes it while reporting that it is there.**
+
+#### The denominator first
+
+    negative assertions in the web suite           176
+      of which target the SHELL (nav / launcher)    21
+        permission-driven ("this role cannot")       8
+        UI-state (collapsed group · search · menu)  13
+
+**The sweep nearly stopped at 8 of the 21.** My first classifier read each statement on its
+own and missed nine where the target is a variable:
+
+    const planning = sidebar.locator('a[href="/planning-export"]');
+    await expect(planning).toBeHidden();
+
+The statement carries no navigation marker, so it classified as "not navigation". Resolving
+identifiers against the file's own `const` declarations found the other nine. A tenth
+spelling — the launcher's `[data-home-card="…"]` — was missed entirely until I checked the
+launcher by hand, which took the total from 17 to 21. **Two rounds of "the search quietly
+stopped", in a sweep whose whole purpose was to find things that quietly do nothing.**
+
+#### The plant, and what it proved
+
+Reading cannot answer "can this fail". The plant is **every role holds every permission** —
+`permissionsForRoles` returns the whole catalogue — so every screen is wide open and every
+"this role cannot see X" assertion must fail. A second plant, **the launcher ignores
+permissions**, covers the launcher tests that pass an explicit permission list and so bypass
+the fixture.
+
+Of the **8 permission-driven** shell assertions:
+
+| Assertion | Verdict |
+|---|---|
+| `dsr.spec.ts` DPO cannot open the deadlines dashboard | **DIED** (fixed under § 1.61) |
+| `insurers.spec.ts` no "Register an insurer" control | **DIED** |
+| `claims-queue.spec.ts` no Claims link without `claim.read` | **DIED** — but by luck, see below |
+| `home-launcher.spec.ts` administrator sees no card she cannot open | **DIED** |
+| `home-launcher.spec.ts` sales officer sees no administration card | **DIED** |
+| `home-launcher.spec.ts` (two more) | **unreached** — an earlier assertion in the same test dies first, so the guard is observed |
+| `policies.spec.ts` DPO cannot see the Policies link | **SURVIVED — vacuous** |
+
+The 13 UI-state assertions correctly survive a permission plant: they are about a collapsed
+`<details>`, a search filter or a profile menu closing, and a permission has nothing to do
+with them. **They are not in the defect class and were not changed.**
+
+#### The one that could not fail, and the comment that pointed at it
+
+    await expect(
+      page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Policies" }),
+    ).toHaveCount(0);
+
+`getByRole` matches only the accessibility tree; nav groups are `<details>` that collapse by
+default, and a closed one drops its contents from that tree. So this returned zero whether
+the Data Protection Officer was denied `policy.read` or handed it — **the assertion for the
+directive's own requirement could not observe the requirement.**
+
+**And `home.spec.ts` documents this exact trap.** Its comment reads *"a closed `<details>`
+drops its contents from the accessibility tree, so `getByRole` legitimately finds zero"* and
+then cites, as its worked example of the permission case, **`policies.spec.ts` — the one
+test doing it wrong.** A correct rule, written down, with a citation pointing at its own
+counter-example. That citation is now corrected.
+
+#### Fixed, and one more hardened
+
+`policies.spec.ts` asserts the **href** through `expectNone`, which takes a required anchor;
+re-planting the old spelling kills it. `claims-queue.spec.ts` is moved to the href too even
+though it died: it passed only because the group holding the current route happened to be
+expanded, which is luck rather than design.
+
+**That fix needed a second attempt worth recording.** My first anchor was the Policies link
+— but the role in that test holds no `policy.read` either, so it asserted one absence
+against another and failed. The anchor is now the nav LANDMARK, which proves the shell
+hydrated, which is all an anchor has to do.
+
+#### The guard, and why it is narrow
+
+`test/e2e-anchored-reads.test.ts` gains a second check: **no absence assertion may target a
+nav link by ROLE.** It is deliberately narrow, because the first version produced three
+false positives and **a brittle matcher behind a red build is a liability — the first false
+red teaches everyone to ignore it.** It exempts a PAGE link (in the accessibility tree,
+never inside a collapsed group — `insurers.spec.ts`'s "Register an insurer" is that case and
+died correctly), and it exempts a test that also asserts by href, because
+`sidebar-manager.spec.ts` pins the accessibility consequence of a collapsed group on purpose
+and says so. Proven both ways: it passes on the suite as it stands, and planting the old
+`policies.spec.ts` spelling back makes it name that file.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

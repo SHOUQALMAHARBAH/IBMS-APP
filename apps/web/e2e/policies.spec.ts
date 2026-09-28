@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectNone } from "./support/anchored";
 import { permissionsForRoles } from "./fixtures/role-permissions";
 
 /**
@@ -196,11 +197,25 @@ test("the sidebar shows Policies to a Policy Checking Officer and hides it from 
 
   // The DPO holds no policy.read, so the link must not exist at all — not be
   // rendered and then rejected on click (directive §1).
+  //
+  // BY HREF, NOT BY ROLE, and this test is why the rule exists. It used
+  // `getByRole('link', { name: 'Policies' })` and COULD NOT FAIL: nav groups collapse by
+  // default, a closed `<details>` drops its contents from the accessibility tree, so
+  // `getByRole` returns zero whether the link is permission-hidden or merely collapsed.
+  // Planting "every role holds every permission" left this assertion green while three
+  // sibling permission assertions died. `home.spec.ts` documents the trap and cited THIS
+  // test as its example of the permission case — the citation pointed at the one place
+  // doing it wrong.
+  //
+  // `expectNone` takes a required anchor for a related reason: an absence assertion that
+  // runs before hydration is satisfied by a blank page.
   await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
   await page.goto("/consent");
-  await expect(
-    page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Policies" }),
-  ).toHaveCount(0);
+  const primary = page.getByRole("navigation", { name: "Primary" });
+  await expectNone(
+    primary.locator('a[href="/policies"]'),
+    primary.locator('a[href="/consent"]'),
+  );
 });
 
 test("a Policy Checking Officer records the QC check from the policy screen", async ({

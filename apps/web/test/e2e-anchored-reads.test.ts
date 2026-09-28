@@ -116,6 +116,65 @@ describe("an absence assertion is anchored on something that proves the page ren
     ).toEqual([]);
   });
 
+  /**
+   * THE SECOND WAY AN ABSENCE ASSERTION CAN BE VACUOUS: the wrong LOCATOR.
+   *
+   * `getByRole` only matches the accessibility tree. Nav groups in this shell are
+   * `<details>` elements that collapse by default, and a closed `<details>` drops its
+   * contents from that tree — so
+   *
+   *     await expect(nav.getByRole("link", { name: "Policies" })).toHaveCount(0)
+   *
+   * returns zero whether the link is PERMISSION-HIDDEN or merely COLLAPSED. It cannot
+   * fail, and hiding screens rather than refusing them is a stated product requirement,
+   * so a vacuous one does not weaken the guard — it removes it while reporting that it is
+   * there.
+   *
+   * Found by sweeping the suite on 2026-09-28: 176 negative assertions, 21 of them
+   * targeting the shell, and this spelling was vacuous in `policies.spec.ts` while three
+   * sibling assertions using the href died correctly under the same plant.
+   *
+   * The rule: assert the ABSENCE of a navigation destination by its HREF, which is in the
+   * DOM whether or not its group is open. `toBeHidden()` plus `toHaveCount(1)` is the
+   * correct pair for the collapsed case — it proves the link is present AND not visible —
+   * and `home.spec.ts` is the worked example of that.
+   */
+  it("has no absence assertion that targets a nav link by ROLE, which a collapsed group satisfies", () => {
+    const offenders: string[] = [];
+    for (const file of specs()) {
+      const src = readFileSync(file, "utf8");
+      for (const block of src.split(/\ntest(?:\.skip|\.fixme|\.only)?\(/)) {
+        // One statement at a time: a spec may legitimately assert a link is VISIBLE by
+        // role in the same test.
+        for (const stmt of block.split(";")) {
+          const negative =
+            /toHaveCount\(\s*0\s*\)/.test(stmt) || /not\.toBeVisible\(\)/.test(stmt);
+          if (!negative) continue;
+          if (!/getByRole\(\s*["']link["']/.test(stmt)) continue;
+          // NAV-SCOPED only. A page link is in the accessibility tree — it is not inside a
+          // collapsed <details> — so asserting its absence by role is sound, and flagging
+          // it would be a false red. `insurers.spec.ts`'s "Register an insurer" is that
+          // case and died correctly under the plant.
+          if (!/nav|sidebar|getByRole\(\s*["']navigation["']/.test(stmt)) continue;
+          // And exempt a test that ALSO asserts by href: `sidebar-manager.spec.ts`
+          // deliberately asserts the accessibility consequence of a collapsed group,
+          // anchored by a count(1)+toBeHidden pair on the href. That is the documented
+          // behaviour being pinned on purpose, not a permission assertion.
+          if (block.includes("a[href=")) continue;
+          offenders.push(
+            `${file.split(/[\\/]/).pop()} :: ${stmt.trim().replace(/\s+/g, " ").slice(0, 100)}`,
+          );
+        }
+      }
+    }
+    expect(
+      offenders,
+      "these assert a nav link is ABSENT by accessible role, which a collapsed <details> " +
+        "satisfies whether the link is permission-hidden or not — target the href instead, " +
+        "through expectNone() from e2e/support/anchored.ts",
+    ).toEqual([]);
+  });
+
   it("scans real specs and really finds absence assertions, so the guarantee is not vacuous", () => {
     // Both halves matter. A wrong directory makes the test above pass by scanning nothing; a broken
     // block split makes it pass by finding no assertions to check. This is the standard failure of

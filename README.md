@@ -4255,6 +4255,16 @@ commission**, and two of those show it per employee. Regenerate with
 `python scripts/measurements/dashboard-figures.py`; the screen is the authority, not the API, because a
 route can return a figure the screen never renders (§ 1.60).
 
+**Negative navigation assertions swept for vacuity (2026-09-28).** Hiding a screen rather than refusing
+it is a directive requirement, so every "this role cannot reach X" test is load-bearing. Measured: 176
+negative assertions in the web suite, 21 targeting the shell, 8 of those permission-driven — and **one
+could not fail**, because `getByRole` matches only the accessibility tree and a collapsed `<details>` drops
+its contents from it, so the assertion returned zero whether the role was denied or granted. **Assert the
+absence of a nav destination BY HREF** through `expectNone(target, anchor)`; `toHaveCount(1)` +
+`toBeHidden()` is the pair for the collapsed case. `apps/web/test/e2e-anchored-reads.test.ts` now refuses
+the role-targeted spelling, and `python scripts/measurements/negative-nav-assertions.py` re-runs the sweep.
+`IMPROVEMENTS.md` § 1.69.
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold
