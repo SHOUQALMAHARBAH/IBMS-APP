@@ -632,7 +632,10 @@ describe('SlaTimerService — one record, several clocks (IMPROVEMENTS § 1.61)'
           pausedAt: new Date('2026-09-28T00:00:00.000Z'),
           pauseReason: 'Awaiting documents',
         },
-        { pausedAt: new Date('2026-09-20T00:00:00.000Z'), pauseReason: 'Older' },
+        {
+          pausedAt: new Date('2026-09-20T00:00:00.000Z'),
+          pauseReason: 'Older',
+        },
         { pausedAt: null, pauseReason: null },
         { pausedAt: null, pauseReason: null },
       ],

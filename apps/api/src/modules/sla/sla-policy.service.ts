@@ -418,7 +418,12 @@ export class SlaPolicyService {
     year: number;
     holidays: SlaHoliday[];
     missingFixed: { nameEn: string; nameAr: string; observedOn: string }[];
-    missingOccasions: { key: string; nameEn: string; nameAr: string; days: number }[];
+    missingOccasions: {
+      key: string;
+      nameEn: string;
+      nameAr: string;
+      days: number;
+    }[];
   }> {
     const all = await this.policies.findHolidays();
     const inYear = all.filter((h) => h.observedOn.getUTCFullYear() === year);
@@ -439,9 +444,15 @@ export class SlaPolicyService {
       (o) =>
         !names.some(
           (n) =>
-            n.includes(o.nameEn.toLowerCase()) || n.includes(o.nameAr.toLowerCase()),
+            n.includes(o.nameEn.toLowerCase()) ||
+            n.includes(o.nameAr.toLowerCase()),
         ),
-    ).map((o) => ({ key: o.key, nameEn: o.nameEn, nameAr: o.nameAr, days: o.days }));
+    ).map((o) => ({
+      key: o.key,
+      nameEn: o.nameEn,
+      nameAr: o.nameAr,
+      days: o.days,
+    }));
 
     return { year, holidays: inYear, missingFixed, missingOccasions };
   }

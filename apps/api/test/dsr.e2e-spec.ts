@@ -696,7 +696,8 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .send({ reason: 'Nine char' })
       .expect(400);
 
-    const REASON = 'Waiting for the identity documents the subject was asked for';
+    const REASON =
+      'Waiting for the identity documents the subject was asked for';
     const paused = await request(app.getHttpServer())
       .post(`/dsr/${dsrId}/sla/pause`)
       .set(bearer(dpo.accessToken))
@@ -717,7 +718,11 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .get(`/dsr/${dsrId}`)
       .set(bearer(dpo.accessToken))
       .expect(200);
-    const clock = (detail.body as { slaClock: { open: number; paused: number; pauseReason: string | null } }).slaClock;
+    const clock = (
+      detail.body as {
+        slaClock: { open: number; paused: number; pauseReason: string | null };
+      }
+    ).slaClock;
     expect(clock.paused).toBe(clock.open);
     expect(clock.pauseReason).toBe(REASON);
 
@@ -734,7 +739,9 @@ describe('Data Subject Request Management (e2e) — backlog Part D, Process #52 
       .post(`/dsr/${dsrId}/sla/resume`)
       .set(bearer(dpo.accessToken))
       .expect(201);
-    expect((resumed.body as { resumed: number }).resumed).toBe(pausedBody.paused);
+    expect((resumed.body as { resumed: number }).resumed).toBe(
+      pausedBody.paused,
+    );
 
     // THE SECOND HALF OF THE ACCEPTANCE: the DPO still cannot read the deadlines
     // dashboard. A test that only proved the pause works would pass equally on the

@@ -258,7 +258,10 @@ describe('Role CRUD', () => {
       orderBy: { occurredAt: 'desc' },
       take: 1,
     });
-    expect(rows, 'the permission change wrote no audit row at all').toHaveLength(1);
+    expect(
+      rows,
+      'the permission change wrote no audit row at all',
+    ).toHaveLength(1);
 
     const before = rows[0].beforeValue as { permissionCodes?: string[] };
     const after = rows[0].afterValue as {

@@ -449,12 +449,16 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
       .post(`/sla/holidays/year/${YEAR}/fixed`)
       .set(bearer(compliance.accessToken))
       .expect(201);
-    expect((first.body as { created: unknown[]; skipped: number }).created).toHaveLength(4);
+    expect(
+      (first.body as { created: unknown[]; skipped: number }).created,
+    ).toHaveLength(4);
     const second = await request(app.getHttpServer())
       .post(`/sla/holidays/year/${YEAR}/fixed`)
       .set(bearer(compliance.accessToken))
       .expect(201);
-    expect((second.body as { created: unknown[]; skipped: number }).created).toHaveLength(0);
+    expect(
+      (second.body as { created: unknown[]; skipped: number }).created,
+    ).toHaveLength(0);
     expect((second.body as { skipped: number }).skipped).toBe(4);
 
     // AN EID IS FIVE DAYS, and the server supplies the length so an officer does not

@@ -87,9 +87,12 @@ function makeService(
     // The detail read reports the request's clock state, because the pause control lives
     // on the request screen (IMPROVEMENTS § 1.61). A request carries SEVERAL timers, so
     // the default here is the ordinary case: four open, none paused.
-    entityClockState: vi
-      .fn()
-      .mockResolvedValue({ open: 4, paused: 0, pauseReason: null, pausedAt: null }),
+    entityClockState: vi.fn().mockResolvedValue({
+      open: 4,
+      paused: 0,
+      pauseReason: null,
+      pausedAt: null,
+    }),
     pauseForEntity: vi
       .fn()
       .mockResolvedValue({ paused: 4, alreadyPaused: 0, open: 4 }),
@@ -916,10 +919,16 @@ describe('DsrService reads (M04) — audited (sensitive)', () => {
 
 /** The pause routes take the whole session, not a bare id — the act is attributed. */
 const actor = (id: string) =>
-  ({ id, roles: [], roleIds: [], permissions: [] }) as unknown as AuthenticatedUser;
-const closedDsrRow = () => row({ closedAt: new Date('2026-09-01T00:00:00.000Z') });
+  ({
+    id,
+    roles: [],
+    roleIds: [],
+    permissions: [],
+  }) as unknown as AuthenticatedUser;
+const closedDsrRow = () =>
+  row({ closedAt: new Date('2026-09-01T00:00:00.000Z') });
 
-describe('DsrService — stopping the request\'s clock (IMPROVEMENTS § 1.61)', () => {
+describe("DsrService — stopping the request's clock (IMPROVEMENTS § 1.61)", () => {
   /*
    * The control lives on the REQUEST, not on the deadlines dashboard, because the Data
    * Protection Officer holds `sla.timer.pause` and NOT `sla-dashboard.view` — so for the
