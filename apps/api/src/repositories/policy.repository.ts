@@ -75,7 +75,11 @@ const POLICY_INCLUDE = {
   schedules: { orderBy: { effectiveFrom: 'desc' } },
   documents: { orderBy: { createdAt: 'desc' } },
   // Process 20 — the one maker/checker quality-control row (or null).
-  checking: true,
+  //
+  // With its combined-duty act, so a reader of the policy can see that ONE person both placed and
+  // checked it. Part 4 step 5: on the record, not only in the report at `/internal-controls`. The
+  // endorsement's refund block is the pattern (`refund: { include: { combinedDutyAct: true } }`).
+  checking: { include: { combinedDutyAct: true } },
   // Process 21 — the one delivery record (or null).
   deliveryRecord: true,
 } as const;

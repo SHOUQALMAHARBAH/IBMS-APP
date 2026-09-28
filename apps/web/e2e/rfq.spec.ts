@@ -208,6 +208,16 @@ async function mockRfqApi(
     seedIssuedPolicy?: boolean;
     /** pre-seed an ACTIVE policy (delivered + acknowledged) — Process 22 needs one */
     seedActivePolicy?: boolean;
+    /** A declared combined-duty act on the seeded policy's quality check — Part 4 step 5. */
+    seedCombinedDutyAct?: {
+      id: string;
+      at: string;
+      actorUserId: string;
+      reason: string;
+      pair: string;
+      roles: string[];
+      hatAmbiguous: boolean;
+    } | null;
     opportunityStatus?: string;
   } = {},
 ) {
@@ -555,6 +565,10 @@ async function mockRfqApi(
                 complianceOverrideByUserId: null,
                 checklist: {},
                 createdAt: "2026-10-05T00:00:00.000Z",
+                // The endpoint returns this now, so the fixture carries it. `null` is the ordinary
+                // two-person check, which is what this seed represents — `chk-1` checked what
+                // `someone-else` placed.
+                combinedDutyAct: opts.seedCombinedDutyAct ?? null,
               }
             : null,
           delivery: opts.seedActivePolicy
@@ -2752,4 +2766,83 @@ test("RFQ screens have no serious/critical accessibility violations @a11y", asyn
   expect(
     rfqResults.violations.filter((v) => v.impact === "serious" || v.impact === "critical"),
   ).toEqual([]);
+});
+
+/*
+ * THE COMBINED-DUTY ACT ON THE POLICY'S QUALITY CHECK — Part 4 step 5, the second pair to show it.
+ *
+ * When an office declares COMBINED duty segregation, one person may place AND check the same policy
+ * by stating why. Until now that was visible only in the report at `/internal-controls`: the policy
+ * showed `placedByUserId` and `checkedByUserId` and a reader could not tell they were the same person
+ * without looking both up. **The four-eyes check is exactly the place somebody must be able to see
+ * there were not four eyes.**
+ *
+ * Rendered by the SHARED `CombinedDutyOnRecord`, which the endorsement's refund block now also uses —
+ * so the sentence reads the same on both, and the remaining twelve pairs are one line each.
+ */
+
+const SELF_CHECK_ACT = {
+  id: "cda-1",
+  at: "2026-10-05T00:00:00.000Z",
+  actorUserId: "someone-else",
+  reason: "Only qualified checker present; branch covered alone this week.",
+  pair: "PolicyChecking_maker_checker_distinct",
+  roles: ["POLICY_CHECKING_OFFICER"],
+  hatAmbiguous: false,
+};
+
+test("shows on the policy that one person both placed and checked it, and why", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, {
+    seedActivePolicy: true,
+    seedCombinedDutyAct: SELF_CHECK_ACT,
+  });
+  await page.goto("/opportunities/opp-1");
+
+  const declared = page.getByTestId("combined-duty-policy-checking");
+  // The hat and the reason. The reason is what a reader is entitled to — a bare "self-approved" says
+  // nothing about whether it was reasonable.
+  await expect(declared).toContainText("POLICY_CHECKING_OFFICER");
+  await expect(declared).toContainText("Only qualified checker present");
+  // Tied to the database rule it excuses, so the record and the constraint cannot drift apart.
+  await expect(declared).toHaveAttribute(
+    "data-combined-duty-pair",
+    "PolicyChecking_maker_checker_distinct",
+  );
+});
+
+test("says the authorising role cannot be determined when more than one granted it", async ({
+  page,
+}) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  await mockRfqApi(page, {
+    seedActivePolicy: true,
+    seedCombinedDutyAct: {
+      ...SELF_CHECK_ACT,
+      roles: ["POLICY_CHECKING_OFFICER", "BRANCH_DEPARTMENT_MANAGER"],
+      hatAmbiguous: true,
+    },
+  });
+  await page.goto("/opportunities/opp-1");
+
+  // The act records ambiguity deliberately rather than picking one role, and the record must not
+  // resolve it either — naming one would assert something the system cannot know.
+  const declared = page.getByTestId("combined-duty-policy-checking");
+  await expect(declared).toContainText("cannot be determined");
+  await expect(declared).toContainText("BRANCH_DEPARTMENT_MANAGER");
+});
+
+test("says nothing on an ordinary two-person check", async ({ page }) => {
+  await mockAuth(page, ["PLACEMENT_TECHNICAL_OFFICER"]);
+  // The same seed WITHOUT an act — `chk-1` checked what `someone-else` placed, which is every
+  // ordinary check and nearly every record.
+  await mockRfqApi(page, { seedActivePolicy: true });
+  await page.goto("/opportunities/opp-1");
+
+  // Anchored on the quality-check block itself, from the SAME read that would carry the act — so the
+  // absence cannot pass while that read is still in flight.
+  await expect(page.getByText("Checked by", { exact: false })).toBeVisible();
+  await expect(page.getByTestId("combined-duty-policy-checking")).toHaveCount(0);
 });

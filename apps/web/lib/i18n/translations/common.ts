@@ -94,6 +94,11 @@ export const COMMON = {
     dutyModeSaved: 'تم إعلان الوضع وتسجيله في سجل التدقيق.',
     // The act ON the record (step 5). «الشخص نفسه» — names what happened, not a euphemism for it.
     combinedDutyOnRecord: 'نفّذ الشخص نفسه طرفي هذه العملية بصفته ({roles})، والسبب المسجّل:',
+    // When MORE THAN ONE of the actor's roles granted the checker permission, the record says it
+    // cannot tell which — naming one would assert something the system does not know.
+    combinedDutyOnRecordAmbiguous:
+      'نفّذ الشخص نفسه طرفي هذه العملية، وكانت أكثر من صفة من صفاته تمنح هذه الصلاحية ' +
+      '({roles})، فلا يمكن تحديد أيها استُند إليه. والسبب المسجّل:',
     combinedDutyReasonLabel: 'سبب تنفيذك لطرفي العملية',
     combinedDutyReasonHint:
       'أنت من سجّل هذا الطلب، ومكتبك أعلن السماح لك باعتماده أيضاً. اذكر السبب — يُحفَظ بشكل دائم ويظهر في تقرير الاعتمادات الذاتية.',
@@ -177,6 +182,11 @@ export const COMMON = {
     dutyModeSaved: 'Declared, and recorded in the audit trail.',
     combinedDutyOnRecord:
       'One person performed both halves of this, acting as {roles}. Recorded reason:',
+    // When MORE THAN ONE of the actor's roles granted the checker permission, the record says it
+    // cannot tell which — naming one would assert something the system does not know.
+    combinedDutyOnRecordAmbiguous:
+      'One person performed both halves of this. More than one of their roles grants that ' +
+      'permission ({roles}), so which one authorised it cannot be determined. Recorded reason:',
     combinedDutyReasonLabel: 'Why you are doing both halves',
     combinedDutyReasonHint:
       'You raised this, and your office has declared that you may also approve it. Say why — it is kept permanently and appears in the self-approval report.',

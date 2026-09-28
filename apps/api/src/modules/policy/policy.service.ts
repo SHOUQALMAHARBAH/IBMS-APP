@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@ibms/db';
 import { pageWindow, wholeSet, type Paginated } from '../../common/pagination';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import type { Customer, Policy, PolicyStatus } from '@ibms/db';
 import {
   PolicyRepository,
@@ -87,6 +91,16 @@ interface PolicyCheckingView {
   discrepancyLoggedAsPiRiskEvent: boolean;
   complianceOverrideByUserId: string | null;
   checklist: Prisma.JsonValue;
+  /**
+   * Set when ONE person both placed and checked this policy, in an office that declared COMBINED
+   * duty segregation and stated why.
+   *
+   * `null` on every ordinary two-person check, which is nearly all of them. Here rather than only in
+   * the report at `/internal-controls` because a reader of the policy would otherwise see
+   * `placedByUserId` and `checkedByUserId` and have no way to know they are the same person without
+   * going to look them up — Part 4 step 5.
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   createdAt: Date;
 }
 
@@ -410,6 +424,8 @@ export class PolicyService {
             complianceOverrideByUserId:
               policy.checking.complianceOverrideByUserId,
             checklist: policy.checking.checklistResult ?? null,
+            // Part 4 step 5 — on the record, not only in a report.
+            combinedDutyAct: combinedDutyActView(policy.checking.combinedDutyAct),
             createdAt: policy.checking.createdAt,
           }
         : null,

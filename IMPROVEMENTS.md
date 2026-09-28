@@ -4944,6 +4944,110 @@ indistinguishable from ten guards that all hold.**
 **Verification**: new `email-integration.spec.ts` 12/12 including a11y and all four states; the five
 nav-sensitive specs 33/33 after the new destination; web unit 109; typecheck clean, lint 0 errors.
 
+
+### 1.77 — THE COMBINED-DUTY ACT WAS ON ONE RECORD OF FIFTEEN; THE PATTERN IS NOW SHARED, AND TWO OF THE REMAINDER TOUCH MONEY
+
+> **TWO PAIRS NEED THE OWNER, NOT ME.** `Settlement` is a claim payment and
+> `CommissionLedgerEntry` is the broker's own income. Both fall inside "all money work is deferred
+> until after the broker session", so they are **named here and not built** — her instruction on the
+> § 1.75 rows applies verbatim: *if any of them touches money it joins the deferred list rather than
+> the queue; tell me, do not decide it.*
+
+Queue item 3. When an office declares COMBINED duty segregation, one person may perform both halves
+of an approval by stating why, and the act is recorded against the record's own escape column. Part 4
+step 5 put it **on the record**, so a reader sees that nobody else signed this without going to find
+the report at `/internal-controls`.
+
+#### The denominator
+
+    registered maker/checker pairs        15
+      dormant (no writer at all)           0
+      projecting the act on the record     1   -> now 2
+      writing it and showing nobody       14   -> now 13
+
+`combinedDutyActView` had exactly **one call site** — the endorsement's refund block. Every other
+pair writes the escape column and no reader ever surfaces it, so those records read as ordinary
+two-person approvals.
+
+**`scripts/measurements/combined-duty-projection.py`** re-runs it, and it took three attempts to be
+honest. The first version asked whether any file mentioning a pair's model also mentioned the view
+anywhere, and reported `Recommendation` as projecting because the one file that calls the view
+happens to contain that word — **the same substring weakness that produced 69 false positives on the
+permission-reachability check**. It now attributes each call site by the relation in its ARGUMENT,
+which cannot over-report.
+
+#### Built: the shared renderer, and the second pair
+
+`components/ui/CombinedDutyOnRecord.tsx`. The endorsement rendered the act as four inline lines, and
+copying those fourteen times is fourteen places for the WORDING to drift — which is exactly the
+argument that made twelve approve screens share one `CombinedDutyReasonField` on the write side. The
+endorsement now uses the component too, so there is one sentence and the remaining twelve pairs are
+one line each.
+
+**`PolicyChecking` is the second pair, chosen by consequence**: the four-eyes check on a policy is
+the place a reader most needs to be able to see that there were not four eyes. `POLICY_INCLUDE` now
+nests `checking: { include: { combinedDutyAct: true } }`, the view projects it, and
+`PolicySection.tsx` renders it under the QC result.
+
+**The ambiguous hat is shown as ambiguity.** When more than one of the actor's roles granted the
+checker permission the act records that deliberately rather than picking one, and the record now says
+*"which one authorised it cannot be determined"* — a second translation key, because naming one role
+would assert something the system does not know.
+
+#### Two findings about WHERE a record is read
+
+- **`/policies/[id]` does not show the quality check at all.** It renders "Basic Information" and
+  nothing about checking; the QC block lives in `PolicySection.tsx`, which is mounted on the
+  OPPORTUNITY detail page. My first three tests were written against `/policies/[id]` and failed
+  finding nothing — **my scope script's "web screen" column matched pages that merely NAME the
+  entity, not pages that render it.** Whether the policy's own page should show its QC result is a
+  separate question and is not assumed here.
+- **Its "relation in the read" column was wrong too**, counting a repository that WRITES
+  `combinedDutyActId` as one that reads the relation. `policy-checking.repository.ts` writes it;
+  `policy.repository.ts` had `checking: true`. Both columns are printed as signals for a human, not
+  as verdicts.
+
+#### The remaining 13, for direction rather than for building
+
+    MONEY — the owner's call, not mine
+      Settlement                  a claim payment
+      CommissionLedgerEntry       the broker's own income
+
+    NO RENDER SITE FOUND — needs a placement decision before any code
+      Settlement, CommissionLedgerEntry   (the same two, which is why they are first)
+
+    READ ALREADY CARRIES THE RELATION — a view field plus one component line
+      DataSharingApproval · DataProcessingAgreement · Recommendation ·
+      AccessRecertificationItem · IncidentReport
+
+    READ MUST CHANGE TOO — an include, then the same two steps
+      KYCRecord · DisposalBatch · NeedsAssessment (x2, two pairs on one model) ·
+      Complaint · DataSubjectRequest
+
+**`KYCRecord` is flagged rather than scheduled**: projecting an act onto a KYC record is not
+screening work and does not extend it, but it sits in the KYC/AML area the deferral covers, and the
+line is close enough to be worth her saying which side it falls on.
+
+**Four plants, each killing the test it names** — and two attempts were dropped for reasons worth
+keeping.
+
+**The api-side plant PROVED NOTHING, and revealed a hole in my own assertion.** Putting
+`checking: true` back into `POLICY_INCLUDE` left the api e2e green: with the relation absent the field
+is `undefined`, and `combinedDutyActView` normalises that to `null` — **the ordinary two-person path
+gives the same answer whether the relation is read or not.** My comment in the test had claimed the
+opposite, that `undefined` and `null` tell the two apart. At that boundary they do not. What would
+prove it is a COMBINED-path case where an act exists and must come back non-null, which is
+`duty-segregation-combined.e2e-spec.ts`'s shape and **this pair does not have one** — the same gap
+that work recorded for thirteen of fifteen pairs. The assertion stays, because it pins the field's
+presence and its ordinary value, and the comment now says what it cannot do.
+
+A fifth plant ("the component renders nothing") would not compile — unreachable JSX after a return —
+and is **redundant anyway**: removing the call site already proves those tests die when the act is not
+rendered there.
+
+**Verification**: `rfq.spec.ts` + `policies.spec.ts` 43/43 as whole files, not filtered subsets —
+the rule the previous commit earned.
+
 ### 1.50 `P1` — PEP SCREENING DOES NOT EXIST: a sanctions result is stored three times, once labelled PEP
 
 Measured on the owner's question "do KYC and PEP actually work end to end", driven through the real

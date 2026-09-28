@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
   advanceEndorsement,
@@ -279,19 +280,14 @@ export function EndorsementSection({
                   {formatMoney(e.cancellation.returnPremium, language)}
                 </p>
               ) : null}
-              {e.refund?.combinedDutyAct ? (
-                // Part 4 step 5 — ON THE RECORD, not only in a report. Somebody reading this refund has to see
-                // that nobody else signed it without going to find the self-approval report.
-                <p
-                  data-testid={`combined-duty-${e.refund.id}`}
-                  style={{ margin: '0.4rem 0', fontSize: '0.85rem' }}
-                >
-                  {t('combinedDutyOnRecord', {
-                    roles: e.refund.combinedDutyAct.roles.join(', ') || '—',
-                  })}{' '}
-                  {e.refund.combinedDutyAct.reason}
-                </p>
-              ) : null}
+              {/* The SHARED renderer. This was four inline lines here, and it is now one component
+                  because there are fifteen maker/checker pairs and fifteen copies is fifteen chances
+                  for one of them to say less than the others. It renders nothing when there is no
+                  act, which is every ordinary two-person approval. */}
+              <CombinedDutyOnRecord
+                act={e.refund?.combinedDutyAct}
+                testId={`combined-duty-${e.refund?.id ?? 'none'}`}
+              />
               {e.refund ? (
                 <p style={{ margin: '0.4rem 0', fontSize: '0.9rem' }}>
                   {t('endorsementRefundLabel')} {formatMoney(e.refund.amount, language)} ·{' '}

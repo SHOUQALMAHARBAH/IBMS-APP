@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../ui/CombinedDutyOnRecord';
 import { PolicyCheckingBlock } from './PolicyCheckingBlock';
 import { ENUM_LABEL } from '../../lib/i18n/enum-labels';
 import {
@@ -610,6 +611,13 @@ export function PolicySection({
               {policy.checking.discrepancyLoggedAsPiRiskEvent ? (
                 <p style={{ margin: '0.3rem 0', fontSize: '0.85rem', opacity: 0.75 }}>{t('policyPiRiskEventLogged')}</p>
               ) : null}
+              {/* Part 4 step 5 — the four-eyes check on a policy is exactly the place a reader must
+                  be able to see that there were not four eyes. Shared renderer, so this sentence
+                  reads the same here as on the endorsement's refund. */}
+              <CombinedDutyOnRecord
+                act={policy.checking.combinedDutyAct}
+                testId="combined-duty-policy-checking"
+              />
               <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: 'var(--ink-secondary)' }}>
                 Checked by {policy.checking.checkedByUserId ?? '—'}
                 {policy.checking.checkedAt
