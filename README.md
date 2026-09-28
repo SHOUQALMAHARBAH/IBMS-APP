@@ -4248,6 +4248,13 @@ measured, a request carries four (two escalation stages, and a second pair once 
 deadline) — because pausing one of four looks exactly like a control that worked while the request still
 escalates. The screen shows the counts, not the word "paused", and the detail read carries `slaClock`.
 
+**What each dashboard reveals, measured (2026-09-28).** `docs/what-each-dashboard-reveals.md` — the
+figures ON THE SCREEN for all 14 reporting surfaces plus the two operational ones, so an office manager can
+decide who may open one based on what it discloses rather than on its name. **Eight of fourteen reveal
+commission**, and two of those show it per employee. Regenerate with
+`python scripts/measurements/dashboard-figures.py`; the screen is the authority, not the API, because a
+route can return a figure the screen never renders (§ 1.60).
+
 **Two AMLU screening obligations measured, not built — `IMPROVEMENTS.md` § 1.58.** Existing customers are
 re-screened 4-hourly, but nothing connects that to a LIST UPDATE: the obligation is met by the arithmetic
 of two unrelated cron expressions. And no transaction path consults screening at all — the screening hold
