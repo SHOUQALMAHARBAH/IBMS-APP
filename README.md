@@ -2007,13 +2007,18 @@ else.
   `workflowName`, to avoid another schema migration for a stage column.
 - `business-days.util.ts` (`apps/api/src/common/`) is a new shared Friday/Saturday
   (Jordan's real weekend, not Saturday/Sunday) business-day calculator — the gazetted
-  public-holiday calendar is EMPTY rather than unbuildable: since 2026-09-27 an office
-  enters its own non-working days at `/sla-policies` ("Non-working days", gated on
-  `sla.holiday.create`), and the section warns in plain terms while it is empty. Until an
-  office enters them, a computed business-day deadline remains a lower bound, not an exact
-  one — and the error runs AGAINST the brokerage, over-reporting its own lateness
-  (IMPROVEMENTS § 1.57). The dates are not seeded deliberately: several are lunar and all
-  are gazetted annually, so a guessed list would record an internal guess as a legal fact.
+  public-holiday calendar now carries Jordan's four FIXED dates, seeded for every office
+  for the current year and the next — 1 Jan, 1 May, 25 May, 25 Dec (Ministry of Foreign
+  Affairs, https://www.mfa.gov.jo/content/public-holidays). The four ISLAMIC occasions
+  (Islamic New Year, Prophet's Birthday, Eid al-Fitr 4d, Eid al-Adha 5d) are **never
+  computed**: in Jordan the date is set by official announcement and can differ by a day
+  from any calendar conversion, so a generated Hijri calendar would be wrong most years
+  and nobody would know why. They are entered per year at `/sla-policies`
+  ("Non-working days", gated on `sla.holiday.create`), which names which occasions a year
+  is still missing and with how many days each runs. Until a year's occasions are entered,
+  its business-day deadlines remain a lower bound and the error runs AGAINST the brokerage
+  (IMPROVEMENTS § 1.57). **The weekend is correct and guarded**: Friday + Saturday, the
+  only day-of-week test in the codebase, pinned by a test named for the claim.
 - **One real call site**: `AccessRecertificationService.startCycle()` now starts a
   `quarterly_access_review` timer (best-effort — a timer-bookkeeping failure never rolls
   back or blocks the cycle itself). Fixed in the same change:

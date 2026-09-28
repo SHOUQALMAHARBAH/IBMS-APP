@@ -2,13 +2,15 @@
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import {
+  addFixedHolidaysForYear,
+  addMovingOccasion,
   createSlaHoliday,
+  getHolidayYear,
   holidayDateIsValid,
   holidayNameIsValid,
-  listSlaHolidays,
   SLA_CALENDAR_TYPES,
+  type HolidayYearView,
   type SlaCalendarType,
-  type SlaHoliday,
 } from '../../lib/sla/sla-holiday-api';
 import { ApiError } from '../../lib/auth/api-client';
 import { useAuth } from '../../lib/auth/auth-context';
@@ -17,22 +19,32 @@ import { hasPermission } from '../../lib/auth/permissions';
 import { errorStyle } from '../auth/auth-form.styles';
 
 /*
- * THE NON-WORKING-DAY CALENDAR — the thing every business-day deadline is
- * counted against, and which had no screen at all (IMPROVEMENTS § 1.44, § 1.57).
+ * THE NON-WORKING-DAY CALENDAR, ONE YEAR AT A TIME.
  *
- * The empty-calendar warning is the point of this section, not decoration. The
- * dev database holds ZERO holiday rows, so the error is live, and it has a
- * direction: a deadline computed without the office's holidays lands EARLIER than
- * the real one, so a breach is reported before it happened and work finished
- * inside the true window is recorded late. The brokerage's own compliance
- * figures currently overstate its lateness, against itself — which is why the
- * warning says so in those terms rather than "no data".
+ * Every business-day deadline in the system is counted against this. `GET`/`POST
+ * /sla/holidays` had no screen at all (IMPROVEMENTS § 1.44, § 1.57), and the error has a
+ * direction: a deadline computed without the office's holidays lands EARLIER than the
+ * real one, so a breach is reported before it happened and work finished inside the true
+ * window is recorded late. The brokerage's own compliance figures overstate its lateness,
+ * against itself.
  *
- * It lives on `/sla-policies` rather than behind its own nav entry, and that is
- * measured: every role holding `sla.holiday.create` (Manager, Compliance,
- * Executive) also holds `sla.policy.read`, so the control sits on a screen every
- * holder of its permission can open — § 1.61's rule, which is easy to break by
- * putting a control somewhere reasonable-looking.
+ * ## WHY IT IS PER YEAR
+ *
+ * Jordan's holidays split in two (Ministry of Foreign Affairs,
+ * https://www.mfa.gov.jo/content/public-holidays):
+ *
+ *   FIXED    1 Jan · 1 May · 25 May · 25 Dec — same date every year, seeded and fillable
+ *   MOVING   Islamic New Year · Prophet's Birthday · Eid al-Fitr (4d) · Eid al-Adha (5d)
+ *
+ * **The moving dates are never computed, and that is the whole reason this screen is
+ * shaped around a year.** In Jordan the actual holiday is set by official announcement
+ * and can differ by a day from any calendar conversion; a computed Hijri calendar would
+ * be wrong most years and nobody would know why, because every deadline would simply be
+ * off and the error would look like arithmetic rather than a wrong input.
+ *
+ * So the screen's job is to say what the selected year is still MISSING. A calendar that
+ * only lists what is present cannot do that, and "what do we still owe after this year's
+ * announcement" is the question an office actually has.
  */
 
 const cell: CSSProperties = {
@@ -45,9 +57,15 @@ const head: CSSProperties = {
   fontWeight: 600,
   borderBottom: '2px solid var(--border-default)',
 };
+const muted: CSSProperties = {
+  fontSize: '0.8rem',
+  color: 'var(--ink-secondary)',
+  margin: 0,
+};
+const fieldStyle: CSSProperties = { display: 'grid', gap: '0.2rem' };
 
-/** The stored value is a whole UTC day; render the day, never a local-time
- * conversion that can show the day before. */
+/** The stored value is a whole UTC day; render the day, never a local-time conversion
+ * that can show the day before. */
 function dayOf(iso: string): string {
   return iso.slice(0, 10);
 }
@@ -57,58 +75,64 @@ export function SlaHolidayCalendar() {
   const { t } = useLanguage();
   const canCreate = hasPermission(user, 'sla.holiday.create');
 
-  const [rows, setRows] = useState<SlaHoliday[] | null>(null);
+  const [year, setYear] = useState(() => new Date().getUTCFullYear());
+  const [view, setView] = useState<HolidayYearView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // One-off entry, for a closure this vocabulary does not know about.
   const [day, setDay] = useState('');
   const [name, setName] = useState('');
   const [calendar, setCalendar] = useState<SlaCalendarType | ''>('');
 
-  const load = useCallback(async () => {
-    try {
-      setRows(await listSlaHolidays());
-      setLoadError(null);
-    } catch (err) {
-      setRows(null);
-      setLoadError(
-        err instanceof ApiError ? err.message : t('slapHolidayLoadError'),
-      );
-    }
-  }, [t]);
+  // A moving occasion from the announcement.
+  const [occasion, setOccasion] = useState('');
+  const [startDay, setStartDay] = useState('');
+
+  const load = useCallback(
+    async (y: number) => {
+      try {
+        setView(await getHolidayYear(y));
+        setLoadError(null);
+      } catch (err) {
+        setView(null);
+        setLoadError(
+          err instanceof ApiError ? err.message : t('slapHolidayLoadError'),
+        );
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     if (!user) return;
-    // The house async-IIFE form. `void load()` here is a lint error: calling
-    // setState synchronously inside an effect can cascade renders.
     void (async () => {
-      await load();
+      await load(year);
     })();
-  }, [user, load]);
+  }, [user, year, load]);
 
-  const add = useCallback(async () => {
-    setBusy(true);
-    setAddError(null);
-    try {
-      await createSlaHoliday({
-        observedOn: day,
-        name,
-        ...(calendar === '' ? {} : { calendarType: calendar }),
-      });
-      setDay('');
-      setName('');
-      setCalendar('');
-      await load();
-    } catch (err) {
-      // The API's own sentence when it has one: a duplicate date comes back as a
-      // 409 naming the day, which is more useful than a generic failure.
-      setAddError(
-        err instanceof ApiError ? err.message : t('slapHolidayAddError'),
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, [day, name, calendar, load, t]);
+  const run = useCallback(
+    async (work: () => Promise<unknown>, fallbackKey: 'slapHolidayAddError' | 'slapHolidayOccasionError') => {
+      setBusy(true);
+      setActionError(null);
+      try {
+        await work();
+        await load(year);
+      } catch (err) {
+        // The API's own sentence when it has one: a duplicate date comes back as a 409
+        // naming the day, which is more useful than a generic failure.
+        setActionError(err instanceof ApiError ? err.message : t(fallbackKey));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load, year, t],
+  );
+
+  const owes =
+    view != null &&
+    (view.missingFixed.length > 0 || view.missingOccasions.length > 0);
 
   return (
     <section style={{ margin: '2rem 0' }} data-testid="sla-holidays">
@@ -117,11 +141,33 @@ export function SlaHolidayCalendar() {
         {t('slapHolidaysIntro')}
       </p>
 
-      {/* An EMPTY calendar is not an empty state, it is a wrong-answer state, so
-        * it is an alert rather than a muted line. Rendered only once the list has
-        * actually loaded: "we do not know yet" must not read as "there are
-        * none". */}
-      {rows != null && rows.length === 0 && (
+      <label style={{ display: 'inline-flex', gap: '0.5rem', margin: '0.5rem 0' }}>
+        {t('slapHolidayYear')}
+        <select
+          aria-label={t('slapHolidayYear')}
+          data-testid="sla-holiday-year"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+        >
+          {/* Last year through three ahead: an office corrects the year just gone and
+            * enters the one just announced. A longer list is a guess about how far
+            * ahead anybody plans. */}
+          {[-1, 0, 1, 2, 3].map((offset) => {
+            const y = new Date().getUTCFullYear() + offset;
+            return (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            );
+          })}
+        </select>
+      </label>
+
+      {/* An EMPTY year is not an empty state, it is a wrong-answer state — every
+        * business-day deadline in it is computed as though Fridays were the only
+        * non-working days. Rendered only once the year has loaded: "we do not know yet"
+        * must not read as "there are none". */}
+      {view != null && view.holidays.length === 0 && (
         <p
           role="alert"
           data-testid="sla-holidays-empty-warning"
@@ -142,10 +188,130 @@ export function SlaHolidayCalendar() {
           {loadError}
         </p>
       )}
-      {addError && (
+      {actionError && (
         <p role="alert" style={errorStyle} data-testid="sla-holiday-add-error">
-          {addError}
+          {actionError}
         </p>
+      )}
+
+      {view != null && !owes && (
+        <p style={muted} data-testid="sla-holiday-year-complete">
+          {t('slapHolidayYearComplete')}
+        </p>
+      )}
+
+      {view != null && owes && (
+        <div data-testid="sla-holiday-year-owes" style={{ margin: '0.75rem 0' }}>
+          <strong>{t('slapHolidayYearOwes')}</strong>
+
+          {view.missingFixed.length > 0 && (
+            <div style={{ margin: '0.4rem 0' }}>
+              <div style={muted}>{t('slapHolidayFixedMissing')}</div>
+              <ul style={{ margin: '0.2rem 0', paddingInlineStart: '1.1rem' }}>
+                {view.missingFixed.map((f) => (
+                  <li key={f.observedOn} style={{ fontSize: '0.85rem' }}>
+                    {f.observedOn} · {f.nameEn}
+                  </li>
+                ))}
+              </ul>
+              {canCreate && (
+                <button
+                  type="button"
+                  data-testid="sla-holiday-add-fixed"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () => addFixedHolidaysForYear(year),
+                      'slapHolidayAddError',
+                    )
+                  }
+                >
+                  {t('slapHolidayAddFixed')}
+                </button>
+              )}
+              <p style={{ ...muted, maxWidth: '44rem' }}>
+                {t('slapHolidayFixedNote')}
+              </p>
+            </div>
+          )}
+
+          {view.missingOccasions.length > 0 && (
+            <div style={{ margin: '0.4rem 0' }}>
+              <div style={muted}>{t('slapHolidayMovingHeading')}</div>
+              <ul style={{ margin: '0.2rem 0', paddingInlineStart: '1.1rem' }}>
+                {view.missingOccasions.map((o) => (
+                  <li
+                    key={o.key}
+                    style={{ fontSize: '0.85rem' }}
+                    data-testid={`sla-holiday-missing-${o.key}`}
+                  >
+                    {o.nameEn} · {o.days} {t('slapHolidayDays')}
+                  </li>
+                ))}
+              </ul>
+              <p style={{ ...muted, maxWidth: '44rem' }}>
+                {t('slapHolidayMovingNote')}
+              </p>
+
+              {canCreate && (
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    alignItems: 'end',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <label style={fieldStyle}>
+                    <span style={{ fontSize: '0.8rem' }}>
+                      {t('slapHolidayOccasion')}
+                    </span>
+                    <select
+                      data-testid="sla-holiday-occasion"
+                      value={occasion}
+                      onChange={(e) => setOccasion(e.target.value)}
+                    >
+                      <option value="">{t('slapHolidayOccasion')}</option>
+                      {view.missingOccasions.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.nameEn} ({o.days})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={fieldStyle}>
+                    <span style={{ fontSize: '0.8rem' }}>
+                      {t('slapHolidayStartDate')}
+                    </span>
+                    <input
+                      type="date"
+                      data-testid="sla-holiday-occasion-start"
+                      value={startDay}
+                      onChange={(e) => setStartDay(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    data-testid="sla-holiday-add-occasion"
+                    // Only the START date is collected — the server supplies the length
+                    // from the occasion, so a five-day Eid cannot be entered as four.
+                    disabled={
+                      busy || occasion === '' || !holidayDateIsValid(startDay)
+                    }
+                    onClick={() =>
+                      void run(
+                        () => addMovingOccasion(occasion, startDay),
+                        'slapHolidayOccasionError',
+                      )
+                    }
+                  >
+                    {t('slapHolidayAddOccasion')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {canCreate ? (
@@ -158,7 +324,7 @@ export function SlaHolidayCalendar() {
             margin: '0.75rem 0',
           }}
         >
-          <label style={{ display: 'grid', gap: '0.2rem' }}>
+          <label style={fieldStyle}>
             <span style={{ fontSize: '0.8rem' }}>{t('slapHolidayDate')}</span>
             <input
               type="date"
@@ -167,7 +333,7 @@ export function SlaHolidayCalendar() {
               onChange={(e) => setDay(e.target.value)}
             />
           </label>
-          <label style={{ display: 'grid', gap: '0.2rem' }}>
+          <label style={fieldStyle}>
             <span style={{ fontSize: '0.8rem' }}>{t('slapHolidayName')}</span>
             <input
               type="text"
@@ -176,7 +342,7 @@ export function SlaHolidayCalendar() {
               onChange={(e) => setName(e.target.value)}
             />
           </label>
-          <label style={{ display: 'grid', gap: '0.2rem' }}>
+          <label style={fieldStyle}>
             <span style={{ fontSize: '0.8rem' }}>
               {t('slapHolidayCalendar')}
             </span>
@@ -187,9 +353,8 @@ export function SlaHolidayCalendar() {
                 setCalendar(e.target.value as SlaCalendarType | '')
               }
             >
-              {/* The DEFAULT is every calendar, because a national holiday is
-                * the ordinary case and the narrower choice should be the one a
-                * reader has to make deliberately. */}
+              {/* The DEFAULT is every calendar, because a national holiday is the
+                * ordinary case and the narrower choice should be the deliberate one. */}
               <option value="">{t('slapHolidayAllCalendars')}</option>
               {SLA_CALENDAR_TYPES.map((c) => (
                 <option key={c} value={c}>
@@ -202,7 +367,21 @@ export function SlaHolidayCalendar() {
             type="button"
             data-testid="sla-holiday-add"
             disabled={busy || !holidayDateIsValid(day) || !holidayNameIsValid(name)}
-            onClick={() => void add()}
+            onClick={() =>
+              void run(
+                async () => {
+                  await createSlaHoliday({
+                    observedOn: day,
+                    name,
+                    ...(calendar === '' ? {} : { calendarType: calendar }),
+                  });
+                  setDay('');
+                  setName('');
+                  setCalendar('');
+                },
+                'slapHolidayAddError',
+              )
+            }
           >
             {t('slapHolidayAdd')}
           </button>
@@ -213,11 +392,11 @@ export function SlaHolidayCalendar() {
         </p>
       )}
 
-      {rows == null ? (
+      {view == null ? (
         loadError ? null : (
           <p>{t('slapHolidayLoading')}</p>
         )
-      ) : rows.length > 0 ? (
+      ) : view.holidays.length > 0 ? (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', minWidth: '32rem' }}>
             <thead>
@@ -228,7 +407,7 @@ export function SlaHolidayCalendar() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((h) => (
+              {view.holidays.map((h) => (
                 <tr key={h.id} data-testid={`sla-holiday-${h.id}`}>
                   <td style={cell}>{dayOf(h.observedOn)}</td>
                   <td style={cell}>{h.name}</td>

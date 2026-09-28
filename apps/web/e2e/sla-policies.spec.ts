@@ -130,19 +130,64 @@ function holidayRow(over: Record<string, unknown> = {}) {
   };
 }
 
-/** Re-routable: a later `page.route` for the same pattern takes precedence, so a
- * test can override the default empty calendar. */
-async function mockHolidays(page: Page, rows: Record<string, unknown>[]) {
-  await page.route("**/sla/holidays", (route) => {
+const ALL_OCCASIONS = [
+  { key: "islamic_new_year", nameEn: "Islamic New Year", nameAr: "رأس السنة الهجرية", days: 1 },
+  { key: "prophets_birthday", nameEn: "Prophet's Birthday", nameAr: "المولد النبوي الشريف", days: 1 },
+  { key: "eid_al_fitr", nameEn: "Eid al-Fitr", nameAr: "عيد الفطر", days: 4 },
+  { key: "eid_al_adha", nameEn: "Eid al-Adha", nameAr: "عيد الأضحى", days: 5 },
+];
+
+const ALL_FIXED = [
+  { nameEn: "New Year's Day", nameAr: "رأس السنة الميلادية", observedOn: "2026-01-01" },
+  { nameEn: "Labour Day", nameAr: "عيد العمال", observedOn: "2026-05-01" },
+  { nameEn: "Independence Day", nameAr: "عيد الاستقلال", observedOn: "2026-05-25" },
+  { nameEn: "Christmas", nameAr: "عيد الميلاد المجيد", observedOn: "2026-12-25" },
+];
+
+/** The calendar is read PER YEAR, because the Islamic occasions are entered from each
+ * year's official announcement rather than computed. Re-routable: a later `page.route`
+ * for the same pattern wins, so a test can override the default. */
+async function mockHolidays(
+  page: Page,
+  rows: Record<string, unknown>[],
+  over: Partial<{ missingFixed: unknown[]; missingOccasions: unknown[] }> = {},
+) {
+  await page.route("http://localhost:4000/sla/holidays/year/*", (route) => {
     if (route.request().method() !== "GET") return route.fallback();
-    return route.fulfill({ status: 200, json: rows });
+    return route.fulfill({
+      status: 200,
+      json: {
+        year: 2026,
+        holidays: rows,
+        missingFixed: over.missingFixed ?? (rows.length === 0 ? ALL_FIXED : []),
+        missingOccasions: over.missingOccasions ?? ALL_OCCASIONS,
+      },
+    });
   });
+}
+
+/** The two per-year writes, captured so assertions are about the wire. */
+async function captureYearWrites(page: Page) {
+  const calls: { url: string; body: unknown }[] = [];
+  for (const pattern of [
+    "http://localhost:4000/sla/holidays/year/*/fixed",
+    "http://localhost:4000/sla/holidays/occasion",
+  ]) {
+    await page.route(pattern, (route) => {
+      calls.push({
+        url: route.request().url(),
+        body: route.request().postDataJSON(),
+      });
+      return route.fulfill({ status: 201, json: { created: [], skipped: 0 } });
+    });
+  }
+  return calls;
 }
 
 /** Every POST to the calendar, captured so an assertion is about the wire. */
 async function captureHolidayPosts(page: Page, status = 201) {
   const calls: { body: unknown }[] = [];
-  await page.route("**/sla/holidays", (route) => {
+  await page.route("http://localhost:4000/sla/holidays", (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     calls.push({ body: route.request().postDataJSON() });
     return route.fulfill({
@@ -407,6 +452,102 @@ test("a reader without sla.holiday.create sees the calendar and no form", async 
   await expect(page.getByTestId("sla-holiday-hol-1")).toBeVisible();
   await expect(page.getByTestId("sla-holiday-add")).toHaveCount(0);
   await expect(page.getByText("sla.holiday.create")).toBeVisible();
+});
+
+test("names what the year still owes, in occasions and in days", async ({ page }) => {
+  // THE POINT OF THE PER-YEAR VIEW. Jordan's Islamic holidays are set by official
+  // announcement and can differ by a day from any calendar conversion, so the system
+  // does not compute them — which means an office has to be TOLD which ones it has not
+  // entered. A calendar that only lists what is present cannot say that.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, [holidayRow()]);
+
+  await page.goto("/sla-policies");
+  await expect(page.getByTestId("sla-holiday-year-owes")).toBeVisible();
+
+  // The LENGTHS are shown, because an officer entering Eid al-Adha has to know it is
+  // five days and not four.
+  await expect(page.getByTestId("sla-holiday-missing-eid_al_adha")).toContainText(
+    "5 days",
+  );
+  await expect(page.getByTestId("sla-holiday-missing-eid_al_fitr")).toContainText(
+    "4 days",
+  );
+  await expect(page.getByTestId("sla-holiday-missing-islamic_new_year")).toContainText(
+    "1 days",
+  );
+});
+
+test("fills the four fixed dates for the selected year in one action", async ({
+  page,
+}) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, []);
+  const calls = await captureYearWrites(page);
+
+  await page.goto("/sla-policies");
+  await expect(page.getByTestId("sla-holiday-add-fixed")).toBeEnabled();
+  await page.getByTestId("sla-holiday-add-fixed").click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  expect(calls[0].url).toContain("/fixed");
+});
+
+test("enters a moving occasion from its FIRST day only", async ({ page }) => {
+  // Only the start date is collected. The server supplies the length from the
+  // occasion, so a five-day Eid cannot be entered as four by a screen that forgot —
+  // and no date is ever computed from a Hijri conversion.
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, [holidayRow()]);
+  const calls = await captureYearWrites(page);
+
+  await page.goto("/sla-policies");
+  const add = page.getByTestId("sla-holiday-add-occasion");
+  await expect(add).toBeDisabled();
+
+  await page.getByTestId("sla-holiday-occasion").selectOption("eid_al_adha");
+  await expect(add).toBeDisabled(); // an occasion with no date is still refused
+  await page.getByTestId("sla-holiday-occasion-start").fill("2026-05-27");
+  await expect(add).toBeEnabled();
+  await add.click();
+
+  await expect.poll(() => calls.length).toBe(1);
+  // No `days` field: the length is a fact about the occasion, not a caller's input.
+  expect(calls[0].body).toEqual({
+    occasionKey: "eid_al_adha",
+    startDate: "2026-05-27",
+  });
+});
+
+test("says a year is complete when nothing is missing", async ({ page }) => {
+  await mockAuth(page, ["COMPLIANCE_OFFICER"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, [holidayRow()], {
+    missingFixed: [],
+    missingOccasions: [],
+  });
+
+  await page.goto("/sla-policies");
+  await expect(page.getByTestId("sla-holiday-year-complete")).toBeVisible();
+  // Positive anchor above, so this absence cannot pass on an unrendered section.
+  await expect(page.getByTestId("sla-holiday-year-owes")).toHaveCount(0);
+});
+
+test("a reader without the write code is told what is missing but cannot fill it", async ({
+  page,
+}) => {
+  // The missing list is information an auditor wants even when they cannot act on it.
+  await mockAuthWithCodes(page, ["sla.policy.read"]);
+  await mockPolicies(page, [internalPolicy]);
+  await mockHolidays(page, []);
+
+  await page.goto("/sla-policies");
+  await expect(page.getByTestId("sla-holiday-year-owes")).toBeVisible();
+  await expect(page.getByTestId("sla-holiday-add-fixed")).toHaveCount(0);
+  await expect(page.getByTestId("sla-holiday-add-occasion")).toHaveCount(0);
 });
 
 test("renders in Arabic with RTL direction", async ({ page }) => {

@@ -3381,6 +3381,72 @@ is two days later than the one computed. The breach reports, the SLA dashboard, 
 drawn from them therefore over-report lateness. For a compliance artefact that is the worse direction:
 the brokerage's own records would show it missing statutory deadlines it actually met.
 
+#### THE WEEKEND, MEASURED FIRST — AND IT IS CORRECT
+
+The owner asked for this before anything else in the item, on the reasoning that if the
+weekend were wrong then **seeding holidays would HIDE the defect rather than fix it**: the
+numbers would move and look corrected. She was right to ask and the answer is clean.
+
+`JORDAN_WEEKEND_DAYS = [5, 6]` — Friday and Saturday in `getUTCDay()` numbering, verified
+empirically rather than read (25 Sep 2026 → 5 → weekend; 26 Sep → 6 → weekend; **27 Sep →
+0 → a working day**). It is the **only day-of-week test in the entire codebase**:
+`grep getUTCDay()|getDay()` across the api, the web and the db package returns one live
+site. There is no second implementation to be wrong.
+
+No policy can silently override it either: `JORDAN_STANDARD` returns the holiday set only
+and falls through to the Fri+Sat default, `CONTINUOUS_24_7` deliberately has no weekend (a
+containment clock does not stop for Friday), and only `CUSTOM` supplies its own — measured
+on both databases, **20 policies, 17 `JORDAN_STANDARD` + 3 `CONTINUOUS_24_7`, zero
+`CUSTOM`**, so the empty-override case is not live. Pinned by a test whose name is the
+claim — *"is Friday and Saturday, not Saturday/Sunday"* — and planting `[6, 0]` kills two
+tests.
+
+**So § 1.57 is the empty calendar and nothing more.** It does not need restating.
+
+#### THE DATA ARRIVED 2026-09-28, AND THE ISLAMIC DATES ARE STILL NOT COMPUTED
+
+Source, owner-supplied: Jordan's Ministry of Foreign Affairs,
+https://www.mfa.gov.jo/content/public-holidays.
+
+**Seeded — the four FIXED dates**, for every office, for the current year and the next:
+1 January (New Year's Day) · 1 May (Labour Day) · 25 May (Independence Day) ·
+25 December (Christmas). Generating these is not a calendar conversion — 1 January is
+1 January — so there is no risk in it. Idempotent per (office, date), proven by running the
+seed twice: 16 created then 0.
+
+**NOT computed, and must never be — the four Islamic occasions**: Islamic New Year ·
+Prophet's Birthday · Eid al-Fitr (4 days) · Eid al-Adha (5 days). In Jordan the actual
+holiday is **set by official announcement and can differ by a day from any calendar
+conversion**, so a generated Hijri calendar would be wrong most years and nobody would
+know why: every business-day deadline would simply be off, and the error would look like
+arithmetic rather than a wrong input. `jordan-public-holidays.config.ts` therefore holds
+their NAMES and LENGTHS and **no dates at all** — and its spec asserts that each occasion
+carries exactly `days`, `key`, `nameAr`, `nameEn`, so a `month` or `date` field appearing
+there later fails the build.
+
+**The screen is now per YEAR, and its job is to say what the year is MISSING.** A calendar
+that lists only what is present cannot answer *"what do we still owe after this year's
+announcement"*, which is the question an office actually has. So the year view names the
+missing fixed dates (fillable in one idempotent action) and the missing occasions **with
+their lengths** — because an officer entering Eid al-Adha has to know it is five days and
+not four. An occasion is entered from its FIRST day only; the server expands the run from
+the vocabulary, so a five-day Eid cannot be entered as four by a caller that forgot. The
+run is plain consecutive days **including a weekend**, because a public holiday falls on
+the day it falls on and skipping Friday would move Eid.
+
+**§ 1.57 is now closed for the fixed half and open for the moving half by design** — the
+moving dates are an annual input, not a build, and the screen asks for them every year.
+
+#### A pre-existing test leak this surfaced
+
+Seeding the calendar made `four-action-separability.e2e-spec.ts` fail locally with
+`expected 201, got 409`, and the cause was **not the seed**: that spec created holidays on
+FIXED dates (2027-01-01 / 2027-01-02) and deleted nothing, so the second run ever against
+a cumulative db-test collided on the one-holiday-per-date constraint. CI never saw it
+because CI builds db-test from nothing every time. **A failure about test hygiene wearing
+the costume of a permission defect** — the dates are now derived from the run id and the
+spec tears its rows down, and two consecutive local runs pass.
+
 #### PARTIALLY CLOSED 2026-09-27 — the way in exists; the dates do not
 
 **What shipped.** `GET`/`POST /sla/holidays` now have a caller: a "Non-working days" section on

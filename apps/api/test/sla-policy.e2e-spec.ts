@@ -392,6 +392,123 @@ describe('Configurable SLA policies (e2e) — task Part A', () => {
     });
   });
 
+  it('reports what a year still owes, fills the fixed four, and expands an Eid', async () => {
+    // Jordan's public holidays, per the Ministry of Foreign Affairs
+    // (https://www.mfa.gov.jo/content/public-holidays): four fixed dates that may be
+    // generated, and four Islamic occasions that may NOT — in Jordan the date is set by
+    // official announcement and can differ by a day from any calendar conversion, so
+    // they are entered from the announcement.
+    //
+    // A distant year, cleaned at both ends: db-test is cumulative, and the fixed four
+    // are fixed DATES, so two runs against the same year would collide on the
+    // duplicate-date constraint rather than on anything this test is about.
+    const YEAR = 2091;
+    const clearYear = () =>
+      prisma.slaHoliday.deleteMany({
+        where: {
+          observedOn: {
+            gte: new Date(`${YEAR}-01-01T00:00:00.000Z`),
+            lt: new Date(`${YEAR + 1}-01-01T00:00:00.000Z`),
+          },
+        },
+      });
+    await clearYear();
+
+    interface YearView {
+      year: number;
+      holidays: { name: string; observedOn: string }[];
+      missingFixed: { nameEn: string; observedOn: string }[];
+      missingOccasions: { key: string; days: number }[];
+    }
+
+    // EMPTY YEAR: it owes all four fixed dates and all four occasions. The missing list
+    // is the point of this read — a calendar that only lists what is present cannot tell
+    // an office what it has not entered.
+    const before = await request(app.getHttpServer())
+      .get(`/sla/holidays/year/${YEAR}`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const b = before.body as YearView;
+    expect(b.holidays).toHaveLength(0);
+    expect(b.missingFixed.map((f) => f.observedOn)).toEqual([
+      `${YEAR}-01-01`,
+      `${YEAR}-05-01`,
+      `${YEAR}-05-25`,
+      `${YEAR}-12-25`,
+    ]);
+    expect(b.missingOccasions.map((o) => `${o.key}:${o.days}`)).toEqual([
+      'islamic_new_year:1',
+      'prophets_birthday:1',
+      'eid_al_fitr:4',
+      'eid_al_adha:5',
+    ]);
+
+    // FILL THE FIXED FOUR, then again — the second call must create nothing rather than
+    // conflict, because two people opening the same year is ordinary.
+    const first = await request(app.getHttpServer())
+      .post(`/sla/holidays/year/${YEAR}/fixed`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+    expect((first.body as { created: unknown[]; skipped: number }).created).toHaveLength(4);
+    const second = await request(app.getHttpServer())
+      .post(`/sla/holidays/year/${YEAR}/fixed`)
+      .set(bearer(compliance.accessToken))
+      .expect(201);
+    expect((second.body as { created: unknown[]; skipped: number }).created).toHaveLength(0);
+    expect((second.body as { skipped: number }).skipped).toBe(4);
+
+    // AN EID IS FIVE DAYS, and the server supplies the length so an officer does not
+    // have to remember it. Started on a Thursday so the run crosses Friday+Saturday —
+    // a public holiday falls on the day it falls on.
+    const adha = await request(app.getHttpServer())
+      .post('/sla/holidays/occasion')
+      .set(bearer(compliance.accessToken))
+      .send({ occasionKey: 'eid_al_adha', startDate: `${YEAR}-06-04` })
+      .expect(201);
+    const rows = adha.body as { observedOn: string; name: string }[];
+    expect(rows).toHaveLength(5);
+    expect(rows.map((r) => r.observedOn.slice(0, 10))).toEqual([
+      `${YEAR}-06-04`,
+      `${YEAR}-06-05`,
+      `${YEAR}-06-06`,
+      `${YEAR}-06-07`,
+      `${YEAR}-06-08`,
+    ]);
+    // The day number is in the name, so a reader can see a five-day Eid is complete.
+    expect(rows[4].name).toContain('day 5 of 5');
+
+    // The year now owes only the three occasions it has not been told about.
+    const after = await request(app.getHttpServer())
+      .get(`/sla/holidays/year/${YEAR}`)
+      .set(bearer(compliance.accessToken))
+      .expect(200);
+    const a = after.body as YearView;
+    expect(a.holidays).toHaveLength(9); // 4 fixed + 5 Eid days
+    expect(a.missingFixed).toHaveLength(0);
+    expect(a.missingOccasions.map((o) => o.key)).toEqual([
+      'islamic_new_year',
+      'prophets_birthday',
+      'eid_al_fitr',
+    ]);
+
+    // An unknown occasion is a 422 that NAMES the four, rather than a silent no-op.
+    const bad = await request(app.getHttpServer())
+      .post('/sla/holidays/occasion')
+      .set(bearer(compliance.accessToken))
+      .send({ occasionKey: 'ramadan', startDate: `${YEAR}-03-01` })
+      .expect(422);
+    expect((bad.body as { message: string }).message).toContain('eid_al_adha');
+
+    // And a start date that is not a day is refused before anything is created.
+    await request(app.getHttpServer())
+      .post('/sla/holidays/occasion')
+      .set(bearer(compliance.accessToken))
+      .send({ occasionKey: 'eid_al_fitr', startDate: `${YEAR}-02-30` })
+      .expect(400);
+
+    await clearYear();
+  });
+
   it('separates "change the duration" from "declare it legally required"', async () => {
     // BRANCH_DEPARTMENT_MANAGER holds sla.policy.update but NOT
     // sla.policy.regulatory. Shortening a deadline is a normal governance

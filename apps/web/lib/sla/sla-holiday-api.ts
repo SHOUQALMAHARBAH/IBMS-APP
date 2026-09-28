@@ -71,3 +71,52 @@ export function holidayNameIsValid(name: string): boolean {
 export function holidayDateIsValid(day: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(day);
 }
+
+/*
+ * ONE YEAR AT A TIME, AND WHAT THE YEAR STILL OWES.
+ *
+ * Jordan's public holidays split in two (Ministry of Foreign Affairs,
+ * https://www.mfa.gov.jo/content/public-holidays):
+ *
+ *   FIXED    1 Jan · 1 May · 25 May · 25 Dec — may be generated, and are seeded
+ *   MOVING   Islamic New Year · Prophet's Birthday · Eid al-Fitr (4d) · Eid al-Adha (5d)
+ *
+ * **The moving dates are never computed.** In Jordan the actual holiday is set by
+ * official announcement and can differ by a day from any calendar conversion — a
+ * computed Hijri calendar would be wrong most years and nobody would know why, because
+ * the deadlines would just be off and the error would look like arithmetic rather than a
+ * wrong input. They are entered per year from the announcement, and `missingOccasions`
+ * is how the screen tells an office which ones it has not entered yet.
+ */
+
+export interface HolidayYearView {
+  year: number;
+  holidays: SlaHoliday[];
+  /** Fixed dates not yet present in this year — fillable in one action. */
+  missingFixed: { nameEn: string; nameAr: string; observedOn: string }[];
+  /** Occasions with no row naming them in this year. `days` is how many consecutive
+   * non-working days the occasion covers, which is why it cannot be entered as one. */
+  missingOccasions: { key: string; nameEn: string; nameAr: string; days: number }[];
+}
+
+export function getHolidayYear(year: number): Promise<HolidayYearView> {
+  return apiGet(`/sla/holidays/year/${year}`);
+}
+
+/** Creates only the fixed dates the year is missing. Idempotent server-side: two people
+ * opening the same year must not give the second one a duplicate-date conflict. */
+export function addFixedHolidaysForYear(
+  year: number,
+): Promise<{ created: SlaHoliday[]; skipped: number }> {
+  return apiPost(`/sla/holidays/year/${year}/fixed`, {});
+}
+
+/** Enters a moving occasion from the year's announcement. Only the START date is sent —
+ * the server supplies the length from the occasion, so a five-day Eid cannot be entered
+ * as four by a caller that forgot. */
+export function addMovingOccasion(
+  occasionKey: string,
+  startDate: string,
+): Promise<SlaHoliday[]> {
+  return apiPost('/sla/holidays/occasion', { occasionKey, startDate });
+}

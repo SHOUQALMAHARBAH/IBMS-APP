@@ -111,6 +111,24 @@ async function actorHolding(
 
 let app: INestApplication<App>;
 
+/*
+ * RUN-UNIQUE HOLIDAY DATES, and a teardown.
+ *
+ * These two assertions used FIXED dates (2027-01-01 / 2027-01-02) and the spec deleted
+ * nothing, so the second run ever against a cumulative db-test hit the
+ * one-holiday-per-date constraint and reported a 409 where it expected a 201 — a failure
+ * about test hygiene wearing the costume of a permission defect. CI never saw it because
+ * CI builds db-test from nothing every time, which is exactly the class of thing that
+ * only bites locally and then costs an afternoon.
+ *
+ * A far-future year keeps these clear of the seeded Jordanian public holidays, and the
+ * day is derived from the run so two runs cannot collide even without the teardown.
+ */
+const HOLIDAY_YEAR = 2088;
+const holidayDay = 1 + ((Number.parseInt(RUN.slice(-4), 36) || 0) % 26);
+const refusedHoliday = `${HOLIDAY_YEAR}-01-${String(holidayDay).padStart(2, '0')}`;
+const separabilityHoliday = `${HOLIDAY_YEAR}-02-${String(holidayDay).padStart(2, '0')}`;
+
 describe('four-action Phases 1 and 4 — each successor can be held alone (e2e)', () => {
   beforeAll(async () => {
     app = await createTestApp();
@@ -118,6 +136,13 @@ describe('four-action Phases 1 and 4 — each successor can be held alone (e2e)'
 
   afterAll(async () => {
     await app?.close();
+    // The holiday this spec creates. Its dates are already run-unique, so this is belt
+    // and braces rather than the fix — but a holiday row left in db-test changes
+    // business-day arithmetic for every later spec in the run, which is a far more
+    // confusing failure than a duplicate-date conflict.
+    await prisma.slaHoliday.deleteMany({
+      where: { name: { in: [`Separability ${RUN}`, `Refused ${RUN}`] } },
+    });
     // db-test is cumulative; a leftover role moves every count of the catalogue.
     if (createdRoleIds.length > 0) {
       await prisma.userRoleAssignment.deleteMany({
@@ -371,7 +396,7 @@ describe('four-action Phases 1 and 4 — each successor can be held alone (e2e)'
     await request(app.getHttpServer())
       .post('/sla/holidays')
       .set(bearer(token))
-      .send({ observedOn: '2027-01-01', name: `Refused ${RUN}` })
+      .send({ observedOn: refusedHoliday, name: `Refused ${RUN}` })
       .expect(403);
   }, 180_000);
 
@@ -386,7 +411,7 @@ describe('four-action Phases 1 and 4 — each successor can be held alone (e2e)'
     await request(app.getHttpServer())
       .post('/sla/holidays')
       .set(bearer(token))
-      .send({ observedOn: '2027-01-02', name: `Separability ${RUN}` })
+      .send({ observedOn: separabilityHoliday, name: `Separability ${RUN}` })
       .expect(201);
 
     await request(app.getHttpServer())

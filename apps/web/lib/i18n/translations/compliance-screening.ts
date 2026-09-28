@@ -89,6 +89,24 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayReadOnly:
       'لا تملك صلاحية sla.holiday.create، فالتقويم للقراءة فقط.',
     slapHolidayLoading: 'جارٍ تحميل التقويم…',
+    slapHolidayYear: 'السنة',
+    slapHolidayYearOwes: 'ما زالت هذه السنة تنقصها أيام',
+    slapHolidayFixedMissing: 'العطل ثابتة التاريخ غير المُدخلة',
+    slapHolidayAddFixed: 'أضِف العطل الثابتة لهذه السنة',
+    slapHolidayFixedNote:
+      'أربع عطل تتكرر في التاريخ نفسه كل سنة: رأس السنة الميلادية (١ كانون الثاني)، ' +
+      'عيد العمال (١ أيار)، عيد الاستقلال (٢٥ أيار)، عيد الميلاد المجيد (٢٥ كانون الأول).',
+    slapHolidayMovingHeading: 'المناسبات الإسلامية — تُدخل حسب الإعلان الرسمي',
+    slapHolidayMovingNote:
+      'تواريخ هذه المناسبات تُحدَّد بإعلان رسمي في الأردن وقد تختلف بيوم عن أي تحويل ' +
+      'تقويمي، لذلك لا يحسبها النظام. أدخل تاريخ أول يوم من الإعلان، ويتولى النظام ' +
+      'باقي الأيام بعدد أيام المناسبة.',
+    slapHolidayOccasion: 'المناسبة',
+    slapHolidayStartDate: 'تاريخ أول يوم',
+    slapHolidayAddOccasion: 'إدخال المناسبة',
+    slapHolidayDays: 'أيام',
+    slapHolidayYearComplete: 'هذه السنة مكتملة — كل العطل المعروفة مُدخلة.',
+    slapHolidayOccasionError: 'تعذّر إدخال المناسبة — حاول مرة أخرى.',
     slapProcess: 'العملية',
     slapDuration: 'المهلة',
     slapSource: 'المصدر',
@@ -265,6 +283,25 @@ export const COMPLIANCE_SCREENING = {
     slapHolidayReadOnly:
       'You do not hold sla.holiday.create, so the calendar is read-only.',
     slapHolidayLoading: 'Loading the calendar…',
+    slapHolidayYear: 'Year',
+    slapHolidayYearOwes: 'This year is still missing days',
+    slapHolidayFixedMissing: 'Fixed-date holidays not yet entered',
+    slapHolidayAddFixed: 'Add the fixed holidays for this year',
+    slapHolidayFixedNote:
+      'Four holidays fall on the same date every year: New Year\'s Day (1 Jan), Labour ' +
+      'Day (1 May), Independence Day (25 May), Christmas (25 Dec).',
+    slapHolidayMovingHeading: 'Islamic occasions — entered from the official announcement',
+    slapHolidayMovingNote:
+      'These dates are set by official announcement in Jordan and can differ by a day ' +
+      'from any calendar conversion, so the system does not compute them. Enter the ' +
+      'first day from the announcement and the system fills the rest, using the number ' +
+      'of days the occasion runs.',
+    slapHolidayOccasion: 'Occasion',
+    slapHolidayStartDate: 'First day',
+    slapHolidayAddOccasion: 'Enter the occasion',
+    slapHolidayDays: 'days',
+    slapHolidayYearComplete: 'This year is complete — every known holiday is entered.',
+    slapHolidayOccasionError: 'Could not enter that occasion — try again.',
     slapProcess: 'Process',
     slapDuration: 'Duration',
     slapSource: 'Source',

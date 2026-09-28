@@ -8,6 +8,13 @@ import {
 import { Prisma } from '@ibms/db';
 import type { SlaHoliday, SlaPolicy, SlaPolicyStatus } from '@ibms/db';
 import {
+  consecutiveDays,
+  fixedHolidaysForYear,
+  JORDAN_FIXED_HOLIDAYS,
+  JORDAN_MOVING_HOLIDAYS,
+  utcDayKey,
+} from './jordan-public-holidays.config';
+import {
   SlaPolicyRepository,
   type SlaPolicyWithEscalations,
 } from '../../repositories/sla-policy.repository';
@@ -391,6 +398,129 @@ export class SlaPolicyService {
       },
     });
     return created;
+  }
+
+  /**
+   * One year of the non-working-day calendar, and what it still owes.
+   *
+   * The `missing` half is the point. Jordan's four fixed holidays can be generated; the
+   * four Islamic occasions cannot — in Jordan the date is set by official announcement
+   * and can differ by a day from any calendar conversion, so a computed Hijri calendar
+   * would be wrong most years and nobody would know why. They are ENTERED from the
+   * announcement, which means an office needs to be told which ones it has not entered
+   * yet. A calendar that merely lists what is present cannot say that.
+   *
+   * An occasion counts as entered when at least one row names it. Deliberately not "all
+   * `days` rows present": Eid runs are entered in one action, and a partial run means
+   * somebody is mid-edit rather than that the occasion is absent.
+   */
+  async holidayCalendarForYear(year: number): Promise<{
+    year: number;
+    holidays: SlaHoliday[];
+    missingFixed: { nameEn: string; nameAr: string; observedOn: string }[];
+    missingOccasions: { key: string; nameEn: string; nameAr: string; days: number }[];
+  }> {
+    const all = await this.policies.findHolidays();
+    const inYear = all.filter((h) => h.observedOn.getUTCFullYear() === year);
+    const keys = new Set(inYear.map((h) => utcDayKey(h.observedOn)));
+    const names = inYear.map((h) => h.name.toLowerCase());
+
+    const missingFixed = fixedHolidaysForYear(year)
+      .filter((h) => !keys.has(utcDayKey(h.observedOn)))
+      .map((h) => ({
+        nameEn: h.nameEn,
+        nameAr: h.nameAr,
+        observedOn: utcDayKey(h.observedOn),
+      }));
+
+    // Matched on the NAME, because a moving occasion has no date to match on — that is
+    // the whole reason it is entered rather than generated.
+    const missingOccasions = JORDAN_MOVING_HOLIDAYS.filter(
+      (o) =>
+        !names.some(
+          (n) =>
+            n.includes(o.nameEn.toLowerCase()) || n.includes(o.nameAr.toLowerCase()),
+        ),
+    ).map((o) => ({ key: o.key, nameEn: o.nameEn, nameAr: o.nameAr, days: o.days }));
+
+    return { year, holidays: inYear, missingFixed, missingOccasions };
+  }
+
+  /**
+   * Add the four fixed-date holidays for `year`, skipping any already present.
+   *
+   * Idempotent on purpose: two people opening the calendar for the same year is
+   * ordinary, and the second one must not get a duplicate-date conflict for pressing a
+   * button that describes itself as filling in what is missing.
+   */
+  async createFixedHolidaysForYear(
+    year: number,
+    actor: AuthenticatedUser,
+  ): Promise<{ created: SlaHoliday[]; skipped: number }> {
+    const { missingFixed } = await this.holidayCalendarForYear(year);
+    const created: SlaHoliday[] = [];
+    for (const h of missingFixed) {
+      created.push(
+        await this.createHoliday(
+          {
+            observedOn: new Date(`${h.observedOn}T00:00:00.000Z`),
+            name: h.nameEn,
+            calendarType: null,
+          },
+          actor,
+        ),
+      );
+    }
+    return { created, skipped: JORDAN_FIXED_HOLIDAYS.length - created.length };
+  }
+
+  /**
+   * Enter a moving occasion from the year's announcement: a start date, expanded to the
+   * occasion's own length.
+   *
+   * Eid al-Adha is five days and Eid al-Fitr is four, and an officer entering them one
+   * row at a time has to remember which — so the length comes from the vocabulary rather
+   * than from the request. The run is plain consecutive days INCLUDING a weekend,
+   * because a public holiday falls on the day it falls on and skipping Friday would move
+   * Eid.
+   *
+   * The whole run is created or the call fails partway with the earlier days present;
+   * that is deliberate rather than transactional, because a half-entered Eid is visible
+   * on the calendar as a short run and is fixable, while a rolled-back one looks like
+   * nothing happened.
+   */
+  async createMovingOccasion(
+    occasionKey: string,
+    startDay: string,
+    actor: AuthenticatedUser,
+  ): Promise<SlaHoliday[]> {
+    const occasion = JORDAN_MOVING_HOLIDAYS.find((o) => o.key === occasionKey);
+    if (!occasion) {
+      throw new UnprocessableEntityException(
+        `Unknown occasion ${occasionKey}. Jordan's moving public holidays are: ${JORDAN_MOVING_HOLIDAYS.map((o) => o.key).join(', ')}.`,
+      );
+    }
+    const start = new Date(`${startDay}T00:00:00.000Z`);
+    const out: SlaHoliday[] = [];
+    const run = consecutiveDays(start, occasion.days);
+    for (let i = 0; i < run.length; i += 1) {
+      out.push(
+        await this.createHoliday(
+          {
+            observedOn: run[i],
+            // The occasion's name carries the day number when it runs to more than one,
+            // so a reader can see at a glance that a five-day Eid is complete.
+            name:
+              occasion.days === 1
+                ? occasion.nameEn
+                : `${occasion.nameEn} (day ${i + 1} of ${occasion.days})`,
+            calendarType: null,
+          },
+          actor,
+        ),
+      );
+    }
+    return out;
   }
 
   private async safeAudit(input: RecordAuditEntryInput): Promise<void> {
