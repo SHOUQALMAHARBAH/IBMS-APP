@@ -12,7 +12,7 @@ import { SlaTimerService } from '../sla/sla-timer.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
 import { hasExactlyOneOwner } from '../../common/dto.util';
-import { DsrRepository } from '../../repositories/dsr.repository';
+import { DsrRepository , type DataSubjectRequestWithAct } from '../../repositories/dsr.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
@@ -703,7 +703,15 @@ export class DsrService {
 
   // --- helpers -------------------------------------------------
 
-  private async load(id: string): Promise<DataSubjectRequest> {
+  /**
+   * One read, one shape — including the combined-duty relation.
+   *
+   * Widened here rather than making the row type's field optional. An optional field would have kept
+   * every existing caller compiling and let the next one pass a row whose act state nobody knows;
+   * requiring it turned this into a handful of compile errors that named each site, which is the
+   * whole value of the strict shape.
+   */
+  private async load(id: string): Promise<DataSubjectRequestWithAct> {
     const dsr = await this.repo.findById(id);
     if (!dsr) {
       throw new NotFoundException(`Data Subject Request ${id} not found.`);

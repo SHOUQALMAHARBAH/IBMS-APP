@@ -1,4 +1,9 @@
 import { DsrType } from '@ibms/db';
+import type { CombinedDutyAct } from '@ibms/db';
+import {
+  combinedDutyActView,
+  type CombinedDutyActView,
+} from '../../common/duty-segregation.view';
 import type { DsrStatus, Prisma } from '@ibms/db';
 import {
   applyDuration,
@@ -108,6 +113,10 @@ export interface DataSubjectRequestRow {
   dpoHandlerUserId: string | null;
   processedByUserId: string | null;
   closedByUserId: string | null;
+  /** The relation is `closureCombinedDutyAct` — each pair's escape column is named after the
+   *  CONSTRAINT it excuses, not the table, because `NeedsAssessment` has two pairs and one shared
+   *  column would let a declared combined REVIEW excuse a self-APPROVAL. */
+  closureCombinedDutyAct: CombinedDutyAct | null;
   rejectionReason: string | null;
   noOpenRetentionHoldConfirmedAt: Date | null;
   createdAt: Date;
@@ -130,6 +139,15 @@ export interface DataSubjectRequestView {
   dpoHandlerUserId: string | null;
   processedByUserId: string | null;
   closedByUserId: string | null;
+  /**
+   * Set when ONE person both logged and closed this request, in an office that declared COMBINED duty
+   * segregation and stated why. Null on every ordinary closure.
+   *
+   * `DataSubjectRequest_maker_checker_distinct` normally forbids it. Here rather than only in the
+   * report at `/internal-controls` because a statutory request closed by its own logger is exactly
+   * what an auditor asks about, and `closedByUserId` alone cannot say it — Part 4 step 5.
+   */
+  combinedDutyAct: CombinedDutyActView | null;
   rejectionReason: string | null;
   noOpenRetentionHoldConfirmedAt: string | null;
 
@@ -183,6 +201,7 @@ export function deriveDsrView(
     dpoHandlerUserId: row.dpoHandlerUserId,
     processedByUserId: row.processedByUserId,
     closedByUserId: row.closedByUserId,
+    combinedDutyAct: combinedDutyActView(row.closureCombinedDutyAct),
     rejectionReason: row.rejectionReason,
     noOpenRetentionHoldConfirmedAt: row.noOpenRetentionHoldConfirmedAt
       ? row.noOpenRetentionHoldConfirmedAt.toISOString()

@@ -43,6 +43,8 @@ const DSRS = [
     dpoHandlerUserId: "user-1",
     processedByUserId: null,
     closedByUserId: null,
+    // The endpoint returns this now. Null here: nothing has closed this request at all.
+    combinedDutyAct: null,
     rejectionReason: null,
     isOverdue: false,
     createdAt: "2026-09-01T09:00:00.000Z",
@@ -64,6 +66,8 @@ const DSRS = [
     dpoHandlerUserId: "user-2",
     processedByUserId: "user-2",
     closedByUserId: "user-3",
+    // `user-2` processed it and `user-3` closed it — an ordinary TWO-PERSON closure, so no act.
+    combinedDutyAct: null,
     rejectionReason: null,
     isOverdue: false,
     createdAt: "2026-08-01T09:00:00.000Z",
@@ -308,4 +312,67 @@ test("dsr screen has no serious/critical accessibility violations @a11y", async 
       (v) => v.impact === "serious" || v.impact === "critical",
     ),
   ).toEqual([]);
+});
+
+/*
+ * THE COMBINED-DUTY ACT ON A DATA SUBJECT REQUEST — Part 4 step 5, the third pair to show it.
+ *
+ * `DataSubjectRequest_maker_checker_distinct` normally requires that whoever logs a statutory request
+ * is not whoever closes it. In an office that declared COMBINED mode one person may do both by stating
+ * why — and **a statutory request closed by its own logger is exactly what an auditor asks about**,
+ * which `closedByUserId` alone cannot say.
+ *
+ * The § 1.65 measurement is what makes this pair matter: the DPO holds `dsr.close`/`dsr.handle` and NOT
+ * `customer.update`, so the two-person split here is a deliberate segregation — and a record that
+ * quietly stopped honouring it should say so where the request is read.
+ */
+
+/** A closure performed by the SAME person who logged the request, with the reason they gave. */
+const SELF_CLOSED = {
+  ...DSRS[1],
+  id: "dsr-3",
+  closedByUserId: "user-2",
+  combinedDutyAct: {
+    id: "cda-dsr-1",
+    at: "2026-08-20T00:00:00.000Z",
+    actorUserId: "user-2",
+    reason: "Sole DPO on duty; request would otherwise have breached its statutory deadline.",
+    pair: "DataSubjectRequest_maker_checker_distinct",
+    roles: ["DATA_PROTECTION_OFFICER"],
+    hatAmbiguous: false,
+  },
+};
+
+test("shows on a request that one person both logged and closed it, and why", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await page.route("http://localhost:4000/dsr**", (route) =>
+    route.fulfill({ status: 200, json: [SELF_CLOSED] }),
+  );
+  await page.goto("/dsr");
+
+  const declared = page.getByTestId("combined-duty-dsr-dsr-3");
+  await expect(declared).toContainText("DATA_PROTECTION_OFFICER");
+  await expect(declared).toContainText("Sole DPO on duty");
+  // Tied to the database rule it excuses, so the record and the constraint cannot drift apart.
+  await expect(declared).toHaveAttribute(
+    "data-combined-duty-pair",
+    "DataSubjectRequest_maker_checker_distinct",
+  );
+});
+
+test("says nothing on a request closed by somebody other than its logger", async ({
+  page,
+}) => {
+  await mockAuth(page, ["DATA_PROTECTION_OFFICER"]);
+  await mockDsrs(page);
+  await page.goto("/dsr");
+
+  // Anchored on the CLOSED request rendering — the same read that would carry an act — so the absence
+  // cannot pass while that read is still in flight.
+  await expect(page.getByText("DELETION", { exact: false }).first()).toBeVisible();
+  await expect(page.getByTestId("combined-duty-dsr-dsr-2")).toHaveCount(0);
+  // And not on the open one either, which nothing has closed at all.
+  await expect(page.getByTestId("combined-duty-dsr-dsr-1")).toHaveCount(0);
 });

@@ -20,6 +20,10 @@ function row(
     id: 'dsr-1',
     customerId: 'cust-1',
     insuredPersonId: null,
+    // The read includes this relation now, so the fixture carries it. A fixture that omits a field
+    // the row type has is a fixture that lies — the compiler caught this one, which is the argument
+    // for the row type NOT making it optional just to keep the fixture quiet.
+    closureCombinedDutyAct: null,
     type: 'ACCESS',
     status: 'RECEIVED',
     receivedAt: new Date('2026-09-01T09:00:00.000Z'),

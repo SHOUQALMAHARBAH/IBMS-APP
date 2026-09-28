@@ -5016,13 +5016,20 @@ would assert something the system does not know.
     NO RENDER SITE FOUND — needs a placement decision before any code
       Settlement, CommissionLedgerEntry   (the same two, which is why they are first)
 
-    READ ALREADY CARRIES THE RELATION — a view field plus one component line
+    EVERY ONE NEEDS THE READ CHANGED — corrected 2026-09-29
       DataSharingApproval · DataProcessingAgreement · Recommendation ·
-      AccessRecertificationItem · IncidentReport
+      AccessRecertificationItem · IncidentReport · KYCRecord · DisposalBatch ·
+      NeedsAssessment (x2, two pairs on one model) · Complaint · DataSubjectRequest
 
-    READ MUST CHANGE TOO — an include, then the same two steps
-      KYCRecord · DisposalBatch · NeedsAssessment (x2, two pairs on one model) ·
-      Complaint · DataSubjectRequest
+**The "read already carries the relation" split above was WRONG, and the correction is the same
+mistake a third time.** Measured directly: `grep 'combinedDutyAct: true'` across every repository
+returns exactly TWO hits, and both are the pairs already built (`endorsement.repository.ts`,
+`policy.repository.ts`). **No other read includes the relation at all.** The column had matched files
+that WRITE `combinedDutyActId` — a scalar the service passes in — rather than files that READ the
+relation, which is precisely the error already recorded one section above about
+`policy-checking.repository.ts`. Writing the escape column and reading the act back are opposite
+directions, and a name-matched search cannot tell them apart. So each of the thirteen is three steps,
+not two: an `include`, a view field, one component line.
 
 **`KYCRecord` is flagged rather than scheduled**: projecting an act onto a KYC record is not
 screening work and does not extend it, but it sits in the KYC/AML area the deferral covers, and the

@@ -5,6 +5,7 @@
 // closure.
 
 import { apiGet, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export const DSR_TYPES = ['ACCESS', 'CORRECTION', 'DELETION', 'OBJECTION'] as const;
 
@@ -36,6 +37,14 @@ export interface DataSubjectRequest {
   dpoHandlerUserId: string | null;
   processedByUserId: string | null;
   closedByUserId: string | null;
+  /**
+   * Set when ONE person both logged and closed this request, in an office that declared COMBINED duty
+   * segregation and stated why. Null on every ordinary closure.
+   *
+   * A statutory request closed by its own logger is exactly what an auditor asks about, and
+   * `closedByUserId` alone cannot say it — Part 4 step 5, the act on the record.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   rejectionReason: string | null;
   noOpenRetentionHoldConfirmedAt: string | null;
   isOverdue: boolean;

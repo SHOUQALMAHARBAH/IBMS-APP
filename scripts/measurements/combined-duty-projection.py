@@ -82,6 +82,7 @@ def main():
     BY_ARGUMENT = {
         'e.refund.combinedDutyAct': 'Refund',
         'policy.checking.combinedDutyAct': 'PolicyChecking',
+        'row.closureCombinedDutyAct': 'DataSubjectRequest',
     }
 
     unmapped = [a.strip() for a in call_args if a.strip() not in BY_ARGUMENT]

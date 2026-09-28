@@ -30,6 +30,7 @@ import { pageStyle } from '../../../components/lead/lead.styles';
 import { hasAnyPermission } from '../../../lib/auth/permissions';
 import { useLanguage } from '../../../lib/i18n/language-context';
 import { DsrClockControl } from '../../../components/pdpl/DsrClockControl';
+import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
 
 const LOG_ROLES = [
   'dsr.log',
@@ -209,7 +210,19 @@ export default function DsrPage() {
                     </td>
                     <td style={cell}>
                       {d.status === 'CLOSED' ? (
-                        '—'
+                        /* A closed request has no actions left, so this cell held a bare em-dash.
+                           Part 4 step 5 — if ONE person both logged and closed it, that is the one
+                           thing still worth saying here, and `closedByUserId` alone cannot say it.
+                           Renders the em-dash when there is no act, which is every ordinary
+                           closure. */
+                        d.combinedDutyAct ? (
+                          <CombinedDutyOnRecord
+                            act={d.combinedDutyAct}
+                            testId={`combined-duty-dsr-${d.id}`}
+                          />
+                        ) : (
+                          '—'
+                        )
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: '18rem' }}>
                           {canHandle ? (
