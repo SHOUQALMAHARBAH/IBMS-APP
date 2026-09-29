@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, type FormEvent, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -18,15 +19,30 @@ const cell: CSSProperties = {
   borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
-const formStyle: CSSProperties = { margin: '1rem 0', display: 'grid', gap: '0.4rem', maxWidth: '26rem' };
-const labelStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.2rem' };
+const formStyle: CSSProperties = {
+  margin: '1rem 0',
+  display: 'grid',
+  gap: '0.4rem',
+  maxWidth: '26rem',
+};
+const labelStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.2rem',
+};
 
 function BreakdownTable({ rows }: { rows: PlanningExportBreakdownRow[] }) {
   const { t } = useLanguage();
   if (rows.length === 0) {
-    return <p style={{ color: 'var(--ink-secondary)' }}>{t('pexNoPolicies')}</p>;
+    return (
+      <p style={{ color: 'var(--ink-secondary)' }}>{t('pexNoPolicies')}</p>
+    );
   }
   return (
     <table style={{ borderCollapse: 'collapse', minWidth: '26rem' }}>
@@ -89,9 +105,7 @@ export default function PlanningExportPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('pexHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('pexIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('pexIntro')}</p>
 
       <form onSubmit={onGenerate} style={formStyle}>
         <label style={labelStyle}>
@@ -118,10 +132,11 @@ export default function PlanningExportPage() {
 
       {summary ? (
         <>
-          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-            Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)} —
-            market period {summary.periodLabel}.
-          </p>
+          <ReportProvenance
+            kind="generatedAtWithPeriod"
+            at={summary.generatedAt}
+            periodLabel={summary.periodLabel}
+          />
 
           <section style={sectionStyle}>
             <h2>{t('pexPortfolioByLine')}</h2>

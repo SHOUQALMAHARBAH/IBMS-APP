@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import {
@@ -18,7 +19,11 @@ const cell: CSSProperties = {
   borderBottom: '1px solid var(--border-subtle)',
   textAlign: 'start',
 };
-const head: CSSProperties = { ...cell, fontWeight: 600, borderBottom: '2px solid var(--border-default)' };
+const head: CSSProperties = {
+  ...cell,
+  fontWeight: 600,
+  borderBottom: '2px solid var(--border-default)',
+};
 const sectionStyle: CSSProperties = { margin: '1.75rem 0' };
 
 function BreakdownTable({ rows }: { rows: PortfolioBreakdownRow[] }) {
@@ -90,9 +95,7 @@ export default function PortfolioAnalysisPage() {
   return (
     <main style={pageStyle}>
       <h1>{t('paHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {t('paIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{t('paIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -102,9 +105,7 @@ export default function PortfolioAnalysisPage() {
 
       {summary ? (
         <>
-          <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem' }}>
-            Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
-          </p>
+          <ReportProvenance kind="generatedAt" at={summary.generatedAt} />
 
           <section style={sectionStyle}>
             <h2>{t('paByLine')}</h2>

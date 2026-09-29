@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { ReportProvenance } from '../../../components/ui/ReportProvenance';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth/auth-context';
 import { useLanguage } from '../../../lib/i18n/language-context';
@@ -123,16 +124,19 @@ export default function SlaDashboardPage() {
     }
   }, [messageFor, tr]);
 
-  const loadTimers = useCallback(async (state: SlaTimerStateFilter) => {
-    try {
-      setTimers(await getSlaDashboardTimers({ state }));
-    } catch (err) {
-      setTimers(null);
-      setLoadError((prev) =>
-        prev ?? messageFor(err, tr('slaDashTimerLoadError')),
-      );
-    }
-  }, [messageFor, tr]);
+  const loadTimers = useCallback(
+    async (state: SlaTimerStateFilter) => {
+      try {
+        setTimers(await getSlaDashboardTimers({ state }));
+      } catch (err) {
+        setTimers(null);
+        setLoadError(
+          (prev) => prev ?? messageFor(err, tr('slaDashTimerLoadError')),
+        );
+      }
+    },
+    [messageFor, tr],
+  );
 
   const doPause = useCallback(
     async (timerId: string, reason: string) => {
@@ -193,9 +197,7 @@ export default function SlaDashboardPage() {
   return (
     <main style={pageStyle}>
       <h1>{tr('slaDashHeading')}</h1>
-      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>
-        {tr('slaDashIntro')}
-      </p>
+      <p style={{ opacity: 0.75, maxWidth: '46rem' }}>{tr('slaDashIntro')}</p>
 
       {loadError ? (
         <p role="alert" style={errorStyle}>
@@ -210,18 +212,16 @@ export default function SlaDashboardPage() {
       ) : (
         <>
           <section style={sectionStyle}>
-            <div
-              style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}
-            >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
               <Stat label={tr('slaDashColTimers')} value={t!.total} />
               <Stat label={tr('slaDashOnTrack')} value={t!.onTrack} />
               <Stat label={tr('slaDashDueSoon')} value={t!.dueSoon} />
               <Stat label={tr('slaDashBreached')} value={t!.breached} />
               <Stat label={tr('slaDashEscalated')} value={t!.escalated} />
               {/* Shown unconditionally, including at zero. A paused clock is an
-                * exceptional state and "0 paused" is itself the reassurance a
-                * compliance reader wants; hiding the tile when empty would make
-                * its absence and the value 0 indistinguishable. */}
+               * exceptional state and "0 paused" is itself the reassurance a
+               * compliance reader wants; hiding the tile when empty would make
+               * its absence and the value 0 indistinguishable. */}
               <Stat label={tr('slaDashStatePaused')} value={t!.paused} />
               <Stat
                 label={tr('slaDashResolved')}
@@ -232,12 +232,25 @@ export default function SlaDashboardPage() {
                 value={`${(Number(t!.breachRate) * 100).toFixed(1)}%`}
               />
             </div>
-            <p style={{ color: 'var(--ink-secondary)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              &ldquo;Due soon&rdquo; = unresolved and due within{' '}
-              {formatSlaDuration(summary.dueSoonWindow)}. Breach rate =
-              late-or-breached over all timers that have reached a deadline.
-              Generated {summary.generatedAt.replace('T', ' ').slice(0, 16)}.
+            {/*
+              Item 5 batch 1. This paragraph was entirely hardcoded ENGLISH — not just the provenance
+              stamp my first sweep caught, but the two DEFINITIONS with it, which are the sentences that
+              make the two figures above readable at all. An Arabic reader got the numbers and none of the
+              explanation. Now two translated sentences plus the shared provenance line.
+            */}
+            <p
+              style={{
+                color: 'var(--ink-secondary)',
+                fontSize: '0.85rem',
+                marginTop: '0.5rem',
+              }}
+            >
+              {tr('slaDashDueSoonMeaning', {
+                window: formatSlaDuration(summary.dueSoonWindow),
+              })}{' '}
+              {tr('slaDashBreachRateMeaning')}
             </p>
+            <ReportProvenance kind="generatedAt" at={summary.generatedAt} />
           </section>
 
           <section style={sectionStyle}>
