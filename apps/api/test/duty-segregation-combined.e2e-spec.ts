@@ -571,11 +571,42 @@ describe('duty segregation — a declared combined act through the API (e2e)', (
         .set(bearer(one.accessToken))
         .send({})
         .expect(422);
-      await request(app.getHttpServer())
-        .post(`/needs-assessments/${assessmentId}/review`)
-        .set(bearer(one.accessToken))
-        .send({ combinedDutyReason: REASON })
-        .expect(201);
+      const reviewed = (
+        await request(app.getHttpServer())
+          .post(`/needs-assessments/${assessmentId}/review`)
+          .set(bearer(one.accessToken))
+          .send({ combinedDutyReason: REASON })
+          .expect(201)
+      ).body as Record<string, unknown>;
+
+      /*
+       * THE WIRE, AND THE PART THAT ONLY THIS PAIR CAN PROVE (Part 4 step 5).
+       *
+       * `NeedsAssessment` is the only table of the fifteen carrying TWO pairs, so the response carries two
+       * act fields and a declared REVIEW must fill exactly one of them. The database half is asserted
+       * below on the two escape columns; this is the same property on the wire, where the SCREEN reads it.
+       *
+       * Without this, a controller projecting one act into both fields would report the approval as
+       * doubled up when nobody has approved the assessment at all — and no Playwright test could see it,
+       * because the mock supplies the body.
+       */
+      const reviewerAct = reviewed.reviewerCombinedDutyAct as Record<
+        string,
+        unknown
+      > | null;
+      expect(reviewerAct).not.toBeNull();
+      expect(reviewerAct?.pair).toBe(
+        'NeedsAssessment_reviewer_maker_checker_distinct',
+      );
+      expect(reviewerAct?.reason).toBe(REASON);
+      expect(reviewerAct?.roles).toContain('BRANCH_DEPARTMENT_MANAGER');
+      // The raw Prisma spellings must be absent — § 1.80's defect, where the screen read `at`/`roles`
+      // against a body carrying `actedAt`/`grantingRoleNames` and rendered every field empty.
+      expect(reviewerAct).not.toHaveProperty('actedAt');
+      expect(reviewerAct).not.toHaveProperty('grantingRoleNames');
+      expect(reviewerAct).not.toHaveProperty('constraintName');
+      // AND THE OTHER PAIR SAYS NOTHING. Nobody has approved this assessment.
+      expect(reviewed.approverCombinedDutyAct).toBeNull();
     });
 
     // THIS IS WHAT THE SECOND PAIR PROVES: the act id reaches THAT PAIR'S OWN column. `NeedsAssessment`

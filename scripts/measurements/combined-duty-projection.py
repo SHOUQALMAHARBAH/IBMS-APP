@@ -61,24 +61,52 @@ FIELD = re.compile(r"(\w+):\s*(?:'([^']*)'|(true|false))")
 # collided with the first and the count stayed at 5 after the sixth pair was built. The file
 # disambiguates, and the collision is now impossible to express rather than something to notice.
 BY_CALL_SITE = {
-    ('endorsement.service.ts', 'e.refund.combinedDutyAct'): 'Refund',
-    ('policy.service.ts', 'policy.checking.combinedDutyAct'): 'PolicyChecking',
-    ('dsr.config.ts', 'row.closureCombinedDutyAct'): 'DataSubjectRequest',
-    ('commission.config.ts', 'row.combinedDutyAct'): 'CommissionLedgerEntry',
-    ('claim.config.ts', 's.combinedDutyAct'): 'Settlement',
-    ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord',
-    ('data-sharing-approval.config.ts', 'row.combinedDutyAct'): 'DataSharingApproval',
-    ('disposal-batch.config.ts', 'row.combinedDutyAct'): 'DisposalBatch',
+    ('endorsement.service.ts', 'e.refund.combinedDutyAct'): 'Refund_maker_checker_distinct',
+    ('policy.service.ts', 'policy.checking.combinedDutyAct'): 'PolicyChecking_maker_checker_distinct',
+    ('dsr.config.ts', 'row.closureCombinedDutyAct'): 'DataSubjectRequest_closure_maker_checker_distinct',
+    ('commission.config.ts', 'row.combinedDutyAct'): 'CommissionLedgerEntry_maker_checker_distinct',
+    ('claim.config.ts', 's.combinedDutyAct'): 'Settlement_maker_checker_distinct',
+    ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord_maker_checker_distinct',
+    ('data-sharing-approval.config.ts', 'row.combinedDutyAct'): 'DataSharingApproval_maker_checker_distinct',
+    ('disposal-batch.config.ts', 'row.combinedDutyAct'): 'DisposalBatch_maker_checker_distinct',
     # Two entries for ONE pair: this module has no view layer, so the controller projects — once for the
     # single-row handlers and once for the list. KYC is the other module shaped this way (§ 1.80).
-    ('data-processing-agreement.controller.ts', 'row.combinedDutyAct'): 'DataProcessingAgreement',
-    ('complaint.config.ts', 'row.closureCombinedDutyAct'): 'Complaint',
+    ('data-processing-agreement.controller.ts', 'row.combinedDutyAct'): 'DataProcessingAgreement_maker_checker_distinct',
+    ('complaint.config.ts', 'row.closureCombinedDutyAct'): 'Complaint_closure_maker_checker_distinct',
     (
         'incident.config.ts',
         'row.classificationCombinedDutyAct',
-    ): 'IncidentReport',
-    ('recommendation.service.ts', 'rec.combinedDutyAct'): 'Recommendation',
+    ): 'IncidentReport_classification_maker_checker_distinct',
+    ('recommendation.service.ts', 'rec.combinedDutyAct'): 'Recommendation_maker_checker_distinct',
+    # TWO rows for the two pairs on one table, which is what makes them separately countable. A controller
+    # projecting one act into both fields would still have two call sites and would still count as two —
+    # that property is pinned by the wire assertion in `duty-segregation-combined.e2e-spec.ts`, not here.
+    (
+        'needs-assessment.controller.ts',
+        'row.reviewerCombinedDutyAct',
+    ): 'NeedsAssessment_reviewer_maker_checker_distinct',
+    (
+        'needs-assessment.controller.ts',
+        'row.approverCombinedDutyAct',
+    ): 'NeedsAssessment_approver_maker_checker_distinct',
 }
+
+
+def key(pair):
+    """
+    A pair's identity is its CONSTRAINT, never its table.
+
+    `NeedsAssessment` carries TWO pairs — reviewer and approver — with two escape columns, deliberately,
+    because one shared column would let a declared combined REVIEW excuse a self-APPROVAL. Keying this
+    measurement on `entityType` collapses them, so it would report the table as projecting the moment one
+    of its two acts reached a screen. That is the schema's own rule broken in the measurement.
+    """
+    return pair['dbCheckConstraint']
+
+
+def label(pair):
+    """What a reader sees. The constraint name already distinguishes the two NeedsAssessment pairs."""
+    return pair['dbCheckConstraint']
 
 
 def read_sources():
@@ -128,22 +156,36 @@ def measure(sources):
     )
     projected = {BY_CALL_SITE[a] for a in call_args}
 
-    dormant = [p['entityType'] for p in pairs if p.get('dormant') == 'true']
-    live = [p['entityType'] for p in pairs if p.get('dormant') != 'true']
+    dormant = [label(p) for p in pairs if p.get('dormant') == 'true']
+    live = [p for p in pairs if p.get('dormant') != 'true']
 
     return {
         'pairs': len(pairs),
         'dormant': dormant,
         'live': len(live),
-        'projecting': sorted({e for e in live if e in projected}),
-        'writing_only': sorted([e for e in live if e not in projected]),
+        'projecting': sorted({label(p) for p in live if key(p) in projected}),
+        'writing_only': sorted([label(p) for p in live if key(p) not in projected]),
         'call_sites': len(call_args),
     }
 
 
 def report():
-    r = measure(read_sources())
+    sources = read_sources()
+    r = measure(sources)
     assert r['pairs'] == 15, 'expected 15 registered pairs, parsed %d' % r['pairs']
+
+    # A BY_CALL_SITE value must name a REAL constraint. Without this, a typo'd or reconstructed constraint
+    # name makes its pair read as UNPROJECTED while a screen is showing it — under-reporting, the direction
+    # that looks like honest remaining work. Two reconstructed names were caught exactly this way.
+    #
+    # It lives here and NOT in `measure()`: inside the measured seam it fired on the self-test's own first
+    # plant, which drops a pair from the registry on purpose.
+    known = {p['dbCheckConstraint'] for p in parse_pairs(sources[REGISTRY])}
+    bogus = sorted(v for v in set(BY_CALL_SITE.values()) if v not in known)
+    assert not bogus, (
+        'BY_CALL_SITE names %s, which is not a `dbCheckConstraint` in the registry. Copy the name from '
+        '`maker-checker-pairs.config.ts` rather than reconstructing it.' % bogus
+    )
 
     print('registered maker/checker pairs        %3d' % r['pairs'])
     print('  dormant (ESTIMATE — see header)     %3d' % len(r['dormant']))

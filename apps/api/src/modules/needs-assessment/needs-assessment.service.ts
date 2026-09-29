@@ -5,10 +5,10 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import type { NeedsAssessment } from '@ibms/db';
 import {
   NeedsAssessmentRepository,
   type NeedsAssessmentFilter,
+  type NeedsAssessmentWithActs,
 } from '../../repositories/needs-assessment.repository';
 import { RiskProfileRepository } from '../../repositories/risk-profile.repository';
 import { CustomerRepository } from '../../repositories/customer.repository';
@@ -97,7 +97,7 @@ export class NeedsAssessmentService {
   private async findVisible(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.assessments.findById(id);
     if (
       !assessment ||
@@ -111,7 +111,7 @@ export class NeedsAssessmentService {
   /** Re-read after a transition — WorkflowTransitionService.transition()
    * returns only the narrow `{ id, status }` shape (same pattern as
    * KycService.mustFind()). */
-  private async mustFind(id: string): Promise<NeedsAssessment> {
+  private async mustFind(id: string): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.assessments.findById(id);
     if (!assessment) {
       throw new NotFoundException(`NeedsAssessment ${id} not found`);
@@ -142,7 +142,7 @@ export class NeedsAssessmentService {
   async create(
     dto: CreateNeedsAssessmentDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     await this.assertRiskProfileVisible(dto.riskProfileId, actor);
 
     const answers = parseQuestionnaireAnswers(dto.questionnaireAnswers);
@@ -174,7 +174,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: UpdateNeedsAssessmentDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.findVisible(id, actor);
     // Only the capturer edits their own draft — a cross-owner viewer
     // (Placement/Manager/Exec) can read it but not rewrite the questionnaire.
@@ -206,7 +206,10 @@ export class NeedsAssessmentService {
   }
 
   /** DRAFT -> PENDING_REVIEW. Owner-only (needs-assessment.create). */
-  async submit(id: string, actor: AuthenticatedUser): Promise<NeedsAssessment> {
+  async submit(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.findVisible(id, actor);
     if (assessment.createdByUserId !== actor.id) {
       throw new NotFoundException('NeedsAssessment not found');
@@ -226,7 +229,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.mustFind(id);
     const combinedDutyActId = await this.dutySegregation.resolve({
       constraint: 'NeedsAssessment_reviewer_maker_checker_distinct',
@@ -261,7 +264,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: CombinedDutyDeclarationDto | undefined,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     const assessment = await this.mustFind(id);
     const combinedDutyActId = await this.dutySegregation.resolve({
       constraint: 'NeedsAssessment_approver_maker_checker_distinct',
@@ -303,7 +306,7 @@ export class NeedsAssessmentService {
     id: string,
     reason: string | undefined,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     await this.mustFind(id);
     if (!reason?.trim()) {
       throw new BadRequestException(
@@ -333,7 +336,7 @@ export class NeedsAssessmentService {
     id: string,
     dto: NeedsAssessmentDecisionDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment> {
+  ): Promise<NeedsAssessmentWithActs> {
     const reason = dto.reason;
     const assessment = await this.mustFind(id);
     // A THIRD APPLICATION-ONLY PAIR, found while wiring Part 4 and not in the two the plan recorded.
@@ -381,7 +384,7 @@ export class NeedsAssessmentService {
   list(
     query: ListNeedsAssessmentsQueryDto,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment[]> {
+  ): Promise<NeedsAssessmentWithActs[]> {
     const filter: NeedsAssessmentFilter = {
       riskProfileId: query.riskProfileId,
       status: query.status,
@@ -399,7 +402,7 @@ export class NeedsAssessmentService {
   async get(
     id: string,
     actor: AuthenticatedUser,
-  ): Promise<NeedsAssessment & { customerId: string }> {
+  ): Promise<NeedsAssessmentWithActs & { customerId: string }> {
     const assessment = await this.findVisible(id, actor);
     const riskProfile = await this.riskProfiles.findById(
       assessment.riskProfileId,
