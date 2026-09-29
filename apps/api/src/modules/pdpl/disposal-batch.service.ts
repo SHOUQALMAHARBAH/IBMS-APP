@@ -11,7 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import type { RecordAuditEntryInput } from '../audit/audit.service';
 import { SlaTimerService } from '../sla/sla-timer.service';
 import { WorkflowTransitionService } from '../workflow/workflow-transition.service';
-import { DisposalBatchRepository } from '../../repositories/disposal-batch.repository';
+import { DisposalBatchRepository , type DisposalBatchWithAct } from '../../repositories/disposal-batch.repository';
 import { LegalHoldRepository } from '../../repositories/legal-hold.repository';
 import {
   DISPOSAL_BATCH_SLA_WORKFLOW,
@@ -323,7 +323,7 @@ export class DisposalBatchService {
 
   // --- helpers -------------------------------------------------
 
-  private async load(id: string): Promise<DisposalBatch> {
+  private async load(id: string): Promise<DisposalBatchWithAct> {
     const row = await this.repo.findById(id);
     if (!row) {
       throw new NotFoundException(`Disposal batch ${id} not found.`);
@@ -331,7 +331,7 @@ export class DisposalBatchService {
     return row;
   }
 
-  private async toView(row: DisposalBatch): Promise<DisposalBatchView> {
+  private async toView(row: DisposalBatchWithAct): Promise<DisposalBatchView> {
     const certificate = await this.repo.findCertificateByBatchId(row.id);
     return deriveDisposalBatchView(row, certificate !== null);
   }

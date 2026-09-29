@@ -1,6 +1,7 @@
 'use client';
 
 import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { CombinedDutyOnRecord } from '../../../components/ui/CombinedDutyOnRecord';
 import { EntitySearch } from '../../../components/ui/EntitySearch';
 import { ENUM_LABEL } from '../../../lib/i18n/enum-labels';
 import { useRouter } from 'next/navigation';
@@ -479,7 +480,16 @@ export default function RetentionDisposalPage() {
                       <td style={cell}>
                         {b.retentionScheduleItemId ? b.retentionScheduleItemId.slice(0, 8) + '…' : '—'}
                       </td>
-                      <td style={cell}>{t(ENUM_LABEL.DisposalBatchStatus[b.status])}</td>
+                      <td style={cell}>
+                        {t(ENUM_LABEL.DisposalBatchStatus[b.status])}
+                        {/* Part 4 step 5 — in the STATUS cell, because the status says DPO_APPROVED
+                            whether one person or two agreed, and this pair authorises irreversible
+                            destruction of personal data. Shared renderer. */}
+                        <CombinedDutyOnRecord
+                          act={b.combinedDutyAct}
+                          testId={`combined-duty-disposal-${b.id}`}
+                        />
+                      </td>
                       <td style={cell}>{b.slaDueAt ? b.slaDueAt.slice(0, 10) : '—'}</td>
                       <td style={cell}>{b.hasCertificateOfDestruction ? t('rdAttached') : '—'}</td>
                       <td style={cell}>

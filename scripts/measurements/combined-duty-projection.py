@@ -68,6 +68,7 @@ BY_CALL_SITE = {
     ('claim.config.ts', 's.combinedDutyAct'): 'Settlement',
     ('kyc.controller.ts', 'row.combinedDutyAct'): 'KYCRecord',
     ('data-sharing-approval.config.ts', 'row.combinedDutyAct'): 'DataSharingApproval',
+    ('disposal-batch.config.ts', 'row.combinedDutyAct'): 'DisposalBatch',
 }
 
 

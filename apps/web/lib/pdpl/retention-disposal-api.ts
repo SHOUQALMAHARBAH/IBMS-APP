@@ -6,6 +6,7 @@
 // (DPO, checker) gate the dual-control disposal workflow.
 
 import { apiGet, apiPatch, apiPost } from '../auth/api-client';
+import type { CombinedDutyActOnRecord } from '../../components/ui/CombinedDutyOnRecord';
 
 export const DISPOSAL_METHODS = [
   'certified_secure_wipe_nist_800_88',
@@ -49,6 +50,14 @@ export interface DisposalBatch {
   nominatedByUserId: string;
   managerApprovedAt: string | null;
   dpoApprovedByUserId: string | null;
+  /**
+   * Set when ONE person both nominated this batch and approved it, in an office that declared COMBINED
+   * duty segregation and stated why. Null on every ordinary approval.
+   *
+   * This pair authorises IRREVERSIBLE DESTRUCTION of personal data, so whether two people agreed is the
+   * most load-bearing fact on the row — and the status column says DPO_APPROVED either way.
+   */
+  combinedDutyAct: CombinedDutyActOnRecord | null;
   dpoApprovedAt: string | null;
   method: string | null;
   executedAt: string | null;
