@@ -57,6 +57,12 @@ gate() {
 # gate proves every failure mode of `scripts/plant.mjs` is loud, including the original bug (invoked
 # with no plant name, it must exit non-zero rather than no-op).
 gate "Plant mechanism"     node scripts/plant.mjs --self-test
+# Same argument one level up, and it earned its place the same way. Three times in one session an
+# extraction matched NOTHING and the nothing read as a result — twice the ANSI codes vitest writes inside
+# its own summary line, once a lingering dev server that `CI=1` correctly refused while the grep swallowed
+# the message saying so. Blank is not zero. This gate proves an empty extraction is loud, and that
+# `--expect-fail` turns "the plant killed nothing" into a red rather than a line to read carefully.
+gate "Summary extractor"   node scripts/test-summary.mjs --self-test
 gate "Types"               npm run typecheck
 gate "Lint"                npm run lint
 gate "Unit Tests"          npm run test
